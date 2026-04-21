@@ -1,0 +1,31 @@
+target-version = "py311"
+line-length = 100
+extend-exclude = ["data", ".venv", "build", "dist"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "S",   # bandit
+    "SIM", # flake8-simplify
+    "RET", # flake8-return
+    "RUF", # ruff-specific
+]
+ignore = []
+
+[lint.per-file-ignores]
+"tests/**" = ["S101", "S106", "S107"]
+"scripts/**" = ["S603", "S607"]
+
+[lint.isort]
+known-first-party = ["audit"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

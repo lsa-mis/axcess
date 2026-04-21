@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Virtual environments
+.venv/
+venv/
+
+# Tool data (runtime state)
+data/audit.db
+data/audit.db-wal
+data/audit.db-shm
+data/blobs/
+data/logs/
+
+# Playwright
+playwright-report/
+test-results/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Environment
+.env
+.env.local
