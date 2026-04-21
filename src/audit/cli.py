@@ -40,6 +40,10 @@ def crawl(
         bool,
         typer.Option("--ignore-robots", help="Skip robots.txt (authorized testing only)."),
     ] = False,
+    skip_ocr: Annotated[
+        bool,
+        typer.Option("--skip-ocr", help="Skip OCR (fetch + image download only)."),
+    ] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose logging.")] = False,
 ) -> None:
     """Crawl a site and store page records in the audit DB."""
@@ -57,6 +61,11 @@ def crawl(
             ignore_robots=ignore_robots,
             user_agent=settings.user_agent,
             request_timeout_s=settings.request_timeout_s,
+            ocr_enabled=not skip_ocr,
+            ocr_language=settings.ocr_language,
+            ocr_max_workers=settings.ocr_max_workers,
+            ocr_min_confidence=settings.ocr_min_confidence,
+            ocr_min_word_count=settings.ocr_min_word_count,
         )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:
@@ -88,6 +97,9 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
         table.add_row("Inline SVG text hits", str(summary.svg_text_hits))
     if summary.image_errors:
         table.add_row("Image download errors", str(summary.image_errors))
+    if summary.ocr_analyzed:
+        table.add_row("Images OCR'd", str(summary.ocr_analyzed))
+        table.add_row("Text-candidate images", str(summary.ocr_text_candidates))
     table.add_row("Page errors", str(summary.errors))
     if summary.pages_skipped_robots:
         table.add_row("Skipped (robots.txt)", str(summary.pages_skipped_robots))

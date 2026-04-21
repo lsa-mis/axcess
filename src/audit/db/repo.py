@@ -90,6 +90,40 @@ def upsert_image(
     return int(row["id"])
 
 
+def upsert_analysis(
+    conn: sqlite3.Connection,
+    *,
+    image_id: int,
+    ocr_text: str | None,
+    ocr_confidence: float | None,
+    has_text: bool,
+    model_versions: dict[str, str],
+) -> int:
+    """Record an analysis for ``image_id``, keyed on ``(image_id, model_versions_json)``.
+
+    The model-versions JSON is canonical (sorted keys, no whitespace) so re-runs
+    with the same engine version dedupe onto the same row.
+    """
+    model_json = json.dumps(model_versions, sort_keys=True, separators=(",", ":"))
+    conn.execute(
+        """
+        INSERT INTO analyses (image_id, ocr_text, ocr_confidence, has_text, model_versions_json)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(image_id, model_versions_json) DO UPDATE SET
+            ocr_text = excluded.ocr_text,
+            ocr_confidence = excluded.ocr_confidence,
+            has_text = excluded.has_text,
+            analyzed_at = CURRENT_TIMESTAMP
+        """,
+        (image_id, ocr_text, ocr_confidence, 1 if has_text else 0, model_json),
+    )
+    row = conn.execute(
+        "SELECT id FROM analyses WHERE image_id = ? AND model_versions_json = ?",
+        (image_id, model_json),
+    ).fetchone()
+    return int(row["id"])
+
+
 def upsert_page_image(
     conn: sqlite3.Connection,
     *,

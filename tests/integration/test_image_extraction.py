@@ -102,14 +102,13 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
         config = CrawlConfig(seed_url=f"{base}/gallery.html", max_pages=5, rps=100.0, workers=1)
         asyncio.run(run_crawl(tmp_db, config))
 
-    # blank.png appears exactly once (same bytes, one hash).
+    # blank.png, blank@2x.png, text-banner.png → 3 distinct-bytes PNGs, deduped.
     row = tmp_db.execute("SELECT COUNT(*) AS n FROM images WHERE blob_path LIKE '%.png'").fetchone()
-    # blank.png, blank@2x.png — distinct bytes, distinct hashes: 2 rows.
-    assert row["n"] == 2
+    assert row["n"] == 3
 
-    # Confirm the blob store has exactly 2 PNG files too.
+    # Confirm the blob store has exactly 3 PNG files too.
     pngs = [p for p in blob_dir.rglob("*.png") if not p.name.endswith(".tmp")]
-    assert len(pngs) == 2
+    assert len(pngs) == 3
 
 
 def test_blob_store_contents_match_db(tmp_db: sqlite3.Connection, blob_dir: Path) -> None:

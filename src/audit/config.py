@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     request_timeout_s: float = 30.0
     user_agent: str = "imagetextscanner/0.1 (+local accessibility audit)"
 
-    # OCR thresholds (Phase 3)
+    # OCR (Phase 3)
+    ocr_language: str = "eng"
+    ocr_max_workers: int = 2
     ocr_min_confidence: float = 60.0
     ocr_min_word_count: int = 3
 

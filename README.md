@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.2 (Phase 2: image extraction)
+## Status — v0.3 (Phase 3: OCR)
 
 What works today:
 
@@ -32,11 +32,18 @@ What works today:
   are recorded as findings with `has_svg_text=1` (no blob needed).
 - **Content-addressed blob store** — images land at
   `data/blobs/<aa>/<sha256>.<ext>`, deduped across the whole site.
+- **OCR pass** — Tesseract (via `pytesseract`) runs in a
+  `ProcessPoolExecutor` in parallel with the crawl. Each downloaded
+  raster image is OCR'd; the mean per-word confidence and word count
+  are stored alongside the extracted text in the `analyses` table.
+  The text-candidate gate is `confidence >= 60.0 AND word_count >= 3`
+  (both configurable via `AUDIT_OCR_MIN_CONFIDENCE` / `AUDIT_OCR_MIN_WORD_COUNT`).
+  SVG and icon MIMEs are skipped. Pass `--skip-ocr` to disable entirely.
 - **CLI** — `audit crawl <url>` and `audit status` produce Rich summary
-  tables now including image and SVG-text counters.
+  tables with page, image, SVG-text, and OCR counters.
 
-Not yet implemented: CSS `background-image` extraction (Phase 2.5), OCR,
-VLM, finding synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction (Phase 2.5), VLM
+classifier, finding synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
 
 ## Try it
 

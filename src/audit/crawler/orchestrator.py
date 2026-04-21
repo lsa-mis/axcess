@@ -21,6 +21,7 @@ from urllib.parse import urljoin
 import httpx
 from selectolax.parser import HTMLParser
 
+from audit.analyzer.ocr.pool import OcrPool
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import url_policy
@@ -32,7 +33,7 @@ from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
 from audit.extractor.downloader import ImageDownloader
-from audit.extractor.pipeline import process_page
+from audit.extractor.pipeline import OcrConfig, process_page
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -52,6 +53,12 @@ class CrawlConfig:
     workers: int = 4
     user_agent: str = "imagetextscanner/0.1 (+local accessibility audit)"
     request_timeout_s: float = 30.0
+    # OCR — disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
+    ocr_enabled: bool = True
+    ocr_language: str = "eng"
+    ocr_max_workers: int = 2
+    ocr_min_confidence: float = 60.0
+    ocr_min_word_count: int = 3
 
 
 @dataclass
@@ -64,6 +71,8 @@ class CrawlSummary:
     images_persisted: int = 0
     svg_text_hits: int = 0
     image_errors: int = 0
+    ocr_analyzed: int = 0
+    ocr_text_candidates: int = 0
     status: str = "running"
     # Human-readable status reasons collected during the crawl.
     notes: list[str] = field(default_factory=list)
@@ -93,6 +102,16 @@ async def run_crawl(
     fetcher = StaticFetcher(client)
     blob_store = BlobStore(get_settings().blob_dir)
     downloader = ImageDownloader(client, blob_store)
+    ocr_pool: OcrPool | None = None
+    ocr_config: OcrConfig | None = None
+    if config.ocr_enabled:
+        ocr_pool = OcrPool(lang=config.ocr_language, max_workers=config.ocr_max_workers)
+        ocr_config = OcrConfig(
+            pool=ocr_pool,
+            blob_store=blob_store,
+            min_confidence=config.ocr_min_confidence,
+            min_word_count=config.ocr_min_word_count,
+        )
     ctx = _WorkerContext(
         conn=conn,
         config=config,
@@ -103,6 +122,7 @@ async def run_crawl(
         static=fetcher,
         js=js_fetcher,
         downloader=downloader,
+        ocr=ocr_config,
         in_flight=0,
         summary=summary,
     )
@@ -125,6 +145,8 @@ async def run_crawl(
         elif summary.status == "running":
             summary.status = "completed"
         _finalize_scan(conn, scan_id, summary)
+        if ocr_pool is not None:
+            ocr_pool.shutdown()
         if owned_client:
             with contextlib.suppress(Exception):
                 await client.aclose()
@@ -209,6 +231,7 @@ class _WorkerContext:
     static: StaticFetcher
     js: JsFetcher | None
     downloader: ImageDownloader
+    ocr: OcrConfig | None
     in_flight: int
     summary: CrawlSummary
 
@@ -278,10 +301,13 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             page_url=result.url,
             body=result.body,
             downloader=ctx.downloader,
+            ocr=ctx.ocr,
         )
         ctx.summary.images_persisted += extraction.images_persisted
         ctx.summary.svg_text_hits += extraction.svg_text_hits
         ctx.summary.image_errors += extraction.errors
+        ctx.summary.ocr_analyzed += extraction.ocr_analyzed
+        ctx.summary.ocr_text_candidates += extraction.ocr_text_candidates
 
     if not result.is_html or not result.is_ok:
         return
