@@ -21,10 +21,12 @@ def test_cli_help_runs() -> None:
     assert "status" in result.output
 
 
-def test_crawl_stub_exits_nonzero() -> None:
+def test_crawl_help_lists_flags() -> None:
     runner = CliRunner()
-    result = runner.invoke(cli.app, ["crawl", "https://example.com"])
-    assert result.exit_code != 0
+    result = runner.invoke(cli.app, ["crawl", "--help"])
+    assert result.exit_code == 0
+    assert "--max-pages" in result.output
+    assert "--ignore-robots" in result.output
 
 
 def test_settings_defaults() -> None:

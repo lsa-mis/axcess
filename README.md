@@ -2,18 +2,43 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.1 (Phase 0: scaffolding)
+## Status — v0.1 (Phase 1: crawl and store)
 
 What works today:
 
-- Repo scaffolded (src-layout, tests/, scripts/)
-- `uv` dependency management
-- ruff + mypy (strict) + pytest wired
-- SQLite schema defined in migration `0001_initial_schema.sql`
-- CLI stub: `audit --help` lists commands (no crawl behavior yet)
-- FastAPI health endpoint stub at `/health`
+- Repo scaffolded, `uv`-managed, ruff + mypy (strict) + pytest green (77 tests).
+- SQLite schema per `0001_initial_schema.sql`; WAL, FK on.
+- **URL policy** — deterministic normalization and registrable-domain scope
+  checks using an offline tldextract PSL snapshot.
+- **robots.txt** — per-origin cache with fail-open behavior on network errors;
+  `--ignore-robots` escape hatch for authorized testing.
+- **Sitemap** — `defusedxml` parsing of `urlset`/`sitemapindex` with recursion
+  cap; discovery unions robots-declared sitemaps with conventional paths.
+- **Job queue** — SQLite-backed with atomic `UPDATE … RETURNING` lease,
+  dedupe keys, retry budget, and `reclaim_expired` for crash recovery.
+- **Fetchers** — async httpx static fetcher (HTTP/2, Retry-After parsing)
+  plus Playwright chromium JS fetcher (shared browser, per-page contexts).
+- **Render heuristic** — escalates to JS on sparse DOM, `<noscript>` meta
+  refresh redirects, or empty SPA mount points.
+- **Rate limiting** — per-host semaphore + token-bucket RPS limiter.
+- **Orchestrator** — workers lease from queue, fetch, record pages, enqueue
+  in-scope links. Resumable after Ctrl-C or crash.
+- **CLI** — `audit crawl <url>` and `audit status` produce Rich summary tables.
 
-Not yet implemented: crawling, image extraction, OCR, VLM, finding synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md) for the phased roadmap.
+Not yet implemented: image extraction, OCR, VLM, finding synthesis, review
+UI, exports, rescans. See [PLAN.md](PLAN.md).
+
+## Try it
+
+```bash
+make setup
+make migrate
+# in one shell, serve the fixture site
+make fixture-site                    # → http://127.0.0.1:8000
+# in another shell
+uv run audit crawl http://127.0.0.1:8000 --max-pages 50
+uv run audit status
+```
 
 ## Requirements
 

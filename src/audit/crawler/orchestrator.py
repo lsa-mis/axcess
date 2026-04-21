@@ -1,0 +1,357 @@
+"""Top-level crawl orchestration.
+
+Seed URL → queue → workers → fetch → record page → enqueue in-scope links.
+Resumability comes from the SQLite-backed queue: an interrupted crawl leaves
+pending jobs behind, and a re-run under the same seed URL reuses the scan row
+and drains what's left.
+
+Phase 1 only records pages; image extraction arrives in Phase 2.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import hashlib
+import json
+import sqlite3
+from dataclasses import dataclass, field
+from urllib.parse import urljoin
+
+import httpx
+from selectolax.parser import HTMLParser
+
+from audit.crawler import url_policy
+from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
+from audit.crawler.js_fetcher import JsFetcher
+from audit.crawler.rate_limit import HostLimiter
+from audit.crawler.render_detect import is_js_only
+from audit.crawler.robots import RobotsChecker
+from audit.crawler.url_policy import HostScope
+from audit.db import queue
+from audit.logging import get_logger
+
+log = get_logger(__name__)
+
+JOB_KIND = "fetch"
+
+
+@dataclass(frozen=True)
+class CrawlConfig:
+    seed_url: str
+    max_pages: int = 500
+    max_depth: int = 10
+    allow_subdomains: bool = False
+    rps: float = 2.0
+    ignore_robots: bool = False
+    concurrency_per_host: int = 2
+    workers: int = 4
+    user_agent: str = "imagetextscanner/0.1 (+local accessibility audit)"
+    request_timeout_s: float = 30.0
+
+
+@dataclass
+class CrawlSummary:
+    scan_id: int
+    seed_url: str
+    pages_fetched: int = 0
+    pages_skipped_robots: int = 0
+    errors: int = 0
+    status: str = "running"
+    # Human-readable status reasons collected during the crawl.
+    notes: list[str] = field(default_factory=list)
+
+
+async def run_crawl(
+    conn: sqlite3.Connection,
+    config: CrawlConfig,
+    *,
+    http_client: httpx.AsyncClient | None = None,
+    js_fetcher: JsFetcher | None = None,
+) -> CrawlSummary:
+    """Execute (or resume) a crawl for ``config.seed_url``."""
+    normalized_seed = url_policy.normalize(config.seed_url)
+    scope = url_policy.build_scope(normalized_seed)
+
+    scan_id = _ensure_scan(conn, normalized_seed, config)
+    queue.reclaim_expired(conn)
+    _seed_queue(conn, scan_id, normalized_seed)
+
+    summary = CrawlSummary(scan_id=scan_id, seed_url=normalized_seed)
+    limiter = HostLimiter(rps=config.rps, concurrency_per_host=config.concurrency_per_host)
+
+    owned_client = http_client is None
+    client = http_client or _default_client(config)
+    robots = RobotsChecker(client, user_agent=config.user_agent)
+    fetcher = StaticFetcher(client)
+    ctx = _WorkerContext(
+        conn=conn,
+        config=config,
+        scope=scope,
+        scan_id=scan_id,
+        limiter=limiter,
+        robots=robots,
+        static=fetcher,
+        js=js_fetcher,
+        in_flight=0,
+        summary=summary,
+    )
+
+    interrupted = False
+    try:
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for _ in range(config.workers):
+                    tg.create_task(_worker(ctx))
+        except* asyncio.CancelledError:
+            interrupted = True
+    except asyncio.CancelledError:
+        interrupted = True
+        raise
+    finally:
+        if interrupted:
+            summary.status = "interrupted"
+            summary.notes.append("crawl interrupted")
+        elif summary.status == "running":
+            summary.status = "completed"
+        _finalize_scan(conn, scan_id, summary)
+        if owned_client:
+            with contextlib.suppress(Exception):
+                await client.aclose()
+
+    return summary
+
+
+def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=config.request_timeout_s,
+        headers={"User-Agent": config.user_agent},
+        http2=True,
+        max_redirects=10,
+    )
+
+
+def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
+    """Create (or resume) a scan row for ``seed_url``. Returns its id."""
+    row = conn.execute(
+        """
+        SELECT id FROM scans
+         WHERE seed_url = ? AND status IN ('running', 'interrupted')
+         ORDER BY id DESC
+         LIMIT 1
+        """,
+        (seed_url,),
+    ).fetchone()
+    if row is not None:
+        scan_id = int(row["id"])
+        conn.execute(
+            "UPDATE scans SET status = 'running' WHERE id = ?",
+            (scan_id,),
+        )
+        return scan_id
+
+    cur = conn.execute(
+        """
+        INSERT INTO scans (seed_url, status, config_json)
+        VALUES (?, 'running', ?)
+        """,
+        (seed_url, _config_json(config)),
+    )
+    return int(cur.lastrowid or 0)
+
+
+def _config_json(config: CrawlConfig) -> str:
+    return json.dumps(
+        {
+            "max_pages": config.max_pages,
+            "max_depth": config.max_depth,
+            "allow_subdomains": config.allow_subdomains,
+            "rps": config.rps,
+            "ignore_robots": config.ignore_robots,
+            "concurrency_per_host": config.concurrency_per_host,
+            "user_agent": config.user_agent,
+        },
+        sort_keys=True,
+    )
+
+
+def _seed_queue(conn: sqlite3.Connection, scan_id: int, seed_url: str) -> None:
+    queue.enqueue(
+        conn,
+        JOB_KIND,
+        {"url": seed_url, "depth": 0, "scan_id": scan_id},
+        dedupe_key=_dedupe_key(scan_id, seed_url),
+    )
+
+
+def _dedupe_key(scan_id: int, url: str) -> str:
+    return f"{JOB_KIND}:{scan_id}:{url}"
+
+
+@dataclass
+class _WorkerContext:
+    conn: sqlite3.Connection
+    config: CrawlConfig
+    scope: HostScope
+    scan_id: int
+    limiter: HostLimiter
+    robots: RobotsChecker
+    static: StaticFetcher
+    js: JsFetcher | None
+    in_flight: int
+    summary: CrawlSummary
+
+
+async def _worker(ctx: _WorkerContext) -> None:
+    """Lease and process jobs until both queue and peers are idle."""
+    while True:
+        if _page_limit_reached(ctx):
+            return
+        job = queue.lease(ctx.conn, JOB_KIND, lease_secs=120)
+        if job is None:
+            if ctx.in_flight == 0 and queue.pending_count(ctx.conn, JOB_KIND) == 0:
+                return
+            await asyncio.sleep(0.05)
+            continue
+        ctx.in_flight += 1
+        try:
+            await _process_job(ctx, job)
+            queue.complete(ctx.conn, job.id)
+        except Exception as exc:  # record and move on
+            log.warning("crawl.job_failed", id=job.id, error=str(exc))
+            queue.fail(ctx.conn, job.id, str(exc))
+            ctx.summary.errors += 1
+        finally:
+            ctx.in_flight -= 1
+
+
+def _page_limit_reached(ctx: _WorkerContext) -> bool:
+    return ctx.summary.pages_fetched >= ctx.config.max_pages
+
+
+async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
+    url: str = job.payload["url"]
+    depth: int = int(job.payload["depth"])
+
+    if not ctx.config.ignore_robots and not await ctx.robots.allowed(url):
+        ctx.summary.pages_skipped_robots += 1
+        return
+
+    async with ctx.limiter.throttle(url):
+        try:
+            result = await ctx.static.fetch(url)
+        except FetchError as exc:
+            log.warning("crawl.fetch_failed", url=url, error=str(exc))
+            ctx.summary.errors += 1
+            _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+            return
+
+    render_mode = "static"
+    if result.is_html and result.is_ok and ctx.js is not None and is_js_only(result.body):
+        try:
+            result = await ctx.js.fetch(url)
+            render_mode = "js"
+        except FetchError as exc:
+            log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+
+    _record_page(ctx, url, status_code=result.status_code, result=result, render_mode=render_mode)
+    ctx.summary.pages_fetched += 1
+
+    if not result.is_html or not result.is_ok:
+        return
+    if depth >= ctx.config.max_depth:
+        return
+    if _page_limit_reached(ctx):
+        return
+    _enqueue_children(ctx, base_url=result.url, body=result.body, depth=depth + 1)
+
+
+def _record_page(
+    ctx: _WorkerContext,
+    url: str,
+    *,
+    status_code: int | None,
+    result: FetchResult | None,
+    render_mode: str,
+) -> None:
+    title = _extract_title(result.body) if result and result.is_html else None
+    html_hash = hashlib.sha256(result.body).hexdigest() if result and result.body else None
+    ctx.conn.execute(
+        """
+        INSERT INTO pages (scan_id, url_normalized, status_code, title, render_mode, html_hash)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(scan_id, url_normalized) DO UPDATE SET
+            status_code = excluded.status_code,
+            title = excluded.title,
+            render_mode = excluded.render_mode,
+            html_hash = excluded.html_hash,
+            fetched_at = CURRENT_TIMESTAMP
+        """,
+        (ctx.scan_id, url, status_code, title, render_mode, html_hash),
+    )
+
+
+def _extract_title(body: bytes) -> str | None:
+    try:
+        tree = HTMLParser(body)
+    except Exception:  # selectolax can raise on exotic inputs
+        return None
+    node = tree.css_first("title")
+    if node is None:
+        return None
+    text = (node.text() or "").strip()
+    return text or None
+
+
+def _enqueue_children(
+    ctx: _WorkerContext,
+    *,
+    base_url: str,
+    body: bytes,
+    depth: int,
+) -> None:
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        return
+    seen: set[str] = set()
+    for anchor in tree.css("a[href]"):
+        href = anchor.attributes.get("href")
+        if not href:
+            continue
+        try:
+            absolute = urljoin(base_url, href)
+        except ValueError:
+            continue
+        normalized = url_policy.normalize(absolute)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        if not url_policy.is_in_scope(
+            normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
+        ):
+            continue
+        queue.enqueue(
+            ctx.conn,
+            JOB_KIND,
+            {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
+            dedupe_key=_dedupe_key(ctx.scan_id, normalized),
+        )
+
+
+def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary) -> None:
+    page_count = conn.execute(
+        "SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?",
+        (scan_id,),
+    ).fetchone()["n"]
+    conn.execute(
+        """
+        UPDATE scans
+           SET status = ?,
+               finished_at = CURRENT_TIMESTAMP,
+               page_count = ?,
+               error_count = ?
+         WHERE id = ?
+        """,
+        (summary.status, int(page_count), summary.errors, scan_id),
+    )
