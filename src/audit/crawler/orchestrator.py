@@ -21,6 +21,8 @@ from urllib.parse import urljoin
 import httpx
 from selectolax.parser import HTMLParser
 
+from audit.blob_store import BlobStore
+from audit.config import get_settings
 from audit.crawler import url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
@@ -28,7 +30,9 @@ from audit.crawler.rate_limit import HostLimiter
 from audit.crawler.render_detect import is_js_only
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
-from audit.db import queue
+from audit.db import queue, repo
+from audit.extractor.downloader import ImageDownloader
+from audit.extractor.pipeline import process_page
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -57,6 +61,9 @@ class CrawlSummary:
     pages_fetched: int = 0
     pages_skipped_robots: int = 0
     errors: int = 0
+    images_persisted: int = 0
+    svg_text_hits: int = 0
+    image_errors: int = 0
     status: str = "running"
     # Human-readable status reasons collected during the crawl.
     notes: list[str] = field(default_factory=list)
@@ -84,6 +91,8 @@ async def run_crawl(
     client = http_client or _default_client(config)
     robots = RobotsChecker(client, user_agent=config.user_agent)
     fetcher = StaticFetcher(client)
+    blob_store = BlobStore(get_settings().blob_dir)
+    downloader = ImageDownloader(client, blob_store)
     ctx = _WorkerContext(
         conn=conn,
         config=config,
@@ -93,6 +102,7 @@ async def run_crawl(
         robots=robots,
         static=fetcher,
         js=js_fetcher,
+        downloader=downloader,
         in_flight=0,
         summary=summary,
     )
@@ -198,6 +208,7 @@ class _WorkerContext:
     robots: RobotsChecker
     static: StaticFetcher
     js: JsFetcher | None
+    downloader: ImageDownloader
     in_flight: int
     summary: CrawlSummary
 
@@ -254,8 +265,23 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         except FetchError as exc:
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
 
-    _record_page(ctx, url, status_code=result.status_code, result=result, render_mode=render_mode)
+    page_id = _record_page(
+        ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
+    )
     ctx.summary.pages_fetched += 1
+
+    if result.is_html and result.is_ok and page_id is not None:
+        extraction = await process_page(
+            ctx.conn,
+            page_id=page_id,
+            scan_id=ctx.scan_id,
+            page_url=result.url,
+            body=result.body,
+            downloader=ctx.downloader,
+        )
+        ctx.summary.images_persisted += extraction.images_persisted
+        ctx.summary.svg_text_hits += extraction.svg_text_hits
+        ctx.summary.image_errors += extraction.errors
 
     if not result.is_html or not result.is_ok:
         return
@@ -273,21 +299,17 @@ def _record_page(
     status_code: int | None,
     result: FetchResult | None,
     render_mode: str,
-) -> None:
+) -> int | None:
     title = _extract_title(result.body) if result and result.is_html else None
     html_hash = hashlib.sha256(result.body).hexdigest() if result and result.body else None
-    ctx.conn.execute(
-        """
-        INSERT INTO pages (scan_id, url_normalized, status_code, title, render_mode, html_hash)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(scan_id, url_normalized) DO UPDATE SET
-            status_code = excluded.status_code,
-            title = excluded.title,
-            render_mode = excluded.render_mode,
-            html_hash = excluded.html_hash,
-            fetched_at = CURRENT_TIMESTAMP
-        """,
-        (ctx.scan_id, url, status_code, title, render_mode, html_hash),
+    return repo.upsert_page(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        url_normalized=url,
+        status_code=status_code,
+        title=title,
+        render_mode=render_mode,
+        html_hash=html_hash,
     )
 
 

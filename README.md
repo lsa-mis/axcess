@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.1 (Phase 1: crawl and store)
+## Status — v0.2 (Phase 2: image extraction)
 
 What works today:
 
@@ -23,10 +23,20 @@ What works today:
 - **Rate limiting** — per-host semaphore + token-bucket RPS limiter.
 - **Orchestrator** — workers lease from queue, fetch, record pages, enqueue
   in-scope links. Resumable after Ctrl-C or crash.
-- **CLI** — `audit crawl <url>` and `audit status` produce Rich summary tables.
+- **Image extraction** — pulls `<img>` (incl. `srcset`) and
+  `<picture><source>` refs from the rendered HTML; preserves the
+  missing-vs-empty-alt distinction, captures `aria-label`,
+  `aria-labelledby`, `role`, the nearest `<figcaption>`, and a
+  surrounding-text snippet.
+- **Inline SVG text** — top-level `<svg>` elements with visible `<text>`
+  are recorded as findings with `has_svg_text=1` (no blob needed).
+- **Content-addressed blob store** — images land at
+  `data/blobs/<aa>/<sha256>.<ext>`, deduped across the whole site.
+- **CLI** — `audit crawl <url>` and `audit status` produce Rich summary
+  tables now including image and SVG-text counters.
 
-Not yet implemented: image extraction, OCR, VLM, finding synthesis, review
-UI, exports, rescans. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction (Phase 2.5), OCR,
+VLM, finding synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
 
 ## Try it
 

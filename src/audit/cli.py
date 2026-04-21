@@ -83,7 +83,12 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     table.add_row("Status", summary.status)
     table.add_row("Pages fetched", str(summary.pages_fetched))
     table.add_row("Pages in DB", str(row["page_count"] if row else 0))
-    table.add_row("Errors", str(summary.errors))
+    table.add_row("Images persisted", str(summary.images_persisted))
+    if summary.svg_text_hits:
+        table.add_row("Inline SVG text hits", str(summary.svg_text_hits))
+    if summary.image_errors:
+        table.add_row("Image download errors", str(summary.image_errors))
+    table.add_row("Page errors", str(summary.errors))
     if summary.pages_skipped_robots:
         table.add_row("Skipped (robots.txt)", str(summary.pages_skipped_robots))
     console.print(table)
