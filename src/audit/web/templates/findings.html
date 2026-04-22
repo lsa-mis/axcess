@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Findings — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <h2>Findings — Scan #{{ scan.id }}</h2>
+  <p class="subtle">{{ scan.seed_url }}</p>
+
+  <search>
+    <form
+      class="filters"
+      hx-get="/scans/{{ scan.id }}/findings"
+      hx-target="#findings-list"
+      hx-push-url="true"
+      hx-trigger="submit, change from:select, keyup from:input delay:300ms"
+    >
+      <label>
+        Severity
+        <select name="severity">
+          <option value="">any</option>
+          {% for level in ("critical", "major", "minor", "info") %}
+            <option value="{{ level }}" {% if filters.severity == level %}selected{% endif %}>{{ level }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Status
+        <select name="status">
+          <option value="">any</option>
+          {% for opt in status_options %}
+            <option value="{{ opt }}" {% if filters.status == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Classification
+        <select name="classification">
+          <option value="">any</option>
+          {% for opt in classification_options %}
+            <option value="{{ opt }}" {% if filters.classification == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Search
+        <input
+          type="search"
+          name="q"
+          value="{{ filters.q or '' }}"
+          placeholder="URL, alt, or OCR text…"
+          data-filter-focus
+          aria-label="Filter findings"
+        >
+      </label>
+      <button type="submit">Apply</button>
+    </form>
+  </search>
+
+  <div id="findings-list">
+    {% include "partials/findings_table.html" %}
+  </div>
+{% endblock %}

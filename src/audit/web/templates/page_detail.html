@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Page — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <p><a href="/scans/{{ scan.id }}/findings">← Back to findings</a></p>
+  <h2>Page #{{ page.id }}</h2>
+  <p class="subtle">
+    <a href="{{ page.url_normalized }}" rel="noopener noreferrer">{{ page.url_normalized }}</a>
+  </p>
+
+  <dl class="meta">
+    <dt>Title</dt><dd>{{ page.title or "—" }}</dd>
+    <dt>Status code</dt><dd>{{ page.status_code or "—" }}</dd>
+    <dt>Render mode</dt><dd>{{ page.render_mode }}</dd>
+    <dt>Fetched at</dt><dd>{{ page.fetched_at }}</dd>
+  </dl>
+
+  <h3>Images on this page</h3>
+  {% if not page_images %}
+    <p>No images recorded for this page.</p>
+  {% else %}
+  <table class="data" aria-label="Images on this page">
+    <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Image</th>
+        <th scope="col">Alt</th>
+        <th scope="col">Finding</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in page_images %}
+      <tr>
+        <td>{{ row.position }}</td>
+        <td>
+          {% if row.finding_id %}
+            <a href="/findings/{{ row.finding_id }}">{{ row.src_url_short }}</a>
+          {% else %}
+            {{ row.src_url_short }}
+          {% endif %}
+        </td>
+        <td>
+          {% if row.alt_text is none %}
+            <em class="subtle">missing</em>
+          {% elif row.alt_text == "" %}
+            <em class="subtle">(empty)</em>
+          {% else %}
+            {{ row.alt_text }}
+          {% endif %}
+        </td>
+        <td>
+          {% if row.severity %}
+            <span class="sev sev-{{ row.severity }}">{{ row.severity }}</span>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+{% endblock %}

@@ -170,6 +170,29 @@ def synthesize(
 
 
 @app.command()
+def serve(
+    host: Annotated[str, typer.Option("--host", help="Bind address.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", min=1, max=65535, help="Bind port.")] = 8765,
+    reload: Annotated[bool, typer.Option("--reload", help="Auto-reload on code change.")] = False,
+) -> None:
+    """Serve the local review UI at http://HOST:PORT."""
+    import uvicorn
+
+    settings = get_settings()
+    settings.ensure_dirs()
+    console.print(
+        f"[cyan]Audit UI[/cyan] serving at http://{host}:{port}  (db: {settings.db_path})"
+    )
+    uvicorn.run(
+        "audit.web.server:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="warning",
+    )
+
+
+@app.command()
 def status() -> None:
     """Show status of the latest scan."""
     settings = get_settings()

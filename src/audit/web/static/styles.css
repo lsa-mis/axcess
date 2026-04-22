@@ -1,0 +1,235 @@
+/* Hand-written CSS for the audit review UI. Kept minimal — no framework —
+   so the a11y audit surface stays small and offline footprint is tiny. */
+
+:root {
+  color-scheme: light dark;
+  --fg: #1a1a1a;
+  --bg: #fafafa;
+  --fg-muted: #555;
+  --border: #d0d0d0;
+  --accent: #0059a8;
+  --accent-fg: #ffffff;
+  --focus: #ffb020;
+  --row-hover: #eef5ff;
+  --severity-critical-bg: #8b0000;
+  --severity-major-bg: #b15a00;
+  --severity-minor-bg: #7a7a00;
+  --severity-info-bg: #4a4a4a;
+  --space: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #ececec;
+    --bg: #121212;
+    --fg-muted: #a0a0a0;
+    --border: #3a3a3a;
+    --accent: #4aa3ff;
+    --accent-fg: #0a0a0a;
+    --focus: #ffcc33;
+    --row-hover: #1f2a3a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+/* Skip link — visible on focus only. Kept above every other landmark. */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: var(--space);
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  z-index: 100;
+  transition: top 0.1s ease-in;
+}
+.skip-link:focus { top: var(--space); }
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link { transition: none; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Visible focus ring — never removed, always distinct. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+a { color: var(--accent); }
+a:hover, a:focus-visible { text-decoration: underline; }
+
+header.site {
+  border-bottom: 1px solid var(--border);
+  padding: var(--space);
+  background: var(--bg);
+}
+header.site h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+header.site nav ul {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+header.site nav a {
+  text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+}
+header.site nav a[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+main {
+  padding: var(--space);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+h2, h3 { margin-top: 0; }
+
+.subtle { color: var(--fg-muted); font-size: 0.9rem; }
+
+/* Tables — our primary data surface. */
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space) 0;
+}
+table.data th,
+table.data td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+table.data th { font-weight: 600; background: color-mix(in srgb, var(--bg) 85%, var(--fg) 15%); }
+table.data tr:hover td { background: var(--row-hover); }
+table.data tr[aria-current="true"] td {
+  background: var(--row-hover);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Severity badges — use different backgrounds + text labels
+   (color-only would fail WCAG 1.4.1). */
+.sev {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+.sev-critical { background: var(--severity-critical-bg); }
+.sev-major    { background: var(--severity-major-bg); }
+.sev-minor    { background: var(--severity-minor-bg); }
+.sev-info     { background: var(--severity-info-bg); }
+
+/* Search / filter bar */
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space);
+}
+.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--fg-muted); }
+.filters input,
+.filters select,
+.filters button {
+  font-size: 0.95rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.filters button {
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+  border-color: transparent;
+}
+.filters button:hover { filter: brightness(1.1); }
+
+/* Finding detail layout */
+.finding-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 40%) 1fr;
+  gap: 2rem;
+}
+@media (max-width: 800px) {
+  .finding-layout { grid-template-columns: 1fr; }
+}
+.finding-layout img.preview {
+  max-width: 100%;
+  max-height: 480px;
+  border: 1px solid var(--border);
+  background: repeating-conic-gradient(#e8e8e8 0 25%, transparent 0 50%) 0 0/20px 20px;
+}
+dl.meta { margin: 0; }
+dl.meta dt { font-weight: 600; margin-top: 0.5rem; }
+dl.meta dd { margin: 0.2rem 0 0 0; color: var(--fg-muted); }
+dl.meta dd .rationale { color: var(--fg); font-style: italic; }
+
+/* Keyboard help */
+kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+footer.site {
+  border-top: 1px solid var(--border);
+  padding: var(--space);
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.status-form { display: inline-flex; gap: 0.5rem; align-items: center; }
+.status-form select { padding: 0.3rem; }
+
+/* Small pagination nav */
+nav.pagination {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: var(--space);
+}
+nav.pagination a,
+nav.pagination span {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  text-decoration: none;
+}
+nav.pagination a[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Finding #{{ finding.id }} — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <p><a href="/scans/{{ scan.id }}/findings">← Back to findings</a></p>
+  <h2>
+    <span class="sev sev-{{ finding.severity }}">{{ finding.severity }}</span>
+    Finding #{{ finding.id }}
+  </h2>
+
+  <section class="finding-layout" aria-label="Finding details">
+    <div>
+      {% if finding.blob_path %}
+        <img
+          class="preview"
+          src="/blobs/{{ finding.content_hash }}"
+          alt="Image under audit"
+          width="{{ finding.width or '' }}"
+          height="{{ finding.height or '' }}"
+        >
+      {% elif finding.has_svg_text %}
+        <p class="subtle">Inline SVG (no blob stored).</p>
+      {% else %}
+        <p class="subtle">No image blob available.</p>
+      {% endif %}
+    </div>
+
+    <div>
+      <dl class="meta">
+        <dt>Priority score</dt>
+        <dd>{{ "%.2f"|format(finding.priority_score) }}</dd>
+
+        <dt>Classification</dt>
+        <dd>{{ finding.vlm_classification or "—" }}</dd>
+
+        <dt>Alt adequacy</dt>
+        <dd>{{ finding.alt_adequacy or "—" }}</dd>
+
+        <dt>WCAG criterion</dt>
+        <dd>{{ finding.wcag_criterion }}</dd>
+
+        {% if finding.ocr_text %}
+        <dt>OCR text (confidence {{ "%.1f"|format(finding.ocr_confidence) }})</dt>
+        <dd>{{ finding.ocr_text }}</dd>
+        {% endif %}
+
+        {% if finding.vlm_rationale %}
+        <dt>VLM rationale</dt>
+        <dd class="rationale">{{ finding.vlm_rationale }}</dd>
+        {% endif %}
+
+        <dt>Remediation hint</dt>
+        <dd>{{ finding.remediation_hint or "—" }}</dd>
+      </dl>
+
+      <h3>Status</h3>
+      <form
+        class="status-form"
+        hx-post="/findings/{{ finding.id }}/status"
+        hx-target="#status-feedback"
+        hx-swap="innerHTML"
+      >
+        <label for="status-select">
+          <span class="visually-hidden">Status</span>
+        </label>
+        <select id="status-select" name="status" data-status-select>
+          {% for opt in status_options %}
+            <option value="{{ opt }}" {% if finding.status == opt %}selected{% endif %}>{{ opt }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Save</button>
+      </form>
+      <p id="status-feedback" role="status" aria-live="polite"></p>
+
+      {% if occurrences %}
+      <h3>Occurrences ({{ occurrences|length }})</h3>
+      <table class="data" aria-label="Occurrences of this image">
+        <thead><tr><th scope="col">Page</th><th scope="col">Alt text</th><th scope="col">Above fold</th></tr></thead>
+        <tbody>
+          {% for occ in occurrences %}
+          <tr>
+            <td><a href="/pages/{{ occ.page_id }}">{{ occ.page_url|truncate(60) }}</a></td>
+            <td>
+              {% if occ.alt_text is none %}
+                <em class="subtle">missing</em>
+              {% elif occ.alt_text == "" %}
+                <em class="subtle">(empty)</em>
+              {% else %}
+                {{ occ.alt_text }}
+              {% endif %}
+            </td>
+            <td>{{ "yes" if occ.above_fold else "no" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

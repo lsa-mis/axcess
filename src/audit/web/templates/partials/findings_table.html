@@ -1,0 +1,57 @@
+{% if not findings %}
+  <p>No findings match the current filters.</p>
+{% else %}
+<table class="data" aria-label="Findings">
+  <thead>
+    <tr>
+      <th scope="col">Severity</th>
+      <th scope="col">Score</th>
+      <th scope="col">Classification</th>
+      <th scope="col">Alt adequacy</th>
+      <th scope="col">Image</th>
+      <th scope="col">OCR text</th>
+      <th scope="col">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for f in findings %}
+    <tr data-finding-id="{{ f.id }}">
+      <td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td>
+      <td>{{ "%.2f"|format(f.priority_score) }}</td>
+      <td>{{ f.vlm_classification or "—" }}</td>
+      <td>{{ f.alt_adequacy or "—" }}</td>
+      <td>
+        <a href="/findings/{{ f.id }}">{{ f.src_url_short }}</a>
+      </td>
+      <td class="subtle">
+        {% if f.ocr_text %}
+          {{ f.ocr_text|truncate(60) }}
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td>{{ f.status }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if pagination.total_pages > 1 %}
+<nav class="pagination" aria-label="Findings pagination">
+  <a href="?{{ pagination.prev_qs }}"
+     hx-get="/scans/{{ scan.id }}/findings?{{ pagination.prev_qs }}"
+     hx-target="#findings-list"
+     hx-push-url="true"
+     aria-disabled="{{ 'true' if pagination.page <= 1 else 'false' }}"
+     rel="prev">← Prev</a>
+  <span aria-current="page">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+  <a href="?{{ pagination.next_qs }}"
+     hx-get="/scans/{{ scan.id }}/findings?{{ pagination.next_qs }}"
+     hx-target="#findings-list"
+     hx-push-url="true"
+     aria-disabled="{{ 'true' if pagination.page >= pagination.total_pages else 'false' }}"
+     rel="next">Next →</a>
+  <span class="subtle">{{ pagination.total }} total</span>
+</nav>
+{% endif %}
+{% endif %}

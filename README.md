@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.5 (Phase 5: finding synthesis)
+## Status — v0.6 (Phase 6: review UI)
 
 What works today:
 
@@ -64,23 +64,37 @@ What works today:
     stomp human-set `status` values; re-synthesizing with
     `audit synthesize [scan_id]` refreshes scores and hints.
   - Pass `--skip-synthesize` to crawl only and run synthesis later.
-- **CLI** — `audit crawl <url>`, `audit synthesize`, and `audit status`
-  produce Rich summary tables with page, image, SVG-text, OCR, VLM, and
-  finding-by-severity counters.
+- **Review UI** — FastAPI + HTMX + Jinja + hand-written CSS, served at
+  `127.0.0.1:8765` via `audit serve`. Views: scan list, scan detail
+  with severity breakdown, filterable/paginated findings list, finding
+  detail with image preview and OCR/VLM metadata, per-page image
+  inventory. HTMX partials for filter-as-you-type with `hx-push-url`
+  so back/forward still work. Status workflow with a confirmation
+  prompt for destructive transitions (`remediated`, `accepted_risk`,
+  `false_positive`). Keyboard shortcuts: `j/k` next/prev finding,
+  `Enter` to open, `/` focus filter, `s` focus status dropdown,
+  `?` help. Zero axe-core WCAG 2.1 AA violations on every view.
+  Dark-mode + prefers-reduced-motion honored. Content-hash-validated
+  `/blobs/{hash}` for image previews.
+- **CLI** — `audit crawl <url>`, `audit synthesize`, `audit serve`,
+  and `audit status`. Summary tables cover pages, images, SVG-text,
+  OCR, VLM, and finding-by-severity counters.
 
-Not yet implemented: CSS `background-image` extraction (Phase 2.5), review
-UI, exports, rescans. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction (Phase 2.5),
+exports, rescans. See [PLAN.md](PLAN.md).
 
 ## Try it
 
 ```bash
 make setup
 make migrate
-# in one shell, serve the fixture site
+# Shell 1 — fixture site
 make fixture-site                    # → http://127.0.0.1:8000
-# in another shell
+# Shell 2 — crawl it
 uv run audit crawl http://127.0.0.1:8000 --max-pages 50
 uv run audit status
+# Shell 2 — open the review UI
+uv run audit serve                   # → http://127.0.0.1:8765
 ```
 
 ## Requirements

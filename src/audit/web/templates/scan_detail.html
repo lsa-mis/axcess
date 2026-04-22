@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Scan #{{ scan.id }} — Image Text Audit{% endblock %}
+{% block content %}
+  <h2>Scan #{{ scan.id }}</h2>
+  <p class="subtle">{{ scan.seed_url }}</p>
+
+  <dl class="meta" aria-label="Scan metadata">
+    <dt>Status</dt><dd>{{ scan.status }}</dd>
+    <dt>Started</dt><dd>{{ scan.started_at }}</dd>
+    <dt>Finished</dt><dd>{{ scan.finished_at or "—" }}</dd>
+    <dt>Pages</dt><dd>{{ scan.page_count }}</dd>
+    <dt>Findings</dt>
+    <dd>
+      {% if scan.finding_count %}
+        <a href="/scans/{{ scan.id }}/findings">{{ scan.finding_count }}</a>
+      {% else %}
+        0
+      {% endif %}
+    </dd>
+  </dl>
+
+  {% if by_severity %}
+  <h3>Findings by severity</h3>
+  <table class="data" aria-label="Severity breakdown">
+    <thead><tr><th scope="col">Severity</th><th scope="col">Count</th></tr></thead>
+    <tbody>
+    {% for level in ("critical", "major", "minor", "info") %}
+      {% if by_severity.get(level) %}
+      <tr>
+        <td><span class="sev sev-{{ level }}">{{ level }}</span></td>
+        <td>
+          <a href="/scans/{{ scan.id }}/findings?severity={{ level }}">
+            {{ by_severity[level] }}
+          </a>
+        </td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <p><a href="/scans/{{ scan.id }}/findings">All findings →</a></p>
+{% endblock %}
