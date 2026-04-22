@@ -142,6 +142,44 @@ def upsert_analysis(
     return int(row["id"])
 
 
+def upsert_finding(
+    conn: sqlite3.Connection,
+    *,
+    image_id: int,
+    scan_id: int,
+    severity: str,
+    priority_score: float,
+    remediation_hint: str | None,
+    wcag_criterion: str = "1.4.5",
+) -> int:
+    """Idempotent upsert on ``(image_id, scan_id)``. Returns the finding id.
+
+    Preserves human-set status/notes on repeat runs: only the system-owned
+    fields (severity, priority_score, remediation_hint, wcag_criterion) are
+    refreshed on conflict.
+    """
+    conn.execute(
+        """
+        INSERT INTO findings (
+            image_id, scan_id, severity, wcag_criterion, priority_score, remediation_hint
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(image_id, scan_id) DO UPDATE SET
+            severity = excluded.severity,
+            priority_score = excluded.priority_score,
+            remediation_hint = excluded.remediation_hint,
+            wcag_criterion = excluded.wcag_criterion,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (image_id, scan_id, severity, wcag_criterion, priority_score, remediation_hint),
+    )
+    row = conn.execute(
+        "SELECT id FROM findings WHERE image_id = ? AND scan_id = ?",
+        (image_id, scan_id),
+    ).fetchone()
+    return int(row["id"])
+
+
 def upsert_page_image(
     conn: sqlite3.Connection,
     *,

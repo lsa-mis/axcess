@@ -37,6 +37,7 @@ from audit.db import queue, repo
 from audit.extractor.downloader import ImageDownloader
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
+from audit.synthesizer.findings import synthesize_findings
 
 log = get_logger(__name__)
 
@@ -67,6 +68,9 @@ class CrawlConfig:
     vlm_base_url: str = "http://localhost:11434"
     vlm_prompt_name: str = "classify_v1.txt"
     vlm_concurrency: int = 1
+    # Synthesis — toggle off with ``--skip-synthesize`` if the caller wants
+    # to run ``audit synthesize`` manually against the same scan later.
+    synthesize_enabled: bool = True
 
 
 @dataclass
@@ -83,6 +87,10 @@ class CrawlSummary:
     ocr_text_candidates: int = 0
     vlm_classified: int = 0
     vlm_errors: int = 0
+    findings_written: int = 0
+    findings_by_severity: dict[str, int] = field(
+        default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
+    )
     status: str = "running"
     # Human-readable status reasons collected during the crawl.
     notes: list[str] = field(default_factory=list)
@@ -157,6 +165,17 @@ async def run_crawl(
             summary.notes.append("crawl interrupted")
         elif summary.status == "running":
             summary.status = "completed"
+        if (
+            summary.status == "completed"
+            and config.synthesize_enabled
+            and summary.pages_fetched > 0
+        ):
+            try:
+                synth = synthesize_findings(conn, scan_id=scan_id)
+                summary.findings_written = synth.findings_written
+                summary.findings_by_severity = synth.by_severity
+            except Exception as exc:
+                log.warning("synthesize.failed", scan_id=scan_id, error=str(exc))
         _finalize_scan(conn, scan_id, summary)
         if ocr_pool is not None:
             ocr_pool.shutdown()

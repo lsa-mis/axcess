@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.4 (Phase 4: VLM classification)
+## Status — v0.5 (Phase 5: finding synthesis)
 
 What works today:
 
@@ -49,11 +49,27 @@ What works today:
   backoff. If the Ollama daemon is unreachable or the model isn't
   pulled, the crawler logs `vlm.unavailable` and completes without VLM.
   Pass `--skip-vlm` to opt out explicitly.
-- **CLI** — `audit crawl <url>` and `audit status` produce Rich summary
-  tables with page, image, SVG-text, OCR, and VLM counters.
+- **Finding synthesis** — end-of-crawl (or via `audit synthesize`):
+  - `alt_compare` normalizes alt and visible text (lowercase, strip
+    punctuation, collapse whitespace) and uses `rapidfuzz` token-set
+    ratio plus substring checks to bucket adequacy as `missing |
+    inadequate | partial | adequate`.
+  - `priority_score = classification_weight + alt_adequacy_weight +
+    log1p(occurrence_count) + (above_fold ? 1 : 0)`, mapped to
+    severity `critical >=8 | major >=5 | minor >=2 | info`.
+  - Remediation hints live in `src/audit/rules/remediation.yaml`, keyed
+    on `(classification, adequacy)` with a `*` fallback for inline SVG
+    text and other cases with no VLM label.
+  - Findings are upserted on `(image_id, scan_id)` so re-runs don't
+    stomp human-set `status` values; re-synthesizing with
+    `audit synthesize [scan_id]` refreshes scores and hints.
+  - Pass `--skip-synthesize` to crawl only and run synthesis later.
+- **CLI** — `audit crawl <url>`, `audit synthesize`, and `audit status`
+  produce Rich summary tables with page, image, SVG-text, OCR, VLM, and
+  finding-by-severity counters.
 
-Not yet implemented: CSS `background-image` extraction (Phase 2.5), finding
-synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction (Phase 2.5), review
+UI, exports, rescans. See [PLAN.md](PLAN.md).
 
 ## Try it
 

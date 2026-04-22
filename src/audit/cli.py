@@ -12,6 +12,7 @@ from rich.table import Table
 from audit.config import get_settings
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
+from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
     help="Local offline web accessibility auditor for WCAG 1.4.5 (Images of Text).",
@@ -48,6 +49,13 @@ def crawl(
         bool,
         typer.Option("--skip-vlm", help="Skip VLM classification stage."),
     ] = False,
+    skip_synthesize: Annotated[
+        bool,
+        typer.Option(
+            "--skip-synthesize",
+            help="Skip end-of-crawl finding synthesis. Run `audit synthesize` later.",
+        ),
+    ] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose logging.")] = False,
 ) -> None:
     """Crawl a site and store page records in the audit DB."""
@@ -75,6 +83,7 @@ def crawl(
             vlm_base_url=settings.ollama_base_url,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=settings.vlm_concurrency,
+            synthesize_enabled=not skip_synthesize,
         )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:
@@ -113,10 +122,51 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
         table.add_row("Images VLM-classified", str(summary.vlm_classified))
     if summary.vlm_errors:
         table.add_row("VLM errors", str(summary.vlm_errors))
+    if summary.findings_written:
+        table.add_row("Findings written", str(summary.findings_written))
+        for level in ("critical", "major", "minor", "info"):
+            count = summary.findings_by_severity.get(level, 0)
+            if count:
+                table.add_row(f"  {level}", str(count))
     table.add_row("Page errors", str(summary.errors))
     if summary.pages_skipped_robots:
         table.add_row("Skipped (robots.txt)", str(summary.pages_skipped_robots))
     console.print(table)
+
+
+@app.command()
+def synthesize(
+    scan_id: Annotated[
+        int | None,
+        typer.Argument(help="Scan id to re-synthesize. Defaults to the latest scan."),
+    ] = None,
+) -> None:
+    """Re-compute findings for a scan without re-crawling."""
+    settings = get_settings()
+    conn = connect(settings.db_path)
+    try:
+        if scan_id is None:
+            row = conn.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1").fetchone()
+            if row is None:
+                console.print("[yellow]No scans in the database.[/yellow]")
+                raise typer.Exit(code=1)
+            scan_id = int(row["id"])
+
+        result = synthesize_findings(conn, scan_id=scan_id)
+        conn.execute(
+            "UPDATE scans SET finding_count = ? WHERE id = ?",
+            (result.findings_written, scan_id),
+        )
+
+        table = Table(title=f"Synthesis complete (scan #{scan_id})", show_header=False)
+        table.add_column("metric", style="bold")
+        table.add_column("value", justify="right")
+        table.add_row("Findings written", str(result.findings_written))
+        for level in ("critical", "major", "minor", "info"):
+            table.add_row(f"  {level}", str(result.by_severity.get(level, 0)))
+        console.print(table)
+    finally:
+        conn.close()
 
 
 @app.command()
@@ -126,9 +176,16 @@ def status() -> None:
     conn = connect(settings.db_path)
     try:
         row = conn.execute(
-            "SELECT id, seed_url, status, page_count, error_count, started_at, finished_at "
-            "FROM scans ORDER BY id DESC LIMIT 1"
+            "SELECT id, seed_url, status, page_count, error_count, finding_count, "
+            "started_at, finished_at FROM scans ORDER BY id DESC LIMIT 1"
         ).fetchone()
+        severities: dict[str, int] = {}
+        if row is not None:
+            cur = conn.execute(
+                "SELECT severity, COUNT(*) AS n FROM findings WHERE scan_id = ? GROUP BY severity",
+                (row["id"],),
+            )
+            severities = {r["severity"]: int(r["n"]) for r in cur}
     finally:
         conn.close()
 
@@ -143,6 +200,10 @@ def status() -> None:
     table.add_row("Status", row["status"])
     table.add_row("Pages", str(row["page_count"]))
     table.add_row("Errors", str(row["error_count"]))
+    table.add_row("Findings", str(row["finding_count"]))
+    for level in ("critical", "major", "minor", "info"):
+        if severities.get(level):
+            table.add_row(f"  {level}", str(severities[level]))
     table.add_row("Started", str(row["started_at"]))
     table.add_row("Finished", str(row["finished_at"] or "-"))
     console.print(table)

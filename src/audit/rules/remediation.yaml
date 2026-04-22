@@ -1,0 +1,155 @@
+# Remediation hints keyed on (vlm_classification, alt_adequacy).
+# Matched in order — first match wins; the fallback entry at the bottom
+# handles any combo not named above.
+
+rules:
+  # Essential — image IS text and the text is load-bearing.
+  - classification: essential
+    adequacy: missing
+    hint: >-
+      This image contains essential text but has no alt attribute. Replace it
+      with real HTML text or add alt="" plus visible text on the page. Minimum:
+      set alt to the image's full visible text.
+
+  - classification: essential
+    adequacy: inadequate
+    hint: >-
+      The alt is empty or unrelated to the essential text in the image.
+      Update alt to include every word shown, or replace the image with real
+      HTML text so it can be zoomed and styled.
+
+  - classification: essential
+    adequacy: partial
+    hint: >-
+      The alt covers only part of the essential text. Complete it so the
+      alternative text conveys the full meaning, or swap the image for real
+      HTML text.
+
+  - classification: essential
+    adequacy: adequate
+    hint: >-
+      Alt matches the visible text, but essential text should be real HTML so
+      users can zoom, translate, and select it. Consider replacing the image.
+
+  # Informational — image has text that enriches surrounding content.
+  - classification: informational
+    adequacy: missing
+    hint: >-
+      Informational image is missing alt. Add alt summarizing the information
+      the image conveys (not just the words inside).
+
+  - classification: informational
+    adequacy: inadequate
+    hint: >-
+      Empty or mismatched alt on an informational image. Summarize the key
+      information so screen-reader users aren't excluded.
+
+  - classification: informational
+    adequacy: partial
+    hint: >-
+      Alt captures some of the information. Expand it to cover the chart
+      labels or call-outs currently missing.
+
+  - classification: informational
+    adequacy: adequate
+    hint: >-
+      Alt summarizes the visible text. For longer content, consider a linked
+      long description (aria-describedby) and real HTML for labels.
+
+  # Logo — brand mark or wordmark.
+  - classification: logo
+    adequacy: missing
+    hint: >-
+      Logo is missing alt. Set alt to the brand name (e.g. "Acme"). If the
+      logo is also a link, describe the destination.
+
+  - classification: logo
+    adequacy: inadequate
+    hint: >-
+      Alt on a logo should be the brand name. An empty alt hides the brand
+      from screen-reader users; update it.
+
+  - classification: logo
+    adequacy: partial
+    hint: >-
+      Alt is close but missing the brand name. Use the canonical brand
+      (e.g. "Acme Corp") so assistive tech reads it consistently.
+
+  - classification: logo
+    adequacy: adequate
+    hint: >-
+      Good — logo alt names the brand. No action required.
+
+  # Decorative — text in image is stylistic; same info is in page text.
+  - classification: decorative
+    adequacy: missing
+    hint: >-
+      Decorative image is missing alt. Add alt="" (or role="presentation")
+      to hide it from assistive tech.
+
+  - classification: decorative
+    adequacy: inadequate
+    hint: >-
+      Good: alt="" is correct for decorative images. Confirm the text is
+      truly decorative (same info elsewhere on the page) and add
+      role="presentation" for extra clarity.
+
+  - classification: decorative
+    adequacy: partial
+    hint: >-
+      Decorative image has a partial alt. If the text is purely stylistic,
+      set alt="" instead.
+
+  - classification: decorative
+    adequacy: adequate
+    hint: >-
+      Alt matches the decorative text. If the same info is already in the
+      page, switch to alt="" to avoid duplicate announcements.
+
+  # No meaningful text — likely OCR false positive.
+  - classification: no_meaningful_text
+    adequacy: missing
+    hint: >-
+      Image has no intentional text. Review whether alt is needed at all; if
+      the image is decorative, add alt="".
+
+  - classification: no_meaningful_text
+    adequacy: inadequate
+    hint: >-
+      Likely OCR false positive — no meaningful text in the image. Confirm
+      and, if truly decorative, keep alt="".
+
+  - classification: no_meaningful_text
+    adequacy: partial
+    hint: >-
+      Likely OCR false positive. Review the image and update alt based on
+      its actual content.
+
+  - classification: no_meaningful_text
+    adequacy: adequate
+    hint: >-
+      Likely OCR false positive. No action required.
+
+  # Fallback — used when the VLM wasn't run (SVG text, etc.)
+  - classification: "*"
+    adequacy: missing
+    hint: >-
+      Image contains text but has no alt attribute. Add alt conveying the
+      image's text, or mark it decorative with alt="".
+
+  - classification: "*"
+    adequacy: inadequate
+    hint: >-
+      Alt is missing or doesn't match the image's visible text. Update it to
+      reflect the text in the image.
+
+  - classification: "*"
+    adequacy: partial
+    hint: >-
+      Alt captures part of the image's text. Expand it to cover all visible
+      words.
+
+  - classification: "*"
+    adequacy: adequate
+    hint: >-
+      Alt matches the image's text. No action required.
