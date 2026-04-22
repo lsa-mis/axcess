@@ -44,6 +44,10 @@ def crawl(
         bool,
         typer.Option("--skip-ocr", help="Skip OCR (fetch + image download only)."),
     ] = False,
+    skip_vlm: Annotated[
+        bool,
+        typer.Option("--skip-vlm", help="Skip VLM classification stage."),
+    ] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose logging.")] = False,
 ) -> None:
     """Crawl a site and store page records in the audit DB."""
@@ -66,6 +70,11 @@ def crawl(
             ocr_max_workers=settings.ocr_max_workers,
             ocr_min_confidence=settings.ocr_min_confidence,
             ocr_min_word_count=settings.ocr_min_word_count,
+            vlm_enabled=not skip_vlm,
+            vlm_model=settings.vlm_model,
+            vlm_base_url=settings.ollama_base_url,
+            vlm_prompt_name=settings.vlm_prompt_name,
+            vlm_concurrency=settings.vlm_concurrency,
         )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:
@@ -100,6 +109,10 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     if summary.ocr_analyzed:
         table.add_row("Images OCR'd", str(summary.ocr_analyzed))
         table.add_row("Text-candidate images", str(summary.ocr_text_candidates))
+    if summary.vlm_classified:
+        table.add_row("Images VLM-classified", str(summary.vlm_classified))
+    if summary.vlm_errors:
+        table.add_row("VLM errors", str(summary.vlm_errors))
     table.add_row("Page errors", str(summary.errors))
     if summary.pages_skipped_robots:
         table.add_row("Skipped (robots.txt)", str(summary.pages_skipped_robots))

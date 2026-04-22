@@ -53,7 +53,7 @@ def _page_urls(conn: sqlite3.Connection, scan_id: int) -> set[str]:
 
 def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=base, max_pages=50, rps=100.0, workers=2)
+        config = CrawlConfig(seed_url=base, max_pages=50, rps=100.0, workers=2, vlm_enabled=False)
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     assert summary.status == "completed"
@@ -75,7 +75,7 @@ def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
 
 def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=base, max_pages=2, rps=100.0, workers=1)
+        config = CrawlConfig(seed_url=base, max_pages=2, rps=100.0, workers=1, vlm_enabled=False)
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     # Workers can overshoot slightly because the limit check is cooperative;
@@ -86,7 +86,7 @@ def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
 
 def test_crawl_skips_out_of_scope_and_non_http(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=base, max_pages=50, rps=100.0, workers=2)
+        config = CrawlConfig(seed_url=base, max_pages=50, rps=100.0, workers=2, vlm_enabled=False)
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     urls = _page_urls(tmp_db, summary.scan_id)
@@ -115,7 +115,10 @@ def test_crawl_resumes_interrupted_scan(tmp_db: sqlite3.Connection) -> None:
         assert queue.pending_count(tmp_db, "fetch") == 3
 
         summary = asyncio.run(
-            run_crawl(tmp_db, CrawlConfig(seed_url=seed, max_pages=50, rps=100.0, workers=2))
+            run_crawl(
+                tmp_db,
+                CrawlConfig(seed_url=seed, max_pages=50, rps=100.0, workers=2, vlm_enabled=False),
+            )
         )
 
     assert summary.scan_id == scan_id  # resumed, not a new scan
@@ -137,7 +140,7 @@ def test_crawl_interrupt_mid_run_leaves_queue_intact(tmp_db: sqlite3.Connection)
             task = asyncio.create_task(
                 run_crawl(
                     tmp_db,
-                    CrawlConfig(seed_url=seed, max_pages=50, rps=1.0, workers=1),
+                    CrawlConfig(seed_url=seed, max_pages=50, rps=1.0, workers=1, vlm_enabled=False),
                 )
             )
             await asyncio.sleep(0.2)
@@ -157,7 +160,7 @@ def test_crawl_interrupt_mid_run_leaves_queue_intact(tmp_db: sqlite3.Connection)
 
 def test_crawl_records_html_hash_and_title(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=base, max_pages=10, rps=100.0, workers=2)
+        config = CrawlConfig(seed_url=base, max_pages=10, rps=100.0, workers=2, vlm_enabled=False)
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     row = tmp_db.execute(

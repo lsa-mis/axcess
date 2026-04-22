@@ -22,6 +22,8 @@ import httpx
 from selectolax.parser import HTMLParser
 
 from audit.analyzer.ocr.pool import OcrPool
+from audit.analyzer.vlm.base import VlmProvider
+from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import url_policy
@@ -33,7 +35,7 @@ from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
 from audit.extractor.downloader import ImageDownloader
-from audit.extractor.pipeline import OcrConfig, process_page
+from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -59,6 +61,12 @@ class CrawlConfig:
     ocr_max_workers: int = 2
     ocr_min_confidence: float = 60.0
     ocr_min_word_count: int = 3
+    # VLM — disabled unless Ollama is reachable and the model is loaded.
+    vlm_enabled: bool = True
+    vlm_model: str = "qwen2-vl:2b"
+    vlm_base_url: str = "http://localhost:11434"
+    vlm_prompt_name: str = "classify_v1.txt"
+    vlm_concurrency: int = 1
 
 
 @dataclass
@@ -73,6 +81,8 @@ class CrawlSummary:
     image_errors: int = 0
     ocr_analyzed: int = 0
     ocr_text_candidates: int = 0
+    vlm_classified: int = 0
+    vlm_errors: int = 0
     status: str = "running"
     # Human-readable status reasons collected during the crawl.
     notes: list[str] = field(default_factory=list)
@@ -84,6 +94,7 @@ async def run_crawl(
     *,
     http_client: httpx.AsyncClient | None = None,
     js_fetcher: JsFetcher | None = None,
+    vlm_provider: VlmProvider | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``."""
     normalized_seed = url_policy.normalize(config.seed_url)
@@ -112,6 +123,7 @@ async def run_crawl(
             min_confidence=config.ocr_min_confidence,
             min_word_count=config.ocr_min_word_count,
         )
+    vlm_config = await _build_vlm(config, client, vlm_provider)
     ctx = _WorkerContext(
         conn=conn,
         config=config,
@@ -123,6 +135,7 @@ async def run_crawl(
         js=js_fetcher,
         downloader=downloader,
         ocr=ocr_config,
+        vlm=vlm_config,
         in_flight=0,
         summary=summary,
     )
@@ -232,8 +245,37 @@ class _WorkerContext:
     js: JsFetcher | None
     downloader: ImageDownloader
     ocr: OcrConfig | None
+    vlm: VlmConfig | None
     in_flight: int
     summary: CrawlSummary
+
+
+async def _build_vlm(
+    config: CrawlConfig,
+    client: httpx.AsyncClient,
+    provider: VlmProvider | None,
+) -> VlmConfig | None:
+    """Resolve a :class:`VlmConfig` or log a reason for skipping."""
+    if not config.vlm_enabled:
+        return None
+    if provider is not None:
+        return VlmConfig(provider=provider)
+    ollama = OllamaProvider(
+        client,
+        model=config.vlm_model,
+        base_url=config.vlm_base_url,
+        prompt_name=config.vlm_prompt_name,
+        concurrency=config.vlm_concurrency,
+    )
+    if not await ollama.healthy():
+        log.warning(
+            "vlm.unavailable",
+            model=config.vlm_model,
+            base_url=config.vlm_base_url,
+            hint="Ollama daemon not running or model not pulled; continuing without VLM.",
+        )
+        return None
+    return VlmConfig(provider=ollama)
 
 
 async def _worker(ctx: _WorkerContext) -> None:
@@ -302,12 +344,15 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             body=result.body,
             downloader=ctx.downloader,
             ocr=ctx.ocr,
+            vlm=ctx.vlm,
         )
         ctx.summary.images_persisted += extraction.images_persisted
         ctx.summary.svg_text_hits += extraction.svg_text_hits
         ctx.summary.image_errors += extraction.errors
         ctx.summary.ocr_analyzed += extraction.ocr_analyzed
         ctx.summary.ocr_text_candidates += extraction.ocr_text_candidates
+        ctx.summary.vlm_classified += extraction.vlm_classified
+        ctx.summary.vlm_errors += extraction.vlm_errors
 
     if not result.is_html or not result.is_ok:
         return

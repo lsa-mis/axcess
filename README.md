@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.3 (Phase 3: OCR)
+## Status — v0.4 (Phase 4: VLM classification)
 
 What works today:
 
@@ -39,11 +39,21 @@ What works today:
   The text-candidate gate is `confidence >= 60.0 AND word_count >= 3`
   (both configurable via `AUDIT_OCR_MIN_CONFIDENCE` / `AUDIT_OCR_MIN_WORD_COUNT`).
   SVG and icon MIMEs are skipped. Pass `--skip-ocr` to disable entirely.
+- **VLM classification** — only OCR text-candidate images reach the VLM.
+  `OllamaProvider` POSTs to a local `/api/generate` with the image
+  base64-encoded and a content-hashed prompt (default
+  `classify_v1.txt`). Returns one of `essential | informational | logo |
+  decorative | no_meaningful_text` plus a rationale, merged into the
+  same `analyses` row with combined `{ocr, vlm, prompt}` versioning.
+  Transient HTTP errors (408/429/5xx) are retried with exponential
+  backoff. If the Ollama daemon is unreachable or the model isn't
+  pulled, the crawler logs `vlm.unavailable` and completes without VLM.
+  Pass `--skip-vlm` to opt out explicitly.
 - **CLI** — `audit crawl <url>` and `audit status` produce Rich summary
-  tables with page, image, SVG-text, and OCR counters.
+  tables with page, image, SVG-text, OCR, and VLM counters.
 
-Not yet implemented: CSS `background-image` extraction (Phase 2.5), VLM
-classifier, finding synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction (Phase 2.5), finding
+synthesis, review UI, exports, rescans. See [PLAN.md](PLAN.md).
 
 ## Try it
 

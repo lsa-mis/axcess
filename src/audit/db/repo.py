@@ -94,28 +94,46 @@ def upsert_analysis(
     conn: sqlite3.Connection,
     *,
     image_id: int,
-    ocr_text: str | None,
-    ocr_confidence: float | None,
-    has_text: bool,
+    ocr_text: str | None = None,
+    ocr_confidence: float | None = None,
+    vlm_classification: str | None = None,
+    vlm_rationale: str | None = None,
+    has_text: bool = False,
     model_versions: dict[str, str],
 ) -> int:
     """Record an analysis for ``image_id``, keyed on ``(image_id, model_versions_json)``.
 
     The model-versions JSON is canonical (sorted keys, no whitespace) so re-runs
-    with the same engine version dedupe onto the same row.
+    with the same engine version dedupe onto the same row. Fields are merged on
+    conflict with ``COALESCE`` so an OCR-only row can later be upgraded in place
+    with a VLM classification.
     """
     model_json = json.dumps(model_versions, sort_keys=True, separators=(",", ":"))
     conn.execute(
         """
-        INSERT INTO analyses (image_id, ocr_text, ocr_confidence, has_text, model_versions_json)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO analyses (
+            image_id, ocr_text, ocr_confidence,
+            vlm_classification, vlm_rationale,
+            has_text, model_versions_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(image_id, model_versions_json) DO UPDATE SET
-            ocr_text = excluded.ocr_text,
-            ocr_confidence = excluded.ocr_confidence,
-            has_text = excluded.has_text,
+            ocr_text = COALESCE(excluded.ocr_text, analyses.ocr_text),
+            ocr_confidence = COALESCE(excluded.ocr_confidence, analyses.ocr_confidence),
+            vlm_classification = COALESCE(excluded.vlm_classification, analyses.vlm_classification),
+            vlm_rationale = COALESCE(excluded.vlm_rationale, analyses.vlm_rationale),
+            has_text = MAX(excluded.has_text, analyses.has_text),
             analyzed_at = CURRENT_TIMESTAMP
         """,
-        (image_id, ocr_text, ocr_confidence, 1 if has_text else 0, model_json),
+        (
+            image_id,
+            ocr_text,
+            ocr_confidence,
+            vlm_classification,
+            vlm_rationale,
+            1 if has_text else 0,
+            model_json,
+        ),
     )
     row = conn.execute(
         "SELECT id FROM analyses WHERE image_id = ? AND model_versions_json = ?",

@@ -63,6 +63,7 @@ def _config(base: str, **overrides: object) -> CrawlConfig:
         "rps": 100.0,
         "workers": 2,
         "ocr_max_workers": 0,  # in-process for test determinism
+        "vlm_enabled": False,
     }
     defaults.update(overrides)
     return CrawlConfig(**defaults)  # type: ignore[arg-type]

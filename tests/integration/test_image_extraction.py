@@ -53,7 +53,13 @@ def test_gallery_page_persists_images_and_svg_text(
     tmp_db: sqlite3.Connection, blob_dir: Path
 ) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=f"{base}/gallery.html", max_pages=5, rps=100.0, workers=2)
+        config = CrawlConfig(
+            seed_url=f"{base}/gallery.html",
+            max_pages=5,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+        )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     assert summary.status == "completed"
@@ -99,7 +105,13 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
 ) -> None:
     """srcset 1x and picture source both reference blank@2x.png; only one images row."""
     with _serve() as base:
-        config = CrawlConfig(seed_url=f"{base}/gallery.html", max_pages=5, rps=100.0, workers=1)
+        config = CrawlConfig(
+            seed_url=f"{base}/gallery.html",
+            max_pages=5,
+            rps=100.0,
+            workers=1,
+            vlm_enabled=False,
+        )
         asyncio.run(run_crawl(tmp_db, config))
 
     # blank.png, blank@2x.png, text-banner.png → 3 distinct-bytes PNGs, deduped.
@@ -113,7 +125,13 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
 
 def test_blob_store_contents_match_db(tmp_db: sqlite3.Connection, blob_dir: Path) -> None:
     with _serve() as base:
-        config = CrawlConfig(seed_url=f"{base}/gallery.html", max_pages=5, rps=100.0, workers=1)
+        config = CrawlConfig(
+            seed_url=f"{base}/gallery.html",
+            max_pages=5,
+            rps=100.0,
+            workers=1,
+            vlm_enabled=False,
+        )
         asyncio.run(run_crawl(tmp_db, config))
 
     store = BlobStore(blob_dir)

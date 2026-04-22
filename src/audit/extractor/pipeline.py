@@ -24,10 +24,12 @@ import sqlite3
 from dataclasses import dataclass
 
 from audit.analyzer.ocr.pool import OcrPool
+from audit.analyzer.vlm.base import Classification, ClassifyContext, VlmProvider
+from audit.analyzer.vlm.ollama import VlmError
 from audit.blob_store import BlobStore
 from audit.db import repo
 from audit.extractor.downloader import DownloadedImage, ImageDownloader, ImageDownloadError
-from audit.extractor.html_images import extract_image_refs
+from audit.extractor.html_images import ImageRef, extract_image_refs
 from audit.extractor.svg_text import find_inline_svg_text
 from audit.logging import get_logger
 
@@ -47,11 +49,20 @@ class OcrConfig:
 
 
 @dataclass
+class VlmConfig:
+    """Wiring needed to run the VLM stage against OCR text-candidate images."""
+
+    provider: VlmProvider
+
+
+@dataclass
 class PageExtractionResult:
     images_persisted: int = 0
     svg_text_hits: int = 0
     ocr_analyzed: int = 0
     ocr_text_candidates: int = 0
+    vlm_classified: int = 0
+    vlm_errors: int = 0
     errors: int = 0
 
 
@@ -64,10 +75,14 @@ async def process_page(
     body: bytes,
     downloader: ImageDownloader,
     ocr: OcrConfig | None = None,
+    vlm: VlmConfig | None = None,
 ) -> PageExtractionResult:
-    """Extract, download, OCR, and persist every image referenced by ``body``."""
+    """Extract, download, OCR, VLM-classify, and persist every image in ``body``."""
     result = PageExtractionResult()
     ocr_tasks: list[asyncio.Task[_OcrOutcome]] = []
+    # Keep per-image context (ref + download) keyed on image_id so the VLM
+    # stage can fetch the bytes and build the ClassifyContext.
+    ctx_by_image: dict[int, _ImageWork] = {}
 
     refs = extract_image_refs(body, page_url)
     for ref in refs:
@@ -102,6 +117,7 @@ async def process_page(
         result.images_persisted += 1
 
         if ocr is not None and _should_ocr(downloaded):
+            ctx_by_image[image_id] = _ImageWork(ref=ref, downloaded=downloaded)
             ocr_tasks.append(asyncio.create_task(_ocr_image(ocr, image_id, downloaded)))
 
     # Inline SVG text hits get positions after any downloaded images so their
@@ -132,24 +148,98 @@ async def process_page(
         )
         result.svg_text_hits += 1
 
-    if ocr_tasks:
-        for outcome in await asyncio.gather(*ocr_tasks, return_exceptions=False):
-            if outcome.succeeded:
-                result.ocr_analyzed += 1
-                if outcome.has_text:
-                    result.ocr_text_candidates += 1
-                repo.upsert_analysis(
-                    conn,
-                    image_id=outcome.image_id,
-                    ocr_text=outcome.text or None,
-                    ocr_confidence=outcome.confidence,
-                    has_text=outcome.has_text,
-                    model_versions={"ocr": outcome.engine_version},
-                )
-            else:
-                result.errors += 1
+    if not ocr_tasks:
+        return result
+
+    ocr_outcomes = await asyncio.gather(*ocr_tasks, return_exceptions=False)
+
+    vlm_tasks: list[tuple[_OcrOutcome, asyncio.Task[Classification]]] = []
+    for outcome in ocr_outcomes:
+        if not outcome.succeeded:
+            result.errors += 1
+            continue
+        result.ocr_analyzed += 1
+        if outcome.has_text:
+            result.ocr_text_candidates += 1
+
+        if (
+            vlm is not None
+            and ocr is not None
+            and outcome.has_text
+            and outcome.image_id in ctx_by_image
+        ):
+            work = ctx_by_image[outcome.image_id]
+            task = asyncio.create_task(_vlm_classify(vlm, ocr, outcome, work))
+            vlm_tasks.append((outcome, task))
+        else:
+            repo.upsert_analysis(
+                conn,
+                image_id=outcome.image_id,
+                ocr_text=outcome.text or None,
+                ocr_confidence=outcome.confidence,
+                has_text=outcome.has_text,
+                model_versions={"ocr": outcome.engine_version},
+            )
+
+    for outcome, task in vlm_tasks:
+        try:
+            classification = await task
+        except VlmError as exc:
+            log.warning("vlm.classify_failed", image_id=outcome.image_id, error=str(exc))
+            result.vlm_errors += 1
+            # Fall back to the OCR-only row so we still have evidence.
+            repo.upsert_analysis(
+                conn,
+                image_id=outcome.image_id,
+                ocr_text=outcome.text or None,
+                ocr_confidence=outcome.confidence,
+                has_text=outcome.has_text,
+                model_versions={"ocr": outcome.engine_version},
+            )
+            continue
+
+        result.vlm_classified += 1
+        repo.upsert_analysis(
+            conn,
+            image_id=outcome.image_id,
+            ocr_text=outcome.text or None,
+            ocr_confidence=outcome.confidence,
+            vlm_classification=str(classification.label),
+            vlm_rationale=classification.rationale,
+            has_text=outcome.has_text,
+            model_versions={
+                "ocr": outcome.engine_version,
+                "vlm": classification.model_version,
+                "prompt": classification.prompt_version,
+            },
+        )
 
     return result
+
+
+@dataclass(frozen=True)
+class _ImageWork:
+    """Per-image context needed by the VLM stage."""
+
+    ref: ImageRef
+    downloaded: DownloadedImage
+
+
+async def _vlm_classify(
+    vlm: VlmConfig,
+    ocr: OcrConfig,
+    outcome: _OcrOutcome,
+    work: _ImageWork,
+) -> Classification:
+    """Read the blob and dispatch a VLM classify."""
+    image_bytes = ocr.blob_store.path_for(work.downloaded.blob_path).read_bytes()
+    context = ClassifyContext(
+        alt_text=work.ref.alt,
+        figcaption=work.ref.figcaption,
+        context_snippet=work.ref.context_snippet,
+        ocr_text=outcome.text,
+    )
+    return await vlm.provider.classify(image_bytes, work.downloaded.mime, context)
 
 
 def _should_ocr(image: DownloadedImage) -> bool:

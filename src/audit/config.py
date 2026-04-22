@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # VLM (Phase 4)
     ollama_base_url: str = "http://localhost:11434"
     vlm_model: str = "qwen2-vl:2b"
+    vlm_concurrency: int = 1
+    vlm_prompt_name: str = "classify_v1.txt"
 
     def ensure_dirs(self) -> None:
         """Create runtime directories if missing."""
