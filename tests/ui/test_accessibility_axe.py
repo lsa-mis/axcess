@@ -21,12 +21,7 @@ pytestmark = pytest.mark.ui
 playwright_async = pytest.importorskip("playwright.async_api")
 
 _AXE_SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "audit"
-    / "web"
-    / "static"
-    / "axe.min.js"
+    Path(__file__).resolve().parents[2] / "src" / "audit" / "web" / "static" / "axe.min.js"
 )
 
 if not _AXE_SCRIPT_PATH.exists():  # pragma: no cover - gated
@@ -84,9 +79,7 @@ async def test_findings_list_has_no_axe_violations(
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
-            await page.goto(
-                f"{base}/scans/{scan_id}/findings", wait_until="networkidle"
-            )
+            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
             violations = await _run_axe(page)
             assert not violations, _render_violations(violations)
         finally:
@@ -102,9 +95,7 @@ async def test_finding_detail_has_no_axe_violations(
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
-            await page.goto(
-                f"{base}/scans/{scan_id}/findings", wait_until="networkidle"
-            )
+            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
             # Follow the first finding link.
             await page.locator("table.data a").first.click()
             await page.wait_for_load_state("networkidle")
@@ -139,9 +130,7 @@ async def test_keyboard_navigation_j_k_opens_finding(
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
-            await page.goto(
-                f"{base}/scans/{scan_id}/findings", wait_until="networkidle"
-            )
+            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
 
             # j highlights the first row.
             await page.keyboard.press("j")
@@ -151,13 +140,13 @@ async def test_keyboard_navigation_j_k_opens_finding(
 
             # Pressing j again advances, k goes back.
             await page.keyboard.press("j")
-            second_id = await page.locator(
-                'tr[aria-current="true"]'
-            ).get_attribute("data-finding-id")
+            second_id = await page.locator('tr[aria-current="true"]').get_attribute(
+                "data-finding-id"
+            )
             await page.keyboard.press("k")
-            first_id = await page.locator(
-                'tr[aria-current="true"]'
-            ).get_attribute("data-finding-id")
+            first_id = await page.locator('tr[aria-current="true"]').get_attribute(
+                "data-finding-id"
+            )
             assert first_id != second_id
 
             # Enter on the focused link should navigate to the finding page.

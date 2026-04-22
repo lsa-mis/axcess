@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Diff — Scan #{{ scan.id }} vs #{{ compare_to.id }}{% endblock %}
+{% block content %}
+  <p><a href="/scans/{{ scan.id }}">← Back to scan #{{ scan.id }}</a></p>
+  <h2>Diff — Scan #{{ scan.id }} vs #{{ compare_to.id }}</h2>
+  <p class="subtle">
+    Comparing {{ scan.seed_url }} between
+    <strong>#{{ compare_to.id }}</strong> ({{ compare_to.started_at }})
+    and <strong>#{{ scan.id }}</strong> ({{ scan.started_at }}).
+  </p>
+
+  <table class="data" aria-label="Diff summary">
+    <thead><tr><th scope="col">Bucket</th><th scope="col">Count</th></tr></thead>
+    <tbody>
+      <tr><td>New</td><td>{{ counts.new }}</td></tr>
+      <tr><td>Resolved</td><td>{{ counts.resolved }}</td></tr>
+      <tr><td>Still open</td><td>{{ counts.still_open }}</td></tr>
+      <tr><td>Status changed</td><td>{{ counts.status_changed }}</td></tr>
+    </tbody>
+  </table>
+
+  {% macro entry_row(e, bucket) %}
+    <tr>
+      <td>
+        {% if e.severity %}
+          <span class="sev sev-{{ e.severity }}">{{ e.severity }}</span>
+        {% elif e.previous_severity %}
+          <span class="sev sev-{{ e.previous_severity }}">{{ e.previous_severity }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if bucket == "resolved" and e.previous_finding_id %}
+          <a href="/findings/{{ e.previous_finding_id }}">{{ e.url_normalized|truncate(60) }}</a>
+        {% elif e.current_finding_id %}
+          <a href="/findings/{{ e.current_finding_id }}">{{ e.url_normalized|truncate(60) }}</a>
+        {% else %}
+          {{ e.url_normalized|truncate(60) }}
+        {% endif %}
+      </td>
+      <td>
+        {% if bucket == "status_changed" %}
+          {{ e.previous_status }} → <strong>{{ e.current_status }}</strong>
+        {% elif bucket == "resolved" %}
+          was {{ e.previous_status }}
+        {% else %}
+          {{ e.current_status or "—" }}
+        {% endif %}
+      </td>
+    </tr>
+  {% endmacro %}
+
+  <section aria-labelledby="new-heading">
+    <h3 id="new-heading">New ({{ counts.new }})</h3>
+    {% if not report.new %}
+      <p class="subtle">No new findings since scan #{{ compare_to.id }}.</p>
+    {% else %}
+    <table class="data" aria-label="Newly detected findings">
+      <thead><tr><th>Severity</th><th>Page</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for e in report.new %}{{ entry_row(e, "new") }}{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="resolved-heading">
+    <h3 id="resolved-heading">Resolved ({{ counts.resolved }})</h3>
+    {% if not report.resolved %}
+      <p class="subtle">No findings from scan #{{ compare_to.id }} have been cleared.</p>
+    {% else %}
+    <table class="data" aria-label="Resolved findings">
+      <thead><tr><th>Previous severity</th><th>Page</th><th>Previous status</th></tr></thead>
+      <tbody>
+        {% for e in report.resolved %}{{ entry_row(e, "resolved") }}{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="status-changed-heading">
+    <h3 id="status-changed-heading">Status changed ({{ counts.status_changed }})</h3>
+    {% if not report.status_changed %}
+      <p class="subtle">No manual status updates since scan #{{ compare_to.id }}.</p>
+    {% else %}
+    <table class="data" aria-label="Findings with status changes">
+      <thead><tr><th>Severity</th><th>Page</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for e in report.status_changed %}{{ entry_row(e, "status_changed") }}{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="still-open-heading">
+    <h3 id="still-open-heading">Still open ({{ counts.still_open }})</h3>
+    {% if not report.still_open %}
+      <p class="subtle">No findings remain open from scan #{{ compare_to.id }}.</p>
+    {% else %}
+    <table class="data" aria-label="Findings open in both scans">
+      <thead><tr><th>Severity</th><th>Page</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for e in report.still_open %}{{ entry_row(e, "still_open") }}{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+{% endblock %}

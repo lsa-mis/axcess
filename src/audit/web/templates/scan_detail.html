@@ -40,7 +40,15 @@
   </table>
   {% endif %}
 
-  <p><a href="/scans/{{ scan.id }}/findings">All findings →</a></p>
+  <p>
+    <a href="/scans/{{ scan.id }}/findings">All findings →</a>
+    {% if previous_scan_id %}
+      &nbsp;·&nbsp;
+      <a href="/scans/{{ scan.id }}/diff?compare_to={{ previous_scan_id }}">
+        Diff vs scan #{{ previous_scan_id }} →
+      </a>
+    {% endif %}
+  </p>
 
   <h3>Export</h3>
   <nav aria-label="Export this scan">

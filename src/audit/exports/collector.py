@@ -151,13 +151,13 @@ def _collect_findings(
 
     findings: list[ExportFinding] = []
     for row in rows:
-        occurrences = _collect_occurrences(
-            conn, scan_id=scan_id, image_id=int(row["image_id"])
-        )
+        occurrences = _collect_occurrences(conn, scan_id=scan_id, image_id=int(row["image_id"]))
         ocr_text = row["ocr_text"] or ""
-        adequacy = worst(
-            [compare(occ.alt_text, ocr_text) for occ in occurrences]
-        ) if occurrences else AltAdequacy.MISSING
+        adequacy = (
+            worst([compare(occ.alt_text, ocr_text) for occ in occurrences])
+            if occurrences
+            else AltAdequacy.MISSING
+        )
         findings.append(
             ExportFinding(
                 id=int(row["id"]),
@@ -171,9 +171,7 @@ def _collect_findings(
                 alt_adequacy=adequacy.value,
                 ocr_text=row["ocr_text"],
                 ocr_confidence=(
-                    float(row["ocr_confidence"])
-                    if row["ocr_confidence"] is not None
-                    else None
+                    float(row["ocr_confidence"]) if row["ocr_confidence"] is not None else None
                 ),
                 remediation_hint=row["remediation_hint"],
                 image_url=str(row["src_url_canonical"]),

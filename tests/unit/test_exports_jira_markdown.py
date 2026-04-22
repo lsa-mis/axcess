@@ -174,9 +174,7 @@ def test_jira_csv_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) 
     assert len(records) == 1 + 3
 
 
-def test_jira_priority_maps_from_severity(
-    tmp_db: sqlite3.Connection, scan_fixture: int
-) -> None:
+def test_jira_priority_maps_from_severity(tmp_db: sqlite3.Connection, scan_fixture: int) -> None:
     scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
     actual = render_jira_csv(scan)
     # The essential / missing-alt banner should map to Highest.
@@ -185,9 +183,7 @@ def test_jira_priority_maps_from_severity(
     assert ",Lowest," in actual
 
 
-def test_jira_includes_labels_and_ui_url(
-    tmp_db: sqlite3.Connection, scan_fixture: int
-) -> None:
+def test_jira_includes_labels_and_ui_url(tmp_db: sqlite3.Connection, scan_fixture: int) -> None:
     scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
     actual = render_jira_csv(scan)
     assert "wcag-1-4-5" in actual
@@ -198,9 +194,7 @@ def test_jira_includes_labels_and_ui_url(
 
 def test_markdown_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> None:
     scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
-    actual = render_markdown(
-        scan, generated_at=datetime(2026, 4, 22, 12, 0, tzinfo=UTC)
-    )
+    actual = render_markdown(scan, generated_at=datetime(2026, 4, 22, 12, 0, tzinfo=UTC))
     _assert_matches_golden(actual, "scan.md")
 
 

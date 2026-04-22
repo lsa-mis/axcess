@@ -91,6 +91,9 @@ class CrawlSummary:
     findings_by_severity: dict[str, int] = field(
         default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
     )
+    compare_to_scan_id: int | None = None
+    first_seen: int = 0
+    resolved: int = 0
     status: str = "running"
     # Human-readable status reasons collected during the crawl.
     notes: list[str] = field(default_factory=list)
@@ -171,9 +174,13 @@ async def run_crawl(
             and summary.pages_fetched > 0
         ):
             try:
-                synth = synthesize_findings(conn, scan_id=scan_id)
+                prior = _previous_completed_scan(conn, normalized_seed, scan_id)
+                synth = synthesize_findings(conn, scan_id=scan_id, compare_to=prior)
                 summary.findings_written = synth.findings_written
                 summary.findings_by_severity = synth.by_severity
+                summary.compare_to_scan_id = prior
+                summary.first_seen = synth.first_seen
+                summary.resolved = synth.resolved
             except Exception as exc:
                 log.warning("synthesize.failed", scan_id=scan_id, error=str(exc))
         _finalize_scan(conn, scan_id, summary)
@@ -449,6 +456,24 @@ def _enqueue_children(
             {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
             dedupe_key=_dedupe_key(ctx.scan_id, normalized),
         )
+
+
+def _previous_completed_scan(
+    conn: sqlite3.Connection, seed_url: str, current_scan_id: int
+) -> int | None:
+    """Most-recent completed scan of the same seed URL other than ``current``."""
+    row = conn.execute(
+        """
+        SELECT id FROM scans
+         WHERE seed_url = ? AND status = 'completed' AND id <> ?
+         ORDER BY id DESC
+         LIMIT 1
+        """,
+        (seed_url, current_scan_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return int(row["id"])
 
 
 def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary) -> None:

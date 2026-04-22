@@ -122,9 +122,7 @@ async def test_post_sends_json_with_auth_header_when_token_set(
 async def test_post_swallows_http_errors(tmp_db: sqlite3.Connection) -> None:
     scan_id = _minimal_scan(tmp_db)
     scan = collect_scan(tmp_db, scan_id)
-    respx.post("https://hooks.example.com/ingest").mock(
-        side_effect=httpx.ConnectError("down")
-    )
+    respx.post("https://hooks.example.com/ingest").mock(side_effect=httpx.ConnectError("down"))
     async with httpx.AsyncClient() as client:
         status = await post(
             scan,

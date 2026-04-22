@@ -215,9 +215,7 @@ def export(
     conn = connect(settings.db_path)
     try:
         if scan_id is None:
-            row = conn.execute(
-                "SELECT id FROM scans ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+            row = conn.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1").fetchone()
             if row is None:
                 console.print("[yellow]No scans in the database.[/yellow]")
                 raise typer.Exit(code=1)
@@ -234,14 +232,11 @@ def export(
         "markdown": render_markdown,
     }[fmt_lower](scan)
 
-    target = output or (
-        settings.data_dir / "exports" / f"scan_{scan_id}.{_EXPORT_EXT[fmt_lower]}"
-    )
+    target = output or (settings.data_dir / "exports" / f"scan_{scan_id}.{_EXPORT_EXT[fmt_lower]}")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(rendered, encoding="utf-8")
     console.print(
-        f"[green]Wrote[/green] {target}  "
-        f"([cyan]{fmt_lower}[/cyan], {scan.finding_count} findings)"
+        f"[green]Wrote[/green] {target}  ([cyan]{fmt_lower}[/cyan], {scan.finding_count} findings)"
     )
 
 

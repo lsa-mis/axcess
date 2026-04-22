@@ -62,9 +62,7 @@ def test_findings_list_returns_partial_for_htmx(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
     _, _, scan_id = seeded_db
-    resp = client.get(
-        f"/scans/{scan_id}/findings", headers={"HX-Request": "true"}
-    )
+    resp = client.get(f"/scans/{scan_id}/findings", headers={"HX-Request": "true"})
     assert resp.status_code == 200
     # Partial must NOT include <html> / skip-link / nav.
     assert "<title>" not in resp.text
@@ -131,7 +129,7 @@ def test_status_post_updates_db_and_returns_partial(
     assert "reviewing" in resp.text
     # History row was written.
     detail = client.get("/findings/1")
-    assert "<option value=\"reviewing\" selected" in detail.text
+    assert '<option value="reviewing" selected' in detail.text
 
 
 def test_status_post_destructive_requires_confirm(
@@ -171,9 +169,7 @@ def test_page_detail_shows_images_with_findings(
     assert "/findings/" in resp.text
 
 
-def test_blob_serves_png_bytes(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_blob_serves_png_bytes(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     # Grab the content hash from the API surface (any finding works).
     # Just hit the seeded banner PNG by known hash from the seeded row.
     detail = client.get("/findings/1")
@@ -198,9 +194,7 @@ def test_blob_returns_404_for_unknown_hash(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_export_csv_route(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_export_csv_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/export/csv")
     assert resp.status_code == 200
@@ -210,9 +204,7 @@ def test_export_csv_route(
     assert "finding_id,severity" in resp.text
 
 
-def test_export_json_route(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_export_json_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/export/json")
     assert resp.status_code == 200
@@ -222,9 +214,7 @@ def test_export_json_route(
     assert isinstance(body["findings"], list)
 
 
-def test_export_jira_route(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_export_jira_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/export/jira")
     assert resp.status_code == 200
@@ -232,9 +222,7 @@ def test_export_jira_route(
     assert "Summary,Description,Priority" in resp.text
 
 
-def test_export_markdown_route(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
@@ -263,3 +251,19 @@ def test_scan_detail_lists_export_links(
     assert resp.status_code == 200
     for fmt in ("csv", "json", "jira", "markdown"):
         assert f"/scans/{scan_id}/export/{fmt}" in resp.text
+
+
+def test_diff_route_without_previous_scan_400(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/diff")
+    assert resp.status_code == 400
+
+
+def test_diff_route_with_explicit_compare_to_404s_on_missing(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/diff?compare_to=99999")
+    assert resp.status_code == 404

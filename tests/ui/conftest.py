@@ -186,9 +186,7 @@ def live_server(seeded_db: tuple[Path, Path, int]) -> Iterator[tuple[str, int]]:
     """
     db_path, blob_dir, scan_id = seeded_db
     app = create_app(db_path=db_path, blob_dir=blob_dir)
-    config = uvicorn.Config(
-        app, host="127.0.0.1", port=0, log_level="warning", access_log=False
-    )
+    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", access_log=False)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

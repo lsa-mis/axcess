@@ -18,6 +18,7 @@ from audit.analyzer.vlm.base import VlmLabel
 from audit.db import repo
 from audit.logging import get_logger
 from audit.synthesizer.alt_compare import compare, worst
+from audit.synthesizer.diff import materialize_history
 from audit.synthesizer.priority import compute_priority_score, severity_for
 from audit.synthesizer.rules import RemediationRules
 
@@ -34,6 +35,8 @@ class SynthesizeResult:
 
     findings_written: int = 0
     by_severity: dict[str, int] = field(default_factory=_zero_severity_counts)
+    first_seen: int = 0
+    resolved: int = 0
 
 
 def synthesize_findings(
@@ -41,8 +44,14 @@ def synthesize_findings(
     *,
     scan_id: int,
     rules: RemediationRules | None = None,
+    compare_to: int | None = None,
 ) -> SynthesizeResult:
-    """Compute findings for every image-with-text in ``scan_id``."""
+    """Compute findings for every image-with-text in ``scan_id``.
+
+    When ``compare_to`` is another scan id, first-seen / resolved rows are
+    written to ``finding_history`` so the UI's diff view has a durable
+    record of appearances and disappearances across rescans.
+    """
     rules = rules or RemediationRules.load()
     result = SynthesizeResult()
 
@@ -87,6 +96,16 @@ def synthesize_findings(
         result.by_severity[severity.value] = result.by_severity.get(severity.value, 0) + 1
 
     _refresh_scan_finding_count(conn, scan_id)
+
+    if compare_to is not None and compare_to != scan_id:
+        history_counts = materialize_history(
+            conn,
+            current_scan_id=scan_id,
+            compare_to_scan_id=compare_to,
+        )
+        result.first_seen = history_counts.get("first_seen", 0)
+        result.resolved = history_counts.get("resolved", 0)
+
     return result
 
 

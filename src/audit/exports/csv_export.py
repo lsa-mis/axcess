@@ -76,9 +76,7 @@ def _row(
         finding.image_url,
         finding.content_hash,
         _one_line(finding.ocr_text),
-        ""
-        if finding.ocr_confidence is None
-        else f"{finding.ocr_confidence:.2f}",
+        "" if finding.ocr_confidence is None else f"{finding.ocr_confidence:.2f}",
         _one_line(finding.vlm_rationale),
         _one_line(finding.remediation_hint),
         finding.ui_url,

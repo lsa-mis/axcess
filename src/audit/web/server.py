@@ -29,6 +29,7 @@ from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.logging import get_logger
+from audit.synthesizer.diff import compute_diff
 
 log = get_logger(__name__)
 
@@ -126,10 +127,24 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         with get_conn() as conn:
             scan = _load_scan_or_404(conn, scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
+            prev = conn.execute(
+                """
+                SELECT id FROM scans
+                 WHERE seed_url = ? AND id <> ? AND status = 'completed'
+                 ORDER BY id DESC LIMIT 1
+                """,
+                (scan["seed_url"], scan_id),
+            ).fetchone()
+            previous_scan_id = int(prev["id"]) if prev is not None else None
         return render(
             request,
             "scan_detail.html",
-            {"scan": scan, "by_severity": breakdown, "active": "scan"},
+            {
+                "scan": scan,
+                "by_severity": breakdown,
+                "previous_scan_id": previous_scan_id,
+                "active": "scan",
+            },
         )
 
     @app.get("/scans/{scan_id}/findings", response_class=HTMLResponse)
@@ -267,9 +282,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             return HTMLResponse(
                 f'<span class="subtle">Status updated to <strong>{status}</strong>.</span>'
             )
-        return HTMLResponse(
-            f'<meta http-equiv="refresh" content="0;url=/findings/{finding_id}">'
-        )
+        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/findings/{finding_id}">')
 
     @app.get("/pages/{page_id}", response_class=HTMLResponse)
     def page_detail(request: Request, page_id: int) -> HTMLResponse:
@@ -295,9 +308,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 """,
                 (page["scan_id"], page_id),
             ).fetchall()
-        enriched = [
-            {**dict(r), "src_url_short": _short_url(r["src_url_canonical"])} for r in rows
-        ]
+        enriched = [{**dict(r), "src_url_short": _short_url(r["src_url_canonical"])} for r in rows]
         return render(
             request,
             "page_detail.html",
@@ -306,6 +317,43 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "page_images": enriched,
                 "scan": scan,
                 "active": "findings",
+            },
+        )
+
+    @app.get("/scans/{scan_id}/diff", response_class=HTMLResponse)
+    def scan_diff(
+        request: Request,
+        scan_id: int,
+        compare_to: int | None = Query(default=None),
+    ) -> HTMLResponse:
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            if compare_to is None:
+                prev = conn.execute(
+                    """
+                    SELECT id FROM scans
+                     WHERE seed_url = ? AND id <> ? AND status = 'completed'
+                     ORDER BY id DESC LIMIT 1
+                    """,
+                    (scan["seed_url"], scan_id),
+                ).fetchone()
+                if prev is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="No prior completed scan to compare against.",
+                    )
+                compare_to = int(prev["id"])
+            compare_scan = _load_scan_or_404(conn, compare_to)
+            report = compute_diff(conn, current_scan_id=scan_id, compare_to_scan_id=compare_to)
+        return render(
+            request,
+            "diff.html",
+            {
+                "scan": scan,
+                "compare_to": compare_scan,
+                "report": report,
+                "counts": report.counts,
+                "active": "scan",
             },
         )
 
@@ -395,9 +443,7 @@ def _query_findings(
         clauses.append("a.vlm_classification = ?")
         params.append(filters["classification"])
     if filters["q"]:
-        clauses.append(
-            "(i.src_url_canonical LIKE ? OR a.ocr_text LIKE ? OR pi.alt_text LIKE ?)"
-        )
+        clauses.append("(i.src_url_canonical LIKE ? OR a.ocr_text LIKE ? OR pi.alt_text LIKE ?)")
         like = f"%{filters['q']}%"
         params.extend([like, like, like])
     where = " AND ".join(clauses)
@@ -434,9 +480,7 @@ def _query_findings(
     return findings, total
 
 
-def _pagination(
-    *, page: int, size: int, total: int, filters: dict[str, str]
-) -> dict[str, Any]:
+def _pagination(*, page: int, size: int, total: int, filters: dict[str, str]) -> dict[str, Any]:
     total_pages = max(1, math.ceil(total / size))
     base = {k: v for k, v in filters.items() if v}
     prev_qs = urlencode({**base, "page": max(1, page - 1)})

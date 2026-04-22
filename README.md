@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.7 (Phase 7: exports)
+## Status — v1.0 (Phase 8: rescans + diff — **v1 feature-complete**)
 
 What works today:
 
@@ -91,12 +91,23 @@ What works today:
     the scan.
   Available from the review UI (`/scans/{id}/export/<format>` download
   links) and from the CLI (`audit export <scan_id> --format <fmt>`).
+- **Rescans + diff** — a second crawl of the same seed URL creates a
+  new scan row but reuses the `images` table via `content_hash`.
+  Finding match is keyed on `(content_hash, url_normalized)` so an
+  image that moves pages shows as "resolved on old URL, new on new
+  URL". At end of each crawl the synthesizer auto-picks the most
+  recent completed scan of the same seed as `compare_to` and writes
+  `first_seen` / `resolved` rows into `finding_history`. The UI has
+  `/scans/{id}/diff?compare_to={prev}` with sections for New,
+  Resolved, Status changed, and Still open — plus a diff link from
+  the scan detail when a prior scan exists.
 - **CLI** — `audit crawl <url>`, `audit synthesize`, `audit export`,
   `audit serve`, and `audit status`. Summary tables cover pages,
-  images, SVG-text, OCR, VLM, and finding-by-severity counters.
+  images, SVG-text, OCR, VLM, finding-by-severity, and rescan
+  first_seen / resolved counters.
 
-Not yet implemented: CSS `background-image` extraction (Phase 2.5),
-rescans + diff. See [PLAN.md](PLAN.md).
+Not yet implemented: CSS `background-image` extraction remains as
+Phase 2.5 follow-up. See [PLAN.md](PLAN.md).
 
 ## Try it
 
