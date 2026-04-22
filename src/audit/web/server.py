@@ -23,6 +23,11 @@ from audit import __version__
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.db.schema import connect
+from audit.exports.collector import collect_scan
+from audit.exports.csv_export import render_csv
+from audit.exports.jira_export import render_jira_csv
+from audit.exports.json_export import render_json
+from audit.exports.markdown_report import render_markdown
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -46,6 +51,20 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+_EXPORT_RENDERERS: dict[str, Any] = {
+    "csv": render_csv,
+    "json": render_json,
+    "jira": render_jira_csv,
+    "markdown": render_markdown,
+}
+_EXPORT_MEDIA_TYPES = {
+    "csv": "text/csv; charset=utf-8",
+    "json": "application/json; charset=utf-8",
+    "jira": "text/csv; charset=utf-8",
+    "markdown": "text/markdown; charset=utf-8",
+}
+_EXPORT_EXTENSIONS = {"csv": "csv", "json": "json", "jira": "jira.csv", "markdown": "md"}
 
 _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _BASE_DIR / "templates"
@@ -288,6 +307,28 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "scan": scan,
                 "active": "findings",
             },
+        )
+
+    @app.get("/scans/{scan_id}/export/{fmt}")
+    def export_scan(request: Request, scan_id: int, fmt: str) -> Response:
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown."""
+        fmt_lower = fmt.lower()
+        if fmt_lower not in _EXPORT_RENDERERS:
+            raise HTTPException(status_code=400, detail="Unknown export format")
+        ui_base = str(request.base_url).rstrip("/")
+        with get_conn() as conn:
+            try:
+                scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
+            except ValueError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+        rendered = _EXPORT_RENDERERS[fmt_lower](scan)
+        media = _EXPORT_MEDIA_TYPES[fmt_lower]
+        ext = _EXPORT_EXTENSIONS[fmt_lower]
+        filename = f"scan_{scan_id}.{ext}"
+        return Response(
+            content=rendered,
+            media_type=media,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     @app.get("/blobs/{content_hash}")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -12,6 +13,11 @@ from rich.table import Table
 from audit.config import get_settings
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
+from audit.exports.collector import collect_scan
+from audit.exports.csv_export import render_csv
+from audit.exports.jira_export import render_jira_csv
+from audit.exports.json_export import render_json
+from audit.exports.markdown_report import render_markdown
 from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
@@ -167,6 +173,76 @@ def synthesize(
         console.print(table)
     finally:
         conn.close()
+
+
+_EXPORT_FORMATS = ("csv", "json", "jira", "markdown")
+_EXPORT_EXT = {"csv": "csv", "json": "json", "jira": "jira.csv", "markdown": "md"}
+
+
+@app.command()
+def export(
+    scan_id: Annotated[
+        int | None,
+        typer.Argument(help="Scan id to export. Defaults to the latest scan."),
+    ] = None,
+    fmt: Annotated[
+        str,
+        typer.Option("--format", "-f", help="csv | json | jira | markdown"),
+    ] = "csv",
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file path. Omit to write under data/exports/scan_<id>.<ext>.",
+        ),
+    ] = None,
+    ui_base: Annotated[
+        str,
+        typer.Option("--ui-base", help="Base URL used in deep links inside exports."),
+    ] = "http://127.0.0.1:8765",
+) -> None:
+    """Write a scan's findings to CSV, JSON, Jira CSV, or a Markdown report."""
+    fmt_lower = fmt.lower()
+    if fmt_lower not in _EXPORT_FORMATS:
+        console.print(
+            f"[red]Unknown --format {fmt!r}.[/red] Use one of: {', '.join(_EXPORT_FORMATS)}."
+        )
+        raise typer.Exit(code=2)
+
+    settings = get_settings()
+    settings.ensure_dirs()
+    conn = connect(settings.db_path)
+    try:
+        if scan_id is None:
+            row = conn.execute(
+                "SELECT id FROM scans ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if row is None:
+                console.print("[yellow]No scans in the database.[/yellow]")
+                raise typer.Exit(code=1)
+            scan_id = int(row["id"])
+
+        scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
+    finally:
+        conn.close()
+
+    rendered = {
+        "csv": render_csv,
+        "json": render_json,
+        "jira": render_jira_csv,
+        "markdown": render_markdown,
+    }[fmt_lower](scan)
+
+    target = output or (
+        settings.data_dir / "exports" / f"scan_{scan_id}.{_EXPORT_EXT[fmt_lower]}"
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(rendered, encoding="utf-8")
+    console.print(
+        f"[green]Wrote[/green] {target}  "
+        f"([cyan]{fmt_lower}[/cyan], {scan.finding_count} findings)"
+    )
 
 
 @app.command()

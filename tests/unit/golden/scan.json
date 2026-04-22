@@ -1,0 +1,112 @@
+{
+  "findings": [
+    {
+      "alt_adequacy": "missing",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "has_svg_text": false,
+      "id": 1,
+      "image_url": "http://example.com/banner.png",
+      "mime": "image/png",
+      "occurrences": [
+        {
+          "above_fold": true,
+          "alt_text": null,
+          "page_id": 1,
+          "page_url": "http://example.com/",
+          "position": 0
+        },
+        {
+          "above_fold": false,
+          "alt_text": null,
+          "page_id": 2,
+          "page_url": "http://example.com/about",
+          "position": 1
+        }
+      ],
+      "ocr_confidence": 92.5,
+      "ocr_text": "BUY WIDGETS NOW",
+      "priority_score": 9.099,
+      "remediation_hint": "This image contains essential text but has no alt attribute. Replace it with real HTML text or add alt=\"\" plus visible text on the page. Minimum: set alt to the image's full visible text.",
+      "scan_id": 1,
+      "severity": "critical",
+      "status": "new",
+      "ui_url": "http://127.0.0.1:8765/findings/1",
+      "vlm_classification": "essential",
+      "vlm_rationale": "Promotional banner with text as image.",
+      "wcag_criterion": "1.4.5"
+    },
+    {
+      "alt_adequacy": "missing",
+      "content_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "has_svg_text": true,
+      "id": 3,
+      "image_url": "inline-svg://http://example.com/#0",
+      "mime": "image/svg+xml",
+      "occurrences": [
+        {
+          "above_fold": false,
+          "alt_text": null,
+          "page_id": 1,
+          "page_url": "http://example.com/",
+          "position": 3
+        }
+      ],
+      "ocr_confidence": null,
+      "ocr_text": null,
+      "priority_score": 3.693,
+      "remediation_hint": "Image contains text but has no alt attribute. Add alt conveying the image's text, or mark it decorative with alt=\"\".",
+      "scan_id": 1,
+      "severity": "minor",
+      "status": "new",
+      "ui_url": "http://127.0.0.1:8765/findings/3",
+      "vlm_classification": null,
+      "vlm_rationale": null,
+      "wcag_criterion": "1.4.5"
+    },
+    {
+      "alt_adequacy": "adequate",
+      "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "has_svg_text": false,
+      "id": 2,
+      "image_url": "http://example.com/logo.png",
+      "mime": "image/png",
+      "occurrences": [
+        {
+          "above_fold": false,
+          "alt_text": "Acme Corp",
+          "page_id": 1,
+          "page_url": "http://example.com/",
+          "position": 2
+        }
+      ],
+      "ocr_confidence": 88.0,
+      "ocr_text": "Acme Corp",
+      "priority_score": 1.693,
+      "remediation_hint": "Good — logo alt names the brand. No action required.",
+      "scan_id": 1,
+      "severity": "info",
+      "status": "new",
+      "ui_url": "http://127.0.0.1:8765/findings/2",
+      "vlm_classification": "logo",
+      "vlm_rationale": "Brand mark.",
+      "wcag_criterion": "1.4.5"
+    }
+  ],
+  "scan": {
+    "by_severity": {
+      "critical": 1,
+      "info": 1,
+      "major": 0,
+      "minor": 1
+    },
+    "error_count": 0,
+    "finding_count": 3,
+    "finished_at": "2026-04-22T12:01:00",
+    "id": 1,
+    "page_count": 2,
+    "seed_url": "http://example.com/",
+    "started_at": "2026-04-22T12:00:00",
+    "status": "completed"
+  },
+  "schema_version": 1
+}

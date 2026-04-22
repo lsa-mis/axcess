@@ -1,0 +1,38 @@
+Summary,Description,Priority,Issue Type,Labels,Component
+WCAG 1.4.5: image of text — BUY WIDGETS NOW,"**Severity:** critical  (priority score 9.10)
+**Criterion:** WCAG 1.4.5
+**Classification:** essential
+**Alt adequacy:** missing
+**Image URL:** http://example.com/banner.png
+**OCR text:** BUY WIDGETS NOW
+**VLM rationale:** Promotional banner with text as image.
+**Suggested fix:** This image contains essential text but has no alt attribute. Replace it with real HTML text or add alt="""" plus visible text on the page. Minimum: set alt to the image's full visible text.
+
+**Occurrences:**
+  - http://example.com/ — alt='(missing)' (above fold)
+  - http://example.com/about — alt='(missing)'
+
+Review locally: http://127.0.0.1:8765/findings/1",Highest,Bug,wcag-1-4-5 accessibility images-of-text sev-critical class-essential,Accessibility
+WCAG 1.4.5: inline SVG with visible text (minor),"**Severity:** minor  (priority score 3.69)
+**Criterion:** WCAG 1.4.5
+**Alt adequacy:** missing
+**Image URL:** inline-svg://http://example.com/#0
+**Suggested fix:** Image contains text but has no alt attribute. Add alt conveying the image's text, or mark it decorative with alt="""".
+
+**Occurrences:**
+  - http://example.com/ — alt='(missing)'
+
+Review locally: http://127.0.0.1:8765/findings/3",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor inline-svg,Accessibility
+WCAG 1.4.5: image of text — Acme Corp,"**Severity:** info  (priority score 1.69)
+**Criterion:** WCAG 1.4.5
+**Classification:** logo
+**Alt adequacy:** adequate
+**Image URL:** http://example.com/logo.png
+**OCR text:** Acme Corp
+**VLM rationale:** Brand mark.
+**Suggested fix:** Good — logo alt names the brand. No action required.
+
+**Occurrences:**
+  - http://example.com/ — alt='Acme Corp'
+
+Review locally: http://127.0.0.1:8765/findings/2",Lowest,Bug,wcag-1-4-5 accessibility images-of-text sev-info class-logo,Accessibility

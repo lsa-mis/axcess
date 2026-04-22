@@ -41,4 +41,14 @@
   {% endif %}
 
   <p><a href="/scans/{{ scan.id }}/findings">All findings →</a></p>
+
+  <h3>Export</h3>
+  <nav aria-label="Export this scan">
+    <ul>
+      <li><a href="/scans/{{ scan.id }}/export/csv" download>CSV (one row per occurrence)</a></li>
+      <li><a href="/scans/{{ scan.id }}/export/json" download>JSON (nested per finding)</a></li>
+      <li><a href="/scans/{{ scan.id }}/export/jira" download>Jira CSV (import template)</a></li>
+      <li><a href="/scans/{{ scan.id }}/export/markdown" download>Markdown report</a></li>
+    </ul>
+  </nav>
 {% endblock %}

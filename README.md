@@ -2,7 +2,7 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
-## Status — v0.6 (Phase 6: review UI)
+## Status — v0.7 (Phase 7: exports)
 
 What works today:
 
@@ -76,12 +76,27 @@ What works today:
   `?` help. Zero axe-core WCAG 2.1 AA violations on every view.
   Dark-mode + prefers-reduced-motion honored. Content-hash-validated
   `/blobs/{hash}` for image previews.
-- **CLI** — `audit crawl <url>`, `audit synthesize`, `audit serve`,
-  and `audit status`. Summary tables cover pages, images, SVG-text,
-  OCR, VLM, and finding-by-severity counters.
+- **Exports** — one shared collector feeds four deterministic formats,
+  all with golden-file tests so any change is explicit:
+  - **CSV** — flat, one row per (finding, occurrence) pair.
+  - **JSON** — nested per finding with an `occurrences` array; sorted
+    keys so diffs are meaningful. `schema_version` field.
+  - **Jira CSV** — Summary / Description / Priority / Labels mapping
+    that Jira Cloud's External import accepts out of the box. Severity
+    maps to Jira priorities (critical→Highest, info→Lowest).
+  - **Markdown** — stakeholder-friendly report with exec summary, top
+    20 findings, and a full severity table.
+  - **Webhook** — opt-in via `AUDIT_WEBHOOK_URL`, optional bearer
+    token, async POST of the JSON payload; best-effort, never fails
+    the scan.
+  Available from the review UI (`/scans/{id}/export/<format>` download
+  links) and from the CLI (`audit export <scan_id> --format <fmt>`).
+- **CLI** — `audit crawl <url>`, `audit synthesize`, `audit export`,
+  `audit serve`, and `audit status`. Summary tables cover pages,
+  images, SVG-text, OCR, VLM, and finding-by-severity counters.
 
 Not yet implemented: CSS `background-image` extraction (Phase 2.5),
-exports, rescans. See [PLAN.md](PLAN.md).
+rescans + diff. See [PLAN.md](PLAN.md).
 
 ## Try it
 

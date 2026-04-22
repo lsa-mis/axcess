@@ -196,3 +196,70 @@ def test_blob_rejects_invalid_hash(client: TestClient) -> None:
 def test_blob_returns_404_for_unknown_hash(client: TestClient) -> None:
     resp = client.get("/blobs/" + "f" * 64)
     assert resp.status_code == 404
+
+
+def test_export_csv_route(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/export/csv")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "attachment" in resp.headers["content-disposition"]
+    assert f"scan_{scan_id}.csv" in resp.headers["content-disposition"]
+    assert "finding_id,severity" in resp.text
+
+
+def test_export_json_route(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/export/json")
+    assert resp.status_code == 200
+    assert "application/json" in resp.headers["content-type"]
+    body = resp.json()
+    assert body["scan"]["id"] == scan_id
+    assert isinstance(body["findings"], list)
+
+
+def test_export_jira_route(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/export/jira")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "Summary,Description,Priority" in resp.text
+
+
+def test_export_markdown_route(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/export/markdown")
+    assert resp.status_code == 200
+    assert "text/markdown" in resp.headers["content-type"]
+    assert resp.text.startswith(f"# WCAG 1.4.5 audit — Scan #{scan_id}")
+
+
+def test_export_unknown_format_rejected(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/export/xml")
+    assert resp.status_code == 400
+
+
+def test_export_unknown_scan_returns_404(client: TestClient) -> None:
+    resp = client.get("/scans/99999/export/csv")
+    assert resp.status_code == 404
+
+
+def test_scan_detail_lists_export_links(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}")
+    assert resp.status_code == 200
+    for fmt in ("csv", "json", "jira", "markdown"):
+        assert f"/scans/{scan_id}/export/{fmt}" in resp.text
