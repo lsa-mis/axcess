@@ -17,6 +17,18 @@
   </aside>
   {% endif %}
 
+  {% if blocked %}
+  <aside role="alert"
+         style="padding:0.75rem;border:1px solid var(--severity-critical-bg);border-radius:4px;margin:1rem 0;">
+    <strong>Seed URL returned HTTP {{ blocked.status_code }}</strong>
+    {% if blocked.title %}(&ldquo;{{ blocked.title }}&rdquo;){% endif %}.
+    The crawl couldn't read past the entry page — your target is likely
+    behind a login, WAF, or bot challenge. Try the
+    <a href="/scans/new">New scan</a> form with
+    <em>Use real browser (Playwright) for every page</em> checked.
+  </aside>
+  {% endif %}
+
   <dl class="meta" aria-label="Scan metadata">
     <dt>Status</dt><dd>{{ scan.status }}</dd>
     <dt>Started</dt><dd>{{ scan.started_at }}</dd>

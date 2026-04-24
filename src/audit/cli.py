@@ -62,6 +62,17 @@ def crawl(
             help="Skip end-of-crawl finding synthesis. Run `audit synthesize` later.",
         ),
     ] = False,
+    use_js: Annotated[
+        bool,
+        typer.Option(
+            "--use-js",
+            help=(
+                "Render every page with Playwright (chromium). Slower but "
+                "handles SPAs and sites behind Cloudflare / WAF challenges. "
+                "Auto-escalation on challenge pages happens either way."
+            ),
+        ),
+    ] = False,
     compare_to: Annotated[
         int | None,
         typer.Option(
@@ -102,6 +113,7 @@ def crawl(
             vlm_concurrency=settings.vlm_concurrency,
             synthesize_enabled=not skip_synthesize,
             compare_to=compare_to,
+            js_eager=use_js,
         )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:

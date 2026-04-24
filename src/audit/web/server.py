@@ -156,6 +156,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         ignore_robots: str | None = Form(default=None),
         skip_ocr: str | None = Form(default=None),
         skip_vlm: str | None = Form(default=None),
+        js_eager: str | None = Form(default=None),
     ) -> Response:
         form = {
             "url": url,
@@ -167,6 +168,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             "ignore_robots": bool(ignore_robots),
             "skip_ocr": bool(skip_ocr),
             "skip_vlm": bool(skip_vlm),
+            "js_eager": bool(js_eager),
         }
         error = _validate_seed_url(url)
         if error is not None:
@@ -219,6 +221,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 (scan["seed_url"], scan_id),
             ).fetchone()
             previous_scan_id = int(prev["id"]) if prev is not None else None
+            blocked = _detect_blocked_scan(conn, scan_id, scan)
         return render(
             request,
             "scan_detail.html",
@@ -226,6 +229,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "scan": scan,
                 "by_severity": breakdown,
                 "previous_scan_id": previous_scan_id,
+                "blocked": blocked,
                 "active": "scan",
             },
         )
@@ -524,6 +528,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         vlm_base_url=settings.ollama_base_url,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
+        js_eager=bool(form.get("js_eager")),
     )
 
 
@@ -578,6 +583,49 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
         log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
     finally:
         conn.close()
+
+
+def _detect_blocked_scan(
+    conn: sqlite3.Connection, scan_id: int, scan: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Return a warning payload when a completed crawl looks like it was blocked.
+
+    Two heuristics we trust without false-positiving:
+
+      * The seed URL is present in ``pages`` and its ``status_code`` is not 2xx.
+        That's the classic "crawler hit a WAF challenge / 403 / login wall"
+        pattern — the crawl completed but found no real content.
+      * ``page_count == 1`` AND that page is non-2xx.
+
+    Returns ``{'status_code': int | None, 'title': str | None, 'seed_url': str}``
+    when a warning should be shown, or ``None`` to render normally.
+    """
+    if scan.get("status") != "completed":
+        return None
+    page_count = int(scan.get("page_count") or 0)
+    if page_count == 0:
+        return None
+    seed = str(scan["seed_url"])
+    row = conn.execute(
+        "SELECT status_code, title FROM pages "
+        "WHERE scan_id = ? AND url_normalized = ? LIMIT 1",
+        (scan_id, seed),
+    ).fetchone()
+    if row is None:
+        return None
+    code = row["status_code"]
+    if code is None:
+        return None
+    if 200 <= int(code) < 300:
+        return None
+    # Non-2xx seed: show warning. Include the scan in the signal so the UI can
+    # suggest re-running with --use-js / "Use real browser" when relevant.
+    return {
+        "status_code": int(code),
+        "title": row["title"],
+        "seed_url": seed,
+        "page_count": page_count,
+    }
 
 
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

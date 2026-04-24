@@ -159,8 +159,19 @@ def test_crawl_interrupt_mid_run_leaves_queue_intact(tmp_db: sqlite3.Connection)
 
 
 def test_crawl_records_html_hash_and_title(tmp_db: sqlite3.Connection) -> None:
+    # js_enabled=False keeps this test focused on the static-fetcher path.
+    # The tiny fixture pages otherwise trip the is_js_only heuristic and
+    # get auto-escalated to Playwright — which is correct behavior, just
+    # not what this particular test is checking.
     with _serve() as base:
-        config = CrawlConfig(seed_url=base, max_pages=10, rps=100.0, workers=2, vlm_enabled=False)
+        config = CrawlConfig(
+            seed_url=base,
+            max_pages=10,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            js_enabled=False,
+        )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     row = tmp_db.execute(

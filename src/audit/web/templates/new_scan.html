@@ -85,6 +85,12 @@
                {% if form.skip_vlm %}checked{% endif %}>
         Skip VLM classification
       </label>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="js_eager" value="1"
+               {% if form.js_eager %}checked{% endif %}>
+        Use real browser (Playwright) for every page — slower but handles
+        SPAs and sites behind Cloudflare
+      </label>
     </fieldset>
 
     <div style="display:flex;gap:0.5rem;">

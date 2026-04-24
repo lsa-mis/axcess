@@ -30,7 +30,7 @@ from audit.crawler import url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
-from audit.crawler.render_detect import is_js_only
+from audit.crawler.render_detect import is_challenge_response, is_js_only
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
@@ -75,6 +75,12 @@ class CrawlConfig:
     # auto-discover the most-recent completed scan of the same logical site
     # (matched via :func:`audit.crawler.url_policy.compare_key`).
     compare_to: int | None = None
+    # JS rendering. ``js_enabled`` lets the orchestrator start Playwright on
+    # demand (when the static fetcher sees a JS-only page or a bot-challenge
+    # interstitial). ``js_eager`` forces Playwright for every HTML page —
+    # useful for sites that aggressively filter non-browser traffic.
+    js_enabled: bool = True
+    js_eager: bool = False
 
 
 @dataclass
@@ -139,6 +145,9 @@ async def run_crawl(
             min_word_count=config.ocr_min_word_count,
         )
     vlm_config = await _build_vlm(config, client, vlm_provider)
+    js_holder: _LazyJs | None = None
+    if js_fetcher is not None or config.js_enabled:
+        js_holder = _LazyJs(user_agent=config.user_agent, injected=js_fetcher)
     ctx = _WorkerContext(
         conn=conn,
         config=config,
@@ -147,7 +156,7 @@ async def run_crawl(
         limiter=limiter,
         robots=robots,
         static=fetcher,
-        js=js_fetcher,
+        js=js_holder,
         downloader=downloader,
         ocr=ocr_config,
         vlm=vlm_config,
@@ -192,6 +201,9 @@ async def run_crawl(
         _finalize_scan(conn, scan_id, summary)
         if ocr_pool is not None:
             ocr_pool.shutdown()
+        if js_holder is not None:
+            with contextlib.suppress(Exception):
+                await js_holder.shutdown()
         if owned_client:
             with contextlib.suppress(Exception):
                 await client.aclose()
@@ -265,6 +277,38 @@ def _dedupe_key(scan_id: int, url: str) -> str:
     return f"{JOB_KIND}:{scan_id}:{url}"
 
 
+class _LazyJs:
+    """Start the Playwright JsFetcher on first use, keep it alive for the crawl.
+
+    Chromium startup costs ~1-2 seconds, so we don't pay it unless a page
+    actually needs JS rendering (SPA bootstrap or a WAF challenge). If a
+    caller injects a ready-made JsFetcher, we use it directly and don't
+    manage its lifecycle.
+    """
+
+    def __init__(
+        self,
+        *,
+        user_agent: str,
+        injected: JsFetcher | None = None,
+    ) -> None:
+        self._user_agent = user_agent
+        self._fetcher: JsFetcher | None = injected
+        self._owned = injected is None
+
+    async def get(self) -> JsFetcher:
+        if self._fetcher is None:
+            fetcher = JsFetcher(user_agent=self._user_agent)
+            await fetcher.__aenter__()
+            self._fetcher = fetcher
+        return self._fetcher
+
+    async def shutdown(self) -> None:
+        if self._owned and self._fetcher is not None:
+            await self._fetcher.__aexit__(None, None, None)
+            self._fetcher = None
+
+
 @dataclass
 class _WorkerContext:
     conn: sqlite3.Connection
@@ -274,7 +318,7 @@ class _WorkerContext:
     limiter: HostLimiter
     robots: RobotsChecker
     static: StaticFetcher
-    js: JsFetcher | None
+    js: _LazyJs | None
     downloader: ImageDownloader
     ocr: OcrConfig | None
     vlm: VlmConfig | None
@@ -355,9 +399,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             return
 
     render_mode = "static"
-    if result.is_html and result.is_ok and ctx.js is not None and is_js_only(result.body):
+    if ctx.js is not None and _should_escalate_to_js(ctx, result):
         try:
-            result = await ctx.js.fetch(url)
+            js_fetcher = await ctx.js.get()
+            result = await js_fetcher.fetch(url)
             render_mode = "js"
         except FetchError as exc:
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
@@ -462,6 +507,25 @@ def _enqueue_children(
             {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
             dedupe_key=_dedupe_key(ctx.scan_id, normalized),
         )
+
+
+def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
+    """Decide whether a static fetch result warrants a re-fetch via Playwright.
+
+    Three triggers, any of which is enough:
+      * ``js_eager`` is on — the caller asked for JS on every page.
+      * the static HTML clearly needs client rendering (SPA bootstrap).
+      * the response looks like a WAF / bot-check interstitial.
+
+    The static body still needs to be present so we aren't re-fetching
+    binary responses or images.
+    """
+    if ctx.config.js_eager and result.is_html:
+        return True
+    body = result.body or b""
+    if result.is_html and result.is_ok and is_js_only(body):
+        return True
+    return is_challenge_response(result.status_code, body)
 
 
 def _previous_completed_scan(

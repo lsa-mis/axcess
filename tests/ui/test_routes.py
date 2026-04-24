@@ -253,6 +253,56 @@ def test_scan_detail_lists_export_links(
         assert f"/scans/{scan_id}/export/{fmt}" in resp.text
 
 
+def test_scan_detail_shows_blocked_warning_for_non_2xx_seed(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """When the seed page returned 4xx, surface a warning so the user
+    knows the crawl wasn't successful — not just silently show 0 findings."""
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    # Insert a new scan whose seed page is a 403.
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://blocked.example/', 'completed', 1, 0, '{}')"
+        )
+        blocked_scan_id = int(cur.lastrowid or 0)
+        conn.execute(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, title, "
+            "render_mode, html_hash) VALUES (?, ?, 403, 'Just a moment...', "
+            "'static', ?)",
+            (blocked_scan_id, "https://blocked.example/", "0" * 64),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get(f"/scans/{blocked_scan_id}")
+    assert resp.status_code == 200
+    assert "HTTP 403" in resp.text
+    assert "Just a moment..." in resp.text
+    assert "Use real browser" in resp.text
+
+
+def test_scan_detail_no_warning_when_seed_is_2xx(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}")
+    assert resp.status_code == 200
+    assert "returned HTTP" not in resp.text
+
+
+def test_new_scan_form_has_js_eager_checkbox(client: TestClient) -> None:
+    resp = client.get("/scans/new")
+    assert resp.status_code == 200
+    assert 'name="js_eager"' in resp.text
+    assert "Use real browser" in resp.text
+
+
 def test_diff_route_without_previous_scan_400(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
