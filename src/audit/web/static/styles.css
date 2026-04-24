@@ -340,118 +340,155 @@ footer.site {
 .status-form { display: inline-flex; gap: 0.5rem; align-items: center; }
 .status-form select { padding: 0.3rem; }
 
-/* Findings as a thumbnail-first card grid.
-   The reviewer's job is to look at images and decide, so the thumbnail is
-   the hero of each card and metadata fans out from it. */
-ol.finding-grid {
-  list-style: none;
-  padding: 0;
+/* Findings table — compact, scannable, accessible.
+   Small fixed thumbnails (72×48) that never expand. Reviewers want
+   density here, not a hero layout; click into the finding detail for
+   the large image + decision affordance. */
+.findings-table-wrap {
   margin: var(--space) 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1rem;
-}
-.card {
-  display: flex;
-  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
-  background: var(--bg);
-  transition: box-shadow 0.1s ease-in, transform 0.1s ease-in;
+  overflow-x: auto;
 }
-.card:hover,
-.card:focus-within {
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 12%, transparent);
-  transform: translateY(-1px);
-}
-.card[aria-current="true"] {
-  outline: 3px solid var(--focus);
-  outline-offset: -1px;
-}
-.card__thumb {
-  display: block;
-  position: relative;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: repeating-conic-gradient(
-    color-mix(in srgb, var(--border) 40%, transparent) 0 25%,
-    transparent 0 50%
-  ) 0 0 / 20px 20px;
-  text-decoration: none;
-}
-.card__thumb img {
+table.findings-table {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: #fff;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
-.card__thumb-placeholder {
-  display: flex;
+table.findings-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+  background: color-mix(in srgb, var(--bg) 85%, var(--fg) 15%);
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.findings-table tbody td {
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  vertical-align: middle;
+}
+table.findings-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
+}
+table.findings-table tbody tr:hover td {
+  background: var(--row-hover);
+}
+table.findings-table tbody tr[aria-current="true"] td {
+  background: var(--row-hover);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+table.findings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Column widths are soft hints — the wrap allows overflow scroll on narrow
+   screens rather than forcing awkward truncation everywhere. */
+.findings-table .col-sev { width: 6em; }
+.findings-table .col-thumb { width: 92px; }
+.findings-table .col-class { width: 10em; }
+.findings-table .col-status { width: 9em; white-space: nowrap; }
+.findings-table .col-ocr,
+.findings-table .col-alt,
+.findings-table .col-page { max-width: 0; }
+
+/* Severity cells hold the badge link directly so the whole badge is
+   clickable and visibly hit-targetable. */
+.findings-table .sev {
+  text-decoration: none;
+  display: inline-block;
+}
+.findings-table .sev:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Fixed-size thumbnails. No hover expansion — we want scannability. */
+.thumb {
+  width: 72px;
+  height: 48px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 3px;
   color: var(--fg-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.5rem;
+  font-size: 0.75rem;
+  vertical-align: middle;
 }
-.card__severity {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  z-index: 1;
-}
-.card__body {
-  padding: 0.75rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  flex: 1;
-}
-.card__title {
-  margin: 0;
-  font-size: 0.95rem;
+.thumb--svg {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  color: var(--accent);
   font-weight: 600;
-  overflow-wrap: anywhere;
+  font-size: 0.7rem;
 }
-.card__title a {
+.thumb--missing {
+  background: var(--bg);
+  font-size: 1rem;
+}
+
+/* OCR + alt text cells truncate with ellipsis on overflow; full text in
+   title attribute for hover and screen-reader announcement. */
+.findings-table .ocr-text,
+.findings-table .alt-text,
+.findings-table .page-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.findings-table .ocr-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+/* Tag pills for the alt column — color-independent signal via the label
+   text itself. "missing" gets the critical color as reinforcement only. */
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+.tag--missing {
+  background: color-mix(in srgb, var(--severity-critical-bg) 15%, var(--bg));
+  color: var(--severity-critical-bg);
+  border-color: color-mix(in srgb, var(--severity-critical-bg) 40%, transparent);
+}
+.tag--muted {
+  background: color-mix(in srgb, var(--border) 30%, var(--bg));
+  color: var(--fg-muted);
+  border-color: var(--border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: none;
+}
+
+.page-link {
   text-decoration: none;
-  color: var(--fg);
+  color: var(--accent);
 }
-.card__title a:hover,
-.card__title a:focus-visible {
+.page-link:hover,
+.page-link:focus-visible {
   text-decoration: underline;
 }
-.card__meta {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 0.75rem;
-  row-gap: 0.25rem;
-  margin: 0;
-  font-size: 0.85rem;
-}
-.card__meta dt {
-  color: var(--fg-muted);
-  font-weight: 500;
-}
-.card__meta dd {
-  margin: 0;
-}
-.card__ocr {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  color: var(--fg);
-  overflow-wrap: anywhere;
-}
-.card__alt .missing-alt {
-  color: var(--severity-critical-bg);
-  font-style: normal;
-  font-weight: 600;
-}
-.card__alt .empty-alt {
-  color: var(--fg-muted);
-  font-style: normal;
-}
+
 .empty {
   text-align: center;
   padding: 3rem 1rem;

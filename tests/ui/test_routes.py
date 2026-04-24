@@ -55,7 +55,9 @@ def test_findings_list_returns_full_page(
     assert resp.status_code == 200
     assert "<title>Findings" in resp.text
     assert "data-finding-id" in resp.text
-    assert "banner.png" in resp.text
+    # Table surfaces OCR text + the page URL where the image appears. The
+    # banner image's OCR snippet should be visible on the row.
+    assert "BUY OUR WIDGETS" in resp.text or "WIDGETS" in resp.text
 
 
 def test_findings_list_returns_partial_for_htmx(
@@ -67,7 +69,7 @@ def test_findings_list_returns_partial_for_htmx(
     # Partial must NOT include <html> / skip-link / nav.
     assert "<title>" not in resp.text
     assert "skip-link" not in resp.text
-    assert "finding-grid" in resp.text or "No findings" in resp.text
+    assert "findings-table" in resp.text or "No findings" in resp.text
 
 
 def test_findings_filter_by_severity(
@@ -89,7 +91,10 @@ def test_findings_search_query_matches_ocr_text(
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/findings?q=WIDGETS")
     assert resp.status_code == 200
-    assert "banner.png" in resp.text
+    # The banner finding (which contains "WIDGETS" in OCR) should be the
+    # only row rendered, visible by its OCR snippet.
+    assert "WIDGETS" in resp.text
+    assert "data-finding-id" in resp.text
     # A search that matches nothing should render the empty message.
     empty = client.get(f"/scans/{scan_id}/findings?q=notarealtoken12345")
     assert empty.status_code == 200
@@ -256,22 +261,37 @@ def test_scan_detail_lists_export_links(
 def test_findings_list_renders_thumbnails_with_blob_links(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
-    """Card view must include <img src='/blobs/<hash>'> so the reviewer
-    can actually see what they're triaging."""
+    """Table rows must include inline <img src='/blobs/<hash>'> thumbnails
+    so the reviewer can actually see what they're triaging."""
     import re
 
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/findings")
     assert resp.status_code == 200
-    assert "finding-grid" in resp.text
+    assert "findings-table" in resp.text
+    # Semantic table markup for accessibility.
+    assert "<caption" in resp.text
+    assert 'scope="col"' in resp.text
     blob_srcs = re.findall(r'src="/blobs/([0-9a-f]{64})"', resp.text)
     # Seeded fixture has two blob-backed findings (banner + logo).
     assert len(blob_srcs) >= 1
-    # And every blob URL must actually serve an image.
+    # Every blob URL must actually serve an image.
     for h in blob_srcs[:2]:
         r = client.get(f"/blobs/{h}")
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("image/")
+
+
+def test_findings_list_flags_missing_and_empty_alt(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """The alt column should carry explicit labels — color-independent."""
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/findings")
+    assert resp.status_code == 200
+    # Seeded fixture has at least one finding with missing alt (banner).
+    assert "tag--missing" in resp.text
+    assert ">missing<" in resp.text
 
 
 def test_scan_detail_running_shows_cancel_button(
