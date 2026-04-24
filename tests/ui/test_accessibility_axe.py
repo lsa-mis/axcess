@@ -96,8 +96,8 @@ async def test_finding_detail_has_no_axe_violations(
         try:
             page = await browser.new_page()
             await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
-            # Follow the first finding link.
-            await page.locator("table.data a").first.click()
+            # Follow the first finding card's title link.
+            await page.locator("[data-finding-id] a").first.click()
             await page.wait_for_load_state("networkidle")
             violations = await _run_axe(page)
             assert not violations, _render_violations(violations)
@@ -132,19 +132,19 @@ async def test_keyboard_navigation_j_k_opens_finding(
             page = await browser.new_page()
             await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
 
-            # j highlights the first row.
+            # j highlights the first card.
             await page.keyboard.press("j")
             await asyncio.sleep(0.1)
-            current = page.locator('tr[aria-current="true"]')
+            current = page.locator('[data-finding-id][aria-current="true"]')
             assert await current.count() == 1
 
-            # Pressing j again advances, k goes back.
+            # Pressing j again advances; k goes back.
             await page.keyboard.press("j")
-            second_id = await page.locator('tr[aria-current="true"]').get_attribute(
+            second_id = await page.locator('[data-finding-id][aria-current="true"]').get_attribute(
                 "data-finding-id"
             )
             await page.keyboard.press("k")
-            first_id = await page.locator('tr[aria-current="true"]').get_attribute(
+            first_id = await page.locator('[data-finding-id][aria-current="true"]').get_attribute(
                 "data-finding-id"
             )
             assert first_id != second_id

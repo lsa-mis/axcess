@@ -1,40 +1,60 @@
 {% if not findings %}
-  <p>No findings match the current filters.</p>
+  <p class="empty">No findings match the current filters.</p>
 {% else %}
-<table class="data" aria-label="Findings">
-  <thead>
-    <tr>
-      <th scope="col">Severity</th>
-      <th scope="col">Score</th>
-      <th scope="col">Classification</th>
-      <th scope="col">Alt adequacy</th>
-      <th scope="col">Image</th>
-      <th scope="col">OCR text</th>
-      <th scope="col">Status</th>
-    </tr>
-  </thead>
-  <tbody>
+<ol class="finding-grid" role="list" aria-label="Findings">
   {% for f in findings %}
-    <tr data-finding-id="{{ f.id }}">
-      <td><span class="sev sev-{{ f.severity }}">{{ f.severity }}</span></td>
-      <td>{{ "%.2f"|format(f.priority_score) }}</td>
-      <td>{{ f.vlm_classification or "—" }}</td>
-      <td>{{ f.alt_adequacy or "—" }}</td>
-      <td>
+  <li class="card" data-finding-id="{{ f.id }}" aria-labelledby="f{{ f.id }}-title">
+    <a class="card__thumb"
+       href="/findings/{{ f.id }}"
+       aria-label="Open finding {{ f.id }}">
+      {% if f.has_svg_text %}
+        <span class="card__thumb-placeholder" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="32" height="32" role="img">
+            <text x="4" y="22" font-size="18" font-family="serif">SVG</text>
+          </svg>
+        </span>
+      {% elif f.content_hash %}
+        <img src="/blobs/{{ f.content_hash }}"
+             alt=""
+             loading="lazy"
+             decoding="async"
+             {% if f.width %}width="{{ f.width }}"{% endif %}
+             {% if f.height %}height="{{ f.height }}"{% endif %}>
+      {% else %}
+        <span class="card__thumb-placeholder" aria-hidden="true">—</span>
+      {% endif %}
+      <span class="card__severity sev sev-{{ f.severity }}" aria-hidden="true">{{ f.severity }}</span>
+    </a>
+    <div class="card__body">
+      <h3 id="f{{ f.id }}-title" class="card__title">
         <a href="/findings/{{ f.id }}">{{ f.src_url_short }}</a>
-      </td>
-      <td class="subtle">
+      </h3>
+      <dl class="card__meta">
         {% if f.ocr_text %}
-          {{ f.ocr_text|truncate(60) }}
-        {% else %}
-          —
+        <dt>OCR</dt>
+        <dd class="card__ocr">{{ f.ocr_text|truncate(80) }}</dd>
         {% endif %}
-      </td>
-      <td>{{ f.status }}</td>
-    </tr>
+        <dt>Alt</dt>
+        <dd class="card__alt">
+          {% if f.sample_alt is none %}
+            <em class="missing-alt">missing</em>
+          {% elif f.sample_alt == "" %}
+            <em class="empty-alt">alt=""</em>
+          {% else %}
+            &ldquo;{{ f.sample_alt|truncate(80) }}&rdquo;
+          {% endif %}
+        </dd>
+        {% if f.vlm_classification %}
+        <dt>Type</dt>
+        <dd>{{ f.vlm_classification }}</dd>
+        {% endif %}
+        <dt>Priority</dt>
+        <dd>{{ "%.2f"|format(f.priority_score) }} &middot; status <strong>{{ f.status }}</strong></dd>
+      </dl>
+    </div>
+  </li>
   {% endfor %}
-  </tbody>
-</table>
+</ol>
 
 {% if pagination.total_pages > 1 %}
 <nav class="pagination" aria-label="Findings pagination">

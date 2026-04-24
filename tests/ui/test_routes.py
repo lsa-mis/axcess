@@ -67,7 +67,7 @@ def test_findings_list_returns_partial_for_htmx(
     # Partial must NOT include <html> / skip-link / nav.
     assert "<title>" not in resp.text
     assert "skip-link" not in resp.text
-    assert "<table" in resp.text or "No findings" in resp.text
+    assert "finding-grid" in resp.text or "No findings" in resp.text
 
 
 def test_findings_filter_by_severity(
@@ -251,6 +251,110 @@ def test_scan_detail_lists_export_links(
     assert resp.status_code == 200
     for fmt in ("csv", "json", "jira", "markdown"):
         assert f"/scans/{scan_id}/export/{fmt}" in resp.text
+
+
+def test_findings_list_renders_thumbnails_with_blob_links(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """Card view must include <img src='/blobs/<hash>'> so the reviewer
+    can actually see what they're triaging."""
+    import re
+
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/scans/{scan_id}/findings")
+    assert resp.status_code == 200
+    assert "finding-grid" in resp.text
+    blob_srcs = re.findall(r'src="/blobs/([0-9a-f]{64})"', resp.text)
+    # Seeded fixture has two blob-backed findings (banner + logo).
+    assert len(blob_srcs) >= 1
+    # And every blob URL must actually serve an image.
+    for h in blob_srcs[:2]:
+        r = client.get(f"/blobs/{h}")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/")
+
+
+def test_scan_detail_running_shows_cancel_button(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """Scans still in 'running' state surface a Stop-crawl button."""
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('http://live.example/', 'running', 0, 0, '{}')"
+        )
+        running_id = int(cur.lastrowid or 0)
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get(f"/scans/{running_id}")
+    assert resp.status_code == 200
+    assert "Stop crawl" in resp.text
+    assert f"/scans/{running_id}/cancel" in resp.text
+
+
+def test_cancel_endpoint_marks_scan_interrupted(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('http://cancel.example/', 'running', 0, 0, '{}')"
+        )
+        running_id = int(cur.lastrowid or 0)
+        # Seed a pending job for this scan so we verify cleanup.
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state) VALUES ('fetch', ?, 'pending')",
+            (f'{{"url":"http://x/a","scan_id":{running_id},"depth":0}}',),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.post(f"/scans/{running_id}/cancel", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == f"/scans/{running_id}"
+
+    check = _sqlite3.connect(str(db_path))
+    check.row_factory = _sqlite3.Row
+    try:
+        row = check.execute("SELECT status FROM scans WHERE id = ?", (running_id,)).fetchone()
+        pending = check.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE state = 'pending' AND "
+            "json_extract(payload_json, '$.scan_id') = ?",
+            (running_id,),
+        ).fetchone()
+    finally:
+        check.close()
+    assert row["status"] == "interrupted"
+    assert int(pending["n"]) == 0
+
+
+def test_cancel_unknown_scan_404s(client: TestClient) -> None:
+    resp = client.post("/scans/99999/cancel")
+    assert resp.status_code == 404
+
+
+def test_cancel_completed_scan_is_noop(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.post(f"/scans/{scan_id}/cancel", follow_redirects=False)
+    assert resp.status_code == 303
+    # Completed scans keep their status.
+    detail = client.get(f"/scans/{scan_id}")
+    assert "completed" in detail.text
 
 
 def test_scan_detail_shows_blocked_warning_for_non_2xx_seed(

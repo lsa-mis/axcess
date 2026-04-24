@@ -5,16 +5,67 @@
   <p class="subtle">{{ scan.seed_url }}</p>
 
   {% if scan.status == 'running' %}
-  <aside role="status" aria-live="polite"
-         hx-get="/scans/{{ scan.id }}"
-         hx-trigger="every 2s"
-         hx-select="main"
-         hx-target="main"
-         hx-swap="outerHTML"
-         style="padding:0.75rem;border:1px solid var(--accent);border-radius:4px;margin:1rem 0;">
-    Crawl in progress — this page refreshes every 2 seconds. Pages fetched so
-    far: <strong>{{ scan.page_count }}</strong>.
-  </aside>
+  <section aria-labelledby="progress-heading"
+           hx-get="/scans/{{ scan.id }}"
+           hx-trigger="every 2s"
+           hx-select="main"
+           hx-target="main"
+           hx-swap="outerHTML"
+           style="padding:1rem;border:1px solid var(--accent);border-radius:6px;margin:1rem 0;background:color-mix(in srgb, var(--accent) 6%, transparent);">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:1rem;flex-wrap:wrap;">
+      <div>
+        <h3 id="progress-heading" style="margin:0 0 0.25rem 0;">
+          <span aria-hidden="true">⏳</span> Crawl in progress
+        </h3>
+        <p class="subtle" style="margin:0;">
+          Auto-refreshes every 2 seconds.
+        </p>
+      </div>
+      <form method="post" action="/scans/{{ scan.id }}/cancel"
+            onsubmit="return confirm('Stop this crawl? Any pending pages will be dropped.');">
+        <button type="submit"
+                style="background:var(--severity-critical-bg);color:#fff;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600;">
+          Stop crawl
+        </button>
+      </form>
+    </div>
+
+    {% if progress %}
+    <div role="status" aria-live="polite"
+         style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-top:0.75rem;">
+      <div><strong style="font-size:1.25rem;">{{ scan.page_count }}</strong><br><span class="subtle">pages fetched</span></div>
+      <div><strong style="font-size:1.25rem;">{{ progress.pending }}</strong><br><span class="subtle">queued</span></div>
+      <div><strong style="font-size:1.25rem;">{{ progress.leased }}</strong><br><span class="subtle">in flight</span></div>
+      <div><strong style="font-size:1.25rem;">{{ progress.images_seen }}</strong><br><span class="subtle">images seen</span></div>
+      {% if progress.failed %}
+      <div><strong style="font-size:1.25rem;color:var(--severity-critical-bg);">{{ progress.failed }}</strong><br><span class="subtle">failed</span></div>
+      {% endif %}
+    </div>
+
+    {% if progress.recent_pages %}
+    <details style="margin-top:0.75rem;" open>
+      <summary style="cursor:pointer;font-weight:600;">Last 5 pages fetched</summary>
+      <ul class="subtle" style="margin-top:0.5rem;padding-left:1.25rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.85rem;">
+        {% for p in progress.recent_pages %}
+        <li style="margin:0.2rem 0;">
+          <span style="display:inline-block;min-width:3.5em;">
+            {% if p.status_code and 200 <= p.status_code < 300 %}
+              <span style="color:var(--accent);">{{ p.status_code }}</span>
+            {% elif p.status_code %}
+              <span style="color:var(--severity-critical-bg);">{{ p.status_code }}</span>
+            {% else %}
+              <span>—</span>
+            {% endif %}
+          </span>
+          <span style="display:inline-block;min-width:3em;font-size:0.75rem;padding:0.05rem 0.35rem;border-radius:3px;background:var(--border);">{{ p.render_mode }}</span>
+          {{ p.url_normalized|truncate(80) }}
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+    {% endif %}
+  </section>
   {% endif %}
 
   {% if blocked %}

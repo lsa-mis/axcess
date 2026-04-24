@@ -222,6 +222,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             ).fetchone()
             previous_scan_id = int(prev["id"]) if prev is not None else None
             blocked = _detect_blocked_scan(conn, scan_id, scan)
+            progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
         return render(
             request,
             "scan_detail.html",
@@ -230,6 +231,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "by_severity": breakdown,
                 "previous_scan_id": previous_scan_id,
                 "blocked": blocked,
+                "progress": progress,
                 "active": "scan",
             },
         )
@@ -406,6 +408,36 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "active": "findings",
             },
         )
+
+    @app.post("/scans/{scan_id}/cancel", response_class=HTMLResponse)
+    async def cancel_scan(request: Request, scan_id: int) -> Response:
+        """Stop a running crawl. Safe to call even if the task is gone."""
+        task = crawl_state.get("task")
+        active_scan_id = crawl_state.get("scan_id")
+        cancelled_live = False
+        if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
+            task.cancel()
+            cancelled_live = True
+
+        with get_conn() as conn:
+            existing = conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()
+            if existing is None:
+                raise HTTPException(status_code=404, detail="Scan not found")
+            if existing["status"] == "running":
+                conn.execute(
+                    "UPDATE scans SET status = 'interrupted', "
+                    "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (scan_id,),
+                )
+                # Drop pending jobs so a subsequent crawl starts fresh rather
+                # than resuming whatever this scan was chasing.
+                conn.execute(
+                    "DELETE FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
+                    "AND state = 'pending'",
+                    (scan_id,),
+                )
+        log.info("web.scan_cancelled", scan_id=scan_id, live=cancelled_live)
+        return RedirectResponse(url=f"/scans/{scan_id}", status_code=303)
 
     @app.get("/scans/{scan_id}/diff", response_class=HTMLResponse)
     def scan_diff(
@@ -585,6 +617,33 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
         conn.close()
 
 
+def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
+    """Live snapshot for a running crawl: queue counts + last fetched pages."""
+    jobs = conn.execute(
+        "SELECT state, COUNT(*) AS n FROM jobs "
+        "WHERE json_extract(payload_json, '$.scan_id') = ? GROUP BY state",
+        (scan_id,),
+    ).fetchall()
+    job_counts = {r["state"]: int(r["n"]) for r in jobs}
+    recent = conn.execute(
+        "SELECT url_normalized, status_code, render_mode, fetched_at "
+        "FROM pages WHERE scan_id = ? ORDER BY id DESC LIMIT 5",
+        (scan_id,),
+    ).fetchall()
+    image_count = conn.execute(
+        "SELECT COUNT(DISTINCT pi.image_id) AS n FROM page_images pi "
+        "JOIN pages p ON p.id = pi.page_id WHERE p.scan_id = ?",
+        (scan_id,),
+    ).fetchone()["n"]
+    return {
+        "pending": int(job_counts.get("pending", 0)),
+        "leased": int(job_counts.get("leased", 0)),
+        "failed": int(job_counts.get("failed", 0)),
+        "images_seen": int(image_count),
+        "recent_pages": [dict(r) for r in recent],
+    }
+
+
 def _detect_blocked_scan(
     conn: sqlite3.Connection, scan_id: int, scan: dict[str, Any]
 ) -> dict[str, Any] | None:
@@ -607,8 +666,7 @@ def _detect_blocked_scan(
         return None
     seed = str(scan["seed_url"])
     row = conn.execute(
-        "SELECT status_code, title FROM pages "
-        "WHERE scan_id = ? AND url_normalized = ? LIMIT 1",
+        "SELECT status_code, title FROM pages WHERE scan_id = ? AND url_normalized = ? LIMIT 1",
         (scan_id, seed),
     ).fetchone()
     if row is None:
@@ -685,7 +743,8 @@ def _query_findings(
     list_sql = f"""
         SELECT DISTINCT f.id, f.severity, f.priority_score, f.status,
                a.vlm_classification, a.ocr_text,
-               i.src_url_canonical
+               i.src_url_canonical, i.content_hash, i.has_svg_text, i.mime,
+               i.width, i.height
           FROM findings f
           JOIN images i ON i.id = f.image_id
           LEFT JOIN analyses a ON a.image_id = i.id
@@ -700,8 +759,33 @@ def _query_findings(
         item = dict(r)
         item["src_url_short"] = _short_url(item["src_url_canonical"])
         item["alt_adequacy"] = None
+        # Pull a sample occurrence for scannable context on the card.
+        sample = conn.execute(
+            """
+            SELECT pi.alt_text, p.url_normalized AS page_url
+              FROM page_images pi
+              JOIN pages p ON p.id = pi.page_id
+             WHERE pi.image_id = ? AND p.scan_id = ?
+             ORDER BY pi.above_fold DESC, pi.position ASC
+             LIMIT 1
+            """,
+            (item.get("content_hash") and _image_id_for_hash(conn, item["content_hash"]), scan_id),
+        ).fetchone()
+        if sample is not None:
+            item["sample_alt"] = sample["alt_text"]
+            item["sample_page"] = sample["page_url"]
+        else:
+            item["sample_alt"] = None
+            item["sample_page"] = None
         findings.append(item)
     return findings, total
+
+
+def _image_id_for_hash(conn: sqlite3.Connection, content_hash: str) -> int | None:
+    row = conn.execute(
+        "SELECT id FROM images WHERE content_hash = ? LIMIT 1", (content_hash,)
+    ).fetchone()
+    return int(row["id"]) if row is not None else None
 
 
 def _pagination(*, page: int, size: int, total: int, filters: dict[str, str]) -> dict[str, Any]:

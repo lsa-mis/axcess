@@ -31,14 +31,20 @@
       Press <kbd>?</kbd> for keyboard shortcuts.
     </small>
   </footer>
-  <aside id="kb-help" hidden tabindex="-1" aria-label="Keyboard shortcuts">
-    <dl class="meta">
-      <dt>j / k</dt><dd>Next / previous finding</dd>
-      <dt>Enter</dt><dd>Open focused finding</dd>
-      <dt>/</dt><dd>Focus the filter input</dd>
-      <dt>s</dt><dd>Focus the status dropdown</dd>
-      <dt>?</dt><dd>Toggle this help</dd>
+  <aside id="kb-help" hidden tabindex="-1" aria-label="Keyboard shortcuts"
+         style="position:fixed;right:1rem;bottom:1rem;max-width:340px;padding:1rem;border:1px solid var(--border);border-radius:6px;background:var(--bg);box-shadow:0 4px 16px color-mix(in srgb, var(--fg) 20%, transparent);z-index:50;">
+    <h3 style="margin:0 0 0.5rem 0;font-size:1rem;">Keyboard shortcuts</h3>
+    <dl class="meta" style="font-size:0.9rem;">
+      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous finding</dd>
+      <dt><kbd>Enter</kbd></dt><dd>Open focused finding</dd>
+      <dt><kbd>/</kbd></dt><dd>Focus the filter input</dd>
+      <dt><kbd>s</kbd></dt><dd>Focus status dropdown</dd>
+      <dt><kbd>0</kbd>–<kbd>5</kbd></dt><dd>Set status (new → false_positive)</dd>
+      <dt><kbd>?</kbd></dt><dd>Toggle this help</dd>
     </dl>
+    <p class="subtle" style="margin:0.5rem 0 0 0;font-size:0.8rem;">
+      Shortcuts are disabled while typing in a form field.
+    </p>
   </aside>
 </body>
 </html>
