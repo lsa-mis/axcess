@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Scans — Image Text Audit{% endblock %}
 {% block content %}
-  <h2>Scans</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+    <h2 style="margin:0;">Scans</h2>
+    <a href="/scans/new"
+       style="padding:0.5rem 1rem;background:var(--accent);color:var(--accent-fg);text-decoration:none;border-radius:4px;font-weight:600;">
+      + New scan
+    </a>
+  </div>
   {% if not scans %}
-    <p>No scans yet. Run <kbd>audit crawl &lt;url&gt;</kbd> from the command line.</p>
+    <p>No scans yet. Start one via <a href="/scans/new">New scan</a>,
+       or run <kbd>audit crawl &lt;url&gt;</kbd> from the command line.</p>
   {% else %}
   <table class="data" aria-label="Scan list">
     <thead>

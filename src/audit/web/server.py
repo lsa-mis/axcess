@@ -7,12 +7,13 @@ authentication is provided because this is a single-user local tool.
 
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -21,7 +22,8 @@ from fastapi.templating import Jinja2Templates
 
 from audit import __version__
 from audit.blob_store import BlobStore
-from audit.config import get_settings
+from audit.config import Settings, get_settings
+from audit.crawler.orchestrator import CrawlConfig, run_crawl
 from audit.db.schema import connect
 from audit.exports.collector import collect_scan
 from audit.exports.csv_export import render_csv
@@ -83,6 +85,13 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
     templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
+    # Single running crawl at a time. Tracked here (not in the DB) because
+    # "running" in the scans table can be stale after a server restart.
+    crawl_state: dict[str, asyncio.Task[Any] | int | None] = {
+        "task": None,
+        "scan_id": None,
+    }
+
     def get_conn() -> sqlite3.Connection:
         return connect(resolved_db)
 
@@ -121,6 +130,80 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             "scans.html",
             {"scans": [dict(r) for r in rows], "active": "scans"},
         )
+
+    @app.get("/scans/new", response_class=HTMLResponse)
+    def new_scan_form(request: Request) -> HTMLResponse:
+        task = crawl_state.get("task")
+        running_id: int | None = None
+        if isinstance(task, asyncio.Task) and not task.done():
+            val = crawl_state.get("scan_id")
+            running_id = int(val) if isinstance(val, int) else None
+        return render(
+            request,
+            "new_scan.html",
+            {"form": {}, "running_scan_id": running_id, "active": "new"},
+        )
+
+    @app.post("/scans/new", response_class=HTMLResponse)
+    async def new_scan_submit(
+        request: Request,
+        url: str = Form(...),
+        max_pages: int = Form(100),
+        max_depth: int = Form(10),
+        rps: float = Form(2.0),
+        workers: int = Form(4),
+        include_subdomain: str | None = Form(default=None),
+        ignore_robots: str | None = Form(default=None),
+        skip_ocr: str | None = Form(default=None),
+        skip_vlm: str | None = Form(default=None),
+    ) -> Response:
+        form = {
+            "url": url,
+            "max_pages": max_pages,
+            "max_depth": max_depth,
+            "rps": rps,
+            "workers": workers,
+            "include_subdomain": bool(include_subdomain),
+            "ignore_robots": bool(ignore_robots),
+            "skip_ocr": bool(skip_ocr),
+            "skip_vlm": bool(skip_vlm),
+        }
+        error = _validate_seed_url(url)
+        if error is not None:
+            return render(
+                request,
+                "new_scan.html",
+                {"form": form, "error": error, "running_scan_id": None, "active": "new"},
+            )
+
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            running_val = crawl_state.get("scan_id")
+            running_id = int(running_val) if isinstance(running_val, int) else None
+            return render(
+                request,
+                "new_scan.html",
+                {
+                    "form": form,
+                    "error": "A crawl is already running. Wait for it to finish or interrupt it.",
+                    "running_scan_id": running_id,
+                    "active": "new",
+                },
+            )
+
+        config = _build_crawl_config(form, settings)
+        scan_id = _prepare_scan_row(resolved_db, config)
+        crawl_state["scan_id"] = scan_id
+
+        async def _run_and_unregister() -> None:
+            try:
+                await _run_background_crawl(resolved_db, config)
+            finally:
+                # Leave scan_id in place so the form can still show "last run".
+                pass
+
+        crawl_state["task"] = asyncio.create_task(_run_and_unregister())
+        return RedirectResponse(url=f"/scans/{scan_id}", status_code=303)
 
     @app.get("/scans/{scan_id}", response_class=HTMLResponse)
     def scan_detail(request: Request, scan_id: int) -> HTMLResponse:
@@ -402,6 +485,99 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         return FileResponse(full, media_type=row["mime"] or "application/octet-stream")
 
     return app
+
+
+def _validate_seed_url(url: str) -> str | None:
+    """Return an error message if ``url`` is unsuitable as a seed, else ``None``."""
+    url = (url or "").strip()
+    if not url:
+        return "Seed URL is required."
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "Seed URL is not a valid URL."
+    if parts.scheme not in ("http", "https"):
+        return "Seed URL must start with http:// or https://."
+    if not parts.hostname:
+        return "Seed URL is missing a host."
+    return None
+
+
+def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig:
+    return CrawlConfig(
+        seed_url=str(form["url"]).strip(),
+        max_pages=int(form["max_pages"]),
+        max_depth=int(form["max_depth"]),
+        rps=float(form["rps"]),
+        workers=int(form["workers"]),
+        allow_subdomains=bool(form["include_subdomain"]),
+        ignore_robots=bool(form["ignore_robots"]),
+        user_agent=settings.user_agent,
+        request_timeout_s=settings.request_timeout_s,
+        ocr_enabled=not bool(form["skip_ocr"]),
+        ocr_language=settings.ocr_language,
+        ocr_max_workers=settings.ocr_max_workers,
+        ocr_min_confidence=settings.ocr_min_confidence,
+        ocr_min_word_count=settings.ocr_min_word_count,
+        vlm_enabled=not bool(form["skip_vlm"]),
+        vlm_model=settings.vlm_model,
+        vlm_base_url=settings.ollama_base_url,
+        vlm_prompt_name=settings.vlm_prompt_name,
+        vlm_concurrency=settings.vlm_concurrency,
+    )
+
+
+def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
+    """Create the scan row up front so the UI can redirect immediately.
+
+    ``run_crawl`` will discover and reuse this row via its seed-URL match,
+    so we don't end up with duplicates.
+    """
+    import json as _json
+
+    conn = connect(db_path)
+    try:
+        existing = conn.execute(
+            "SELECT id FROM scans WHERE seed_url = ? AND status IN ('running', 'interrupted') "
+            "ORDER BY id DESC LIMIT 1",
+            (config.seed_url,),
+        ).fetchone()
+        if existing is not None:
+            return int(existing["id"])
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', ?)",
+            (
+                config.seed_url,
+                _json.dumps(
+                    {
+                        "max_pages": config.max_pages,
+                        "max_depth": config.max_depth,
+                        "rps": config.rps,
+                        "allow_subdomains": config.allow_subdomains,
+                        "ignore_robots": config.ignore_robots,
+                        "ocr_enabled": config.ocr_enabled,
+                        "vlm_enabled": config.vlm_enabled,
+                    },
+                    sort_keys=True,
+                ),
+            ),
+        )
+        return int(cur.lastrowid or 0)
+    finally:
+        conn.close()
+
+
+async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
+    """Open a private DB connection and run the crawl. Never raises."""
+    log.info("web.crawl_start", seed=config.seed_url)
+    conn = connect(db_path)
+    try:
+        await run_crawl(conn, config)
+    except Exception as exc:
+        # Log and swallow — the scans row status carries the outcome.
+        log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
+    finally:
+        conn.close()
 
 
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

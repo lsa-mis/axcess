@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}New scan — Image Text Audit{% endblock %}
+{% block content %}
+  <h2>New scan</h2>
+  <p class="subtle">
+    Start a crawl against a public URL. The site must be reachable from this
+    machine. Runs in the background; the scan page will auto-refresh until
+    the crawl finishes.
+  </p>
+
+  {% if running_scan_id %}
+  <aside role="status" class="subtle" style="padding:0.75rem;border:1px solid var(--border);border-radius:4px;margin:1rem 0;">
+    A crawl is already in progress —
+    <a href="/scans/{{ running_scan_id }}">scan #{{ running_scan_id }}</a>.
+    Starting a new one will queue behind it.
+  </aside>
+  {% endif %}
+
+  {% if error %}
+  <aside role="alert" style="padding:0.75rem;border:1px solid var(--severity-critical-bg);border-radius:4px;margin:1rem 0;color:var(--severity-critical-bg);">
+    {{ error }}
+  </aside>
+  {% endif %}
+
+  <form method="post" action="/scans/new" class="filters" style="flex-direction:column;align-items:stretch;gap:1rem;max-width:640px;">
+    <label>
+      Seed URL
+      <input
+        type="url"
+        name="url"
+        required
+        autofocus
+        placeholder="https://example.com/"
+        value="{{ form.url or '' }}"
+        aria-describedby="url-hint"
+      >
+      <span id="url-hint" class="subtle">
+        Must start with http:// or https://. The crawl stays on this host by
+        default.
+      </span>
+    </label>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <label>
+        Max pages
+        <input type="number" name="max_pages" min="1" max="10000"
+               value="{{ form.max_pages or 100 }}">
+      </label>
+      <label>
+        Max depth
+        <input type="number" name="max_depth" min="1" max="20"
+               value="{{ form.max_depth or 10 }}">
+      </label>
+      <label>
+        Requests / second / host
+        <input type="number" name="rps" step="0.1" min="0.1" max="50"
+               value="{{ form.rps or 2.0 }}">
+      </label>
+      <label>
+        Workers
+        <input type="number" name="workers" min="1" max="16"
+               value="{{ form.workers or 4 }}">
+      </label>
+    </div>
+
+    <fieldset style="border:1px solid var(--border);border-radius:4px;padding:0.75rem;">
+      <legend>Options</legend>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="include_subdomain" value="1"
+               {% if form.include_subdomain %}checked{% endif %}>
+        Follow links on subdomains
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="ignore_robots" value="1"
+               {% if form.ignore_robots %}checked{% endif %}>
+        Ignore robots.txt (authorized testing only)
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="skip_ocr" value="1"
+               {% if form.skip_ocr %}checked{% endif %}>
+        Skip OCR
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="skip_vlm" value="1"
+               {% if form.skip_vlm %}checked{% endif %}>
+        Skip VLM classification
+      </label>
+    </fieldset>
+
+    <div style="display:flex;gap:0.5rem;">
+      <button type="submit">Start crawl</button>
+      <a href="/scans" style="align-self:center;">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

@@ -4,6 +4,19 @@
   <h2>Scan #{{ scan.id }}</h2>
   <p class="subtle">{{ scan.seed_url }}</p>
 
+  {% if scan.status == 'running' %}
+  <aside role="status" aria-live="polite"
+         hx-get="/scans/{{ scan.id }}"
+         hx-trigger="every 2s"
+         hx-select="main"
+         hx-target="main"
+         hx-swap="outerHTML"
+         style="padding:0.75rem;border:1px solid var(--accent);border-radius:4px;margin:1rem 0;">
+    Crawl in progress — this page refreshes every 2 seconds. Pages fetched so
+    far: <strong>{{ scan.page_count }}</strong>.
+  </aside>
+  {% endif %}
+
   <dl class="meta" aria-label="Scan metadata">
     <dt>Status</dt><dd>{{ scan.status }}</dd>
     <dt>Started</dt><dd>{{ scan.started_at }}</dd>

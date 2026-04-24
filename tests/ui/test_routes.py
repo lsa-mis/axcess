@@ -267,3 +267,107 @@ def test_diff_route_with_explicit_compare_to_404s_on_missing(
     _, _, scan_id = seeded_db
     resp = client.get(f"/scans/{scan_id}/diff?compare_to=99999")
     assert resp.status_code == 404
+
+
+def test_new_scan_form_renders(client: TestClient) -> None:
+    resp = client.get("/scans/new")
+    assert resp.status_code == 200
+    assert "<title>New scan" in resp.text
+    assert 'name="url"' in resp.text
+    assert 'name="max_pages"' in resp.text
+    assert 'name="skip_ocr"' in resp.text
+
+
+def test_new_scan_list_links_to_form(client: TestClient) -> None:
+    resp = client.get("/scans")
+    assert resp.status_code == 200
+    assert 'href="/scans/new"' in resp.text
+
+
+def test_new_scan_rejects_non_http_url(client: TestClient) -> None:
+    resp = client.post(
+        "/scans/new",
+        data={"url": "ftp://example.com/"},
+        follow_redirects=False,
+    )
+    # Stays on the form with an error, no redirect.
+    assert resp.status_code == 200
+    assert "http:// or https://" in resp.text
+    # Echoes the bad value back into the form so the user can fix it.
+    assert "ftp://example.com" in resp.text
+
+
+def test_new_scan_rejects_empty_url(client: TestClient) -> None:
+    # FastAPI's Form(...) returns 422 for a missing required field.
+    resp = client.post("/scans/new", data={}, follow_redirects=False)
+    assert resp.status_code == 422
+
+
+def test_new_scan_accepts_valid_url_and_redirects(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio as _asyncio
+
+    # Stub the background crawl so the test stays offline.
+    called: dict[str, object] = {}
+
+    async def _noop_crawl(db_path, config):  # type: ignore[no-untyped-def]
+        called["ran"] = True
+        called["seed"] = config.seed_url
+
+    from audit.web import server as _server
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _noop_crawl)
+    resp = client.post(
+        "/scans/new",
+        data={
+            "url": "https://example.test/",
+            "max_pages": 5,
+            "max_depth": 2,
+            "rps": 1.0,
+            "workers": 2,
+            "skip_ocr": "1",
+            "skip_vlm": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert resp.headers["location"].startswith("/scans/")
+
+    # Give the scheduled task a tick to run.
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    assert called.get("ran") is True
+    assert called.get("seed") == "https://example.test/"
+
+
+def test_new_scan_form_template_shows_running_banner() -> None:
+    """Template-level check for the 'crawl in progress' banner.
+
+    Rendering directly via Jinja avoids TestClient's per-request asyncio loop
+    lifecycle, which makes live-task inspection flaky in tests. The banner
+    itself is a simple conditional on ``running_scan_id``.
+    """
+    from jinja2 import Environment, FileSystemLoader
+
+    from audit.web.server import _TEMPLATES_DIR
+
+    env = Environment(loader=FileSystemLoader(_TEMPLATES_DIR), autoescape=True)
+
+    # Minimal stubs for base.html's url_for / scan context.
+    def _url_for(_name: str, path: str = "") -> str:
+        return f"/static/{path}"
+
+    env.globals["url_for"] = _url_for
+    rendered = env.get_template("new_scan.html").render(
+        form={},
+        running_scan_id=42,
+        active="new",
+        request=None,
+        scan=None,
+    )
+    assert "crawl is already in progress" in rendered
+    assert "/scans/42" in rendered

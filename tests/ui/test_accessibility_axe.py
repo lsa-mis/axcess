@@ -158,6 +158,22 @@ async def test_keyboard_navigation_j_k_opens_finding(
 
 
 @pytest.mark.asyncio
+async def test_new_scan_form_has_no_axe_violations(
+    live_server: tuple[str, int],
+) -> None:
+    base, _ = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/scans/new", wait_until="networkidle")
+            violations = await _run_axe(page)
+            assert not violations, _render_violations(violations)
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
 async def test_skip_link_reachable_by_tab(live_server: tuple[str, int]) -> None:
     base, _ = live_server
     async with playwright_async.async_playwright() as pw:
