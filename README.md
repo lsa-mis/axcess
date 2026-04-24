@@ -2,6 +2,15 @@
 
 Local, offline web accessibility auditor focused on **WCAG 1.4.5 — Images of Text**. Crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text, cross-checks against `alt`, and surfaces prioritized findings in a local UI with rescan/diff support.
 
+## Docs
+
+Full documentation lives under [`docs/`](./docs/README.md):
+
+- **[Architecture](./docs/architecture.md)** — pipeline, data flow, storage model
+- **[User guide](./docs/user-guide.md)** — CLI + UI walkthroughs
+- **[Developer guide](./docs/developer-guide.md)** — code layout + extension points
+- **[Troubleshooting](./docs/troubleshooting.md)** — Cloudflare, stuck scans, Ollama, scope
+
 ## Status — v1.0 (Phase 8: rescans + diff — **v1 feature-complete**)
 
 What works today:
