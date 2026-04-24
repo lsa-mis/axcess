@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 from audit import __version__
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
+from audit.crawler import url_policy
 from audit.crawler.orchestrator import CrawlConfig, run_crawl
 from audit.db.schema import connect
 from audit.exports.collector import collect_scan
@@ -144,6 +145,33 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             {"form": {}, "running_scan_id": running_id, "active": "new"},
         )
 
+    @app.get("/scans/new/preview", response_class=HTMLResponse)
+    def new_scan_preview(
+        request: Request,
+        url: str = Query(default=""),
+        whole_host: str = Query(default=""),
+    ) -> HTMLResponse:
+        """HTMX-driven preview of the scope the crawler will actually use."""
+        url = (url or "").strip()
+        if not url:
+            return HTMLResponse("")
+        error = _validate_seed_url(url)
+        if error is not None:
+            return HTMLResponse(f'<span class="subtle">{error}</span>')
+        normalized = url_policy.normalize_seed_url(url)
+        if whole_host:
+            return HTMLResponse(
+                "<strong>Scope:</strong> entire host "
+                f"<code>{url_policy.build_scope(normalized).seed_host}</code>"
+            )
+        scope = url_policy.build_scope(normalized)
+        suffix = (
+            "" if normalized == url else f" (auto-added trailing slash: <code>{normalized}</code>)"
+        )
+        return HTMLResponse(
+            f"<strong>Scope:</strong> <code>{scope.seed_host}{scope.path_prefix}</code>{suffix}"
+        )
+
     @app.post("/scans/new", response_class=HTMLResponse)
     async def new_scan_submit(
         request: Request,
@@ -153,6 +181,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         rps: float = Form(2.0),
         workers: int = Form(4),
         include_subdomain: str | None = Form(default=None),
+        whole_host: str | None = Form(default=None),
         ignore_robots: str | None = Form(default=None),
         skip_ocr: str | None = Form(default=None),
         skip_vlm: str | None = Form(default=None),
@@ -165,6 +194,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             "rps": rps,
             "workers": workers,
             "include_subdomain": bool(include_subdomain),
+            "whole_host": bool(whole_host),
             "ignore_robots": bool(ignore_robots),
             "skip_ocr": bool(skip_ocr),
             "skip_vlm": bool(skip_vlm),
@@ -547,6 +577,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         rps=float(form["rps"]),
         workers=int(form["workers"]),
         allow_subdomains=bool(form["include_subdomain"]),
+        whole_host=bool(form.get("whole_host")),
         ignore_robots=bool(form["ignore_robots"]),
         user_agent=settings.user_agent,
         request_timeout_s=settings.request_timeout_s,

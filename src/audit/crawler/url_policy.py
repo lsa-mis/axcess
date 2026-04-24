@@ -1,8 +1,19 @@
 """URL normalization and scope rules.
 
-Normalization is aggressive and deterministic so that two cosmetic variants of the
-same URL dedupe against the same row. Scope is based on the registrable domain
-(eTLD+1) of the seed URL; subdomains are opt-in via ``allow_subdomains``.
+Normalization is aggressive and deterministic so that two cosmetic variants of
+the same URL dedupe against the same row.
+
+Scope is anchored on the seed URL's host AND path. A seed like
+``https://lsa.umich.edu/bicentennial/`` produces a scope whose
+``path_prefix`` is ``/bicentennial/``; the crawler then follows links
+whose path starts with that prefix. If the user enters the same URL
+without the trailing slash (``…/bicentennial``), we auto-add the slash so
+long as the last path segment doesn't look like a filename (no dot in
+the last segment). Seeds with an extension (``/docs/intro.html``) fall
+back to the directory of the seed (``/docs/``) so links to sibling pages
+still get crawled. A bare-host seed (``/``) gives a whole-host scope.
+
+Subdomains are still opt-in via ``allow_subdomains``.
 """
 
 from __future__ import annotations
@@ -51,10 +62,12 @@ def normalize(url: str) -> str:
 
 @dataclass(frozen=True)
 class HostScope:
-    """Crawl scope anchored on a seed URL's registrable domain."""
+    """Crawl scope anchored on a seed URL's host AND path prefix."""
 
     registrable_domain: str
     seed_host: str
+    path_prefix: str = "/"
+    """URL path prefix (always ends in ``/``). ``/`` means whole-host."""
 
 
 def _registrable_domain(host: str) -> str:
@@ -64,10 +77,67 @@ def _registrable_domain(host: str) -> str:
     return f"{parts.domain}.{parts.suffix}"
 
 
-def build_scope(seed_url: str) -> HostScope:
-    """Derive a ``HostScope`` from a seed URL."""
-    host = (urlsplit(seed_url).hostname or "").lower()
-    return HostScope(registrable_domain=_registrable_domain(host), seed_host=host)
+def _looks_like_filename(segment: str) -> bool:
+    """True if the last path segment looks like a file (has a dot + extension)."""
+    return "." in segment and not segment.startswith(".")
+
+
+def _path_prefix_for(path: str) -> str:
+    """Pick a path-scope prefix from a seed URL path.
+
+    Rules (see module docstring for rationale):
+
+      * ``/`` → ``/`` (whole-host)
+      * ends in ``/`` → returned as-is
+      * last segment has an extension (``/docs/intro.html``) → the
+        directory of that file (``/docs/``)
+      * otherwise → auto-add a trailing slash (``/bicentennial`` →
+        ``/bicentennial/``)
+    """
+    if not path or path == "/":
+        return "/"
+    if path.endswith("/"):
+        return path
+    last_slash = path.rfind("/")
+    last_segment = path[last_slash + 1 :]
+    if _looks_like_filename(last_segment):
+        # Include everything up to and including the last '/'.
+        return path[: last_slash + 1]
+    return path + "/"
+
+
+def normalize_seed_url(seed_url: str) -> str:
+    """Return ``seed_url`` with a trailing slash added when the last path
+    segment looks like a directory (no extension).
+
+    Canonicalizes the input a user likely typed into a form. Does not alter
+    seeds that look like files or already end with ``/``.
+    """
+    parts = urlsplit(seed_url.strip())
+    path = parts.path or "/"
+    if path == "/" or path.endswith("/"):
+        return urlunsplit(parts)
+    last_segment = path[path.rfind("/") + 1 :]
+    if _looks_like_filename(last_segment):
+        return urlunsplit(parts)
+    return urlunsplit(parts._replace(path=path + "/"))
+
+
+def build_scope(seed_url: str, *, whole_host: bool = False) -> HostScope:
+    """Derive a ``HostScope`` from a seed URL.
+
+    Set ``whole_host=True`` to keep the old behavior (ignore path; follow
+    every in-host link). By default the scope is path-constrained, so
+    ``/bicentennial/`` crawls only ``/bicentennial/*`` — not the whole site.
+    """
+    parts = urlsplit(seed_url)
+    host = (parts.hostname or "").lower()
+    prefix = "/" if whole_host else _path_prefix_for(parts.path or "/")
+    return HostScope(
+        registrable_domain=_registrable_domain(host),
+        seed_host=host,
+        path_prefix=prefix,
+    )
 
 
 def _strip_www(host: str) -> str:
@@ -120,10 +190,14 @@ def compare_key(url: str) -> str:
 def is_in_scope(url: str, scope: HostScope, *, allow_subdomains: bool = False) -> bool:
     """Return True if ``url`` should be crawled under ``scope``.
 
-    Only ``http`` and ``https`` URLs are considered in scope.
-    With ``allow_subdomains=True``, any host under the registrable domain matches.
-    Without it, only the seed host matches, with ``www.`` normalized out for the
-    convenience of matching ``example.com`` and ``www.example.com`` as the same site.
+    Checks, in order:
+      * ``http``/``https`` scheme only
+      * host matches the seed (or falls under the registrable domain when
+        ``allow_subdomains`` is set)
+      * path starts with ``scope.path_prefix`` (``/`` matches everything)
+
+    The ``www.`` vs apex host variance is normalized so ``example.com`` and
+    ``www.example.com`` are treated as the same site.
     """
     try:
         parts = urlsplit(url)
@@ -135,5 +209,17 @@ def is_in_scope(url: str, scope: HostScope, *, allow_subdomains: bool = False) -
     if not host:
         return False
     if allow_subdomains:
-        return _registrable_domain(host) == scope.registrable_domain
-    return _strip_www(host) == _strip_www(scope.seed_host)
+        host_ok = _registrable_domain(host) == scope.registrable_domain
+    else:
+        host_ok = _strip_www(host) == _strip_www(scope.seed_host)
+    if not host_ok:
+        return False
+
+    if scope.path_prefix == "/":
+        return True
+    path = parts.path or "/"
+    # Match against the prefix itself OR the prefix with its trailing '/'
+    # dropped — so a link to ``/bicentennial`` resolves as in-scope for a
+    # ``/bicentennial/`` prefix, letting the server's redirect settle it.
+    bare = scope.path_prefix.rstrip("/")
+    return path == bare or path.startswith(scope.path_prefix)

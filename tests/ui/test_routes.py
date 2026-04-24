@@ -407,6 +407,79 @@ def test_new_scan_form_has_js_eager_checkbox(client: TestClient) -> None:
     assert "Use real browser" in resp.text
 
 
+def test_new_scan_form_has_whole_host_checkbox(client: TestClient) -> None:
+    resp = client.get("/scans/new")
+    assert resp.status_code == 200
+    assert 'name="whole_host"' in resp.text
+    assert "entire host" in resp.text
+
+
+def test_scope_preview_auto_adds_slash(client: TestClient) -> None:
+    resp = client.get("/scans/new/preview?url=https://example.com/bicentennial")
+    assert resp.status_code == 200
+    # Preview should show the path-scoped prefix with a note about the slash.
+    assert "example.com/bicentennial/" in resp.text
+    assert "auto-added trailing slash" in resp.text
+
+
+def test_scope_preview_whole_host(client: TestClient) -> None:
+    resp = client.get("/scans/new/preview?url=https://example.com/bicentennial&whole_host=1")
+    assert resp.status_code == 200
+    assert "entire host" in resp.text
+
+
+def test_scope_preview_for_root_seed_has_no_slash_note(client: TestClient) -> None:
+    resp = client.get("/scans/new/preview?url=https://example.com/")
+    assert resp.status_code == 200
+    assert "auto-added trailing slash" not in resp.text
+
+
+def test_scope_preview_rejects_invalid_url(client: TestClient) -> None:
+    resp = client.get("/scans/new/preview?url=ftp://example.com/")
+    assert resp.status_code == 200
+    assert "http://" in resp.text
+
+
+def test_new_scan_submit_respects_whole_host(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Submitting the form with whole_host=1 should end up with
+    scope.path_prefix == '/' in the CrawlConfig that gets built."""
+    from audit.web import server as _server
+
+    captured: dict[str, object] = {}
+
+    async def _capture(db_path, config):  # type: ignore[no-untyped-def]
+        captured["whole_host"] = config.whole_host
+        captured["seed_url"] = config.seed_url
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _capture)
+    resp = client.post(
+        "/scans/new",
+        data={
+            "url": "https://example.test/docs",
+            "max_pages": 1,
+            "max_depth": 1,
+            "rps": 1.0,
+            "workers": 1,
+            "whole_host": "1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    import asyncio as _asyncio
+
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    assert captured.get("whole_host") is True
+    assert captured.get("seed_url") == "https://example.test/docs"
+
+
 def test_diff_route_without_previous_scan_400(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:

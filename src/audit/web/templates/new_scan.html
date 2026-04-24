@@ -30,14 +30,23 @@
         name="url"
         required
         autofocus
-        placeholder="https://example.com/"
+        placeholder="https://example.com/section/"
         value="{{ form.url or '' }}"
-        aria-describedby="url-hint"
+        aria-describedby="url-hint scope-preview"
+        hx-get="/scans/new/preview"
+        hx-target="#scope-preview"
+        hx-trigger="input changed delay:250ms, change from:input[name='whole_host']"
+        hx-include="[name='url'],[name='whole_host']"
+        hx-swap="innerHTML"
       >
       <span id="url-hint" class="subtle">
-        Must start with http:// or https://. The crawl stays on this host by
-        default.
+        Must start with http:// or https://. By default the crawl stays under
+        the seed URL's path — e.g. <code>…/bicentennial/</code> only follows
+        links in that section.
       </span>
+      <span id="scope-preview" class="subtle"
+            style="margin-top:0.35rem;display:block;font-size:0.85rem;"
+            aria-live="polite"></span>
     </label>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
@@ -65,6 +74,11 @@
 
     <fieldset style="border:1px solid var(--border);border-radius:4px;padding:0.75rem;">
       <legend>Options</legend>
+      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="whole_host" value="1"
+               {% if form.whole_host %}checked{% endif %}>
+        Crawl the entire host (ignore the path scope)
+      </label>
       <label style="flex-direction:row;align-items:center;gap:0.5rem;">
         <input type="checkbox" name="include_subdomain" value="1"
                {% if form.include_subdomain %}checked{% endif %}>

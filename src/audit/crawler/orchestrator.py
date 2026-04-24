@@ -81,6 +81,10 @@ class CrawlConfig:
     # useful for sites that aggressively filter non-browser traffic.
     js_enabled: bool = True
     js_eager: bool = False
+    # Scope: by default, the crawler stays under the seed URL's path prefix
+    # (so ``https://example.com/docs/`` only follows ``/docs/*`` links).
+    # Set ``whole_host`` to follow every link on the seed host.
+    whole_host: bool = False
 
 
 @dataclass
@@ -118,8 +122,11 @@ async def run_crawl(
     vlm_provider: VlmProvider | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``."""
-    normalized_seed = url_policy.normalize(config.seed_url)
-    scope = url_policy.build_scope(normalized_seed)
+    # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
+    # the canonical normalize pass. Scope then reads the normalized path.
+    seed_with_slash = url_policy.normalize_seed_url(config.seed_url)
+    normalized_seed = url_policy.normalize(seed_with_slash)
+    scope = url_policy.build_scope(normalized_seed, whole_host=config.whole_host)
 
     scan_id = _ensure_scan(conn, normalized_seed, config)
     queue.reclaim_expired(conn)

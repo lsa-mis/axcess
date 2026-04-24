@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from audit.crawler.url_policy import HostScope, build_scope, compare_key, is_in_scope, normalize
+from audit.crawler.url_policy import (
+    HostScope,
+    build_scope,
+    compare_key,
+    is_in_scope,
+    normalize,
+    normalize_seed_url,
+)
 
 
 def test_normalize_drops_fragment() -> None:
@@ -88,6 +95,89 @@ def test_is_in_scope_rejects_non_http_scheme() -> None:
 def test_is_in_scope_rejects_malformed_url() -> None:
     scope = build_scope("https://example.com/")
     assert not is_in_scope("not a url", scope)
+
+
+# ---------- path scope + auto-slash -----------------------------------------
+
+
+def test_normalize_seed_url_adds_trailing_slash_on_dir_like_path() -> None:
+    assert (
+        normalize_seed_url("https://example.com/bicentennial")
+        == "https://example.com/bicentennial/"
+    )
+
+
+def test_normalize_seed_url_preserves_existing_slash() -> None:
+    assert normalize_seed_url("https://example.com/docs/") == "https://example.com/docs/"
+
+
+def test_normalize_seed_url_leaves_file_seeds_alone() -> None:
+    # Ends in an extension → treated as a file, no slash added.
+    for seed in (
+        "https://example.com/index.html",
+        "https://example.com/docs/intro.html",
+        "https://example.com/path/sitemap.xml",
+    ):
+        assert normalize_seed_url(seed) == seed
+
+
+def test_normalize_seed_url_treats_root_as_root() -> None:
+    assert normalize_seed_url("https://example.com") == "https://example.com"
+    assert normalize_seed_url("https://example.com/") == "https://example.com/"
+
+
+def test_build_scope_path_prefix_for_bicentennial() -> None:
+    scope = build_scope("https://lsa.umich.edu/bicentennial/")
+    assert scope.path_prefix == "/bicentennial/"
+
+
+def test_build_scope_path_prefix_for_file_seed_is_its_directory() -> None:
+    scope = build_scope("https://example.com/docs/intro.html")
+    assert scope.path_prefix == "/docs/"
+
+
+def test_build_scope_whole_host_override_ignores_path() -> None:
+    scope = build_scope("https://example.com/section/", whole_host=True)
+    assert scope.path_prefix == "/"
+
+
+def test_build_scope_bare_host_is_whole_host() -> None:
+    scope = build_scope("https://example.com/")
+    assert scope.path_prefix == "/"
+
+
+def test_is_in_scope_honors_path_prefix() -> None:
+    scope = build_scope("https://lsa.umich.edu/bicentennial/")
+    # Under the prefix: in scope.
+    assert is_in_scope("https://lsa.umich.edu/bicentennial/about", scope)
+    assert is_in_scope("https://lsa.umich.edu/bicentennial/", scope)
+    # The bare prefix (no trailing slash) should still be in-scope so the
+    # server can redirect us to the canonical form.
+    assert is_in_scope("https://lsa.umich.edu/bicentennial", scope)
+    # Siblings with the same prefix string but different segment: out.
+    assert not is_in_scope("https://lsa.umich.edu/bicentennial-news", scope)
+    # Other sections: out.
+    assert not is_in_scope("https://lsa.umich.edu/admissions/", scope)
+
+
+def test_is_in_scope_whole_host_matches_everything() -> None:
+    scope = build_scope("https://example.com/section/", whole_host=True)
+    assert is_in_scope("https://example.com/anywhere/else", scope)
+    assert is_in_scope("https://example.com/", scope)
+
+
+def test_is_in_scope_path_prefix_combines_with_host_check() -> None:
+    scope = build_scope("https://example.com/docs/")
+    # Correct path prefix but wrong host → still out.
+    assert not is_in_scope("https://other.example/docs/intro", scope)
+
+
+def test_is_in_scope_path_prefix_with_subdomains_flag() -> None:
+    scope = build_scope("https://www.example.com/docs/")
+    # Subdomain off: other subdomain rejected even when the path matches.
+    assert not is_in_scope("https://api.example.com/docs/intro", scope)
+    # Subdomain on: accept any subdomain under the registrable domain.
+    assert is_in_scope("https://api.example.com/docs/intro", scope, allow_subdomains=True)
 
 
 def test_compare_key_strips_loopback_port() -> None:

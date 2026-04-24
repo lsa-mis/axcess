@@ -40,6 +40,17 @@ def crawl(
     include_subdomain: Annotated[
         bool, typer.Option("--include-subdomain", help="Follow links on subdomains.")
     ] = False,
+    whole_host: Annotated[
+        bool,
+        typer.Option(
+            "--whole-host",
+            help=(
+                "Follow every in-host link instead of staying under the seed URL's "
+                "path. Default is path-scoped (e.g. /bicentennial/ crawls only that "
+                "section)."
+            ),
+        ),
+    ] = False,
     rps: Annotated[
         float, typer.Option("--rps", min=0.1, help="Max requests per second per host.")
     ] = 2.0,
@@ -97,6 +108,7 @@ def crawl(
             max_pages=max_pages,
             max_depth=max_depth,
             allow_subdomains=include_subdomain,
+            whole_host=whole_host,
             rps=rps,
             ignore_robots=ignore_robots,
             user_agent=settings.user_agent,
