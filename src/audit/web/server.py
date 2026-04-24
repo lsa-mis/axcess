@@ -93,6 +93,12 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         "scan_id": None,
     }
 
+    # Startup sweep: any scan left in 'running' when the server boots is
+    # stale by definition — its live asyncio task is gone. Flip those to
+    # 'interrupted' so they don't pollute the UI or block "single crawl
+    # at a time" gating for new submissions.
+    _sweep_stale_running_scans(resolved_db)
+
     def get_conn() -> sqlite3.Connection:
         return connect(resolved_db)
 
@@ -551,6 +557,28 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         return FileResponse(full, media_type=row["mime"] or "application/octet-stream")
 
     return app
+
+
+def _sweep_stale_running_scans(db_path: Path) -> int:
+    """Mark scans left in 'running' as 'interrupted' on server boot.
+
+    A 'running' scan in the DB but no live asyncio task is always stale
+    (the task died with the previous process). Returns the number of
+    rows updated.
+    """
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "UPDATE scans SET status = 'interrupted', "
+            "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP) "
+            "WHERE status = 'running'"
+        )
+        swept = int(cur.rowcount or 0)
+        if swept:
+            log.info("web.sweep_stale_scans", count=swept)
+        return swept
+    finally:
+        conn.close()
 
 
 def _validate_seed_url(url: str) -> str | None:

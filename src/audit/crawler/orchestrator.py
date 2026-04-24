@@ -97,6 +97,7 @@ class CrawlSummary:
     images_persisted: int = 0
     svg_text_hits: int = 0
     image_errors: int = 0
+    pages_skipped_scope: int = 0
     ocr_analyzed: int = 0
     ocr_text_candidates: int = 0
     vlm_classified: int = 0
@@ -130,6 +131,17 @@ async def run_crawl(
 
     scan_id = _ensure_scan(conn, normalized_seed, config)
     queue.reclaim_expired(conn)
+    # If we're reusing a scan whose queue was built under different scope
+    # rules (e.g. path-scope was added after the scan started, or the user
+    # re-submitted the seed with a tighter prefix), drop pending jobs that
+    # fall outside the current scope. Without this, a resume would spend
+    # time leasing + rejecting them at process time.
+    _purge_out_of_scope_jobs(
+        conn,
+        scan_id=scan_id,
+        scope=scope,
+        allow_subdomains=config.allow_subdomains,
+    )
     _seed_queue(conn, scan_id, normalized_seed)
 
     summary = CrawlSummary(scan_id=scan_id, seed_url=normalized_seed)
@@ -271,6 +283,44 @@ def _config_json(config: CrawlConfig) -> str:
     )
 
 
+def _purge_out_of_scope_jobs(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    scope: HostScope,
+    allow_subdomains: bool,
+) -> int:
+    """Delete pending ``fetch`` jobs for ``scan_id`` whose URL is out of scope.
+
+    Returns the number of rows dropped. Safe to call on scans that don't
+    have any stale jobs — no-op if every pending job still matches scope.
+    """
+    rows = conn.execute(
+        "SELECT id, payload_json FROM jobs "
+        "WHERE kind = ? AND state = 'pending' "
+        "AND json_extract(payload_json, '$.scan_id') = ?",
+        (JOB_KIND, scan_id),
+    ).fetchall()
+    stale: list[int] = []
+    for row in rows:
+        try:
+            payload = json.loads(row["payload_json"])
+        except (TypeError, ValueError):
+            stale.append(int(row["id"]))
+            continue
+        url = str(payload.get("url") or "")
+        if not url_policy.is_in_scope(url, scope, allow_subdomains=allow_subdomains):
+            stale.append(int(row["id"]))
+    if stale:
+        placeholders = ",".join("?" * len(stale))
+        conn.execute(
+            f"DELETE FROM jobs WHERE id IN ({placeholders})",  # noqa: S608 — ids only
+            stale,
+        )
+        log.info("crawl.purge_out_of_scope", scan_id=scan_id, dropped=len(stale))
+    return len(stale)
+
+
 def _seed_queue(conn: sqlite3.Connection, scan_id: int, seed_url: str) -> None:
     queue.enqueue(
         conn,
@@ -391,6 +441,15 @@ def _page_limit_reached(ctx: _WorkerContext) -> bool:
 async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     url: str = job.payload["url"]
     depth: int = int(job.payload["depth"])
+
+    # Defensive re-check: jobs enqueued under a previous scope (e.g. before
+    # the user added a path prefix, or before a server upgrade that tightened
+    # scope rules) shouldn't be fetched. Cheaper than the robots call below.
+    if not url_policy.is_in_scope(
+        url, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
+    ):
+        ctx.summary.pages_skipped_scope += 1
+        return
 
     if not ctx.config.ignore_robots and not await ctx.robots.allowed(url):
         ctx.summary.pages_skipped_robots += 1

@@ -346,6 +346,58 @@ def test_cancel_unknown_scan_404s(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+def test_stale_running_scans_interrupted_on_server_boot(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """When the web app boots it should mark every DB row stuck in
+    'running' as 'interrupted', because the live task that was driving
+    that scan is gone after a process restart."""
+    import sqlite3 as _sqlite3
+    from pathlib import Path as _Path
+
+    from audit.db.schema import connect as _connect
+
+    # Fresh DB with schema — just the scans table is needed for the sweep.
+    db_path = tmp_path / "sweep.db"
+    migrations_dir = (
+        _Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
+    )
+    prep = _connect(db_path)
+    try:
+        for p in sorted(migrations_dir.glob("*.sql")):
+            prep.executescript(p.read_text())
+        prep.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://stuck.example/', 'running', '{}')"
+        )
+        prep.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://stuck2.example/', 'running', '{}')"
+        )
+        prep.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://done.example/', 'completed', '{}')"
+        )
+    finally:
+        prep.close()
+
+    # Building the app runs the sweep.
+    from audit.web.server import create_app
+
+    create_app(db_path=db_path, blob_dir=tmp_path / "blobs")
+
+    check = _sqlite3.connect(str(db_path))
+    check.row_factory = _sqlite3.Row
+    try:
+        rows = check.execute(
+            "SELECT seed_url, status FROM scans ORDER BY id"
+        ).fetchall()
+    finally:
+        check.close()
+    states = {r["seed_url"]: r["status"] for r in rows}
+    assert states["http://stuck.example/"] == "interrupted"
+    assert states["http://stuck2.example/"] == "interrupted"
+    assert states["http://done.example/"] == "completed"
+
+
 def test_cancel_completed_scan_is_noop(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
