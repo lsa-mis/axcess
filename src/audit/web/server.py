@@ -12,11 +12,17 @@ import math
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import FastAPI, Form, HTTPException, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi import Body, FastAPI, Form, HTTPException, Query, Request
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -73,6 +79,7 @@ _EXPORT_EXTENSIONS = {"csv": "csv", "json": "json", "jira": "jira.csv", "markdow
 _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _BASE_DIR / "templates"
 _STATIC_DIR = _BASE_DIR / "static"
+_FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
 
 
 def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> FastAPI:
@@ -84,6 +91,18 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
 
     app = FastAPI(title="Image Text Audit", version=__version__)
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+    # React bundle lives under /app/. The asset paths (/app/assets/…) are
+    # served by Vite's hashed output directly from dist/; the SPA shell
+    # (index.html) is served for every /app/* route so React Router can
+    # handle client-side navigation. Mounted conditionally so tests that
+    # don't need the bundle don't require a prior `npm run build`.
+    _frontend_assets = _FRONTEND_DIST / "assets"
+    if _frontend_assets.is_dir():
+        app.mount(
+            "/app/assets",
+            StaticFiles(directory=_frontend_assets),
+            name="app-assets",
+        )
     templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
     # Single running crawl at a time. Tracked here (not in the DB) because
@@ -121,9 +140,323 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
 
+    # ---------------------------------------------------------------- /api
+    # JSON surface for the React SPA. Mirrors the Jinja routes below.
+    # Kept inline here (rather than split into api.py) so the closure
+    # can share `crawl_state`, `resolved_db`, and helpers.
+
+    @app.get("/api/scans")
+    def api_list_scans() -> JSONResponse:
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, seed_url, status, page_count, finding_count, "
+                "started_at, finished_at FROM scans ORDER BY id DESC"
+            ).fetchall()
+        return JSONResponse([_scan_row_to_summary(r) for r in rows])
+
+    @app.get("/api/scans/{scan_id}")
+    def api_scan_detail(scan_id: int) -> JSONResponse:
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            breakdown = _severity_breakdown(conn, scan_id)
+            prev = conn.execute(
+                "SELECT id FROM scans WHERE seed_url = ? AND id <> ? "
+                "AND status = 'completed' ORDER BY id DESC LIMIT 1",
+                (scan["seed_url"], scan_id),
+            ).fetchone()
+            blocked = _detect_blocked_scan(conn, scan_id, scan)
+            progress = (
+                _scan_progress(conn, scan_id) if scan["status"] == "running" else None
+            )
+        payload: dict[str, Any] = {
+            **_scan_row_to_summary(scan),
+            "error_count": int(scan.get("error_count") or 0),
+            "by_severity": {
+                level: int(breakdown.get(level, 0))
+                for level in _SEVERITY_OPTIONS
+            },
+            "previous_scan_id": int(prev["id"]) if prev is not None else None,
+            "blocked": blocked,
+            "progress": progress,
+        }
+        return JSONResponse(payload)
+
+    @app.post("/api/scans")
+    async def api_create_scan(
+        request: Request, body: Annotated[dict[str, Any], Body()]
+    ) -> JSONResponse:
+        """Kick off a crawl. Body mirrors the new-scan form fields."""
+        url = str(body.get("url") or "").strip()
+        validation_error = _validate_seed_url(url)
+        if validation_error is not None:
+            return JSONResponse({"error": validation_error}, status_code=400)
+
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            scan_id_val = crawl_state.get("scan_id")
+            return JSONResponse(
+                {
+                    "error": "A crawl is already running.",
+                    "running_scan_id": int(scan_id_val)
+                    if isinstance(scan_id_val, int)
+                    else None,
+                },
+                status_code=409,
+            )
+
+        form = {
+            "url": url,
+            "max_pages": int(body.get("max_pages") or 100),
+            "max_depth": int(body.get("max_depth") or 10),
+            "rps": float(body.get("rps") or 2.0),
+            "workers": int(body.get("workers") or 4),
+            "include_subdomain": bool(body.get("include_subdomain")),
+            "whole_host": bool(body.get("whole_host")),
+            "ignore_robots": bool(body.get("ignore_robots")),
+            "skip_ocr": bool(body.get("skip_ocr")),
+            "skip_vlm": bool(body.get("skip_vlm")),
+            "js_eager": bool(body.get("js_eager")),
+        }
+        config = _build_crawl_config(form, settings)
+        scan_id = _prepare_scan_row(resolved_db, config)
+        crawl_state["scan_id"] = scan_id
+
+        async def _runner() -> None:
+            await _run_background_crawl(resolved_db, config)
+
+        crawl_state["task"] = asyncio.create_task(_runner())
+        return JSONResponse({"scan_id": scan_id}, status_code=201)
+
+    @app.post("/api/scans/{scan_id}/cancel")
+    async def api_cancel_scan(scan_id: int) -> JSONResponse:
+        task = crawl_state.get("task")
+        active_scan_id = crawl_state.get("scan_id")
+        if (
+            isinstance(task, asyncio.Task)
+            and not task.done()
+            and active_scan_id == scan_id
+        ):
+            task.cancel()
+        with get_conn() as conn:
+            existing = conn.execute(
+                "SELECT status FROM scans WHERE id = ?", (scan_id,)
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(status_code=404, detail="Scan not found")
+            if existing["status"] == "running":
+                conn.execute(
+                    "UPDATE scans SET status = 'interrupted', "
+                    "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (scan_id,),
+                )
+                conn.execute(
+                    "DELETE FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
+                    "AND state = 'pending'",
+                    (scan_id,),
+                )
+        return JSONResponse({"ok": True})
+
+    @app.get("/api/scans/{scan_id}/findings")
+    def api_list_findings(
+        scan_id: int,
+        severity: str = Query(default=""),
+        status: str = Query(default=""),
+        classification: str = Query(default=""),
+        q: str = Query(default=""),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=_PAGE_SIZE, ge=1, le=500),
+    ) -> JSONResponse:
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            filters = {
+                "severity": severity if severity in _SEVERITY_OPTIONS else "",
+                "status": status if status in _STATUS_OPTIONS else "",
+                "classification": (
+                    classification if classification in _CLASSIFICATION_OPTIONS else ""
+                ),
+                "q": q,
+            }
+            findings, total = _query_findings(
+                conn, scan_id=scan_id, filters=filters, page=page, size=page_size
+            )
+        total_pages = max(1, math.ceil(total / page_size))
+        return JSONResponse(
+            {
+                "findings": findings,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+            }
+        )
+
+    @app.get("/api/findings/{finding_id}")
+    def api_finding_detail(finding_id: int) -> JSONResponse:
+        with get_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT f.id, f.scan_id, f.status, f.severity, f.priority_score,
+                       f.remediation_hint, f.wcag_criterion,
+                       i.id AS image_id, i.content_hash, i.blob_path, i.mime,
+                       i.width, i.height, i.has_svg_text, i.src_url_canonical,
+                       a.ocr_text, a.ocr_confidence, a.vlm_classification,
+                       a.vlm_rationale
+                  FROM findings f
+                  JOIN images i ON i.id = f.image_id
+                  LEFT JOIN analyses a ON a.image_id = i.id
+                 WHERE f.id = ?
+                 ORDER BY
+                    CASE WHEN a.vlm_classification IS NOT NULL THEN 0 ELSE 1 END,
+                    a.analyzed_at DESC
+                 LIMIT 1
+                """,
+                (finding_id,),
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Finding not found")
+            occurrences = [
+                dict(r)
+                for r in conn.execute(
+                    """
+                    SELECT pi.page_id, pi.alt_text, pi.above_fold,
+                           p.url_normalized AS page_url
+                      FROM page_images pi
+                      JOIN pages p ON p.id = pi.page_id
+                     WHERE pi.image_id = ? AND p.scan_id = ?
+                     ORDER BY pi.position
+                    """,
+                    (row["image_id"], row["scan_id"]),
+                ).fetchall()
+            ]
+        payload = dict(row)
+        payload["has_svg_text"] = bool(payload.get("has_svg_text"))
+        payload["occurrences"] = [
+            {**o, "above_fold": bool(o["above_fold"])} for o in occurrences
+        ]
+        return JSONResponse(payload)
+
+    @app.post("/api/findings/{finding_id}/status")
+    async def api_set_finding_status(
+        finding_id: int, body: Annotated[dict[str, Any], Body()]
+    ) -> JSONResponse:
+        status = str(body.get("status") or "")
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        with get_conn() as conn:
+            existing = conn.execute(
+                "SELECT status FROM findings WHERE id = ?", (finding_id,)
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(status_code=404, detail="Finding not found")
+            prev = existing["status"]
+            conn.execute(
+                "UPDATE findings SET status = ?, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ?",
+                (status, finding_id),
+            )
+            conn.execute(
+                """
+                INSERT INTO finding_history
+                    (finding_id, scan_id, change_type, from_status, to_status, actor, note)
+                SELECT id, scan_id, 'status_change', ?, ?, 'user', NULL
+                  FROM findings WHERE id = ?
+                """,
+                (prev, status, finding_id),
+            )
+        return JSONResponse({"status": status})
+
+    @app.get("/api/scans/{scan_id}/diff")
+    def api_scan_diff(
+        scan_id: int, compare_to: int = Query(...)
+    ) -> JSONResponse:
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, compare_to)
+            report = compute_diff(
+                conn, current_scan_id=scan_id, compare_to_scan_id=compare_to
+            )
+        return JSONResponse(
+            {
+                "current_scan_id": scan_id,
+                "compare_to_scan_id": compare_to,
+                "counts": report.counts,
+                "new": [vars(e) for e in report.new],
+                "resolved": [vars(e) for e in report.resolved],
+                "still_open": [vars(e) for e in report.still_open],
+                "status_changed": [vars(e) for e in report.status_changed],
+            }
+        )
+
+    @app.get("/api/scope-preview")
+    def api_scope_preview(
+        url: str = Query(default=""), whole_host: str = Query(default="")
+    ) -> JSONResponse:
+        url = (url or "").strip()
+        if not url:
+            return JSONResponse(
+                {
+                    "normalized_url": "",
+                    "host": "",
+                    "path_prefix": "",
+                    "auto_slash_added": False,
+                    "whole_host": False,
+                    "error": None,
+                }
+            )
+        error = _validate_seed_url(url)
+        if error is not None:
+            return JSONResponse(
+                {
+                    "normalized_url": url,
+                    "host": "",
+                    "path_prefix": "",
+                    "auto_slash_added": False,
+                    "whole_host": bool(whole_host),
+                    "error": error,
+                }
+            )
+        normalized = url_policy.normalize_seed_url(url)
+        whole = bool(whole_host)
+        scope = url_policy.build_scope(normalized, whole_host=whole)
+        return JSONResponse(
+            {
+                "normalized_url": normalized,
+                "host": scope.seed_host,
+                "path_prefix": scope.path_prefix,
+                "auto_slash_added": normalized != url,
+                "whole_host": whole,
+                "error": None,
+            }
+        )
+
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
-        return RedirectResponse("/scans", status_code=307)
+        # React SPA is the default UI; Jinja version lingers at /scans, /findings
+        # while we finish the migration. Fall through to /scans if the bundle
+        # isn't built yet so developers still land somewhere useful.
+        target = "/app/" if _FRONTEND_DIST.is_dir() else "/scans"
+        return RedirectResponse(target, status_code=307)
+
+    @app.get("/app", include_in_schema=False)
+    @app.get("/app/", include_in_schema=False)
+    @app.get("/app/{path:path}", include_in_schema=False)
+    def spa_shell(path: str = "") -> Response:
+        """Serve the React bundle's index.html for every /app/* URL.
+
+        Client-side routing means /app/scans/3, /app/findings/7, etc. all
+        need to return the same shell HTML; React Router parses the path.
+        Static assets requested under /app/assets/* are served by the
+        StaticFiles mount above before this catch-all is reached.
+        """
+        _ = path  # consumed by React Router, not by us
+        index = _FRONTEND_DIST / "index.html"
+        if not index.exists():
+            return HTMLResponse(
+                "<p>Frontend bundle not built. Run "
+                "<code>cd src/audit/web/frontend && npm install && npm run build</code>.</p>",
+                status_code=503,
+            )
+        return FileResponse(index, media_type="text/html")
 
     @app.get("/scans", response_class=HTMLResponse)
     def scans_list(request: Request) -> HTMLResponse:
@@ -579,6 +912,28 @@ def _sweep_stale_running_scans(db_path: Path) -> int:
         return swept
     finally:
         conn.close()
+
+
+def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
+    """Coerce a sqlite3.Row or dict into the ScanSummary JSON shape."""
+    row = dict(scan) if not isinstance(scan, dict) else scan
+    return {
+        "id": int(row["id"]),
+        "seed_url": str(row["seed_url"]),
+        "status": str(row["status"]),
+        "page_count": int(row.get("page_count") or 0),
+        "finding_count": int(row.get("finding_count") or 0),
+        "started_at": _to_iso_string(row.get("started_at")),
+        "finished_at": _to_iso_string(row.get("finished_at")),
+    }
+
+
+def _to_iso_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return str(value.isoformat())
+    return str(value)
 
 
 def _validate_seed_url(url: str) -> str | None:

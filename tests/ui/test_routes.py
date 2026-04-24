@@ -12,10 +12,12 @@ from fastapi.testclient import TestClient
 pytestmark = pytest.mark.ui
 
 
-def test_root_redirects_to_scans(client: TestClient) -> None:
+def test_root_redirects_to_ui(client: TestClient) -> None:
+    # Once the React bundle is built, / redirects to /app/ (the SPA).
+    # Until then it falls back to the Jinja /scans list. Either is valid.
     resp = client.get("/", follow_redirects=False)
     assert resp.status_code in (301, 307)
-    assert resp.headers["location"] == "/scans"
+    assert resp.headers["location"] in ("/scans", "/app/")
 
 
 def test_health_returns_version(client: TestClient) -> None:
@@ -427,6 +429,193 @@ def test_cancel_completed_scan_is_noop(
     # Completed scans keep their status.
     detail = client.get(f"/scans/{scan_id}")
     assert "completed" in detail.text
+
+
+# ------------------------------------------------------------- /api tests
+
+
+def test_api_list_scans(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get("/api/scans")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert isinstance(body, list) and len(body) >= 1
+    one = next(s for s in body if s["id"] == scan_id)
+    assert one["status"] == "completed"
+    assert set(one.keys()) >= {
+        "id",
+        "seed_url",
+        "status",
+        "page_count",
+        "finding_count",
+        "started_at",
+    }
+
+
+def test_api_scan_detail(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/api/scans/{scan_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == scan_id
+    assert "by_severity" in body
+    assert set(body["by_severity"].keys()) == {
+        "critical",
+        "major",
+        "minor",
+        "info",
+    }
+    assert body["previous_scan_id"] is None  # only one scan seeded
+    assert body["blocked"] is None
+    assert body["progress"] is None  # not running
+
+
+def test_api_scan_detail_404(client: TestClient) -> None:
+    resp = client.get("/api/scans/99999")
+    assert resp.status_code == 404
+
+
+def test_api_list_findings(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/api/scans/{scan_id}/findings?page_size=10")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "findings" in body
+    assert body["total"] >= 1
+    # Thumbnails: every listed finding carries its content_hash when blob-backed.
+    hashes = {f["content_hash"] for f in body["findings"] if f["content_hash"]}
+    assert len(hashes) >= 1
+
+
+def test_api_finding_detail(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    resp = client.get("/api/findings/1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == 1
+    assert "occurrences" in body
+    assert isinstance(body["occurrences"], list)
+
+
+def test_api_finding_status_round_trip(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    resp = client.post("/api/findings/1/status", json={"status": "reviewing"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "reviewing"
+    detail = client.get("/api/findings/1").json()
+    assert detail["status"] == "reviewing"
+
+
+def test_api_finding_status_rejects_unknown(client: TestClient) -> None:
+    resp = client.post("/api/findings/1/status", json={"status": "nope"})
+    assert resp.status_code == 400
+
+
+def test_api_scope_preview_auto_slash(client: TestClient) -> None:
+    resp = client.get("/api/scope-preview?url=https://example.com/bicentennial")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["path_prefix"] == "/bicentennial/"
+    assert body["auto_slash_added"] is True
+    assert body["normalized_url"] == "https://example.com/bicentennial/"
+
+
+def test_api_scope_preview_whole_host(client: TestClient) -> None:
+    body = client.get(
+        "/api/scope-preview?url=https://example.com/a&whole_host=1"
+    ).json()
+    assert body["whole_host"] is True
+    assert body["path_prefix"] == "/"
+
+
+def test_api_scope_preview_invalid(client: TestClient) -> None:
+    body = client.get("/api/scope-preview?url=ftp://example.com/").json()
+    assert body["error"] is not None
+
+
+def test_api_create_scan_rejects_bad_url(client: TestClient) -> None:
+    resp = client.post("/api/scans", json={"url": "ftp://nope/"})
+    assert resp.status_code == 400
+    assert "error" in resp.json()
+
+
+def test_api_create_scan_kicks_off_crawl(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from audit.web import server as _server
+
+    called: dict[str, object] = {}
+
+    async def _noop(db_path, config):  # type: ignore[no-untyped-def]
+        called["ran"] = True
+        called["seed"] = config.seed_url
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _noop)
+    resp = client.post(
+        "/api/scans",
+        json={
+            "url": "https://example.test/",
+            "max_pages": 5,
+            "max_depth": 2,
+            "rps": 1.0,
+            "workers": 1,
+            "skip_ocr": True,
+            "skip_vlm": True,
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert isinstance(body["scan_id"], int)
+    import asyncio as _asyncio
+
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    assert called.get("ran") is True
+
+
+def test_api_cancel_endpoint(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+            "config_json) VALUES ('http://x/', 'running', 0, 0, '{}')"
+        )
+        running_id = int(cur.lastrowid or 0)
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.post(f"/api/scans/{running_id}/cancel")
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    # Scan should be interrupted in the DB.
+    detail = client.get(f"/api/scans/{running_id}").json()
+    assert detail["status"] == "interrupted"
+
+
+def test_app_shell_redirect_when_bundle_missing(client: TestClient) -> None:
+    """Without a built bundle, /app/ returns a helpful 503."""
+    resp = client.get("/app/", follow_redirects=False)
+    # Either 503 (bundle not built) or 200 (bundle exists and was served).
+    assert resp.status_code in (200, 503)
 
 
 def test_scan_detail_shows_blocked_warning_for_non_2xx_seed(

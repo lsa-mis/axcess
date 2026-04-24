@@ -1,0 +1,189 @@
+import { Link, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertOctagon, Download, GitCompare, ListFilter, Square } from "lucide-react";
+import { api, exportUrl } from "../api/client";
+import { Button, Card, PageHeader, StatCard } from "../components/ui";
+import type { Severity } from "../api/types";
+
+export default function ScanDetailRoute() {
+  const { scanId } = useParams<{ scanId: string }>();
+  const id = Number(scanId);
+  const qc = useQueryClient();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["scan", id],
+    queryFn: () => api.getScan(id),
+    enabled: Number.isFinite(id),
+    // Poll while running so the page updates in near-real-time.
+    refetchInterval: (q) =>
+      q.state.data?.status === "running" ? 2000 : false,
+  });
+
+  const cancel = useMutation({
+    mutationFn: () => api.cancelScan(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
+  });
+
+  if (error) {
+    return (
+      <Card className="p-4 text-sm text-sev-critical">
+        {error instanceof Error ? error.message : String(error)}
+      </Card>
+    );
+  }
+  if (isLoading || !data) {
+    return <div className="text-fg-muted">Loading…</div>;
+  }
+
+  const severities: Severity[] = ["critical", "major", "minor", "info"];
+
+  return (
+    <>
+      <PageHeader
+        crumbs={[
+          { label: "Scans", to: "/scans" },
+          { label: `Scan #${data.id}` },
+        ]}
+        title={<>Scan #{data.id}</>}
+        subtitle={data.seed_url}
+        actions={
+          <>
+            <Link
+              to={`/scans/${data.id}/findings`}
+              className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
+            >
+              <ListFilter className="h-4 w-4" aria-hidden />
+              Findings ({data.finding_count})
+            </Link>
+            {data.previous_scan_id != null && (
+              <Link
+                to={`/scans/${data.id}/diff?compare_to=${data.previous_scan_id}`}
+                className="inline-flex items-center gap-1.5 rounded-xs border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-fg no-underline hover:bg-surface-muted"
+              >
+                <GitCompare className="h-4 w-4" aria-hidden />
+                Diff vs #{data.previous_scan_id}
+              </Link>
+            )}
+          </>
+        }
+      />
+
+      {data.status === "running" && (
+        <Card className="mb-4 border-umich-blue/30 bg-umich-blue/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-umich-maize" />
+              <strong className="text-fg">Crawl in progress</strong>
+              <span className="text-sm text-fg-muted">
+                refreshing every 2s
+              </span>
+            </div>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirm("Stop this crawl? Pending pages will be dropped.")) {
+                  cancel.mutate();
+                }
+              }}
+              disabled={cancel.isPending}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
+              Stop crawl
+            </Button>
+          </div>
+          {data.progress && (
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatCard label="Pages" value={data.page_count} />
+              <StatCard label="Queued" value={data.progress.pending} />
+              <StatCard label="In flight" value={data.progress.leased} />
+              <StatCard label="Images" value={data.progress.images_seen} />
+            </div>
+          )}
+          {data.progress && data.progress.recent_pages.length > 0 && (
+            <details className="mt-3" open>
+              <summary className="cursor-pointer text-sm font-semibold text-fg">
+                Last {data.progress.recent_pages.length} pages
+              </summary>
+              <ul className="mt-2 space-y-0.5 font-mono text-2xs text-fg-muted">
+                {data.progress.recent_pages.map((p) => (
+                  <li key={p.url_normalized} className="flex gap-2">
+                    <span
+                      className={
+                        p.status_code && p.status_code >= 200 && p.status_code < 300
+                          ? "text-fg"
+                          : "text-sev-critical"
+                      }
+                    >
+                      {p.status_code ?? "—"}
+                    </span>
+                    <span className="inline-block rounded bg-surface-muted px-1.5 font-sans uppercase text-fg-subtle">
+                      {p.render_mode}
+                    </span>
+                    <span className="truncate">{p.url_normalized}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </Card>
+      )}
+
+      {data.blocked && (
+        <Card className="mb-4 border-sev-critical/40 bg-sev-critical-bg p-4">
+          <div className="flex items-start gap-3">
+            <AlertOctagon className="mt-0.5 h-5 w-5 text-sev-critical" aria-hidden />
+            <div className="text-sm">
+              <strong className="text-sev-critical">
+                Seed URL returned HTTP {data.blocked.status_code}
+              </strong>
+              {data.blocked.title && <> — "{data.blocked.title}"</>}. The
+              crawler couldn't read past the entry page. Try{" "}
+              <Link to="/scans/new">New scan</Link> with "Use real browser
+              (Playwright) for every page" checked.
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <StatCard label="Pages" value={data.page_count} />
+        <StatCard label="Findings" value={data.finding_count} />
+        {severities.map((sev) => (
+          <StatCard
+            key={sev}
+            label={sev}
+            value={data.by_severity[sev] ?? 0}
+            tone={sev}
+          />
+        ))}
+      </div>
+
+      <Card className="mt-6 p-4">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
+          <Download className="h-4 w-4" aria-hidden />
+          Export this scan
+        </h2>
+        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {(
+            [
+              ["csv", "CSV (one row per occurrence)"],
+              ["json", "JSON (nested per finding)"],
+              ["jira", "Jira CSV (import template)"],
+              ["markdown", "Markdown report"],
+            ] as const
+          ).map(([fmt, label]) => (
+            <li key={fmt}>
+              <a
+                href={exportUrl(data.id, fmt)}
+                download
+                className="block rounded-xs border border-border px-3 py-2 text-sm no-underline hover:bg-surface-muted"
+              >
+                {label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </>
+  );
+}

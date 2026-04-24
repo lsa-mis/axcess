@@ -73,17 +73,28 @@ What works today:
     stomp human-set `status` values; re-synthesizing with
     `audit synthesize [scan_id]` refreshes scores and hints.
   - Pass `--skip-synthesize` to crawl only and run synthesis later.
-- **Review UI** — FastAPI + HTMX + Jinja + hand-written CSS, served at
-  `127.0.0.1:8765` via `audit serve`. Views: scan list, scan detail
-  with severity breakdown, filterable/paginated findings list, finding
-  detail with image preview and OCR/VLM metadata, per-page image
-  inventory. HTMX partials for filter-as-you-type with `hx-push-url`
-  so back/forward still work. Status workflow with a confirmation
-  prompt for destructive transitions (`remediated`, `accepted_risk`,
-  `false_positive`). Keyboard shortcuts: `j/k` next/prev finding,
-  `Enter` to open, `/` focus filter, `s` focus status dropdown,
-  `?` help. Zero axe-core WCAG 2.1 AA violations on every view.
-  Dark-mode + prefers-reduced-motion honored. Content-hash-validated
+- **Review UI** — two front-ends sharing the same FastAPI backend at
+  `127.0.0.1:8765` (launch with `audit serve` or `make run`):
+  - **React SPA** at `/app/` — default UI. Tanstack Query + React
+    Router + a Michigan-palette design system in hand-rolled CSS, all
+    driven by the `/api/*` JSON endpoints (`/api/scans`,
+    `/api/scans/{id}/findings`, `/api/findings/{id}`, etc.). Build
+    with `make frontend-build`; dev server on `:5173` via
+    `make frontend-dev` (proxies `/api` and `/blobs` to FastAPI).
+  - **Legacy Jinja + HTMX** at `/scans`, `/findings/{id}`, … — still
+    shipped while the SPA matures. Filter-as-you-type with
+    `hx-push-url` so back/forward works; destructive status
+    transitions (`remediated`, `accepted_risk`, `false_positive`)
+    confirm before saving.
+
+  Shared across both: scan list + detail with severity breakdown,
+  filterable paginated findings list, finding detail with image
+  preview and OCR/VLM metadata, per-page image inventory. Keyboard
+  shortcuts: `j/k` next/prev finding, `Enter` to open, `/` focus
+  filter, `s` focus status dropdown, `?` help. Zero axe-core WCAG
+  2.1 AA violations on every Jinja view; SPA views inherit the same
+  focus-ring, skip-link, and landmark semantics. Dark-mode +
+  prefers-reduced-motion honored. Content-hash-validated
   `/blobs/{hash}` for image previews.
 - **Exports** — one shared collector feeds four deterministic formats,
   all with golden-file tests so any change is explicit:

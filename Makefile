@@ -1,8 +1,9 @@
-.PHONY: help setup run test test-unit test-integration test-ui lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean
+.PHONY: help setup run test test-unit test-integration test-ui lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-build frontend-dev
 
 PY := uv run
 DB := data/audit.db
 MIGRATIONS := src/audit/db/migrations
+FRONTEND := src/audit/web/frontend
 HOST ?= 127.0.0.1
 PORT ?= 8765
 
@@ -32,6 +33,15 @@ fixture-site: ## Serve tests/fixtures/site on :8000 for crawler tests
 
 run: ## Start the review UI on http://$(HOST):$(PORT)
 	$(PY) uvicorn audit.web.server:app --host $(HOST) --port $(PORT) --reload
+
+frontend-install: ## Install React SPA dependencies (one-time)
+	cd $(FRONTEND) && npm install
+
+frontend-build: ## Build the React SPA into dist/ (served by FastAPI at /app/)
+	cd $(FRONTEND) && npm run build
+
+frontend-dev: ## Run Vite dev server on :5173 (proxies /api to FastAPI)
+	cd $(FRONTEND) && npm run dev
 
 test: ## Run full test suite
 	$(PY) pytest

@@ -38,3 +38,8 @@ test-results/
 # Environment
 .env
 .env.local
+
+# Frontend (src/audit/web/frontend)
+# Vite build output is already ignored by the global "dist/" rule above.
+node_modules/
+*.tsbuildinfo
