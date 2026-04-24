@@ -106,8 +106,17 @@ What works today:
   images, SVG-text, OCR, VLM, finding-by-severity, and rescan
   first_seen / resolved counters.
 
-Not yet implemented: CSS `background-image` extraction remains as
-Phase 2.5 follow-up. See [PLAN.md](PLAN.md).
+**Port-tolerant rescan matching**: auto-diff uses
+`url_policy.compare_key`, which drops the port on loopback hosts (and
+canonicalizes `localhost` / `127.0.0.1` / `::1` / `0.0.0.0` to a single
+form). So a second crawl of the same local site on a different dev-server
+port still lands in the right diff buckets instead of showing every
+finding as new + resolved. Real-host ports stay significant
+(`example.com:8443` is not the same as `example.com:9443`). Override
+auto-discovery with `audit crawl --compare-to <scan_id>` or
+`audit synthesize --compare-to <scan_id>`.
+
+Not yet implemented: CSS `background-image` extraction.
 
 ## Try it
 

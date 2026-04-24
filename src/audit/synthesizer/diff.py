@@ -18,6 +18,8 @@ import sqlite3
 from dataclasses import dataclass, field
 from typing import TypedDict
 
+from audit.crawler.url_policy import compare_key
+
 _OPEN_STATUSES = {"new", "reviewing", "in_progress"}
 
 
@@ -26,6 +28,7 @@ class _PairRow(TypedDict):
     finding_id: int
     severity: str
     status: str
+    original_url: str
 
 
 @dataclass(frozen=True)
@@ -87,7 +90,7 @@ def compute_diff(
         report.new.append(
             DiffEntry(
                 content_hash=key[0],
-                url_normalized=key[1],
+                url_normalized=cur["original_url"],
                 image_id=cur["image_id"],
                 severity=cur["severity"],
                 previous_severity=None,
@@ -103,7 +106,7 @@ def compute_diff(
         report.resolved.append(
             DiffEntry(
                 content_hash=key[0],
-                url_normalized=key[1],
+                url_normalized=prev["original_url"],
                 image_id=prev["image_id"],
                 severity=None,
                 previous_severity=prev["severity"],
@@ -119,7 +122,7 @@ def compute_diff(
         prev = previous[key]
         entry = DiffEntry(
             content_hash=key[0],
-            url_normalized=key[1],
+            url_normalized=cur["original_url"],
             image_id=cur["image_id"],
             severity=cur["severity"],
             previous_severity=prev["severity"],
@@ -156,9 +159,10 @@ def _collect_pairs(conn: sqlite3.Connection, scan_id: int) -> dict[tuple[str, st
     ).fetchall()
     out: dict[tuple[str, str], _PairRow] = {}
     for row in rows:
-        key = (str(row["content_hash"]), str(row["url_normalized"]))
-        # There is at most one finding per image per scan, so the first row
-        # for a key is the authoritative one.
+        url = str(row["url_normalized"])
+        # The match key is the port-tolerant canonical form; the display URL
+        # on the DiffEntry stays the as-crawled URL.
+        key = (str(row["content_hash"]), compare_key(url))
         out.setdefault(
             key,
             _PairRow(
@@ -166,6 +170,7 @@ def _collect_pairs(conn: sqlite3.Connection, scan_id: int) -> dict[tuple[str, st
                 finding_id=int(row["finding_id"]),
                 severity=str(row["severity"]),
                 status=str(row["status"]),
+                original_url=url,
             ),
         )
     return out

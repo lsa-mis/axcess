@@ -71,6 +71,10 @@ class CrawlConfig:
     # Synthesis — toggle off with ``--skip-synthesize`` if the caller wants
     # to run ``audit synthesize`` manually against the same scan later.
     synthesize_enabled: bool = True
+    # Explicit override for the diff's ``compare_to`` scan id. ``None`` means
+    # auto-discover the most-recent completed scan of the same logical site
+    # (matched via :func:`audit.crawler.url_policy.compare_key`).
+    compare_to: int | None = None
 
 
 @dataclass
@@ -174,7 +178,9 @@ async def run_crawl(
             and summary.pages_fetched > 0
         ):
             try:
-                prior = _previous_completed_scan(conn, normalized_seed, scan_id)
+                prior = config.compare_to
+                if prior is None:
+                    prior = _previous_completed_scan(conn, normalized_seed, scan_id)
                 synth = synthesize_findings(conn, scan_id=scan_id, compare_to=prior)
                 summary.findings_written = synth.findings_written
                 summary.findings_by_severity = synth.by_severity
@@ -461,19 +467,25 @@ def _enqueue_children(
 def _previous_completed_scan(
     conn: sqlite3.Connection, seed_url: str, current_scan_id: int
 ) -> int | None:
-    """Most-recent completed scan of the same seed URL other than ``current``."""
-    row = conn.execute(
+    """Most-recent completed scan of the same logical site, excluding ``current``.
+
+    Matching uses :func:`audit.crawler.url_policy.compare_key`, which drops
+    ports on loopback hosts so a dev-server port change doesn't hide the
+    prior scan from the auto-diff.
+    """
+    target = url_policy.compare_key(seed_url)
+    rows = conn.execute(
         """
-        SELECT id FROM scans
-         WHERE seed_url = ? AND status = 'completed' AND id <> ?
+        SELECT id, seed_url FROM scans
+         WHERE status = 'completed' AND id <> ?
          ORDER BY id DESC
-         LIMIT 1
         """,
-        (seed_url, current_scan_id),
-    ).fetchone()
-    if row is None:
-        return None
-    return int(row["id"])
+        (current_scan_id,),
+    ).fetchall()
+    for row in rows:
+        if url_policy.compare_key(str(row["seed_url"])) == target:
+            return int(row["id"])
+    return None
 
 
 def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary) -> None:

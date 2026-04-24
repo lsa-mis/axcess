@@ -74,6 +74,49 @@ def _strip_www(host: str) -> str:
     return host[4:] if host.startswith("www.") else host
 
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})  # noqa: S104  (string constant for URL host matching, not a bind address)
+_CANONICAL_LOOPBACK = "127.0.0.1"
+
+_INLINE_SVG_SCHEME = "inline-svg://"
+
+
+def compare_key(url: str) -> str:
+    """Canonicalize ``url`` for cross-scan matching.
+
+    Two rules beyond :func:`normalize`:
+
+      * On loopback hosts (``127.0.0.1``/``localhost``/``::1``/``0.0.0.0``)
+        the port is dropped and the host name is canonicalized to
+        ``127.0.0.1``. This way a rescan run against a different dev-server
+        port doesn't register every finding as "new + resolved".
+      * Inline-SVG pseudo-URLs (``inline-svg://<page_url>#<position>``) have
+        the embedded page URL normalized the same way.
+
+    For any other host, the input is returned unchanged — a port change on
+    a real host is semantically significant and should not be papered over.
+    """
+    if url.startswith(_INLINE_SVG_SCHEME):
+        inner = url[len(_INLINE_SVG_SCHEME) :]
+        frag = ""
+        if "#" in inner:
+            inner, frag = inner.split("#", 1)
+        return f"{_INLINE_SVG_SCHEME}{compare_key(inner)}" + (f"#{frag}" if frag else "")
+
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    host = (parts.hostname or "").lower()
+    if host not in _LOOPBACK_HOSTS:
+        return url
+
+    scheme = parts.scheme.lower()
+    path = parts.path or "/"
+    query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    query = urlencode(sorted(query_pairs))
+    return urlunsplit((scheme, _CANONICAL_LOOPBACK, path, query, ""))
+
+
 def is_in_scope(url: str, scope: HostScope, *, allow_subdomains: bool = False) -> bool:
     """Return True if ``url`` should be crawled under ``scope``.
 

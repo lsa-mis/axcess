@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from audit.crawler.url_policy import HostScope, build_scope, is_in_scope, normalize
+from audit.crawler.url_policy import HostScope, build_scope, compare_key, is_in_scope, normalize
 
 
 def test_normalize_drops_fragment() -> None:
@@ -88,3 +88,57 @@ def test_is_in_scope_rejects_non_http_scheme() -> None:
 def test_is_in_scope_rejects_malformed_url() -> None:
     scope = build_scope("https://example.com/")
     assert not is_in_scope("not a url", scope)
+
+
+def test_compare_key_strips_loopback_port() -> None:
+    a = compare_key("http://127.0.0.1:18800/gallery.html")
+    b = compare_key("http://127.0.0.1:18801/gallery.html")
+    assert a == b == "http://127.0.0.1/gallery.html"
+
+
+def test_compare_key_canonicalizes_loopback_aliases() -> None:
+    k = compare_key("http://127.0.0.1/x")
+    for variant in (
+        "http://localhost/x",
+        "http://127.0.0.1:8080/x",
+        "http://localhost:9090/x",
+        "http://0.0.0.0:3000/x",
+    ):
+        assert compare_key(variant) == k, variant
+
+
+def test_compare_key_preserves_real_host_port() -> None:
+    # Ports on real hosts are semantically significant — do not strip.
+    assert compare_key("https://example.com:8443/x") == "https://example.com:8443/x"
+    assert compare_key("https://example.com:8443/x") != compare_key("https://example.com:9443/x")
+
+
+def test_compare_key_preserves_real_host() -> None:
+    assert compare_key("https://example.com/x") == "https://example.com/x"
+
+
+def test_compare_key_handles_inline_svg_embedded_url() -> None:
+    a = compare_key("inline-svg://http://127.0.0.1:18800/page.html#0")
+    b = compare_key("inline-svg://http://127.0.0.1:18801/page.html#0")
+    assert a == b
+    assert a.endswith("#0")
+    assert "127.0.0.1/page.html" in a
+
+
+def test_compare_key_is_idempotent() -> None:
+    for url in (
+        "http://localhost:8000/a?b=2&a=1",
+        "https://example.com/path",
+        "inline-svg://http://localhost:8000/p.html#3",
+    ):
+        assert compare_key(compare_key(url)) == compare_key(url)
+
+
+def test_compare_key_sorts_query_for_loopback() -> None:
+    a = compare_key("http://localhost:8000/x?b=2&a=1")
+    b = compare_key("http://127.0.0.1:9000/x?a=1&b=2")
+    assert a == b
+
+
+def test_compare_key_invalid_url_returned_unchanged() -> None:
+    assert compare_key("not a url") == "not a url"

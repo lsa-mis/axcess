@@ -148,6 +148,53 @@ def test_synthesize_with_compare_to_writes_history(
     assert result.resolved >= 1
 
 
+def test_diff_matches_across_loopback_port_change(tmp_db: sqlite3.Connection) -> None:
+    """Two scans on the same logical page but different dev-server ports should
+    still match their findings — not show everything as new+resolved."""
+    # Scan A on :18800
+    a = _new_scan(tmp_db, "http://127.0.0.1:18800/")
+    page_a = repo.upsert_page(
+        tmp_db,
+        scan_id=a,
+        url_normalized="http://127.0.0.1:18800/home",
+        status_code=200,
+        title="home",
+        render_mode="static",
+        html_hash="0" * 64,
+    )
+    img = _seed_image(tmp_db, a, content_hash="a" * 64, mime="image/png")
+    _occurrence(tmp_db, page_id=page_a, image_id=img, alt=None, position=0)
+    _analysis(tmp_db, image_id=img, ocr="BUY NOW", classification="essential")
+    synthesize_findings(tmp_db, scan_id=a)
+    tmp_db.execute("UPDATE scans SET status='completed' WHERE id=?", (a,))
+
+    # Scan B on :18801 — same path, same image, different port
+    b = _new_scan(tmp_db, "http://127.0.0.1:18801/")
+    page_b = repo.upsert_page(
+        tmp_db,
+        scan_id=b,
+        url_normalized="http://127.0.0.1:18801/home",
+        status_code=200,
+        title="home",
+        render_mode="static",
+        html_hash="0" * 64,
+    )
+    img2 = _seed_image(tmp_db, b, content_hash="a" * 64, mime="image/png")
+    assert img2 == img  # content_hash dedup, same image row
+    _occurrence(tmp_db, page_id=page_b, image_id=img, alt=None, position=0)
+    _analysis(tmp_db, image_id=img, ocr="BUY NOW", classification="essential")
+    synthesize_findings(tmp_db, scan_id=b)
+    tmp_db.execute("UPDATE scans SET status='completed' WHERE id=?", (b,))
+
+    report = compute_diff(tmp_db, current_scan_id=b, compare_to_scan_id=a)
+    # No new/resolved — the only finding is still open across the port change.
+    assert report.new == []
+    assert report.resolved == []
+    assert len(report.still_open) == 1
+    # The displayed URL on the still-open entry is the current scan's URL.
+    assert report.still_open[0].url_normalized == "http://127.0.0.1:18801/home"
+
+
 # --------------------------- seeding helpers --------------------------- #
 
 

@@ -62,6 +62,17 @@ def crawl(
             help="Skip end-of-crawl finding synthesis. Run `audit synthesize` later.",
         ),
     ] = False,
+    compare_to: Annotated[
+        int | None,
+        typer.Option(
+            "--compare-to",
+            help=(
+                "Scan id to diff against. Defaults to auto-discovering the most "
+                "recent completed scan of the same logical site (port-tolerant "
+                "on loopback hosts)."
+            ),
+        ),
+    ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose logging.")] = False,
 ) -> None:
     """Crawl a site and store page records in the audit DB."""
@@ -90,6 +101,7 @@ def crawl(
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=settings.vlm_concurrency,
             synthesize_enabled=not skip_synthesize,
+            compare_to=compare_to,
         )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:
@@ -134,6 +146,10 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
             count = summary.findings_by_severity.get(level, 0)
             if count:
                 table.add_row(f"  {level}", str(count))
+    if summary.compare_to_scan_id is not None:
+        table.add_row("Compared against scan", f"#{summary.compare_to_scan_id}")
+        table.add_row("  first-seen", str(summary.first_seen))
+        table.add_row("  resolved", str(summary.resolved))
     table.add_row("Page errors", str(summary.errors))
     if summary.pages_skipped_robots:
         table.add_row("Skipped (robots.txt)", str(summary.pages_skipped_robots))
@@ -145,6 +161,16 @@ def synthesize(
     scan_id: Annotated[
         int | None,
         typer.Argument(help="Scan id to re-synthesize. Defaults to the latest scan."),
+    ] = None,
+    compare_to: Annotated[
+        int | None,
+        typer.Option(
+            "--compare-to",
+            help=(
+                "Diff against this scan id and write first-seen / resolved rows "
+                "to finding_history. Omit to skip history materialization."
+            ),
+        ),
     ] = None,
 ) -> None:
     """Re-compute findings for a scan without re-crawling."""
@@ -158,7 +184,7 @@ def synthesize(
                 raise typer.Exit(code=1)
             scan_id = int(row["id"])
 
-        result = synthesize_findings(conn, scan_id=scan_id)
+        result = synthesize_findings(conn, scan_id=scan_id, compare_to=compare_to)
         conn.execute(
             "UPDATE scans SET finding_count = ? WHERE id = ?",
             (result.findings_written, scan_id),
@@ -170,6 +196,10 @@ def synthesize(
         table.add_row("Findings written", str(result.findings_written))
         for level in ("critical", "major", "minor", "info"):
             table.add_row(f"  {level}", str(result.by_severity.get(level, 0)))
+        if compare_to is not None:
+            table.add_row("Compared against scan", f"#{compare_to}")
+            table.add_row("  first-seen", str(result.first_seen))
+            table.add_row("  resolved", str(result.resolved))
         console.print(table)
     finally:
         conn.close()
