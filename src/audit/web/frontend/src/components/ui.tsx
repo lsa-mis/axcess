@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus } from "../api/types";
 
@@ -90,12 +91,17 @@ export function PageHeader({
             {crumbs.map((c, i) => (
               <li key={i} className="flex items-center gap-1">
                 {c.to ? (
-                  <a
+                  // Must be a Router <Link>, not a raw <a href>: the SPA is
+                  // mounted under basename="/app", and a raw anchor would
+                  // navigate to ``/scans`` (legacy Jinja UI) instead of the
+                  // SPA's ``/app/scans`` route. Same goes for any internal
+                  // breadcrumb target — always Link, never <a>.
+                  <Link
                     className="text-fg-muted no-underline hover:underline"
-                    href={c.to}
+                    to={c.to}
                   >
                     {c.label}
-                  </a>
+                  </Link>
                 ) : (
                   <span aria-current="page" className="text-fg">
                     {c.label}
@@ -143,9 +149,28 @@ export function EmptyState({
   );
 }
 
-/** Flat button variants — kept tiny; use `<a>` + cn() for links. */
+/**
+ * Shared chrome for ``Button`` and ``LinkButton`` so a primary <button>
+ * and a primary <Link>-styled-as-button look identical. Keeping this in
+ * one place is the single source of truth for action affordances — if a
+ * designer changes "primary" to a different blue, both elements update.
+ */
+type Variant = "primary" | "secondary" | "danger" | "ghost";
+
+const BUTTON_BASE =
+  "inline-flex items-center gap-1.5 rounded-xs px-3 py-1.5 text-sm font-semibold transition-colors no-underline disabled:cursor-not-allowed disabled:opacity-60";
+
+const VARIANT_CLASSES: Record<Variant, string> = {
+  primary: "bg-umich-blue text-fg-inverse hover:bg-umich-blue-600",
+  secondary:
+    "border border-border bg-surface text-fg hover:bg-surface-muted",
+  danger: "bg-sev-critical text-fg-inverse hover:brightness-110",
+  ghost: "bg-transparent text-fg hover:bg-surface-muted",
+};
+
+/** Flat button variants. */
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: Variant;
 };
 export function Button({
   variant = "secondary",
@@ -154,17 +179,34 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-xs px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-        variant === "primary" &&
-          "bg-umich-blue text-fg-inverse hover:bg-umich-blue-600",
-        variant === "secondary" &&
-          "border border-border bg-surface text-fg hover:bg-surface-muted",
-        variant === "danger" &&
-          "bg-sev-critical text-fg-inverse hover:brightness-110",
-        variant === "ghost" && "bg-transparent text-fg hover:bg-surface-muted",
-        className,
-      )}
+      className={cn(BUTTON_BASE, VARIANT_CLASSES[variant], className)}
+      {...rest}
+    />
+  );
+}
+
+/**
+ * Internal styled link that LOOKS like a button. Always renders a Router
+ * ``<Link>`` so the SPA basename is honored and the click is intercepted
+ * — never a raw ``<a href>`` (which under ``basename="/app"`` would
+ * silently navigate to the legacy Jinja UI).
+ *
+ * Use this anywhere a styled "go to another SPA route" affordance is
+ * needed; reach for plain ``<Link>`` only when you need link styling
+ * (an inline body link), and for ``<a target="_blank">`` only when the
+ * destination is genuinely external.
+ */
+type LinkButtonProps = ComponentPropsWithoutRef<typeof Link> & {
+  variant?: Variant;
+};
+export function LinkButton({
+  variant = "secondary",
+  className,
+  ...rest
+}: LinkButtonProps) {
+  return (
+    <Link
+      className={cn(BUTTON_BASE, VARIANT_CLASSES[variant], className)}
       {...rest}
     />
   );

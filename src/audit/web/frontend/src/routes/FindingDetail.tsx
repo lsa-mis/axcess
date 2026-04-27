@@ -1,9 +1,16 @@
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import { AltTag, Button, Card, PageHeader, SeverityChip } from "../components/ui";
+import {
+  AltTag,
+  Button,
+  Card,
+  LinkButton,
+  PageHeader,
+  SeverityChip,
+} from "../components/ui";
 import type { FindingStatus } from "../api/types";
 
 const STATUSES: FindingStatus[] = [
@@ -109,13 +116,13 @@ export default function FindingDetailRoute() {
           </span>
         }
         actions={
-          <Link
+          <LinkButton
             to={`/scans/${data.scan_id}/findings`}
-            className="inline-flex items-center gap-1.5 rounded-xs border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-fg no-underline hover:bg-surface-muted"
+            variant="secondary"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Back to findings
-          </Link>
+          </LinkButton>
         }
       />
 

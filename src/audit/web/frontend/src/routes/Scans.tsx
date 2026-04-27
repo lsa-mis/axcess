@@ -2,7 +2,13 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { PlusCircle } from "lucide-react";
 import { api } from "../api/client";
-import { Card, EmptyState, PageHeader, StatusChip } from "../components/ui";
+import {
+  Card,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  StatusChip,
+} from "../components/ui";
 
 export default function ScansRoute() {
   const { data: scans = [], isLoading } = useQuery({
@@ -16,13 +22,10 @@ export default function ScansRoute() {
         title="Scans"
         subtitle={isLoading ? "Loading…" : `${scans.length} total`}
         actions={
-          <Link
-            to="/scans/new"
-            className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
-          >
+          <LinkButton to="/scans/new" variant="primary">
             <PlusCircle className="h-4 w-4" aria-hidden />
             New scan
-          </Link>
+          </LinkButton>
         }
       />
 
@@ -31,12 +34,9 @@ export default function ScansRoute() {
           title="No scans yet"
           message="Point the crawler at a URL to start auditing."
           action={
-            <Link
-              to="/scans/new"
-              className="inline-flex items-center gap-1 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline"
-            >
+            <LinkButton to="/scans/new" variant="primary">
               <PlusCircle className="h-4 w-4" aria-hidden /> Start a scan
-            </Link>
+            </LinkButton>
           }
         />
       ) : (

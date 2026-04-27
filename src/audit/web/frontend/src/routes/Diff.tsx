@@ -1,7 +1,14 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { api } from "../api/client";
-import { Card, PageHeader, SeverityChip, StatCard } from "../components/ui";
+import {
+  Card,
+  LinkButton,
+  PageHeader,
+  SeverityChip,
+  StatCard,
+} from "../components/ui";
 import type { DiffEntry } from "../api/types";
 
 export default function DiffRoute() {
@@ -41,6 +48,12 @@ export default function DiffRoute() {
           { label: "Diff" },
         ]}
         title={<>Diff — #{id} vs #{compareTo}</>}
+        actions={
+          <LinkButton to={`/scans/${id}`} variant="secondary">
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to Scan #{id}
+          </LinkButton>
+        }
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

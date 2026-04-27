@@ -2,9 +2,17 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import { AltTag, Card, EmptyState, PageHeader, SeverityChip, StatusChip } from "../components/ui";
+import {
+  AltTag,
+  Card,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  SeverityChip,
+  StatusChip,
+} from "../components/ui";
 import type {
   Classification,
   FindingListItem,
@@ -74,6 +82,12 @@ export default function FindingsRoute() {
           data
             ? `${data.total.toLocaleString()} total · showing ${rows.length}`
             : "Loading…"
+        }
+        actions={
+          <LinkButton to={`/scans/${id}`} variant="secondary">
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to Scan #{id}
+          </LinkButton>
         }
       />
 

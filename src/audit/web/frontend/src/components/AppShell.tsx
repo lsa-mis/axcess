@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3,
   FilePlus2,
@@ -8,18 +8,50 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
+import { LinkButton } from "./ui";
 
+/**
+ * One sidebar entry. ``isActive`` decides whether the item should render
+ * as the highlighted current section — we compute it ourselves rather
+ * than relying on ``NavLink``'s built-in matching because the routes
+ * overlap (``/scans/new`` is a child of ``/scans``) and the default
+ * matcher can't disambiguate "you're inside a scan" from "you're on
+ * the new-scan form" cleanly.
+ */
 interface NavItem {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  end?: boolean;
+  isActive: (pathname: string) => boolean;
 }
 
 const NAV: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/scans", label: "Scans", icon: Radar, end: true },
-  { to: "/scans/new", label: "New scan", icon: FilePlus2 },
+  {
+    to: "/",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    isActive: (p) => p === "/",
+  },
+  {
+    // ``Scans`` highlights for any /scans/* route EXCEPT the new-scan
+    // form, which has its own item. So /scans, /scans/5, /scans/5/findings,
+    // /scans/5/diff, and /findings/123 (a finding always belongs to a scan)
+    // all keep the Scans tab lit — the user never loses context for which
+    // section they're in.
+    to: "/scans",
+    label: "Scans",
+    icon: Radar,
+    isActive: (p) =>
+      (p === "/scans" ||
+        (p.startsWith("/scans/") && p !== "/scans/new") ||
+        p.startsWith("/findings/")),
+  },
+  {
+    to: "/scans/new",
+    label: "New scan",
+    icon: FilePlus2,
+    isActive: (p) => p === "/scans/new",
+  },
 ];
 
 /**
@@ -53,6 +85,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 }
 
 function Sidebar() {
+  const { pathname } = useLocation();
   return (
     <aside
       className="hidden w-60 flex-col bg-umich-blue text-fg-inverse md:flex"
@@ -68,23 +101,22 @@ function Sidebar() {
         <ul className="space-y-0.5">
           {NAV.map((item) => {
             const Icon = item.icon;
+            const active = item.isActive(pathname);
             return (
               <li key={item.to}>
-                <NavLink
+                <Link
                   to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    cn(
-                      "group flex items-center gap-2.5 rounded-xs px-3 py-2 text-sm font-medium no-underline transition-colors",
-                      isActive
-                        ? "bg-umich-maize text-umich-blue"
-                        : "text-white/85 hover:bg-white/10 hover:text-white",
-                    )
-                  }
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "group flex items-center gap-2.5 rounded-xs px-3 py-2 text-sm font-medium no-underline transition-colors",
+                    active
+                      ? "bg-umich-maize text-umich-blue"
+                      : "text-white/85 hover:bg-white/10 hover:text-white",
+                  )}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{item.label}</span>
-                </NavLink>
+                </Link>
               </li>
             );
           })}
@@ -107,13 +139,16 @@ function TopBar() {
         <BarChart3 className="h-5 w-5 text-umich-blue" aria-hidden />
         <span className="font-semibold text-fg">Image Text Audit</span>
       </div>
-      <NavLink
+      {/* Topbar primary CTA. Hidden on mobile because the sidebar already
+          shows "New scan" — it'd just be redundant in a narrow viewport. */}
+      <LinkButton
         to="/scans/new"
-        className="hidden items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600 md:inline-flex"
+        variant="primary"
+        className="hidden md:inline-flex"
       >
         <ListChecks className="h-4 w-4" aria-hidden />
         Start a new scan
-      </NavLink>
+      </LinkButton>
     </header>
   );
 }

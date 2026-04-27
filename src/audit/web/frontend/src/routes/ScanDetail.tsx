@@ -9,7 +9,13 @@ import {
   Square,
 } from "lucide-react";
 import { api, exportUrl } from "../api/client";
-import { Button, Card, PageHeader, StatCard } from "../components/ui";
+import {
+  Button,
+  Card,
+  LinkButton,
+  PageHeader,
+  StatCard,
+} from "../components/ui";
 import type { Severity } from "../api/types";
 
 export default function ScanDetailRoute() {
@@ -74,22 +80,22 @@ export default function ScanDetailRoute() {
                 Findings — pending
               </span>
             ) : (
-              <Link
+              <LinkButton
                 to={`/scans/${data.id}/findings`}
-                className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
+                variant="primary"
               >
                 <ListFilter className="h-4 w-4" aria-hidden />
                 Findings ({data.finding_count})
-              </Link>
+              </LinkButton>
             )}
             {data.previous_scan_id != null && !isRunning && (
-              <Link
+              <LinkButton
                 to={`/scans/${data.id}/diff?compare_to=${data.previous_scan_id}`}
-                className="inline-flex items-center gap-1.5 rounded-xs border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-fg no-underline hover:bg-surface-muted"
+                variant="secondary"
               >
                 <GitCompare className="h-4 w-4" aria-hidden />
                 Diff vs #{data.previous_scan_id}
-              </Link>
+              </LinkButton>
             )}
           </>
         }

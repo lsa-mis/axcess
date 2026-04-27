@@ -2,7 +2,13 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, PlusCircle, ServerCrash } from "lucide-react";
 import { api } from "../api/client";
-import { Card, EmptyState, PageHeader, StatCard } from "../components/ui";
+import {
+  Card,
+  EmptyState,
+  LinkButton,
+  PageHeader,
+  StatCard,
+} from "../components/ui";
 
 /** Home landing: counts across all scans + link to kick off a new one. */
 export default function DashboardRoute() {
@@ -23,13 +29,10 @@ export default function DashboardRoute() {
         title="Dashboard"
         subtitle="Local, offline WCAG 1.4.5 accessibility review."
         actions={
-          <Link
-            to="/scans/new"
-            className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
-          >
+          <LinkButton to="/scans/new" variant="primary">
             <PlusCircle className="h-4 w-4" aria-hidden />
             New scan
-          </Link>
+          </LinkButton>
         }
       />
 
@@ -58,6 +61,9 @@ export default function DashboardRoute() {
           >
             View progress →
           </Link>
+          {/* Plain inline Link is correct here — this is a body text link, not
+              a button-shaped affordance. The variant API on LinkButton is for
+              chrome elements (page-header CTAs, table action cells, etc). */}
         </Card>
       )}
 
@@ -93,12 +99,9 @@ export default function DashboardRoute() {
               title="No scans yet"
               message="Run a crawl to see findings here."
               action={
-                <Link
-                  to="/scans/new"
-                  className="inline-flex items-center gap-1 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline"
-                >
+                <LinkButton to="/scans/new" variant="primary">
                   <PlusCircle className="h-4 w-4" aria-hidden /> New scan
-                </Link>
+                </LinkButton>
               }
             />
           ) : (
