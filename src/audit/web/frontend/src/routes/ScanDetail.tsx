@@ -1,6 +1,13 @@
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertOctagon, Download, GitCompare, ListFilter, Square } from "lucide-react";
+import {
+  AlertOctagon,
+  Download,
+  GitCompare,
+  ListFilter,
+  Loader2,
+  Square,
+} from "lucide-react";
 import { api, exportUrl } from "../api/client";
 import { Button, Card, PageHeader, StatCard } from "../components/ui";
 import type { Severity } from "../api/types";
@@ -36,6 +43,12 @@ export default function ScanDetailRoute() {
   }
 
   const severities: Severity[] = ["critical", "major", "minor", "info"];
+  // Findings + exports are meaningless mid-crawl: synthesis only runs at
+  // end-of-crawl, so the count is always 0 and an export would be empty.
+  // Disable the contextual buttons (with a tooltip) until the scan settles.
+  const isRunning = data.status === "running";
+  const lockedTip =
+    "Available once the crawl completes — findings are synthesized at end of scan.";
 
   return (
     <>
@@ -48,14 +61,28 @@ export default function ScanDetailRoute() {
         subtitle={data.seed_url}
         actions={
           <>
-            <Link
-              to={`/scans/${data.id}/findings`}
-              className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
-            >
-              <ListFilter className="h-4 w-4" aria-hidden />
-              Findings ({data.finding_count})
-            </Link>
-            {data.previous_scan_id != null && (
+            {isRunning ? (
+              <span
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xs border border-border bg-surface-muted px-3 py-1.5 text-sm font-semibold text-fg-subtle"
+                aria-disabled="true"
+                title={lockedTip}
+              >
+                <Loader2
+                  className="h-4 w-4 animate-spin"
+                  aria-hidden
+                />
+                Findings — pending
+              </span>
+            ) : (
+              <Link
+                to={`/scans/${data.id}/findings`}
+                className="inline-flex items-center gap-1.5 rounded-xs bg-umich-blue px-3 py-1.5 text-sm font-semibold text-fg-inverse no-underline hover:bg-umich-blue-600"
+              >
+                <ListFilter className="h-4 w-4" aria-hidden />
+                Findings ({data.finding_count})
+              </Link>
+            )}
+            {data.previous_scan_id != null && !isRunning && (
               <Link
                 to={`/scans/${data.id}/diff?compare_to=${data.previous_scan_id}`}
                 className="inline-flex items-center gap-1.5 rounded-xs border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-fg no-underline hover:bg-surface-muted"
@@ -99,10 +126,46 @@ export default function ScanDetailRoute() {
               <StatCard label="Images" value={data.progress.images_seen} />
             </div>
           )}
+          {data.progress && data.progress.in_flight_pages.length > 0 && (
+            <details className="mt-3" open>
+              <summary className="cursor-pointer text-sm font-semibold text-fg">
+                Fetching now ({data.progress.in_flight_pages.length})
+              </summary>
+              <ul className="mt-2 space-y-0.5 font-mono text-2xs text-fg-muted">
+                {data.progress.in_flight_pages.map((p) => (
+                  <li
+                    key={p.url}
+                    className="flex items-center gap-2"
+                    aria-live="polite"
+                  >
+                    <Loader2
+                      className="h-3 w-3 shrink-0 animate-spin text-umich-blue"
+                      aria-hidden
+                    />
+                    <span
+                      className="inline-block rounded bg-surface-muted px-1.5 font-sans uppercase text-fg-subtle"
+                      title={`Depth ${p.depth}`}
+                    >
+                      d{p.depth}
+                    </span>
+                    {p.attempts > 0 && (
+                      <span
+                        className="inline-block rounded bg-sev-major-bg px-1.5 font-sans text-sev-major"
+                        title={`Retry ${p.attempts}`}
+                      >
+                        ↻{p.attempts}
+                      </span>
+                    )}
+                    <span className="truncate">{p.url}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {data.progress && data.progress.recent_pages.length > 0 && (
             <details className="mt-3" open>
               <summary className="cursor-pointer text-sm font-semibold text-fg">
-                Last {data.progress.recent_pages.length} pages
+                Last {data.progress.recent_pages.length} fetched
               </summary>
               <ul className="mt-2 space-y-0.5 font-mono text-2xs text-fg-muted">
                 {data.progress.recent_pages.map((p) => (
@@ -163,6 +226,12 @@ export default function ScanDetailRoute() {
           <Download className="h-4 w-4" aria-hidden />
           Export this scan
         </h2>
+        {isRunning && (
+          <p className="mb-3 text-sm text-fg-muted">
+            Exports become available when the crawl finishes — until then
+            the report would be empty.
+          </p>
+        )}
         <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {(
             [
@@ -171,17 +240,35 @@ export default function ScanDetailRoute() {
               ["jira", "Jira CSV (import template)"],
               ["markdown", "Markdown report"],
             ] as const
-          ).map(([fmt, label]) => (
-            <li key={fmt}>
-              <a
-                href={exportUrl(data.id, fmt)}
-                download
-                className="block rounded-xs border border-border px-3 py-2 text-sm no-underline hover:bg-surface-muted"
-              >
-                {label}
-              </a>
-            </li>
-          ))}
+          ).map(([fmt, label]) =>
+            isRunning ? (
+              <li key={fmt}>
+                {/* Using a styled <span aria-disabled> instead of a disabled
+                    <a> because anchors don't honor `disabled`. The visual
+                    treatment + tooltip + aria-disabled cover keyboard,
+                    screen-reader, and pointer users. */}
+                <span
+                  role="link"
+                  aria-disabled="true"
+                  tabIndex={-1}
+                  title={lockedTip}
+                  className="block cursor-not-allowed rounded-xs border border-border bg-surface-muted px-3 py-2 text-sm text-fg-subtle"
+                >
+                  {label}
+                </span>
+              </li>
+            ) : (
+              <li key={fmt}>
+                <a
+                  href={exportUrl(data.id, fmt)}
+                  download
+                  className="block rounded-xs border border-border px-3 py-2 text-sm no-underline hover:bg-surface-muted"
+                >
+                  {label}
+                </a>
+              </li>
+            ),
+          )}
         </ul>
       </Card>
     </>

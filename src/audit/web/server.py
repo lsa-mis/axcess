@@ -1044,6 +1044,28 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
         "FROM pages WHERE scan_id = ? ORDER BY id DESC LIMIT 5",
         (scan_id,),
     ).fetchall()
+    # Currently-leased jobs: which URLs are in a worker right now. Useful so
+    # the UI can show *what* is in flight, not just the count. Scoped to this
+    # scan via json_extract on payload_json so cross-scan jobs don't leak.
+    #
+    # ``CAST(lease_until AS TEXT)`` defeats SQLite's PARSE_DECLTYPES converter:
+    # the queue writes ISO-8601 strings via ``_iso(dt)`` (``2026-04-27T16:48:53
+    # +00:00``), but the default ``convert_timestamp`` expects space-separated
+    # ``YYYY-MM-DD HH:MM:SS`` and raises ``ValueError`` on the ``T`` form. We
+    # don't need the parsed datetime — ``_to_iso_string`` will pass the raw
+    # string through unchanged. (We can't use the ``[text]`` colname alias
+    # trick because schema.py only opens connections with PARSE_DECLTYPES,
+    # not PARSE_COLNAMES.)
+    in_flight = conn.execute(
+        "SELECT json_extract(payload_json, '$.url') AS url, "
+        "       json_extract(payload_json, '$.depth') AS depth, "
+        "       attempts, "
+        "       CAST(lease_until AS TEXT) AS lease_until "
+        "FROM jobs WHERE state = 'leased' "
+        "AND json_extract(payload_json, '$.scan_id') = ? "
+        "ORDER BY id LIMIT 10",
+        (scan_id,),
+    ).fetchall()
     image_count = conn.execute(
         "SELECT COUNT(DISTINCT pi.image_id) AS n FROM page_images pi "
         "JOIN pages p ON p.id = pi.page_id WHERE p.scan_id = ?",
@@ -1054,7 +1076,26 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
         "leased": int(job_counts.get("leased", 0)),
         "failed": int(job_counts.get("failed", 0)),
         "images_seen": int(image_count),
-        "recent_pages": [dict(r) for r in recent],
+        "recent_pages": [
+            {
+                "url_normalized": r["url_normalized"],
+                "status_code": r["status_code"],
+                "render_mode": r["render_mode"],
+                # sqlite returns this as a datetime under PARSE_DECLTYPES;
+                # JSONResponse can't serialize raw datetimes — coerce here.
+                "fetched_at": _to_iso_string(r["fetched_at"]),
+            }
+            for r in recent
+        ],
+        "in_flight_pages": [
+            {
+                "url": str(r["url"]) if r["url"] is not None else "",
+                "depth": int(r["depth"]) if r["depth"] is not None else 0,
+                "attempts": int(r["attempts"] or 0),
+                "lease_until": _to_iso_string(r["lease_until"]),
+            }
+            for r in in_flight
+        ],
     }
 
 

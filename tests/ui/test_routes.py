@@ -618,6 +618,81 @@ def test_app_shell_redirect_when_bundle_missing(client: TestClient) -> None:
     assert resp.status_code in (200, 503)
 
 
+def test_api_running_scan_includes_in_flight_and_recent(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """Running scans must serialize cleanly: pages.fetched_at is a real
+    datetime and jobs.lease_until likewise. Both must round-trip through
+    JSONResponse without TypeErrors. Also confirm the new in_flight_pages
+    field is populated from leased jobs scoped to this scan.
+    """
+    import json as _json
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+            "config_json) VALUES ('http://x/', 'running', 1, 0, '{}')"
+        )
+        running_id = int(cur.lastrowid or 0)
+        # A finished page (so recent_pages.fetched_at is a real datetime).
+        conn.execute(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, "
+            "render_mode, fetched_at) VALUES (?, ?, 200, 'static', "
+            "CURRENT_TIMESTAMP)",
+            (running_id, "http://x/finished"),
+        )
+        # A leased job (so in_flight_pages picks it up). Write lease_until in
+        # the same ISO-8601 format the real queue uses (``_iso(dt)`` produces
+        # ``2026-04-27T16:48:53+00:00``) — *not* SQLite's ``CURRENT_TIMESTAMP``
+        # which produces the space-separated ``YYYY-MM-DD HH:MM:SS`` form.
+        # PARSE_DECLTYPES tries to auto-convert the column based on its
+        # ``TIMESTAMP`` declared type, and the default converter chokes on the
+        # ``T`` separator. The earlier version of this test passed (because it
+        # wrote the converter-friendly form) while production 500'd; this
+        # version exercises the real format and would catch a regression.
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state, lease_until) "
+            "VALUES ('crawl', ?, 'leased', ?)",
+            (
+                _json.dumps(
+                    {"url": "http://x/in-flight", "depth": 2, "scan_id": running_id}
+                ),
+                "2026-04-27T16:48:53+00:00",
+            ),
+        )
+        # And a pending one to verify the count.
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state) "
+            "VALUES ('crawl', ?, 'pending')",
+            (_json.dumps({"url": "http://x/queued", "depth": 1, "scan_id": running_id}),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get(f"/api/scans/{running_id}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "running"
+    progress = body["progress"]
+    assert progress is not None
+    # Recent page surfaces with an ISO-string fetched_at, not a raw datetime.
+    assert progress["recent_pages"][0]["url_normalized"] == "http://x/finished"
+    assert isinstance(progress["recent_pages"][0]["fetched_at"], str)
+    # In-flight panel is populated and scoped to this scan.
+    in_flight = progress["in_flight_pages"]
+    assert len(in_flight) == 1
+    assert in_flight[0]["url"] == "http://x/in-flight"
+    assert in_flight[0]["depth"] == 2
+    assert in_flight[0]["attempts"] == 0
+    # Pending job count too.
+    assert progress["pending"] == 1
+    assert progress["leased"] == 1
+
+
 def test_scan_detail_shows_blocked_warning_for_non_2xx_seed(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:

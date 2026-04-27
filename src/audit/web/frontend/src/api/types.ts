@@ -48,6 +48,16 @@ export interface ScanProgress {
     render_mode: string;
     fetched_at: string | null;
   }[];
+  /**
+   * URLs currently leased by a worker — the things being fetched *right
+   * now*, not yet recorded in the pages table. Useful for live activity.
+   */
+  in_flight_pages: {
+    url: string;
+    depth: number;
+    attempts: number;
+    lease_until: string | null;
+  }[];
 }
 
 export interface ScanDetail extends ScanSummary {
