@@ -245,6 +245,30 @@ def test_export_unknown_format_rejected(
     assert resp.status_code == 400
 
 
+def test_export_routes_are_aliased_under_api(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """The React SPA's ``exportUrl()`` helper hits ``/api/scans/{id}/export
+    /{fmt}`` to stay consistent with the rest of its ``/api/*`` surface,
+    while the legacy Jinja UI uses ``/scans/{id}/export/{fmt}``. Both must
+    resolve to identical responses or downloads silently break in one UI."""
+    _, _, scan_id = seeded_db
+    for fmt in ("csv", "json", "jira", "markdown"):
+        legacy = client.get(f"/scans/{scan_id}/export/{fmt}")
+        api_route = client.get(f"/api/scans/{scan_id}/export/{fmt}")
+        assert legacy.status_code == 200, fmt
+        assert api_route.status_code == 200, fmt
+        assert api_route.content == legacy.content, fmt
+        assert (
+            api_route.headers["content-type"]
+            == legacy.headers["content-type"]
+        ), fmt
+        assert (
+            api_route.headers["content-disposition"]
+            == legacy.headers["content-disposition"]
+        ), fmt
+
+
 def test_export_unknown_scan_returns_404(client: TestClient) -> None:
     resp = client.get("/scans/99999/export/csv")
     assert resp.status_code == 404

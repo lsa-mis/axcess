@@ -845,6 +845,12 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             },
         )
 
+    # Two URLs, one handler. The legacy Jinja UI links exports at
+    # ``/scans/{id}/export/{fmt}``; the React SPA's ``exportUrl()`` helper
+    # uses ``/api/scans/{id}/export/{fmt}`` to stay consistent with the rest
+    # of its ``/api/*`` surface. FastAPI lets us stack route decorators on
+    # the same function so we don't duplicate the handler body.
+    @app.get("/api/scans/{scan_id}/export/{fmt}")
     @app.get("/scans/{scan_id}/export/{fmt}")
     def export_scan(request: Request, scan_id: int, fmt: str) -> Response:
         """Download a scan export as CSV / JSON / Jira CSV / Markdown."""
