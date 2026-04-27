@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/cn";
-import type { Severity, FindingStatus } from "../api/types";
+import type { Severity, FindingStatus, ScanStatus } from "../api/types";
 
 /** Severity chip — pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
@@ -236,4 +236,64 @@ export function AltTag({ value }: { value: string | null }) {
       &ldquo;{value}&rdquo;
     </span>
   );
+}
+
+/**
+ * Color-coded scan status. Unlike findings (where status is workflow and we
+ * stay neutral), scan status is operational state — running scans want a
+ * "live" pulse, failures want red, interrupted wants amber. This is the
+ * only place in the SPA we color-code status.
+ *
+ * Color is paired with text and an aria-label so screen readers and
+ * deuteranopes get the same signal.
+ */
+const SCAN_STATUS_CLASS: Record<ScanStatus, string> = {
+  running:
+    "border-umich-blue/50 bg-umich-blue/10 text-umich-blue animate-pulse",
+  completed: "border-border bg-surface-muted text-fg-muted",
+  failed: "border-sev-critical/40 bg-sev-critical-bg text-sev-critical",
+  interrupted: "border-sev-major/40 bg-sev-major-bg text-sev-major",
+};
+export function ScanStatusBadge({ value }: { value: ScanStatus }) {
+  return (
+    <span
+      aria-label={`Scan status: ${value}`}
+      className={cn(
+        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide",
+        SCAN_STATUS_CLASS[value],
+      )}
+    >
+      {value}
+    </span>
+  );
+}
+
+/**
+ * Render an ISO-8601 timestamp as a short, human-friendly relative string
+ * (``"2h ago"``, ``"3d ago"``). Returns ``"—"`` for null/empty input so
+ * callers don't have to guard.
+ *
+ * We round down — "59 minutes" reads as "59m ago", not "1h ago" — because
+ * scan timing matters for the user ("did this finish recently?") and
+ * over-rounding hides recency. The full ISO timestamp should be passed
+ * via a ``title`` attribute on the wrapping element so hovering reveals
+ * the exact moment; this helper only formats, it doesn't render.
+ */
+export function relativeTime(iso: string | null): string {
+  if (!iso) return "—";
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return "—";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
 }

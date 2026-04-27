@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertOctagon,
@@ -7,6 +7,7 @@ import {
   ListFilter,
   Loader2,
   Square,
+  Trash2,
 } from "lucide-react";
 import { api, exportUrl } from "../api/client";
 import {
@@ -22,6 +23,7 @@ export default function ScanDetailRoute() {
   const { scanId } = useParams<{ scanId: string }>();
   const id = Number(scanId);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["scan", id],
@@ -35,6 +37,19 @@ export default function ScanDetailRoute() {
   const cancel = useMutation({
     mutationFn: () => api.cancelScan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
+  });
+
+  // Delete sends the user back to the scans list. We invalidate the list
+  // query first (so the navigation lands on a fresh, deleted-row-free
+  // page) and replace the history entry — pressing Back from /scans
+  // shouldn't try to load the now-404 detail page.
+  const deleteScan = useMutation({
+    mutationFn: () => api.deleteScan(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["scans"] });
+      qc.removeQueries({ queryKey: ["scan", id] });
+      navigate("/scans", { replace: true });
+    },
   });
 
   if (error) {
@@ -97,9 +112,46 @@ export default function ScanDetailRoute() {
                 Diff vs #{data.previous_scan_id}
               </LinkButton>
             )}
+            {/* Delete is only offered when the scan isn't running — the
+                backend rejects DELETE on a live scan with 409, so we hide
+                the button rather than letting the user click into an
+                error. The Stop crawl affordance below covers the running
+                case; once stopped, the page re-renders with Delete shown. */}
+            {!isRunning && (
+              <Button
+                variant="ghost"
+                disabled={deleteScan.isPending}
+                className="text-sev-critical hover:bg-sev-critical-bg"
+                onClick={() => {
+                  const ok = window.confirm(
+                    `Delete scan #${data.id} (${data.seed_url})?\n\n` +
+                      "This permanently removes the scan, its pages, " +
+                      "findings, and history. Image blobs are kept (they " +
+                      "may be referenced by other scans). This cannot be " +
+                      "undone.",
+                  );
+                  if (ok) deleteScan.mutate();
+                }}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                {deleteScan.isPending ? "Deleting…" : "Delete scan"}
+              </Button>
+            )}
           </>
         }
       />
+
+      {deleteScan.error && (
+        <Card
+          className="mb-4 border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
+          role="alert"
+        >
+          Couldn't delete scan:{" "}
+          {deleteScan.error instanceof Error
+            ? deleteScan.error.message
+            : String(deleteScan.error)}
+        </Card>
+      )}
 
       {data.status === "running" && (
         <Card className="mb-4 border-umich-blue/30 bg-umich-blue/5 p-4">

@@ -958,3 +958,243 @@ def test_new_scan_form_template_shows_running_banner() -> None:
     )
     assert "crawl is already in progress" in rendered
     assert "/scans/42" in rendered
+
+
+def test_favicon_svg_served(client: TestClient) -> None:
+    """The brand favicon must serve from /favicon.svg with the SVG mime."""
+    resp = client.get("/favicon.svg")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/svg+xml")
+    # The actual mark is a UMich-blue rounded rect with a maize T — assert
+    # the maize hex is present so a swap to a placeholder (or an empty
+    # file) is caught loudly rather than rendering a blank tab icon.
+    assert b"#FFCB05" in resp.content
+
+
+def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
+    """Browsers and devtools poke /favicon.ico from the root regardless of
+    the ``<link rel="icon">`` tag. We serve the same SVG payload there so
+    every UI surface (SPA, Jinja, dev tools) gets a tab icon."""
+    resp = client.get("/favicon.ico")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/svg+xml")
+    assert b"#FFCB05" in resp.content
+
+
+def test_api_delete_scan_removes_scan_and_cascades(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """DELETE /api/scans/{id} removes the scan plus everything keyed on it.
+
+    The fixture seeds a scan with pages, page_images, analyses, findings,
+    and finding_history. After delete: the scan row is gone, the cascading
+    children are gone, but the deduped images survive (their blobs are
+    still referenced conceptually — and would still be by other scans).
+    """
+    import sqlite3 as _sqlite3
+
+    db_path, _, scan_id = seeded_db
+
+    # Sanity: the seeded scan really has children to cascade.
+    pre = _sqlite3.connect(str(db_path))
+    pre.row_factory = _sqlite3.Row
+    try:
+        page_n = pre.execute(
+            "SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)
+        ).fetchone()["n"]
+        finding_n = pre.execute(
+            "SELECT COUNT(*) AS n FROM findings WHERE scan_id = ?", (scan_id,)
+        ).fetchone()["n"]
+        image_n_before = pre.execute("SELECT COUNT(*) AS n FROM images").fetchone()["n"]
+    finally:
+        pre.close()
+    assert page_n > 0, "fixture should seed at least one page"
+    assert finding_n > 0, "fixture should seed at least one finding"
+
+    resp = client.delete(f"/api/scans/{scan_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"ok": True, "deleted_scan_id": scan_id}
+
+    post = _sqlite3.connect(str(db_path))
+    post.row_factory = _sqlite3.Row
+    try:
+        scan_row = post.execute(
+            "SELECT id FROM scans WHERE id = ?", (scan_id,)
+        ).fetchone()
+        page_n_after = post.execute(
+            "SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)
+        ).fetchone()["n"]
+        finding_n_after = post.execute(
+            "SELECT COUNT(*) AS n FROM findings WHERE scan_id = ?", (scan_id,)
+        ).fetchone()["n"]
+        history_n_after = post.execute(
+            "SELECT COUNT(*) AS n FROM finding_history WHERE scan_id = ?",
+            (scan_id,),
+        ).fetchone()["n"]
+        # Images survive: dedupe means another scan could still reference them.
+        image_n_after = post.execute("SELECT COUNT(*) AS n FROM images").fetchone()["n"]
+        # And first_seen_scan_id was NULL'd, not left dangling.
+        dangling = post.execute(
+            "SELECT COUNT(*) AS n FROM images WHERE first_seen_scan_id = ?",
+            (scan_id,),
+        ).fetchone()["n"]
+    finally:
+        post.close()
+
+    assert scan_row is None
+    assert page_n_after == 0
+    assert finding_n_after == 0
+    assert history_n_after == 0
+    assert image_n_after == image_n_before
+    assert dangling == 0
+
+
+def test_api_delete_scan_404s_for_unknown_id(client: TestClient) -> None:
+    resp = client.delete("/api/scans/9999999")
+    assert resp.status_code == 404
+
+
+def test_api_delete_scan_clears_jobs_for_that_scan(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """Jobs aren't FK-bound (scan_id lives in payload_json), so the delete
+    handler must explicitly remove them. Otherwise a deleted scan would
+    leave orphan pending jobs that workers would later try to lease."""
+    import sqlite3 as _sqlite3
+
+    db_path, _, scan_id = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    try:
+        # Seed two jobs for this scan in different states; both should go.
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state) VALUES "
+            "('fetch', ?, 'pending')",
+            (f'{{"url":"http://x/a","scan_id":{scan_id},"depth":0}}',),
+        )
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state) VALUES "
+            "('fetch', ?, 'failed')",
+            (f'{{"url":"http://x/b","scan_id":{scan_id},"depth":0}}',),
+        )
+        # And one job for a *different* scan that must NOT be touched.
+        conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+            "config_json) VALUES ('http://other.example/', 'completed', 0, 0, '{}')"
+        )
+        other_scan = int(
+            conn.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+        )
+        conn.execute(
+            "INSERT INTO jobs (kind, payload_json, state) VALUES "
+            "('fetch', ?, 'pending')",
+            (f'{{"url":"http://x/c","scan_id":{other_scan},"depth":0}}',),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.delete(f"/api/scans/{scan_id}")
+    assert resp.status_code == 200
+
+    check = _sqlite3.connect(str(db_path))
+    check.row_factory = _sqlite3.Row
+    try:
+        for_deleted = check.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE "
+            "json_extract(payload_json, '$.scan_id') = ?",
+            (scan_id,),
+        ).fetchone()["n"]
+        for_other = check.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE "
+            "json_extract(payload_json, '$.scan_id') = ?",
+            (other_scan,),
+        ).fetchone()["n"]
+    finally:
+        check.close()
+
+    assert for_deleted == 0, "jobs for the deleted scan should be removed"
+    assert for_other == 1, "jobs for sibling scans must not be touched"
+
+
+def test_api_delete_scan_409s_when_scan_is_running(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    """A scan with an active asyncio task must not be deleted out from
+    under the worker — it would keep writing rows into the gap. The
+    handler returns 409 and the scan stays put.
+
+    The "is it running" gate is in-memory (``crawl_state["task"]``), not
+    DB-only, because a row left as ``status='running'`` after a crash is
+    stale by definition. To exercise the guard we have to inject a real
+    task into the same dict the handler closes over. We locate that dict
+    by walking ``api_delete_scan.__closure__``.
+    """
+    import asyncio
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+            "config_json) VALUES ('http://live.example/', 'running', 0, 0, '{}')"
+        )
+        running_id = int(cur.lastrowid or 0)
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Find the handler's captured crawl_state dict by inspecting the
+    # endpoint's closure cells. We match by structure (a dict containing
+    # both 'task' and 'scan_id' keys) so the test doesn't break if the
+    # variable is renamed in server.py.
+    app = client.app  # type: ignore[attr-defined]
+    target: dict[str, object] | None = None
+    for route in app.routes:  # type: ignore[attr-defined]
+        endpoint = getattr(route, "endpoint", None)
+        if endpoint is None or endpoint.__name__ != "api_delete_scan":
+            continue
+        for cell in endpoint.__closure__ or ():
+            val = cell.cell_contents
+            if isinstance(val, dict) and "task" in val and "scan_id" in val:
+                target = val
+                break
+        if target is not None:
+            break
+    assert target is not None, "could not locate crawl_state via closure"
+
+    async def _never() -> None:
+        await asyncio.sleep(60)
+
+    loop = asyncio.new_event_loop()
+    try:
+        task = loop.create_task(_never())
+        target["task"] = task
+        target["scan_id"] = running_id
+        try:
+            resp = client.delete(f"/api/scans/{running_id}")
+        finally:
+            task.cancel()
+            loop.run_until_complete(asyncio.gather(task, return_exceptions=True))
+            target["task"] = None
+            target["scan_id"] = None
+    finally:
+        loop.close()
+
+    assert resp.status_code == 409
+    detail = resp.json().get("detail", "")
+    assert "running" in detail.lower()
+
+    # And the scan row is still there.
+    check = _sqlite3.connect(str(db_path))
+    try:
+        row = check.execute(
+            "SELECT status FROM scans WHERE id = ?", (running_id,)
+        ).fetchone()
+    finally:
+        check.close()
+    assert row is not None
+    assert row[0] == "running"

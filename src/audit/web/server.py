@@ -80,6 +80,17 @@ _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _BASE_DIR / "templates"
 _STATIC_DIR = _BASE_DIR / "static"
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
+# Favicon lives under frontend/public/ as the source of truth (Vite copies it
+# verbatim into dist/ on build). We resolve at request time rather than import
+# time so a fresh build is picked up without restarting the server, and so
+# tests that haven't run `npm run build` still get a 200 from the public copy.
+_FAVICON_PUBLIC = _BASE_DIR / "frontend" / "public" / "favicon.svg"
+_FAVICON_DIST = _FRONTEND_DIST / "favicon.svg"
+
+
+def _favicon_path() -> Path:
+    """Return the deployed favicon if a build exists, else the source copy."""
+    return _FAVICON_DIST if _FAVICON_DIST.is_file() else _FAVICON_PUBLIC
 
 
 def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> FastAPI:
@@ -139,6 +150,31 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
+
+    @app.get("/favicon.svg")
+    @app.get("/favicon.ico")
+    @app.get("/app/favicon.svg")
+    def favicon() -> Response:
+        """Serve the brand favicon as SVG.
+
+        Three paths because browsers, tooling, and Vite are inconsistent:
+
+        * ``/favicon.svg`` — modern browsers honor the ``<link rel="icon">``
+          tag in the Jinja base template.
+        * ``/favicon.ico`` — devtools, screenshot pipelines, and a handful
+          of older clients still poke this URL from the root regardless of
+          the link tag. Every browser we care about accepts an SVG payload
+          at the ``.ico`` path.
+        * ``/app/favicon.svg`` — the SPA's index.html ships with
+          ``base: "/app/"`` (vite.config.ts), so Vite rewrites
+          ``href="/favicon.svg"`` to ``href="/app/favicon.svg"`` at build
+          time. We mirror the route under that prefix so the SPA tab
+          icon resolves without an extra static mount or a build hack.
+
+        All three URLs return the same SVG with ``image/svg+xml``. One
+        source file, three callable paths.
+        """
+        return FileResponse(_favicon_path(), media_type="image/svg+xml")
 
     # ---------------------------------------------------------------- /api
     # JSON surface for the React SPA. Mirrors the Jinja routes below.
@@ -255,6 +291,66 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                     (scan_id,),
                 )
         return JSONResponse({"ok": True})
+
+    @app.delete("/api/scans/{scan_id}")
+    async def api_delete_scan(scan_id: int) -> JSONResponse:
+        """Permanently delete a scan and everything it owns.
+
+        Cascades take care of the obvious children (pages, page_images,
+        findings, finding_history) via the FK declarations in
+        0001_initial_schema.sql. Two things they don't cover and we have
+        to handle ourselves:
+
+        * ``images.first_seen_scan_id`` has no ``ON DELETE`` action — if
+          left pointing at a doomed scan, the DELETE FK-violates. We NULL
+          it instead of cascading because images are dedupe'd by
+          ``content_hash`` and may be referenced by later scans; losing
+          the image row would orphan blobs and break diff history.
+        * ``jobs`` rows aren't FK-bound (``scan_id`` lives inside
+          ``payload_json``), so they need an explicit DELETE keyed on
+          ``json_extract`` — same trick the cancel endpoint uses.
+
+        We refuse to delete a currently-running scan: the live asyncio
+        task would keep writing rows after the DELETE, leaving
+        half-resurrected state. Caller must cancel first, then delete.
+        """
+        task = crawl_state.get("task")
+        active_scan_id = crawl_state.get("scan_id")
+        if (
+            isinstance(task, asyncio.Task)
+            and not task.done()
+            and active_scan_id == scan_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Cancel the running scan before deleting it.",
+            )
+        with get_conn() as conn:
+            existing = conn.execute(
+                "SELECT id, status FROM scans WHERE id = ?", (scan_id,)
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(status_code=404, detail="Scan not found")
+            # Belt-and-braces: status can lie if the server crashed mid-run
+            # before the startup sweep flipped it to 'interrupted'. The
+            # in-memory crawl_state check above is the authoritative gate.
+            if existing["status"] == "running" and active_scan_id == scan_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cancel the running scan before deleting it.",
+                )
+            with conn:
+                conn.execute(
+                    "UPDATE images SET first_seen_scan_id = NULL "
+                    "WHERE first_seen_scan_id = ?",
+                    (scan_id,),
+                )
+                conn.execute(
+                    "DELETE FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ?",
+                    (scan_id,),
+                )
+                conn.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
+        return JSONResponse({"ok": True, "deleted_scan_id": scan_id})
 
     @app.get("/api/scans/{scan_id}/findings")
     def api_list_findings(

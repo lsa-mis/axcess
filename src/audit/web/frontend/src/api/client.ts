@@ -48,6 +48,15 @@ export const api = {
     }),
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
+  /**
+   * Permanently delete a scan and its findings/pages/jobs. Backend refuses
+   * (409) if the scan is currently running — caller must `cancelScan` first.
+   * Idempotent at the UI layer because we invalidate ["scans"] after.
+   */
+  deleteScan: (id: number) =>
+    request<{ ok: boolean; deleted_scan_id: number }>(`/api/scans/${id}`, {
+      method: "DELETE",
+    }),
   listFindings: (scanId: number, filter: FindingsFilter) => {
     const params = new URLSearchParams();
     params.set("page", String(filter.page));

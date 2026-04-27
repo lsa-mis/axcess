@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Image Text Audit">
+  <!-- UMich blue rounded background. -->
+  <rect width="32" height="32" rx="6" fill="#00274C"/>
+  <!-- Maize "T" — the product is about images that contain text, so the
+       letterform is the symbol. Designed to read at 16×16; chunky strokes
+       so it doesn't dissolve at favicon size. -->
+  <path d="M7 9 H25 V13 H18.5 V25 H13.5 V13 H7 Z" fill="#FFCB05"/>
+</svg>
