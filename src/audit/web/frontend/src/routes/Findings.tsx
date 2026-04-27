@@ -1,6 +1,6 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search } from "lucide-react";
 import { api, blobUrl } from "../api/client";
@@ -214,7 +214,11 @@ function FindingsTable({
     overscan: 8,
   });
 
-  const items = useMemo(() => rowVirtualizer.getVirtualItems(), [rowVirtualizer]);
+  // Call directly each render — react-virtual's hook subscribes to scroll +
+  // resize internally and triggers re-renders, so this stays in sync. A
+  // useMemo([rowVirtualizer]) would *cache* the first (empty) result
+  // forever because the virtualizer reference is stable across renders.
+  const items = rowVirtualizer.getVirtualItems();
 
   return (
     <Card className="overflow-hidden">
