@@ -55,11 +55,20 @@ export default function TestRunnerRoute() {
   const pageId = params.get("page") ?? "";
   const module = (params.get("module") ?? "") as ModuleId | "";
 
+  // Functional updater so consecutive calls compose instead of
+  // stomping each other. Building from the captured `params` here was
+  // a real bug: the site dropdown set two keys in one event and the
+  // second write erased the first, so picking a site looked dead.
   const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next, { replace: true });
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   const sitePages = data.pages.filter((p) => p.siteId === siteId);
@@ -100,8 +109,18 @@ export default function TestRunnerRoute() {
               className={inputClass}
               value={siteId}
               onChange={(e) => {
-                setParam("site", e.target.value);
-                setParam("page", "");
+                // One atomic URL update: set the site and clear the
+                // stale page selection together.
+                setParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev);
+                    if (e.target.value) next.set("site", e.target.value);
+                    else next.delete("site");
+                    next.delete("page");
+                    return next;
+                  },
+                  { replace: true },
+                );
               }}
             >
               <option value="">Choose a site</option>
