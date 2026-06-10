@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* One shared focus indicator for the whole app: a solid dark-blue ring
+   with a white halo so it stays visible on every surface. Applied
+   globally so no component can ship without it. */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 6px #003f75;
+  border-radius: 2px;
+}
+
+/* Skip link: visually hidden until focused, then a high-contrast pill
+   in the top left corner. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus-visible {
+  left: 0.5rem;
+  top: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: #00274c;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Respect reduced motion: the tracker has no essential animation. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
