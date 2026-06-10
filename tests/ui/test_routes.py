@@ -234,7 +234,9 @@ def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, obje
     resp = client.get(f"/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
     assert "text/markdown" in resp.headers["content-type"]
-    assert resp.text.startswith(f"# WCAG 1.4.5 audit — Scan #{scan_id}")
+    # Report retitled in the AccessibleAccessibility rebrand — the tool
+    # now covers more than the original 1.4.5 images-of-text criterion.
+    assert resp.text.startswith(f"# Accessibility audit — Scan #{scan_id}")
 
 
 def test_export_unknown_format_rejected(

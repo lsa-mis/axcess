@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Image Text Audit{% endblock %}</title>
+  <title>{% block title %}AccessibleAccessibility{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
   <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
@@ -12,7 +12,7 @@
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site">
-    <h1>Image Text Audit</h1>
+    <h1>AccessibleAccessibility</h1>
     <nav aria-label="Primary">
       <ul>
         <li><a href="/scans" {% if active == 'scans' %}aria-current="page"{% endif %}>Scans</a></li>

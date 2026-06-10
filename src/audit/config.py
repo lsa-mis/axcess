@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # Crawler
     default_rps: float = 2.0
     request_timeout_s: float = 30.0
-    user_agent: str = "imagetextscanner/0.1 (+local accessibility audit)"
+    user_agent: str = "accessible-accessibility/0.1 (+local accessibility audit)"
 
     # OCR (Phase 3)
     ocr_language: str = "eng"

@@ -25,9 +25,12 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
     lines: list[str] = []
     when = generated_at or datetime.now(UTC)
 
-    lines.append(f"# WCAG 1.4.5 audit — Scan #{scan.id}")
+    lines.append(f"# Accessibility audit — Scan #{scan.id}")
     lines.append("")
-    lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')}_")
+    lines.append(
+        f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} "
+        "by AccessibleAccessibility._"
+    )
     lines.append("")
     lines.append("## Scan metadata")
     lines.append("")

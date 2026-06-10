@@ -54,7 +54,7 @@ class CrawlConfig:
     ignore_robots: bool = False
     concurrency_per_host: int = 2
     workers: int = 4
-    user_agent: str = "imagetextscanner/0.1 (+local accessibility audit)"
+    user_agent: str = "accessible-accessibility/0.1 (+local accessibility audit)"
     request_timeout_s: float = 30.0
     # OCR — disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
     ocr_enabled: bool = True

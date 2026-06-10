@@ -76,7 +76,7 @@ def test_build_payload_has_source_and_schema(tmp_db: sqlite3.Connection) -> None
     scan_id = _minimal_scan(tmp_db)
     scan = collect_scan(tmp_db, scan_id)
     payload = build_payload(scan)
-    assert payload["source"]["tool"] == "imagetextscanner"
+    assert payload["source"]["tool"] == "accessible-accessibility"
     assert payload["schema_version"] >= 1
     assert payload["scan"]["id"] == scan_id
 

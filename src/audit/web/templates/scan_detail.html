@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Scan #{{ scan.id }} — Image Text Audit{% endblock %}
+{% block title %}Scan #{{ scan.id }} — AccessibleAccessibility{% endblock %}
 {% block content %}
   <h2>Scan #{{ scan.id }}</h2>
   <p class="subtle">{{ scan.seed_url }}</p>
@@ -117,7 +117,9 @@
   {% endif %}
 
   <p>
-    <a href="/scans/{{ scan.id }}/findings">All findings →</a>
+    {# Label matches the SPA's "Findings (N)" so both UIs cue the same
+       destination the same way. #}
+    <a href="/scans/{{ scan.id }}/findings">Findings ({{ scan.finding_count }}) →</a>
     {% if previous_scan_id %}
       &nbsp;·&nbsp;
       <a href="/scans/{{ scan.id }}/diff?compare_to={{ previous_scan_id }}">
@@ -127,6 +129,16 @@
   </p>
 
   <h3>Export</h3>
+  {% if scan.status == 'running' %}
+    {# Exports are synthesized at end-of-crawl — mid-crawl downloads
+       would be empty files. The SPA disables these with a tooltip;
+       mirror that here instead of letting the user click into an
+       empty download. #}
+    <p class="subtle">
+      Exports become available when the crawl finishes — until then the
+      reports would be empty.
+    </p>
+  {% else %}
   <nav aria-label="Export this scan">
     <ul>
       <li><a href="/scans/{{ scan.id }}/export/csv" download>CSV (one row per occurrence)</a></li>
@@ -135,4 +147,5 @@
       <li><a href="/scans/{{ scan.id }}/export/markdown" download>Markdown report</a></li>
     </ul>
   </nav>
+  {% endif %}
 {% endblock %}

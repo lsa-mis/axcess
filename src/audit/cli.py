@@ -21,7 +21,10 @@ from audit.exports.markdown_report import render_markdown
 from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
-    help="Local offline web accessibility auditor for WCAG 1.4.5 (Images of Text).",
+    help=(
+        "AccessibleAccessibility — local, offline web accessibility auditor "
+        "(images-of-text detection, keyboard-trap probing, and more)."
+    ),
     no_args_is_help=True,
     add_completion=False,
 )

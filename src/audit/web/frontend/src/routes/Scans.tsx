@@ -33,15 +33,11 @@ export default function ScansRoute() {
 
   return (
     <>
+      {/* No header "New scan" action — the topbar carries the single
+          global CTA. The empty state below keeps its contextual one. */}
       <PageHeader
         title="Scans"
         subtitle={isLoading ? "Loading…" : `${scans.length} total`}
-        actions={
-          <LinkButton to="/scans/new" variant="primary">
-            <PlusCircle className="h-4 w-4" aria-hidden />
-            New scan
-          </LinkButton>
-        }
       />
 
       {scans.length === 0 && !isLoading ? (
@@ -50,7 +46,7 @@ export default function ScansRoute() {
           message="Point the crawler at a URL to start auditing."
           action={
             <LinkButton to="/scans/new" variant="primary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> Start a scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> New scan
             </LinkButton>
           }
         />

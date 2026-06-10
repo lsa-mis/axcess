@@ -1,11 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import {
-  BarChart3,
-  FilePlus2,
-  LayoutDashboard,
-  ListChecks,
-  Radar,
-} from "lucide-react";
+import { LayoutDashboard, Plus, Radar } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { LinkButton } from "./ui";
@@ -25,6 +19,12 @@ interface NavItem {
   isActive: (pathname: string) => boolean;
 }
 
+/**
+ * Nav lists DESTINATIONS only. "New scan" is an action, not a place —
+ * it lives in the topbar as the single global CTA, never in the nav.
+ * (Earlier versions had it in both places plus per-page header buttons:
+ * three simultaneous "New scan" affordances per screen.)
+ */
 const NAV: NavItem[] = [
   {
     to: "/",
@@ -33,30 +33,43 @@ const NAV: NavItem[] = [
     isActive: (p) => p === "/",
   },
   {
-    // ``Scans`` highlights for any /scans/* route EXCEPT the new-scan
-    // form, which has its own item. So /scans, /scans/5, /scans/5/findings,
-    // /scans/5/diff, and /findings/123 (a finding always belongs to a scan)
-    // all keep the Scans tab lit — the user never loses context for which
-    // section they're in.
+    // ``Scans`` highlights for any /scans/* route INCLUDING the new-scan
+    // form (it's contextually part of the scans section now that it has
+    // no nav item of its own) and /findings/* (a finding always belongs
+    // to a scan) — the user never loses context for which section
+    // they're in.
     to: "/scans",
     label: "Scans",
     icon: Radar,
     isActive: (p) =>
-      (p === "/scans" ||
-        (p.startsWith("/scans/") && p !== "/scans/new") ||
-        p.startsWith("/findings/")),
-  },
-  {
-    to: "/scans/new",
-    label: "New scan",
-    icon: FilePlus2,
-    isActive: (p) => p === "/scans/new",
+      p === "/scans" || p.startsWith("/scans/") || p.startsWith("/findings/"),
   },
 ];
 
 /**
+ * Brand mark: maize rounded square with blue "AA". The doubled A is the
+ * product initials (AccessibleAccessibility) and a deliberate nod to the
+ * WCAG AA conformance badge. Inverted relative to the favicon (blue
+ * square, maize letters) because the sidebar is already UMich blue.
+ */
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex shrink-0 select-none items-center justify-center rounded-md bg-umich-maize font-black tracking-tighter text-umich-blue",
+        className,
+      )}
+    >
+      AA
+    </span>
+  );
+}
+
+/**
  * App shell: UMich-Blue sidebar with Maize accent for the active item,
- * topbar with the product name + skip-link for a11y, main content area.
+ * topbar with the product name + the single global "New scan" CTA,
+ * skip-link for a11y, main content area.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -91,10 +104,14 @@ function Sidebar() {
       className="hidden w-60 flex-col bg-umich-blue text-fg-inverse md:flex"
       aria-label="Primary"
     >
-      <div className="flex h-14 items-center gap-2 border-b border-white/10 px-4">
-        <BarChart3 className="h-5 w-5 text-umich-maize" aria-hidden />
-        <span className="text-sm font-semibold tracking-tight">
-          Image Text Audit
+      <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
+        <BrandMark className="h-7 w-7 text-xs" />
+        {/* Two-line lockup — the 23-char name fits the w-60 rail cleanly
+            stacked; one line would force a font size too small to read. */}
+        <span className="text-sm font-semibold leading-tight tracking-tight">
+          Accessible
+          <br />
+          Accessibility
         </span>
       </div>
       <nav className="flex-1 px-2 py-3">
@@ -123,31 +140,45 @@ function Sidebar() {
         </ul>
       </nav>
       <div className="border-t border-white/10 px-4 py-3 text-2xs text-white/60">
-        <p>Local · offline · WCAG 1.4.5 review</p>
+        <p>Local · offline · accessibility review</p>
       </div>
     </aside>
   );
 }
 
 function TopBar() {
+  const { pathname } = useLocation();
+  const onNewScanForm = pathname === "/scans/new";
   return (
     <header
-      className="flex h-14 items-center justify-between border-b border-border bg-surface px-6"
+      className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 sm:px-6"
       role="banner"
     >
+      {/* Mobile brand — the sidebar (which carries the brand on desktop)
+          is hidden below md, so the topbar shows it instead. */}
       <div className="flex items-center gap-2 text-sm text-fg-muted md:hidden">
-        <BarChart3 className="h-5 w-5 text-umich-blue" aria-hidden />
-        <span className="font-semibold text-fg">Image Text Audit</span>
+        <BrandMark className="h-7 w-7 text-xs" />
+        <span className="font-semibold leading-tight text-fg">
+          AccessibleAccessibility
+        </span>
       </div>
-      {/* Topbar primary CTA. Hidden on mobile because the sidebar already
-          shows "New scan" — it'd just be redundant in a narrow viewport. */}
+
+      {/* The ONE global scan CTA. Always visible, every breakpoint —
+          icon-only below sm to stay sleek on small screens. On the
+          new-scan form itself it renders inert (ghost + aria-disabled):
+          a self-link would be noise, but vanishing entirely would make
+          users wonder where the button went. */}
       <LinkButton
         to="/scans/new"
-        variant="primary"
-        className="hidden md:inline-flex"
+        variant={onNewScanForm ? "ghost" : "primary"}
+        className={cn("ml-auto", onNewScanForm && "pointer-events-none opacity-50")}
+        aria-disabled={onNewScanForm || undefined}
+        tabIndex={onNewScanForm ? -1 : undefined}
+        aria-label="New scan"
+        title="New scan"
       >
-        <ListChecks className="h-4 w-4" aria-hidden />
-        Start a new scan
+        <Plus className="h-4 w-4" aria-hidden />
+        <span className="hidden sm:inline">New scan</span>
       </LinkButton>
     </header>
   );

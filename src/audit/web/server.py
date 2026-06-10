@@ -100,7 +100,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     resolved_blob = blob_dir or settings.blob_dir
     blob_store = BlobStore(resolved_blob)
 
-    app = FastAPI(title="Image Text Audit", version=__version__)
+    app = FastAPI(title="AccessibleAccessibility", version=__version__)
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
     # React bundle lives under /app/. The asset paths (/app/assets/…) are
     # served by Vite's hashed output directly from dist/; the SPA shell

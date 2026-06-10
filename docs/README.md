@@ -1,11 +1,12 @@
-# Image Text Audit — Docs
+# AccessibleAccessibility — Docs
 
-A local, offline tool for finding WCAG 1.4.5 (Images of Text) violations at
-site scale. Crawls a URL, extracts every image it renders, runs OCR + a
-vision-language model to decide whether each image is actually text, and
-compares that against the `alt` text the page offered. The result is a
-prioritized list of findings in a local web UI that you can triage, export
-to CSV / Jira / Markdown, and diff across rescans.
+A local, offline web accessibility auditor. Crawls a URL, extracts every
+image it renders, runs OCR + a vision-language model to decide whether each
+image is actually text (WCAG 1.4.5), compares that against the `alt` text
+the page offered, and probes rendered pages for keyboard traps (WCAG 2.1.2)
+with a real browser. The result is a prioritized list of findings in a
+local web UI that you can triage, export to CSV / Jira / Markdown, and
+diff across rescans.
 
 ## Read in this order
 

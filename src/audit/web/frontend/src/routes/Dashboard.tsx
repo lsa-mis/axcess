@@ -25,15 +25,12 @@ export default function DashboardRoute() {
 
   return (
     <>
+      {/* No "New scan" action here — the topbar carries the single
+          global CTA. (The empty state below keeps its contextual one
+          for the zero-scans first run.) */}
       <PageHeader
         title="Dashboard"
-        subtitle="Local, offline WCAG 1.4.5 accessibility review."
-        actions={
-          <LinkButton to="/scans/new" variant="primary">
-            <PlusCircle className="h-4 w-4" aria-hidden />
-            New scan
-          </LinkButton>
-        }
+        subtitle="Local, offline accessibility review."
       />
 
       {error && (
