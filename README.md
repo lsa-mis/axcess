@@ -1,207 +1,201 @@
+<div align="center">
+
 # Axcess
 
-Local, offline web accessibility auditor. Started as a **WCAG 1.4.5 — Images of Text** detector and has grown into an overall accessibility scanner: it crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text and cross-checks against `alt`, probes pages for keyboard traps (WCAG 2.1.2) with a real browser, and surfaces prioritized findings in a local UI with rescan/diff support. A companion test-management app, **Accessibility Testing Tracker**, lives under [`tracker/`](./tracker/).
+**A local-first, AI-augmented web accessibility auditor.**
 
-## Docs
+Axcess crawls a website, renders every page in a real browser, and runs
+**five complementary detection pipelines** — a rule engine, two behavioural
+probes, and two AI models — to find the WCAG failures that matter. It runs
+entirely on your machine. No cloud, no telemetry, no data leaving your laptop.
 
-Full documentation lives under [`docs/`](./docs/README.md):
+[Landing page](https://rayraycodes.github.io/axcess) ·
+[Documentation](./docs/README.md) ·
+[What it covers](./docs/coverage-tracker.md) ·
+[Hosting](./docs/hosting.md)
 
-- **[Architecture](./docs/architecture.md)** — pipeline, data flow, storage model
-- **[User guide](./docs/user-guide.md)** — CLI + UI walkthroughs
-- **[Developer guide](./docs/developer-guide.md)** — code layout + extension points
-- **[Troubleshooting](./docs/troubleshooting.md)** — Cloudflare, stuck scans, Ollama, scope
+`Python 3.11+` · `WCAG 2.2 AAA` (the tool audits *itself* at AAA) · `MIT`
 
-## Status — v1.0 (Phase 8: rescans + diff — **v1 feature-complete**)
+</div>
 
-What works today:
+---
 
-- Repo scaffolded, `uv`-managed, ruff + mypy (strict) + pytest green (77 tests).
-- SQLite schema per `0001_initial_schema.sql`; WAL, FK on.
-- **URL policy** — deterministic normalization and registrable-domain scope
-  checks using an offline tldextract PSL snapshot.
-- **robots.txt** — per-origin cache with fail-open behavior on network errors;
-  `--ignore-robots` escape hatch for authorized testing.
-- **Sitemap** — `defusedxml` parsing of `urlset`/`sitemapindex` with recursion
-  cap; discovery unions robots-declared sitemaps with conventional paths.
-- **Job queue** — SQLite-backed with atomic `UPDATE … RETURNING` lease,
-  dedupe keys, retry budget, and `reclaim_expired` for crash recovery.
-- **Fetchers** — async httpx static fetcher (HTTP/2, Retry-After parsing)
-  plus Playwright chromium JS fetcher (shared browser, per-page contexts).
-- **Render heuristic** — escalates to JS on sparse DOM, `<noscript>` meta
-  refresh redirects, or empty SPA mount points.
-- **Rate limiting** — per-host semaphore + token-bucket RPS limiter.
-- **Orchestrator** — workers lease from queue, fetch, record pages, enqueue
-  in-scope links. Resumable after Ctrl-C or crash.
-- **Image extraction** — pulls `<img>` (incl. `srcset`) and
-  `<picture><source>` refs from the rendered HTML; preserves the
-  missing-vs-empty-alt distinction, captures `aria-label`,
-  `aria-labelledby`, `role`, the nearest `<figcaption>`, and a
-  surrounding-text snippet.
-- **Inline SVG text** — top-level `<svg>` elements with visible `<text>`
-  are recorded as findings with `has_svg_text=1` (no blob needed).
-- **Content-addressed blob store** — images land at
-  `data/blobs/<aa>/<sha256>.<ext>`, deduped across the whole site.
-- **OCR pass** — Tesseract (via `pytesseract`) runs in a
-  `ProcessPoolExecutor` in parallel with the crawl. Each downloaded
-  raster image is OCR'd; the mean per-word confidence and word count
-  are stored alongside the extracted text in the `analyses` table.
-  The text-candidate gate is `confidence >= 60.0 AND word_count >= 3`
-  (both configurable via `AUDIT_OCR_MIN_CONFIDENCE` / `AUDIT_OCR_MIN_WORD_COUNT`).
-  SVG and icon MIMEs are skipped. Pass `--skip-ocr` to disable entirely.
-- **VLM classification** — only OCR text-candidate images reach the VLM.
-  `OllamaProvider` POSTs to a local `/api/generate` with the image
-  base64-encoded and a content-hashed prompt (default
-  `classify_v1.txt`). Returns one of `essential | informational | logo |
-  decorative | no_meaningful_text` plus a rationale, merged into the
-  same `analyses` row with combined `{ocr, vlm, prompt}` versioning.
-  Transient HTTP errors (408/429/5xx) are retried with exponential
-  backoff. If the Ollama daemon is unreachable or the model isn't
-  pulled, the crawler logs `vlm.unavailable` and completes without VLM.
-  Pass `--skip-vlm` to opt out explicitly.
-- **Finding synthesis** — end-of-crawl (or via `audit synthesize`):
-  - `alt_compare` normalizes alt and visible text (lowercase, strip
-    punctuation, collapse whitespace) and uses `rapidfuzz` token-set
-    ratio plus substring checks to bucket adequacy as `missing |
-    inadequate | partial | adequate`.
-  - `priority_score = classification_weight + alt_adequacy_weight +
-    log1p(occurrence_count) + (above_fold ? 1 : 0)`, mapped to
-    severity `critical >=8 | major >=5 | minor >=2 | info`.
-  - Remediation hints live in `src/audit/rules/remediation.yaml`, keyed
-    on `(classification, adequacy)` with a `*` fallback for inline SVG
-    text and other cases with no VLM label.
-  - Findings are upserted on `(image_id, scan_id)` so re-runs don't
-    stomp human-set `status` values; re-synthesizing with
-    `audit synthesize [scan_id]` refreshes scores and hints.
-  - Pass `--skip-synthesize` to crawl only and run synthesis later.
-- **Review UI** — two front-ends sharing the same FastAPI backend at
-  `127.0.0.1:8765` (launch with `audit serve` or `make run`):
-  - **React SPA** at `/app/` — default UI. Tanstack Query + React
-    Router + a Michigan-palette design system in hand-rolled CSS, all
-    driven by the `/api/*` JSON endpoints (`/api/scans`,
-    `/api/scans/{id}/findings`, `/api/findings/{id}`, etc.). Build
-    with `make frontend-build`; dev server on `:5173` via
-    `make frontend-dev` (proxies `/api` and `/blobs` to FastAPI).
-  - **Legacy Jinja + HTMX** at `/scans`, `/findings/{id}`, … — still
-    shipped while the SPA matures. Filter-as-you-type with
-    `hx-push-url` so back/forward works; destructive status
-    transitions (`remediated`, `accepted_risk`, `false_positive`)
-    confirm before saving.
+## Why Axcess
 
-  Shared across both: scan list + detail with severity breakdown,
-  filterable paginated findings list, finding detail with image
-  preview and OCR/VLM metadata, per-page image inventory. Keyboard
-  shortcuts: `j/k` next/prev finding, `Enter` to open, `/` focus
-  filter, `s` focus status dropdown, `?` help. Zero axe-core WCAG
-  2.1 AA violations on every Jinja view; SPA views inherit the same
-  focus-ring, skip-link, and landmark semantics. Dark-mode +
-  prefers-reduced-motion honored. Content-hash-validated
-  `/blobs/{hash}` for image previews.
-- **Exports** — one shared collector feeds four deterministic formats,
-  all with golden-file tests so any change is explicit:
-  - **CSV** — flat, one row per (finding, occurrence) pair.
-  - **JSON** — nested per finding with an `occurrences` array; sorted
-    keys so diffs are meaningful. `schema_version` field.
-  - **Jira CSV** — Summary / Description / Priority / Labels mapping
-    that Jira Cloud's External import accepts out of the box. Severity
-    maps to Jira priorities (critical→Highest, info→Lowest).
-  - **Markdown** — stakeholder-friendly report with exec summary, top
-    20 findings, and a full severity table.
-  - **Webhook** — opt-in via `AUDIT_WEBHOOK_URL`, optional bearer
-    token, async POST of the JSON payload; best-effort, never fails
-    the scan.
-  Available from the review UI (`/scans/{id}/export/<format>` download
-  links) and from the CLI (`audit export <scan_id> --format <fmt>`).
-- **Rescans + diff** — a second crawl of the same seed URL creates a
-  new scan row but reuses the `images` table via `content_hash`.
-  Finding match is keyed on `(content_hash, url_normalized)` so an
-  image that moves pages shows as "resolved on old URL, new on new
-  URL". At end of each crawl the synthesizer auto-picks the most
-  recent completed scan of the same seed as `compare_to` and writes
-  `first_seen` / `resolved` rows into `finding_history`. The UI has
-  `/scans/{id}/diff?compare_to={prev}` with sections for New,
-  Resolved, Status changed, and Still open — plus a diff link from
-  the scan detail when a prior scan exists.
-- **CLI** — `audit crawl <url>`, `audit synthesize`, `audit export`,
-  `audit serve`, and `audit status`. Summary tables cover pages,
-  images, SVG-text, OCR, VLM, finding-by-severity, and rescan
-  first_seen / resolved counters.
+Most accessibility scanners are a single rule engine. Rule engines are fast and
+exact, but they can only check what's mechanically decidable — *is there an
+`alt` attribute?*, *does this text meet 4.5:1 contrast?* They go quiet on the
+criteria that actually need **judgment**:
 
-**Port-tolerant rescan matching**: auto-diff uses
-`url_policy.compare_key`, which drops the port on loopback hosts (and
-canonicalizes `localhost` / `127.0.0.1` / `::1` / `0.0.0.0` to a single
-form). So a second crawl of the same local site on a different dev-server
-port still lands in the right diff buckets instead of showing every
-finding as new + resolved. Real-host ports stay significant
-(`example.com:8443` is not the same as `example.com:9443`). Override
-auto-discovery with `audit crawl --compare-to <scan_id>` or
-`audit synthesize --compare-to <scan_id>`.
+- Is this image *really text* dressed up as a picture? (WCAG 1.4.5)
+- Does this link's text make sense out of context? (WCAG 2.4.4)
+- Does the page reflow at 320px, or trap the keyboard in a modal?
 
-Not yet implemented: CSS `background-image` extraction.
+Axcess closes that gap by combining four kinds of detection in one crawl:
 
-## Try it
+| | Pipeline | How it decides | Needs a model? |
+|---|---|---|---|
+| 🟦 | **axe-core** | Rule engine on the rendered DOM — dozens of SCs | No |
+| 🟦 | **Keyboard-trap probe** | A real browser tabs through every focusable element | No |
+| 🟦 | **Responsive / zoom probe** | Mutates viewport + injects WCAG text-spacing CSS | No |
+| 🟨 | **Image-of-text (VLM)** | OCR + a local vision model judge each image | Yes (Ollama) |
+| 🟨 | **Semantic analyzer** | A local text model reads context like a human would | Yes (Ollama) |
+
+The blue pipelines need only a browser — run Axcess with **zero AI** and still
+get axe + keyboard + responsive coverage. The yellow pipelines add the
+judgment calls, all via a **local [Ollama](https://ollama.com) daemon** so your
+content never leaves the machine.
+
+👉 **See exactly what's covered today vs. planned:** the in-app **Tracking**
+page (`/app/tracking`) and [`docs/coverage-tracker.md`](./docs/coverage-tracker.md),
+both generated from one source of truth so they can't drift from the code.
+
+---
+
+## Quickstart
 
 ```bash
+# 1. Install (uv + Playwright chromium + data dirs), then the DB schema
 make setup
 make migrate
-# Shell 1 — fixture site
-make fixture-site                    # → http://127.0.0.1:8000
-# Shell 2 — crawl it
-uv run audit crawl http://127.0.0.1:8000 --max-pages 50
-uv run audit status
-# Shell 2 — open the review UI
-uv run audit serve                   # → http://127.0.0.1:8765
+
+# 2. Crawl a site — renders every page and runs axe + keyboard + responsive
+uv run audit crawl https://example.com --max-pages 50
+
+# 3. Open the review UI (React SPA)
+make frontend-build      # one time, builds the SPA
+uv run audit serve       # → http://127.0.0.1:8765/app/
 ```
 
-## Requirements
+Want the AI pipelines too? Start [Ollama](https://ollama.com), then
+`make fetch-models` to pull the vision + text models. Don't want them? Add
+`--skip-vlm --skip-ocr --skip-semantic` and the three browser-only pipelines
+still run.
 
-- macOS or Linux
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) (`brew install uv`)
-- [Ollama](https://ollama.com) (for Phase 4+)
-- Tesseract OCR (Phase 3+): `brew install tesseract` on macOS
+**Requirements:** macOS or Linux · Python 3.11+ ·
+[uv](https://github.com/astral-sh/uv) · Tesseract (`brew install tesseract`) ·
+optionally [Ollama](https://ollama.com) for the AI pipelines.
 
-## Setup
+---
+
+## How it works
+
+```
+seed URL
+   │
+   ▼  queue-driven crawl (SQLite job queue, resumable)
+render each page  ──►  static HTTP first, Playwright chromium when needed
+   │
+   ├─► axe-core ........... rule violations on the live DOM
+   ├─► keyboard probe ..... tab-walk / Esc / iframe traps        (SC 2.1.2)
+   ├─► responsive probe ... reflow @320px, zoom clip, text-spacing (1.4.4/10/12)
+   ├─► image-of-text ...... OCR → VLM: is this image really text?  (SC 1.4.5)
+   └─► semantic ........... text LLM: does the link/context read right? (2.4.4)
+   │
+   ▼  synthesize
+prioritized findings  ──►  React review UI · CSV / JSON / Jira / Markdown exports · rescan diffs
+```
+
+Everything persists to one **SQLite** database (WAL mode, content-addressed
+image blobs). A crashed or `Ctrl-C`'d crawl resumes from the queue. Re-crawling
+the same site produces a **diff** — new / resolved / still-open findings.
+
+For the full picture, read [`docs/architecture.md`](./docs/architecture.md).
+
+---
+
+## The review UI
+
+A single **React SPA** (Vite + Tailwind + TanStack Query) served at `/app/`,
+backed by a FastAPI `/api/*` JSON surface. It's a Michigan-palette design
+system that **audits itself at WCAG 2.2 AAA** — every view has axe-core tests
+in the AAA tag pack that fail the build on any violation.
+
+- **Dashboard / Scans** — start a crawl, watch live per-pipeline progress.
+- **Issues** — one row per issue across all pipelines, with conformance level,
+  affected abilities, and a what / why / how fix card.
+- **Findings** — filterable, paginated, with image previews and OCR/VLM evidence.
+- **Tracking** — what the tool detects today vs. the AI roadmap.
+- **Exports** — CSV · JSON · Jira CSV · Markdown · a holistic audit report.
+
+---
+
+## Hosting it for a team
+
+Axcess is local-first, but you can host it on an always-on machine for a small
+team over your LAN or [Tailscale](https://tailscale.com), behind an opt-in
+shared-token gate:
 
 ```bash
-make setup           # uv sync + playwright install chromium + create data dirs
-make migrate         # apply SQLite schema
-make fetch-models    # pull Ollama VLM models (requires ollama daemon)
+export AUDIT_ACCESS_TOKEN=$(openssl rand -hex 16)
+make serve     # binds 0.0.0.0; no token set = stays a local-only app
 ```
+
+Full runbook (Tailscale, autostart, the security model): [`docs/hosting.md`](./docs/hosting.md).
+
+---
+
+## Documentation
+
+Axcess keeps **one front door and one hub**, so docs don't sprawl:
+
+- **This README** — what Axcess is, why, and how to start. The single entry point.
+- **[`docs/README.md`](./docs/README.md)** — the documentation hub: read-in-order
+  guides plus the design contract for the UI.
+
+| Doc | For | Covers |
+|---|---|---|
+| [architecture.md](./docs/architecture.md) | understanding it | pipeline, data flow, storage |
+| [user-guide.md](./docs/user-guide.md) | running it | CLI + UI walkthroughs |
+| [developer-guide.md](./docs/developer-guide.md) | extending it | code layout, "add a page", tests |
+| [coverage-tracker.md](./docs/coverage-tracker.md) | scoping it | shipped vs. planned, the AI roadmap |
+| [hosting.md](./docs/hosting.md) | deploying it | LAN / Tailscale + token gate |
+| [troubleshooting.md](./docs/troubleshooting.md) | unsticking it | Cloudflare, stuck scans, Ollama, scope |
+| [accessibility.md](./docs/accessibility.md) · [personas.md](./docs/personas.md) · [design-principles.md](./docs/design-principles.md) | building the UI | the AAA contract, who it serves |
+
+**Anti-drift principle:** anything that exists in two places is generated from
+one. The coverage tables (in-app + `coverage-tracker.md` + this README) trace
+back to [`src/audit/web/coverage_status.py`](./src/audit/web/coverage_status.py);
+exports are pinned by golden-file tests. Flip a status in the source, and every
+surface updates.
+
+---
 
 ## Development
 
 ```bash
-make test            # run pytest
-make lint            # ruff check + format --check
-make typecheck       # mypy strict on src/
-make help            # list all targets
+make test         # pytest (434 tests: unit + integration + Playwright/axe UI)
+make lint         # ruff check + format --check
+make typecheck    # mypy --strict on src/
+make help         # every target
 ```
+
+The gates a change must pass: **ruff**, **mypy (strict)**, **pytest**, and the
+**frontend** lint/typecheck/build. The UI's own AAA axe tests run in CI against
+the built SPA.
+
+---
 
 ## Project layout
 
 ```
-src/audit/          # application code
-  cli.py            # typer CLI
-  config.py         # pydantic-settings
-  logging.py        # structlog config
-  db/               # schema + migrations + repo + queue
-  crawler/          # (Phase 1)
-  extractor/        # (Phase 2)
-  analyzer/         # (Phases 3–4: OCR + VLM)
-  synthesizer/      # (Phase 5)
-  web/              # (Phase 6)
-  exports/          # (Phase 7)
-tests/
-  unit/             # fast pure-python tests
-  integration/      # end-to-end (fixture site)
-  ui/               # Playwright + axe-core (Phase 6+)
-  fixtures/site/    # static HTML fixture site
-scripts/            # setup, fetch-models, fixture-site runner
-data/               # gitignored runtime (SQLite + blobs + logs)
+src/audit/
+├── cli.py            # typer CLI: crawl / synthesize / export / serve / status
+├── crawler/          # URL policy, fetchers, rate limit, orchestrator
+├── extractor/        # HTML image parsing, content-addressed blob store
+├── analyzer/         # OCR, VLM, semantic, keyboard + responsive probes
+├── synthesizer/      # alt-compare, priority, remediation, diff
+├── exports/          # CSV / JSON / Jira / Markdown / audit report / webhook
+├── web/              # FastAPI /api/* + the React SPA (frontend/)
+├── db/               # schema + migrations + typed upserts + job queue
+└── rules/            # YAML rule packs (remediation, audit cards, models)
+tests/                # unit · integration (fixture site) · ui (Playwright + axe)
+docs/                 # the documentation hub
+site/                 # the static landing page (deployed to GitHub Pages)
 ```
 
-See [PLAN.md](PLAN.md) for milestones, risks, and the first-week task list.
+---
 
 ## License
 
-MIT
+[MIT](./LICENSE). Built at the University of Michigan. 〽️

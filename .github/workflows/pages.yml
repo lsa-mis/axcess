@@ -1,0 +1,52 @@
+name: Deploy landing page
+
+# Builds the static landing page (site/index.html) from the coverage source
+# of truth and publishes it to GitHub Pages at /axcess. Re-runs whenever the
+# page template or the coverage data changes, and on manual dispatch.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "src/audit/web/coverage_status.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One concurrent deploy; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate landing page from coverage_status.py
+        run: python site/build.py
+      - name: Assemble artifact (only the static page)
+        run: |
+          mkdir -p _site
+          cp site/index.html _site/index.html
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
