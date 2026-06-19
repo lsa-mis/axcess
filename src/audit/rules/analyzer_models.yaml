@@ -1,0 +1,183 @@
+# Offline model recommendations per analyzer kind / WCAG criterion.
+#
+# This file is the *editorial* source of truth for "which local model
+# should this analyzer use." The codebase reads it through
+# `src/audit/analyzer/model_registry.py`. Three things drive each row:
+#
+#   1. Task shape — vision / text / code-aware / reasoning-heavy.
+#   2. Output discipline — does the model reliably emit valid JSON when
+#      asked? (We test against the structured-output behavior of each.)
+#   3. Hardware budget — every entry has to fit on Apple Silicon
+#      consumer hardware (M-series, ≤32GB RAM) running through Ollama.
+#
+# All models are pullable via `ollama pull <tag>` and free to run.
+# This is the cost-control argument vs. GenA11y's $4.78/page through
+# OpenAI: same idea, ~$0 marginal cost per page beyond electricity.
+#
+# Last reviewed: 2026-05.
+
+# ---------------------------------------------------------------------
+# Default models — used when an analyzer has no explicit override.
+# These are the "safe" picks: strong instruction following, reliable
+# JSON output, broad criterion coverage.
+# ---------------------------------------------------------------------
+defaults:
+  vision:
+    # SC 1.4.5 image-of-text, SC 1.4.3/1.4.6 contrast verification,
+    # SC 1.4.4 reflow screenshots, etc.
+    # qwen2.5-vl:7b ~5.5GB Q4, strongest open VLM at the 7B size.
+    # qwen2-vl:2b is faster but loses OCR precision on small text.
+    primary: "qwen2.5-vl:7b"
+    fast:    "qwen2-vl:2b"
+
+  text:
+    # General text reasoning for "is this descriptive?" style judgments.
+    # qwen2.5:7b-instruct: best small-model instruction following + JSON.
+    # gemma2:9b: good fallback; already on most machines that have
+    # touched this project.
+    # Phase-9.1 demo: pinned to gemma2:9b (the model already pulled
+    # locally) so the developer can exercise the end-to-end pipeline
+    # without first downloading 5GB. Flip back to qwen2.5:7b-instruct
+    # before the Phase-9.4 calibration runs.
+    primary: "gemma2:9b"
+    fast:    "llama3.2:3b-instruct"
+
+  code:
+    # DOM-heavy criteria (SC 1.3.1, 4.1.2) — code-tuned variants parse
+    # HTML / ARIA attributes more reliably than general models.
+    primary: "qwen2.5-coder:7b-instruct"
+    fast:    "qwen2.5-coder:3b-instruct"
+
+  reasoning:
+    # Multi-step judgments (e.g. SC 2.5.3 Label-in-Name: visible label
+    # must be substring/match of accessible name). Models with chain-
+    # of-thought traces help on these.
+    primary: "qwen2.5:14b-instruct"
+    fast:    "qwen2.5:7b-instruct"
+
+
+# ---------------------------------------------------------------------
+# Per-criterion overrides. Add an entry here only when the criterion
+# benefits from a SPECIFIC model that differs from the defaults above.
+# An empty/missing entry means "use the default for this kind."
+#
+# Each entry shape:
+#   <SC>:
+#     kind: vision|text|code|reasoning
+#     primary: <ollama-tag>
+#     fast: <ollama-tag>    # optional, for --skip-vlm-style quick passes
+#     rationale: |
+#       short prose explaining the pick
+# ---------------------------------------------------------------------
+criteria:
+
+  "1.1.1":
+    title: "Non-text Content — alt-text descriptiveness"
+    kind: vision
+    primary: "qwen2.5-vl:7b"
+    fast: "qwen2-vl:2b"
+    rationale: |
+      Needs to look at the image AND read the alt to judge match.
+      qwen2.5-vl:7b's improved OCR and grounding beats the 2B at
+      borderline cases (e.g. logos with tagline text), at ~3x the cost.
+
+  "1.4.3":
+    title: "Contrast (Minimum)"
+    kind: text
+    primary: "qwen2.5:7b-instruct"
+    fast: "llama3.2:3b-instruct"
+    rationale: |
+      Computed-style values come from Playwright; the model only does
+      the ratio calculation + threshold check + font-size logic. Text
+      model is sufficient; vision adds nothing here.
+
+  "1.4.5":
+    title: "Images of Text"
+    kind: vision
+    primary: "qwen2-vl:2b"
+    fast: "moondream:2b"
+    rationale: |
+      Our existing pipeline. qwen2-vl:2b is the right default —
+      classification is binary-ish (essential/informational/logo/
+      decorative), 7B doesn't materially improve it.
+
+  "2.4.4":
+    title: "Link Purpose (In Context)"
+    kind: text
+    primary: "gemma2:9b"
+    fast: "llama3.2:3b-instruct"
+    rationale: |
+      Needs only the link text + a few ancestor/sibling elements.
+      Token-light. 7B is plenty. Currently pinned to gemma2:9b for
+      the Phase-9.1 demo because that's the model already on the
+      developer machine — swap back to qwen2.5:7b-instruct for the
+      Phase-9.4 calibration runs where the precision numbers are
+      pinned against the qwen baseline.
+
+  "2.4.6":
+    title: "Headings and Labels — descriptiveness"
+    kind: text
+    primary: "qwen2.5:7b-instruct"
+    rationale: |
+      Heading text + surrounding section content. Pure text task.
+
+  "2.4.9":
+    title: "Link Purpose (Link Only)"
+    kind: text
+    primary: "qwen2.5:7b-instruct"
+    rationale: |
+      Stricter than 2.4.4: link text in isolation must be descriptive.
+      Same model.
+
+  "2.5.3":
+    title: "Label in Name"
+    kind: reasoning
+    primary: "qwen2.5:14b-instruct"
+    fast: "qwen2.5:7b-instruct"
+    rationale: |
+      Visible label must be in the accessible name. Sounds simple but
+      "Submit" vs "Submit form" vs "Send" are subtle calls; 14B
+      handles the edge cases better than 7B in our pilot.
+
+  "3.3.2":
+    title: "Labels or Instructions"
+    kind: text
+    primary: "qwen2.5:7b-instruct"
+    rationale: |
+      Field labels need to make the field's purpose clear. Pure text.
+
+  "1.3.1":
+    title: "Info and Relationships"
+    kind: code
+    primary: "qwen2.5-coder:7b-instruct"
+    rationale: |
+      DOM structure check — semantic markup vs styled divs, list-
+      element parents, etc. Code-tuned model handles the HTML
+      structure better than the general 7B.
+
+  "4.1.2":
+    title: "Name, Role, Value"
+    kind: code
+    primary: "qwen2.5-coder:7b-instruct"
+    rationale: |
+      ARIA attribute validation. Code model is the right call —
+      same reasoning as 1.3.1.
+
+
+# ---------------------------------------------------------------------
+# Pre-flight: which models the fetch script should pull. Built from
+# `defaults` + every `criteria` entry's `primary` and `fast` tags.
+# The script dedupes; this list is just the recommended *minimum*
+# set for someone wanting to cover the analyzers above.
+# ---------------------------------------------------------------------
+fetch_set:
+  required:
+    - "qwen2-vl:2b"          # SC 1.4.5 — our existing default
+    - "qwen2.5:7b-instruct"  # default text + most criteria
+  recommended:
+    - "qwen2.5-vl:7b"        # vision criteria w/ improved OCR
+    - "qwen2.5-coder:7b-instruct"  # DOM-heavy criteria
+    - "llama3.2:3b-instruct" # fast fallback
+  optional:
+    - "qwen2.5:14b-instruct" # reasoning-heavy SC 2.5.3 etc
+    - "moondream:2b"         # fast vision fallback

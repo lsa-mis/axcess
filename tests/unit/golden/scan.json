@@ -1,4 +1,5 @@
 {
+  "a11y_findings": [],
   "findings": [
     {
       "alt_adequacy": "missing",
@@ -93,11 +94,19 @@
     }
   ],
   "scan": {
+    "axe_pages_scanned": 0,
+    "axe_violations_total": 0,
     "by_severity": {
       "critical": 1,
       "info": 1,
       "major": 0,
       "minor": 1
+    },
+    "by_wcag_level": {
+      "A": 0,
+      "AA": 0,
+      "AAA": 0,
+      "best_practice": 0
     },
     "error_count": 0,
     "finding_count": 3,
@@ -108,5 +117,5 @@
     "started_at": "2026-04-22T12:00:00",
     "status": "completed"
   },
-  "schema_version": 1
+  "schema_version": 2
 }

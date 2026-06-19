@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% import "partials/_macros.html" as ui %}
+{% block title %}WCAG findings — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <nav aria-label="Breadcrumb" class="subtle" style="margin-bottom:0.5rem;">
+    <a href="/scans/{{ scan.id }}">Scan #{{ scan.id }}</a>
+    &nbsp;›&nbsp;
+    <span aria-current="page">WCAG findings</span>
+  </nav>
+
+  <header class="page-header-row">
+    <div>
+      <h2 style="margin:0;">WCAG axe-core findings</h2>
+      <p class="subtle" style="margin:0.25rem 0 0 0;">{{ scan.seed_url }}</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      <a href="/scans/{{ scan.id }}/a11y/by-rule" class="btn btn--primary">
+        Group by rule →
+      </a>
+      <a href="/scans/{{ scan.id }}/findings/grouped" class="btn">
+        Image findings (grouped) →
+      </a>
+    </div>
+  </header>
+
+  {# Scope-honesty banner — axe auto-detects only 30-40% of WCAG SCs.
+     Surface this prominently so the operator never reads "0 violations
+     on SC 3.3.2" as "we passed 3.3.2." We do not have an opinion on
+     3.3.2; axe can't check it. #}
+  <aside role="note"
+         style="margin:1rem 0;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:4px;background:color-mix(in srgb, var(--accent) 4%, var(--bg));">
+    <strong>What this view shows.</strong>
+    Axe-core auto-detects roughly 30-40% of WCAG 2.x AA success criteria —
+    the ones that can be checked from the rendered DOM alone (color
+    contrast, missing labels, ARIA misuse, focus order). The other ~60%
+    require human judgment (whether alt text is <em>meaningful</em>,
+    whether a heading is <em>descriptive</em>, whether a label is
+    <em>clear</em>) and are not represented here. A clean axe pass is
+    necessary, not sufficient, for WCAG conformance.
+  </aside>
+
+  <section aria-label="Coverage" class="coverage-grid">
+    <div class="stat-cell">
+      <span class="stat-cell__label">Pages scanned</span>
+      <strong class="stat-cell__value">{{ coverage.axe_pages_scanned }}</strong>
+      <span class="subtle">of {{ coverage.pages_total }}</span>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Total violations</span>
+      <strong class="stat-cell__value">{{ coverage.axe_violations_total }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Level A</span>
+      <strong class="stat-cell__value">{{ level_counts.A }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Level AA</span>
+      <strong class="stat-cell__value">{{ level_counts.AA }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Level AAA</span>
+      <strong class="stat-cell__value">{{ level_counts.AAA }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Best-practice</span>
+      <strong class="stat-cell__value">{{ level_counts.best_practice }}</strong>
+    </div>
+  </section>
+
+  {% if coverage.axe_pages_scanned == 0 %}
+    <p>
+      No pages were axe-scanned in this scan. Axe requires Playwright
+      rendering — re-run with <code>--use-js</code> (or
+      <strong>Use real browser (Playwright) for every page</strong>
+      checked on the New Scan form) to cover every page.
+    </p>
+  {% elif not groups %}
+    <p><strong>No WCAG axe-core violations were detected on the {{ coverage.axe_pages_scanned }} scanned page{{ 's' if coverage.axe_pages_scanned != 1 else '' }}.</strong> Remember the scope caveat above — axe can't speak for the criteria that need human review.</p>
+  {% else %}
+
+  {% if wcag_sc %}
+    {# Drill-down view: one SC, all its individual violations. #}
+    <h3 id="drill-heading">
+      SC {{ wcag_sc }}
+      {% for g in groups if g.wcag_sc == wcag_sc %}
+        — {{ g.violation_count }} violation{{ 's' if g.violation_count != 1 else '' }}
+        on {{ g.page_count }} page{{ 's' if g.page_count != 1 else '' }}
+        {% if g.wcag_level %}(Level {{ g.wcag_level }}){% endif %}
+      {% endfor %}
+    </h3>
+    <p><a href="/scans/{{ scan.id }}/a11y">← Back to all SCs</a></p>
+
+    {# Status filter — defaults to "all". Each option carries the count
+       so the triager can see at a glance how many findings sit in each
+       bucket before they click. Auto-submits via GET (no JS). #}
+    <form method="get" action="/scans/{{ scan.id }}/a11y" class="filters"
+          style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap;margin:0.75rem 0;">
+      <input type="hidden" name="wcag_sc" value="{{ wcag_sc }}">
+      <label>
+        Status
+        <select name="status" onchange="this.form.submit()" style="min-width:14rem;">
+          <option value="" {% if not status_filter %}selected{% endif %}>all statuses</option>
+          {% for opt in status_options %}
+            <option value="{{ opt }}" {% if status_filter == opt %}selected{% endif %}>
+              {{ opt }} ({{ status_counts.get(opt, 0) }})
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if status_filter %}
+      <a href="/scans/{{ scan.id }}/a11y?wcag_sc={{ wcag_sc }}" class="subtle">clear</a>
+      {% endif %}
+    </form>
+
+    {% if drill %}
+    <table class="data" aria-labelledby="drill-heading">
+      <thead>
+        <tr>
+          <th scope="col">Rule</th>
+          <th scope="col">Impact</th>
+          <th scope="col">Page</th>
+          <th scope="col">Target selector</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in drill %}
+        <tr>
+          <td>
+            <strong>{{ f.rule_id }}</strong>
+            {% if f.help %}<div class="subtle" style="font-size:0.85rem;">{{ f.help|truncate(160) }}</div>{% endif %}
+            {% if f.help_url %}<a href="{{ f.help_url }}" rel="noopener" target="_blank" class="subtle" style="font-size:0.8rem;">axe rule docs ↗</a>{% endif %}
+          </td>
+          <td>
+            {% if f.impact %}<span class="sev sev-{{ {'critical':'critical','serious':'major','moderate':'minor','minor':'info'}[f.impact] }}">{{ f.impact }}</span>{% else %}<span class="subtle">—</span>{% endif %}
+          </td>
+          <td>{{ ui.pagelink(page_id=f.page_id, page_url=f.page_url, page_title=f.page_title) }}</td>
+          <td>
+            <code style="font-size:0.8rem;">{{ f.target_selector|truncate(90) }}</code>
+            {% if f.html_snippet %}
+            <details style="margin-top:0.25rem;">
+              <summary class="subtle" style="font-size:0.8rem;cursor:pointer;">show HTML</summary>
+              <pre style="white-space:pre-wrap;font-size:0.78rem;margin:0.25rem 0;background:var(--surface);padding:0.4rem;border-radius:3px;">{{ f.html_snippet }}</pre>
+            </details>
+            {% endif %}
+            {% if f.failure_summary %}
+            <div class="subtle" style="font-size:0.78rem;margin-top:0.25rem;">{{ f.failure_summary }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {# Inline status select. HTMX auto-saves on change so there's
+               no Save button to track — the triager can fly through dozens
+               of findings with arrow keys + tab. The feedback `<span>`
+               sits below; `hx-target` swaps it in place. #}
+            <form
+              hx-post="/a11y-findings/{{ f.id }}/status"
+              hx-target="next .a11y-status-feedback"
+              hx-swap="innerHTML"
+              style="display:flex;flex-direction:column;gap:0.25rem;"
+            >
+              <label class="visually-hidden" for="status-{{ f.id }}">
+                Triage status for finding {{ f.id }}
+              </label>
+              <select id="status-{{ f.id }}"
+                      name="status"
+                      onchange="this.form.requestSubmit()"
+                      style="min-width:9.5rem;">
+                {% for opt in status_options %}
+                  <option value="{{ opt }}" {% if f.status == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            <span class="a11y-status-feedback subtle" role="status" aria-live="polite" style="font-size:0.78rem;"></span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>
+        No drill-down rows
+        {% if status_filter %} matching status <strong>{{ status_filter }}</strong>{% endif %}.
+        {% if status_filter %}<a href="/scans/{{ scan.id }}/a11y?wcag_sc={{ wcag_sc }}">Show all statuses</a> ·{% endif %}
+        <a href="/scans/{{ scan.id }}/a11y">← Back to all SCs</a>
+      </p>
+    {% endif %}
+
+  {% else %}
+    {# Roll-up view: every SC with violations, with per-rule nested. #}
+    <h3>Failures by WCAG success criterion</h3>
+    {% for g in groups %}
+    <section class="a11y-sc-card" aria-labelledby="sc-{{ loop.index }}-heading">
+      <header class="a11y-sc-card__header">
+        <h4 id="sc-{{ loop.index }}-heading" style="margin:0;">
+          {% if g.wcag_sc %}
+            <a href="/scans/{{ scan.id }}/a11y?wcag_sc={{ g.wcag_sc }}">SC {{ g.wcag_sc }}</a>
+            {% if g.wcag_level %}<span class="subtle" style="font-weight:normal;font-size:0.9rem;"> &middot; Level {{ g.wcag_level }}</span>{% endif %}
+          {% else %}
+            Best-practice (no SC)
+          {% endif %}
+        </h4>
+        <span class="subtle">
+          <strong>{{ g.violation_count }}</strong> violation{{ 's' if g.violation_count != 1 else '' }}
+          on <strong>{{ g.page_count }}</strong> page{{ 's' if g.page_count != 1 else '' }}
+        </span>
+      </header>
+      <ul class="a11y-rule-list">
+        {% for r in g.rules %}
+        <li class="a11y-rule">
+          <div class="a11y-rule__head">
+            <code>{{ r.rule_id }}</code>
+            {% if r.impact %}<span class="sev sev-{{ {'critical':'critical','serious':'major','moderate':'minor','minor':'info'}[r.impact] }}">{{ r.impact }}</span>{% endif %}
+            <span class="subtle">{{ r.violation_count }} ×, on {{ r.page_count }} page{{ 's' if r.page_count != 1 else '' }}</span>
+          </div>
+          {% if r.help %}<div style="font-size:0.9rem;">{{ r.help }}</div>{% endif %}
+          {% if r.help_url %}<a href="{{ r.help_url }}" rel="noopener" target="_blank" class="subtle" style="font-size:0.8rem;">axe rule docs ↗</a>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  {% endif %}
+
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC 2.1.2 fixture — clean (no traps)</title>
+</head>
+<body>
+  <main>
+    <h1>Clean page — no keyboard traps</h1>
+    <p>Tab through this page. Focus should move through every link,
+       button, and input, then exit to the browser chrome cleanly.</p>
+
+    <a href="#section">Skip link</a>
+
+    <nav aria-label="Primary">
+      <a href="/a">Link one</a> |
+      <a href="/b">Link two</a> |
+      <a href="/c">Link three</a>
+    </nav>
+
+    <form>
+      <label>Name <input type="text" name="name"></label>
+      <label>Email <input type="email" name="email"></label>
+      <button type="submit">Submit</button>
+    </form>
+
+    <h2 id="section">More content</h2>
+    <p>Pressing Tab here just lands on the next link normally.</p>
+    <a href="/d">Another link</a>
+    <button type="button">A button that just sits there</button>
+  </main>
+</body>
+</html>

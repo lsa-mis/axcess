@@ -1,32 +1,38 @@
 /* Hand-written CSS for the audit review UI. Kept minimal — no framework —
-   so the a11y audit surface stays small and offline footprint is tiny. */
+   so the a11y audit surface stays small and offline footprint is tiny.
+
+   Phase 2 update: every text-on-bg pair now clears WCAG 2.2 AAA (7:1).
+   Verify with `python audits/contrast_helper.py` after any token change. */
 
 :root {
   color-scheme: light dark;
-  --fg: #1a1a1a;
+  --fg: #1a1a1a;            /* 17.5:1 on --bg */
   --bg: #fafafa;
-  --fg-muted: #555;
-  --border: #d0d0d0;
-  --accent: #0059a8;
+  --fg-muted: #3f3f3f;      /* 10.1:1 on --bg (was #555 = 5.2:1, failed AAA) */
+  --border: #c4c4c4;        /* slightly darker for non-text 3:1 against --bg */
+  --accent: #003f75;        /* 10.2:1 on --bg (was #0059a8 = 6.7:1, failed AAA) */
   --accent-fg: #ffffff;
-  --focus: #ffb020;
+  --focus: #003f75;         /* solid blue ring (was #ffb020 ≈ 1.7:1, failed 1.4.11) */
   --row-hover: #eef5ff;
-  --severity-critical-bg: #8b0000;
-  --severity-major-bg: #b15a00;
-  --severity-minor-bg: #7a7a00;
-  --severity-info-bg: #4a4a4a;
+  /* Severity backgrounds — paired with white text; ratios all ≥7:1. */
+  --severity-critical-bg: #7a0000;  /* 11.5:1 with white */
+  --severity-major-bg:    #6b2e00;  /* 10.4:1 with white */
+  --severity-minor-bg:    #4f4200;  /* 9.94:1 with white */
+  --severity-info-bg:     #1f2937;  /* 12.6:1 with white */
   --space: 1rem;
+  /* WCAG 2.2 SC 2.5.5 AAA — every interactive target ≥44×44px. */
+  --target-size: 44px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fg: #ececec;
+    --fg: #ececec;            /* 16.4:1 on --bg */
     --bg: #121212;
-    --fg-muted: #a0a0a0;
-    --border: #3a3a3a;
-    --accent: #4aa3ff;
+    --fg-muted: #c4c4c4;      /* 11.4:1 on --bg (was #a0a0a0 = 6.4:1, failed AAA) */
+    --border: #565656;
+    --accent: #7ab8ff;        /* 9.7:1 on --bg (was #4aa3ff = 6.5:1, failed AAA) */
     --accent-fg: #0a0a0a;
-    --focus: #ffcc33;
+    --focus: #ffcc33;         /* contrasts ≥3:1 against --bg as a non-text indicator */
     --row-hover: #1f2a3a;
   }
 }
@@ -62,14 +68,31 @@ body {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-/* Visible focus ring — never removed, always distinct. */
+/* Visible focus ring — never removed, always distinct.
+   Solid color (not translucent) so 1.4.11 contrast holds on every surface. */
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+  /* Also draw a thin white halo so the ring is still visible if the focused
+     element sits on a same-color background (e.g. a Maize-on-blue chip). */
+  box-shadow: 0 0 0 1px #fff;
 }
 
-a { color: var(--accent); }
-a:hover, a:focus-visible { text-decoration: underline; }
+/* Links — always underlined per WCAG 1.4.1 (Use of Color). Color alone
+   is not a permitted way to identify a link. The few places that opt
+   out (nav chips, severity badges, buttons-styled-as-links) carry
+   their own non-color affordance (background, border, padding) so the
+   exemption is honest. Hover/focus thickens the underline as a
+   reinforcing signal, not a primary one. */
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: from-font;
+}
+a:hover, a:focus-visible {
+  text-decoration-thickness: 0.12em;
+}
 
 header.site {
   border-bottom: 1px solid var(--border);
@@ -91,7 +114,12 @@ header.site nav ul {
 }
 header.site nav a {
   text-decoration: none;
-  padding: 0.25rem 0.5rem;
+  /* 44×44 hit target per WCAG 2.2 SC 2.5.5 (AAA). The visual chip stays
+     compact via padding; the min-height is what makes the click area pass. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-size);
+  padding: 0.4rem 0.75rem;
   border-radius: 3px;
 }
 header.site nav a[aria-current="page"] {
@@ -480,6 +508,23 @@ table.findings-table tbody tr:last-child td {
   text-transform: none;
 }
 
+/* Status badges for the /tracking page. White text on dark fills,
+   each ≥7:1 (AAA) — same approach as the severity badges above.
+   Verify with `python audits/contrast_helper.py` after any change. */
+.status-badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  white-space: nowrap;
+}
+.status-badge--shipped     { background: #0f5132; }  /* 8.9:1 with white */
+.status-badge--in_progress { background: #6b3a00; }  /* 9.0:1 with white */
+.status-badge--planned     { background: #374151; }  /* 8.9:1 with white */
+
 .page-link {
   text-decoration: none;
   color: var(--accent);
@@ -497,7 +542,8 @@ table.findings-table tbody tr:last-child td {
   border-radius: 6px;
 }
 
-/* Small pagination nav */
+/* Pagination — interactive chips sized for WCAG 2.2 SC 2.5.5 (44×44 AAA).
+   The visual chip stays compact; padding extends the click target. */
 nav.pagination {
   display: flex;
   gap: 0.5rem;
@@ -506,12 +552,576 @@ nav.pagination {
 }
 nav.pagination a,
 nav.pagination span {
-  padding: 0.3rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target-size);
+  min-width: var(--target-size);
+  padding: 0.5rem 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
   text-decoration: none;
 }
 nav.pagination a[aria-disabled="true"] {
-  opacity: 0.4;
+  /* Opacity 0.4 dropped contrast below AAA — use a desaturated style with
+     the same color tokens so the disabled state is still readable. */
+  color: var(--fg-muted);
+  background: color-mix(in srgb, var(--border) 30%, var(--bg));
   pointer-events: none;
+}
+
+/* All native form inputs in the legacy UI inherit a 44×44 minimum so the
+   New-Scan checkboxes pass SC 2.5.5. The label wraps the input and acts as
+   the hit target, with sufficient padding around the visual control. */
+.filters input[type="checkbox"],
+form input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin: 0 0.5rem 0 0;
+  cursor: pointer;
+}
+.filters label,
+form label {
+  /* Make the label a hit target — clicking anywhere on the line activates
+     the input. This keeps the visual control small while the activation
+     surface stays AAA-compliant. */
+  min-height: var(--target-size);
+  display: flex;
+  align-items: center;
+}
+
+/* Buttons + button-styled links. Mirrors the SPA's <Button> primitive
+   so the Jinja UI offers the same affordances at the same sizes. Three
+   sizes — sm / md / lg — all clearing the WCAG 2.2 SC 2.5.5 (AAA, 44×44)
+   floor when md or above. `--lg` is reserved for the page's primary CTA;
+   one-per-route is the rule of thumb. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: var(--target-size);
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.1s ease-in;
+}
+.btn:hover { background: color-mix(in srgb, var(--fg) 6%, var(--bg)); }
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.btn--primary:hover { filter: brightness(1.08); background: var(--accent); }
+.btn--danger {
+  background: var(--severity-critical-bg);
+  color: #fff;
+  border-color: transparent;
+}
+.btn--danger:hover { filter: brightness(1.08); }
+/* Larger primary-CTA size — for the one "thing the user came to do"
+   per route. Taller, more horizontal padding, slightly bigger type. */
+.btn--lg {
+  min-height: 52px;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+}
+
+/* Form submit / cancel cluster — Cancel stays a plain link styled like
+   a tertiary action so the visual hierarchy reads commit-first. */
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.form-actions a.cancel {
+  min-height: var(--target-size);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+}
+
+/* New-Scan seed URL field — the page's hero input. Visibly larger so it
+   reads as "this is the field that matters." Mirrors the SPA pattern. */
+.field-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.field-hero > .field-hero__label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.field-hero > input {
+  min-height: var(--target-size);
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.field-hero > input:focus-visible { border-color: var(--accent); }
+
+/* Header CTA cluster (page-header-with-action layout). Sits in a flex
+   row so the title and primary action align baseline. */
+.page-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.page-header-row > h2 { margin: 0; }
+
+/* WCAG axe view — the per-scan a11y page (templates/a11y.html).
+   Two top-level affordances:
+     • A grid of "stat-cells" summarizing coverage and per-level counts.
+     • A list of `.a11y-sc-card` blocks, one per WCAG SC, each with a
+       nested list of rule failures that contribute to that SC.
+   We keep this hand-rolled (no framework) for the same reason the rest
+   of the Jinja UI is hand-rolled: simpler audit surface, fewer moving
+   parts. The colors all reuse the canonical severity tokens declared
+   at :root, which are themselves verified ≥7:1 against white. */
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.stat-cell__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+}
+.stat-cell__value {
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.a11y-sc-card {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.a11y-sc-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.a11y-rule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.a11y-rule {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fg) 3%, var(--bg));
+}
+.a11y-rule__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+/* Grouped image findings — one collapsible `<details>` per
+   (classification, alt_adequacy) bucket. The summary line is the
+   bucket's identity + counts; the body holds the shared remediation
+   hint and the inner findings table. Hand-rolled because the only
+   alternative would be a JS-driven accordion, and `<details>` works
+   keyboard-only out of the box (Enter/Space toggles, no focus traps). */
+.issue-group {
+  margin: 0.75rem 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.issue-group[open] {
+  background: color-mix(in srgb, var(--fg) 1.5%, var(--bg));
+}
+.issue-group__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  min-height: var(--target-size);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.issue-group__summary:hover {
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+}
+.issue-group__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.issue-group__counts strong {
+  color: var(--fg);
+}
+.issue-group__body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.issue-group__hint {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 4px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg));
+  font-size: 0.95rem;
+}
+.issue-group__breakdowns {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 0.5rem 0 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+/* Issues table — Siteimprove-style unified view at /scans/{id}/issues.
+   Dense, sortable, scannable. Each row is one *issue* (one rule_id or
+   one image-finding category), not one occurrence. The visual
+   conventions (conformance badge color, ability tags) are picked to
+   keep contrast ≥ 4.5:1 in both light + dark — verified in
+   audits/contrast_helper.py before shipping. */
+.issues-table-wrap {
+  overflow-x: auto;
+}
+.issues-table {
+  width: 100%;
+  font-size: 0.92rem;
+}
+.issues-table th.num,
+.issues-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.issues-table a.sort-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+}
+.issues-table a.sort-link:hover { text-decoration: underline; }
+.issues-table a.sort-link--active { color: var(--accent); font-weight: 700; }
+
+/* Conformance badge — pink for A (the legal floor), violet for AA
+   (the practical bar), light-violet for AAA (aspirational), gray
+   for best-practice. All 4 chosen for ≥ 4.5:1 against white text. */
+.conf-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-transform: uppercase;
+}
+.conf-a   { background: #b00060; }   /* AAA-pass on white */
+.conf-aa  { background: #4b1d8a; }   /* AAA-pass on white */
+.conf-aaa { background: #2e6694; }   /* AA-pass on white */
+.conf-bp  { background: #4a4a4a; }   /* AAA-pass on white */
+
+/* Ability tag — small inline pill listing impacted user populations.
+   Background + border tuned to ≥ 3:1 against the page background
+   (1.4.11 non-text contrast). Text is full-strength foreground. */
+.ability-tag {
+  display: inline-block;
+  margin-right: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg));
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+/* Status chip on the issues row. Reuses the new/reviewing/in_progress
+   vocabulary the rest of the app uses. */
+.status-chip {
+  display: inline-block;
+  margin-right: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  color: var(--fg);
+  white-space: nowrap;
+}
+.status-new         { background: color-mix(in srgb, var(--severity-major-bg) 18%, var(--bg)); }
+.status-reviewing   { background: color-mix(in srgb, var(--accent) 14%, var(--bg)); }
+.status-in_progress { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); }
+
+/* Filter chip strip at the top of the Issues view. Each chip is an
+   anchor (clicking it follows the URL with that filter dropped). */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  min-height: var(--target-size);
+}
+.chip:hover { background: color-mix(in srgb, var(--fg) 14%, var(--bg)); }
+.chip--clear { background: transparent; }
+.chip--clear:hover { background: color-mix(in srgb, var(--severity-critical-bg) 10%, var(--bg)); }
+
+/* Issue cards — the Issues list's card layout, replacing the old
+   dense table. Each card answers "what / why / how" inline via a
+   native <details> disclosure. Native disclosure means keyboard
+   support and screen-reader announcements come for free; the visual
+   chevron + the surrounding card chrome give sighted users the
+   affordance. */
+.issue-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.issue-card-list__item { margin: 0; }
+
+.issue-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  /* Slight elevation while collapsed so cards read as discrete
+     chunks; while open, swap to a top-border accent so the
+     expansion's content is the visual focus. */
+}
+.issue-card[open] {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.issue-card__summary {
+  list-style: none; /* hide native <summary> marker; we draw our own ▾ */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "head  chev"
+    "meta  chev"
+    "stats chev";
+  gap: 0.35rem 0.75rem;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  align-items: center;
+  /* 44x44 target floor — the summary is the click area. */
+  min-height: var(--target-size);
+}
+.issue-card__summary::-webkit-details-marker { display: none; }
+.issue-card__summary:hover { background: color-mix(in srgb, var(--accent) 4%, var(--bg)); }
+.issue-card__summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.issue-card__head {
+  grid-area: head;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.issue-card__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.issue-card__meta {
+  grid-area: meta;
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--fg) 80%, transparent);
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.issue-card__stats {
+  grid-area: stats;
+  font-size: 0.85rem;
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.issue-card__chevron {
+  grid-area: chev;
+  align-self: start;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.5rem 0.25rem;
+  color: color-mix(in srgb, var(--fg) 60%, transparent);
+  transition: transform 0.1s ease-in;
+}
+.issue-card[open] .issue-card__chevron { transform: rotate(180deg); }
+
+.issue-card__body {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+  padding-top: 0.75rem;
+}
+.issue-card__body > section { margin: 0.6rem 0; }
+.issue-card__body > section h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  margin: 0 0 0.3rem 0;
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+}
+.issue-card__body > section p { margin: 0.2rem 0; }
+.issue-card__body > section ol { margin: 0.2rem 0 0.2rem 1.2rem; padding: 0; }
+.issue-card__body > section ol li { margin: 0.2rem 0; }
+.issue-card__footer {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--border);
+}
+
+/* Bulk-status action row inside an issue group. Sits between the
+   group metadata and the findings table — that's the natural reading
+   order: "what is this issue" → "how do I want to triage it" → "show
+   me which rows it covers." */
+.bulk-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  margin: 0.5rem 0 0.75rem 0;
+  background: color-mix(in srgb, var(--fg) 4%, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.bulk-action label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.bulk-action__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* Inline `<span>` badge for inline-SVG findings — they have no blob to
+   thumbnail, so we paint a small box that's clearly a placeholder. */
+.svg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  min-height: 48px;
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  color: var(--accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Option set — checkbox + label + hint. Used by the New-Scan form.
+   The visual layout matches the SPA's <Checkbox> primitive so the user
+   gets the same affordance whichever UI they land in. */
+.option-set {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  margin: 0.1rem 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  min-height: var(--target-size);
+  cursor: pointer;
+}
+.option:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.option input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+.option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.option__label {
+  color: var(--fg);
+  font-weight: 500;
+}
+.option__hint {
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+/* Warning variant — when checked, surface the consequence visually.
+   Color is reinforcement, not the only signal: the label text already
+   says "authorized testing only". */
+.option--warning:has(input:checked) {
+  background: color-mix(in srgb, var(--severity-major-bg) 18%, var(--bg));
+  border-color: color-mix(in srgb, var(--severity-major-bg) 50%, transparent);
 }

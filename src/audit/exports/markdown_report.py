@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from audit.exports.collector import ExportFinding, ExportScan
+from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 
 TOP_N = 20
+TOP_A11Y_N = 30
 
 
 def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -> str:
@@ -41,7 +42,11 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
     if scan.finished_at:
         lines.append(f"- **Finished:** {scan.finished_at}")
     lines.append(f"- **Pages crawled:** {scan.page_count}")
-    lines.append(f"- **Findings:** {scan.finding_count}")
+    lines.append(f"- **Image-of-text findings (WCAG 1.4.5):** {scan.finding_count}")
+    lines.append(
+        f"- **WCAG axe-core findings:** {scan.axe_violations_total} "
+        f"(scanned {scan.axe_pages_scanned} of {scan.page_count} pages)"
+    )
     if scan.error_count:
         lines.append(f"- **Errors:** {scan.error_count}")
 
@@ -65,7 +70,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
             lines.extend(_format_finding_block(finding))
             lines.append("")
 
-    lines.append("## All findings")
+    lines.append("## All image-of-text findings")
     lines.append("")
     if not scan.findings:
         lines.append("_No findings._")
@@ -84,8 +89,98 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
                 )
             )
 
+    # WCAG axe section — only emitted when axe ran. A scan with
+    # `axe_pages_scanned == 0` skips this section entirely so legacy /
+    # static-only crawls produce the same report as before.
+    if scan.axe_pages_scanned or scan.a11y_findings:
+        lines.append("")
+        lines.append("## WCAG axe-core findings")
+        lines.append("")
+        lines.append(_axe_summary_line(scan))
+        lines.append("")
+        lines.append("| WCAG level | Count |")
+        lines.append("| --- | ---: |")
+        for level_label, key in (
+            ("A", "A"),
+            ("AA", "AA"),
+            ("AAA", "AAA"),
+            ("best-practice", "best_practice"),
+        ):
+            lines.append(f"| {level_label} | {scan.by_wcag_level.get(key, 0)} |")
+
+        lines.append("")
+        lines.append(
+            "**Scope reminder.** Axe-core auto-detects ~30-40% of WCAG 2.x AA "
+            "success criteria (DOM-checkable rules: contrast, labels, ARIA, "
+            "focus order). The remaining ~60% require human judgment and are "
+            "not represented in this section."
+        )
+
+        if scan.a11y_findings:
+            top = scan.a11y_findings[: TOP_A11Y_N]
+            lines.append("")
+            lines.append(f"### Top {len(top)} axe violations")
+            lines.append("")
+            for af in top:
+                lines.extend(_format_axe_block(af))
+                lines.append("")
+
+            lines.append("### All axe violations")
+            lines.append("")
+            lines.append("| # | Impact | WCAG SC | Level | Rule | Page |")
+            lines.append("| ---: | --- | --- | --- | --- | --- |")
+            for af in scan.a11y_findings:
+                lines.append(
+                    "| {id} | {imp} | {sc} | {lvl} | `{rule}` | {pg} |".format(
+                        id=af.id,
+                        imp=af.impact or "—",
+                        sc=af.wcag_sc or "—",
+                        lvl=af.wcag_level or "—",
+                        rule=af.rule_id,
+                        pg=_short(af.page_url, 48),
+                    )
+                )
+
     lines.append("")
     return "\n".join(lines)
+
+
+def _axe_summary_line(scan: ExportScan) -> str:
+    if scan.axe_violations_total == 0 and scan.axe_pages_scanned > 0:
+        return (
+            f"Axe ran cleanly on {scan.axe_pages_scanned} page(s) — no automated WCAG "
+            "DOM failures detected."
+        )
+    if scan.axe_pages_scanned == 0:
+        return "Axe was not run on this scan (no Playwright-rendered pages)."
+    return (
+        f"Detected {scan.axe_violations_total} axe violation(s) across "
+        f"{scan.axe_pages_scanned} of {scan.page_count} page(s)."
+    )
+
+
+def _format_axe_block(af: ExportA11yFinding) -> list[str]:
+    """One-finding bullet block for the top-N axe section."""
+    lines: list[str] = []
+    sc = af.wcag_sc or "best-practice"
+    lvl = f" (Level {af.wcag_level})" if af.wcag_level else ""
+    impact = af.impact or "—"
+    lines.append(
+        f"### [{impact}] {af.rule_id} — SC {sc}{lvl}"
+    )
+    if af.help:
+        lines.append(f"- **Rule:** {af.help}")
+    lines.append(f"- **Page:** {af.page_url}")
+    lines.append(f"- **Target:** `{_short(af.target_selector, 100)}`")
+    if af.failure_summary:
+        # Failure summaries can be multi-line; collapse to one for the bullet.
+        one_line = " ".join(af.failure_summary.split())
+        lines.append(f"- **Why it failed:** {_short(one_line, 240)}")
+    if af.help_url:
+        lines.append(f"- **Docs:** {af.help_url}")
+    lines.append(f"- **Status:** {af.status}")
+    lines.append(f"- **Review:** {af.ui_url}")
+    return lines
 
 
 def _summary_line(scan: ExportScan) -> str:

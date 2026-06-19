@@ -19,9 +19,31 @@ diff across rescans.
 3. **[Developer guide](./developer-guide.md)** — where the code lives and
    how to extend it. Adding an export format, swapping OCR or VLM
    backends, tweaking the priority formula, running tests.
-4. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
+4. **[Coverage & feature tracker](./coverage-tracker.md)** — what's
+   shipped vs. in-progress vs. planned across every pipeline, reconciled
+   against the actual code. The roadmap for closing the AI coverage gap.
+
+5. **[Hosting](./hosting.md)** — run it for a small team on an always-on
+   machine (LAN / Tailscale + the opt-in shared-token gate).
+
+6. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
    gets stuck, when a site blocks the crawler, when Ollama isn't
    answering, when scope creeps.
+
+### Working on the UI
+
+Three additional docs cover the design contract for the review UI itself.
+Read these before changing any UI code:
+
+- **[Accessibility](./accessibility.md)** — the WCAG 2.2 AAA contract.
+  Tokens, contrast ratios, target-size policy, focus indicator, the
+  five gates a PR must pass, criterion-by-criterion coverage.
+- **[Personas](./personas.md)** — the assumed users (Sam the
+  accessibility lead; the editor receiving exported findings; the
+  maintainer). Every UI decision should cite the persona it serves.
+- **[Design principles](./design-principles.md)** — the seven Universal
+  Design principles + Nielsen's ten heuristics, mapped onto this
+  codebase, with a 20-item checklist for new screens.
 
 ## Mental model in one paragraph
 
@@ -87,8 +109,9 @@ tests/
 - **Fully offline at runtime** after initial model pull. No telemetry, no
   CDN calls. htmx and axe-core are vendored under `src/audit/web/static/`;
   tldextract uses a bundled PSL snapshot.
-- **The tool itself is WCAG 2.1 AA.** Every review-UI view has axe-core
-  tests that fail the build on any violation.
+- **The tool itself is WCAG 2.2 AAA.** Every review-UI view has axe-core
+  tests (with the AAA tag pack) that fail the build on any violation. See
+  [`accessibility.md`](./accessibility.md) for the full contract.
 - **Resumable.** All long work is in the SQLite queue. A crashed or
   Ctrl-C'd crawl picks up where it left off.
 - **Single-machine footprint.** SQLite for everything — no Redis, no

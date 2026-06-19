@@ -1,9 +1,17 @@
 import type {
+  A11yByRuleResponse,
+  A11yDrillFinding,
+  A11yRollup,
+  AbilityLabel,
+  ConformanceLabel,
+  IssueDetail,
   DiffReport,
   FindingDetail,
   FindingsFilter,
   FindingsPage,
   FindingStatus,
+  GroupedFindingsResponse,
+  IssuesResponse,
   NewScanPayload,
   ScanDetail,
   ScanSummary,
@@ -57,6 +65,19 @@ export const api = {
     request<{ ok: boolean; deleted_scan_id: number }>(`/api/scans/${id}`, {
       method: "DELETE",
     }),
+  /**
+   * Image-of-text findings grouped by `(classification, alt_adequacy)`.
+   * Each group's findings share one remediation hint — same key the
+   * `rules/remediation.yaml` rule book uses. Optional `status` filter
+   * narrows to a single triage state.
+   */
+  getGroupedFindings: (scanId: number, status?: FindingStatus | "") => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    return request<GroupedFindingsResponse>(
+      `/api/scans/${scanId}/findings/grouped?${params}`,
+    );
+  },
   listFindings: (scanId: number, filter: FindingsFilter) => {
     const params = new URLSearchParams();
     params.set("page", String(filter.page));
@@ -77,6 +98,126 @@ export const api = {
     request<DiffReport>(
       `/api/scans/${currentId}/diff?compare_to=${compareToId}`,
     ),
+  /**
+   * Per-scan WCAG axe-core roll-up: coverage + counts by SC, level,
+   * and impact. Empty arrays are valid (a scan with no axe pages or
+   * no violations).
+   */
+  getA11yRollup: (scanId: number) =>
+    request<A11yRollup>(`/api/scans/${scanId}/a11y`),
+  /**
+   * Per-rule rollup — the actionable cut. Where `getA11yRollup`
+   * groups by WCAG SC (the reporting axis), this groups by axe
+   * `rule_id` (the fixing axis): one CSS class fails contrast on
+   * 800 pages → one group of 800, ready for one bulk-status decision.
+   */
+  getA11yByRule: (scanId: number, status?: FindingStatus | "") => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    return request<A11yByRuleResponse>(
+      `/api/scans/${scanId}/a11y/by-rule?${params}`,
+    );
+  },
+  /**
+   * Drill-down list of individual axe violations for one WCAG SC.
+   * Pass `null` (or omit) to get findings with no SC mapping —
+   * axe's best-practice rules land there. The server treats an
+   * empty-string query param as "SC IS NULL," so we have to
+   * distinguish: undefined → no filter, null → best-practice only.
+   *
+   * Optional ``status`` narrows to a single triage state; pass
+   * empty/undefined for "all statuses."
+   */
+  getA11yFindings: (
+    scanId: number,
+    wcagSc: string | null | undefined,
+    status?: FindingStatus | "",
+  ) => {
+    const params = new URLSearchParams();
+    if (wcagSc !== undefined) params.set("wcag_sc", wcagSc ?? "");
+    if (status) params.set("status", status);
+    return request<{ findings: A11yDrillFinding[] }>(
+      `/api/scans/${scanId}/a11y/findings?${params}`,
+    );
+  },
+  /**
+   * Update an axe finding's triage status. Mirrors `setStatus` for the
+   * image-of-text findings; same status enum, separate table.
+   */
+  setA11yStatus: (id: number, status: FindingStatus) =>
+    request<{ status: FindingStatus }>(
+      `/api/a11y-findings/${id}/status`,
+      {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      },
+    ),
+  /**
+   * Bulk-update a set of image-of-text findings to the same status.
+   * The natural call site is the grouped-by-issue view: every finding
+   * in a group shares one fix, so one POST replaces N per-row calls.
+   * Returns `{status, updated}` — the count is how many DB rows
+   * changed (≤ length of finding_ids; ids that don't exist are dropped
+   * silently in SQL).
+   */
+  bulkSetStatus: (findingIds: number[], status: FindingStatus) =>
+    request<{ status: FindingStatus; updated: number }>(
+      "/api/findings/bulk-status",
+      {
+        method: "POST",
+        body: JSON.stringify({ finding_ids: findingIds, status }),
+      },
+    ),
+  bulkSetA11yStatus: (findingIds: number[], status: FindingStatus) =>
+    request<{ status: FindingStatus; updated: number }>(
+      "/api/a11y-findings/bulk-status",
+      {
+        method: "POST",
+        body: JSON.stringify({ finding_ids: findingIds, status }),
+      },
+    ),
+  /**
+   * Per-issue detail — Siteimprove-style "page 2".
+   * Includes the IssueRow header data + every page that contributes
+   * findings to this issue + the YAML-sourced description / fix /
+   * verify content. The pages list is server-sorted; pass `sort` to
+   * change the order.
+   */
+  getIssueDetail: (
+    scanId: number,
+    issueKey: string,
+    sort: string = "occurrences_desc",
+  ) => {
+    const params = new URLSearchParams();
+    params.set("sort", sort);
+    return request<IssueDetail>(
+      `/api/scans/${scanId}/issues/${encodeURIComponent(issueKey)}?${params}`,
+    );
+  },
+  /**
+   * Unified Issues table — one row per issue across both pipelines.
+   * Filter args are flat strings (comma-separated for the multi-value
+   * ones if we ever need that; today the backend takes single values).
+   */
+  listIssues: (
+    scanId: number,
+    filters: {
+      conformance?: ConformanceLabel | "";
+      responsibility?: string;
+      abilities?: AbilityLabel | "";
+      status?: FindingStatus | "";
+      q?: string;
+      sort?: string;
+    } = {},
+  ) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(filters)) {
+      if (v) params.set(k, v);
+    }
+    return request<IssuesResponse>(
+      `/api/scans/${scanId}/issues?${params}`,
+    );
+  },
 };
 
 /** Direct URL (bypass fetch) for image blobs — used in <img src=…>. */

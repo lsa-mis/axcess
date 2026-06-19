@@ -23,8 +23,11 @@
   {% endif %}
 
   <form method="post" action="/scans/new" class="filters" style="flex-direction:column;align-items:stretch;gap:1rem;max-width:640px;">
-    <label>
-      Seed URL
+    {# Hero input — the field that matters most on the form-only route.
+       `.field-hero` sizes it bigger than the secondary controls below
+       so the visual hierarchy reads "this first." #}
+    <label class="field-hero">
+      <span class="field-hero__label">Seed URL</span>
       <input
         type="url"
         name="url"
@@ -72,44 +75,91 @@
       </label>
     </div>
 
-    <fieldset style="border:1px solid var(--border);border-radius:4px;padding:0.75rem;">
+    {# Phase-2 update: each option carries a hint line so the consequence
+       is visible without clicking through to docs. The "Ignore robots.txt"
+       row gets the .option--warning class — when checked it renders an
+       amber surface to reinforce the action's significance. The label
+       itself is the 44×44 hit target via the global `form label` rule
+       in styles.css (SC 2.5.5 AAA). #}
+    <fieldset class="option-set">
       <legend>Options</legend>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      <label class="option">
         <input type="checkbox" name="whole_host" value="1"
                {% if form.whole_host %}checked{% endif %}>
-        Crawl the entire host (ignore the path scope)
+        <span class="option__body">
+          <span class="option__label">Crawl the entire host</span>
+          <span class="option__hint">Ignores the URL path scope — every page on the host is in scope.</span>
+        </span>
       </label>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      <label class="option">
         <input type="checkbox" name="include_subdomain" value="1"
                {% if form.include_subdomain %}checked{% endif %}>
-        Follow links on subdomains
+        <span class="option__body">
+          <span class="option__label">Follow links on subdomains</span>
+          <span class="option__hint">e.g. links from <code>www.example.com</code> to <code>docs.example.com</code> are followed.</span>
+        </span>
       </label>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      {# Every page renders in a real browser by default — that's what
+         lets axe / keyboard / responsive checks see the live DOM. The
+         static-only box is the opt-OUT fast path, warning-toned because
+         checking it silently drops three pipelines' coverage. #}
+      <label class="option option--warning">
+        <input type="checkbox" name="static_only" value="1"
+               {% if form.static_only %}checked{% endif %}>
+        <span class="option__body">
+          <span class="option__label">Fast crawl — skip browser rendering (static only)</span>
+          <span class="option__hint">5–10× faster, but disables the axe, keyboard-trap, and responsive checks on every statically-fetched page.</span>
+        </span>
+      </label>
+      <label class="option option--warning">
         <input type="checkbox" name="ignore_robots" value="1"
                {% if form.ignore_robots %}checked{% endif %}>
-        Ignore robots.txt (authorized testing only)
+        <span class="option__body">
+          <span class="option__label">Ignore robots.txt</span>
+          <span class="option__hint">Authorized testing only. The scan will be flagged in its config and audit log.</span>
+        </span>
       </label>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      <label class="option">
         <input type="checkbox" name="skip_ocr" value="1"
                {% if form.skip_ocr %}checked{% endif %}>
-        Skip OCR
+        <span class="option__body">
+          <span class="option__label">Skip OCR</span>
+          <span class="option__hint">Faster, but findings won't include image-text extraction.</span>
+        </span>
       </label>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
+      <label class="option">
         <input type="checkbox" name="skip_vlm" value="1"
                {% if form.skip_vlm %}checked{% endif %}>
-        Skip VLM classification
+        <span class="option__body">
+          <span class="option__label">Skip VLM classification</span>
+          <span class="option__hint">Faster, but findings won't include the essential / decorative / logo verdict.</span>
+        </span>
       </label>
-      <label style="flex-direction:row;align-items:center;gap:0.5rem;">
-        <input type="checkbox" name="js_eager" value="1"
-               {% if form.js_eager %}checked{% endif %}>
-        Use real browser (Playwright) for every page — slower but handles
-        SPAs and sites behind Cloudflare
+      <label class="option">
+        <input type="checkbox" name="skip_keyboard" value="1"
+               {% if form.skip_keyboard %}checked{% endif %}>
+        <span class="option__body">
+          <span class="option__label">Skip keyboard-trap probe</span>
+          <span class="option__hint">Saves ~1–3s per page; loses the only automated WCAG 2.1.2 (Level A) coverage.</span>
+        </span>
+      </label>
+      <label class="option">
+        <input type="checkbox" name="skip_responsive" value="1"
+               {% if form.skip_responsive %}checked{% endif %}>
+        <span class="option__body">
+          <span class="option__label">Skip responsive &amp; zoom checks</span>
+          <span class="option__hint">Saves ~1–2s per page; loses 320px reflow, 200% zoom, and text-spacing coverage (SC 1.4.4 / 1.4.10 / 1.4.12).</span>
+        </span>
       </label>
     </fieldset>
 
-    <div style="display:flex;gap:0.5rem;">
-      <button type="submit">Start crawl</button>
-      <a href="/scans" style="align-self:center;">Cancel</a>
+    {# Submit / cancel cluster. `.btn--lg` on the submit makes the
+       primary commit visible from across the room; Cancel stays a
+       plain link so the hierarchy is unambiguous (the button colors
+       reinforce the same signal). #}
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary btn--lg">Start crawl</button>
+      <a href="/scans" class="cancel">Cancel</a>
     </div>
   </form>
 {% endblock %}

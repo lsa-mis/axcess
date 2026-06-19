@@ -7,10 +7,16 @@ failures (DNS, timeout, connection reset) raise :class:`FetchError`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
+from typing import TYPE_CHECKING
 
 import httpx
+
+if TYPE_CHECKING:
+    from audit.analyzer.axe import AxeViolation
+    from audit.analyzer.keyboard import KeyboardTrap
+    from audit.analyzer.responsive import ResponsiveFinding
 
 _HTML_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 
@@ -21,13 +27,30 @@ class FetchError(Exception):
 
 @dataclass(frozen=True)
 class FetchResult:
-    """One completed HTTP response."""
+    """One completed HTTP response.
+
+    ``axe_violations`` is populated only by :class:`JsFetcher` when it
+    has been constructed with an :class:`AxeAnalyzer`. The static
+    :class:`StaticFetcher` always leaves it empty — axe needs a rendered
+    DOM, which httpx cannot provide. Every page goes through Playwright
+    by default; only ``--static-only`` crawls hit this gap.
+    """
 
     url: str
     status_code: int
     content_type: str
     body: bytes
     retry_after: float | None
+    axe_violations: tuple[AxeViolation, ...] = field(default=())
+    # SC 2.1.2 keyboard-trap probe results. Populated only by JsFetcher
+    # when a KeyboardProbe is attached (default on; ``--skip-keyboard``
+    # disables). Static fetches always leave it empty (probing requires
+    # a live Playwright page).
+    keyboard_traps: tuple[KeyboardTrap, ...] = field(default=())
+    # Responsive/zoom/text-spacing probe results (SC 1.4.4 / 1.4.10 /
+    # 1.4.12). Same population rules as the keyboard probe; default on,
+    # ``--skip-responsive`` disables.
+    responsive_findings: tuple[ResponsiveFinding, ...] = field(default=())
 
     @property
     def is_html(self) -> bool:

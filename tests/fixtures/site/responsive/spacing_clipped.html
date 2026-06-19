@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text-spacing failure fixture (SC 1.4.12)</title>
+  <style>
+    /* Deliberate text-spacing failure: a leaf paragraph with a
+       hard-coded height + overflow hidden, sized to the pixel for
+       default spacing. The WCAG override (line-height 1.5, letter
+       0.12em, word 0.16em) makes the text taller than the box, so it
+       clips vertically. Fluid at every viewport width, so the reflow
+       and zoom checks stay quiet — this fixture must fire ONLY the
+       text-spacing check.
+
+       Geometry note: ~4 lines at 16px/1.2 ≈ 77px fits in the 80px box
+       at default spacing (so the zoom check at 640px stays quiet);
+       the override pushes line-height to 24px → ≥96px of content in
+       an 80px box → scrollHeight exceeds clientHeight by ≥16px (past
+       the probe's 4px slop). */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    #tight-box {
+      height: 80px;
+      overflow: hidden;
+      line-height: 1.2;
+      font-size: 16px;
+      max-width: 28ch;
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Spacing-sensitive layout</h1>
+    <p id="tight-box">This box height fits four default-spacing lines of text exactly and no more at all.</p>
+  </main>
+</body>
+</html>

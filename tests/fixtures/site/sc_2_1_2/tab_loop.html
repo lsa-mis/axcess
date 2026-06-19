@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC 2.1.2 fixture — Tab swallowed (stuck focus)</title>
+</head>
+<body>
+  <main>
+    <h1>Stuck focus — a keydown handler swallows Tab</h1>
+    <p>The "trap" button below has a keydown handler that calls
+       <code>preventDefault()</code> on every Tab press. Focus
+       enters it and never leaves.</p>
+
+    <a href="/before">Before the trap</a>
+
+    <button id="trap" type="button">
+      Focus me, then press Tab — it won&rsquo;t escape
+    </button>
+
+    <a href="/after">After the trap</a>
+
+    <script>
+      // Canonical anti-pattern: kills Tab unconditionally.
+      // This is what the probe's "stuck on same element" check finds.
+      const trap = document.getElementById('trap');
+      trap.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+    </script>
+  </main>
+</body>
+</html>

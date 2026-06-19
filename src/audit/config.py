@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
 
+    # Hosting / access control. Empty by default → the tool stays a
+    # zero-auth local app (binds to 127.0.0.1, no token needed). Set
+    # ``AUDIT_ACCESS_TOKEN`` before binding to a LAN/Tailscale address
+    # so the instance isn't wide open the moment it's reachable beyond
+    # localhost. The middleware that enforces this is a no-op when the
+    # token is empty, so local dev + the test suite are unaffected.
+    access_token: str = ""
+
     def ensure_dirs(self) -> None:
         """Create runtime directories if missing."""
         for p in (self.data_dir, self.blob_dir, self.log_dir):

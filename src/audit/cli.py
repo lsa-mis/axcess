@@ -76,14 +76,110 @@ def crawl(
             help="Skip end-of-crawl finding synthesis. Run `audit synthesize` later.",
         ),
     ] = False,
+    skip_axe: Annotated[
+        bool,
+        typer.Option(
+            "--skip-axe",
+            help=(
+                "Skip the WCAG axe-core DOM scan. The scan adds ~50-150 ms "
+                "per Playwright-rendered page and is on by default."
+            ),
+        ),
+    ] = False,
+    axe_level: Annotated[
+        str,
+        typer.Option(
+            "--axe-level",
+            help="WCAG level filter for axe rules: A, AA (default), or AAA.",
+        ),
+    ] = "AA",
+    skip_semantic: Annotated[
+        bool,
+        typer.Option(
+            "--skip-semantic",
+            help=(
+                "Skip per-criterion semantic (LLM) analyzers. Each enabled "
+                "criterion adds ~1 local Ollama call per page; default set "
+                "is 10 criteria. Disable for fast iterations or when no "
+                "Ollama daemon is reachable."
+            ),
+        ),
+    ] = False,
+    semantic_criteria: Annotated[
+        str,
+        typer.Option(
+            "--semantic-criteria",
+            help=(
+                "Comma-separated WCAG SCs to evaluate (e.g. '2.4.4,1.3.1'). "
+                "Empty = use the default Phase-9 wave-1 set."
+            ),
+        ),
+    ] = "",
+    keyboard_probe: Annotated[
+        bool,
+        typer.Option(
+            "--keyboard-probe",
+            help=(
+                "Deprecated no-op: the SC 2.1.2 keyboard-trap probe now "
+                "runs by default. Use --skip-keyboard to disable it."
+            ),
+        ),
+    ] = False,
+    skip_keyboard: Annotated[
+        bool,
+        typer.Option(
+            "--skip-keyboard",
+            help=(
+                "Skip the SC 2.1.2 (No Keyboard Trap) dynamic probe. "
+                "Saves ~1-3s per rendered page at the cost of losing the "
+                "only automated Level-A keyboard-trap coverage."
+            ),
+        ),
+    ] = False,
+    keyboard_max_focusable: Annotated[
+        int,
+        typer.Option(
+            "--keyboard-max-focusable",
+            min=5,
+            max=500,
+            help=(
+                "Cap on how many focusable elements the keyboard probe "
+                "tests per page. Default 50 covers realistic pages; raise "
+                "for very dense forms, lower for fast iteration."
+            ),
+        ),
+    ] = 50,
+    skip_responsive: Annotated[
+        bool,
+        typer.Option(
+            "--skip-responsive",
+            help=(
+                "Skip the responsive/zoom probe (320px reflow, ~200% zoom "
+                "text clipping, WCAG text-spacing override). Saves ~1-2s "
+                "per rendered page."
+            ),
+        ),
+    ] = False,
     use_js: Annotated[
         bool,
         typer.Option(
             "--use-js",
             help=(
-                "Render every page with Playwright (chromium). Slower but "
-                "handles SPAs and sites behind Cloudflare / WAF challenges. "
-                "Auto-escalation on challenge pages happens either way."
+                "Deprecated no-op: every page is rendered with Playwright "
+                "by default now. Use --static-only for the fast path."
+            ),
+        ),
+    ] = False,
+    static_only: Annotated[
+        bool,
+        typer.Option(
+            "--static-only",
+            help=(
+                "Fast link-inventory crawl: fetch pages with plain HTTP and "
+                "skip browser rendering except for SPA/WAF pages. WARNING: "
+                "disables axe, keyboard, and responsive checks on every "
+                "statically-fetched page — image-of-text + semantic "
+                "pipelines still run."
             ),
         ),
     ] = False,
@@ -102,6 +198,10 @@ def crawl(
 ) -> None:
     """Crawl a site and store page records in the audit DB."""
     _ = verbose  # structlog config will consume this in Phase 2+
+    # Deprecated opt-ins that are now the defaults. Accept silently so
+    # existing scripts keep working; the new opt-OUTs are authoritative.
+    _ = use_js
+    _ = keyboard_probe
     settings = get_settings()
     settings.ensure_dirs()
     conn = connect(settings.db_path)
@@ -128,8 +228,34 @@ def crawl(
             vlm_concurrency=settings.vlm_concurrency,
             synthesize_enabled=not skip_synthesize,
             compare_to=compare_to,
-            js_eager=use_js,
+            js_eager=not static_only,
+            axe_enabled=not skip_axe,
+            axe_level=axe_level.upper(),
+            semantic_enabled=not skip_semantic,
+            keyboard_probe_enabled=not skip_keyboard,
+            keyboard_probe_max_focusable=keyboard_max_focusable,
+            responsive_checks_enabled=not skip_responsive,
         )
+        if static_only:
+            console.print(
+                "[yellow]--static-only:[/yellow] pages are fetched without a "
+                "browser, so the axe, keyboard-trap, and responsive checks "
+                "are skipped on statically-fetched pages. Re-run without "
+                "--static-only for full coverage."
+            )
+        # Override the default semantic-criteria tuple when the user
+        # passed `--semantic-criteria 2.4.4,1.3.1`. Dataclass is frozen,
+        # so we rebuild it via `replace()` — the orchestrator validates
+        # SC formatting and logs + drops any malformed entry.
+        if semantic_criteria:
+            from dataclasses import replace as _dc_replace
+
+            config = _dc_replace(
+                config,
+                semantic_criteria=tuple(
+                    s.strip() for s in semantic_criteria.split(",") if s.strip()
+                ),
+            )
         console.print(f"[cyan]Starting crawl[/cyan] of {url} (max_pages={max_pages})…")
         try:
             summary = asyncio.run(run_crawl(conn, config))
@@ -167,6 +293,22 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
         table.add_row("Images VLM-classified", str(summary.vlm_classified))
     if summary.vlm_errors:
         table.add_row("VLM errors", str(summary.vlm_errors))
+    if summary.axe_pages_scanned:
+        table.add_row("Pages axe-scanned (WCAG)", str(summary.axe_pages_scanned))
+        table.add_row("Axe violations total", str(summary.axe_violations_total))
+    if summary.keyboard_pages_probed:
+        table.add_row(
+            "Pages keyboard-probed (SC 2.1.2)", str(summary.keyboard_pages_probed)
+        )
+        table.add_row("Keyboard traps total", str(summary.keyboard_traps_total))
+    if summary.responsive_pages_probed:
+        table.add_row(
+            "Pages responsive-probed (1.4.4/.10/.12)",
+            str(summary.responsive_pages_probed),
+        )
+        table.add_row(
+            "Responsive findings total", str(summary.responsive_findings_total)
+        )
     if summary.findings_written:
         table.add_row("Findings written", str(summary.findings_written))
         for level in ("critical", "major", "minor", "info"):

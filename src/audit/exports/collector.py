@@ -63,6 +63,38 @@ class ExportFinding:
 
 
 @dataclass(frozen=True)
+class ExportA11yFinding:
+    """One axe-core WCAG violation, flattened for export.
+
+    Parallels :class:`ExportFinding` but for the page-scoped axe pipeline.
+    Each row is a distinct DOM target — duplicates of the same rule
+    across many pages collapse into many rows here (one per page+target),
+    matching how axe reports them.
+    """
+
+    id: int
+    scan_id: int
+    rule_id: str
+    wcag_sc: str | None
+    wcag_scs: str | None
+    wcag_level: str | None
+    impact: str | None
+    help: str
+    help_url: str
+    target_selector: str
+    failure_summary: str | None
+    html_snippet: str | None
+    status: str
+    page_id: int
+    page_url: str
+    page_title: str | None
+    ui_url: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ExportScan:
     """Scan-level metadata paired with its findings."""
 
@@ -76,6 +108,16 @@ class ExportScan:
     error_count: int
     findings: list[ExportFinding]
     by_severity: dict[str, int]
+    # WCAG axe pipeline output, alongside the image-of-text findings
+    # above. Kept on the same scan-level container so every export
+    # format renders both with one collector pass. Empty list when
+    # axe wasn't run (e.g. legacy scans, or `--skip-axe`).
+    a11y_findings: list[ExportA11yFinding] = field(default_factory=list)
+    axe_pages_scanned: int = 0
+    axe_violations_total: int = 0
+    by_wcag_level: dict[str, int] = field(
+        default_factory=lambda: {"A": 0, "AA": 0, "AAA": 0, "best_practice": 0}
+    )
 
 
 def collect_scan(
@@ -87,7 +129,9 @@ def collect_scan(
     """Load a scan + all of its findings into a render-ready structure."""
     scan_row = conn.execute(
         "SELECT id, seed_url, status, started_at, finished_at, page_count, "
-        "finding_count, error_count FROM scans WHERE id = ?",
+        "finding_count, error_count, "
+        "axe_pages_scanned, axe_violations_total "
+        "FROM scans WHERE id = ?",
         (scan_id,),
     ).fetchone()
     if scan_row is None:
@@ -97,6 +141,17 @@ def collect_scan(
     by_severity: dict[str, int] = {"critical": 0, "major": 0, "minor": 0, "info": 0}
     for f in findings:
         by_severity[f.severity] = by_severity.get(f.severity, 0) + 1
+
+    a11y_findings = _collect_a11y_findings(conn, scan_id, ui_base_url=ui_base_url)
+    by_wcag_level: dict[str, int] = {
+        "A": 0,
+        "AA": 0,
+        "AAA": 0,
+        "best_practice": 0,
+    }
+    for af in a11y_findings:
+        key = af.wcag_level if af.wcag_level in {"A", "AA", "AAA"} else "best_practice"
+        by_wcag_level[key] = by_wcag_level.get(key, 0) + 1
 
     return ExportScan(
         id=int(scan_row["id"]),
@@ -109,7 +164,78 @@ def collect_scan(
         error_count=int(scan_row["error_count"]),
         findings=findings,
         by_severity=by_severity,
+        a11y_findings=a11y_findings,
+        axe_pages_scanned=int(scan_row["axe_pages_scanned"] or 0),
+        axe_violations_total=int(scan_row["axe_violations_total"] or 0),
+        by_wcag_level=by_wcag_level,
     )
+
+
+def _collect_a11y_findings(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    *,
+    ui_base_url: str,
+) -> list[ExportA11yFinding]:
+    """Pull axe-core WCAG findings for ``scan_id``, page-joined.
+
+    Ordering matches the UI: worst impact first (critical → minor →
+    none), then within an impact tier by page URL so a developer
+    grouping by file gets adjacent rows for the same template.
+    """
+    rows = conn.execute(
+        """
+        SELECT a.id, a.scan_id, a.rule_id, a.wcag_sc, a.wcag_scs,
+               a.wcag_level, a.impact, a.help, a.help_url,
+               a.target_selector, a.failure_summary, a.html_snippet,
+               a.status,
+               p.id AS page_id, p.url_normalized AS page_url,
+               p.title AS page_title
+          FROM page_a11y_findings a
+          JOIN pages p ON p.id = a.page_id
+         WHERE a.scan_id = ?
+         ORDER BY
+            CASE a.impact
+              WHEN 'critical' THEN 0
+              WHEN 'serious' THEN 1
+              WHEN 'moderate' THEN 2
+              WHEN 'minor' THEN 3
+              ELSE 4
+            END,
+            p.url_normalized, a.rule_id, a.id
+        """,
+        (scan_id,),
+    ).fetchall()
+    out: list[ExportA11yFinding] = []
+    for r in rows:
+        out.append(
+            ExportA11yFinding(
+                id=int(r["id"]),
+                scan_id=int(r["scan_id"]),
+                rule_id=str(r["rule_id"]),
+                wcag_sc=r["wcag_sc"],
+                wcag_scs=r["wcag_scs"],
+                wcag_level=r["wcag_level"],
+                impact=r["impact"],
+                help=str(r["help"] or ""),
+                help_url=str(r["help_url"] or ""),
+                target_selector=str(r["target_selector"] or ""),
+                failure_summary=r["failure_summary"],
+                html_snippet=r["html_snippet"],
+                status=str(r["status"]),
+                page_id=int(r["page_id"]),
+                page_url=str(r["page_url"]),
+                page_title=r["page_title"],
+                # No per-finding detail page yet for axe rows (drill-down
+                # lives at /scans/{id}/a11y?wcag_sc=…). Link to the SC
+                # bucket as the next-best context.
+                ui_url=(
+                    f"{ui_base_url.rstrip('/')}/scans/{scan_id}/a11y"
+                    + (f"?wcag_sc={r['wcag_sc']}" if r["wcag_sc"] else "")
+                ),
+            )
+        )
+    return out
 
 
 def _collect_findings(

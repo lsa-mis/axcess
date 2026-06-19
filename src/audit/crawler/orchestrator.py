@@ -16,12 +16,17 @@ import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 from selectolax.parser import HTMLParser
 
+from audit.analyzer.axe import AxeAnalyzer, AxeViolation
+from audit.analyzer.axe import Level as AxeLevel
+from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
+from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.vlm.base import VlmProvider
 from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.blob_store import BlobStore
@@ -77,14 +82,63 @@ class CrawlConfig:
     compare_to: int | None = None
     # JS rendering. ``js_enabled`` lets the orchestrator start Playwright on
     # demand (when the static fetcher sees a JS-only page or a bot-challenge
-    # interstitial). ``js_eager`` forces Playwright for every HTML page —
-    # useful for sites that aggressively filter non-browser traffic.
+    # interstitial). ``js_eager`` renders EVERY page in a real browser and
+    # defaults to True: this is an accessibility auditor, and three of the
+    # four detection pipelines (axe, keyboard probe, responsive probe) can
+    # only see a rendered DOM. The pre-flip default (False) silently
+    # produced near-zero axe coverage on static sites — an audit tool must
+    # not have a fast path that quietly guts its own audit. Set
+    # ``js_eager=False`` (CLI ``--static-only``) for a fast link-inventory
+    # crawl when rendered-DOM checks aren't needed.
     js_enabled: bool = True
-    js_eager: bool = False
+    js_eager: bool = True
     # Scope: by default, the crawler stays under the seed URL's path prefix
     # (so ``https://example.com/docs/`` only follows ``/docs/*`` links).
     # Set ``whole_host`` to follow every link on the seed host.
     whole_host: bool = False
+    # WCAG 2.x AA scan via axe-core. Runs against the rendered DOM, so it
+    # requires Playwright — pages fetched statically are skipped (only
+    # relevant under ``--static-only``). ``axe_level`` is the WCAG level
+    # the rule set is filtered to: "A" (Level A only), "AA" (default — A+AA),
+    # or "AAA" (all). Best-practice rules are always included.
+    axe_enabled: bool = True
+    axe_level: str = "AA"
+    # Per-criterion semantic analyzers (Phase 9+). Each enabled SC runs
+    # one LLM call per page; the criteria list is the SCs to evaluate.
+    # Default is the Phase 9 wave-1 set (the 10 SCs picked for first
+    # build-out). At 10k pages x 10 SCs = ~100k local Ollama calls,
+    # roughly 3h on M-series with the 7B model. ``--skip-semantic``
+    # disables the whole pass; ``--semantic-criteria 2.4.4,1.3.1``
+    # narrows to a subset.
+    semantic_enabled: bool = True
+    semantic_criteria: tuple[str, ...] = (
+        "2.4.4",  # Link Purpose (In Context)
+        "2.4.9",  # Link Purpose (Link Only)
+        "2.4.6",  # Headings and Labels descriptiveness
+        "2.4.10", # Section Headings
+        "2.5.3",  # Label in Name
+        "3.3.2",  # Labels or Instructions
+        "1.3.5",  # Identify Input Purpose
+        "1.3.1",  # Info and Relationships
+        "4.1.2",  # Name, Role, Value (semantic)
+        "1.1.1",  # Non-text Content descriptiveness
+    )
+    semantic_concurrency: int = 1
+    # SC 2.1.2 keyboard-trap probe (Phase 9.5). Default ON: it's the only
+    # automated coverage for WCAG's lowest bar (Level A keyboard traps),
+    # the cost is bounded (≤ max_focusable*2+4 Tab presses, typically far
+    # fewer — the walk resets when focus wraps to body), and the page is
+    # already open in Playwright for axe. Disable with ``--skip-keyboard``
+    # when crawl speed matters more than 2.1.2 coverage.
+    keyboard_probe_enabled: bool = True
+    keyboard_probe_max_focusable: int = 50
+    # Responsive/zoom/text-spacing probe (Phase 10). Three dynamic checks
+    # on the live page: 320px reflow (SC 1.4.10), ~200% zoom text
+    # clipping (SC 1.4.4), and the WCAG text-spacing override
+    # (SC 1.4.12). The zoom-lock viewport-meta check is deliberately NOT
+    # here — axe's `meta-viewport` rule already covers it. ~1-2s per
+    # page; disable with ``--skip-responsive``.
+    responsive_checks_enabled: bool = True
 
 
 @dataclass
@@ -102,6 +156,14 @@ class CrawlSummary:
     ocr_text_candidates: int = 0
     vlm_classified: int = 0
     vlm_errors: int = 0
+    semantic_pages_analyzed: int = 0
+    semantic_findings_total: int = 0
+    axe_pages_scanned: int = 0
+    axe_violations_total: int = 0
+    keyboard_pages_probed: int = 0
+    keyboard_traps_total: int = 0
+    responsive_pages_probed: int = 0
+    responsive_findings_total: int = 0
     findings_written: int = 0
     findings_by_severity: dict[str, int] = field(
         default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -164,9 +226,62 @@ async def run_crawl(
             min_word_count=config.ocr_min_word_count,
         )
     vlm_config = await _build_vlm(config, client, vlm_provider)
+    # Build the axe analyzer once for the whole crawl. Reads the bundled
+    # axe.min.js off disk; reuses the same JS source across every page so
+    # we pay the 553 KB I/O cost once. A missing bundle is loud, not
+    # silent — the crawl fails fast rather than silently producing
+    # zero axe findings.
+    axe_analyzer: AxeAnalyzer | None = None
+    axe_level: AxeLevel = "AA"
+    if config.axe_enabled:
+        try:
+            axe_analyzer = AxeAnalyzer.from_bundled()
+            if config.axe_level in ("A", "AA", "AAA"):
+                axe_level = config.axe_level  # type: ignore[assignment]
+            else:
+                log.warning(
+                    "crawl.axe_level_invalid",
+                    requested=config.axe_level,
+                    used="AA",
+                )
+        except FileNotFoundError as exc:
+            log.warning("crawl.axe_disabled_missing_bundle", error=str(exc))
+            summary.notes.append("Axe scan disabled: bundle missing.")
+            axe_analyzer = None
+    # SC 2.1.2 keyboard probe — default on. Constructed once per crawl
+    # and reused across all pages; cheap to allocate, no state.
+    keyboard_probe: KeyboardProbe | None = None
+    if config.keyboard_probe_enabled:
+        keyboard_probe = KeyboardProbe(
+            max_focusable=config.keyboard_probe_max_focusable,
+        )
+    # Responsive/zoom/text-spacing probe (SC 1.4.4/1.4.10/1.4.12) —
+    # default on. Stateless like the keyboard probe.
+    responsive_probe: ResponsiveProbe | None = None
+    if config.responsive_checks_enabled:
+        responsive_probe = ResponsiveProbe()
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
-        js_holder = _LazyJs(user_agent=config.user_agent, injected=js_fetcher)
+        js_holder = _LazyJs(
+            user_agent=config.user_agent,
+            injected=js_fetcher,
+            axe_analyzer=axe_analyzer,
+            axe_level=axe_level,
+            keyboard_probe=keyboard_probe,
+            responsive_probe=responsive_probe,
+        )
+    # Phase 9+: build the semantic analyzer list once per crawl. The
+    # provider holds the shared Ollama semaphore so per-page analyzers
+    # don't multiply load on the daemon.
+    _semantic_provider, semantic_analyzers = await _build_semantic_analyzers(
+        config, client
+    )
+    if semantic_analyzers:
+        log.info(
+            "semantic.enabled",
+            count=len(semantic_analyzers),
+            criteria=[a.criterion_sc for a in semantic_analyzers],
+        )
     ctx = _WorkerContext(
         conn=conn,
         config=config,
@@ -181,6 +296,7 @@ async def run_crawl(
         vlm=vlm_config,
         in_flight=0,
         summary=summary,
+        semantic_analyzers=semantic_analyzers,
     )
 
     interrupted = False
@@ -268,7 +384,15 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
     return int(cur.lastrowid or 0)
 
 
-def _config_json(config: CrawlConfig) -> str:
+def config_json_for_scan(config: CrawlConfig) -> str:
+    """Serialize the scan-relevant config for the ``scans.config_json`` column.
+
+    Single source of truth — the web layer's ``_prepare_scan_row`` uses
+    this too, so both writers produce the same shape. The pipeline flags
+    matter beyond reproducibility: the UI's "methods used on this scan"
+    row derives from them, so an operator can tell a full audit from a
+    ``--static-only`` link inventory at a glance.
+    """
     return json.dumps(
         {
             "max_pages": config.max_pages,
@@ -278,9 +402,22 @@ def _config_json(config: CrawlConfig) -> str:
             "ignore_robots": config.ignore_robots,
             "concurrency_per_host": config.concurrency_per_host,
             "user_agent": config.user_agent,
+            # Pipeline switches — drives the "methods used" UI row.
+            "js_eager": config.js_eager,
+            "ocr_enabled": config.ocr_enabled,
+            "vlm_enabled": config.vlm_enabled,
+            "axe_enabled": config.axe_enabled,
+            "axe_level": config.axe_level,
+            "semantic_enabled": config.semantic_enabled,
+            "keyboard_probe_enabled": config.keyboard_probe_enabled,
+            "responsive_checks_enabled": config.responsive_checks_enabled,
         },
         sort_keys=True,
     )
+
+
+# Backwards-compatible private alias (existing call sites/tests).
+_config_json = config_json_for_scan
 
 
 def _purge_out_of_scope_jobs(
@@ -348,14 +485,28 @@ class _LazyJs:
         *,
         user_agent: str,
         injected: JsFetcher | None = None,
+        axe_analyzer: AxeAnalyzer | None = None,
+        axe_level: AxeLevel = "AA",
+        keyboard_probe: KeyboardProbe | None = None,
+        responsive_probe: ResponsiveProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
         self._owned = injected is None
+        self._axe_analyzer = axe_analyzer
+        self._axe_level: AxeLevel = axe_level
+        self._keyboard_probe = keyboard_probe
+        self._responsive_probe = responsive_probe
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
-            fetcher = JsFetcher(user_agent=self._user_agent)
+            fetcher = JsFetcher(
+                user_agent=self._user_agent,
+                axe_analyzer=self._axe_analyzer,
+                axe_level=self._axe_level,
+                keyboard_probe=self._keyboard_probe,
+                responsive_probe=self._responsive_probe,
+            )
             await fetcher.__aenter__()
             self._fetcher = fetcher
         return self._fetcher
@@ -381,6 +532,10 @@ class _WorkerContext:
     vlm: VlmConfig | None
     in_flight: int
     summary: CrawlSummary
+    # Phase 9+: list of per-criterion semantic analyzers to run per
+    # page. Empty when ``config.semantic_enabled`` is False, the
+    # provider can't reach Ollama, or no SC is registered.
+    semantic_analyzers: list[Any] = field(default_factory=list)
 
 
 async def _build_vlm(
@@ -409,6 +564,69 @@ async def _build_vlm(
         )
         return None
     return VlmConfig(provider=ollama)
+
+
+async def _build_semantic_analyzers(
+    config: CrawlConfig,
+    client: httpx.AsyncClient,
+) -> tuple[Any, list[Any]]:
+    """Build the per-criterion semantic analyzer list for this crawl.
+
+    Returns ``(provider, analyzers)``. ``provider`` is the shared
+    :class:`OllamaTextProvider` (or ``None`` if disabled / unhealthy);
+    ``analyzers`` is the registered analyzers for
+    ``config.semantic_criteria`` (or ``[]``).
+
+    The semantic pass is opt-out: if Ollama isn't reachable, or no
+    requested criterion has a registered analyzer yet, we log and
+    return an empty list. The crawl continues without semantic
+    findings — same graceful-skip semantics as the VLM and axe
+    pipelines.
+    """
+    if not config.semantic_enabled:
+        return None, []
+    if not config.semantic_criteria:
+        return None, []
+
+    # Imports inside the function so the orchestrator module doesn't
+    # depend on the semantic package at import time — the analyzer
+    # is a Phase 9+ addition; importing eagerly would couple existing
+    # crawl flow to a brand-new module.
+    # Default model: pick from the model registry's text-default. The
+    # per-criterion analyzer may override via its own pick when the
+    # registry assigns a specialty model (e.g. SC 2.5.3 → 14B).
+    from audit.analyzer.model_registry import get_pick
+    from audit.analyzer.semantic.ollama_text import OllamaTextProvider
+    from audit.analyzer.semantic.registry import build_analyzers
+
+    default_pick = get_pick(None, kind="text")
+    provider = OllamaTextProvider(
+        client,
+        model=default_pick.primary,
+        base_url=config.vlm_base_url,
+        concurrency=config.semantic_concurrency,
+    )
+    if not await provider.healthy():
+        log.warning(
+            "semantic.unavailable",
+            model=default_pick.primary,
+            base_url=config.vlm_base_url,
+            hint=(
+                "Ollama daemon not running or model not pulled; "
+                "continuing without semantic analyzers."
+            ),
+        )
+        return None, []
+
+    analyzers = build_analyzers(config.semantic_criteria, provider)
+    if not analyzers:
+        log.warning(
+            "semantic.no_registered_analyzers",
+            requested=list(config.semantic_criteria),
+            hint="None of the requested criteria are registered yet.",
+        )
+        return None, []
+    return provider, analyzers
 
 
 async def _worker(ctx: _WorkerContext) -> None:
@@ -496,6 +714,39 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx.summary.ocr_text_candidates += extraction.ocr_text_candidates
         ctx.summary.vlm_classified += extraction.vlm_classified
         ctx.summary.vlm_errors += extraction.vlm_errors
+        # Persist axe-core violations attached by JsFetcher. Static fetches
+        # never carry violations (axe needs a browser); we count an axe-page
+        # only when violations is a real attached tuple, even an empty one
+        # — that distinguishes "we scanned and found nothing" from "we
+        # never scanned this page." JsFetcher always returns a tuple after
+        # a successful axe run, so the proxy here is `render_mode == "js"`
+        # AND axe was on.
+        if render_mode == "js" and ctx.config.axe_enabled:
+            _persist_axe(ctx, page_id=page_id, violations=result.axe_violations)
+
+        # SC 2.1.2 keyboard-trap probe. Only runs when the page was
+        # JS-rendered (the probe needs a live page; static fetches
+        # have no FetchResult.keyboard_traps populated). On by default;
+        # ``--skip-keyboard`` disables. Persist via the dedicated
+        # keyboard helper so the row is tagged ``pipeline='keyboard'``.
+        if render_mode == "js" and ctx.config.keyboard_probe_enabled:
+            _persist_keyboard(ctx, page_id=page_id, traps=result.keyboard_traps)
+
+        # Responsive/zoom/text-spacing probe (SC 1.4.4/1.4.10/1.4.12).
+        # Same gating shape as the keyboard probe; rows are tagged
+        # ``pipeline='responsive'``.
+        if render_mode == "js" and ctx.config.responsive_checks_enabled:
+            _persist_responsive(
+                ctx, page_id=page_id, findings=result.responsive_findings
+            )
+
+        # Phase 9+: per-criterion semantic analyzers. Works on both
+        # static and JS-rendered fetches because the first wave is
+        # selectolax-based (the HTML body is enough). Later phases
+        # adding contrast / focus-visible analyzers will check
+        # ``render_mode == 'js'`` themselves before running.
+        if ctx.semantic_analyzers:
+            await _run_semantic(ctx, page_id=page_id, result=result)
 
     if not result.is_html or not result.is_ok:
         return
@@ -592,6 +843,180 @@ def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
     if result.is_html and result.is_ok and is_js_only(body):
         return True
     return is_challenge_response(result.status_code, body)
+
+
+def _persist_axe(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    violations: tuple[AxeViolation, ...],
+) -> None:
+    """Write the page's axe violations to the DB + bump the scan counters.
+
+    One DB statement per violation row keeps the code simple at the
+    expense of N writes per page. SQLite handles this trivially at our
+    scale (10k pages x ~10 violations = 100k inserts, all under one
+    transaction held open by the worker context).
+    """
+    for v in violations:
+        try:
+            repo.upsert_axe_violation(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                rule_id=v.rule_id,
+                wcag_sc=v.wcag_sc,
+                wcag_scs=v.wcag_scs,
+                wcag_level=v.wcag_level,
+                impact=v.impact,
+                help=v.help,
+                help_url=v.help_url,
+                target_selector=v.target_selector,
+                failure_summary=v.failure_summary,
+                html_snippet=v.html_snippet,
+                target_hash=v.target_hash,
+            )
+        except sqlite3.Error as exc:
+            # One bad row must not kill the rest of the page's findings.
+            log.warning(
+                "axe.persist_failed",
+                rule_id=v.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    repo.increment_scan_axe_counters(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        pages_delta=1,
+        violations_delta=len(violations),
+    )
+    ctx.summary.axe_pages_scanned += 1
+    ctx.summary.axe_violations_total += len(violations)
+
+
+def _persist_keyboard(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    traps: tuple[KeyboardTrap, ...],
+) -> None:
+    """Write keyboard-trap findings + bump the keyboard counters.
+
+    Mirrors :func:`_persist_axe`'s row-by-row insert pattern. Counts
+    every probed page (even ones that returned zero findings), because
+    the operator cares about coverage — "we probed 47 of 50 pages and
+    found 2 traps" is more useful than "we found 2 traps somewhere."
+    """
+    for t in traps:
+        try:
+            repo.upsert_keyboard_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                **t.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "keyboard.persist_failed",
+                rule_id=t.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    ctx.summary.keyboard_pages_probed += 1
+    ctx.summary.keyboard_traps_total += len(traps)
+
+
+def _persist_responsive(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[ResponsiveFinding, ...],
+) -> None:
+    """Write responsive-probe findings + bump the responsive counters.
+
+    Mirrors :func:`_persist_keyboard` — pages are counted even when the
+    probe found nothing, because the coverage signal ("we probed 47 of
+    50 pages") matters as much as the findings.
+    """
+    for f in findings:
+        try:
+            repo.upsert_responsive_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "responsive.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    ctx.summary.responsive_pages_probed += 1
+    ctx.summary.responsive_findings_total += len(findings)
+
+
+async def _run_semantic(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    result: FetchResult,
+) -> None:
+    """Run the registered semantic analyzers against this page + persist.
+
+    Mirrors :func:`_persist_axe`'s contract: every per-analyzer failure
+    is logged and dropped (the runner does the gather + log internally);
+    persistence errors don't take down siblings. Net effect of any
+    failure mode: zero or fewer findings, never a crashed crawl.
+    """
+    from audit.analyzer.semantic.base import AnalysisContext
+    from audit.analyzer.semantic.runner import analyze_page
+
+    semantic_ctx = AnalysisContext(
+        body=result.body,
+        page=None,  # The Playwright Page isn't currently surfaced
+        # out of JsFetcher; if a future analyzer needs it, JsFetcher
+        # can be extended to attach it to FetchResult the same way it
+        # already attaches axe_violations.
+        page_url=result.url,
+    )
+    findings = await analyze_page(semantic_ctx, ctx.semantic_analyzers)
+    _persist_semantic(ctx, page_id=page_id, findings=findings)
+
+
+def _persist_semantic(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: list[Any],
+) -> None:
+    """Upsert semantic findings into ``page_a11y_findings``.
+
+    Same row-by-row insert pattern as ``_persist_axe`` — SQLite at our
+    scale handles 100k inserts cleanly. A per-row sqlite3 error logs
+    + drops; the rest of the page's findings still land.
+    """
+    written = 0
+    for f in findings:
+        try:
+            repo.upsert_semantic_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                **f.to_repo_kwargs(),
+            )
+            written += 1
+        except sqlite3.Error as exc:
+            log.warning(
+                "semantic.persist_failed",
+                criterion=f.criterion_sc,
+                page_id=page_id,
+                error=str(exc),
+            )
+    if written > 0 or ctx.semantic_analyzers:
+        ctx.summary.semantic_pages_analyzed += 1
+        ctx.summary.semantic_findings_total += written
 
 
 def _previous_completed_scan(

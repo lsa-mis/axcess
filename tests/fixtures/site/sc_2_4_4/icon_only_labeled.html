@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Icon-only links — properly labeled</title></head>
+<body>
+  <nav>
+    <!-- Same shape as icon_only.html but with aria-label / alt set.
+         Both should be ACCEPTED by SC 2.4.4. -->
+    <a href="/search" aria-label="Search the catalog">
+      <svg width="20" height="20" aria-hidden="true"><path d="M0 0h20v20H0z"/></svg>
+    </a>
+    <a href="/cart" aria-label="Your shopping cart (3 items)">
+      <img src="cart.svg" alt="">
+    </a>
+  </nav>
+</body>
+</html>

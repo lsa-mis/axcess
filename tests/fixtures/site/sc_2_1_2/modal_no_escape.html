@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC 2.1.2 fixture — modal without Escape handler</title>
+</head>
+<body>
+  <main>
+    <h1>Modal does not respond to Escape</h1>
+    <p>The dialog below is open at page-load (so the probe finds it
+       without needing a click). Pressing Escape does nothing — the
+       canonical "modal trap" pattern.</p>
+
+    <a href="/before">Background link</a>
+
+    <div role="dialog" aria-modal="true" aria-labelledby="dlg-title"
+         style="border:2px solid #333; padding:1rem; max-width:32rem;">
+      <h2 id="dlg-title">Confirm action</h2>
+      <p>
+        This modal traps focus inside itself but provides no Escape
+        handler. A keyboard-only user has to mouse-click the close
+        button — which they may not be able to do.
+      </p>
+      <input type="text" placeholder="Comment">
+      <button type="button" id="dlg-ok">OK</button>
+      <button type="button" id="dlg-cancel">Cancel</button>
+    </div>
+
+    <a href="/after">Footer link (cannot be reached by keyboard from the dialog)</a>
+
+    <script>
+      // Intentionally NO Escape handler attached.
+      // The probe's modal-Esc check should detect that focus stays
+      // inside the dialog subtree after Escape is pressed.
+    </script>
+  </main>
+</body>
+</html>

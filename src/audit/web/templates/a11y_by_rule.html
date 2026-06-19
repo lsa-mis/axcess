@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% import "partials/_macros.html" as ui %}
+{% block title %}WCAG findings by rule — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <nav aria-label="Breadcrumb" class="subtle" style="margin-bottom:0.5rem;">
+    <a href="/scans/{{ scan.id }}">Scan #{{ scan.id }}</a>
+    &nbsp;›&nbsp;
+    <a href="/scans/{{ scan.id }}/a11y">WCAG findings</a>
+    &nbsp;›&nbsp;
+    <span aria-current="page">by rule</span>
+  </nav>
+
+  <header class="page-header-row">
+    <div>
+      <h2 style="margin:0;">WCAG findings — grouped by rule</h2>
+      <p class="subtle" style="margin:0.25rem 0 0 0;">{{ scan.seed_url }}</p>
+    </div>
+    <a href="/scans/{{ scan.id }}/a11y" class="btn">
+      Group by WCAG SC →
+    </a>
+  </header>
+
+  <aside role="note"
+         style="margin:1rem 0;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:4px;background:color-mix(in srgb, var(--accent) 4%, var(--bg));">
+    <strong>How this view groups findings.</strong>
+    Findings are grouped by their axe <code>rule_id</code> — the
+    <em>fixing</em> axis. A rule like <code>color-contrast</code>
+    failing 800 times is usually one CSS class on one template;
+    seeing one group of 800 instead of 800 rows tells you where one
+    fix has the biggest payoff. (The <a href="/scans/{{ scan.id }}/a11y">group-by-SC view</a>
+    is the reporting axis — useful when stakeholders ask "which WCAG
+    SCs are we failing?")
+  </aside>
+
+  <section aria-label="Coverage" class="coverage-grid">
+    <div class="stat-cell">
+      <span class="stat-cell__label">Rules with failures</span>
+      <strong class="stat-cell__value">{{ groups|length }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Total violations</span>
+      <strong class="stat-cell__value">{{ coverage.axe_violations_total }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Pages scanned</span>
+      <strong class="stat-cell__value">{{ coverage.axe_pages_scanned }}</strong>
+    </div>
+  </section>
+
+  <form method="get" action="/scans/{{ scan.id }}/a11y/by-rule" class="filters"
+        style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap;margin:0.75rem 0;">
+    <label>
+      Status
+      <select name="status" onchange="this.form.submit()" style="min-width:14rem;">
+        <option value="" {% if not status_filter %}selected{% endif %}>all statuses</option>
+        {% for opt in status_options %}
+          <option value="{{ opt }}" {% if status_filter == opt %}selected{% endif %}>
+            {{ opt }} ({{ status_counts.get(opt, 0) }})
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if status_filter %}
+    <a href="/scans/{{ scan.id }}/a11y/by-rule" class="subtle">clear</a>
+    {% endif %}
+  </form>
+
+  {% if not groups %}
+    <p>
+      No axe violations
+      {% if status_filter %} matching status <strong>{{ status_filter }}</strong>{% endif %}
+      for this scan.
+    </p>
+  {% else %}
+
+  {% for g in groups %}
+  <details class="issue-group" {% if loop.index <= 2 %}open{% endif %}>
+    <summary class="issue-group__summary">
+      <span class="issue-group__title">
+        {% if g.impact %}<span class="sev sev-{{ {'critical':'critical','serious':'major','moderate':'minor','minor':'info'}[g.impact] }}">{{ g.impact }}</span>{% endif %}
+        <code>{{ g.rule_id }}</code>
+        {% if g.wcag_sc %}<span class="subtle" style="font-weight:normal;font-size:0.9rem;">SC {{ g.wcag_sc }}{% if g.wcag_level %} · Level {{ g.wcag_level }}{% endif %}</span>{% endif %}
+      </span>
+      <span class="issue-group__counts subtle">
+        <strong>{{ g.violation_count }}</strong> violation{{ 's' if g.violation_count != 1 else '' }}
+        on <strong>{{ g.page_count }}</strong> page{{ 's' if g.page_count != 1 else '' }}
+      </span>
+    </summary>
+    <div class="issue-group__body">
+      {% if g.help %}
+      <div class="issue-group__hint">
+        <strong>What axe says:</strong> {{ g.help }}
+        {% if g.help_url %}
+        <div style="margin-top:0.25rem;font-size:0.85rem;">
+          <a href="{{ g.help_url }}" rel="noopener" target="_blank">axe rule docs ↗</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="issue-group__breakdowns">
+        <div>
+          <strong style="font-size:0.85rem;">Status:</strong>
+          {% for st, n in g.status_breakdown.items() if n %}
+            <span class="subtle" style="margin-left:0.25rem;">{{ st }} ({{ n }})</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <form method="post" action="/a11y-findings/bulk-status" class="bulk-action"
+            onsubmit="return window.confirm(
+                'Apply ' + this.elements['status'].value
+                + ' to all {{ g.violation_count }} violations of {{ g.rule_id }}?'
+                + ' This is reversible.');">
+        <input type="hidden" name="scan_id" value="{{ scan.id }}">
+        <input type="hidden" name="finding_ids"
+               value="{% for f in g.findings %}{{ f.id }}{% if not loop.last %},{% endif %}{% endfor %}">
+        <label>
+          <span class="bulk-action__label">Bulk status:</span>
+          <select name="status">
+            {% for opt in ('reviewing', 'in_progress', 'remediated', 'accepted_risk', 'false_positive', 'new') %}
+              <option value="{{ opt }}">{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="btn btn--primary">
+          Apply to all {{ g.violation_count }}
+        </button>
+      </form>
+
+      <table class="data" aria-label="{{ g.rule_id }} violations">
+        <thead>
+          <tr>
+            <th scope="col">Page</th>
+            <th scope="col">Target selector</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in g.findings %}
+          <tr>
+            <td>{{ ui.pagelink(page_id=f.page_id, page_url=f.page_url, page_title=f.page_title) }}</td>
+            <td>
+              <code style="font-size:0.8rem;">{{ f.target_selector|truncate(90) }}</code>
+              {% if f.html_snippet %}
+              <details style="margin-top:0.25rem;">
+                <summary class="subtle" style="font-size:0.8rem;cursor:pointer;">show HTML</summary>
+                <pre style="white-space:pre-wrap;font-size:0.78rem;margin:0.25rem 0;background:var(--surface);padding:0.4rem;border-radius:3px;">{{ f.html_snippet }}</pre>
+              </details>
+              {% endif %}
+              {% if f.failure_summary %}
+              <div class="subtle" style="font-size:0.78rem;margin-top:0.25rem;">{{ f.failure_summary }}</div>
+              {% endif %}
+            </td>
+            <td>{{ f.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endfor %}
+
+  {% endif %}
+{% endblock %}

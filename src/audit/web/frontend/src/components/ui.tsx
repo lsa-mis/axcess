@@ -97,7 +97,7 @@ export function PageHeader({
                   // SPA's ``/app/scans`` route. Same goes for any internal
                   // breadcrumb target — always Link, never <a>.
                   <Link
-                    className="text-fg-muted no-underline hover:underline"
+                    className="text-fg-muted underline underline-offset-2"
                     to={c.to}
                   >
                     {c.label}
@@ -154,11 +154,43 @@ export function EmptyState({
  * and a primary <Link>-styled-as-button look identical. Keeping this in
  * one place is the single source of truth for action affordances — if a
  * designer changes "primary" to a different blue, both elements update.
+ *
+ * **Sizing.** Three sizes, all of which clear the WCAG 2.2 SC 2.5.5
+ * (AAA, 44×44) floor. The `size` prop is therefore *visual emphasis*,
+ * not a way to drop below the floor:
+ *
+ * - `lg` — primary page-level CTA. Use when there is exactly one
+ *   "the thing the user came here to do" on a route ("Start crawl",
+ *   "Start a new scan", "Save"). Larger type, more padding, stands out
+ *   in the visual hierarchy.
+ * - `md` — every other action. The default. Buttons in cards, table
+ *   row actions, modal confirms, secondary affordances. Still 44×44.
+ * - `sm` — *only* dense table cells where a 44px button would crowd
+ *   the row layout. Pairs with `min-h-target` on the parent `<td>` so
+ *   the *click target* is still 44×44 even though the chip is shorter.
+ *   Use sparingly; if you reach for `sm`, double-check the layout
+ *   actually needs it.
+ *
+ * **Why a baseline of `md` = 44px.** The Phase 1 baseline scan flagged
+ * `py-1.5 text-sm` row buttons as ~30px tall — a SC 2.5.5 fail. The
+ * earlier Phase 2 fix only addressed the checkbox; this sweep finishes
+ * the job for the entire button surface.
  */
 type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Size = "sm" | "md" | "lg";
 
 const BUTTON_BASE =
-  "inline-flex items-center gap-1.5 rounded-xs px-3 py-1.5 text-sm font-semibold transition-colors no-underline disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-xs font-semibold transition-colors no-underline disabled:cursor-not-allowed disabled:opacity-60";
+
+const SIZE_CLASSES: Record<Size, string> = {
+  // `sm` is sub-44px on its own — callers must wrap in a min-h-target cell
+  // when used in tables. Documented above; not the default.
+  sm: "px-2.5 py-1 text-xs",
+  // `md` is the baseline — 44×44 hit target via min-h-target.
+  md: "min-h-target px-4 py-2.5 text-sm",
+  // `lg` is the primary-CTA size — 52px tall, larger type for visual weight.
+  lg: "min-h-[52px] px-6 py-3 text-base",
+};
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: "bg-umich-blue text-fg-inverse hover:bg-umich-blue-600",
@@ -171,15 +203,22 @@ const VARIANT_CLASSES: Record<Variant, string> = {
 /** Flat button variants. */
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
+  size?: Size;
 };
 export function Button({
   variant = "secondary",
+  size = "md",
   className,
   ...rest
 }: ButtonProps) {
   return (
     <button
-      className={cn(BUTTON_BASE, VARIANT_CLASSES[variant], className)}
+      className={cn(
+        BUTTON_BASE,
+        SIZE_CLASSES[size],
+        VARIANT_CLASSES[variant],
+        className,
+      )}
       {...rest}
     />
   );
@@ -198,17 +237,72 @@ export function Button({
  */
 type LinkButtonProps = ComponentPropsWithoutRef<typeof Link> & {
   variant?: Variant;
+  size?: Size;
 };
 export function LinkButton({
   variant = "secondary",
+  size = "md",
   className,
   ...rest
 }: LinkButtonProps) {
   return (
     <Link
-      className={cn(BUTTON_BASE, VARIANT_CLASSES[variant], className)}
+      className={cn(
+        BUTTON_BASE,
+        SIZE_CLASSES[size],
+        VARIANT_CLASSES[variant],
+        className,
+      )}
       {...rest}
     />
+  );
+}
+
+/**
+ * Button-styled <a> that escapes the React-Router basename trap.
+ *
+ * The SPA is mounted at ``basename="/app"``, which means
+ * ``<Link to="/api/scans/.../export/csv">`` rewrites to
+ * ``/app/api/scans/.../export/csv`` — a path React Router doesn't
+ * recognize, so the user sees a 404 page instead of the file. Even
+ * ``reloadDocument`` doesn't help because the URL prefix has already
+ * been applied by the time the browser navigates.
+ *
+ * For *server* paths that aren't part of the SPA's route tree
+ * (everything under ``/api/*`` and the legacy ``/scans/*`` Jinja
+ * routes), use this component, not :func:`LinkButton`. The plain
+ * ``<a>`` makes a real browser request to the absolute URL, which
+ * hits FastAPI's export route directly and triggers the download.
+ */
+type DownloadLinkProps = ComponentPropsWithoutRef<"a"> & {
+  variant?: Variant;
+  size?: Size;
+};
+export function DownloadLink({
+  variant = "secondary",
+  size = "md",
+  className,
+  download = true,
+  children,
+  ...rest
+}: DownloadLinkProps) {
+  return (
+    <a
+      className={cn(
+        BUTTON_BASE,
+        SIZE_CLASSES[size],
+        VARIANT_CLASSES[variant],
+        className,
+      )}
+      // `download` defaults to true because every current call site is
+      // an export endpoint that returns Content-Disposition:
+      // attachment. Pass ``download={false}`` if you need a styled link
+      // that opens the response in the tab instead of downloading.
+      {...(download ? { download: "" } : {})}
+      {...rest}
+    >
+      {children}
+    </a>
   );
 }
 
@@ -224,7 +318,7 @@ export function AltTag({ value }: { value: string | null }) {
   if (value === "") {
     return (
       <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 font-mono text-2xs text-fg-muted">
-        alt=""
+        alt=&quot;&quot;
       </span>
     );
   }
@@ -265,6 +359,142 @@ export function ScanStatusBadge({ value }: { value: ScanStatus }) {
     >
       {value}
     </span>
+  );
+}
+
+/**
+ * Accessible checkbox — promoted out of NewScan for reuse.
+ *
+ * **Why a custom component over a styled native input.**
+ * The audit baseline scan flagged the New-Scan form's native checkboxes
+ * as 13×13 px — failing WCAG 2.2 SC 2.5.8 (AA, 24×24) and the AAA
+ * SC 2.5.5 (44×44). This component keeps the *visual* control at 22 px
+ * (recognisable as a checkbox; respects platform conventions) but makes
+ * the *whole label row* a 44 px hit target by wrapping the input in a
+ * tall `<label>` with sufficient padding. Click-the-label semantics are
+ * native browser behavior, so screen-reader and keyboard users get the
+ * same affordance as pointer users.
+ *
+ * **Variants.**
+ * - `tone="warning"`: when checked, renders a soft amber surface to
+ *   reinforce that the option has a real consequence (used for
+ *   "Ignore robots.txt"). Color is reinforcement, never the only signal —
+ *   the label text and the optional `hint` carry the actual meaning.
+ *
+ * **Focus.** Uses the global `focus-visible:` outline (solid UMich Blue,
+ * 3 px). Don't add a per-component ring — single source of truth keeps
+ * focus consistent across every interactive element.
+ */
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  hint,
+  tone = "neutral",
+  id,
+  name,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: ReactNode;
+  tone?: "neutral" | "warning";
+  id?: string;
+  name?: string;
+}) {
+  const showWarning = tone === "warning" && checked;
+  return (
+    <label
+      className={cn(
+        // Full-row hit target: SC 2.5.5 AAA (44×44).
+        "group flex min-h-target cursor-pointer items-start gap-3 rounded-xs border border-transparent px-2 py-2 text-sm",
+        "hover:bg-surface-muted",
+        showWarning && "border-sev-major/60 bg-sev-major-bg/40",
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        id={id}
+        name={name}
+        // 22×22 visual control. Padding on the parent label provides the
+        // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
+        // surface for the unchecked state — SC 1.4.11.
+        className={cn(
+          "mt-0.5 h-[22px] w-[22px] shrink-0 cursor-pointer rounded-2xs",
+          "border-2 border-border-strong bg-surface",
+          "checked:border-umich-blue checked:bg-umich-blue",
+          "focus:outline-none",
+          // Focus ring is the global one; we just need to suppress the
+          // double-ring that Tailwind's default `focus:ring` would draw.
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-umich-blue focus-visible:ring-offset-2",
+        )}
+      />
+      <span className="flex flex-col gap-0.5 text-fg">
+        <span className="leading-snug">{label}</span>
+        {hint && (
+          <span className="text-xs leading-snug text-fg-muted">{hint}</span>
+        )}
+      </span>
+    </label>
+  );
+}
+
+/**
+ * PageLink — standardized rendering for "click to see the actual page
+ * that has the issue." Used everywhere a page URL surfaces.
+ *
+ * Visual contract (mirrors Siteimprove's pattern):
+ *   • Primary affordance: page title (or URL when title is missing) is
+ *     the link, opens the actual page in a new tab. Visible "↗" icon
+ *     plus an sr-only "opens in a new tab" announce makes the affordance
+ *     unambiguous to both sighted and screen-reader users.
+ *   • Secondary affordance: a smaller "view in audit" link goes to our
+ *     in-app /pages/{id} view where image thumbnails + filtered axe
+ *     findings live. Smaller treatment so the external link reads as
+ *     primary.
+ *
+ * Centralizing this is what makes the link-sweep durable — future
+ * routes that show a page URL use <PageLink> and inherit the contract.
+ */
+export function PageLink({
+  pageId,
+  pageUrl,
+  pageTitle,
+  showUrlBelow = true,
+}: {
+  pageId: number;
+  pageUrl: string;
+  pageTitle?: string | null;
+  /** Show the raw URL as a microcopy line below the title. */
+  showUrlBelow?: boolean;
+}) {
+  const display = pageTitle?.trim() || pageUrl;
+  return (
+    <div className="min-w-0">
+      <a
+        href={pageUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+      >
+        <span className="break-words">{display}</span>
+        <span aria-hidden className="text-2xs">↗</span>
+        <span className="sr-only">opens in a new tab</span>
+      </a>
+      {showUrlBelow && pageTitle && (
+        <div className="break-all text-2xs text-fg-subtle" title={pageUrl}>
+          {pageUrl}
+        </div>
+      )}
+      <Link
+        to={`/pages/${pageId}`}
+        className="mt-1 inline-block text-2xs text-fg-muted underline underline-offset-2 hover:text-fg"
+      >
+        view in audit →
+      </Link>
+    </div>
   );
 }
 

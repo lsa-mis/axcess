@@ -234,8 +234,9 @@ def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, obje
     resp = client.get(f"/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
     assert "text/markdown" in resp.headers["content-type"]
-    # Report retitled in the AccessibleAccessibility rebrand — the tool
-    # now covers more than the original 1.4.5 images-of-text criterion.
+    # Report title generalized from "WCAG 1.4.5 audit" — the document
+    # covers every pipeline now (axe, image-of-text, semantic, keyboard)
+    # and carries the AccessibleAccessibility brand.
     assert resp.text.startswith(f"# Accessibility audit — Scan #{scan_id}")
 
 
@@ -261,14 +262,10 @@ def test_export_routes_are_aliased_under_api(
         assert legacy.status_code == 200, fmt
         assert api_route.status_code == 200, fmt
         assert api_route.content == legacy.content, fmt
-        assert (
-            api_route.headers["content-type"]
-            == legacy.headers["content-type"]
-        ), fmt
-        assert (
-            api_route.headers["content-disposition"]
-            == legacy.headers["content-disposition"]
-        ), fmt
+        assert api_route.headers["content-type"] == legacy.headers["content-type"], fmt
+        assert api_route.headers["content-disposition"] == legacy.headers["content-disposition"], (
+            fmt
+        )
 
 
 def test_export_unknown_scan_returns_404(client: TestClient) -> None:
@@ -405,12 +402,12 @@ def test_stale_running_scans_interrupted_on_server_boot(tmp_path) -> None:  # ty
 
     # Fresh DB with schema — just the scans table is needed for the sweep.
     db_path = tmp_path / "sweep.db"
-    migrations_dir = (
-        _Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
-    )
+    migrations_dir = _Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
     prep = _connect(db_path)
     try:
         for p in sorted(migrations_dir.glob("*.sql")):
+            if p.name.endswith(".rollback.sql"):
+                continue
             prep.executescript(p.read_text())
         prep.execute(
             "INSERT INTO scans (seed_url, status, config_json) "
@@ -435,9 +432,7 @@ def test_stale_running_scans_interrupted_on_server_boot(tmp_path) -> None:  # ty
     check = _sqlite3.connect(str(db_path))
     check.row_factory = _sqlite3.Row
     try:
-        rows = check.execute(
-            "SELECT seed_url, status FROM scans ORDER BY id"
-        ).fetchall()
+        rows = check.execute("SELECT seed_url, status FROM scans ORDER BY id").fetchall()
     finally:
         check.close()
     states = {r["seed_url"]: r["status"] for r in rows}
@@ -460,9 +455,7 @@ def test_cancel_completed_scan_is_noop(
 # ------------------------------------------------------------- /api tests
 
 
-def test_api_list_scans(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_api_list_scans(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get("/api/scans")
     assert resp.status_code == 200
@@ -480,9 +473,7 @@ def test_api_list_scans(
     }
 
 
-def test_api_scan_detail(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/api/scans/{scan_id}")
     assert resp.status_code == 200
@@ -505,9 +496,7 @@ def test_api_scan_detail_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_api_list_findings(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_api_list_findings(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     _, _, scan_id = seeded_db
     resp = client.get(f"/api/scans/{scan_id}/findings?page_size=10")
     assert resp.status_code == 200
@@ -519,9 +508,7 @@ def test_api_list_findings(
     assert len(hashes) >= 1
 
 
-def test_api_finding_detail(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_api_finding_detail(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     resp = client.get("/api/findings/1")
     assert resp.status_code == 200
     body = resp.json()
@@ -555,9 +542,7 @@ def test_api_scope_preview_auto_slash(client: TestClient) -> None:
 
 
 def test_api_scope_preview_whole_host(client: TestClient) -> None:
-    body = client.get(
-        "/api/scope-preview?url=https://example.com/a&whole_host=1"
-    ).json()
+    body = client.get("/api/scope-preview?url=https://example.com/a&whole_host=1").json()
     assert body["whole_host"] is True
     assert body["path_prefix"] == "/"
 
@@ -612,9 +597,7 @@ def test_api_create_scan_kicks_off_crawl(
     assert called.get("ran") is True
 
 
-def test_api_cancel_endpoint(
-    client: TestClient, seeded_db: tuple[object, object, int]
-) -> None:
+def test_api_cancel_endpoint(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
     import sqlite3 as _sqlite3
 
     db_path, _, _ = seeded_db
@@ -683,16 +666,13 @@ def test_api_running_scan_includes_in_flight_and_recent(
             "INSERT INTO jobs (kind, payload_json, state, lease_until) "
             "VALUES ('crawl', ?, 'leased', ?)",
             (
-                _json.dumps(
-                    {"url": "http://x/in-flight", "depth": 2, "scan_id": running_id}
-                ),
+                _json.dumps({"url": "http://x/in-flight", "depth": 2, "scan_id": running_id}),
                 "2026-04-27T16:48:53+00:00",
             ),
         )
         # And a pending one to verify the count.
         conn.execute(
-            "INSERT INTO jobs (kind, payload_json, state) "
-            "VALUES ('crawl', ?, 'pending')",
+            "INSERT INTO jobs (kind, payload_json, state) VALUES ('crawl', ?, 'pending')",
             (_json.dumps({"url": "http://x/queued", "depth": 1, "scan_id": running_id}),),
         )
         conn.commit()
@@ -762,11 +742,20 @@ def test_scan_detail_no_warning_when_seed_is_2xx(
     assert "returned HTTP" not in resp.text
 
 
-def test_new_scan_form_has_js_eager_checkbox(client: TestClient) -> None:
+def test_new_scan_form_has_static_only_checkbox(client: TestClient) -> None:
+    """Render-every-page is the default; static-only is the opt-OUT.
+
+    The old `js_eager` opt-IN checkbox inverted into `static_only` when
+    the audit-mode default flipped — HTML checkboxes can't post
+    "unchecked", so the field name follows the non-default state.
+    """
     resp = client.get("/scans/new")
     assert resp.status_code == 200
-    assert 'name="js_eager"' in resp.text
-    assert "Use real browser" in resp.text
+    assert 'name="static_only"' in resp.text
+    assert "Fast crawl" in resp.text
+    # The probes' skip toggles also surface on the form.
+    assert 'name="skip_keyboard"' in resp.text
+    assert 'name="skip_responsive"' in resp.text
 
 
 def test_new_scan_form_has_whole_host_checkbox(client: TestClient) -> None:
@@ -1021,9 +1010,7 @@ def test_api_delete_scan_removes_scan_and_cascades(
     post = _sqlite3.connect(str(db_path))
     post.row_factory = _sqlite3.Row
     try:
-        scan_row = post.execute(
-            "SELECT id FROM scans WHERE id = ?", (scan_id,)
-        ).fetchone()
+        scan_row = post.execute("SELECT id FROM scans WHERE id = ?", (scan_id,)).fetchone()
         page_n_after = post.execute(
             "SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)
         ).fetchone()["n"]
@@ -1071,13 +1058,11 @@ def test_api_delete_scan_clears_jobs_for_that_scan(
     try:
         # Seed two jobs for this scan in different states; both should go.
         conn.execute(
-            "INSERT INTO jobs (kind, payload_json, state) VALUES "
-            "('fetch', ?, 'pending')",
+            "INSERT INTO jobs (kind, payload_json, state) VALUES ('fetch', ?, 'pending')",
             (f'{{"url":"http://x/a","scan_id":{scan_id},"depth":0}}',),
         )
         conn.execute(
-            "INSERT INTO jobs (kind, payload_json, state) VALUES "
-            "('fetch', ?, 'failed')",
+            "INSERT INTO jobs (kind, payload_json, state) VALUES ('fetch', ?, 'failed')",
             (f'{{"url":"http://x/b","scan_id":{scan_id},"depth":0}}',),
         )
         # And one job for a *different* scan that must NOT be touched.
@@ -1085,12 +1070,9 @@ def test_api_delete_scan_clears_jobs_for_that_scan(
             "INSERT INTO scans (seed_url, status, page_count, finding_count, "
             "config_json) VALUES ('http://other.example/', 'completed', 0, 0, '{}')"
         )
-        other_scan = int(
-            conn.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
-        )
+        other_scan = int(conn.execute("SELECT last_insert_rowid() AS i").fetchone()["i"])
         conn.execute(
-            "INSERT INTO jobs (kind, payload_json, state) VALUES "
-            "('fetch', ?, 'pending')",
+            "INSERT INTO jobs (kind, payload_json, state) VALUES ('fetch', ?, 'pending')",
             (f'{{"url":"http://x/c","scan_id":{other_scan},"depth":0}}',),
         )
         conn.commit()
@@ -1104,13 +1086,11 @@ def test_api_delete_scan_clears_jobs_for_that_scan(
     check.row_factory = _sqlite3.Row
     try:
         for_deleted = check.execute(
-            "SELECT COUNT(*) AS n FROM jobs WHERE "
-            "json_extract(payload_json, '$.scan_id') = ?",
+            "SELECT COUNT(*) AS n FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ?",
             (scan_id,),
         ).fetchone()["n"]
         for_other = check.execute(
-            "SELECT COUNT(*) AS n FROM jobs WHERE "
-            "json_extract(payload_json, '$.scan_id') = ?",
+            "SELECT COUNT(*) AS n FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ?",
             (other_scan,),
         ).fetchone()["n"]
     finally:
@@ -1193,10 +1173,82 @@ def test_api_delete_scan_409s_when_scan_is_running(
     # And the scan row is still there.
     check = _sqlite3.connect(str(db_path))
     try:
-        row = check.execute(
-            "SELECT status FROM scans WHERE id = ?", (running_id,)
-        ).fetchone()
+        row = check.execute("SELECT status FROM scans WHERE id = ?", (running_id,)).fetchone()
     finally:
         check.close()
     assert row is not None
     assert row[0] == "running"
+
+
+# --------------------------------------------------------------------
+# Hosting: the optional shared-token gate (docs/hosting.md, Path A).
+# --------------------------------------------------------------------
+
+
+def test_access_token_unset_is_no_op(
+    seeded_db: tuple[object, object, int],
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    """With no AUDIT_ACCESS_TOKEN, every route is open (the local default)."""
+    from pathlib import Path
+
+    from audit.web.server import create_app
+
+    monkeypatch.delenv("AUDIT_ACCESS_TOKEN", raising=False)
+    db_path, blob_dir, _ = seeded_db
+    app = create_app(db_path=Path(db_path), blob_dir=Path(blob_dir))
+    c = TestClient(app)
+    assert c.get("/scans").status_code == 200
+    assert c.get("/health").status_code == 200
+
+
+def test_access_token_gate_blocks_and_admits(
+    seeded_db: tuple[object, object, int],
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    """When the token is set: 401 without it, 200 with it, /health always open."""
+    from pathlib import Path
+
+    from audit.web.server import create_app
+
+    monkeypatch.setenv("AUDIT_ACCESS_TOKEN", "s3cret-token")
+    db_path, blob_dir, _ = seeded_db
+    app = create_app(db_path=Path(db_path), blob_dir=Path(blob_dir))
+    # Don't auto-follow redirects: a 401 must not be masked by one.
+    c = TestClient(app)
+
+    # No token → 401.
+    assert c.get("/scans").status_code == 401
+
+    # Health stays open (uptime checks don't carry the token).
+    assert c.get("/health").status_code == 200
+
+    # Query-string token → 200, and a cookie is set for next time.
+    ok = c.get("/scans?token=s3cret-token")
+    assert ok.status_code == 200
+    assert "aa_access" in ok.cookies
+
+    # Header forms also work (API/CLI clients).
+    fresh = TestClient(app)
+    assert fresh.get("/scans", headers={"X-Access-Token": "s3cret-token"}).status_code == 200
+    fresh2 = TestClient(app)
+    assert fresh2.get("/scans", headers={"Authorization": "Bearer s3cret-token"}).status_code == 200
+
+    # Wrong token → 401.
+    bad = TestClient(app)
+    assert bad.get("/scans?token=nope").status_code == 401
+
+
+def test_tracking_page_renders(client: TestClient) -> None:
+    """The /tracking coverage page renders shipped + roadmap tables."""
+    resp = client.get("/tracking")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    # Shipped pipelines table: the axe row and a pipeline discriminator.
+    assert "axe-core" in resp.text
+    assert "Coverage" in resp.text and "tracker" in resp.text
+    # Roadmap table: a planned criterion + a status badge.
+    assert "Meaningful Sequence" in resp.text
+    assert "status-badge--planned" in resp.text
+    # The two shipped semantic/VLM SCs must read "shipped", not "planned".
+    assert "status-badge--shipped" in resp.text

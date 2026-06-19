@@ -28,7 +28,12 @@ _MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "mi
 
 
 def _apply_migrations(conn: sqlite3.Connection) -> None:
+    # Skip *.rollback.sql — those are yoyo-rollback scripts and must not
+    # run as part of forward setup. See the root conftest for the longer
+    # explanation; same issue, same fix.
     for path in sorted(_MIGRATIONS.glob("*.sql")):
+        if path.name.endswith(".rollback.sql"):
+            continue
         conn.executescript(path.read_text())
 
 

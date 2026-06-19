@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Plus, Radar } from "lucide-react";
+import { LayoutDashboard, ListChecks, Plus, Radar } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { LinkButton } from "./ui";
@@ -115,7 +115,7 @@ function Sidebar() {
         </span>
       </div>
       <nav className="flex-1 px-2 py-3">
-        <ul className="space-y-0.5">
+        <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = item.isActive(pathname);
@@ -124,22 +124,40 @@ function Sidebar() {
                 <Link
                   to={item.to}
                   aria-current={active ? "page" : undefined}
+                  // min-h-target keeps every nav row at 44px for SC 2.5.5,
+                  // and the slightly larger icon (h-5) plus base text reads
+                  // as a primary surface, not a sub-list of links.
                   className={cn(
-                    "group flex items-center gap-2.5 rounded-xs px-3 py-2 text-sm font-medium no-underline transition-colors",
+                    "group flex min-h-target items-center gap-3 rounded-xs px-3 py-2.5 text-sm font-medium no-underline transition-colors",
                     active
                       ? "bg-umich-maize text-umich-blue"
                       : "text-white/85 hover:bg-white/10 hover:text-white",
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <Icon className="h-5 w-5 shrink-0" aria-hidden />
                   <span>{item.label}</span>
                 </Link>
               </li>
             );
           })}
+          {/* Tracking is a server-rendered page (outside the SPA's /app
+              basename), so it's a plain anchor — a full navigation, not a
+              client-side Link. Same row styling for visual continuity. */}
+          <li>
+            <a
+              href="/tracking"
+              className="group flex min-h-target items-center gap-3 rounded-xs px-3 py-2.5 text-sm font-medium text-white/85 no-underline transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ListChecks className="h-5 w-5 shrink-0" aria-hidden />
+              <span>Tracking</span>
+            </a>
+          </li>
         </ul>
       </nav>
-      <div className="border-t border-white/10 px-4 py-3 text-2xs text-white/60">
+      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0) — at
+          10:1 against UMich Blue it clears AAA. Plain `text-white/60`
+          rendered as ~#99A9B7, which axe flagged at 6.24:1 (fails AAA). */}
+      <div className="border-t border-white/10 px-4 py-3 text-2xs text-surface-inverse-fg-subtle">
         <p>Local · offline · accessibility review</p>
       </div>
     </aside>
@@ -162,22 +180,24 @@ function TopBar() {
           AccessibleAccessibility
         </span>
       </div>
-
-      {/* The ONE global scan CTA. Always visible, every breakpoint —
-          icon-only below sm to stay sleek on small screens. On the
-          new-scan form itself it renders inert (ghost + aria-disabled):
-          a self-link would be noise, but vanishing entirely would make
-          users wonder where the button went. */}
+      {/* The ONE global scan CTA — every other "New scan" button was
+          consolidated into this. `size="lg"` because it's the app-level
+          primary action (the AAA size system reserves lg for exactly
+          that). Visible at every breakpoint — icon-only below sm to
+          stay sleek. On the new-scan form itself it renders inert
+          (ghost + aria-disabled): a self-link would be noise, but
+          vanishing entirely would make users wonder where it went. */}
       <LinkButton
         to="/scans/new"
         variant={onNewScanForm ? "ghost" : "primary"}
+        size="lg"
         className={cn("ml-auto", onNewScanForm && "pointer-events-none opacity-50")}
         aria-disabled={onNewScanForm || undefined}
         tabIndex={onNewScanForm ? -1 : undefined}
         aria-label="New scan"
         title="New scan"
       >
-        <Plus className="h-4 w-4" aria-hidden />
+        <Plus className="h-5 w-5" aria-hidden />
         <span className="hidden sm:inline">New scan</span>
       </LinkButton>
     </header>

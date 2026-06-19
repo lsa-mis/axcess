@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zoom clipping fixture (SC 1.4.4)</title>
+  <style>
+    /* Deliberate zoom-clipping failure that fires ONLY at the 640px
+       zoom-proxy viewport:
+
+       The nowrap line below renders ~420px wide at 16px sans-serif.
+       Its container is 55vw with overflow hidden:
+         - at 1440px viewport → box ≈ 792px → text fits → quiet
+           (so the text-spacing check, which runs at 1440, stays quiet
+           too: spacing pushes it to ~500px, still under 792)
+         - at  640px viewport → box ≈ 352px → text clips horizontally
+       No text-overflow: ellipsis, so the probe doesn't skip it as
+       designed truncation. The page itself is fluid, so the reflow
+       check at 320px finds no document-level horizontal scrolling
+       (the clipped box hides its own overflow). */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    #vw-box {
+      width: 55vw;
+      white-space: nowrap;
+      overflow: hidden;
+      font-size: 16px;
+      background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Zoom-sensitive layout</h1>
+    <p id="vw-box">This single nowrap line is about four hundred pixels wide in total.</p>
+    <p style="max-width: 60ch;">
+      Everything else on the page wraps normally and stays fluid at
+      every viewport width.
+    </p>
+  </main>
+</body>
+</html>

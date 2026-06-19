@@ -2,10 +2,11 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Layers, Search } from "lucide-react";
 import { api, blobUrl } from "../api/client";
 import {
   AltTag,
+  Button,
   Card,
   EmptyState,
   LinkButton,
@@ -84,10 +85,24 @@ export default function FindingsRoute() {
             : "Loading…"
         }
         actions={
-          <LinkButton to={`/scans/${id}`} variant="secondary">
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to Scan #{id}
-          </LinkButton>
+          <>
+            {/* Promote the grouped view as the *primary* action from
+                this flat-table page — most of the time the user wants
+                to act on issue *kinds*, not on individual rows. The
+                flat table stays the dwell page for one-off lookups
+                and bulk power-user work. */}
+            <LinkButton
+              to={`/scans/${id}/findings/grouped`}
+              variant="primary"
+            >
+              <Layers className="h-4 w-4" aria-hidden />
+              Group by issue
+            </LinkButton>
+            <LinkButton to={`/scans/${id}`} variant="secondary">
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Back to Scan #{id}
+            </LinkButton>
+          </>
         }
       />
 
@@ -115,15 +130,18 @@ export default function FindingsRoute() {
             Search
             <div className="relative mt-1">
               <Search
-                className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-subtle"
+                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
                 aria-hidden
               />
+              {/* min-h-target so the search input clears the 44×44
+                  SC 2.5.5 floor. text-base also lifts the body to 16px,
+                  which iOS won't auto-zoom on focus. */}
               <input
                 type="search"
                 value={filter.q ?? ""}
                 onChange={(e) => setParam("q", e.target.value)}
                 placeholder="URL, alt, OCR…"
-                className="w-full rounded-xs border border-border bg-surface py-1.5 pl-7 pr-2 text-sm font-normal normal-case tracking-normal text-fg placeholder:text-fg-subtle focus:border-umich-blue focus:outline-none"
+                className="min-h-target w-full rounded-xs border border-border bg-surface py-2 pl-8 pr-2 text-base font-normal normal-case tracking-normal text-fg placeholder:text-fg-subtle focus:border-umich-blue focus:outline-none"
               />
             </div>
           </label>
@@ -146,9 +164,16 @@ export default function FindingsRoute() {
       )}
 
       {data && data.total_pages > 1 && (
-        <nav className="mt-4 flex items-center gap-2 text-sm" aria-label="Pagination">
-          <button
-            className="rounded-xs border border-border bg-surface px-3 py-1 font-semibold disabled:opacity-40"
+        <nav
+          className="mt-4 flex flex-wrap items-center gap-3 text-sm"
+          aria-label="Pagination"
+        >
+          {/* Pagination arrows are interactive — they need to clear the
+              44×44 SC 2.5.5 floor like every other control. Using the
+              shared <Button> at default `md` size pulls them up to
+              44px tall and inherits the AAA focus ring. */}
+          <Button
+            variant="secondary"
             disabled={filter.page <= 1}
             onClick={() => {
               const next = new URLSearchParams(params);
@@ -156,13 +181,14 @@ export default function FindingsRoute() {
               setParams(next);
             }}
           >
-            ← Prev
-          </button>
-          <span aria-current="page">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+            Prev
+          </Button>
+          <span aria-current="page" className="font-semibold text-fg">
             Page {filter.page} of {data.total_pages}
           </span>
-          <button
-            className="rounded-xs border border-border bg-surface px-3 py-1 font-semibold disabled:opacity-40"
+          <Button
+            variant="secondary"
             disabled={filter.page >= data.total_pages}
             onClick={() => {
               const next = new URLSearchParams(params);
@@ -170,8 +196,9 @@ export default function FindingsRoute() {
               setParams(next);
             }}
           >
-            Next →
-          </button>
+            Next
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
         </nav>
       )}
     </>
@@ -192,10 +219,16 @@ function FilterSelect({
   return (
     <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
       {label}
+      {/* min-h-target + text-base so each filter clears the 44×44
+          SC 2.5.5 floor and the option list is comfortable to read.
+          The label uppercase/tracking class is text-only — the
+          `font-normal normal-case tracking-normal` resets it on the
+          interactive control so the value renders as natural sentence
+          case, not THE LIKE. */}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 rounded-xs border border-border bg-surface px-2 py-1.5 text-sm font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
+        className="mt-1 min-h-target rounded-xs border border-border bg-surface px-2 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
       >
         <option value="">any</option>
         {options.map((o) => (
@@ -320,13 +353,23 @@ function FindingsTable({
                   </div>
                   <div role="cell" className="min-w-0">
                     {f.sample_page ? (
-                      <Link
-                        to={`/findings/${f.id}`}
-                        className="block truncate text-xs text-umich-blue no-underline hover:underline"
+                      // Page URL is now a real external link (target=_blank)
+                      // so a click here opens the actual page that has the
+                      // issue. Previously this rendered the URL as the
+                      // link text but pointed at /findings/{id}, which was
+                      // misleading. The severity chip on the same row
+                      // still links to the finding detail.
+                      <a
+                        href={f.sample_page}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-xs text-umich-blue underline underline-offset-2"
                         title={f.sample_page}
                       >
-                        {f.sample_page}
-                      </Link>
+                        {f.sample_page}{" "}
+                        <span aria-hidden>↗</span>
+                        <span className="sr-only">opens in a new tab</span>
+                      </a>
                     ) : (
                       <span className="text-xs text-fg-subtle">—</span>
                     )}

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Deliberately broken</title></head>
+<body>
+  <img src="logo.png">
+  <p style="color: #ccc; background: #fff;">Low contrast text — fails SC 1.4.3.</p>
+  <form>
+    <input type="text">
+    <button>Submit</button>
+  </form>
+  <a href="#"></a>
+  <div onclick="alert('hi')" style="cursor:pointer;">Fake button (not keyboard-accessible)</div>
+</body>
+</html>

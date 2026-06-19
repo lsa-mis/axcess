@@ -23,8 +23,11 @@
       </div>
       <form method="post" action="/scans/{{ scan.id }}/cancel"
             onsubmit="return confirm('Stop this crawl? Any pending pages will be dropped.');">
-        <button type="submit"
-                style="background:var(--severity-critical-bg);color:#fff;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-weight:600;">
+        {# Stop is destructive *and* the user needs to find it from across
+           the room — `.btn--lg` mirrors the SPA's <Button variant="danger"
+           size="lg">. The confirm() above provides Tolerance for Error
+           (UD #5). #}
+        <button type="submit" class="btn btn--danger btn--lg">
           Stop crawl
         </button>
       </form>
@@ -58,7 +61,10 @@
             {% endif %}
           </span>
           <span style="display:inline-block;min-width:3em;font-size:0.75rem;padding:0.05rem 0.35rem;border-radius:3px;background:var(--border);">{{ p.render_mode }}</span>
-          {{ p.url_normalized|truncate(80) }}
+          {# Live in-flight URL — clickable so the operator can spot-check
+             a page that just finished fetching. External target so it
+             doesn't navigate out of the audit UI mid-crawl. #}
+          <a href="{{ p.url_normalized }}" target="_blank" rel="noopener noreferrer">{{ p.url_normalized|truncate(80) }} <span aria-hidden="true">↗</span><span class="visually-hidden">opens in a new tab</span></a>
         </li>
         {% endfor %}
       </ul>
@@ -95,6 +101,21 @@
     </dd>
   </dl>
 
+  {# Coverage truth — which detection methods this scan actually ran.
+     A static-only or partial run should be visible at a glance, not
+     discovered after someone trusts an incomplete report. #}
+  {% if methods_used %}
+  <p aria-label="Detection methods used on this scan" style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;margin:0.5rem 0 1rem 0;">
+    <span class="subtle" style="font-weight:600;">Methods:</span>
+    {% for m in methods_used %}
+      <span class="ability-tag" {% if not m.enabled %}style="opacity:0.55;text-decoration:line-through;"{% endif %}
+            title="{{ m.label }} {{ 'ran on this scan' if m.enabled else 'was skipped on this scan' }}">
+        {{ m.label }}{% if not m.enabled %} <span class="visually-hidden">(skipped)</span>{% endif %}
+      </span>
+    {% endfor %}
+  </p>
+  {% endif %}
+
   {% if by_severity %}
   <h3>Findings by severity</h3>
   <table class="data" aria-label="Severity breakdown">
@@ -116,14 +137,19 @@
   </table>
   {% endif %}
 
-  <p>
-    {# Label matches the SPA's "Findings (N)" so both UIs cue the same
-       destination the same way. #}
-    <a href="/scans/{{ scan.id }}/findings">Findings ({{ scan.finding_count }}) →</a>
+  {# Primary CTA: the unified Issues view. Pipeline-specific links
+     remain reachable beside it for operators who already know which
+     slice they want — counts on the labels so both UIs cue the same
+     destinations the same way as the SPA. #}
+  <p style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+    <a href="/scans/{{ scan.id }}/issues" class="btn btn--primary btn--lg">
+      → Issues
+    </a>
+    <a href="/scans/{{ scan.id }}/findings" class="btn">Image-of-text findings ({{ scan.finding_count }})</a>
+    <a href="/scans/{{ scan.id }}/a11y" class="btn">WCAG axe findings</a>
     {% if previous_scan_id %}
-      &nbsp;·&nbsp;
-      <a href="/scans/{{ scan.id }}/diff?compare_to={{ previous_scan_id }}">
-        Diff vs scan #{{ previous_scan_id }} →
+      <a href="/scans/{{ scan.id }}/diff?compare_to={{ previous_scan_id }}" class="btn">
+        Diff vs scan #{{ previous_scan_id }}
       </a>
     {% endif %}
   </p>
@@ -141,10 +167,14 @@
   {% else %}
   <nav aria-label="Export this scan">
     <ul>
+      {# Audit report first — it's the deliverable-shaped output (cards,
+         fix steps, owner type, effort, verification plan). The others
+         are data dumps for downstream tools. #}
+      <li><a href="/scans/{{ scan.id }}/export/audit" download><strong>Audit report</strong> (cards, fixes, verify steps)</a></li>
       <li><a href="/scans/{{ scan.id }}/export/csv" download>CSV (one row per occurrence)</a></li>
       <li><a href="/scans/{{ scan.id }}/export/json" download>JSON (nested per finding)</a></li>
       <li><a href="/scans/{{ scan.id }}/export/jira" download>Jira CSV (import template)</a></li>
-      <li><a href="/scans/{{ scan.id }}/export/markdown" download>Markdown report</a></li>
+      <li><a href="/scans/{{ scan.id }}/export/markdown" download>Markdown report (data-dense)</a></li>
     </ul>
   </nav>
   {% endif %}

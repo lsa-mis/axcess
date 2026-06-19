@@ -16,6 +16,7 @@
     <nav aria-label="Primary">
       <ul>
         <li><a href="/scans" {% if active == 'scans' %}aria-current="page"{% endif %}>Scans</a></li>
+        <li><a href="/tracking" {% if active == 'tracking' %}aria-current="page"{% endif %}>Tracking</a></li>
         {% if scan %}
         <li><a href="/scans/{{ scan.id }}" {% if active == 'scan' %}aria-current="page"{% endif %}>Scan #{{ scan.id }}</a></li>
         <li><a href="/scans/{{ scan.id }}/findings" {% if active == 'findings' %}aria-current="page"{% endif %}>Findings</a></li>

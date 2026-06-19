@@ -15,7 +15,7 @@ from __future__ import annotations
 import csv
 import io
 
-from audit.exports.collector import ExportFinding, ExportScan
+from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 
 JIRA_COLUMNS = (
     "Summary",
@@ -35,16 +35,41 @@ _SEVERITY_TO_PRIORITY = {
     "info": "Lowest",
 }
 
+# Axe's impact scale to the same Jira priority axis. The mapping is
+# the same shape as the SPA's impact-to-severity chip mapping, so a
+# triager who sees `serious` in the UI sees `High` in Jira — no
+# off-by-one surprise.
+_IMPACT_TO_PRIORITY = {
+    "critical": "Highest",
+    "serious": "High",
+    "moderate": "Medium",
+    "minor": "Low",
+}
+
 _ISSUE_TYPE = "Bug"
 _COMPONENT = "Accessibility"
 
+# Statuses that mean "we're not opening a ticket for this." Jira import
+# would silently create issues for accepted_risk / false_positive rows
+# otherwise — Sam would have to delete them manually. Filter out here.
+_TRIAGE_SKIP = frozenset({"remediated", "accepted_risk", "false_positive"})
+
 
 def render_jira_csv(scan: ExportScan) -> str:
-    """One Jira issue per finding. Multi-page findings list every page."""
+    """One Jira issue per finding. Multi-page findings list every page.
+
+    Axe findings join image findings in the same CSV — each row carries
+    the same column shape, just different ``Labels`` and ``Description``
+    content. Findings already triaged as remediated / accepted_risk /
+    false_positive are skipped so re-running an export against a
+    partially-triaged scan doesn't re-open old tickets.
+    """
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(JIRA_COLUMNS)
     for finding in scan.findings:
+        if finding.status in _TRIAGE_SKIP:
+            continue
         writer.writerow(
             [
                 _summary(finding),
@@ -55,7 +80,72 @@ def render_jira_csv(scan: ExportScan) -> str:
                 _COMPONENT,
             ]
         )
+    for af in scan.a11y_findings:
+        if af.status in _TRIAGE_SKIP:
+            continue
+        writer.writerow(
+            [
+                _axe_summary(af),
+                _axe_description(af),
+                _IMPACT_TO_PRIORITY.get(af.impact or "", "Low"),
+                _ISSUE_TYPE,
+                " ".join(_axe_labels(af)),
+                _COMPONENT,
+            ]
+        )
     return buf.getvalue()
+
+
+def _axe_summary(af: ExportA11yFinding) -> str:
+    sc = f" — SC {af.wcag_sc}" if af.wcag_sc else " — best-practice"
+    return f"WCAG {af.rule_id}{sc}: {af.page_url}"
+
+
+def _axe_description(af: ExportA11yFinding) -> str:
+    lines: list[str] = []
+    lines.append(f"**Rule:** {af.rule_id}")
+    if af.impact:
+        lines.append(f"**Impact:** {af.impact}")
+    if af.wcag_sc:
+        lines.append(
+            f"**WCAG SC:** {af.wcag_sc}"
+            + (f" (Level {af.wcag_level})" if af.wcag_level else "")
+        )
+    else:
+        lines.append("**WCAG SC:** _best-practice — no SC mapping_")
+    if af.help:
+        lines.append(f"**Description:** {af.help}")
+    lines.append(f"**Page:** {af.page_url}")
+    lines.append(f"**Target selector:** `{af.target_selector}`")
+    if af.failure_summary:
+        lines.append(f"**Why it failed:** {af.failure_summary}")
+    if af.html_snippet:
+        # Triple-backtick fence so Jira's wiki renderer treats it as
+        # a code block instead of trying to parse the HTML.
+        lines.append("**Failing HTML:**")
+        lines.append("```")
+        lines.append(af.html_snippet)
+        lines.append("```")
+    if af.help_url:
+        lines.append(f"**Axe rule docs:** {af.help_url}")
+    lines.append("")
+    lines.append(f"Review locally: {af.ui_url}")
+    return "\n".join(lines)
+
+
+def _axe_labels(af: ExportA11yFinding) -> list[str]:
+    labels = ["accessibility", f"axe-{af.rule_id}"]
+    if af.impact:
+        labels.append(f"impact-{af.impact}")
+    if af.wcag_sc:
+        # Encode "1.4.3" → "wcag-1-4-3" so the label is valid Jira syntax
+        # (dots are reserved as label separators in some Jira configs).
+        labels.append("wcag-" + af.wcag_sc.replace(".", "-"))
+    if af.wcag_level:
+        labels.append(f"wcag-level-{af.wcag_level.lower()}")
+    else:
+        labels.append("axe-best-practice")
+    return labels
 
 
 def _summary(finding: ExportFinding) -> str:

@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { api, blobUrl } from "../api/client";
 import {
   AltTag,
@@ -9,6 +9,7 @@ import {
   Card,
   LinkButton,
   PageHeader,
+  PageLink,
   SeverityChip,
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
@@ -138,7 +139,13 @@ export default function FindingDetailRoute() {
           ) : data.content_hash ? (
             <img
               src={blobUrl(data.content_hash)}
-              alt="Image under audit"
+              // The audited graphic itself. Avoid the literal word "image"
+              // here — screen readers already announce <img> as an image,
+              // so saying "Image under audit" doubles up
+              // (jsx-a11y/img-redundant-alt). The wider page chrome makes
+              // it clear *why* the graphic is on screen; the alt only needs
+              // to convey what it is.
+              alt="Audited graphic"
               className="max-h-[480px] w-full bg-white object-contain"
               {...(data.width ? { width: data.width } : {})}
               {...(data.height ? { height: data.height } : {})}
@@ -180,7 +187,7 @@ export default function FindingDetailRoute() {
                   </strong>
                   {data.vlm_rationale && (
                     <p className="mt-1 text-sm italic text-fg-muted">
-                      "{data.vlm_rationale}"
+                      &ldquo;{data.vlm_rationale}&rdquo;
                     </p>
                   )}
                 </VerdictCell>
@@ -209,15 +216,24 @@ export default function FindingDetailRoute() {
                 </span>
               )}
             </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <label htmlFor="status-select" className="text-sm font-semibold text-fg">
+            {/* The triage row is the page's primary affordance — the
+                whole reason the user is on FindingDetail. Each control
+                clears 44px (label gets a min-h-target so click-the-label
+                still works for the dropdown), the dropdown is base
+                font-size for legibility, and Save uses `size="lg"` to
+                read as the page's primary CTA. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                htmlFor="status-select"
+                className="flex min-h-target items-center text-base font-semibold text-fg"
+              >
                 Status:
               </label>
               <select
                 id="status-select"
                 value={status ?? data.status}
                 onChange={(e) => setStatus(e.target.value as FindingStatus)}
-                className="rounded-xs border border-border bg-surface px-2 py-1.5 text-sm text-fg focus:border-umich-blue focus:outline-none"
+                className="min-h-target rounded-xs border border-border bg-surface px-3 py-2 text-base text-fg focus:border-umich-blue focus:outline-none"
               >
                 {STATUSES.map((s) => (
                   <option key={s} value={s}>
@@ -227,6 +243,7 @@ export default function FindingDetailRoute() {
               </select>
               <Button
                 variant="primary"
+                size="lg"
                 onClick={() => status && save.mutate(status)}
                 disabled={save.isPending || status === data.status}
               >
@@ -266,16 +283,11 @@ export default function FindingDetailRoute() {
               {data.occurrences.map((o, i) => (
                 <tr key={i} className="hover:bg-surface-muted/60">
                   <td className="px-4 py-2">
-                    <a
-                      href={o.page_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-umich-blue no-underline hover:underline"
-                      title={o.page_url}
-                    >
-                      {o.page_url}
-                      <ExternalLink className="h-3 w-3" aria-hidden />
-                    </a>
+                    <PageLink
+                      pageId={o.page_id}
+                      pageUrl={o.page_url}
+                      pageTitle={null}
+                    />
                   </td>
                   <td className="px-4 py-2">
                     <AltTag value={o.alt_text} />

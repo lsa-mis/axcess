@@ -54,6 +54,7 @@ def test_gallery_page_persists_images_and_svg_text(
 ) -> None:
     with _serve() as base:
         config = CrawlConfig(
+            js_eager=False,
             seed_url=f"{base}/gallery.html",
             max_pages=5,
             rps=100.0,
@@ -106,6 +107,7 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
     """srcset 1x and picture source both reference blank@2x.png; only one images row."""
     with _serve() as base:
         config = CrawlConfig(
+            js_eager=False,
             seed_url=f"{base}/gallery.html",
             max_pages=5,
             rps=100.0,
@@ -126,6 +128,7 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
 def test_blob_store_contents_match_db(tmp_db: sqlite3.Connection, blob_dir: Path) -> None:
     with _serve() as base:
         config = CrawlConfig(
+            js_eager=False,
             seed_url=f"{base}/gallery.html",
             max_pages=5,
             rps=100.0,

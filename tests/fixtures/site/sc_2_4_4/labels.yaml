@@ -1,0 +1,76 @@
+# Hand-labeled fixture set for SC 2.4.4 (Link Purpose In Context).
+#
+# Used by the Phase 9.1 calibration integration test (live Ollama
+# gated on AUDIT_OLLAMA_LIVE=1) to measure precision and recall.
+#
+# Each entry pins:
+#   - file:           the HTML fixture path
+#   - expect_violation_count: how many SC 2.4.4 violations we expect
+#                             the analyzer to find on that page
+#   - violations:     the indices (matching the order extract_links
+#                     returns) we believe SHOULD be flagged. Empty list
+#                     means a clean page; the analyzer should output [].
+#
+# The labels are conservative — only links a reasonable accessibility
+# reviewer would call clearly non-descriptive in context are marked.
+# Borderline cases are NOT flagged so the precision metric stays honest.
+
+clean_page:
+  file: clean.html
+  expect_violation_count: 0
+  violations: []
+  notes: |
+    Five links, every one has descriptive text. Used to measure
+    false-positive rate: the analyzer should output zero violations.
+
+click_here_with_no_context:
+  file: click_here.html
+  expect_violation_count: 3
+  violations: [0, 1, 2]
+  notes: |
+    Three classic "click here" / "read more" / "learn more" links
+    with no surrounding context to disambiguate. All three should
+    be flagged.
+
+read_more_with_context:
+  file: read_more_in_context.html
+  expect_violation_count: 0
+  violations: []
+  notes: |
+    Three "Read more" links inside <article> elements whose <h2>
+    titles disambiguate them. SC 2.4.4 explicitly allows this —
+    the analyzer should NOT flag them. Common false positive trap.
+
+icon_only_no_label:
+  file: icon_only.html
+  expect_violation_count: 2
+  violations: [0, 1]
+  notes: |
+    Two icon-only links (search + cart) with no aria-label, no
+    aria-labelledby, no img alt. Screen readers announce nothing.
+
+icon_only_with_aria_label:
+  file: icon_only_labeled.html
+  expect_violation_count: 0
+  violations: []
+  notes: |
+    Same shape as icon_only.html but each link has aria-label.
+    The analyzer should accept these as labeled and not flag them.
+
+bare_url_text:
+  file: bare_url.html
+  expect_violation_count: 1
+  violations: [0]
+  notes: |
+    Link text is the raw URL "https://example.com/...". Screen
+    readers spell it character-by-character; meaningless.
+
+mixed:
+  file: mixed.html
+  expect_violation_count: 3
+  violations: [1, 4, 5]
+  notes: |
+    A realistic page with 7 links. Three are bad ("click here",
+    "details" x2) with no surrounding context to disambiguate.
+    Four are descriptive. Tests the analyzer's ability to find
+    multiple distinct violations on one page.

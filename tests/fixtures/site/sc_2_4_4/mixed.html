@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Mixed page — some descriptive, some not</title></head>
+<body>
+  <main>
+    <h1>U-M LSA accessibility news</h1>
+
+    <!-- index 0: descriptive, should NOT be flagged -->
+    <a href="/policy">Read the U-M Accessibility Policy</a>
+
+    <!-- index 1: "click here", no helpful surrounding context -->
+    <p>Want to learn more about accessibility? <a href="/learn">click here</a>.</p>
+
+    <!-- index 2: descriptive -->
+    <a href="/training">Sign up for accessibility training</a>
+
+    <!-- index 3: descriptive -->
+    <a href="/checklist">Web accessibility checklist (PDF, 12 pages)</a>
+
+    <!-- index 4: "details", no surrounding context to disambiguate -->
+    <ul>
+      <li>Resource A. <a href="/a">details</a></li>
+      <li>Resource B. <a href="/b">details</a></li>
+    </ul>
+
+    <!-- index 5: brand name, self-describing -->
+    <a href="/wave">Visit the WAVE accessibility checker site</a>
+  </main>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertOctagon,
+  Accessibility,
   Download,
   GitCompare,
   ListFilter,
@@ -83,24 +84,52 @@ export default function ScanDetailRoute() {
         actions={
           <>
             {isRunning ? (
+              // Disabled "pending" placeholder — sized to match the
+              // Findings CTA below (size="lg") so the layout doesn't jump
+              // when the scan completes and the live link replaces it.
               <span
-                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xs border border-border bg-surface-muted px-3 py-1.5 text-sm font-semibold text-fg-subtle"
+                className="inline-flex min-h-[52px] cursor-not-allowed items-center gap-2 rounded-xs border border-border bg-surface-muted px-6 py-3 text-base font-semibold text-fg-subtle"
                 aria-disabled="true"
                 title={lockedTip}
               >
                 <Loader2
-                  className="h-4 w-4 animate-spin"
+                  className="h-5 w-5 animate-spin"
                   aria-hidden
                 />
                 Findings — pending
               </span>
             ) : (
+              // **The** primary CTA on a completed scan: the unified
+              // Issues table. This replaced the old per-pipeline CTAs
+              // because one operator entry point beats two — they
+              // had to remember which surface had which slice.
+              // The pipeline-specific views remain reachable as
+              // secondary actions below for operators who already know
+              // which slice they want.
+              <LinkButton
+                to={`/scans/${data.id}/issues`}
+                variant="primary"
+                size="lg"
+              >
+                <ListFilter className="h-5 w-5" aria-hidden />
+                Issues ({data.finding_count + data.axe_violations_total})
+              </LinkButton>
+            )}
+            {!isRunning && (
               <LinkButton
                 to={`/scans/${data.id}/findings`}
-                variant="primary"
+                variant="secondary"
               >
-                <ListFilter className="h-4 w-4" aria-hidden />
-                Findings ({data.finding_count})
+                Image-of-text ({data.finding_count})
+              </LinkButton>
+            )}
+            {!isRunning && (
+              <LinkButton
+                to={`/scans/${data.id}/a11y`}
+                variant="secondary"
+              >
+                <Accessibility className="h-4 w-4" aria-hidden />
+                WCAG axe ({data.axe_violations_total})
               </LinkButton>
             )}
             {data.previous_scan_id != null && !isRunning && (
@@ -146,11 +175,37 @@ export default function ScanDetailRoute() {
           className="mb-4 border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
           role="alert"
         >
-          Couldn't delete scan:{" "}
+          Couldn&rsquo;t delete scan:{" "}
           {deleteScan.error instanceof Error
             ? deleteScan.error.message
             : String(deleteScan.error)}
         </Card>
+      )}
+
+      {/* Coverage truth — which detection methods this scan ran. A
+          static-only or partial run is visible at a glance instead of
+          being discovered after someone trusts an incomplete report.
+          Skipped methods render struck-through with an sr-only note. */}
+      {data.methods_used && data.methods_used.length > 0 && (
+        <p
+          className="mb-4 flex flex-wrap items-center gap-1.5 text-sm"
+          aria-label="Detection methods used on this scan"
+        >
+          <span className="font-semibold text-fg-muted">Methods:</span>
+          {data.methods_used.map((m) => (
+            <span
+              key={m.key}
+              title={`${m.label} ${m.enabled ? "ran on this scan" : "was skipped on this scan"}`}
+              className={
+                "inline-block rounded-full border border-border bg-surface-muted px-2 py-0.5 text-2xs " +
+                (m.enabled ? "text-fg" : "text-fg-subtle line-through opacity-60")
+              }
+            >
+              {m.label}
+              {!m.enabled && <span className="sr-only"> (skipped)</span>}
+            </span>
+          ))}
+        </p>
       )}
 
       {data.status === "running" && (
@@ -163,8 +218,13 @@ export default function ScanDetailRoute() {
                 refreshing every 2s
               </span>
             </div>
+            {/* The only place a `danger` `lg` button is appropriate:
+                stopping a live crawl is destructive and the user needs to
+                see the affordance clearly. The confirm() wrapper provides
+                Tolerance for Error (UD #5). */}
             <Button
               variant="danger"
+              size="lg"
               onClick={() => {
                 if (confirm("Stop this crawl? Pending pages will be dropped.")) {
                   cancel.mutate();
@@ -172,7 +232,7 @@ export default function ScanDetailRoute() {
               }}
               disabled={cancel.isPending}
             >
-              <Square className="h-3.5 w-3.5 fill-current" aria-hidden />
+              <Square className="h-4 w-4 fill-current" aria-hidden />
               Stop crawl
             </Button>
           </div>
@@ -257,10 +317,12 @@ export default function ScanDetailRoute() {
               <strong className="text-sev-critical">
                 Seed URL returned HTTP {data.blocked.status_code}
               </strong>
-              {data.blocked.title && <> — "{data.blocked.title}"</>}. The
-              crawler couldn't read past the entry page. Try{" "}
-              <Link to="/scans/new">New scan</Link> with "Use real browser
-              (Playwright) for every page" checked.
+              {data.blocked.title && (
+                <> — &ldquo;{data.blocked.title}&rdquo;</>
+              )}
+              . The crawler couldn&rsquo;t read past the entry page. Try{" "}
+              <Link to="/scans/new">New scan</Link> with &ldquo;Use real
+              browser (Playwright) for every page&rdquo; checked.
             </div>
           </div>
         </Card>
@@ -293,10 +355,16 @@ export default function ScanDetailRoute() {
         <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {(
             [
+              // Audit report leads — it's the deliverable-shaped output:
+              // issue cards with fix steps, owner type, effort, and a
+              // verification plan. The other formats are data dumps for
+              // import into other tools (Jira, spreadsheets) or feeds
+              // (JSON for downstream pipelines).
+              ["audit", "Audit report (cards, fixes, verify steps)"],
               ["csv", "CSV (one row per occurrence)"],
               ["json", "JSON (nested per finding)"],
               ["jira", "Jira CSV (import template)"],
-              ["markdown", "Markdown report"],
+              ["markdown", "Markdown report (data-dense)"],
             ] as const
           ).map(([fmt, label]) =>
             isRunning ? (

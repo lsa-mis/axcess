@@ -1,4 +1,4 @@
-.PHONY: help setup run test test-unit test-integration test-ui lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-build frontend-dev
+.PHONY: help setup run serve test test-unit test-integration test-ui lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-build frontend-dev
 
 PY := uv run
 DB := data/audit.db
@@ -28,11 +28,31 @@ fetch-models: ## Pull VLM models via Ollama (qwen2-vl:2b, moondream:2b)
 	ollama pull qwen2-vl:2b || true
 	ollama pull moondream:2b || true
 
+fetch-analyzer-models: ## Pull every model the analyzer_models.yaml recommends (required + recommended tiers)
+	@command -v ollama >/dev/null 2>&1 || { echo "ollama not installed; see https://ollama.com"; exit 1; }
+	@$(PY) python -c "from audit.analyzer.model_registry import all_fetch_tags; [print(t) for t in all_fetch_tags()]" \
+		| while read tag; do echo ">>> ollama pull $$tag"; ollama pull "$$tag" || true; done
+
+list-analyzer-models: ## Print the model recommendation matrix (per criterion)
+	@$(PY) python -m audit.analyzer.model_registry_dump
+
 fixture-site: ## Serve tests/fixtures/site on :8000 for crawler tests
 	$(PY) python scripts/run_fixture_site.py
 
-run: ## Start the review UI on http://$(HOST):$(PORT)
+run: ## Start the review UI on http://$(HOST):$(PORT) (local dev, auto-reload)
 	$(PY) uvicorn audit.web.server:app --host $(HOST) --port $(PORT) --reload
+
+# SERVE_HOST defaults to 0.0.0.0 so other devices on your LAN / Tailscale
+# net can reach it. Set AUDIT_ACCESS_TOKEN first — see docs/hosting.md.
+SERVE_HOST ?= 0.0.0.0
+serve: ## Host for LAN/Tailscale: no reload, binds 0.0.0.0 (set AUDIT_ACCESS_TOKEN!)
+	@if [ -z "$$AUDIT_ACCESS_TOKEN" ]; then \
+	  echo "WARNING: AUDIT_ACCESS_TOKEN is unset — the instance will be open to"; \
+	  echo "         anyone who can reach $(SERVE_HOST):$(PORT). See docs/hosting.md."; \
+	  echo "         Export a token, e.g.: export AUDIT_ACCESS_TOKEN=$$(openssl rand -hex 16)"; \
+	  echo ""; \
+	fi
+	$(PY) uvicorn audit.web.server:app --host $(SERVE_HOST) --port $(PORT)
 
 frontend-install: ## Install React SPA dependencies (one-time)
 	cd $(FRONTEND) && npm install

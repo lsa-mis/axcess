@@ -1,8 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Findings — Scan #{{ scan.id }}{% endblock %}
 {% block content %}
-  <h2>Findings — Scan #{{ scan.id }}</h2>
-  <p class="subtle">{{ scan.seed_url }}</p>
+  <div class="page-header-row">
+    <div>
+      <h2 style="margin:0;">Findings — Scan #{{ scan.id }}</h2>
+      <p class="subtle" style="margin:0.25rem 0 0 0;">{{ scan.seed_url }}</p>
+    </div>
+    {# The grouped view is the one most users want — it stacks findings
+       under their shared remediation fix. Keep this CTA visible from
+       the flat table so the operator can find it without clicking
+       back to the scan detail page. #}
+    <a href="/scans/{{ scan.id }}/findings/grouped" class="btn btn--primary">
+      Group by issue →
+    </a>
+  </div>
 
   <search>
     <form
@@ -50,7 +61,10 @@
           aria-label="Filter findings"
         >
       </label>
-      <button type="submit">Apply</button>
+      {# `md` size (default), not `--lg`: this is the filter form's
+         commit, not the page's primary CTA. Visiting /findings to look
+         at findings is the goal; filtering is the means. #}
+      <button type="submit" class="btn btn--primary">Apply</button>
     </form>
   </search>
 

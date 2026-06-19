@@ -86,6 +86,7 @@ def site_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _config(base: str, **overrides: object) -> CrawlConfig:
     defaults: dict[str, object] = {
+        "js_eager": False,  # pin the pre-flip fast path; rendering isn't under test
         "seed_url": f"{base}/gallery.html",
         "max_pages": 20,
         "rps": 100.0,

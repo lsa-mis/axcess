@@ -7,6 +7,8 @@ refresh after an intentional schema change, set ``AUDIT_UPDATE_GOLDEN=1``.
 
 from __future__ import annotations
 
+import csv as _csv_module  # noqa: F401  # used inside test_axe_findings_propagate_to_all_exports
+import io
 import json
 import os
 import sqlite3
@@ -193,8 +195,11 @@ def test_csv_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> No
     actual = render_csv(scan)
     _assert_matches_golden(actual, "scan.csv")
     # Sanity: header + one row per occurrence (+ one for the orphan inline-svg).
+    # Header starts with `finding_kind` since v2 of the CSV — that's the
+    # discriminator between image-of-text and wcag_axe rows.
     lines = actual.splitlines()
-    assert lines[0].startswith("finding_id,severity")
+    assert lines[0].startswith("finding_kind,finding_id")
+    # Fixture has no axe findings, so the row count is unchanged from v1.
     assert len(lines) == 1 + 2 + 1 + 1  # header + banner(2) + logo(1) + svg(1)
 
 
@@ -207,3 +212,121 @@ def test_json_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> N
     assert payload["scan"]["id"] == scan_fixture
     assert len(payload["findings"]) == 3
     assert payload["scan"]["by_severity"]["critical"] + payload["scan"]["by_severity"]["major"] >= 1
+    # v2 schema additions — the a11y section is present but empty on a
+    # legacy fixture scan (no axe pages run).
+    assert payload["schema_version"] == 2
+    assert payload["a11y_findings"] == []
+    assert payload["scan"]["axe_pages_scanned"] == 0
+    assert payload["scan"]["axe_violations_total"] == 0
+
+
+def _seed_axe_finding(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    rule_id: str = "color-contrast",
+    wcag_sc: str | None = "1.4.3",
+    wcag_level: str | None = "AA",
+    impact: str | None = "serious",
+) -> int:
+    """Insert a single axe finding for tests. Returns the row id."""
+    cur = conn.execute(
+        """
+        INSERT INTO page_a11y_findings
+            (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+             impact, help, help_url, target_selector, failure_summary,
+             html_snippet, target_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            page_id,
+            scan_id,
+            rule_id,
+            wcag_sc,
+            wcag_sc,
+            wcag_level,
+            impact,
+            "Elements must have sufficient color contrast",
+            f"https://dequeuniversity.com/rules/axe/4.10/{rule_id}",
+            "p > span.muted",
+            "Fix any of the following: foreground/background contrast is 2.1.",
+            '<span class="muted">low-contrast text</span>',
+            f"deadbeef-{rule_id}",
+        ),
+    )
+    conn.execute(
+        "UPDATE scans SET axe_pages_scanned = axe_pages_scanned + 1, "
+        "axe_violations_total = axe_violations_total + 1 WHERE id = ?",
+        (scan_id,),
+    )
+    return int(cur.lastrowid or 0)
+
+
+def test_axe_findings_propagate_to_all_exports(
+    tmp_db: sqlite3.Connection, scan_fixture: int
+) -> None:
+    """Seed one axe row and verify it shows up in every export format.
+
+    Image-of-text + axe rows live in different tables; this is the
+    contract test that proves the collector + renderers honor both.
+    """
+    from audit.exports.jira_export import render_jira_csv
+    from audit.exports.markdown_report import render_markdown
+
+    page_row = tmp_db.execute(
+        "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1",
+        (scan_fixture,),
+    ).fetchone()
+    assert page_row is not None
+    _seed_axe_finding(tmp_db, scan_id=scan_fixture, page_id=int(page_row["id"]))
+
+    scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
+    assert scan.axe_violations_total == 1
+    assert scan.axe_pages_scanned == 1
+    assert len(scan.a11y_findings) == 1
+    assert scan.by_wcag_level["AA"] == 1
+
+    # CSV gains exactly one wcag_axe row; image rows unchanged.
+    csv_text = render_csv(scan)
+    csv_rows = csv_text.strip().splitlines()
+    assert sum(1 for r in csv_rows[1:] if r.startswith("wcag_axe,")) == 1
+    assert sum(1 for r in csv_rows[1:] if r.startswith("image_of_text,")) == 4
+
+    # JSON gains the a11y_findings array.
+    payload = json.loads(render_json(scan))
+    assert len(payload["a11y_findings"]) == 1
+    assert payload["a11y_findings"][0]["rule_id"] == "color-contrast"
+    assert payload["a11y_findings"][0]["wcag_sc"] == "1.4.3"
+    assert payload["scan"]["axe_violations_total"] == 1
+    assert payload["scan"]["by_wcag_level"] == {
+        "A": 0,
+        "AA": 1,
+        "AAA": 0,
+        "best_practice": 0,
+    }
+
+    # Markdown report includes a WCAG axe section.
+    md = render_markdown(scan)
+    assert "## WCAG axe-core findings" in md
+    assert "color-contrast" in md
+    assert "SC 1.4.3" in md
+
+    # Jira CSV adds one extra issue row, with axe-flavored labels and a
+    # priority derived from impact, not severity. The Description column
+    # is intentionally multi-line, so we parse with csv.reader rather
+    # than splitlines() — one bug in this test was confusing the
+    # description body for separate rows.
+    import csv as _csv
+
+    jira_text = render_jira_csv(scan)
+    reader = _csv.reader(io.StringIO(jira_text))
+    rows = list(reader)
+    header = rows[0]
+    data_rows = rows[1:]
+    axe_row = next(r for r in data_rows if "color-contrast" in r[0])
+    labels = axe_row[header.index("Labels")]
+    priority = axe_row[header.index("Priority")]
+    assert "wcag-1-4-3" in labels
+    assert "wcag-level-aa" in labels
+    assert priority == "High"  # serious → High

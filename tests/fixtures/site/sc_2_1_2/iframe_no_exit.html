@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC 2.1.2 fixture — untitled iframe (soft trap)</title>
+</head>
+<body>
+  <main>
+    <h1>Iframe with no title and no tabindex=-1</h1>
+    <p>The iframe below is reachable by Tab but has no title and no
+       <code>tabindex="-1"</code> escape. A keyboard user landing
+       inside has no idea what they entered.</p>
+
+    <a href="/before">Page link</a>
+
+    <iframe srcdoc="<p>Embedded document.</p><button>Inner</button>"
+            width="400" height="100">
+    </iframe>
+
+    <a href="/after">Page link below the iframe</a>
+  </main>
+</body>
+</html>

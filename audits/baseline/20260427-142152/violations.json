@@ -1,0 +1,82 @@
+[
+  {
+    "ui": "spa",
+    "route": "/app/",
+    "url": "http://127.0.0.1:64717/app/",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "spa",
+    "route": "/app/scans",
+    "url": "http://127.0.0.1:64717/app/scans",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "spa",
+    "route": "/app/scans/new",
+    "url": "http://127.0.0.1:64717/app/scans/new",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "spa",
+    "route": "/app/scans/1",
+    "url": "http://127.0.0.1:64717/app/scans/1",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "spa",
+    "route": "/app/scans/1/findings",
+    "url": "http://127.0.0.1:64717/app/scans/1/findings",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "jinja",
+    "route": "/scans",
+    "url": "http://127.0.0.1:64717/scans",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "jinja",
+    "route": "/scans/new",
+    "url": "http://127.0.0.1:64717/scans/new",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "jinja",
+    "route": "/scans/1",
+    "url": "http://127.0.0.1:64717/scans/1",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "jinja",
+    "route": "/scans/1/findings",
+    "url": "http://127.0.0.1:64717/scans/1/findings",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  },
+  {
+    "ui": "jinja",
+    "route": "/pages/1",
+    "url": "http://127.0.0.1:64717/pages/1",
+    "error": null,
+    "violation_count": 0,
+    "violations": []
+  }
+]

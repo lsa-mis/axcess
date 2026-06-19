@@ -90,6 +90,7 @@ class _StubVlm:
 
 def _config(base: str, *, vlm_enabled: bool = True) -> CrawlConfig:
     return CrawlConfig(
+        js_eager=False,
         seed_url=f"{base}/gallery.html",
         max_pages=5,
         rps=100.0,

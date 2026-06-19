@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reflow failure fixture (SC 1.4.10)</title>
+  <style>
+    /* Deliberate reflow failure: a fixed 900px-wide container forces
+       horizontal scrolling at any viewport narrower than 900px —
+       including WCAG's 320px reflow baseline. The probe must flag
+       div#fixed-width as the offender. */
+    body { margin: 0; font-family: sans-serif; }
+    #fixed-width {
+      width: 900px;
+      background: #eee;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>This page does not reflow</h1>
+    <div id="fixed-width">
+      This container is hard-coded to 900 CSS pixels wide, so at a
+      320px viewport the page needs ~580px of horizontal scrolling.
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SC 2.1.2 fixture — modal with proper Escape handler</title>
+</head>
+<body>
+  <main>
+    <h1>Modal correctly releases focus on Escape</h1>
+    <p>This page is the positive control for modal handling — the
+       probe should NOT flag it. Same shape as <code>modal_no_escape.html</code>,
+       but with a working Escape listener.</p>
+
+    <a id="opener" href="/before">Page link (focus returns here on close)</a>
+
+    <div id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title"
+         style="border:2px solid #333; padding:1rem; max-width:32rem;">
+      <h2 id="dlg-title">Confirm action</h2>
+      <p>This modal listens for Escape and releases focus correctly.</p>
+      <input type="text" placeholder="Comment">
+      <button type="button" id="dlg-ok">OK</button>
+    </div>
+
+    <script>
+      // Correct behavior: Escape removes the dialog from focus.
+      // The probe will move focus inside, press Escape, and find
+      // activeElement is no longer inside the dialog subtree.
+      const dlg = document.getElementById('dlg');
+      dlg.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          // Move focus out — simulating "close + return focus".
+          // For probe purposes, focusing anything OUTSIDE the dialog
+          // satisfies the test. A real implementation would also
+          // hide the dialog visually.
+          document.getElementById('opener').focus();
+        }
+      });
+    </script>
+  </main>
+</body>
+</html>

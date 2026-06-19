@@ -149,7 +149,7 @@ function Section({
                     {kind === "previous" && e.previous_finding_id ? (
                       <Link
                         to={`/findings/${e.previous_finding_id}`}
-                        className="text-umich-blue no-underline hover:underline"
+                        className="text-umich-blue underline underline-offset-2"
                         title={e.url_normalized}
                       >
                         {e.url_normalized}
@@ -157,7 +157,7 @@ function Section({
                     ) : e.current_finding_id ? (
                       <Link
                         to={`/findings/${e.current_finding_id}`}
-                        className="text-umich-blue no-underline hover:underline"
+                        className="text-umich-blue underline underline-offset-2"
                         title={e.url_normalized}
                       >
                         {e.url_normalized}

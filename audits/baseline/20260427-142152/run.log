@@ -1,0 +1,17 @@
+baseline a11y scan → /Users/imregan/imagetextscanner/audits/baseline/20260427-142152
+  seeding tmp DB at /var/folders/10/5j7cpb1n3pl0bw9qh1_m49lc0000gp/T/audit-baseline-8yinolkx
+  starting uvicorn …
+  server up at http://127.0.0.1:64717, scan_id=1
+  scan spa    /app/ … 0 violations
+  scan spa    /app/scans … 0 violations
+  scan spa    /app/scans/new … 0 violations
+  scan spa    /app/scans/1 … 0 violations
+  scan spa    /app/scans/1/findings … 0 violations
+  scan jinja  /scans … 0 violations
+  scan jinja  /scans/new … 0 violations
+  scan jinja  /scans/1 … 0 violations
+  scan jinja  /scans/1/findings … 0 violations
+  scan jinja  /pages/1 … 0 violations
+
+wrote violations.json + summary.md
+total violations: 0; route errors: 0

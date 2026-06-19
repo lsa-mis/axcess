@@ -37,7 +37,7 @@ export default function DashboardRoute() {
         <Card className="mb-4 flex items-start gap-2 border-sev-critical/30 bg-sev-critical-bg p-4 text-sev-critical">
           <ServerCrash className="mt-0.5 h-5 w-5" aria-hidden />
           <div className="text-sm">
-            <strong>Couldn't load scans.</strong>{" "}
+            <strong>Couldn&rsquo;t load scans.</strong>{" "}
             {error instanceof Error ? error.message : String(error)}
           </div>
         </Card>
@@ -54,7 +54,7 @@ export default function DashboardRoute() {
           </div>
           <Link
             to={`/scans/${running.id}`}
-            className="text-sm font-semibold text-umich-blue no-underline hover:underline"
+            className="text-sm font-semibold text-umich-blue underline underline-offset-2"
           >
             View progress →
           </Link>
@@ -96,8 +96,8 @@ export default function DashboardRoute() {
               title="No scans yet"
               message="Run a crawl to see findings here."
               action={
-                <LinkButton to="/scans/new" variant="primary">
-                  <PlusCircle className="h-4 w-4" aria-hidden /> New scan
+                <LinkButton to="/scans/new" variant="primary" size="lg">
+                  <PlusCircle className="h-5 w-5" aria-hidden /> New scan
                 </LinkButton>
               }
             />
@@ -134,7 +134,7 @@ export default function DashboardRoute() {
           </h2>
           <p className="text-sm leading-relaxed text-fg-muted">
             A local auditor that crawls a site, runs OCR + VLM against every
-            image it finds, and compares the image's text to the authored{" "}
+            image it finds, and compares the image&rsquo;s text to the authored{" "}
             <code className="rounded bg-surface-muted px-1 py-0.5 font-mono text-xs">
               alt
             </code>{" "}
@@ -148,7 +148,7 @@ export default function DashboardRoute() {
                 className="mt-0.5 h-4 w-4 shrink-0 text-umich-blue"
                 aria-hidden
               />
-              WCAG 2.1 AA — this UI itself passes axe-core on every view.
+              WCAG 2.2 AAA — this UI itself passes axe-core on every view.
             </li>
           </ul>
         </Card>

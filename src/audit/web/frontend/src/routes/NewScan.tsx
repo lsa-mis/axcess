@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertOctagon } from "lucide-react";
 import { api } from "../api/client";
-import { Button, Card, PageHeader } from "../components/ui";
+import { Button, Card, Checkbox, PageHeader } from "../components/ui";
 import type { NewScanPayload } from "../api/types";
 
 /** Start a scan: URL input + scope preview + advanced toggles. */
@@ -20,7 +20,17 @@ export default function NewScanRoute() {
     ignore_robots: false,
     skip_ocr: false,
     skip_vlm: false,
-    js_eager: false,
+    // Full rendering is the default — three of the four pipelines (axe,
+    // keyboard, responsive) need the live DOM. `static_only` is the
+    // opt-out fast path, exposed as a warning-toned checkbox below.
+    static_only: false,
+    // Axe is on by default — the WCAG 2.x AA scan is one of the main
+    // reasons most users reach for this tool. The hidden cost is ~50-150 ms
+    // per Playwright-rendered page; the form exposes a toggle below.
+    skip_axe: false,
+    skip_keyboard: false,
+    skip_responsive: false,
+    axe_level: "AA",
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -72,8 +82,15 @@ export default function NewScanRoute() {
 
       <Card className="max-w-3xl p-5">
         <form onSubmit={onSubmit} className="flex flex-col gap-5">
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-semibold text-fg">Seed URL</span>
+          {/* The seed URL is the most important field on the most
+              important form in the app — there is exactly one of it,
+              and the user cannot proceed without it. Treat it as the
+              page's hero input: bigger label, base font size, taller
+              control. The smaller secondary controls (Max pages, etc.)
+              create the visual contrast that says "this one matters
+              first." */}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-base font-semibold text-fg">Seed URL</span>
             <input
               type="url"
               required
@@ -81,11 +98,11 @@ export default function NewScanRoute() {
               placeholder="https://example.com/section/"
               value={form.url}
               onChange={(e) => update("url", e.target.value)}
-              className="rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg focus:border-umich-blue focus:outline-none"
+              className="min-h-target rounded-xs border-2 border-border bg-surface px-4 py-3 text-base text-fg focus:border-umich-blue focus:outline-none"
             />
             <span className="text-xs text-fg-muted">
               Must start with http:// or https://. By default the crawl
-              stays under this URL's path — e.g.{" "}
+              stays under this URL&rsquo;s path — e.g.{" "}
               <code className="rounded bg-surface-muted px-1">
                 /section/
               </code>{" "}
@@ -163,44 +180,87 @@ export default function NewScanRoute() {
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
               Options
             </legend>
-            <div className="mt-1 space-y-1.5">
+            {/* Each checkbox has a per-row 44×44 hit target via the
+                shared <Checkbox> primitive. Hints explain the consequence
+                of the option in plain language (UD #4 Perceptible Information,
+                Nielsen #2 Match between system & real world). */}
+            <div className="mt-1 space-y-1">
               <Checkbox
                 checked={form.whole_host}
                 onChange={(v) => update("whole_host", v)}
-                label="Crawl the entire host (ignore the path scope)"
+                label="Crawl the entire host"
+                hint="Ignores the URL path scope — every page on the host is in scope."
               />
               <Checkbox
                 checked={form.include_subdomain}
                 onChange={(v) => update("include_subdomain", v)}
                 label="Follow links on subdomains"
+                hint="e.g. links from www.example.com to docs.example.com are followed."
+              />
+              {/* Full rendering is the default; static-only is the
+                  warning-toned opt-out because checking it silently
+                  drops three pipelines' coverage. */}
+              <Checkbox
+                tone="warning"
+                checked={form.static_only}
+                onChange={(v) => update("static_only", v)}
+                label="Fast crawl — skip browser rendering (static only)"
+                hint="5–10× faster, but disables the axe, keyboard-trap, and responsive checks on every statically-fetched page."
               />
               <Checkbox
-                checked={form.js_eager}
-                onChange={(v) => update("js_eager", v)}
-                label="Use real browser (Playwright) for every page — slower but handles SPAs / Cloudflare"
-              />
-              <Checkbox
+                tone="warning"
                 checked={form.ignore_robots}
                 onChange={(v) => update("ignore_robots", v)}
-                label="Ignore robots.txt (authorized testing only)"
+                label="Ignore robots.txt"
+                hint="Authorized testing only. The scan will be flagged in its config and audit log."
               />
               <Checkbox
                 checked={form.skip_ocr}
                 onChange={(v) => update("skip_ocr", v)}
                 label="Skip OCR"
+                hint="Faster, but findings won't include image-text extraction."
               />
               <Checkbox
                 checked={form.skip_vlm}
                 onChange={(v) => update("skip_vlm", v)}
                 label="Skip VLM classification"
+                hint="Faster, but findings won't include the essential / decorative / logo verdict."
+              />
+              {/* Axe is opt-out, not opt-in — most users reaching for
+                  this tool want the WCAG 2.x AA scan as the primary
+                  output. We surface a "Skip" rather than an "Enable"
+                  to honor that default. Same for the keyboard and
+                  responsive probes below. */}
+              <Checkbox
+                checked={form.skip_axe}
+                onChange={(v) => update("skip_axe", v)}
+                label="Skip WCAG axe scan"
+                hint="Faster (~50-150 ms / page saved), but findings won't include the WCAG 2.x AA DOM checks."
+              />
+              <Checkbox
+                checked={form.skip_keyboard}
+                onChange={(v) => update("skip_keyboard", v)}
+                label="Skip keyboard-trap probe"
+                hint="Saves ~1–3s per page; loses the only automated WCAG 2.1.2 (Level A) coverage."
+              />
+              <Checkbox
+                checked={form.skip_responsive}
+                onChange={(v) => update("skip_responsive", v)}
+                label="Skip responsive & zoom checks"
+                hint="Saves ~1–2s per page; loses 320px reflow, 200% zoom, and text-spacing coverage (SC 1.4.4 / 1.4.10 / 1.4.12)."
               />
             </div>
           </fieldset>
 
-          <div className="flex gap-2">
+          {/* Submit + Cancel. The submit is the page's primary CTA
+              (`size="lg"`); Cancel stays at the default `md` to make the
+              hierarchy unambiguous — the user shouldn't have to read the
+              colors to know which one commits the form. */}
+          <div className="flex flex-wrap gap-3">
             <Button
               type="submit"
               variant="primary"
+              size="lg"
               disabled={create.isPending || !form.url.trim()}
             >
               {create.isPending ? "Starting…" : "Start crawl"}
@@ -233,6 +293,8 @@ function NumberField({
   return (
     <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
       {label}
+      {/* min-h-target keeps the input at the SC 2.5.5 floor; px-3 gives
+          enough horizontal room for the spinner controls browsers add. */}
       <input
         type="number"
         value={value}
@@ -240,30 +302,12 @@ function NumberField({
         max={max}
         step={step}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="rounded-xs border border-border bg-surface px-2 py-1.5 text-sm font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
+        className="min-h-target rounded-xs border border-border bg-surface px-3 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
       />
     </label>
   );
 }
 
-function Checkbox({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-start gap-2 text-sm text-fg">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded-xs border-border text-umich-blue focus:ring-umich-blue"
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
+// `Checkbox` lives in components/ui.tsx — see that file for the 44×44
+// hit-target rationale. Removed the local copy that shipped with a 16×16
+// native input (failed SC 2.5.5 AAA + SC 2.5.8 AA).

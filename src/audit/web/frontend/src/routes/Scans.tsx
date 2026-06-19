@@ -109,7 +109,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
       <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-fg-muted">
         <Link
           to={`/scans/${scan.id}`}
-          className="text-umich-blue no-underline hover:underline"
+          className="text-umich-blue underline underline-offset-2"
         >
           #{scan.id}
         </Link>
@@ -117,7 +117,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
       <td className="max-w-md truncate px-4 py-2 text-fg">
         <Link
           to={`/scans/${scan.id}`}
-          className="text-umich-blue no-underline hover:underline"
+          className="text-umich-blue underline underline-offset-2"
           title={scan.seed_url}
         >
           {scan.seed_url}
@@ -133,7 +133,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
         {scan.finding_count > 0 ? (
           <Link
             to={`/scans/${scan.id}/findings`}
-            className="font-semibold text-umich-blue no-underline hover:underline"
+            className="font-semibold text-umich-blue underline underline-offset-2"
           >
             {scan.finding_count.toLocaleString()}
           </Link>
@@ -150,15 +150,20 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
         {relativeTime(scan.started_at)}
       </td>
       <td className="whitespace-nowrap px-4 py-2">
-        <div className="flex items-center justify-end gap-1">
+        {/* Per-row actions kept at default `md` size (44px tall). The
+            earlier compressed `px-2 py-1 text-xs` style was the exact
+            SC 2.5.5 fail flagged by the discovery audit — destructive
+            controls in particular must be a real target. The action
+            cluster gets `gap-2` so the two controls don't visually
+            merge into one wide button. */}
+        <div className="flex items-center justify-end gap-2">
           {scan.finding_count > 0 && (
             <LinkButton
               to={`/scans/${scan.id}/findings`}
               variant="ghost"
-              className="px-2 py-1 text-xs"
               aria-label={`View ${scan.finding_count} findings for scan ${scan.id}`}
             >
-              <ListChecks className="h-3.5 w-3.5" aria-hidden />
+              <ListChecks className="h-4 w-4" aria-hidden />
               Findings
             </LinkButton>
           )}
@@ -201,10 +206,10 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled
         title="Cancel the running scan before deleting it."
-        className="px-2 py-1 text-xs text-fg-subtle"
+        className="text-fg-subtle"
         aria-label={`Delete scan ${scan.id} (disabled — scan is running)`}
       >
-        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+        <Trash2 className="h-4 w-4" aria-hidden />
         Delete
       </Button>
     );
@@ -215,7 +220,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       <Button
         variant="ghost"
         disabled={mutation.isPending}
-        className="px-2 py-1 text-xs text-sev-critical hover:bg-sev-critical-bg"
+        className="text-sev-critical hover:bg-sev-critical-bg"
         aria-label={`Delete scan ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".
@@ -230,11 +235,15 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
           if (ok) mutation.mutate();
         }}
       >
-        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+        <Trash2 className="h-4 w-4" aria-hidden />
         {mutation.isPending ? "Deleting…" : "Delete"}
       </Button>
       {error && (
-        <span className="ml-2 text-2xs text-sev-critical" role="alert">
+        // role="alert" + text-xs (12px). Bumped from text-2xs (10px)
+        // because errors are critical to read on first glance — AAA
+        // reading-comfort doesn't mandate a font size, but tiny error
+        // text fights the user.
+        <span className="ml-2 text-xs text-sev-critical" role="alert">
           {error}
         </span>
       )}

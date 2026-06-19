@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import math
 import re
+import secrets
 import sqlite3
 from pathlib import Path
 from typing import Annotated, Any
@@ -20,6 +21,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    PlainTextResponse,
     RedirectResponse,
     Response,
 )
@@ -31,7 +33,9 @@ from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import url_policy
 from audit.crawler.orchestrator import CrawlConfig, run_crawl
+from audit.db import repo
 from audit.db.schema import connect
+from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import collect_scan
 from audit.exports.csv_export import render_csv
 from audit.exports.jira_export import render_jira_csv
@@ -39,6 +43,7 @@ from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.logging import get_logger
 from audit.synthesizer.diff import compute_diff
+from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
 
 log = get_logger(__name__)
 
@@ -67,14 +72,27 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
+    # `audit` is rendered via a special-case branch in the route handler
+    # because it needs the live `conn` (not just the collector result)
+    # to call the per-pipeline grouping helpers. The entry here exists
+    # only so the format-validation check (`fmt in _EXPORT_RENDERERS`)
+    # accepts "audit"; the value is unused for that format.
+    "audit": render_audit_report,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
     "json": "application/json; charset=utf-8",
     "jira": "text/csv; charset=utf-8",
     "markdown": "text/markdown; charset=utf-8",
+    "audit": "text/markdown; charset=utf-8",
 }
-_EXPORT_EXTENSIONS = {"csv": "csv", "json": "json", "jira": "jira.csv", "markdown": "md"}
+_EXPORT_EXTENSIONS = {
+    "csv": "csv",
+    "json": "json",
+    "jira": "jira.csv",
+    "markdown": "md",
+    "audit": "audit.md",
+}
 
 _BASE_DIR = Path(__file__).resolve().parent
 _TEMPLATES_DIR = _BASE_DIR / "templates"
@@ -101,6 +119,45 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     blob_store = BlobStore(resolved_blob)
 
     app = FastAPI(title="AccessibleAccessibility", version=__version__)
+
+    # Optional shared-token gate. No-op when ``AUDIT_ACCESS_TOKEN`` is
+    # unset (the default) so local dev + the test suite are untouched.
+    # When set, every request must carry the token — as ``?token=…``,
+    # an ``X-Access-Token`` header, or a ``Bearer`` Authorization header.
+    # On success we drop a cookie so the browser doesn't need the query
+    # string on every navigation. This is intentionally simple: it's a
+    # "not wide open the moment it's on the LAN" guard, not a real
+    # multi-user auth system (that's Path B). ``/health`` stays open so
+    # uptime checks work without the token.
+    _access_token = settings.access_token.strip()
+    if _access_token:
+        _cookie_name = "aa_access"
+
+        @app.middleware("http")
+        async def _require_token(request: Request, call_next):  # type: ignore[no-untyped-def]
+            if request.url.path == "/health":
+                return await call_next(request)
+            supplied = (
+                request.query_params.get("token")
+                or request.headers.get("x-access-token")
+                or request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+                or request.cookies.get(_cookie_name)
+                or ""
+            )
+            if not secrets.compare_digest(supplied, _access_token):
+                return PlainTextResponse(
+                    "Access token required. Append ?token=… to the URL or set "
+                    "the X-Access-Token header.",
+                    status_code=401,
+                )
+            response = await call_next(request)
+            # Persist a correct token as a cookie so the operator only
+            # pastes ?token=… once. Session cookie (no Max-Age) — clears
+            # on browser close; HttpOnly so page JS can't read it.
+            if request.query_params.get("token") == _access_token:
+                response.set_cookie(_cookie_name, _access_token, httponly=True, samesite="lax")
+            return response
+
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
     # React bundle lives under /app/. The asset paths (/app/assets/…) are
     # served by Vite's hashed output directly from dist/; the SPA shell
@@ -115,6 +172,42 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             name="app-assets",
         )
     templates = Jinja2Templates(directory=_TEMPLATES_DIR)
+
+    # Helpers for templates that build URLs with one filter swapped or
+    # dropped. Used by issues.html to render the "remove this filter"
+    # chips and the column-header sort links without needing JS.
+    def _drop_param(key: str, filters: dict[str, str]) -> str:
+        from urllib.parse import urlencode
+
+        kept = {k: v for k, v in filters.items() if k != key and v}
+        return urlencode(kept, doseq=True)
+
+    def _sort_link(label: str, sort_value: str, filters: dict[str, str], scan_id: int) -> Any:
+        from urllib.parse import urlencode
+
+        from markupsafe import Markup
+
+        params = {k: v for k, v in filters.items() if v and k != "sort"}
+        # Toggle: clicking the currently-active sort flips priority asc/desc;
+        # everything else is single-direction (descending) for now.
+        if sort_value == "priority_desc" and filters.get("sort") == "priority_desc":
+            params["sort"] = "priority_asc"
+        else:
+            params["sort"] = sort_value
+        qs = urlencode(params)
+        active = filters.get("sort") in (sort_value, sort_value.replace("_desc", "_asc"))
+        marker = " ↓" if active else ""
+        # Markup so the <a> tag isn't escaped on render. `label` and
+        # `marker` are static literals supplied by the template author
+        # at call time (never user input); `qs` is `urlencode`-quoted
+        # already; `scan_id` is the int route param. No XSS surface.
+        return Markup(  # noqa: S704
+            f'<a href="/scans/{scan_id}/issues?{qs}" class="sort-link'
+            f'{" sort-link--active" if active else ""}">{label}{marker}</a>'
+        )
+
+    templates.env.globals["_drop_param"] = _drop_param
+    templates.env.globals["_sort_link"] = _sort_link
 
     # Single running crawl at a time. Tracked here (not in the DB) because
     # "running" in the scans table can be stale after a server restart.
@@ -201,19 +294,23 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 (scan["seed_url"], scan_id),
             ).fetchone()
             blocked = _detect_blocked_scan(conn, scan_id, scan)
-            progress = (
-                _scan_progress(conn, scan_id) if scan["status"] == "running" else None
-            )
+            progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
         payload: dict[str, Any] = {
             **_scan_row_to_summary(scan),
             "error_count": int(scan.get("error_count") or 0),
-            "by_severity": {
-                level: int(breakdown.get(level, 0))
-                for level in _SEVERITY_OPTIONS
-            },
+            "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": int(prev["id"]) if prev is not None else None,
             "blocked": blocked,
             "progress": progress,
+            # Axe counters denormalized on scans for cheap reads. The SPA
+            # detail page uses them to label the "WCAG findings" CTA with
+            # the count without a join.
+            "axe_pages_scanned": int(scan.get("axe_pages_scanned") or 0),
+            "axe_violations_total": int(scan.get("axe_violations_total") or 0),
+            # Coverage truth: which detection methods were on for this
+            # scan (derived from config_json + counters). Lets the UI
+            # show when a scan was a partial / static-only run.
+            "methods_used": _methods_used(scan),
         }
         return JSONResponse(payload)
 
@@ -233,9 +330,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             return JSONResponse(
                 {
                     "error": "A crawl is already running.",
-                    "running_scan_id": int(scan_id_val)
-                    if isinstance(scan_id_val, int)
-                    else None,
+                    "running_scan_id": int(scan_id_val) if isinstance(scan_id_val, int) else None,
                 },
                 status_code=409,
             )
@@ -251,7 +346,15 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             "ignore_robots": bool(body.get("ignore_robots")),
             "skip_ocr": bool(body.get("skip_ocr")),
             "skip_vlm": bool(body.get("skip_vlm")),
-            "js_eager": bool(body.get("js_eager")),
+            # Render-every-page is the default; `static_only` is the
+            # opt-out fast path. (`js_eager` accepted for older callers.)
+            "static_only": bool(
+                body.get("static_only") or (body.get("js_eager") is False and "js_eager" in body)
+            ),
+            "skip_axe": bool(body.get("skip_axe")),
+            "skip_keyboard": bool(body.get("skip_keyboard")),
+            "skip_responsive": bool(body.get("skip_responsive")),
+            "axe_level": str(body.get("axe_level", "AA")),
         }
         config = _build_crawl_config(form, settings)
         scan_id = _prepare_scan_row(resolved_db, config)
@@ -267,16 +370,10 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     async def api_cancel_scan(scan_id: int) -> JSONResponse:
         task = crawl_state.get("task")
         active_scan_id = crawl_state.get("scan_id")
-        if (
-            isinstance(task, asyncio.Task)
-            and not task.done()
-            and active_scan_id == scan_id
-        ):
+        if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
             task.cancel()
         with get_conn() as conn:
-            existing = conn.execute(
-                "SELECT status FROM scans WHERE id = ?", (scan_id,)
-            ).fetchone()
+            existing = conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()
             if existing is None:
                 raise HTTPException(status_code=404, detail="Scan not found")
             if existing["status"] == "running":
@@ -316,11 +413,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         """
         task = crawl_state.get("task")
         active_scan_id = crawl_state.get("scan_id")
-        if (
-            isinstance(task, asyncio.Task)
-            and not task.done()
-            and active_scan_id == scan_id
-        ):
+        if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
             raise HTTPException(
                 status_code=409,
                 detail="Cancel the running scan before deleting it.",
@@ -341,8 +434,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 )
             with conn:
                 conn.execute(
-                    "UPDATE images SET first_seen_scan_id = NULL "
-                    "WHERE first_seen_scan_id = ?",
+                    "UPDATE images SET first_seen_scan_id = NULL WHERE first_seen_scan_id = ?",
                     (scan_id,),
                 )
                 conn.execute(
@@ -386,6 +478,279 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             }
         )
 
+    @app.get("/scans/{scan_id}/issues", response_class=HTMLResponse)
+    def scan_issues(
+        request: Request,
+        scan_id: int,
+        conformance: str = Query(default=""),
+        responsibility: str = Query(default=""),
+        abilities: str = Query(default=""),
+        status: str = Query(default=""),
+        q: str = Query(default=""),
+        sort: str = Query(default="priority_desc"),
+    ) -> HTMLResponse:
+        """Unified Issues table — both pipelines, Siteimprove-style.
+
+        This is the new operator entry point. URL-driven so a filtered
+        view is bookmarkable. Filters are applied in Python after the
+        underlying scan-wide queries — keeps row-building in one place
+        even if it costs a small amount of data shuffling.
+        """
+        from audit.web import issues as issues_mod
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            filtered = issues_mod.list_issues(
+                conn,
+                scan_id,
+                conformance=_split_csv(conformance),
+                responsibility=_split_csv(responsibility),
+                abilities=_split_csv(abilities),
+                status=status or None,
+                search=q or None,
+                sort=sort,
+            )
+            # Breakdowns from the *unfiltered* set so chips show
+            # "Vision (12)" — what's available to filter to, not
+            # what's already been narrowed.
+            unfiltered = issues_mod.list_issues(conn, scan_id)
+        return render(
+            request,
+            "issues.html",
+            {
+                "scan": scan,
+                "rows": filtered,
+                "conformance_counts": issues_mod.conformance_breakdown(unfiltered),
+                "responsibility_counts": issues_mod.responsibility_breakdown(unfiltered),
+                "abilities_counts": issues_mod.abilities_breakdown(unfiltered),
+                "filters": {
+                    "conformance": conformance,
+                    "responsibility": responsibility,
+                    "abilities": abilities,
+                    "status": status,
+                    "q": q,
+                    "sort": sort,
+                },
+                "status_options": list(_STATUS_OPTIONS),
+                "active": "scan",
+            },
+        )
+
+    @app.get("/scans/{scan_id}/issues/{issue_key:path}", response_class=HTMLResponse)
+    def scan_issue_detail(
+        request: Request,
+        scan_id: int,
+        issue_key: str,
+        sort: str = Query(default="occurrences_desc"),
+    ) -> HTMLResponse:
+        """Per-issue detail — Siteimprove-style "page 2".
+
+        ``issue_key`` matches what the Issues list builds:
+        ``axe:<rule_id>`` or ``image:<classification>_<adequacy>``.
+        Stat tiles on top, description card middle, sortable
+        Pages-with-this-issue table at the bottom. Pages link out to
+        the actual site by default; a secondary affordance drills into
+        the in-app per-page view.
+        """
+        from audit.web import issues as issues_mod
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            detail = issues_mod.get_issue_detail(conn, scan_id, issue_key, sort=sort)
+        if detail is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Issue {issue_key!r} not found in scan {scan_id}",
+            )
+        return render(
+            request,
+            "issue_detail.html",
+            {
+                "scan": scan,
+                "detail": detail,
+                "sort": sort,
+                "active": "scan",
+            },
+        )
+
+    @app.get("/api/scans/{scan_id}/issues/{issue_key:path}")
+    def api_scan_issue_detail(
+        scan_id: int,
+        issue_key: str,
+        sort: str = Query(default="occurrences_desc"),
+    ) -> JSONResponse:
+        """JSON form of the per-issue detail — used by the SPA."""
+        from dataclasses import asdict
+
+        from audit.web import issues as issues_mod
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            detail = issues_mod.get_issue_detail(conn, scan_id, issue_key, sort=sort)
+        if detail is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Issue {issue_key!r} not found in scan {scan_id}",
+            )
+        # asdict converts the IssueRow nested inside the IssueDetail.
+        return JSONResponse(asdict(detail))
+
+    @app.get("/api/scans/{scan_id}/issues")
+    def api_scan_issues(
+        scan_id: int,
+        conformance: str = Query(default=""),
+        responsibility: str = Query(default=""),
+        abilities: str = Query(default=""),
+        status: str = Query(default=""),
+        q: str = Query(default=""),
+        sort: str = Query(default="priority_desc"),
+    ) -> JSONResponse:
+        """JSON form of the unified Issues list — used by the SPA."""
+        from dataclasses import asdict
+
+        from audit.web import issues as issues_mod
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            filtered = issues_mod.list_issues(
+                conn,
+                scan_id,
+                conformance=_split_csv(conformance),
+                responsibility=_split_csv(responsibility),
+                abilities=_split_csv(abilities),
+                status=status or None,
+                search=q or None,
+                sort=sort,
+            )
+            unfiltered = issues_mod.list_issues(conn, scan_id)
+        return JSONResponse(
+            {
+                "rows": [asdict(r) for r in filtered],
+                "conformance_counts": issues_mod.conformance_breakdown(unfiltered),
+                "responsibility_counts": issues_mod.responsibility_breakdown(unfiltered),
+                "abilities_counts": issues_mod.abilities_breakdown(unfiltered),
+                "total_unfiltered": len(unfiltered),
+            }
+        )
+
+    @app.get("/scans/{scan_id}/a11y/by-rule", response_class=HTMLResponse)
+    def scan_a11y_by_rule(
+        request: Request,
+        scan_id: int,
+        status: str | None = Query(default=None),
+        rule: str | None = Query(default=None),
+    ) -> HTMLResponse:
+        """WCAG axe findings, grouped by rule — the actionable cut.
+
+        The default /a11y view groups by WCAG SC (the reporting axis).
+        This view groups by axe ``rule_id`` (the fixing axis): one
+        ``color-contrast`` row standing in for the 800 pages that
+        same CSS class fails on. Bulk-status lives per group.
+
+        ``rule`` (single rule_id) narrows to one card — the deep-link
+        target for clicks from the unified Issues table. Defaults to
+        showing all rules.
+        """
+        from audit.web import a11y_queries
+
+        normalized_status = status if status else None
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            coverage = a11y_queries.coverage(conn, scan_id)
+            groups = a11y_queries.grouped_by_rule(conn, scan_id, status=normalized_status)
+            if rule:
+                groups = [g for g in groups if g["rule_id"] == rule]
+            status_counts = a11y_queries.by_status(conn, scan_id)
+        return render(
+            request,
+            "a11y_by_rule.html",
+            {
+                "scan": scan,
+                "coverage": coverage,
+                "groups": groups,
+                "rule_filter": rule or "",
+                "status_filter": normalized_status or "",
+                "status_options": list(_STATUS_OPTIONS),
+                "status_counts": status_counts,
+                "active": "scan",
+            },
+        )
+
+    @app.get("/api/scans/{scan_id}/a11y/by-rule")
+    def api_scan_a11y_by_rule(
+        scan_id: int,
+        status: str = Query(default=""),
+    ) -> JSONResponse:
+        """JSON form of the per-rule rollup. Used by the SPA."""
+        from audit.web import a11y_queries
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            coverage = a11y_queries.coverage(conn, scan_id)
+            groups = a11y_queries.grouped_by_rule(conn, scan_id, status=status if status else None)
+        return JSONResponse({"coverage": coverage, "groups": groups})
+
+    @app.get("/api/scans/{scan_id}/a11y")
+    def api_scan_a11y(scan_id: int) -> JSONResponse:
+        """Roll-up of axe-core WCAG findings, segregated by SC and level.
+
+        Shape:
+
+            {
+                "coverage": {pages_total, axe_pages_scanned, axe_violations_total},
+                "by_level": {"A": n, "AA": n, "AAA": n, "best_practice": n},
+                "by_impact": {"critical": n, "serious": n, ...},
+                "by_status": {"new": n, "reviewing": n, ...},
+                "groups": [{ wcag_sc, wcag_level, violation_count,
+                             page_count, worst_impact,
+                             rules: [{ rule_id, impact, help, help_url,
+                                       violation_count, page_count }] }]
+            }
+        """
+        from audit.web import a11y_queries
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return JSONResponse(
+                {
+                    "coverage": a11y_queries.coverage(conn, scan_id),
+                    "by_level": a11y_queries.by_level(conn, scan_id),
+                    "by_impact": a11y_queries.by_impact(conn, scan_id),
+                    "by_status": a11y_queries.by_status(conn, scan_id),
+                    "groups": a11y_queries.by_sc(conn, scan_id),
+                }
+            )
+
+    @app.get("/api/scans/{scan_id}/a11y/findings")
+    def api_scan_a11y_findings(
+        scan_id: int,
+        wcag_sc: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        limit: int = Query(default=200, ge=1, le=1000),
+        offset: int = Query(default=0, ge=0),
+    ) -> JSONResponse:
+        """Drill-down list for a single WCAG SC (or null = best-practice).
+
+        Optional ``status`` filter mirrors the Jinja side — pass a
+        status name to hide already-handled findings; omit (or pass
+        empty) for all rows.
+        """
+        from audit.web import a11y_queries
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            rows = a11y_queries.findings_for_sc(
+                conn,
+                scan_id,
+                # An empty-string query param means "best-practice (NULL SC)".
+                # `None` means "client didn't ask for a drill-down."
+                wcag_sc=None if wcag_sc == "" else wcag_sc,
+                status=status if status else None,
+                limit=limit,
+                offset=offset,
+            )
+        return JSONResponse({"findings": rows})
+
     @app.get("/api/findings/{finding_id}")
     def api_finding_detail(finding_id: int) -> JSONResponse:
         with get_conn() as conn:
@@ -426,10 +791,31 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             ]
         payload = dict(row)
         payload["has_svg_text"] = bool(payload.get("has_svg_text"))
-        payload["occurrences"] = [
-            {**o, "above_fold": bool(o["above_fold"])} for o in occurrences
-        ]
+        payload["occurrences"] = [{**o, "above_fold": bool(o["above_fold"])} for o in occurrences]
         return JSONResponse(payload)
+
+    @app.get("/api/scans/{scan_id}/findings/grouped")
+    def api_scan_findings_grouped(
+        scan_id: int,
+        status: str = Query(default=""),
+    ) -> JSONResponse:
+        """Image findings grouped by ``(classification, alt_adequacy)``.
+
+        Mirrors the Jinja roll-up at ``/scans/{id}/findings/grouped``.
+        Each group carries its shared remediation hint, a severity +
+        status breakdown, and an ordered list of contained findings
+        with their occurrences attached. ``status`` narrows to one
+        triage state; empty means all.
+        """
+        from audit.web import image_findings_queries
+
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            cov = image_findings_queries.coverage(conn, scan_id)
+            groups = image_findings_queries.grouped_by_remediation(
+                conn, scan_id, status=status if status else None
+            )
+        return JSONResponse({"coverage": cov, "groups": groups})
 
     @app.post("/api/findings/{finding_id}/status")
     async def api_set_finding_status(
@@ -446,8 +832,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 raise HTTPException(status_code=404, detail="Finding not found")
             prev = existing["status"]
             conn.execute(
-                "UPDATE findings SET status = ?, updated_at = CURRENT_TIMESTAMP "
-                "WHERE id = ?",
+                "UPDATE findings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (status, finding_id),
             )
             conn.execute(
@@ -461,16 +846,98 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             )
         return JSONResponse({"status": status})
 
-    @app.get("/api/scans/{scan_id}/diff")
-    def api_scan_diff(
-        scan_id: int, compare_to: int = Query(...)
+    @app.post("/api/findings/bulk-status")
+    async def api_bulk_set_finding_status(
+        body: Annotated[dict[str, Any], Body()],
     ) -> JSONResponse:
+        """Update many image-of-text findings at once.
+
+        Body: ``{"finding_ids": [1, 2, 3], "status": "accepted_risk"}``.
+
+        Designed for the grouped-by-issue view: every finding in a group
+        shares one remediation hint, so the natural operator move is
+        "all 96 of these are accepted_risk." A loop of per-row POSTs
+        works but burns a request per finding and produces N rerenders;
+        one transaction here is the right shape.
+        """
+        status = str(body.get("status") or "")
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        raw_ids = body.get("finding_ids") or []
+        if not isinstance(raw_ids, list):
+            raise HTTPException(status_code=400, detail="finding_ids must be a list")
+        try:
+            finding_ids = [int(x) for x in raw_ids]
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="finding_ids must be integers") from exc
+        with get_conn() as conn:
+            updated = repo.bulk_set_findings_status(
+                conn, finding_ids=finding_ids, status=status, actor="user"
+            )
+        return JSONResponse({"status": status, "updated": updated})
+
+    @app.post("/api/a11y-findings/bulk-status")
+    async def api_bulk_set_a11y_finding_status(
+        body: Annotated[dict[str, Any], Body()],
+    ) -> JSONResponse:
+        """Update many WCAG axe findings at once. See bulk-findings doc."""
+        status = str(body.get("status") or "")
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        raw_ids = body.get("finding_ids") or []
+        if not isinstance(raw_ids, list):
+            raise HTTPException(status_code=400, detail="finding_ids must be a list")
+        try:
+            finding_ids = [int(x) for x in raw_ids]
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="finding_ids must be integers") from exc
+        with get_conn() as conn:
+            updated = repo.bulk_set_a11y_findings_status(
+                conn, finding_ids=finding_ids, status=status
+            )
+        return JSONResponse({"status": status, "updated": updated})
+
+    @app.post("/api/a11y-findings/{finding_id}/status")
+    async def api_set_a11y_finding_status(
+        finding_id: int, body: Annotated[dict[str, Any], Body()]
+    ) -> JSONResponse:
+        """Update a WCAG axe finding's triage status.
+
+        Mirrors ``api_set_finding_status`` (image-of-text findings) but
+        targets ``page_a11y_findings``. We deliberately reuse the same
+        status enum so the SPA's StatusChip / shortcuts work without a
+        second vocabulary.
+
+        Note: no separate history table for axe findings in v1 — the row
+        carries ``updated_at`` and the rule itself is stable across
+        re-scans (upserted on ``(page, rule, target_hash)``), so the
+        before/after state is reconstructible from successive scans if
+        needed. We can promote to a ``a11y_finding_history`` table later
+        if Sam asks for an audit trail per finding.
+        """
+        status = str(body.get("status") or "")
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        with get_conn() as conn:
+            existing = conn.execute(
+                "SELECT status FROM page_a11y_findings WHERE id = ?", (finding_id,)
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(status_code=404, detail="Finding not found")
+            conn.execute(
+                "UPDATE page_a11y_findings "
+                "   SET status = ?, updated_at = CURRENT_TIMESTAMP "
+                " WHERE id = ?",
+                (status, finding_id),
+            )
+        return JSONResponse({"status": status})
+
+    @app.get("/api/scans/{scan_id}/diff")
+    def api_scan_diff(scan_id: int, compare_to: int = Query(...)) -> JSONResponse:
         with get_conn() as conn:
             _load_scan_or_404(conn, scan_id)
             _load_scan_or_404(conn, compare_to)
-            report = compute_diff(
-                conn, current_scan_id=scan_id, compare_to_scan_id=compare_to
-            )
+            report = compute_diff(conn, current_scan_id=scan_id, compare_to_scan_id=compare_to)
         return JSONResponse(
             {
                 "current_scan_id": scan_id,
@@ -567,6 +1034,25 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             {"scans": [dict(r) for r in rows], "active": "scans"},
         )
 
+    @app.get("/tracking", response_class=HTMLResponse)
+    def tracking(request: Request) -> HTMLResponse:
+        """Coverage & feature tracker: what's shipped vs. planned.
+
+        Renders straight from ``coverage_status`` (the single source of
+        truth shared with ``docs/coverage-tracker.md``) so the page can't
+        silently drift from the code.
+        """
+        return render(
+            request,
+            "tracking.html",
+            {
+                "shipped": SHIPPED,
+                "roadmap": ROADMAP,
+                "counts": roadmap_counts(),
+                "active": "tracking",
+            },
+        )
+
     @app.get("/scans/new", response_class=HTMLResponse)
     def new_scan_form(request: Request) -> HTMLResponse:
         task = crawl_state.get("task")
@@ -620,7 +1106,11 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
         ignore_robots: str | None = Form(default=None),
         skip_ocr: str | None = Form(default=None),
         skip_vlm: str | None = Form(default=None),
-        js_eager: str | None = Form(default=None),
+        static_only: str | None = Form(default=None),
+        skip_axe: str | None = Form(default=None),
+        skip_keyboard: str | None = Form(default=None),
+        skip_responsive: str | None = Form(default=None),
+        axe_level: str = Form(default="AA"),
     ) -> Response:
         form = {
             "url": url,
@@ -633,7 +1123,11 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             "ignore_robots": bool(ignore_robots),
             "skip_ocr": bool(skip_ocr),
             "skip_vlm": bool(skip_vlm),
-            "js_eager": bool(js_eager),
+            "static_only": bool(static_only),
+            "skip_axe": bool(skip_axe),
+            "skip_keyboard": bool(skip_keyboard),
+            "skip_responsive": bool(skip_responsive),
+            "axe_level": axe_level,
         }
         error = _validate_seed_url(url)
         if error is not None:
@@ -697,6 +1191,115 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "previous_scan_id": previous_scan_id,
                 "blocked": blocked,
                 "progress": progress,
+                "methods_used": _methods_used(scan),
+                "active": "scan",
+            },
+        )
+
+    @app.get("/scans/{scan_id}/a11y", response_class=HTMLResponse)
+    def scan_a11y(
+        request: Request,
+        scan_id: int,
+        wcag_sc: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+    ) -> HTMLResponse:
+        """Per-scan WCAG axe-core findings, segregated by SC.
+
+        When ``wcag_sc`` is given, drill into that SC's individual
+        violations (URL-shareable: ``/scans/5/a11y?wcag_sc=1.4.3``).
+        Without it, show the SC roll-up.
+
+        ``status`` filters drill-down rows by triage state. An empty
+        string (or omitted) means "all statuses". Unknown values are
+        ignored by the queries layer.
+        """
+        from audit.web import a11y_queries
+
+        normalized_status = status if status else None
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            coverage = a11y_queries.coverage(conn, scan_id)
+            grouped = a11y_queries.by_sc(conn, scan_id)
+            level_counts = a11y_queries.by_level(conn, scan_id)
+            impact_counts = a11y_queries.by_impact(conn, scan_id)
+            status_counts = a11y_queries.by_status(conn, scan_id)
+            # Drill-down only fires when the user clicked into a specific
+            # SC — non-null query param. (An empty-string query param means
+            # "best-practice" since those rows have wcag_sc IS NULL; that's
+            # handled in the queries module.)
+            drill = (
+                a11y_queries.findings_for_sc(conn, scan_id, wcag_sc, status=normalized_status)
+                if wcag_sc is not None
+                else []
+            )
+        return render(
+            request,
+            "a11y.html",
+            {
+                "scan": scan,
+                "coverage": coverage,
+                "groups": grouped,
+                "level_counts": level_counts,
+                "impact_counts": impact_counts,
+                "status_counts": status_counts,
+                "wcag_sc": wcag_sc,
+                "status_filter": normalized_status or "",
+                "status_options": list(_STATUS_OPTIONS),
+                "drill": drill,
+                "active": "scan",
+            },
+        )
+
+    @app.get("/scans/{scan_id}/findings/grouped", response_class=HTMLResponse)
+    def scan_findings_grouped(
+        request: Request,
+        scan_id: int,
+        status: str | None = Query(default=None),
+        classification: str | None = Query(default=None),
+        adequacy: str | None = Query(default=None),
+    ) -> HTMLResponse:
+        """Image-of-text findings, grouped by remediation key.
+
+        Parallels the WCAG axe rollup at ``/scans/{id}/a11y`` — instead
+        of grouping by ``wcag_sc``, we group by
+        ``(classification, alt_adequacy)`` because that pair is the
+        natural identity of an issue type: every finding in the same
+        group inherits the same row from ``rules/remediation.yaml`` and
+        therefore the same recommended fix. The flat power-user view
+        still lives at ``/scans/{id}/findings``.
+
+        ``classification`` + ``adequacy`` together narrow to one group
+        — the deep-link target for clicks from the unified Issues
+        table. Both must be present to filter; either alone is ignored.
+        """
+        from audit.web import image_findings_queries
+
+        normalized_status = status if status else None
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            cov = image_findings_queries.coverage(conn, scan_id)
+            groups = image_findings_queries.grouped_by_remediation(
+                conn, scan_id, status=normalized_status
+            )
+            if classification and adequacy:
+                # `classification` may legitimately be the literal
+                # string "unclassified" (image findings without a VLM
+                # call). The DB stores it as None in that case, so map.
+                target_cls = None if classification == "unclassified" else classification
+                groups = [
+                    g
+                    for g in groups
+                    if (g.get("classification") == target_cls and g.get("alt_adequacy") == adequacy)
+                ]
+        return render(
+            request,
+            "findings_grouped.html",
+            {
+                "scan": scan,
+                "coverage": cov,
+                "groups": groups,
+                "status_filter": normalized_status or "",
+                "status_options": list(_STATUS_OPTIONS),
                 "active": "scan",
             },
         )
@@ -838,6 +1441,94 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             )
         return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/findings/{finding_id}">')
 
+    @app.post("/findings/bulk-status", response_class=HTMLResponse)
+    def jinja_bulk_set_finding_status(
+        request: Request,
+        status: str = Form(...),
+        finding_ids: str = Form(...),
+        scan_id: int = Form(...),
+    ) -> HTMLResponse:
+        """Form-post bulk-status for the Jinja grouped view.
+
+        ``finding_ids`` arrives as a comma-separated string from a
+        hidden form field — simpler than multiple repeated form params
+        because the grouped template renders many groups, each with its
+        own set of ids. After the update we redirect back to the
+        referring grouped page so the counts re-render.
+        """
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        try:
+            ids = [int(p) for p in finding_ids.split(",") if p.strip()]
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="finding_ids must be a comma-separated integer list"
+            ) from exc
+        with get_conn() as conn:
+            repo.bulk_set_findings_status(conn, finding_ids=ids, status=status, actor="user")
+        # Send the user back to the grouped view. Falling back to the
+        # scan detail page when there's no Referer (shouldn't happen
+        # with the form submit but defensive).
+        ref = request.headers.get("referer") or f"/scans/{scan_id}/findings/grouped"
+        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
+
+    @app.post("/a11y-findings/bulk-status", response_class=HTMLResponse)
+    def jinja_bulk_set_a11y_finding_status(
+        request: Request,
+        status: str = Form(...),
+        finding_ids: str = Form(...),
+        scan_id: int = Form(...),
+    ) -> HTMLResponse:
+        """Form-post bulk-status for the Jinja WCAG grouped view."""
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        try:
+            ids = [int(p) for p in finding_ids.split(",") if p.strip()]
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="finding_ids must be a comma-separated integer list"
+            ) from exc
+        with get_conn() as conn:
+            repo.bulk_set_a11y_findings_status(conn, finding_ids=ids, status=status)
+        ref = request.headers.get("referer") or f"/scans/{scan_id}/a11y"
+        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
+
+    @app.post("/a11y-findings/{finding_id}/status", response_class=HTMLResponse)
+    def set_a11y_finding_status(
+        request: Request,
+        finding_id: int,
+        status: str = Form(...),
+    ) -> HTMLResponse:
+        """HTMX-friendly status update for a WCAG axe finding.
+
+        Returns a tiny inline fragment that the form's `hx-target`
+        swaps in next to the select — same UX pattern as the image
+        finding's status form, but no destructive-transition modal
+        because axe-finding statuses are all reversible (none of them
+        delete anything).
+        """
+        if status not in _STATUS_OPTIONS:
+            raise HTTPException(status_code=400, detail="Unknown status value")
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT status FROM page_a11y_findings WHERE id = ?", (finding_id,)
+            ).fetchone()
+            if row is None:
+                raise HTTPException(status_code=404, detail="Finding not found")
+            conn.execute(
+                "UPDATE page_a11y_findings "
+                "   SET status = ?, updated_at = CURRENT_TIMESTAMP "
+                " WHERE id = ?",
+                (status, finding_id),
+            )
+        if request.headers.get("HX-Request") == "true":
+            return HTMLResponse(
+                f'<span class="subtle" role="status">Saved · <strong>{status}</strong></span>'
+            )
+        # Non-HTMX fallback: 303 the user back to the referring page.
+        ref = request.headers.get("referer") or "/"
+        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
+
     @app.get("/pages/{page_id}", response_class=HTMLResponse)
     def page_detail(request: Request, page_id: int) -> HTMLResponse:
         with get_conn() as conn:
@@ -949,7 +1640,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     @app.get("/api/scans/{scan_id}/export/{fmt}")
     @app.get("/scans/{scan_id}/export/{fmt}")
     def export_scan(request: Request, scan_id: int, fmt: str) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown."""
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
@@ -959,7 +1650,13 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
             except ValueError as exc:
                 raise HTTPException(status_code=404, detail=str(exc)) from exc
-        rendered = _EXPORT_RENDERERS[fmt_lower](scan)
+            # The audit-report renderer needs the live connection so it
+            # can call the grouping helpers. The other renderers operate
+            # on the pre-collected `scan` only.
+            if fmt_lower == "audit":
+                rendered = render_audit_report(scan, conn=conn)
+            else:
+                rendered = _EXPORT_RENDERERS[fmt_lower](scan)
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
         ext = _EXPORT_EXTENSIONS[fmt_lower]
         filename = f"scan_{scan_id}.{ext}"
@@ -1076,7 +1773,23 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         vlm_base_url=settings.ollama_base_url,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
-        js_eager=bool(form.get("js_eager")),
+        # Render-every-page is the default (audit mode). `static_only`
+        # is the opt-out fast path — HTML checkboxes can't post
+        # "unchecked", so the form field is the inversion.
+        js_eager=not bool(form.get("static_only")),
+        # Axe scan is opt-out, not opt-in — the WCAG 2.x AA pass is the
+        # main reason most users will reach for this tool now that it's
+        # available. If the form posts `skip_axe`, honor it; otherwise
+        # the default in CrawlConfig (axe_enabled=True) wins.
+        axe_enabled=not bool(form.get("skip_axe")),
+        axe_level=str(form.get("axe_level", "AA")).upper(),
+        # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
+        # the wiring to the runner lands in Phase 9.1 — for now this
+        # just plumbs the flag through so the web form has the same
+        # surface as the CLI's `--skip-semantic`.
+        semantic_enabled=not bool(form.get("skip_semantic")),
+        keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
+        responsive_checks_enabled=not bool(form.get("skip_responsive")),
     )
 
 
@@ -1086,7 +1799,7 @@ def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
     ``run_crawl`` will discover and reuse this row via its seed-URL match,
     so we don't end up with duplicates.
     """
-    import json as _json
+    from audit.crawler.orchestrator import config_json_for_scan
 
     conn = connect(db_path)
     try:
@@ -1099,21 +1812,7 @@ def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
             return int(existing["id"])
         cur = conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', ?)",
-            (
-                config.seed_url,
-                _json.dumps(
-                    {
-                        "max_pages": config.max_pages,
-                        "max_depth": config.max_depth,
-                        "rps": config.rps,
-                        "allow_subdomains": config.allow_subdomains,
-                        "ignore_robots": config.ignore_robots,
-                        "ocr_enabled": config.ocr_enabled,
-                        "vlm_enabled": config.vlm_enabled,
-                    },
-                    sort_keys=True,
-                ),
-            ),
+            (config.seed_url, config_json_for_scan(config)),
         )
         return int(cur.lastrowid or 0)
     finally:
@@ -1243,10 +1942,75 @@ def _detect_blocked_scan(
     }
 
 
+def _methods_used(scan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Derive the "methods used on this scan" row from ``config_json``.
+
+    Returns ``[{key, label, enabled}, …]`` for the five detection
+    methods. Pre-flip scans (older ``config_json`` without the pipeline
+    flags) fall back to sensible inference: axe counters prove axe ran;
+    everything else shows as unknown→enabled-by-default so we don't
+    falsely claim a method was skipped.
+    """
+    import json as _json
+
+    try:
+        cfg = _json.loads(scan.get("config_json") or "{}")
+    except (TypeError, ValueError):
+        cfg = {}
+    axe_ran_counters = int(scan.get("axe_pages_scanned") or 0) > 0
+
+    def flag(name: str, default: bool = True) -> bool:
+        value = cfg.get(name)
+        return bool(value) if value is not None else default
+
+    rendered = flag("js_eager")
+    return [
+        {
+            "key": "rendered",
+            "label": "Browser rendering",
+            "enabled": rendered or axe_ran_counters,
+        },
+        {
+            "key": "axe",
+            "label": f"axe-core ({cfg.get('axe_level', 'AA')})",
+            "enabled": (flag("axe_enabled") and rendered) or axe_ran_counters,
+        },
+        {
+            "key": "image",
+            "label": "Image-of-text (OCR+VLM)",
+            "enabled": flag("ocr_enabled") and flag("vlm_enabled"),
+        },
+        {
+            "key": "semantic",
+            "label": "Semantic LLM",
+            "enabled": flag("semantic_enabled"),
+        },
+        {
+            "key": "keyboard",
+            "label": "Keyboard probe",
+            # Pre-flip scans never ran it (old default False).
+            "enabled": flag("keyboard_probe_enabled", default=False) and rendered,
+        },
+        {
+            "key": "responsive",
+            "label": "Responsive & zoom probe",
+            "enabled": flag("responsive_checks_enabled", default=False) and rendered,
+        },
+    ]
+
+
+def _split_csv(value: str) -> list[str]:
+    """Comma-separated query param to a clean list. Empty string → []."""
+    if not value:
+        return []
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     row = conn.execute(
         "SELECT id, seed_url, status, page_count, finding_count, error_count, "
-        "started_at, finished_at, config_json FROM scans WHERE id = ?",
+        "started_at, finished_at, config_json, "
+        "axe_pages_scanned, axe_violations_total FROM scans WHERE id = ?",
         (scan_id,),
     ).fetchone()
     if row is None:

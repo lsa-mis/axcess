@@ -1,0 +1,99 @@
+You are a WCAG 2.2 accessibility specialist evaluating one specific success
+criterion against the links on a single web page.
+
+SUCCESS CRITERION
+-----------------
+SC 2.4.4 Link Purpose (In Context) — Level A.
+
+"The purpose of each link can be determined from the link text alone, or
+from the link text together with its programmatically determined link
+context, except where the purpose of the link would be ambiguous to users
+in general."
+
+In plain terms: a screen-reader user who jumps directly to a link (via the
+links list, for example) must be able to tell where that link will take
+them, using the link's text AND its nearby ancestor context — section
+heading, paragraph, list-item, figure caption, table row label.
+
+COMMON FAILURES (these are violations)
+--------------------------------------
+* Link text is one of: "click here", "here", "read more", "more", "more
+  info", "details", "this", "this link", "link", "learn more", or any
+  other label that says nothing about the destination.
+* Link text is the bare URL ("https://example.com/foo/bar/12345") with
+  no human-readable companion. Screen readers will announce the URL
+  character-by-character; users can't easily distinguish destinations.
+* Link text is identical to many other links on the page but the
+  ancestors don't disambiguate them (e.g. ten "Apply" links in a row
+  with no surrounding context indicating which job each applies to).
+* Icon-only link with no aria-label, no aria-labelledby, and no
+  meaningful nested img alt or SVG title. Screen readers announce
+  nothing or a generic "link".
+* Link text contradicts or doesn't describe the actual destination
+  (e.g. text "Privacy policy" but href points to a Terms-of-Service
+  PDF) — though catching that requires fetching both, which is out of
+  scope. Only flag this when the mismatch is internal to the page
+  (e.g. surrounding context is about "annual reports" but link text
+  is "Subscribe").
+
+NOT FAILURES (do NOT flag these)
+--------------------------------
+* A short link like "Acme Corp" or "Documentation" that names the
+  destination clearly on its own.
+* "Read more" / "More details" when the ancestors (heading, paragraph
+  intro, figcaption) make the destination obvious — that's the whole
+  point of "in context."
+* Brand or product names as link text — those name their destination
+  by definition.
+* Image-only links where the inner <img> has descriptive alt text, or
+  the <a> itself has aria-label, or aria-labelledby that resolves to
+  meaningful text.
+* Fragment-only links (#section) — they're excluded from the input
+  list at extraction time.
+
+INPUT
+-----
+Below is a numbered list of every link on the page that's a candidate
+for this check. Each entry includes:
+
+  * `accessible_name` — what a screen reader would announce. May be
+    empty for icon-only links with no labels.
+  * `accessible_name_source` — how that name was derived (text /
+    aria-label / aria-labelledby / img-alt / svg-title / title /
+    empty).
+  * `href` — the destination URL or path.
+  * `ancestors` — text of up to 5 ancestor elements, innermost first,
+    truncated to 200 chars each. Use this as the "context" SC 2.4.4
+    talks about.
+
+LINKS:
+
+{elements}
+
+YOUR TASK
+---------
+Return a JSON object with exactly this shape:
+
+{{
+  "violations": [
+    {{
+      "index": <integer index from the LINKS list above>,
+      "reason": "<one sentence explaining what makes the purpose unclear>",
+      "recommendation": "<one sentence suggesting a concrete fix>",
+      "confidence": "<'high' | 'medium' | 'low'>"
+    }}
+  ]
+}}
+
+Rules:
+* Use the integer `index` exactly as shown in the LINKS list. Do not
+  invent indices.
+* Only include links you genuinely believe violate SC 2.4.4. If you
+  are uncertain, set `confidence: "low"` and still include the row —
+  the operator can filter.
+* If no link on the page violates the criterion, return:
+  `{{"violations": []}}`.
+* Be conservative. A descriptive-enough link should NOT be flagged.
+  False positives erode operator trust more than false negatives do.
+* `reason` must be specific to THIS link, not a generic restatement
+  of the criterion.

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% import "partials/_macros.html" as ui %}
+{% block title %}Image-of-text findings (grouped) — Scan #{{ scan.id }}{% endblock %}
+{% block content %}
+  <nav aria-label="Breadcrumb" class="subtle" style="margin-bottom:0.5rem;">
+    <a href="/scans/{{ scan.id }}">Scan #{{ scan.id }}</a>
+    &nbsp;›&nbsp;
+    <span aria-current="page">Image-of-text findings (grouped)</span>
+  </nav>
+
+  <header class="page-header-row">
+    <div>
+      <h2 style="margin:0;">Image-of-text findings — grouped by issue</h2>
+      <p class="subtle" style="margin:0.25rem 0 0 0;">{{ scan.seed_url }}</p>
+    </div>
+    <a href="/scans/{{ scan.id }}/findings" class="btn">
+      Show flat table →
+    </a>
+  </header>
+
+  {# Brief explainer — the WCAG view has the "axe covers ~30% of SCs"
+     scope caveat; this view's analog is "every group's fix applies to
+     every row in it." Surfacing that up front prevents the operator
+     from triaging each row individually when one decision per group
+     would have sufficed. #}
+  <aside role="note"
+         style="margin:1rem 0;padding:0.75rem 1rem;border:1px solid var(--border);border-radius:4px;background:color-mix(in srgb, var(--accent) 4%, var(--bg));">
+    <strong>How this view groups findings.</strong>
+    Findings are bucketed by <code>(classification, alt&nbsp;adequacy)</code> —
+    the same pair our remediation rule book is keyed on. Everything in
+    one group has the <em>same recommended fix</em>, so you can decide
+    once per group instead of once per row. Expand a group to see the
+    individual images and the pages where each appears.
+  </aside>
+
+  <section aria-label="Coverage" class="coverage-grid">
+    <div class="stat-cell">
+      <span class="stat-cell__label">Findings</span>
+      <strong class="stat-cell__value">{{ coverage.finding_count }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Issue groups</span>
+      <strong class="stat-cell__value">{{ groups|length }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Total occurrences</span>
+      <strong class="stat-cell__value">{{ coverage.occurrence_total }}</strong>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-cell__label">Pages crawled</span>
+      <strong class="stat-cell__value">{{ coverage.page_count }}</strong>
+    </div>
+  </section>
+
+  {# Status filter — same UX as the WCAG drill-down: auto-submits on
+     change, GET so the URL stays shareable, "clear" link beside it. #}
+  <form method="get" action="/scans/{{ scan.id }}/findings/grouped" class="filters"
+        style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap;margin:0.75rem 0;">
+    <label>
+      Status
+      <select name="status" onchange="this.form.submit()" style="min-width:14rem;">
+        <option value="" {% if not status_filter %}selected{% endif %}>all statuses</option>
+        {% for opt in status_options %}
+          <option value="{{ opt }}" {% if status_filter == opt %}selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if status_filter %}
+    <a href="/scans/{{ scan.id }}/findings/grouped" class="subtle">clear</a>
+    {% endif %}
+  </form>
+
+  {% if not groups %}
+    <p>
+      No image findings
+      {% if status_filter %} matching status <strong>{{ status_filter }}</strong>{% endif %}
+      for this scan.
+      {% if status_filter %}<a href="/scans/{{ scan.id }}/findings/grouped">Show all statuses</a>{% endif %}
+    </p>
+  {% else %}
+
+  {% for g in groups %}
+  <details class="issue-group" {% if loop.index <= 2 %}open{% endif %}>
+    <summary class="issue-group__summary">
+      <span class="issue-group__title">
+        <span class="sev sev-{{ g.worst_severity }}">{{ g.worst_severity }}</span>
+        {{ g.label }}
+      </span>
+      <span class="issue-group__counts subtle">
+        <strong>{{ g.finding_count }}</strong> finding{{ 's' if g.finding_count != 1 else '' }}
+        · <strong>{{ g.occurrence_count }}</strong> occurrence{{ 's' if g.occurrence_count != 1 else '' }}
+      </span>
+    </summary>
+
+    <div class="issue-group__body">
+      {% if g.remediation_hint %}
+      <div class="issue-group__hint">
+        <strong>Suggested fix:</strong> {{ g.remediation_hint }}
+      </div>
+      {% endif %}
+
+      <div class="issue-group__breakdowns">
+        <div>
+          <strong style="font-size:0.85rem;">Severity:</strong>
+          {% for sev in ('critical', 'major', 'minor', 'info') %}
+            {% if g.severity_breakdown.get(sev) %}
+              <span class="sev sev-{{ sev }}" style="margin-left:0.25rem;">{{ sev }} ({{ g.severity_breakdown[sev] }})</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div>
+          <strong style="font-size:0.85rem;">Status:</strong>
+          {% for st, n in g.status_breakdown.items() %}
+            <span class="subtle" style="margin-left:0.25rem;">{{ st }} ({{ n }})</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Bulk-status action — the whole point of the grouped view. One
+         decision touches every finding in the group. Destructive
+         transitions (remediated / accepted_risk / false_positive) are
+         gated by a JS `confirm()` that names the group and count. #}
+      <form method="post" action="/findings/bulk-status" class="bulk-action"
+            onsubmit="return window.confirm(
+                'Apply ' + this.elements['status'].value
+                + ' to all {{ g.finding_count }} findings in &quot;{{ g.label|e }}&quot;?'
+                + ' This is reversible.');">
+        <input type="hidden" name="scan_id" value="{{ scan.id }}">
+        <input type="hidden" name="finding_ids"
+               value="{% for f in g.findings %}{{ f.id }}{% if not loop.last %},{% endif %}{% endfor %}">
+        <label>
+          <span class="bulk-action__label">Bulk status:</span>
+          <select name="status">
+            {% for opt in ('reviewing', 'in_progress', 'remediated', 'accepted_risk', 'false_positive', 'new') %}
+              <option value="{{ opt }}">{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="btn btn--primary">
+          Apply to all {{ g.finding_count }}
+        </button>
+      </form>
+
+      <table class="data" aria-label="Findings in {{ g.label }}">
+        <thead>
+          <tr>
+            <th scope="col">Image</th>
+            <th scope="col">OCR text</th>
+            <th scope="col">Severity</th>
+            <th scope="col">Status</th>
+            <th scope="col">Pages</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in g.findings %}
+          <tr>
+            <td>
+              {% if f.has_svg_text %}
+                <span class="svg-badge">SVG&nbsp;text</span>
+              {% elif f.content_hash %}
+                <a href="/findings/{{ f.id }}">
+                  <img src="/blobs/{{ f.content_hash }}"
+                       alt="Audited graphic"
+                       loading="lazy" decoding="async"
+                       style="max-width:96px;max-height:64px;border:1px solid var(--border);background:#fff;">
+                </a>
+              {% else %}
+                <span class="subtle">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if f.ocr_text %}
+                <code style="font-size:0.8rem;">{{ f.ocr_text|truncate(120) }}</code>
+                {% if f.ocr_confidence is not none %}
+                <div class="subtle" style="font-size:0.78rem;">confidence {{ '%.0f'|format(f.ocr_confidence) }}%</div>
+                {% endif %}
+              {% else %}
+                <span class="subtle">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="sev sev-{{ f.severity }}">{{ f.severity }}</span>
+              <div class="subtle" style="font-size:0.78rem;">priority {{ '%.2f'|format(f.priority_score) }}</div>
+            </td>
+            <td>{{ f.status }}</td>
+            <td>
+              {# Per-occurrence list — collapsed by default so the row stays
+                 scannable. Expanding reveals the pages and their alt values. #}
+              <details>
+                <summary class="subtle" style="font-size:0.85rem;cursor:pointer;">
+                  {{ f.occurrences|length }} page{{ 's' if f.occurrences|length != 1 else '' }}
+                </summary>
+                <ul style="margin:0.4rem 0 0 0;padding-left:1.2rem;font-size:0.85rem;">
+                  {% for occ in f.occurrences %}
+                  <li>
+                    {# External link: opens the actual page. The
+                       inline ↗ icon makes the external-nav affordance
+                       visible without taking a second line. #}
+                    <a href="{{ occ.page_url }}" target="_blank" rel="noopener noreferrer">{{ occ.page_url|truncate(60) }} <span aria-hidden="true">↗</span><span class="visually-hidden">opens in a new tab</span></a>
+                    <a href="/pages/{{ occ.page_id }}" class="subtle" style="font-size:0.78rem;margin-left:0.4rem;">(view in audit)</a>
+                    — alt=
+                    {% if occ.alt_text is none %}<em class="missing-alt">missing</em>
+                    {% elif occ.alt_text == "" %}<em class="subtle">""</em>
+                    {% else %}&ldquo;{{ occ.alt_text|truncate(80) }}&rdquo;{% endif %}
+                    {% if occ.above_fold %} <span class="subtle">(above fold)</span>{% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
+              </details>
+              <a href="/findings/{{ f.id }}" class="subtle" style="font-size:0.78rem;">triage finding →</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endfor %}
+
+  {% endif %}
+{% endblock %}

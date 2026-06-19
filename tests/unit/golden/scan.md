@@ -9,7 +9,8 @@ _Generated 2026-04-22 12:00 UTC by AccessibleAccessibility._
 - **Started:** 2026-04-22T12:00:00
 - **Finished:** 2026-04-22T12:01:00
 - **Pages crawled:** 2
-- **Findings:** 3
+- **Image-of-text findings (WCAG 1.4.5):** 3
+- **WCAG axe-core findings:** 0 (scanned 0 of 2 pages)
 
 ## Executive summary
 
@@ -55,7 +56,7 @@ Detected 1 critical, 1 minor, 1 informational finding(s) across the crawled page
   - http://example.com/ — alt='Acme Corp'
 - **Review:** http://127.0.0.1:8765/findings/2
 
-## All findings
+## All image-of-text findings
 
 | # | Severity | Score | Classification | Adequacy | Image |
 | ---: | --- | ---: | --- | --- | --- |
