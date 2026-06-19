@@ -22,9 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent
 COVERAGE = ROOT / "src" / "audit" / "web" / "coverage_status.py"
 OUT = ROOT / "site" / "index.html"
 
-REPO_URL = "https://github.com/rayraycodes/Axcess"
-DOCS_URL = f"{REPO_URL}/blob/main/docs/README.md"
-TRACKER_URL = f"{REPO_URL}/blob/main/docs/coverage-tracker.md"
+# Axcess is a private repo, so the public landing page links out to the
+# portfolio (which hosts it) and to on-page sections — never to private
+# GitHub URLs that would 404 for visitors.
+PORTFOLIO_URL = "https://reganmaharjan.com.np/"
 
 
 def _load_coverage():  # type: ignore[no-untyped-def]
@@ -79,9 +80,7 @@ def render() -> str:
         ai_pipelines=ai_ct,
         rule_pipelines=shipped_ct - ai_ct,
         planned_count=counts.planned,
-        repo=REPO_URL,
-        docs=DOCS_URL,
-        tracker=TRACKER_URL,
+        portfolio=PORTFOLIO_URL,
     )
 
 
@@ -194,8 +193,8 @@ TEMPLATE = (
     + """ Axcess</a>
     <nav aria-label="Primary">
       <a href="#pipelines">What it checks</a>
-      <a href="{docs}">Docs</a>
-      <a class="btn btn-primary" href="{repo}">GitHub</a>
+      <a href="#start">How it works</a>
+      <a class="btn btn-primary" href="{portfolio}">← Portfolio</a>
     </nav>
   </div>
 </header>
@@ -210,8 +209,8 @@ TEMPLATE = (
       local AI models — to catch the WCAG issues that need judgment, not just a checklist.
       It all runs on your machine. No cloud, no telemetry.</p>
     <div class="cta">
-      <a class="btn btn-primary" href="{repo}">View on GitHub →</a>
-      <a class="btn btn-ghost" href="{docs}">Read the docs</a>
+      <a class="btn btn-primary" href="#pipelines">See what it checks ↓</a>
+      <a class="btn btn-ghost" href="{portfolio}">← Back to portfolio</a>
     </div>
     <p class="meta">Runs with <strong>zero AI</strong> on just a browser, or add a local
       <strong>Ollama</strong> model for the judgment calls — your content never leaves the machine.</p>
@@ -249,7 +248,7 @@ TEMPLATE = (
     <ul class="chips">
 {roadmap_chips}
     </ul>
-    <p style="margin-top:1.25rem"><a href="{tracker}">See the full coverage tracker →</a></p>
+    <p style="margin-top:1.25rem; color:var(--muted); font-size:.95rem;">Every surface — this page, the in-app Tracking view, and the docs — is generated from one source of truth, so the coverage above always matches the code.</p>
   </div>
 </section>
 
@@ -292,7 +291,7 @@ make frontend-build &amp;&amp; uv run audit serve   <span class="c"># → /app/<
     <span>"""
     + MARK
     + """ <strong>Axcess</strong> · MIT licensed · built at the University of Michigan 〽️</span>
-    <span><a href="{repo}">GitHub</a> · <a href="{docs}">Docs</a> · <a href="{tracker}">Coverage</a></span>
+    <span>A project by <a href="{portfolio}">Regan Maharjan</a></span>
   </div>
 </footer>
 </body>

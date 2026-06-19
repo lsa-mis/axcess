@@ -9,7 +9,7 @@ Axcess crawls a website, renders every page in a real browser, and runs
 probes, and two AI models — to find the WCAG failures that matter. It runs
 entirely on your machine. No cloud, no telemetry, no data leaving your laptop.
 
-[Landing page](https://rayraycodes.github.io/axcess) ·
+[Landing page](https://reganmaharjan.com.np/axcess) ·
 [Documentation](./docs/README.md) ·
 [What it covers](./docs/coverage-tracker.md) ·
 [Hosting](./docs/hosting.md)
