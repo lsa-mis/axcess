@@ -16,6 +16,7 @@ import type {
   ScanDetail,
   ScanSummary,
   ScopePreview,
+  TrackingData,
 } from "./types";
 
 /**
@@ -218,6 +219,13 @@ export const api = {
       `/api/scans/${scanId}/issues?${params}`,
     );
   },
+  /**
+   * Coverage & feature tracker data — what's shipped vs. planned across
+   * every detection pipeline. Served from the same source of truth as
+   * docs/coverage-tracker.md (coverage_status.py), so the page can't
+   * drift from the code.
+   */
+  getTracking: () => request<TrackingData>("/api/tracking"),
 };
 
 /** Direct URL (bypass fetch) for image blobs — used in <img src=…>. */

@@ -128,8 +128,9 @@ still have to do myself, and how?"
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Footprint**: ~60 Python source modules, ~16 Jinja templates, ~30 React
-components, ~450 unit / integration tests. Local-first by design — every
+**Footprint**: ~60 Python source modules, ~30 React components (the only
+UI — the legacy Jinja/HTMX pages were retired), ~450 unit / integration
+tests. Local-first by design — every
 inference call routes through Ollama on the loopback (no cloud, no API
 costs). The Phase-2 transformation hardened the UI itself to WCAG 2.2
 AAA (the audit tool's own UI passes the audit it runs).

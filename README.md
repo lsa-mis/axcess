@@ -1,4 +1,4 @@
-# AccessibleAccessibility
+# Axcess
 
 Local, offline web accessibility auditor. Started as a **WCAG 1.4.5 — Images of Text** detector and has grown into an overall accessibility scanner: it crawls a site, finds every image, runs OCR + a local VLM to detect images that contain text and cross-checks against `alt`, probes pages for keyboard traps (WCAG 2.1.2) with a real browser, and surfaces prioritized findings in a local UI with rescan/diff support. A companion test-management app, **Accessibility Testing Tracker**, lives under [`tracker/`](./tracker/).
 

@@ -52,13 +52,14 @@ src/audit/
 │   └── webhook.py            # env-gated, opt-in
 │
 ├── web/
-│   ├── server.py             # FastAPI app factory (create_app)
-│   ├── templates/            # Jinja: scans, findings, finding_detail, diff,
-│   │                         # new_scan, partials/findings_table
+│   ├── server.py             # FastAPI app factory (create_app): /api/* + SPA shell
+│   ├── coverage_status.py    # source of truth for the /tracking data
+│   ├── issues.py             # unified cross-pipeline issue model
+│   ├── frontend/             # React SPA (Vite + Tailwind), served at /app/
+│   │   ├── src/routes/       # one component per page (Scans, Findings, Tracking, …)
+│   │   ├── src/api/          # typed fetch client + response types
+│   │   └── dist/             # `npm run build` output (gitignored)
 │   └── static/
-│       ├── styles.css        # hand-written, no framework
-│       ├── app.js            # keyboard shortcuts
-│       ├── htmx.min.js       # vendored
 │       └── axe.min.js        # vendored (axe-core test harness)
 │
 ├── db/
@@ -177,17 +178,21 @@ The unit-test `tmp_db` fixture picks up new migrations automatically
 (it `.executescript`s every `.sql` file in the migrations dir in
 filename order).
 
-### Add a UI route
+### Add a UI page
 
-1. Add the route inside `create_app` in `src/audit/web/server.py`.
-2. Create the template under `src/audit/web/templates/`.
-3. If it needs an HTMX partial, render a separate `partials/*.html`
-   and have the route's `render()` call pass `partial="partials/foo.html"`.
-4. Add a route test in `tests/ui/test_routes.py` (TestClient-based,
-   fast).
-5. Add an axe-core test in `tests/ui/test_accessibility_axe.py` if the
-   view is reachable from a user flow. Any WCAG 2.1 AA violation
-   fails the suite.
+The UI is the React SPA — there are no server-rendered pages.
+
+1. Add a JSON endpoint inside `create_app` in `src/audit/web/server.py`
+   (a `/api/*` route returning a `JSONResponse`).
+2. Add the typed response shape to `frontend/src/api/types.ts` and a
+   fetch method to `frontend/src/api/client.ts`.
+3. Create the page component under `frontend/src/routes/` and register it
+   in `frontend/src/App.tsx` (and add a sidebar entry in
+   `components/AppShell.tsx` if it's a top-level destination).
+4. Add an API test in `tests/ui/test_routes.py` (TestClient-based, fast).
+5. Add an axe-core test in `tests/ui/test_accessibility_axe.py` (it drives
+   the built SPA under `/app/`). Any WCAG 2.2 AAA violation fails the
+   suite — run `make frontend-build` first so the bundle exists.
 
 ## Testing philosophy
 

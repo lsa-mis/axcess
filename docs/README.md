@@ -1,4 +1,4 @@
-# AccessibleAccessibility — Docs
+# Axcess — Docs
 
 A local, offline web accessibility auditor. Crawls a URL, extracts every
 image it renders, runs OCR + a vision-language model to decide whether each
@@ -88,7 +88,7 @@ src/audit/
 ├── analyzer/           # OCR (tesseract) + VLM (ollama) clients
 ├── synthesizer/        # alt-compare, priority, remediation rules, findings
 ├── exports/            # CSV / JSON / Jira / Markdown / webhook
-├── web/                # FastAPI + Jinja + HTMX review UI
+├── web/                # FastAPI JSON API (/api/*) + React SPA (frontend/)
 ├── db/                 # schema + migrations + typed upsert helpers + job queue
 └── rules/              # remediation.yaml (hints keyed on class × adequacy)
 
@@ -107,8 +107,9 @@ tests/
 ## Non-negotiables that drive the design
 
 - **Fully offline at runtime** after initial model pull. No telemetry, no
-  CDN calls. htmx and axe-core are vendored under `src/audit/web/static/`;
-  tldextract uses a bundled PSL snapshot.
+  CDN calls. axe-core is vendored under `src/audit/web/static/` and the
+  React bundle ships its own hashed assets; tldextract uses a bundled PSL
+  snapshot.
 - **The tool itself is WCAG 2.2 AAA.** Every review-UI view has axe-core
   tests (with the AAA tag pack) that fail the build on any violation. See
   [`accessibility.md`](./accessibility.md) for the full contract.

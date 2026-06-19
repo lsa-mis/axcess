@@ -291,7 +291,7 @@ def render_audit_report(
     lines.append(f"# Accessibility audit — Scan #{scan.id}")
     lines.append("")
     lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} "
-                 "by AccessibleAccessibility._")
+                 "by Axcess._")
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
     lines.append(f"**Pages crawled:** {scan.page_count}")

@@ -48,7 +48,7 @@ flags disagreements in a triage UI.
                            ▼
                      ┌───────────┐        ┌────────────────┐
                      │ Review UI │        │ Exports        │
-                     │ (HTMX)    │        │ CSV/JSON/Jira/ │
+                     │ (React)   │        │ CSV/JSON/Jira/ │
                      │           │        │ Markdown       │
                      └───────────┘        └────────────────┘
 ```
@@ -340,7 +340,7 @@ only writer and it's single-process.
 | Playwright chromium | `playwright install chromium` is a one-time download |
 | Ollama model | `ollama pull qwen2-vl:2b` is a one-time download |
 | Public Suffix List | tldextract opened with `suffix_list_urls=()` → bundled snapshot |
-| HTMX, axe-core | vendored under `src/audit/web/static/` |
+| axe-core | vendored under `src/audit/web/static/` (test harness) |
 | Defusedxml | local pure-Python parser for sitemaps |
 
 After the one-time setup, disconnecting from the internet and running a

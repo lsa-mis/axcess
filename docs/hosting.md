@@ -1,4 +1,4 @@
-# Hosting AccessibleAccessibility
+# Hosting Axcess
 
 This tool was built **local-first**: a single-user app that binds to
 `127.0.0.1` with no authentication. That's the right default — but you

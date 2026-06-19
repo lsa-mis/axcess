@@ -12,6 +12,7 @@ import FindingsRoute from "./routes/Findings";
 import GroupedFindingsRoute from "./routes/GroupedFindings";
 import FindingDetailRoute from "./routes/FindingDetail";
 import DiffRoute from "./routes/Diff";
+import TrackingRoute from "./routes/Tracking";
 import NotFoundRoute from "./routes/NotFound";
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
         />
         <Route path="/scans/:scanId/diff" element={<DiffRoute />} />
         <Route path="/findings/:findingId" element={<FindingDetailRoute />} />
+        <Route path="/tracking" element={<TrackingRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </AppShell>

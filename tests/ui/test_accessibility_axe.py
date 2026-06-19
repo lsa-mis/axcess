@@ -1,22 +1,19 @@
-"""Playwright + axe-core a11y tests.
+"""Playwright + axe-core a11y tests against the React SPA.
 
-Launches a live uvicorn server against a seeded DB, visits each view in a
-real chromium instance, injects the vendored axe-core build, runs scan, and
-fails if any violations are reported. Also exercises the keyboard-only
-navigation flow (j/k, ?, Enter).
+Launches a live uvicorn server against a seeded DB, drives the React
+bundle under ``/app/`` in a real chromium instance, injects the vendored
+axe-core build, runs a scan, and fails on any violations.
 
-Gated on Playwright + vendored axe — skipped cleanly when either is missing.
+Gated on three things, each skipped cleanly when missing: Playwright, the
+vendored axe build, and a built SPA bundle (``npm run build``). The legacy
+Jinja pages these tests used to cover are gone — the SPA is the only UI.
 
-**Phase 2:** the rule pack is now WCAG 2.2 **AAA** (the actual product
-target). Previously the gate was ``wcag2a + wcag2aa`` only, which let AAA
-regressions land silently. The discovery audit found 60 nodes failing
-``color-contrast-enhanced`` (AAA, 7:1) and 5 failing ``target-size``
-(AA, 24 by 24 CSS px) under the broader rule set; both classes are now gated.
+The rule pack is WCAG 2.2 **AAA** (the product target), so AAA contrast
+and target-size regressions fail here, not just AA.
 """
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -26,24 +23,26 @@ pytestmark = pytest.mark.ui
 
 playwright_async = pytest.importorskip("playwright.async_api")
 
-_AXE_SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2] / "src" / "audit" / "web" / "static" / "axe.min.js"
-)
+_WEB = Path(__file__).resolve().parents[2] / "src" / "audit" / "web"
+_AXE_SCRIPT_PATH = _WEB / "static" / "axe.min.js"
+_DIST_INDEX = _WEB / "frontend" / "dist" / "index.html"
 
 if not _AXE_SCRIPT_PATH.exists():  # pragma: no cover - gated
     pytest.skip("axe-core bundle not vendored", allow_module_level=True)
+if not _DIST_INDEX.exists():  # pragma: no cover - gated
+    pytest.skip("SPA bundle not built (run `npm run build`)", allow_module_level=True)
 
 _AXE_TEXT = _AXE_SCRIPT_PATH.read_text(encoding="utf-8")
 
-# Tags scanned. Mirrors the broader set used by ``audits/baseline/.../run_baseline.py``
-# so the in-tree gate and the baseline scanner stay in sync.
+# Tags scanned. Mirrors the broader set used by the baseline scanner so the
+# in-tree gate and the baseline stay in sync.
 _AXE_TAGS = [
     "wcag2a",
     "wcag2aa",
-    "wcag2aaa",  # 1.4.6 contrast (enhanced), 1.4.8 visual presentation, 2.4.10 section headings, …
+    "wcag2aaa",
     "wcag21a",
     "wcag21aa",
-    "wcag22aa",  # 2.5.7 dragging, 2.5.8 target size, 3.2.6 consistent help, ...
+    "wcag22aa",
     "best-practice",
 ]
 
@@ -73,153 +72,67 @@ def _render_violations(violations: list[dict[str, Any]]) -> str:
     return "\n".join(lines) or "(no details)"
 
 
-@pytest.mark.asyncio
-async def test_scan_list_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
-    base, _ = live_server
+async def _axe_clean(base: str, path: str) -> None:
+    """Open a SPA route, wait for React to settle, assert no axe violations."""
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
-            await page.goto(f"{base}/scans", wait_until="networkidle")
+            await page.goto(f"{base}{path}", wait_until="networkidle")
+            # The SPA renders into #main; wait for it to have content so axe
+            # doesn't scan an empty shell.
+            await page.wait_for_selector("main#main *", timeout=5000)
             violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
+            assert not violations, f"{path}:\n{_render_violations(violations)}"
         finally:
             await browser.close()
 
 
 @pytest.mark.asyncio
-async def test_tracking_page_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
+async def test_dashboard_has_no_axe_violations(live_server: tuple[str, int]) -> None:
+    base, _ = live_server
+    await _axe_clean(base, "/app/")
+
+
+@pytest.mark.asyncio
+async def test_scans_list_has_no_axe_violations(live_server: tuple[str, int]) -> None:
+    base, _ = live_server
+    await _axe_clean(base, "/app/scans")
+
+
+@pytest.mark.asyncio
+async def test_tracking_page_has_no_axe_violations(live_server: tuple[str, int]) -> None:
     # The tool's own coverage page must clear axe — status badges carry
     # text labels (not colour alone) and the tables are properly headed.
     base, _ = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/tracking", wait_until="networkidle")
-            violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
-        finally:
-            await browser.close()
+    await _axe_clean(base, "/app/tracking")
 
 
 @pytest.mark.asyncio
-async def test_findings_list_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
+async def test_findings_list_has_no_axe_violations(live_server: tuple[str, int]) -> None:
     base, scan_id = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
-            violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
-        finally:
-            await browser.close()
+    await _axe_clean(base, f"/app/scans/{scan_id}/findings")
 
 
 @pytest.mark.asyncio
-async def test_finding_detail_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
-    base, scan_id = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
-            # Follow the first finding card's title link.
-            await page.locator("[data-finding-id] a").first.click()
-            await page.wait_for_load_state("networkidle")
-            violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
-        finally:
-            await browser.close()
-
-
-@pytest.mark.asyncio
-async def test_page_detail_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
+async def test_new_scan_form_has_no_axe_violations(live_server: tuple[str, int]) -> None:
     base, _ = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/pages/1", wait_until="networkidle")
-            violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
-        finally:
-            await browser.close()
-
-
-@pytest.mark.asyncio
-async def test_keyboard_navigation_j_k_opens_finding(
-    live_server: tuple[str, int],
-) -> None:
-    base, scan_id = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/scans/{scan_id}/findings", wait_until="networkidle")
-
-            # j highlights the first card.
-            await page.keyboard.press("j")
-            await asyncio.sleep(0.1)
-            current = page.locator('[data-finding-id][aria-current="true"]')
-            assert await current.count() == 1
-
-            # Pressing j again advances; k goes back.
-            await page.keyboard.press("j")
-            second_id = await page.locator('[data-finding-id][aria-current="true"]').get_attribute(
-                "data-finding-id"
-            )
-            await page.keyboard.press("k")
-            first_id = await page.locator('[data-finding-id][aria-current="true"]').get_attribute(
-                "data-finding-id"
-            )
-            assert first_id != second_id
-
-            # Enter on the focused link should navigate to the finding page.
-            await page.keyboard.press("Enter")
-            await page.wait_for_url("**/findings/**", timeout=5000)
-            assert "/findings/" in page.url
-        finally:
-            await browser.close()
-
-
-@pytest.mark.asyncio
-async def test_new_scan_form_has_no_axe_violations(
-    live_server: tuple[str, int],
-) -> None:
-    base, _ = live_server
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page()
-            await page.goto(f"{base}/scans/new", wait_until="networkidle")
-            violations = await _run_axe(page)
-            assert not violations, _render_violations(violations)
-        finally:
-            await browser.close()
+    await _axe_clean(base, "/app/scans/new")
 
 
 @pytest.mark.asyncio
 async def test_skip_link_reachable_by_tab(live_server: tuple[str, int]) -> None:
+    """The SPA's skip-link must be the first Tab stop and point at #main."""
     base, _ = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
-            await page.goto(f"{base}/scans", wait_until="networkidle")
+            await page.goto(f"{base}/app/scans", wait_until="networkidle")
             await page.keyboard.press("Tab")
-            active = await page.evaluate("() => document.activeElement.className")
-            assert "skip-link" in active
+            href = await page.evaluate(
+                "() => document.activeElement && document.activeElement.getAttribute('href')"
+            )
+            assert href == "#main"
         finally:
             await browser.close()

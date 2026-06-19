@@ -44,13 +44,19 @@ const NAV: NavItem[] = [
     isActive: (p) =>
       p === "/scans" || p.startsWith("/scans/") || p.startsWith("/findings/"),
   },
+  {
+    to: "/tracking",
+    label: "Tracking",
+    icon: ListChecks,
+    isActive: (p) => p === "/tracking",
+  },
 ];
 
 /**
- * Brand mark: maize rounded square with blue "AA". The doubled A is the
- * product initials (AccessibleAccessibility) and a deliberate nod to the
- * WCAG AA conformance badge. Inverted relative to the favicon (blue
- * square, maize letters) because the sidebar is already UMich blue.
+ * Brand mark: maize rounded square with blue "Ax" — the product wordmark
+ * (Axcess = access + the axe-core engine at its centre). Inverted relative
+ * to the favicon (blue square, maize letters) because the sidebar is
+ * already UMich blue.
  */
 function BrandMark({ className }: { className?: string }) {
   return (
@@ -61,7 +67,7 @@ function BrandMark({ className }: { className?: string }) {
         className,
       )}
     >
-      AA
+      Ax
     </span>
   );
 }
@@ -106,13 +112,7 @@ function Sidebar() {
     >
       <div className="flex h-14 items-center gap-2.5 border-b border-white/10 px-4">
         <BrandMark className="h-7 w-7 text-xs" />
-        {/* Two-line lockup — the 23-char name fits the w-60 rail cleanly
-            stacked; one line would force a font size too small to read. */}
-        <span className="text-sm font-semibold leading-tight tracking-tight">
-          Accessible
-          <br />
-          Accessibility
-        </span>
+        <span className="text-base font-semibold tracking-tight">Axcess</span>
       </div>
       <nav className="flex-1 px-2 py-3">
         <ul className="space-y-1">
@@ -140,18 +140,6 @@ function Sidebar() {
               </li>
             );
           })}
-          {/* Tracking is a server-rendered page (outside the SPA's /app
-              basename), so it's a plain anchor — a full navigation, not a
-              client-side Link. Same row styling for visual continuity. */}
-          <li>
-            <a
-              href="/tracking"
-              className="group flex min-h-target items-center gap-3 rounded-xs px-3 py-2.5 text-sm font-medium text-white/85 no-underline transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <ListChecks className="h-5 w-5 shrink-0" aria-hidden />
-              <span>Tracking</span>
-            </a>
-          </li>
         </ul>
       </nav>
       {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0) — at
@@ -176,9 +164,7 @@ function TopBar() {
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex items-center gap-2 text-sm text-fg-muted md:hidden">
         <BrandMark className="h-7 w-7 text-xs" />
-        <span className="font-semibold leading-tight text-fg">
-          AccessibleAccessibility
-        </span>
+        <span className="font-semibold leading-tight text-fg">Axcess</span>
       </div>
       {/* The ONE global scan CTA — every other "New scan" button was
           consolidated into this. `size="lg"` because it's the app-level

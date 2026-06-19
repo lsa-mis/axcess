@@ -22,7 +22,7 @@ from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
     help=(
-        "AccessibleAccessibility — local, offline web accessibility auditor "
+        "Axcess — local, offline web accessibility auditor "
         "(images-of-text detection, keyboard-trap probing, and more)."
     ),
     no_args_is_help=True,

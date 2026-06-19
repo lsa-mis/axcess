@@ -1,7 +1,8 @@
 # Coverage & feature tracker
 
-> **In the app:** this same data renders live at **`/tracking`** (linked
-> from the sidebar). Both that page and this doc read from
+> **In the app:** this same data renders live on the **Tracking** page
+> (`/app/tracking`, linked from the sidebar), served from the
+> `/api/tracking` endpoint. Both that page and this doc read from
 > `src/audit/web/coverage_status.py` — flip a status there and both
 > update. This file is the long-form version with the verification map.
 

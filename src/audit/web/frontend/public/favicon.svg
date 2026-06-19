@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="AccessibleAccessibility">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Axcess">
   <!-- UMich blue rounded background. -->
   <rect width="32" height="32" rx="6" fill="#00274C"/>
-  <!-- Maize "AA" — the product initials (AccessibleAccessibility) and a
-       deliberate nod to the WCAG AA conformance badge. Two kerned capital
-       A's drawn as chunky triangular letterforms with crossbars, stroke
-       weight tuned so the pair still reads at 16×16. -->
-  <path d="M10.2 7 L14.4 25 H10.6 L9.95 21.6 H5.85 L5.2 25 H1.4 L5.6 7 Z M7.9 11.6 L6.6 17.9 H9.2 Z" fill="#FFCB05"/>
-  <path d="M26.4 7 L30.6 25 H26.8 L26.15 21.6 H22.05 L21.4 25 H17.6 L21.8 7 Z M24.1 11.6 L22.8 17.9 H25.4 Z" fill="#FFCB05"/>
+  <!-- Maize "Ax" wordmark — the product name (Axcess = access + the
+       axe-core engine). Bold geometric sans so the pair still reads at
+       16×16. Maize #FFCB05 on UMich blue clears AAA contrast. -->
+  <text x="16" y="22" text-anchor="middle" fill="#FFCB05"
+        font-family="Arial, Helvetica, sans-serif" font-size="18"
+        font-weight="800">Ax</text>
 </svg>

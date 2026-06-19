@@ -1,8 +1,9 @@
-"""Local review UI — FastAPI + HTMX + Jinja on 127.0.0.1.
+"""Review UI backend — FastAPI JSON API + the React SPA shell.
 
-All routes are read-mostly against the SQLite audit DB. The only write path
-is ``POST /findings/{id}/status``. Server binds to 127.0.0.1 only; no
-authentication is provided because this is a single-user local tool.
+All UI is served by the React bundle under ``/app/``; every data route
+lives under ``/api/*``. The legacy Jinja/HTMX server-rendered pages have
+been removed — this module is now the JSON surface, the SPA shell, blob
+serving, exports, and the optional shared-token gate.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import Body, FastAPI, Form, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -26,7 +27,6 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from audit import __version__
 from audit.blob_store import BlobStore
@@ -95,8 +95,6 @@ _EXPORT_EXTENSIONS = {
 }
 
 _BASE_DIR = Path(__file__).resolve().parent
-_TEMPLATES_DIR = _BASE_DIR / "templates"
-_STATIC_DIR = _BASE_DIR / "static"
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
 # Favicon lives under frontend/public/ as the source of truth (Vite copies it
 # verbatim into dist/ on build). We resolve at request time rather than import
@@ -118,7 +116,7 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     resolved_blob = blob_dir or settings.blob_dir
     blob_store = BlobStore(resolved_blob)
 
-    app = FastAPI(title="AccessibleAccessibility", version=__version__)
+    app = FastAPI(title="Axcess", version=__version__)
 
     # Optional shared-token gate. No-op when ``AUDIT_ACCESS_TOKEN`` is
     # unset (the default) so local dev + the test suite are untouched.
@@ -158,7 +156,6 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 response.set_cookie(_cookie_name, _access_token, httponly=True, samesite="lax")
             return response
 
-    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
     # React bundle lives under /app/. The asset paths (/app/assets/…) are
     # served by Vite's hashed output directly from dist/; the SPA shell
     # (index.html) is served for every /app/* route so React Router can
@@ -171,43 +168,6 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             StaticFiles(directory=_frontend_assets),
             name="app-assets",
         )
-    templates = Jinja2Templates(directory=_TEMPLATES_DIR)
-
-    # Helpers for templates that build URLs with one filter swapped or
-    # dropped. Used by issues.html to render the "remove this filter"
-    # chips and the column-header sort links without needing JS.
-    def _drop_param(key: str, filters: dict[str, str]) -> str:
-        from urllib.parse import urlencode
-
-        kept = {k: v for k, v in filters.items() if k != key and v}
-        return urlencode(kept, doseq=True)
-
-    def _sort_link(label: str, sort_value: str, filters: dict[str, str], scan_id: int) -> Any:
-        from urllib.parse import urlencode
-
-        from markupsafe import Markup
-
-        params = {k: v for k, v in filters.items() if v and k != "sort"}
-        # Toggle: clicking the currently-active sort flips priority asc/desc;
-        # everything else is single-direction (descending) for now.
-        if sort_value == "priority_desc" and filters.get("sort") == "priority_desc":
-            params["sort"] = "priority_asc"
-        else:
-            params["sort"] = sort_value
-        qs = urlencode(params)
-        active = filters.get("sort") in (sort_value, sort_value.replace("_desc", "_asc"))
-        marker = " ↓" if active else ""
-        # Markup so the <a> tag isn't escaped on render. `label` and
-        # `marker` are static literals supplied by the template author
-        # at call time (never user input); `qs` is `urlencode`-quoted
-        # already; `scan_id` is the int route param. No XSS surface.
-        return Markup(  # noqa: S704
-            f'<a href="/scans/{scan_id}/issues?{qs}" class="sort-link'
-            f'{" sort-link--active" if active else ""}">{label}{marker}</a>'
-        )
-
-    templates.env.globals["_drop_param"] = _drop_param
-    templates.env.globals["_sort_link"] = _sort_link
 
     # Single running crawl at a time. Tracked here (not in the DB) because
     # "running" in the scans table can be stale after a server restart.
@@ -224,21 +184,6 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
 
     def get_conn() -> sqlite3.Connection:
         return connect(resolved_db)
-
-    def render(
-        request: Request,
-        template: str,
-        context: dict[str, Any],
-        *,
-        partial: str | None = None,
-    ) -> HTMLResponse:
-        """Render full template normally; render ``partial`` for HTMX requests."""
-        chosen = (
-            partial
-            if partial is not None and request.headers.get("HX-Request") == "true"
-            else template
-        )
-        return templates.TemplateResponse(request, chosen, context)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -478,101 +423,6 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             }
         )
 
-    @app.get("/scans/{scan_id}/issues", response_class=HTMLResponse)
-    def scan_issues(
-        request: Request,
-        scan_id: int,
-        conformance: str = Query(default=""),
-        responsibility: str = Query(default=""),
-        abilities: str = Query(default=""),
-        status: str = Query(default=""),
-        q: str = Query(default=""),
-        sort: str = Query(default="priority_desc"),
-    ) -> HTMLResponse:
-        """Unified Issues table — both pipelines, Siteimprove-style.
-
-        This is the new operator entry point. URL-driven so a filtered
-        view is bookmarkable. Filters are applied in Python after the
-        underlying scan-wide queries — keeps row-building in one place
-        even if it costs a small amount of data shuffling.
-        """
-        from audit.web import issues as issues_mod
-
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            filtered = issues_mod.list_issues(
-                conn,
-                scan_id,
-                conformance=_split_csv(conformance),
-                responsibility=_split_csv(responsibility),
-                abilities=_split_csv(abilities),
-                status=status or None,
-                search=q or None,
-                sort=sort,
-            )
-            # Breakdowns from the *unfiltered* set so chips show
-            # "Vision (12)" — what's available to filter to, not
-            # what's already been narrowed.
-            unfiltered = issues_mod.list_issues(conn, scan_id)
-        return render(
-            request,
-            "issues.html",
-            {
-                "scan": scan,
-                "rows": filtered,
-                "conformance_counts": issues_mod.conformance_breakdown(unfiltered),
-                "responsibility_counts": issues_mod.responsibility_breakdown(unfiltered),
-                "abilities_counts": issues_mod.abilities_breakdown(unfiltered),
-                "filters": {
-                    "conformance": conformance,
-                    "responsibility": responsibility,
-                    "abilities": abilities,
-                    "status": status,
-                    "q": q,
-                    "sort": sort,
-                },
-                "status_options": list(_STATUS_OPTIONS),
-                "active": "scan",
-            },
-        )
-
-    @app.get("/scans/{scan_id}/issues/{issue_key:path}", response_class=HTMLResponse)
-    def scan_issue_detail(
-        request: Request,
-        scan_id: int,
-        issue_key: str,
-        sort: str = Query(default="occurrences_desc"),
-    ) -> HTMLResponse:
-        """Per-issue detail — Siteimprove-style "page 2".
-
-        ``issue_key`` matches what the Issues list builds:
-        ``axe:<rule_id>`` or ``image:<classification>_<adequacy>``.
-        Stat tiles on top, description card middle, sortable
-        Pages-with-this-issue table at the bottom. Pages link out to
-        the actual site by default; a secondary affordance drills into
-        the in-app per-page view.
-        """
-        from audit.web import issues as issues_mod
-
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            detail = issues_mod.get_issue_detail(conn, scan_id, issue_key, sort=sort)
-        if detail is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Issue {issue_key!r} not found in scan {scan_id}",
-            )
-        return render(
-            request,
-            "issue_detail.html",
-            {
-                "scan": scan,
-                "detail": detail,
-                "sort": sort,
-                "active": "scan",
-            },
-        )
-
     @app.get("/api/scans/{scan_id}/issues/{issue_key:path}")
     def api_scan_issue_detail(
         scan_id: int,
@@ -631,49 +481,6 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 "abilities_counts": issues_mod.abilities_breakdown(unfiltered),
                 "total_unfiltered": len(unfiltered),
             }
-        )
-
-    @app.get("/scans/{scan_id}/a11y/by-rule", response_class=HTMLResponse)
-    def scan_a11y_by_rule(
-        request: Request,
-        scan_id: int,
-        status: str | None = Query(default=None),
-        rule: str | None = Query(default=None),
-    ) -> HTMLResponse:
-        """WCAG axe findings, grouped by rule — the actionable cut.
-
-        The default /a11y view groups by WCAG SC (the reporting axis).
-        This view groups by axe ``rule_id`` (the fixing axis): one
-        ``color-contrast`` row standing in for the 800 pages that
-        same CSS class fails on. Bulk-status lives per group.
-
-        ``rule`` (single rule_id) narrows to one card — the deep-link
-        target for clicks from the unified Issues table. Defaults to
-        showing all rules.
-        """
-        from audit.web import a11y_queries
-
-        normalized_status = status if status else None
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            coverage = a11y_queries.coverage(conn, scan_id)
-            groups = a11y_queries.grouped_by_rule(conn, scan_id, status=normalized_status)
-            if rule:
-                groups = [g for g in groups if g["rule_id"] == rule]
-            status_counts = a11y_queries.by_status(conn, scan_id)
-        return render(
-            request,
-            "a11y_by_rule.html",
-            {
-                "scan": scan,
-                "coverage": coverage,
-                "groups": groups,
-                "rule_filter": rule or "",
-                "status_filter": normalized_status or "",
-                "status_options": list(_STATUS_OPTIONS),
-                "status_counts": status_counts,
-                "active": "scan",
-            },
         )
 
     @app.get("/api/scans/{scan_id}/a11y/by-rule")
@@ -992,13 +799,33 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             }
         )
 
+    @app.get("/api/tracking")
+    def api_tracking() -> JSONResponse:
+        """Coverage & feature tracker data for the SPA /tracking page.
+
+        Served from ``coverage_status`` (the single source of truth shared
+        with ``docs/coverage-tracker.md``) so the page can't drift from
+        the code.
+        """
+        counts = roadmap_counts()
+        return JSONResponse(
+            {
+                "shipped": [vars(p) for p in SHIPPED],
+                "roadmap": [vars(r) for r in ROADMAP],
+                "counts": {
+                    "shipped": counts.shipped,
+                    "in_progress": counts.in_progress,
+                    "planned": counts.planned,
+                },
+            }
+        )
+
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
-        # React SPA is the default UI; Jinja version lingers at /scans, /findings
-        # while we finish the migration. Fall through to /scans if the bundle
-        # isn't built yet so developers still land somewhere useful.
-        target = "/app/" if _FRONTEND_DIST.is_dir() else "/scans"
-        return RedirectResponse(target, status_code=307)
+        # The React SPA is the only UI. /app/ serves a 503 "build the
+        # frontend" notice if the bundle isn't built yet, so it's always
+        # the right redirect target.
+        return RedirectResponse("/app/", status_code=307)
 
     @app.get("/app", include_in_schema=False)
     @app.get("/app/", include_in_schema=False)
@@ -1021,624 +848,9 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             )
         return FileResponse(index, media_type="text/html")
 
-    @app.get("/scans", response_class=HTMLResponse)
-    def scans_list(request: Request) -> HTMLResponse:
-        with get_conn() as conn:
-            rows = conn.execute(
-                "SELECT id, seed_url, status, page_count, finding_count, started_at "
-                "FROM scans ORDER BY id DESC"
-            ).fetchall()
-        return render(
-            request,
-            "scans.html",
-            {"scans": [dict(r) for r in rows], "active": "scans"},
-        )
-
-    @app.get("/tracking", response_class=HTMLResponse)
-    def tracking(request: Request) -> HTMLResponse:
-        """Coverage & feature tracker: what's shipped vs. planned.
-
-        Renders straight from ``coverage_status`` (the single source of
-        truth shared with ``docs/coverage-tracker.md``) so the page can't
-        silently drift from the code.
-        """
-        return render(
-            request,
-            "tracking.html",
-            {
-                "shipped": SHIPPED,
-                "roadmap": ROADMAP,
-                "counts": roadmap_counts(),
-                "active": "tracking",
-            },
-        )
-
-    @app.get("/scans/new", response_class=HTMLResponse)
-    def new_scan_form(request: Request) -> HTMLResponse:
-        task = crawl_state.get("task")
-        running_id: int | None = None
-        if isinstance(task, asyncio.Task) and not task.done():
-            val = crawl_state.get("scan_id")
-            running_id = int(val) if isinstance(val, int) else None
-        return render(
-            request,
-            "new_scan.html",
-            {"form": {}, "running_scan_id": running_id, "active": "new"},
-        )
-
-    @app.get("/scans/new/preview", response_class=HTMLResponse)
-    def new_scan_preview(
-        request: Request,
-        url: str = Query(default=""),
-        whole_host: str = Query(default=""),
-    ) -> HTMLResponse:
-        """HTMX-driven preview of the scope the crawler will actually use."""
-        url = (url or "").strip()
-        if not url:
-            return HTMLResponse("")
-        error = _validate_seed_url(url)
-        if error is not None:
-            return HTMLResponse(f'<span class="subtle">{error}</span>')
-        normalized = url_policy.normalize_seed_url(url)
-        if whole_host:
-            return HTMLResponse(
-                "<strong>Scope:</strong> entire host "
-                f"<code>{url_policy.build_scope(normalized).seed_host}</code>"
-            )
-        scope = url_policy.build_scope(normalized)
-        suffix = (
-            "" if normalized == url else f" (auto-added trailing slash: <code>{normalized}</code>)"
-        )
-        return HTMLResponse(
-            f"<strong>Scope:</strong> <code>{scope.seed_host}{scope.path_prefix}</code>{suffix}"
-        )
-
-    @app.post("/scans/new", response_class=HTMLResponse)
-    async def new_scan_submit(
-        request: Request,
-        url: str = Form(...),
-        max_pages: int = Form(100),
-        max_depth: int = Form(10),
-        rps: float = Form(2.0),
-        workers: int = Form(4),
-        include_subdomain: str | None = Form(default=None),
-        whole_host: str | None = Form(default=None),
-        ignore_robots: str | None = Form(default=None),
-        skip_ocr: str | None = Form(default=None),
-        skip_vlm: str | None = Form(default=None),
-        static_only: str | None = Form(default=None),
-        skip_axe: str | None = Form(default=None),
-        skip_keyboard: str | None = Form(default=None),
-        skip_responsive: str | None = Form(default=None),
-        axe_level: str = Form(default="AA"),
-    ) -> Response:
-        form = {
-            "url": url,
-            "max_pages": max_pages,
-            "max_depth": max_depth,
-            "rps": rps,
-            "workers": workers,
-            "include_subdomain": bool(include_subdomain),
-            "whole_host": bool(whole_host),
-            "ignore_robots": bool(ignore_robots),
-            "skip_ocr": bool(skip_ocr),
-            "skip_vlm": bool(skip_vlm),
-            "static_only": bool(static_only),
-            "skip_axe": bool(skip_axe),
-            "skip_keyboard": bool(skip_keyboard),
-            "skip_responsive": bool(skip_responsive),
-            "axe_level": axe_level,
-        }
-        error = _validate_seed_url(url)
-        if error is not None:
-            return render(
-                request,
-                "new_scan.html",
-                {"form": form, "error": error, "running_scan_id": None, "active": "new"},
-            )
-
-        task = crawl_state.get("task")
-        if isinstance(task, asyncio.Task) and not task.done():
-            running_val = crawl_state.get("scan_id")
-            running_id = int(running_val) if isinstance(running_val, int) else None
-            return render(
-                request,
-                "new_scan.html",
-                {
-                    "form": form,
-                    "error": "A crawl is already running. Wait for it to finish or interrupt it.",
-                    "running_scan_id": running_id,
-                    "active": "new",
-                },
-            )
-
-        config = _build_crawl_config(form, settings)
-        scan_id = _prepare_scan_row(resolved_db, config)
-        crawl_state["scan_id"] = scan_id
-
-        async def _run_and_unregister() -> None:
-            try:
-                await _run_background_crawl(resolved_db, config)
-            finally:
-                # Leave scan_id in place so the form can still show "last run".
-                pass
-
-        crawl_state["task"] = asyncio.create_task(_run_and_unregister())
-        return RedirectResponse(url=f"/scans/{scan_id}", status_code=303)
-
-    @app.get("/scans/{scan_id}", response_class=HTMLResponse)
-    def scan_detail(request: Request, scan_id: int) -> HTMLResponse:
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            breakdown = _severity_breakdown(conn, scan_id)
-            prev = conn.execute(
-                """
-                SELECT id FROM scans
-                 WHERE seed_url = ? AND id <> ? AND status = 'completed'
-                 ORDER BY id DESC LIMIT 1
-                """,
-                (scan["seed_url"], scan_id),
-            ).fetchone()
-            previous_scan_id = int(prev["id"]) if prev is not None else None
-            blocked = _detect_blocked_scan(conn, scan_id, scan)
-            progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
-        return render(
-            request,
-            "scan_detail.html",
-            {
-                "scan": scan,
-                "by_severity": breakdown,
-                "previous_scan_id": previous_scan_id,
-                "blocked": blocked,
-                "progress": progress,
-                "methods_used": _methods_used(scan),
-                "active": "scan",
-            },
-        )
-
-    @app.get("/scans/{scan_id}/a11y", response_class=HTMLResponse)
-    def scan_a11y(
-        request: Request,
-        scan_id: int,
-        wcag_sc: str | None = Query(default=None),
-        status: str | None = Query(default=None),
-    ) -> HTMLResponse:
-        """Per-scan WCAG axe-core findings, segregated by SC.
-
-        When ``wcag_sc`` is given, drill into that SC's individual
-        violations (URL-shareable: ``/scans/5/a11y?wcag_sc=1.4.3``).
-        Without it, show the SC roll-up.
-
-        ``status`` filters drill-down rows by triage state. An empty
-        string (or omitted) means "all statuses". Unknown values are
-        ignored by the queries layer.
-        """
-        from audit.web import a11y_queries
-
-        normalized_status = status if status else None
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            coverage = a11y_queries.coverage(conn, scan_id)
-            grouped = a11y_queries.by_sc(conn, scan_id)
-            level_counts = a11y_queries.by_level(conn, scan_id)
-            impact_counts = a11y_queries.by_impact(conn, scan_id)
-            status_counts = a11y_queries.by_status(conn, scan_id)
-            # Drill-down only fires when the user clicked into a specific
-            # SC — non-null query param. (An empty-string query param means
-            # "best-practice" since those rows have wcag_sc IS NULL; that's
-            # handled in the queries module.)
-            drill = (
-                a11y_queries.findings_for_sc(conn, scan_id, wcag_sc, status=normalized_status)
-                if wcag_sc is not None
-                else []
-            )
-        return render(
-            request,
-            "a11y.html",
-            {
-                "scan": scan,
-                "coverage": coverage,
-                "groups": grouped,
-                "level_counts": level_counts,
-                "impact_counts": impact_counts,
-                "status_counts": status_counts,
-                "wcag_sc": wcag_sc,
-                "status_filter": normalized_status or "",
-                "status_options": list(_STATUS_OPTIONS),
-                "drill": drill,
-                "active": "scan",
-            },
-        )
-
-    @app.get("/scans/{scan_id}/findings/grouped", response_class=HTMLResponse)
-    def scan_findings_grouped(
-        request: Request,
-        scan_id: int,
-        status: str | None = Query(default=None),
-        classification: str | None = Query(default=None),
-        adequacy: str | None = Query(default=None),
-    ) -> HTMLResponse:
-        """Image-of-text findings, grouped by remediation key.
-
-        Parallels the WCAG axe rollup at ``/scans/{id}/a11y`` — instead
-        of grouping by ``wcag_sc``, we group by
-        ``(classification, alt_adequacy)`` because that pair is the
-        natural identity of an issue type: every finding in the same
-        group inherits the same row from ``rules/remediation.yaml`` and
-        therefore the same recommended fix. The flat power-user view
-        still lives at ``/scans/{id}/findings``.
-
-        ``classification`` + ``adequacy`` together narrow to one group
-        — the deep-link target for clicks from the unified Issues
-        table. Both must be present to filter; either alone is ignored.
-        """
-        from audit.web import image_findings_queries
-
-        normalized_status = status if status else None
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            cov = image_findings_queries.coverage(conn, scan_id)
-            groups = image_findings_queries.grouped_by_remediation(
-                conn, scan_id, status=normalized_status
-            )
-            if classification and adequacy:
-                # `classification` may legitimately be the literal
-                # string "unclassified" (image findings without a VLM
-                # call). The DB stores it as None in that case, so map.
-                target_cls = None if classification == "unclassified" else classification
-                groups = [
-                    g
-                    for g in groups
-                    if (g.get("classification") == target_cls and g.get("alt_adequacy") == adequacy)
-                ]
-        return render(
-            request,
-            "findings_grouped.html",
-            {
-                "scan": scan,
-                "coverage": cov,
-                "groups": groups,
-                "status_filter": normalized_status or "",
-                "status_options": list(_STATUS_OPTIONS),
-                "active": "scan",
-            },
-        )
-
-    @app.get("/scans/{scan_id}/findings", response_class=HTMLResponse)
-    def scan_findings(
-        request: Request,
-        scan_id: int,
-        severity: str = Query(default=""),
-        status: str = Query(default=""),
-        classification: str = Query(default=""),
-        q: str = Query(default=""),
-        page: int = Query(default=1, ge=1),
-    ) -> HTMLResponse:
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            filters: dict[str, str] = {
-                "severity": severity if severity in _SEVERITY_OPTIONS else "",
-                "status": status if status in _STATUS_OPTIONS else "",
-                "classification": (
-                    classification if classification in _CLASSIFICATION_OPTIONS else ""
-                ),
-                "q": q,
-            }
-            findings, total = _query_findings(
-                conn, scan_id=scan_id, filters=filters, page=page, size=_PAGE_SIZE
-            )
-        pagination = _pagination(page=page, size=_PAGE_SIZE, total=total, filters=filters)
-        return render(
-            request,
-            "findings.html",
-            {
-                "scan": scan,
-                "findings": findings,
-                "filters": filters,
-                "status_options": list(_STATUS_OPTIONS),
-                "classification_options": list(_CLASSIFICATION_OPTIONS),
-                "pagination": pagination,
-                "active": "findings",
-            },
-            partial="partials/findings_table.html",
-        )
-
-    @app.get("/findings/{finding_id}", response_class=HTMLResponse)
-    def finding_detail(request: Request, finding_id: int) -> HTMLResponse:
-        with get_conn() as conn:
-            row = conn.execute(
-                """
-                SELECT f.id, f.scan_id, f.status, f.severity, f.priority_score,
-                       f.remediation_hint, f.wcag_criterion,
-                       i.id AS image_id, i.content_hash, i.blob_path, i.mime,
-                       i.width, i.height, i.has_svg_text, i.src_url_canonical,
-                       a.ocr_text, a.ocr_confidence, a.vlm_classification,
-                       a.vlm_rationale
-                  FROM findings f
-                  JOIN images i ON i.id = f.image_id
-                  LEFT JOIN analyses a ON a.image_id = i.id
-                 WHERE f.id = ?
-                 ORDER BY
-                    CASE WHEN a.vlm_classification IS NOT NULL THEN 0 ELSE 1 END,
-                    a.analyzed_at DESC
-                 LIMIT 1
-                """,
-                (finding_id,),
-            ).fetchone()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Finding not found")
-            finding = dict(row)
-            finding["alt_adequacy"] = None
-            scan = _load_scan_or_404(conn, int(finding["scan_id"]))
-            occurrences = [
-                dict(r)
-                for r in conn.execute(
-                    """
-                    SELECT pi.page_id, pi.alt_text, pi.above_fold,
-                           p.url_normalized AS page_url
-                      FROM page_images pi
-                      JOIN pages p ON p.id = pi.page_id
-                     WHERE pi.image_id = ? AND p.scan_id = ?
-                     ORDER BY pi.position
-                    """,
-                    (finding["image_id"], finding["scan_id"]),
-                ).fetchall()
-            ]
-        return render(
-            request,
-            "finding_detail.html",
-            {
-                "finding": finding,
-                "scan": scan,
-                "occurrences": occurrences,
-                "status_options": list(_STATUS_OPTIONS),
-                "active": "findings",
-            },
-        )
-
-    @app.post("/findings/{finding_id}/status", response_class=HTMLResponse)
-    def set_finding_status(
-        request: Request,
-        finding_id: int,
-        status: str = Form(...),
-        confirm: str | None = Form(default=None),
-    ) -> HTMLResponse:
-        if status not in _STATUS_OPTIONS:
-            raise HTTPException(status_code=400, detail="Unknown status value")
-        with get_conn() as conn:
-            existing = conn.execute(
-                "SELECT status FROM findings WHERE id = ?", (finding_id,)
-            ).fetchone()
-            if existing is None:
-                raise HTTPException(status_code=404, detail="Finding not found")
-            prev = existing["status"]
-            if (
-                status in _DESTRUCTIVE_TRANSITIONS
-                and prev != status
-                and confirm != "yes"
-                and request.headers.get("HX-Request") == "true"
-            ):
-                return HTMLResponse(
-                    '<span role="alert">Confirm marking as '
-                    f"<strong>{status}</strong>. Re-submit with confirm=yes.</span>",
-                )
-            conn.execute(
-                "UPDATE findings SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (status, finding_id),
-            )
-            conn.execute(
-                """
-                INSERT INTO finding_history
-                    (finding_id, scan_id, change_type, from_status, to_status, actor, note)
-                SELECT id, scan_id, 'status_change', ?, ?, 'user', NULL
-                  FROM findings WHERE id = ?
-                """,
-                (prev, status, finding_id),
-            )
-        if request.headers.get("HX-Request") == "true":
-            return HTMLResponse(
-                f'<span class="subtle">Status updated to <strong>{status}</strong>.</span>'
-            )
-        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/findings/{finding_id}">')
-
-    @app.post("/findings/bulk-status", response_class=HTMLResponse)
-    def jinja_bulk_set_finding_status(
-        request: Request,
-        status: str = Form(...),
-        finding_ids: str = Form(...),
-        scan_id: int = Form(...),
-    ) -> HTMLResponse:
-        """Form-post bulk-status for the Jinja grouped view.
-
-        ``finding_ids`` arrives as a comma-separated string from a
-        hidden form field — simpler than multiple repeated form params
-        because the grouped template renders many groups, each with its
-        own set of ids. After the update we redirect back to the
-        referring grouped page so the counts re-render.
-        """
-        if status not in _STATUS_OPTIONS:
-            raise HTTPException(status_code=400, detail="Unknown status value")
-        try:
-            ids = [int(p) for p in finding_ids.split(",") if p.strip()]
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400, detail="finding_ids must be a comma-separated integer list"
-            ) from exc
-        with get_conn() as conn:
-            repo.bulk_set_findings_status(conn, finding_ids=ids, status=status, actor="user")
-        # Send the user back to the grouped view. Falling back to the
-        # scan detail page when there's no Referer (shouldn't happen
-        # with the form submit but defensive).
-        ref = request.headers.get("referer") or f"/scans/{scan_id}/findings/grouped"
-        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
-
-    @app.post("/a11y-findings/bulk-status", response_class=HTMLResponse)
-    def jinja_bulk_set_a11y_finding_status(
-        request: Request,
-        status: str = Form(...),
-        finding_ids: str = Form(...),
-        scan_id: int = Form(...),
-    ) -> HTMLResponse:
-        """Form-post bulk-status for the Jinja WCAG grouped view."""
-        if status not in _STATUS_OPTIONS:
-            raise HTTPException(status_code=400, detail="Unknown status value")
-        try:
-            ids = [int(p) for p in finding_ids.split(",") if p.strip()]
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=400, detail="finding_ids must be a comma-separated integer list"
-            ) from exc
-        with get_conn() as conn:
-            repo.bulk_set_a11y_findings_status(conn, finding_ids=ids, status=status)
-        ref = request.headers.get("referer") or f"/scans/{scan_id}/a11y"
-        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
-
-    @app.post("/a11y-findings/{finding_id}/status", response_class=HTMLResponse)
-    def set_a11y_finding_status(
-        request: Request,
-        finding_id: int,
-        status: str = Form(...),
-    ) -> HTMLResponse:
-        """HTMX-friendly status update for a WCAG axe finding.
-
-        Returns a tiny inline fragment that the form's `hx-target`
-        swaps in next to the select — same UX pattern as the image
-        finding's status form, but no destructive-transition modal
-        because axe-finding statuses are all reversible (none of them
-        delete anything).
-        """
-        if status not in _STATUS_OPTIONS:
-            raise HTTPException(status_code=400, detail="Unknown status value")
-        with get_conn() as conn:
-            row = conn.execute(
-                "SELECT status FROM page_a11y_findings WHERE id = ?", (finding_id,)
-            ).fetchone()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Finding not found")
-            conn.execute(
-                "UPDATE page_a11y_findings "
-                "   SET status = ?, updated_at = CURRENT_TIMESTAMP "
-                " WHERE id = ?",
-                (status, finding_id),
-            )
-        if request.headers.get("HX-Request") == "true":
-            return HTMLResponse(
-                f'<span class="subtle" role="status">Saved · <strong>{status}</strong></span>'
-            )
-        # Non-HTMX fallback: 303 the user back to the referring page.
-        ref = request.headers.get("referer") or "/"
-        return HTMLResponse(f'<meta http-equiv="refresh" content="0;url={ref}">')
-
-    @app.get("/pages/{page_id}", response_class=HTMLResponse)
-    def page_detail(request: Request, page_id: int) -> HTMLResponse:
-        with get_conn() as conn:
-            page = conn.execute(
-                "SELECT id, scan_id, url_normalized, status_code, title, "
-                "render_mode, fetched_at FROM pages WHERE id = ?",
-                (page_id,),
-            ).fetchone()
-            if page is None:
-                raise HTTPException(status_code=404, detail="Page not found")
-            scan = _load_scan_or_404(conn, int(page["scan_id"]))
-            rows = conn.execute(
-                """
-                SELECT pi.position, pi.alt_text,
-                       i.src_url_canonical,
-                       f.id AS finding_id, f.severity
-                  FROM page_images pi
-                  JOIN images i ON i.id = pi.image_id
-                  LEFT JOIN findings f ON f.image_id = i.id AND f.scan_id = ?
-                 WHERE pi.page_id = ?
-                 ORDER BY pi.position
-                """,
-                (page["scan_id"], page_id),
-            ).fetchall()
-        enriched = [{**dict(r), "src_url_short": _short_url(r["src_url_canonical"])} for r in rows]
-        return render(
-            request,
-            "page_detail.html",
-            {
-                "page": dict(page),
-                "page_images": enriched,
-                "scan": scan,
-                "active": "findings",
-            },
-        )
-
-    @app.post("/scans/{scan_id}/cancel", response_class=HTMLResponse)
-    async def cancel_scan(request: Request, scan_id: int) -> Response:
-        """Stop a running crawl. Safe to call even if the task is gone."""
-        task = crawl_state.get("task")
-        active_scan_id = crawl_state.get("scan_id")
-        cancelled_live = False
-        if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
-            task.cancel()
-            cancelled_live = True
-
-        with get_conn() as conn:
-            existing = conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()
-            if existing is None:
-                raise HTTPException(status_code=404, detail="Scan not found")
-            if existing["status"] == "running":
-                conn.execute(
-                    "UPDATE scans SET status = 'interrupted', "
-                    "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (scan_id,),
-                )
-                # Drop pending jobs so a subsequent crawl starts fresh rather
-                # than resuming whatever this scan was chasing.
-                conn.execute(
-                    "DELETE FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
-                    "AND state = 'pending'",
-                    (scan_id,),
-                )
-        log.info("web.scan_cancelled", scan_id=scan_id, live=cancelled_live)
-        return RedirectResponse(url=f"/scans/{scan_id}", status_code=303)
-
-    @app.get("/scans/{scan_id}/diff", response_class=HTMLResponse)
-    def scan_diff(
-        request: Request,
-        scan_id: int,
-        compare_to: int | None = Query(default=None),
-    ) -> HTMLResponse:
-        with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            if compare_to is None:
-                prev = conn.execute(
-                    """
-                    SELECT id FROM scans
-                     WHERE seed_url = ? AND id <> ? AND status = 'completed'
-                     ORDER BY id DESC LIMIT 1
-                    """,
-                    (scan["seed_url"], scan_id),
-                ).fetchone()
-                if prev is None:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="No prior completed scan to compare against.",
-                    )
-                compare_to = int(prev["id"])
-            compare_scan = _load_scan_or_404(conn, compare_to)
-            report = compute_diff(conn, current_scan_id=scan_id, compare_to_scan_id=compare_to)
-        return render(
-            request,
-            "diff.html",
-            {
-                "scan": scan,
-                "compare_to": compare_scan,
-                "report": report,
-                "counts": report.counts,
-                "active": "scan",
-            },
-        )
-
-    # Two URLs, one handler. The legacy Jinja UI links exports at
-    # ``/scans/{id}/export/{fmt}``; the React SPA's ``exportUrl()`` helper
-    # uses ``/api/scans/{id}/export/{fmt}`` to stay consistent with the rest
-    # of its ``/api/*`` surface. FastAPI lets us stack route decorators on
-    # the same function so we don't duplicate the handler body.
+    # The SPA's ``exportUrl()`` helper downloads from this ``/api/*`` route
+    # (a plain <a download>, bypassing the React-Router basename).
     @app.get("/api/scans/{scan_id}/export/{fmt}")
-    @app.get("/scans/{scan_id}/export/{fmt}")
     def export_scan(request: Request, scan_id: int, fmt: str) -> Response:
         """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
         fmt_lower = fmt.lower()

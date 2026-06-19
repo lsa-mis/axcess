@@ -30,7 +30,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
     lines.append("")
     lines.append(
         f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} "
-        "by AccessibleAccessibility._"
+        "by Axcess._"
     )
     lines.append("")
     lines.append("## Scan metadata")

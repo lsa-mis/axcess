@@ -36,7 +36,7 @@ def is_enabled(env: dict[str, str] | None = None) -> bool:
 def build_payload(scan: ExportScan) -> dict[str, Any]:
     """Return the JSON body the webhook will POST."""
     payload = to_payload(scan)
-    payload["source"] = {"tool": "accessible-accessibility", "version": __version__}
+    payload["source"] = {"tool": "axcess", "version": __version__}
     return payload
 
 
@@ -60,7 +60,7 @@ async def post(
     token = env_map.get(ENV_TOKEN, "").strip()
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": f"accessible-accessibility/{__version__}",
+        "User-Agent": f"axcess/{__version__}",
     }
     if token:
         headers["Authorization"] = f"Bearer {token}"

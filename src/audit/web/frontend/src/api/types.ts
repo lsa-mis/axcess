@@ -421,3 +421,34 @@ export interface DiffReport {
   still_open: DiffEntry[];
   status_changed: DiffEntry[];
 }
+
+// --- Coverage & feature tracker (/api/tracking) ----------------------
+// Mirrors src/audit/web/coverage_status.py. Status is one of the three
+// strings below; the UI maps each to a badge tone.
+export type TrackingStatus = "shipped" | "in_progress" | "planned";
+
+export interface ShippedPipeline {
+  name: string;
+  pipeline: string;
+  engine: string;
+  scs: string;
+  needs_ai: boolean;
+  note: string;
+}
+
+export interface RoadmapItem {
+  wcag: string;
+  issue: string;
+  ai_fit: string;
+  model_class: string;
+  what: string;
+  status: TrackingStatus;
+  reuse: string;
+  note: string;
+}
+
+export interface TrackingData {
+  shipped: ShippedPipeline[];
+  roadmap: RoadmapItem[];
+  counts: { shipped: number; in_progress: number; planned: number };
+}
