@@ -125,7 +125,8 @@ _CLIPPED_TEXT_JS = """
 
 # Reflow detector: does the document need a horizontal scrollbar at the
 # current (320px) viewport, and which elements are wider than it?
-_REFLOW_JS = """
+_REFLOW_JS = (
+    """
 () => {
   const doc = document.scrollingElement || document.documentElement;
   const overflow = doc.scrollWidth - doc.clientWidth;
@@ -158,11 +159,13 @@ _REFLOW_JS = """
   }
   return { overflow: overflow, viewport: doc.clientWidth, offenders: out };
 }
-""" % {  # noqa: UP031 — JS braces break str.format
-    "tolerance": _OVERFLOW_TOLERANCE_PX,
-    "scan_cap": _MAX_ELEMENTS_SCANNED,
-    "max_offenders": _MAX_OFFENDERS_PER_CHECK,
-}
+"""
+    % {  # noqa: UP031 — JS braces break str.format
+        "tolerance": _OVERFLOW_TOLERANCE_PX,
+        "scan_cap": _MAX_ELEMENTS_SCANNED,
+        "max_offenders": _MAX_OFFENDERS_PER_CHECK,
+    }
+)
 
 
 @dataclass

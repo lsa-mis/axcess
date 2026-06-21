@@ -28,10 +28,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
 
     lines.append(f"# Accessibility audit — Scan #{scan.id}")
     lines.append("")
-    lines.append(
-        f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} "
-        "by Axcess._"
-    )
+    lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
     lines.append("## Scan metadata")
     lines.append("")
@@ -117,7 +114,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
         )
 
         if scan.a11y_findings:
-            top = scan.a11y_findings[: TOP_A11Y_N]
+            top = scan.a11y_findings[:TOP_A11Y_N]
             lines.append("")
             lines.append(f"### Top {len(top)} axe violations")
             lines.append("")
@@ -165,9 +162,7 @@ def _format_axe_block(af: ExportA11yFinding) -> list[str]:
     sc = af.wcag_sc or "best-practice"
     lvl = f" (Level {af.wcag_level})" if af.wcag_level else ""
     impact = af.impact or "—"
-    lines.append(
-        f"### [{impact}] {af.rule_id} — SC {sc}{lvl}"
-    )
+    lines.append(f"### [{impact}] {af.rule_id} — SC {sc}{lvl}")
     if af.help:
         lines.append(f"- **Rule:** {af.help}")
     lines.append(f"- **Page:** {af.page_url}")

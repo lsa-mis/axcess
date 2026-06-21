@@ -791,6 +791,42 @@ semantic_criteria:
       need 2D layout, like data tables and maps).
     confidence_default: high
 
+  "2.4.11":
+    title: "Focused element hidden behind a sticky header / overlay"
+    wcag_sc: "2.4.11"
+    wcag_name: "Focus Not Obscured (Minimum)"
+    wcag_level: "AA"
+    abilities_affected: [vision, motor]
+    what_happening: >-
+      Our live-page focus probe focused each interactive element and found
+      one whose centre is covered by a <code>position: fixed</code> or
+      <code>sticky</code> overlay (typically a sticky header or cookie
+      banner). A keyboard user who tabs to it can't see where they are.
+    why_matters: >-
+      Keyboard and screen-magnifier users rely on the focus indicator to
+      know what they've selected. If the focused control scrolls under a
+      sticky header, they're acting blind — submitting forms or following
+      links they can't see.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Add <code>scroll-margin-top</code> (or <code>scroll-padding-top</code>
+        on the scroll container) equal to the sticky header's height, so
+        focused elements scroll into view below it.
+      - >-
+        Where possible reduce the sticky element's height, or make it
+        collapse on scroll, so it covers less of the viewport.
+    verify_manual: >-
+      Tab through the page with the keyboard. Every focused control stays
+      fully visible — none disappears under a sticky/fixed element.
+    verify_automated: >-
+      Re-run the crawl — the focus probe re-checks every page on each pass.
+    acceptance: >-
+      No focusable element is hidden behind a sticky/fixed overlay when it
+      receives keyboard focus.
+    confidence_default: medium
+
   "1.4.4":
     title: "Text clipped when zoomed to 200%"
     wcag_sc: "1.4.4"

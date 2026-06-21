@@ -31,9 +31,7 @@ from audit.analyzer.keyboard.base import (
     RULE_STUCK,
 )
 
-FIXTURE_DIR = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "site" / "sc_2_1_2"
-)
+FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "sc_2_1_2"
 
 
 def _file_url(name: str) -> str:
@@ -126,16 +124,14 @@ async def test_detects_stuck_focus_from_swallowed_tab(page) -> None:  # type: ig
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=3)
     findings = await probe.run(page)
     stuck = [f for f in findings if f.rule_id == RULE_STUCK]
-    assert stuck, (
-        "Expected at least one keyboard-trap-stuck finding; got rules: "
-        + ", ".join(f.rule_id for f in findings)
+    assert stuck, "Expected at least one keyboard-trap-stuck finding; got rules: " + ", ".join(
+        f.rule_id for f in findings
     )
     # The reported selector should point at SOME button-shaped element
     # (we don't pin the exact selector — the probe's selector
     # generation is best-effort, not contractual).
     assert any("button" in f.target_selector.lower() for f in stuck), (
-        f"Stuck finding's selector should mention 'button': "
-        f"{[f.target_selector for f in stuck]}"
+        f"Stuck finding's selector should mention 'button': {[f.target_selector for f in stuck]}"
     )
 
 
@@ -180,9 +176,7 @@ async def test_detects_untitled_iframe(page) -> None:  # type: ignore[no-untyped
 @pytest.mark.asyncio
 async def test_probe_never_raises_on_quirky_page(page) -> None:  # type: ignore[no-untyped-def]
     """A pathological page (no focusables, weird markup) must not crash."""
-    await page.set_content(
-        "<!doctype html><html><body><p>Just some text.</p></body></html>"
-    )
+    await page.set_content("<!doctype html><html><body><p>Just some text.</p></body></html>")
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     # Must return an empty list, not raise.
     findings = await probe.run(page)

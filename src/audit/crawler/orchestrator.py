@@ -24,6 +24,7 @@ from selectolax.parser import HTMLParser
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
+from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -115,7 +116,7 @@ class CrawlConfig:
         "2.4.4",  # Link Purpose (In Context)
         "2.4.9",  # Link Purpose (Link Only)
         "2.4.6",  # Headings and Labels descriptiveness
-        "2.4.10", # Section Headings
+        "2.4.10",  # Section Headings
         "2.5.3",  # Label in Name
         "3.3.2",  # Labels or Instructions
         "1.3.5",  # Identify Input Purpose
@@ -140,6 +141,10 @@ class CrawlConfig:
     # here — axe's `meta-viewport` rule already covers it. ~1-2s per
     # page; disable with ``--skip-responsive``.
     responsive_checks_enabled: bool = True
+    # SC 2.4.11 Focus Not Obscured — live-page focus probe. Deterministic
+    # (focuses each element, checks for a sticky/fixed overlay over its
+    # centre); no model. Default on; disable with ``--skip-focus``.
+    focus_checks_enabled: bool = True
 
 
 @dataclass
@@ -165,6 +170,8 @@ class CrawlSummary:
     keyboard_traps_total: int = 0
     responsive_pages_probed: int = 0
     responsive_findings_total: int = 0
+    focus_pages_probed: int = 0
+    focus_findings_total: int = 0
     findings_written: int = 0
     findings_by_severity: dict[str, int] = field(
         default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -261,6 +268,10 @@ async def run_crawl(
     responsive_probe: ResponsiveProbe | None = None
     if config.responsive_checks_enabled:
         responsive_probe = ResponsiveProbe()
+    # SC 2.4.11 focus-obscured probe — default on. Deterministic, stateless.
+    focus_probe: FocusProbe | None = None
+    if config.focus_checks_enabled:
+        focus_probe = FocusProbe()
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
         js_holder = _LazyJs(
@@ -270,13 +281,12 @@ async def run_crawl(
             axe_level=axe_level,
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
+            focus_probe=focus_probe,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
     # don't multiply load on the daemon.
-    _semantic_provider, semantic_analyzers = await _build_semantic_analyzers(
-        config, client
-    )
+    _semantic_provider, semantic_analyzers = await _build_semantic_analyzers(config, client)
     if semantic_analyzers:
         log.info(
             "semantic.enabled",
@@ -412,6 +422,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
+            "focus_checks_enabled": config.focus_checks_enabled,
         },
         sort_keys=True,
     )
@@ -490,6 +501,7 @@ class _LazyJs:
         axe_level: AxeLevel = "AA",
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
+        focus_probe: FocusProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -498,6 +510,7 @@ class _LazyJs:
         self._axe_level: AxeLevel = axe_level
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
+        self._focus_probe = focus_probe
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -507,6 +520,7 @@ class _LazyJs:
                 axe_level=self._axe_level,
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
+                focus_probe=self._focus_probe,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -664,9 +678,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # Defensive re-check: jobs enqueued under a previous scope (e.g. before
     # the user added a path prefix, or before a server upgrade that tightened
     # scope rules) shouldn't be fetched. Cheaper than the robots call below.
-    if not url_policy.is_in_scope(
-        url, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
-    ):
+    if not url_policy.is_in_scope(url, ctx.scope, allow_subdomains=ctx.config.allow_subdomains):
         ctx.summary.pages_skipped_scope += 1
         return
 
@@ -737,9 +749,12 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # Same gating shape as the keyboard probe; rows are tagged
         # ``pipeline='responsive'``.
         if render_mode == "js" and ctx.config.responsive_checks_enabled:
-            _persist_responsive(
-                ctx, page_id=page_id, findings=result.responsive_findings
-            )
+            _persist_responsive(ctx, page_id=page_id, findings=result.responsive_findings)
+
+        # SC 2.4.11 focus-obscured probe. Same gating; rows tagged
+        # ``pipeline='focus'``.
+        if render_mode == "js" and ctx.config.focus_checks_enabled:
+            _persist_focus(ctx, page_id=page_id, findings=result.focus_findings)
 
         # Phase 9+: per-criterion semantic analyzers. Works on both
         # static and JS-rendered fetches because the first wave is
@@ -956,6 +971,32 @@ def _persist_responsive(
             )
     ctx.summary.responsive_pages_probed += 1
     ctx.summary.responsive_findings_total += len(findings)
+
+
+def _persist_focus(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[FocusFinding, ...],
+) -> None:
+    """Write focus-probe findings (SC 2.4.11) + bump the focus counters."""
+    for f in findings:
+        try:
+            repo.upsert_focus_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "focus.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    ctx.summary.focus_pages_probed += 1
+    ctx.summary.focus_findings_total += len(findings)
 
 
 async def _run_semantic(

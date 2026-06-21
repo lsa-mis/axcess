@@ -146,9 +146,7 @@ class KeyboardProbe:
         # still works — Playwright's keyboard.press routes to whatever
         # element is currently focused. Suppression is deliberate.
         with contextlib.suppress(Exception):
-            await page.evaluate(
-                "() => { try { document.body.focus(); } catch (e) {} }"
-            )
+            await page.evaluate("() => { try { document.body.focus(); } catch (e) {} }")
 
         # Walk up to `max_focusable * 2 + 4` Tab presses; enough
         # headroom even for chrome that injects pseudo-focusable
@@ -397,7 +395,7 @@ class KeyboardProbe:
                 failure_summary=(
                     "Iframe is reachable by Tab but has no title. Keyboard users can land "
                     "inside but cannot tell what they entered, and if the embedded document "
-                    "traps focus, they cannot escape. Add title=\"...\" and ensure the "
+                    'traps focus, they cannot escape. Add title="..." and ensure the '
                     "embedded document is itself keyboard-accessible."
                 ),
                 html_snippet=item.get("snippet", "")[:_SNIPPET_CHARS],

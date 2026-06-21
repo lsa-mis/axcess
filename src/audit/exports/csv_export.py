@@ -28,10 +28,10 @@ CSV_COLUMNS = (
     "finding_kind",
     "finding_id",
     # Shared / unified columns
-    "severity",          # image: critical|major|minor|info  ·  axe: critical|serious|moderate|minor
+    "severity",  # image: critical|major|minor|info  ·  axe: critical|serious|moderate|minor
     "status",
-    "wcag_criterion",    # image: "1.4.5" · axe: SC like "1.4.3"
-    "wcag_level",        # axe only: A|AA|AAA
+    "wcag_criterion",  # image: "1.4.5" · axe: SC like "1.4.3"
+    "wcag_level",  # axe only: A|AA|AAA
     "page_url",
     "ui_url",
     # Image-of-text-specific
@@ -68,9 +68,7 @@ def render_csv(scan: ExportScan) -> str:
 
     for finding in scan.findings:
         if not finding.occurrences:
-            writer.writerow(
-                _image_row(finding, page_url="", alt_text=None, above_fold=False)
-            )
+            writer.writerow(_image_row(finding, page_url="", alt_text=None, above_fold=False))
             continue
         for occ in finding.occurrences:
             writer.writerow(

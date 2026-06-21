@@ -20,6 +20,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Self
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.crawler.fetcher import FetchError, FetchResult
@@ -53,6 +54,7 @@ class JsFetcher:
         axe_level: Level = "AA",
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
+        focus_probe: FocusProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -69,6 +71,10 @@ class JsFetcher:
         # viewport and injects CSS — the most page-mutating step —
         # and restores the viewport when done.
         self._responsive_probe = responsive_probe
+        # SC 2.4.11 focus probe. Runs before the responsive probe (it reads
+        # geometry at the normal viewport) but after axe/keyboard. It only
+        # focuses elements + reads layout — no lasting DOM mutation.
+        self._focus_probe = focus_probe
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
 
@@ -143,6 +149,15 @@ class JsFetcher:
             # Responsive probe LAST — it resizes the viewport and
             # injects CSS, so every read-only/quiet-DOM consumer must
             # already be done. Probe never raises; restores viewport.
+            # Focus probe runs before the viewport-mutating responsive probe.
+            focus_findings: list[FocusFinding] = []
+            if (
+                self._focus_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                focus_findings = await self._focus_probe.run(page)
+
             responsive_findings: list[ResponsiveFinding] = []
             if (
                 self._responsive_probe is not None
@@ -159,6 +174,7 @@ class JsFetcher:
                 axe_violations=tuple(axe_violations),
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
+                focus_findings=tuple(focus_findings),
             )
         finally:
             await ctx.close()

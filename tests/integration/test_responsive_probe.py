@@ -79,9 +79,8 @@ async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-unty
     """A fluid page must produce zero findings from all three checks."""
     await page.goto(_file_url("clean.html"))
     findings = await ResponsiveProbe().run(page)
-    assert findings == [], (
-        "Expected zero findings on the clean fixture, got: "
-        + ", ".join(f"{f.rule_id} on {f.target_selector}" for f in findings)
+    assert findings == [], "Expected zero findings on the clean fixture, got: " + ", ".join(
+        f"{f.rule_id} on {f.target_selector}" for f in findings
     )
 
 
@@ -128,8 +127,7 @@ async def test_detects_text_clipping_at_zoom_proxy(page) -> None:  # type: ignor
     assert RULE_TEXT_CLIPPED in rules, f"zoom clipping not detected; got {rules}"
     clipped = [f for f in findings if f.rule_id == RULE_TEXT_CLIPPED]
     assert any("vw-box" in f.target_selector for f in clipped), (
-        "Expected p#vw-box to be named; got "
-        + str([f.target_selector for f in clipped])
+        "Expected p#vw-box to be named; got " + str([f.target_selector for f in clipped])
     )
     assert RULE_REFLOW not in rules
     assert RULE_SPACING_CLIPPED not in rules
@@ -145,8 +143,7 @@ async def test_detects_clipping_under_text_spacing_override(page) -> None:  # ty
     assert RULE_SPACING_CLIPPED in rules, f"spacing clip not detected; got {rules}"
     clipped = [f for f in findings if f.rule_id == RULE_SPACING_CLIPPED]
     assert any("tight-box" in f.target_selector for f in clipped), (
-        "Expected p#tight-box to be named; got "
-        + str([f.target_selector for f in clipped])
+        "Expected p#tight-box to be named; got " + str([f.target_selector for f in clipped])
     )
     assert RULE_REFLOW not in rules
     assert RULE_TEXT_CLIPPED not in rules

@@ -160,6 +160,16 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_focus: Annotated[
+        bool,
+        typer.Option(
+            "--skip-focus",
+            help=(
+                "Skip the focus-obscured probe (SC 2.4.11 — focusable elements "
+                "hidden behind sticky/fixed overlays)."
+            ),
+        ),
+    ] = False,
     use_js: Annotated[
         bool,
         typer.Option(
@@ -235,6 +245,7 @@ def crawl(
             keyboard_probe_enabled=not skip_keyboard,
             keyboard_probe_max_focusable=keyboard_max_focusable,
             responsive_checks_enabled=not skip_responsive,
+            focus_checks_enabled=not skip_focus,
         )
         if static_only:
             console.print(
@@ -297,18 +308,17 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
         table.add_row("Pages axe-scanned (WCAG)", str(summary.axe_pages_scanned))
         table.add_row("Axe violations total", str(summary.axe_violations_total))
     if summary.keyboard_pages_probed:
-        table.add_row(
-            "Pages keyboard-probed (SC 2.1.2)", str(summary.keyboard_pages_probed)
-        )
+        table.add_row("Pages keyboard-probed (SC 2.1.2)", str(summary.keyboard_pages_probed))
         table.add_row("Keyboard traps total", str(summary.keyboard_traps_total))
     if summary.responsive_pages_probed:
         table.add_row(
             "Pages responsive-probed (1.4.4/.10/.12)",
             str(summary.responsive_pages_probed),
         )
-        table.add_row(
-            "Responsive findings total", str(summary.responsive_findings_total)
-        )
+        table.add_row("Responsive findings total", str(summary.responsive_findings_total))
+    if summary.focus_pages_probed:
+        table.add_row("Pages focus-probed (SC 2.4.11)", str(summary.focus_pages_probed))
+        table.add_row("Focus-obscured findings total", str(summary.focus_findings_total))
     if summary.findings_written:
         table.add_row("Findings written", str(summary.findings_written))
         for level in ("critical", "major", "minor", "info"):

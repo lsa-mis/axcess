@@ -207,22 +207,14 @@ def test_parser_well_formed_response_produces_findings() -> None:
 
 def test_parser_low_confidence_maps_to_minor_impact() -> None:
     analyzer = _make_analyzer()
-    raw = {
-        "violations": [
-            {"index": 0, "reason": "Maybe ambiguous", "confidence": "low"}
-        ]
-    }
+    raw = {"violations": [{"index": 0, "reason": "Maybe ambiguous", "confidence": "low"}]}
     findings = list(analyzer._parse_response(raw, _stub_links(1)))
     assert findings[0].impact == "minor"
 
 
 def test_parser_medium_confidence_maps_to_moderate_impact() -> None:
     analyzer = _make_analyzer()
-    raw = {
-        "violations": [
-            {"index": 0, "reason": "Possibly unclear", "confidence": "medium"}
-        ]
-    }
+    raw = {"violations": [{"index": 0, "reason": "Possibly unclear", "confidence": "medium"}]}
     findings = list(analyzer._parse_response(raw, _stub_links(1)))
     assert findings[0].impact == "moderate"
 
@@ -230,11 +222,7 @@ def test_parser_medium_confidence_maps_to_moderate_impact() -> None:
 def test_parser_unknown_confidence_defaults_to_medium() -> None:
     """Defensive: model invents 'definite' or returns int → moderate."""
     analyzer = _make_analyzer()
-    raw = {
-        "violations": [
-            {"index": 0, "reason": "x", "confidence": "definite"}
-        ]
-    }
+    raw = {"violations": [{"index": 0, "reason": "x", "confidence": "definite"}]}
     findings = list(analyzer._parse_response(raw, _stub_links(1)))
     assert findings[0].impact == "moderate"
 
@@ -269,9 +257,7 @@ def test_parser_drops_out_of_range_indices() -> None:
 
 def test_parser_drops_negative_indices() -> None:
     analyzer = _make_analyzer()
-    raw = {
-        "violations": [{"index": -1, "reason": "bad"}]
-    }
+    raw = {"violations": [{"index": -1, "reason": "bad"}]}
     findings = list(analyzer._parse_response(raw, _stub_links(3)))
     assert findings == []
 
@@ -397,9 +383,7 @@ async def test_analyze_happy_path_produces_findings() -> None:
     async with httpx.AsyncClient() as client:
         provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
         analyzer = LinkPurposeInContextAnalyzer(provider)
-        findings = await analyzer.analyze(
-            AnalysisContext(body=body, page_url="http://x/")
-        )
+        findings = await analyzer.analyze(AnalysisContext(body=body, page_url="http://x/"))
     assert len(findings) == 1
     assert findings[0].criterion_sc == "2.4.4"
     assert "click here" in findings[0].help
@@ -415,9 +399,7 @@ async def test_analyze_empty_page_skips_llm_call() -> None:
     async with httpx.AsyncClient() as client:
         provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
         analyzer = LinkPurposeInContextAnalyzer(provider)
-        findings = await analyzer.analyze(
-            AnalysisContext(body=b"<p>no links</p>", page_url="x")
-        )
+        findings = await analyzer.analyze(AnalysisContext(body=b"<p>no links</p>", page_url="x"))
     assert findings == []
     assert route.call_count == 0  # contract: no LLM call when no candidates
 
@@ -426,18 +408,12 @@ async def test_analyze_empty_page_skips_llm_call() -> None:
 @respx.mock
 async def test_analyze_swallows_llm_error_and_returns_empty() -> None:
     """An unhealthy Ollama mid-crawl shouldn't crash the page."""
-    respx.post(f"{BASE}/api/generate").mock(
-        return_value=httpx.Response(500, text="model crashed")
-    )
+    respx.post(f"{BASE}/api/generate").mock(return_value=httpx.Response(500, text="model crashed"))
     body = b'<a href="/x">click here</a>'
     async with httpx.AsyncClient() as client:
-        provider = OllamaTextProvider(
-            client, model=MODEL, base_url=BASE, max_attempts=1
-        )
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE, max_attempts=1)
         analyzer = LinkPurposeInContextAnalyzer(provider)
-        findings = await analyzer.analyze(
-            AnalysisContext(body=body, page_url="x")
-        )
+        findings = await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
     assert findings == []  # logged + skipped, not raised
 
 
@@ -445,9 +421,7 @@ async def test_analyze_swallows_llm_error_and_returns_empty() -> None:
 @respx.mock
 async def test_analyze_caps_links_at_max_per_call() -> None:
     """A page with MAX_LINKS_PER_CALL + 5 links sends only the first N."""
-    big_body_parts = [
-        f'<a href="/p{i}">link {i}</a>' for i in range(MAX_LINKS_PER_CALL + 5)
-    ]
+    big_body_parts = [f'<a href="/p{i}">link {i}</a>' for i in range(MAX_LINKS_PER_CALL + 5)]
     body = "".join(big_body_parts).encode()
     route = respx.post(f"{BASE}/api/generate").mock(
         return_value=httpx.Response(200, json=_ollama_response({"violations": []}))
@@ -471,18 +445,14 @@ async def test_analyze_model_response_with_indices_out_of_range_drops_them() -> 
     respx.post(f"{BASE}/api/generate").mock(
         return_value=httpx.Response(
             200,
-            json=_ollama_response(
-                {"violations": [{"index": 99, "reason": "ghost"}]}
-            ),
+            json=_ollama_response({"violations": [{"index": 99, "reason": "ghost"}]}),
         )
     )
     body = b'<a href="/x">x</a>'
     async with httpx.AsyncClient() as client:
         provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
         analyzer = LinkPurposeInContextAnalyzer(provider)
-        findings = await analyzer.analyze(
-            AnalysisContext(body=body, page_url="x")
-        )
+        findings = await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
     assert findings == []
 
 

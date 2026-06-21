@@ -172,8 +172,7 @@ def test_grouped_findings_severity_and_status_breakdowns(
 def test_grouped_findings_status_filter(tmp_db: sqlite3.Connection, scan: int) -> None:
     # Mark the logo finding as remediated, then filter.
     tmp_db.execute(
-        "UPDATE findings SET status = 'remediated' "
-        " WHERE scan_id = ? AND severity = 'info'",
+        "UPDATE findings SET status = 'remediated'  WHERE scan_id = ? AND severity = 'info'",
         (scan,),
     )
     remediated = grouped_by_remediation(tmp_db, scan, status="remediated")
@@ -190,9 +189,7 @@ def test_grouped_findings_status_filter(tmp_db: sqlite3.Connection, scan: int) -
     assert len(all_groups) == 2
 
 
-def test_grouped_findings_occurrences_are_attached(
-    tmp_db: sqlite3.Connection, scan: int
-) -> None:
+def test_grouped_findings_occurrences_are_attached(tmp_db: sqlite3.Connection, scan: int) -> None:
     groups = grouped_by_remediation(tmp_db, scan)
     essential = next(g for g in groups if g["classification"] == "essential")
     finding = essential["findings"][0]

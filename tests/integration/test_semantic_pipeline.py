@@ -48,8 +48,7 @@ def _ollama_envelope(payload: dict[str, object]) -> dict[str, str]:
 
 def _seed_scan_page(conn: sqlite3.Connection) -> tuple[int, int]:
     cur = conn.execute(
-        "INSERT INTO scans (seed_url, status, config_json) "
-        "VALUES ('http://x/', 'completed', '{}')"
+        "INSERT INTO scans (seed_url, status, config_json) VALUES ('http://x/', 'completed', '{}')"
     )
     scan_id = int(cur.lastrowid or 0)
     page_id = repo.upsert_page(
@@ -131,11 +130,7 @@ async def test_end_to_end_re_run_is_idempotent(
         return_value=httpx.Response(
             200,
             json=_ollama_envelope(
-                {
-                    "violations": [
-                        {"index": 0, "reason": "x", "confidence": "high"}
-                    ]
-                }
+                {"violations": [{"index": 0, "reason": "x", "confidence": "high"}]}
             ),
         )
     )
@@ -195,8 +190,7 @@ async def test_end_to_end_human_status_survives_rerun(
                 tmp_db, page_id=page_id, scan_id=scan_id, **f.to_repo_kwargs()
             )
         tmp_db.execute(
-            "UPDATE page_a11y_findings SET status = 'accepted_risk' "
-            "WHERE pipeline = 'semantic'"
+            "UPDATE page_a11y_findings SET status = 'accepted_risk' WHERE pipeline = 'semantic'"
         )
 
         # Second run — analyzer rediscovers, upsert preserves status.
@@ -246,9 +240,7 @@ async def test_live_calibration_against_labeled_fixtures() -> None:
 
     base_url = os.environ.get("AUDIT_OLLAMA_BASE", "http://localhost:11434")
     async with httpx.AsyncClient() as client:
-        provider = OllamaTextProvider(
-            client, model=MODEL, base_url=base_url, max_attempts=2
-        )
+        provider = OllamaTextProvider(client, model=MODEL, base_url=base_url, max_attempts=2)
         analyzers = build_analyzers(["2.4.4"], provider)
 
         for name, spec in labels.items():
@@ -262,6 +254,7 @@ async def test_live_calibration_against_labeled_fixtures() -> None:
                 # selector format from extractor: "a[ord=N]" / "a#id" /
                 # "a.class[ord=N]"; pull the ord= value when present.
                 import re
+
                 m = re.search(r"ord=(\d+)", f.target_selector)
                 if m:
                     detected.add(int(m.group(1)))
@@ -284,8 +277,7 @@ async def test_live_calibration_against_labeled_fixtures() -> None:
 
     # Phase 9.1 acceptance targets per PLAN.md.
     assert precision >= 0.85, (
-        f"precision {precision:.2%} below 85% target — "
-        f"too many false positives. Tune the prompt."
+        f"precision {precision:.2%} below 85% target — too many false positives. Tune the prompt."
     )
     assert recall >= 0.75, (
         f"recall {recall:.2%} below 75% target — "

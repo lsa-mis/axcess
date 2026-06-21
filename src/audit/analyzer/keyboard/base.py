@@ -15,9 +15,9 @@ from typing import Any
 
 # Rule ids, kept narrow so the audit-report YAML can pin per-rule
 # remediation copy without globbing.
-RULE_STUCK = "keyboard-trap-stuck"            # focus glued to one element
+RULE_STUCK = "keyboard-trap-stuck"  # focus glued to one element
 RULE_NO_ESCAPE = "keyboard-trap-modal-no-escape"  # Esc doesn't release modal
-RULE_IFRAME = "keyboard-trap-iframe"          # untitled / untabindexed iframe
+RULE_IFRAME = "keyboard-trap-iframe"  # untitled / untabindexed iframe
 
 # WCAG SC + level. We expose them as constants so callers don't
 # hardcode them (they appear in IssueRow rendering, exports, etc.).
@@ -52,8 +52,7 @@ class KeyboardTrap:
     criterion_sc: str = SC
     wcag_level: str = LEVEL
     help: str = (
-        "Keyboard users must be able to move focus away from any element "
-        "using only the keyboard."
+        "Keyboard users must be able to move focus away from any element using only the keyboard."
     )
     help_url: str = HELP_URL
 

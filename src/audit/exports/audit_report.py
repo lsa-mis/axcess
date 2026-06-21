@@ -111,6 +111,7 @@ _PIPELINE_LABEL = {
     "semantic": "per-criterion LLM analyzer",
     "keyboard": "dynamic keyboard-trap probe",
     "responsive": "responsive & zoom probe",
+    "focus": "live-page focus probe",
 }
 
 # Static description of each detection pipeline for the coverage section.
@@ -164,6 +165,15 @@ _PIPELINE_COVERAGE = [
         "SC 1.4.12 clipping under user text-spacing.",
         "confidence": "High for reflow (deterministic geometry); medium for the "
         "clipping checks — designed truncation needs a human eye.",
+    },
+    {
+        "key": "focus",
+        "name": "Live-page focus probe",
+        "method": "Focuses each interactive element in the live page and checks "
+        "whether a position:fixed/sticky overlay covers its centre.",
+        "checks": "SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays.",
+        "confidence": "Medium — catches elements whose centre is covered; "
+        "partial-overlap and post-click overlays still need a human.",
     },
 ]
 

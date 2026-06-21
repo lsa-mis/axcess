@@ -108,8 +108,7 @@ def _axe_description(af: ExportA11yFinding) -> str:
         lines.append(f"**Impact:** {af.impact}")
     if af.wcag_sc:
         lines.append(
-            f"**WCAG SC:** {af.wcag_sc}"
-            + (f" (Level {af.wcag_level})" if af.wcag_level else "")
+            f"**WCAG SC:** {af.wcag_sc}" + (f" (Level {af.wcag_level})" if af.wcag_level else "")
         )
     else:
         lines.append("**WCAG SC:** _best-practice — no SC mapping_")

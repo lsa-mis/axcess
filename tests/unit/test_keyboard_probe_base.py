@@ -43,8 +43,7 @@ def tmp_conn(tmp_path: Path) -> sqlite3.Connection:
 @pytest.fixture
 def tmp_scan_and_page(tmp_conn: sqlite3.Connection) -> tuple[sqlite3.Connection, int, int]:
     cur = tmp_conn.execute(
-        "INSERT INTO scans (seed_url, status, config_json) "
-        "VALUES ('http://x/', 'completed', '{}')"
+        "INSERT INTO scans (seed_url, status, config_json) VALUES ('http://x/', 'completed', '{}')"
     )
     scan_id = int(cur.lastrowid or 0)
     page_id = repo.upsert_page(
@@ -182,9 +181,7 @@ def test_upsert_keyboard_finding_inserts_with_pipeline_tag(
         failure_summary="Focus stuck after 4 Tabs.",
         html_snippet="<button id='trap'>x</button>",
     )
-    fid = repo.upsert_keyboard_finding(
-        conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs()
-    )
+    fid = repo.upsert_keyboard_finding(conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs())
     assert fid > 0
     row = conn.execute(
         "SELECT pipeline, criterion_sc, wcag_sc, wcag_level, impact, rule_id, status "
@@ -215,12 +212,8 @@ def test_upsert_keyboard_finding_is_idempotent(
         failure_summary="Escape did not release focus.",
         html_snippet="<div role='dialog'>...</div>",
     )
-    a = repo.upsert_keyboard_finding(
-        conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs()
-    )
-    b = repo.upsert_keyboard_finding(
-        conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs()
-    )
+    a = repo.upsert_keyboard_finding(conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs())
+    b = repo.upsert_keyboard_finding(conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs())
     assert a == b, "second upsert should hit the same row id"
     count = conn.execute(
         "SELECT COUNT(*) AS n FROM page_a11y_findings WHERE page_id = ?",
@@ -241,9 +234,7 @@ def test_upsert_keyboard_finding_preserves_human_status(
         failure_summary="Untitled iframe.",
         html_snippet="<iframe src='x'/>",
     )
-    fid = repo.upsert_keyboard_finding(
-        conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs()
-    )
+    fid = repo.upsert_keyboard_finding(conn, page_id=page_id, scan_id=scan_id, **t.to_repo_kwargs())
     conn.execute(
         "UPDATE page_a11y_findings SET status = 'accepted_risk' WHERE id = ?",
         (fid,),

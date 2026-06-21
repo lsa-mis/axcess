@@ -126,9 +126,7 @@ def _load() -> dict[str, Any]:
     if _cache is not None:
         return _cache
     try:
-        text = (
-            resources.files(_RULES_PACKAGE) / _RULES_FILE
-        ).read_text(encoding="utf-8")
+        text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")
         parsed = yaml.safe_load(text) or {}
         _cache = parsed if isinstance(parsed, dict) else {}
     except (FileNotFoundError, yaml.YAMLError):

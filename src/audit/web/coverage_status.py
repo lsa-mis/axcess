@@ -76,6 +76,13 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         needs_ai=False,
     ),
     ShippedPipeline(
+        name="Focus probe",
+        pipeline="focus",
+        engine="Deterministic Playwright (focus each element + elementFromPoint)",
+        scs="2.4.11 Focus Not Obscured (Minimum)",
+        needs_ai=False,
+    ),
+    ShippedPipeline(
         name="Image-of-text (VLM)",
         pipeline="image",
         engine="OCR (Tesseract) + VLM via Ollama",
@@ -204,11 +211,12 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         wcag="2.4.11",
         issue="Focus Not Obscured (Minimum)",
         ai_fit="Strong",
-        model_class="VLM + Playwright",
-        what="Screenshot each focus state; is the focused element hidden "
-        "behind a sticky header / cookie banner / modal?",
-        status="planned",
-        reuse="VLM + Playwright runtime",
+        model_class="Deterministic Playwright",
+        what="Focus each element; is its centre covered by a sticky/fixed overlay?",
+        status="shipped",
+        reuse="live-page focus probe (no model needed)",
+        note="FocusProbe — turned out to be doable deterministically "
+        "(elementFromPoint geometry), no VLM required.",
     ),
     RoadmapItem(
         wcag="3.2.4",

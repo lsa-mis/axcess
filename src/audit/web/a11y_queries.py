@@ -38,9 +38,9 @@ def coverage(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     if row is None:
         return {"axe_pages_scanned": 0, "axe_violations_total": 0, "pages_total": 0}
     pages_total = int(
-        conn.execute(
-            "SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)
-        ).fetchone()["n"]
+        conn.execute("SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()[
+            "n"
+        ]
     )
     return {
         "axe_pages_scanned": int(row["axe_pages_scanned"] or 0),
@@ -179,9 +179,7 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
         ).fetchone()
         entry["page_count"] = int(page_count_row["n"]) if page_count_row else 0
         # Sort rules within the SC: worst impact first, then page count.
-        entry["rules"].sort(
-            key=lambda x: (_IMPACT_RANK.get(x["impact"], 4), -x["page_count"])
-        )
+        entry["rules"].sort(key=lambda x: (_IMPACT_RANK.get(x["impact"], 4), -x["page_count"]))
         entry.pop("page_count_set", None)
         entry.pop("worst_impact_rank", None)
 

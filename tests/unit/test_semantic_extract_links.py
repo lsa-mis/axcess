@@ -112,11 +112,7 @@ def test_image_only_link_uses_img_alt() -> None:
 def test_image_only_link_with_empty_alt_falls_through_to_title() -> None:
     """Empty alt='' marks the image as decorative; the link is
     effectively unnamed unless something else is set."""
-    rows = _e(
-        '<a href="/x" title="Search the catalog">'
-        '<img src="search.svg" alt="">'
-        "</a>"
-    )
+    rows = _e('<a href="/x" title="Search the catalog"><img src="search.svg" alt=""></a>')
     # Fallback chain: text=empty → img-alt=empty → svg-title=none → title.
     assert rows[0].accessible_name == "Search the catalog"
     assert rows[0].accessible_name_source == "title"
@@ -130,11 +126,7 @@ def test_link_with_no_text_no_label_no_alt_is_empty_source() -> None:
 
 def test_aria_label_takes_precedence_over_img_alt() -> None:
     """Two competing labels: aria-label on the <a> wins per HTML-AAM."""
-    rows = _e(
-        '<a href="/x" aria-label="Buy widgets">'
-        '<img src="cart.svg" alt="cart icon">'
-        "</a>"
-    )
+    rows = _e('<a href="/x" aria-label="Buy widgets"><img src="cart.svg" alt="cart icon"></a>')
     assert rows[0].accessible_name == "Buy widgets"
     assert rows[0].accessible_name_source == "aria-label"
 
@@ -145,7 +137,7 @@ def test_aria_label_takes_precedence_over_img_alt() -> None:
 
 
 def test_link_without_href_is_skipped() -> None:
-    rows = _e('<a>placeholder anchor</a>')
+    rows = _e("<a>placeholder anchor</a>")
     assert rows == []
 
 
@@ -167,10 +159,7 @@ def test_javascript_scheme_is_skipped() -> None:
 
 
 def test_mailto_and_tel_schemes_are_skipped() -> None:
-    rows = _e(
-        '<a href="mailto:a@b.co">Email</a>'
-        '<a href="tel:+15551234">Call</a>'
-    )
+    rows = _e('<a href="mailto:a@b.co">Email</a><a href="tel:+15551234">Call</a>')
     assert rows == []
 
 

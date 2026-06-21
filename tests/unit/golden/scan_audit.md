@@ -57,6 +57,7 @@ This audit used multiple detection methods. Each sees different things; together
 | **Per-criterion LLM analyzer** | ✅ found issues | Judgment calls automated tools miss — e.g. SC 2.4.4, whether a link's text actually describes where it goes. | Medium — semantic judgments are inherently fuzzier; treat as strong leads, confirm before mass edits. |
 | **Dynamic keyboard-trap probe** | ✅ found issues | WCAG 2.1.2 — focus stuck on an element, modals that don't release on Escape, untitled tabbable iframes. | High for what it reaches — but only the initial DOM; interaction-triggered traps need manual testing. |
 | **Responsive & zoom probe** | — | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | High for reflow (deterministic geometry); medium for the clipping checks — designed truncation needs a human eye. |
+| **Live-page focus probe** | — | SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays. | Medium — catches elements whose centre is covered; partial-overlap and post-click overlays still need a human. |
 
 _A “—” means this method produced no findings on this scan — it may have been disabled for the run, or it ran and found nothing. Only axe-core records a definitive ran-clean signal today._
 
@@ -69,11 +70,11 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
-| **Partly automated** | 13 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **Partly automated** | 14 | Automated checks catch the mechanical failures; the rest needs a human. |
 | **AI-assisted** | 5 | A local model flags candidates — a human confirms before counting them. |
-| **Manual only** | 31 | No automated detection — a human must test this criterion. |
+| **Manual only** | 30 | No automated detection — a human must test this criterion. |
 
-### Automated &amp; AI-assisted (24 criteria)
+### Automated &amp; AI-assisted (25 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
@@ -94,6 +95,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 2.4.4 | Link Purpose (In Context) | A | AI-assisted | axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes. | Confirm the LLM's borderline calls ("read more", icon links) — it flags strong leads, not verdicts. |
 | 2.4.6 | Headings and Labels | AA | AI-assisted | axe flags empty headings / unlabelled controls; the semantic LLM judges whether each heading actually describes the content it introduces. | Confirm the LLM's borderline heading calls, and check that form-control LABELS are descriptive — label descriptiveness is not yet AI-assisted. |
 | 2.4.7 | Focus Visible | AA | Partly automated | axe has limited checks for suppressed focus indicators. | Tab the whole page and confirm a clearly visible focus indicator on every interactive element — largely manual. |
+| 2.4.11 | Focus Not Obscured (Minimum) | AA | Partly automated | The live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic "focus hidden behind the sticky header" failure). | Confirm partial-overlap cases the centre-point check can miss, and tab through interactively — overlays that appear only after a click still need a human. |
 | 2.5.3 | Label in Name | A | Partly automated | axe flags controls whose accessible name doesn't contain the visible label text (label-content-name-mismatch). | Confirm the visible text is fully contained in the accessible name for voice-control users. |
 | 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
 | 3.1.1 | Language of Page | A | Automated | axe checks <html> has a present and valid lang attribute. | Confirm the declared language actually matches the page's main content. |
@@ -102,7 +104,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
 
-### Needs manual testing (31 criteria)
+### Needs manual testing (30 criteria)
 
 No Axcess pipeline detects these — they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
@@ -124,7 +126,6 @@ No Axcess pipeline detects these — they require a human. Treat this as your ma
 | 2.3.1 | Three Flashes or Below Threshold | A | Confirm nothing flashes more than three times per second. Flash analysis is not implemented. |
 | 2.4.3 | Focus Order | A | Tab through and confirm focus order matches the logical/visual order. A focus-order VLM+Playwright analyzer is on the roadmap. |
 | 2.4.5 | Multiple Ways | AA | Confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. |
-| 2.4.11 | Focus Not Obscured (Minimum) | AA | Tab through and confirm the focused element isn't hidden behind sticky headers / cookie banners. A VLM+Playwright analyzer is on the roadmap. |
 | 2.5.1 | Pointer Gestures | A | For any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. |
 | 2.5.2 | Pointer Cancellation | A | Confirm actions fire on the up-event and can be aborted (no critical action on down-press). |
 | 2.5.4 | Motion Actuation | A | If a function is triggered by device motion (shake/tilt), confirm a UI alternative and a way to disable motion actuation. |

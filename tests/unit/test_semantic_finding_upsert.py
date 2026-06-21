@@ -22,8 +22,7 @@ from audit.db import repo
 
 def _seed_scan_page(conn: sqlite3.Connection) -> tuple[int, int]:
     cur = conn.execute(
-        "INSERT INTO scans (seed_url, status, config_json) "
-        "VALUES ('http://x/', 'completed', '{}')"
+        "INSERT INTO scans (seed_url, status, config_json) VALUES ('http://x/', 'completed', '{}')"
     )
     scan_id = int(cur.lastrowid or 0)
     page_id = repo.upsert_page(
@@ -89,8 +88,7 @@ def test_upsert_semantic_finding_writes_pipeline_and_criterion(
         help_url=None,
     )
     row = tmp_db.execute(
-        "SELECT pipeline, criterion_sc, rule_id, status FROM page_a11y_findings "
-        "WHERE id = ?",
+        "SELECT pipeline, criterion_sc, rule_id, status FROM page_a11y_findings WHERE id = ?",
         (fid,),
     ).fetchone()
     assert row["pipeline"] == "semantic"
@@ -133,9 +131,7 @@ def test_upsert_semantic_finding_is_idempotent_on_same_key(
         target_hash="h-same",
     )
     assert first == second
-    row = tmp_db.execute(
-        "SELECT help FROM page_a11y_findings WHERE id = ?", (first,)
-    ).fetchone()
+    row = tmp_db.execute("SELECT help FROM page_a11y_findings WHERE id = ?", (first,)).fetchone()
     assert "Refined wording" in row["help"]
 
 
@@ -216,9 +212,7 @@ def test_upsert_semantic_finding_preserves_human_status_on_conflict(
         html_snippet="<a>x</a>",
         target_hash="h-status",
     )
-    row = tmp_db.execute(
-        "SELECT status FROM page_a11y_findings WHERE id = ?", (fid,)
-    ).fetchone()
+    row = tmp_db.execute("SELECT status FROM page_a11y_findings WHERE id = ?", (fid,)).fetchone()
     assert row["status"] == "accepted_risk"
 
 
@@ -256,13 +250,11 @@ def test_pipeline_filter_query(tmp_db: sqlite3.Connection) -> None:
         target_hash="h-2",
     )
     axe_count = tmp_db.execute(
-        "SELECT COUNT(*) AS n FROM page_a11y_findings "
-        "WHERE scan_id = ? AND pipeline = 'axe'",
+        "SELECT COUNT(*) AS n FROM page_a11y_findings WHERE scan_id = ? AND pipeline = 'axe'",
         (scan_id,),
     ).fetchone()["n"]
     semantic_count = tmp_db.execute(
-        "SELECT COUNT(*) AS n FROM page_a11y_findings "
-        "WHERE scan_id = ? AND pipeline = 'semantic'",
+        "SELECT COUNT(*) AS n FROM page_a11y_findings WHERE scan_id = ? AND pipeline = 'semantic'",
         (scan_id,),
     ).fetchone()["n"]
     assert axe_count == 1

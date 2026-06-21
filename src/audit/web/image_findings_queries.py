@@ -137,9 +137,7 @@ def grouped_by_remediation(
         entry["severity_breakdown"][f["severity"]] = (
             entry["severity_breakdown"].get(f["severity"], 0) + 1
         )
-        entry["status_breakdown"][f["status"]] = (
-            entry["status_breakdown"].get(f["status"], 0) + 1
-        )
+        entry["status_breakdown"][f["status"]] = entry["status_breakdown"].get(f["status"], 0) + 1
         rank = _SEVERITY_RANK.get(f["severity"], _SEVERITY_RANK["info"])
         if rank < entry["worst_severity_rank"]:
             entry["worst_severity_rank"] = rank
@@ -149,9 +147,7 @@ def grouped_by_remediation(
     # Within each group, sort findings by priority desc so the operator
     # sees the most-urgent rows first when they expand a group.
     for entry in groups.values():
-        entry["findings"].sort(
-            key=lambda x: (-(x["priority_score"] or 0), x["id"])
-        )
+        entry["findings"].sort(key=lambda x: (-(x["priority_score"] or 0), x["id"]))
         entry.pop("worst_severity_rank", None)
 
     # Order the groups themselves: worst severity first, then largest

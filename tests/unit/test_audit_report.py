@@ -218,8 +218,7 @@ def _scan_with_real_findings(conn: sqlite3.Connection) -> int:
     )
 
     conn.execute(
-        "UPDATE scans SET axe_pages_scanned = 1, axe_violations_total = 5 "
-        "WHERE id = ?",
+        "UPDATE scans SET axe_pages_scanned = 1, axe_violations_total = 5 WHERE id = ?",
         (scan_id,),
     )
     return scan_id
@@ -350,14 +349,10 @@ def test_audit_report_already_triaged_lands_in_appendix_a(
     # The accepted_risk finding (rule_id=label) should NOT appear in the
     # main "Form controls have no programmatic label" card — it should
     # only show up in Appendix A as a dropped row.
-    issue_cards_section = md.split("## Issue cards", 1)[1].split(
-        "## Appendix A", 1
-    )[0]
+    issue_cards_section = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
     assert "Form controls have no programmatic label" not in issue_cards_section
 
-    appendix_a = md.split("## Appendix A", 1)[1].split(
-        "## Appendix B", 1
-    )[0]
+    appendix_a = md.split("## Appendix A", 1)[1].split("## Appendix B", 1)[0]
     assert "label" in appendix_a
     assert "accepted_risk" in appendix_a
 
@@ -382,9 +377,7 @@ def test_audit_report_executive_summary_has_quick_win(
     scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
     md = render_audit_report(scan, conn=tmp_db)
 
-    summary = md.split("## Executive summary", 1)[1].split(
-        "## Issue cards", 1
-    )[0]
+    summary = md.split("## Executive summary", 1)[1].split("## Issue cards", 1)[0]
     assert "Highest-impact fix this team could ship this week" in summary
     # Image-alt is Critical + Under 15 minutes, so it should win the pick
     # over color-contrast (Serious) and image-of-text (Critical but tied

@@ -215,21 +215,12 @@ def list_issues(
         rows = [r for r in rows if r.responsibility.lower() in wanted_r]
     if abilities:
         wanted_a = {a.lower() for a in abilities}
-        rows = [
-            r
-            for r in rows
-            if any(a.lower() in wanted_a for a in r.abilities_affected)
-        ]
+        rows = [r for r in rows if any(a.lower() in wanted_a for a in r.abilities_affected)]
     if status:
         rows = [r for r in rows if r.status_summary.get(status, 0) > 0]
     if search:
         needle = search.lower()
-        rows = [
-            r
-            for r in rows
-            if needle in r.title.lower()
-            or (r.wcag_sc and needle in r.wcag_sc)
-        ]
+        rows = [r for r in rows if needle in r.title.lower() or (r.wcag_sc and needle in r.wcag_sc)]
 
     return _sort_rows(rows, sort)
 
@@ -306,15 +297,15 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive"):
+    if row.pipeline in ("keyboard", "responsive", "focus"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids — e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
         # SCs live), then axe_rules for any author who keyed there.
         sc = row.wcag_sc or ""
-        meta = rules.get("semantic_criteria", {}).get(sc, {}) or rules.get(
-            "axe_rules", {}
-        ).get(sc, {})
+        meta = rules.get("semantic_criteria", {}).get(sc, {}) or rules.get("axe_rules", {}).get(
+            sc, {}
+        )
         return dict(meta) if isinstance(meta, dict) else {}
     image_key = row.issue_key.removeprefix("image:")
     meta = rules.get("image_findings", {}).get(image_key, {})
@@ -334,7 +325,7 @@ def _pages_for_issue(
     ``page_images`` joins to ``pages``), so the query is heavier; the
     column shape comes out the same.
     """
-    if row.pipeline in ("axe", "semantic", "keyboard", "responsive"):
+    if row.pipeline in ("axe", "semantic", "keyboard", "responsive", "focus"):
         # All four DOM pipelines live in page_a11y_findings; the DB
         # rule_id carries the discriminator: bare rule_id for axe
         # ("color-contrast") and the dynamic probes
@@ -343,11 +334,7 @@ def _pages_for_issue(
         # axe/keyboard/responsive with "<pipeline>:" — strip that to
         # recover the DB value; semantic's issue_key already matches
         # the DB column exactly.
-        rule_id = (
-            row.issue_key
-            if row.pipeline == "semantic"
-            else row.issue_key.split(":", 1)[1]
-        )
+        rule_id = row.issue_key if row.pipeline == "semantic" else row.issue_key.split(":", 1)[1]
         rows = conn.execute(
             """
             SELECT p.id AS page_id,
@@ -419,9 +406,11 @@ def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:
         return sorted(
             pages,
             key=lambda p: (
-                -(p.status_summary.get("new", 0)
-                  + p.status_summary.get("reviewing", 0)
-                  + p.status_summary.get("in_progress", 0)),
+                -(
+                    p.status_summary.get("new", 0)
+                    + p.status_summary.get("reviewing", 0)
+                    + p.status_summary.get("in_progress", 0)
+                ),
                 -p.occurrence_count,
             ),
         )
@@ -492,6 +481,9 @@ def _axe_issue_rows(
         # "responsive-text-clipped", …) follow the keyboard pattern:
         # non-axe rule_ids resolved by SC through the YAML fallback.
         is_responsive = raw_rule_id.startswith("responsive-")
+        # Focus probe rows ("focus-not-obscured", SC 2.4.11) — same
+        # non-axe, SC-resolved pattern as keyboard/responsive.
+        is_focus = raw_rule_id.startswith("focus-")
         if is_semantic:
             sc = raw_rule_id.removeprefix("semantic:")
             meta = semantic_meta.get(sc, {})
@@ -506,10 +498,7 @@ def _axe_issue_rows(
             if not meta:
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
-                    meta = (
-                        axe_rules_meta.get(sc_from_db, {})
-                        or semantic_meta.get(sc_from_db, {})
-                    )
+                    meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
         wcag_sc = meta.get("wcag_sc") or g.get("wcag_sc")
         wcag_level = meta.get("wcag_level") or g.get("wcag_level")
         conformance = _conformance_label(wcag_level)
@@ -527,6 +516,9 @@ def _axe_issue_rows(
         elif is_responsive:
             issue_key = f"responsive:{raw_rule_id}"
             default_title = f"Responsive failure: {raw_rule_id}"
+        elif is_focus:
+            issue_key = f"focus:{raw_rule_id}"
+            default_title = f"Focus not visible: {raw_rule_id}"
         else:
             issue_key = f"axe:{raw_rule_id}"
             default_title = f"axe rule: {raw_rule_id}"
@@ -539,6 +531,8 @@ def _axe_issue_rows(
                     if is_keyboard
                     else "responsive"
                     if is_responsive
+                    else "focus"
+                    if is_focus
                     else "axe"
                 ),
                 issue_key=issue_key,
@@ -550,9 +544,7 @@ def _axe_issue_rows(
                 wcag_name=meta.get("wcag_name"),
                 responsibility=(meta.get("owner") or "dev"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
-                difficulty=_EFFORT_TO_DIFFICULTY.get(
-                    meta.get("effort", ""), "Unknown"
-                ),
+                difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
                 occurrence_count=g["violation_count"],
                 page_count=g["page_count"],
                 priority=_priority(impact, g["page_count"]),
@@ -615,9 +607,7 @@ def _image_issue_rows(
                 wcag_name=meta.get("wcag_name") or "Images of Text",
                 responsibility=(meta.get("owner") or "editor"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
-                difficulty=_EFFORT_TO_DIFFICULTY.get(
-                    meta.get("effort", ""), "Unknown"
-                ),
+                difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
                 occurrence_count=g.get("occurrence_count", g["finding_count"]),
                 page_count=g.get("page_count", 0),
                 priority=_priority(worst_severity, g.get("page_count", 0)),
@@ -706,9 +696,7 @@ def _load_rules() -> dict[str, Any]:
     still gets a sensible default title and 'dev' as the owner.
     """
     try:
-        text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(
-            encoding="utf-8"
-        )
+        text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")
         data = yaml.safe_load(text) or {}
         if not isinstance(data, dict):
             return {}

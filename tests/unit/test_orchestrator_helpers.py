@@ -99,9 +99,7 @@ def test_purge_drops_jobs_outside_path_prefix(tmp_db: sqlite3.Connection) -> Non
     _add_pending_job(tmp_db, scan_id=scan_id, url="https://lsa.umich.edu/bicentennial-news/y")
 
     scope = build_scope("https://lsa.umich.edu/bicentennial/")
-    dropped = _purge_out_of_scope_jobs(
-        tmp_db, scan_id=scan_id, scope=scope, allow_subdomains=False
-    )
+    dropped = _purge_out_of_scope_jobs(tmp_db, scan_id=scan_id, scope=scope, allow_subdomains=False)
     assert dropped == 2
 
     remaining = tmp_db.execute(
@@ -119,15 +117,12 @@ def test_purge_leaves_other_scans_alone(tmp_db: sqlite3.Connection) -> None:
 
     # Purge scan b only — scan a's (unrelated) job must remain.
     scope_b = build_scope("https://b.example/docs/")
-    dropped = _purge_out_of_scope_jobs(
-        tmp_db, scan_id=b, scope=scope_b, allow_subdomains=False
-    )
+    dropped = _purge_out_of_scope_jobs(tmp_db, scan_id=b, scope=scope_b, allow_subdomains=False)
     assert dropped == 1
     urls = {
         r["url"]
         for r in tmp_db.execute(
-            "SELECT json_extract(payload_json, '$.url') AS url FROM jobs "
-            "WHERE state = 'pending'"
+            "SELECT json_extract(payload_json, '$.url') AS url FROM jobs WHERE state = 'pending'"
         ).fetchall()
     }
     assert urls == {"https://a.example/docs/x"}
@@ -138,6 +133,6 @@ def test_purge_is_noop_when_all_in_scope(tmp_db: sqlite3.Connection) -> None:
     _add_pending_job(tmp_db, scan_id=scan_id, url="https://example.com/a")
     _add_pending_job(tmp_db, scan_id=scan_id, url="https://example.com/b")
     scope = build_scope("https://example.com/")
-    assert _purge_out_of_scope_jobs(
-        tmp_db, scan_id=scan_id, scope=scope, allow_subdomains=False
-    ) == 0
+    assert (
+        _purge_out_of_scope_jobs(tmp_db, scan_id=scan_id, scope=scope, allow_subdomains=False) == 0
+    )

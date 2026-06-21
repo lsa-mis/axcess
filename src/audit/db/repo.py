@@ -224,10 +224,7 @@ def bulk_set_findings_status(
     ).fetchall()
     if not rows:
         return 0
-    history = [
-        (int(r["id"]), int(r["scan_id"]), str(r["status"]), status, actor)
-        for r in rows
-    ]
+    history = [(int(r["id"]), int(r["scan_id"]), str(r["status"]), status, actor) for r in rows]
     conn.executemany(
         """
         INSERT INTO finding_history
@@ -339,8 +336,7 @@ def upsert_axe_violation(
         ),
     )
     row = conn.execute(
-        "SELECT id FROM page_a11y_findings "
-        "WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
+        "SELECT id FROM page_a11y_findings WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
         (page_id, rule_id, target_hash),
     ).fetchone()
     return int(row["id"])
@@ -418,8 +414,7 @@ def upsert_keyboard_finding(
         ),
     )
     row = conn.execute(
-        "SELECT id FROM page_a11y_findings "
-        "WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
+        "SELECT id FROM page_a11y_findings WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
         (page_id, rule_id, target_hash),
     ).fetchone()
     return int(row["id"])
@@ -452,6 +447,50 @@ def upsert_responsive_finding(
     pipeline-parameterized. A dedicated entry point keeps the
     per-pipeline call-site audit a single grep (the documented
     convention for this module).
+    """
+    return upsert_keyboard_finding(
+        conn,
+        page_id=page_id,
+        scan_id=scan_id,
+        rule_id=rule_id,
+        wcag_sc=wcag_sc,
+        wcag_scs=wcag_scs,
+        wcag_level=wcag_level,
+        impact=impact,
+        help=help,
+        help_url=help_url,
+        target_selector=target_selector,
+        failure_summary=failure_summary,
+        html_snippet=html_snippet,
+        target_hash=target_hash,
+        criterion_sc=criterion_sc,
+        pipeline=pipeline,
+    )
+
+
+def upsert_focus_finding(
+    conn: sqlite3.Connection,
+    *,
+    page_id: int,
+    scan_id: int,
+    rule_id: str,
+    wcag_sc: str | None,
+    wcag_scs: str | None,
+    wcag_level: str | None,
+    impact: str | None,
+    help: str,
+    help_url: str,
+    target_selector: str,
+    failure_summary: str,
+    html_snippet: str,
+    target_hash: str,
+    criterion_sc: str,
+    pipeline: str = "focus",
+) -> int:
+    """Idempotent upsert for a live-page focus probe finding (SC 2.4.11).
+
+    Same row format as the keyboard/responsive probes — delegates to the
+    pipeline-parameterized :func:`upsert_keyboard_finding`.
     """
     return upsert_keyboard_finding(
         conn,
@@ -547,8 +586,7 @@ def upsert_semantic_finding(
         ),
     )
     row = conn.execute(
-        "SELECT id FROM page_a11y_findings "
-        "WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
+        "SELECT id FROM page_a11y_findings WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
         (page_id, rule_id, target_hash),
     ).fetchone()
     return int(row["id"])

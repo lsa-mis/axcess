@@ -143,9 +143,7 @@ def test_list_issues_filters_by_conformance(tmp_db: sqlite3.Connection) -> None:
 def test_list_issues_filters_by_responsibility(tmp_db: sqlite3.Connection) -> None:
     """Responsibility filter narrows to the named owner."""
     scan_id = _seed_two_pipelines(tmp_db)
-    only_designer = issues_mod.list_issues(
-        tmp_db, scan_id, responsibility=["designer"]
-    )
+    only_designer = issues_mod.list_issues(tmp_db, scan_id, responsibility=["designer"])
     # color-contrast is owned by designer in the YAML.
     assert any(r.issue_key == "axe:color-contrast" for r in only_designer)
     # image-alt is owned by editor — should NOT appear.
@@ -209,9 +207,7 @@ def test_priority_rewards_spread(tmp_db: sqlite3.Connection) -> None:
 def test_get_issue_detail_axe_pipeline(tmp_db: sqlite3.Connection) -> None:
     """Detail loads the row + page list + YAML template for an axe issue."""
     scan_id = _seed_two_pipelines(tmp_db)
-    detail = issues_mod.get_issue_detail(
-        tmp_db, scan_id, "axe:color-contrast"
-    )
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, "axe:color-contrast")
     assert detail is not None
     assert detail.row.issue_key == "axe:color-contrast"
     assert detail.row.pipeline == "axe"
@@ -235,18 +231,14 @@ def test_get_issue_detail_returns_none_for_stale_key(
 ) -> None:
     """Stale issue keys (e.g. after rescan) return None — caller 404s."""
     scan_id = _seed_two_pipelines(tmp_db)
-    detail = issues_mod.get_issue_detail(
-        tmp_db, scan_id, "axe:rule-that-never-existed"
-    )
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, "axe:rule-that-never-existed")
     assert detail is None
 
 
 def test_get_issue_detail_pages_sort_order(tmp_db: sqlite3.Connection) -> None:
     """The pages-with-issue table honors the `sort` argument."""
     scan_id = _seed_two_pipelines(tmp_db)
-    by_url = issues_mod.get_issue_detail(
-        tmp_db, scan_id, "axe:color-contrast", sort="url"
-    )
+    by_url = issues_mod.get_issue_detail(tmp_db, scan_id, "axe:color-contrast", sort="url")
     assert by_url is not None
     urls = [p.page_url for p in by_url.pages]
     assert urls == sorted(urls)
@@ -290,8 +282,13 @@ def test_issue_row_empty_longform_for_un_templated_rule(
     )
     scan_id = int(cur.lastrowid or 0)
     page = repo.upsert_page(
-        tmp_db, scan_id=scan_id, url_normalized="http://x/",
-        status_code=200, title="x", render_mode="js", html_hash="0" * 64,
+        tmp_db,
+        scan_id=scan_id,
+        url_normalized="http://x/",
+        status_code=200,
+        title="x",
+        render_mode="js",
+        html_hash="0" * 64,
     )
     tmp_db.execute(
         """
@@ -357,16 +354,13 @@ def test_responsive_rows_get_their_own_pipeline_label(
     so the detail route can resolve pages from page_a11y_findings.
     """
     scan_id = _seed_two_pipelines(tmp_db)
-    page = tmp_db.execute(
-        "SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)
-    ).fetchone()
+    page = tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
     _seed_responsive_finding(tmp_db, scan_id, int(page["id"]))
 
     rows = issues_mod.list_issues(tmp_db, scan_id)
     resp_rows = [r for r in rows if r.pipeline == "responsive"]
     assert len(resp_rows) == 1, (
-        f"expected exactly one responsive issue; pipelines seen: "
-        f"{[r.pipeline for r in rows]}"
+        f"expected exactly one responsive issue; pipelines seen: {[r.pipeline for r in rows]}"
     )
     row = resp_rows[0]
     assert row.issue_key == "responsive:responsive-reflow-overflow"
@@ -396,9 +390,7 @@ def test_responsive_issue_detail_resolves_pages(
     ).fetchone()
     _seed_responsive_finding(tmp_db, scan_id, int(page["id"]))
 
-    detail = issues_mod.get_issue_detail(
-        tmp_db, scan_id, "responsive:responsive-reflow-overflow"
-    )
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, "responsive:responsive-reflow-overflow")
     assert detail is not None
     assert len(detail.pages) == 1
     assert detail.pages[0].page_url == page["url_normalized"]

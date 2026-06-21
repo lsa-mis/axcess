@@ -472,13 +472,17 @@ criteria:
   - sc: "2.4.11"
     name: "Focus Not Obscured (Minimum)"
     level: AA
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [focus]
+    confidence: medium
+    automated_check: >-
+      The live-page focus probe focuses each element and flags any whose
+      centre is covered by a position:fixed/sticky overlay (the classic
+      "focus hidden behind the sticky header" failure).
     manual_check: >-
-      Tab through and confirm the focused element isn't hidden behind sticky
-      headers / cookie banners. A VLM+Playwright analyzer is on the roadmap.
+      Confirm partial-overlap cases the centre-point check can miss, and tab
+      through interactively — overlays that appear only after a click still
+      need a human.
 
   - sc: "2.5.7"
     name: "Dragging Movements"

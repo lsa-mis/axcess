@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Focus obscured</title></head>
+<body style="margin:0;height:1200px;">
+  <!-- A fixed header covering the top 120px with a high z-index. -->
+  <header style="position:fixed;top:0;left:0;width:100%;height:120px;background:#003f75;z-index:1000;"></header>
+
+  <!-- This link sits UNDER the fixed header (top:40px) — when focused, its
+       centre is covered by the header → SC 2.4.11 failure. -->
+  <a href="#hidden" id="hidden-link" style="position:absolute;top:40px;left:20px;">Hidden under the header</a>
+
+  <!-- This link is well below the header — fully visible, not flagged. -->
+  <a href="#ok" id="visible-link" style="position:absolute;top:400px;left:20px;">Clearly visible</a>
+</body>
+</html>

@@ -16,8 +16,8 @@ from typing import Any
 
 # Rule ids — narrow, grep-able, and prefixed so `issues.py` can route
 # the pipeline label the same way it does for `keyboard-trap-*`.
-RULE_REFLOW = "responsive-reflow-overflow"          # SC 1.4.10 at 320px
-RULE_TEXT_CLIPPED = "responsive-text-clipped"        # SC 1.4.4 zoom proxy
+RULE_REFLOW = "responsive-reflow-overflow"  # SC 1.4.10 at 320px
+RULE_TEXT_CLIPPED = "responsive-text-clipped"  # SC 1.4.4 zoom proxy
 RULE_SPACING_CLIPPED = "responsive-text-spacing-clipped"  # SC 1.4.12
 
 # Canonical WCAG "Understanding" pages per criterion.

@@ -15,6 +15,7 @@ import httpx
 
 if TYPE_CHECKING:
     from audit.analyzer.axe import AxeViolation
+    from audit.analyzer.focus import FocusFinding
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
 
@@ -51,6 +52,9 @@ class FetchResult:
     # 1.4.12). Same population rules as the keyboard probe; default on,
     # ``--skip-responsive`` disables.
     responsive_findings: tuple[ResponsiveFinding, ...] = field(default=())
+    # SC 2.4.11 Focus Not Obscured — live-page focus probe results. Same
+    # population rules: JsFetcher only, default on, ``--skip-focus`` disables.
+    focus_findings: tuple[FocusFinding, ...] = field(default=())
 
     @property
     def is_html(self) -> bool:

@@ -55,9 +55,7 @@ log = logging.getLogger(__name__)
 # Path to the axe-core bundle inside the repo. The web UI serves the same
 # file at /static/axe.min.js — we just read it off disk for crawl-time
 # injection so we don't depend on a running web server.
-DEFAULT_AXE_BUNDLE = (
-    Path(__file__).resolve().parents[1] / "web" / "static" / "axe.min.js"
-)
+DEFAULT_AXE_BUNDLE = Path(__file__).resolve().parents[1] / "web" / "static" / "axe.min.js"
 
 
 Level = Literal["A", "AA", "AAA"]
@@ -280,9 +278,7 @@ def _flatten(raw_violations: list[dict[str, Any]]) -> Iterator[AxeViolation]:
             # axe target is a list of CSS selectors (one per iframe hop).
             # Most of our pages aren't iframed, so this is usually a
             # single-element list; we join with " > " when it isn't.
-            target_selector = (
-                " > ".join(str(t) for t in target) if target else "(unknown)"
-            )
+            target_selector = " > ".join(str(t) for t in target) if target else "(unknown)"
             failure_summary = str(node.get("failureSummary", "") or "")
             html_snippet = str(node.get("html", "") or "")[:4000]
             yield AxeViolation(

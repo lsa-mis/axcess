@@ -102,9 +102,7 @@ async def test_generate_json_parses_and_returns_object() -> None:
 async def test_generate_json_raises_on_empty_response() -> None:
     """Empty Ollama body = model probably crashed; raise rather than
     returning a misleading empty dict."""
-    respx.post(f"{BASE}/api/generate").mock(
-        return_value=httpx.Response(200, json={"response": ""})
-    )
+    respx.post(f"{BASE}/api/generate").mock(return_value=httpx.Response(200, json={"response": ""}))
     async with httpx.AsyncClient() as client:
         provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
         with pytest.raises(OllamaError, match="empty"):
@@ -135,9 +133,7 @@ async def test_generate_retries_on_5xx_then_succeeds() -> None:
         ]
     )
     async with httpx.AsyncClient() as client:
-        provider = OllamaTextProvider(
-            client, model=MODEL, base_url=BASE, max_attempts=3
-        )
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE, max_attempts=3)
         out = await provider.generate("p")
 
     assert out == json.dumps({"ok": True})

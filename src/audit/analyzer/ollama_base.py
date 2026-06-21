@@ -135,9 +135,7 @@ class OllamaBase:
                         try:
                             return str(resp.json().get("response", ""))
                         except json.JSONDecodeError as exc:
-                            raise OllamaError(
-                                f"non-JSON envelope from Ollama: {exc}"
-                            ) from exc
+                            raise OllamaError(f"non-JSON envelope from Ollama: {exc}") from exc
                     if resp.status_code in (408, 429) or resp.status_code >= 500:
                         last_error = OllamaError(f"HTTP {resp.status_code}")
                         log.warning(
@@ -147,8 +145,7 @@ class OllamaBase:
                         )
                     else:
                         raise OllamaError(
-                            f"Ollama returned HTTP {resp.status_code}: "
-                            f"{resp.text[:200]}"
+                            f"Ollama returned HTTP {resp.status_code}: {resp.text[:200]}"
                         )
 
                 if attempt < self._max_attempts:
