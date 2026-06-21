@@ -11,6 +11,7 @@ render the same collected structure without re-joining tables.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -118,6 +119,10 @@ class ExportScan:
     by_wcag_level: dict[str, int] = field(
         default_factory=lambda: {"A": 0, "AA": 0, "AAA": 0, "best_practice": 0}
     )
+    # The WCAG conformance level this scan was checked against (from the
+    # scan's stored config). Drives the axe rule set; "AA" for older scans
+    # that predate the setting.
+    axe_level: str = "AA"
 
 
 def collect_scan(
@@ -130,12 +135,22 @@ def collect_scan(
     scan_row = conn.execute(
         "SELECT id, seed_url, status, started_at, finished_at, page_count, "
         "finding_count, error_count, "
-        "axe_pages_scanned, axe_violations_total "
+        "axe_pages_scanned, axe_violations_total, config_json "
         "FROM scans WHERE id = ?",
         (scan_id,),
     ).fetchone()
     if scan_row is None:
         raise ValueError(f"Scan {scan_id} not found")
+
+    # Pull the conformance target out of the stored config (best-effort —
+    # an unparseable / missing config falls back to the default "AA").
+    axe_level = "AA"
+    try:
+        cfg = json.loads(scan_row["config_json"] or "{}")
+        if isinstance(cfg, dict) and str(cfg.get("axe_level", "")).upper() in {"A", "AA", "AAA"}:
+            axe_level = str(cfg["axe_level"]).upper()
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     findings = _collect_findings(conn, scan_id, ui_base_url=ui_base_url)
     by_severity: dict[str, int] = {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -168,6 +183,7 @@ def collect_scan(
         axe_pages_scanned=int(scan_row["axe_pages_scanned"] or 0),
         axe_violations_total=int(scan_row["axe_violations_total"] or 0),
         by_wcag_level=by_wcag_level,
+        axe_level=axe_level,
     )
 
 

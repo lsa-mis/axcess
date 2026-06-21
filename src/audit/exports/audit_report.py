@@ -282,6 +282,7 @@ def render_audit_report(
     lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
+    lines.append(f"**Audited against:** WCAG 2.2 Level {scan.axe_level}")
     lines.append(f"**Pages crawled:** {scan.page_count}")
     lines.append(f"**Detection methods used:** {_methods_line(rows)}")
     lines.append("")

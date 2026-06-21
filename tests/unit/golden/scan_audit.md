@@ -2,6 +2,7 @@
 
 
 **Seed URL:** http://example.com/
+**Audited against:** WCAG 2.2 Level AA
 **Pages crawled:** 2
 **Detection methods used:** axe-core (deterministic DOM rules), image-of-text VLM, per-criterion LLM analyzer, dynamic keyboard-trap probe
 

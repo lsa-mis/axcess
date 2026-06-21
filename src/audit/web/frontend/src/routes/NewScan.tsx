@@ -180,6 +180,41 @@ export default function NewScanRoute() {
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
               Options
             </legend>
+
+            {/* Conformance target — the standard to check against. Drives the
+                axe rule set (tags_for_level) and frames the report. AA is the
+                default because it's the near-universal legal/compliance
+                target (Section 508, EN 301 549, ADA all map to WCAG AA). */}
+            <div className="mb-3 mt-1">
+              <label
+                htmlFor="axe-level"
+                className="block text-sm font-medium text-fg"
+              >
+                Conformance target
+              </label>
+              <p id="axe-level-hint" className="mb-1.5 text-xs text-fg-muted">
+                The WCAG 2.2 level to check against. AA is the standard
+                legal/compliance target; AAA adds the strictest rules (e.g.
+                enhanced 7:1 contrast).
+              </p>
+              <select
+                id="axe-level"
+                aria-describedby="axe-level-hint"
+                value={form.axe_level}
+                onChange={(e) =>
+                  update(
+                    "axe_level",
+                    e.target.value as NewScanPayload["axe_level"],
+                  )
+                }
+                className="min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg"
+              >
+                <option value="A">WCAG 2.2 — Level A (minimum)</option>
+                <option value="AA">WCAG 2.2 — Level AA (recommended)</option>
+                <option value="AAA">WCAG 2.2 — Level AAA (strictest)</option>
+              </select>
+            </div>
+
             {/* Each checkbox has a per-row 44×44 hit target via the
                 shared <Checkbox> primitive. Hints explain the consequence
                 of the option in plain language (UD #4 Perceptible Information,

@@ -241,7 +241,7 @@ def test_api_create_scan_respects_whole_host(
     seeded_db: tuple[object, object, int],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Posting whole_host=true must reach the built CrawlConfig."""
+    """Posting whole_host + a conformance target must reach the CrawlConfig."""
     from audit.web import server as _server
 
     captured: dict[str, object] = {}
@@ -249,6 +249,7 @@ def test_api_create_scan_respects_whole_host(
     async def _capture(db_path, config):  # type: ignore[no-untyped-def]
         captured["whole_host"] = config.whole_host
         captured["seed_url"] = config.seed_url
+        captured["axe_level"] = config.axe_level
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -260,6 +261,7 @@ def test_api_create_scan_respects_whole_host(
             "rps": 1.0,
             "workers": 1,
             "whole_host": True,
+            "axe_level": "AAA",
             "skip_ocr": True,
             "skip_vlm": True,
         },
@@ -274,6 +276,8 @@ def test_api_create_scan_respects_whole_host(
         loop.close()
     assert captured.get("whole_host") is True
     assert captured.get("seed_url") == "https://example.test/docs"
+    # The chosen conformance target reaches the crawl config.
+    assert captured.get("axe_level") == "AAA"
 
 
 def test_api_cancel_endpoint(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
