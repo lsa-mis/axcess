@@ -365,13 +365,17 @@ criteria:
   - sc: "2.4.3"
     name: "Focus Order"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [focus]
+    confidence: medium
+    automated_check: >-
+      The focus probe flags positive tabindex (WCAG failure F44) — a manual
+      tab order that overrides the natural DOM order and usually breaks the
+      sequence.
     manual_check: >-
-      Tab through and confirm focus order matches the logical/visual order. A
-      focus-order VLM+Playwright analyzer is on the roadmap.
+      Tab through the whole page and confirm the focus order preserves meaning
+      and operability — the order can break without a positive tabindex (e.g.
+      CSS-reordered columns), which still needs a human.
 
   - sc: "2.4.4"
     name: "Link Purpose (In Context)"

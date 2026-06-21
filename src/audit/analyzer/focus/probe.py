@@ -16,7 +16,11 @@ from typing import Any
 
 from playwright.async_api import Page
 
-from audit.analyzer.focus.base import RULE_FOCUS_OBSCURED, FocusFinding
+from audit.analyzer.focus.base import (
+    RULE_FOCUS_OBSCURED,
+    RULE_POSITIVE_TABINDEX,
+    FocusFinding,
+)
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -77,6 +81,36 @@ _OBSCURED_JS = """
 """
 
 
+# SC 2.4.3 (WCAG F44): positive tabindex forces a manual tab order that
+# overrides DOM order. Deterministic + high-confidence — return every
+# element whose tabindex attribute parses to a value > 0.
+_POSITIVE_TABINDEX_JS = """
+(cap) => {
+  const cssPath = (el) => {
+    if (el.id) return el.tagName.toLowerCase() + '#' + el.id;
+    let p = el.tagName.toLowerCase();
+    if (el.className && typeof el.className === 'string') {
+      const c = el.className.trim().split(/\\s+/)[0];
+      if (c) p += '.' + c;
+    }
+    return p;
+  };
+  const out = [];
+  const els = Array.from(document.querySelectorAll('[tabindex]')).slice(0, cap);
+  for (const el of els) {
+    const ti = parseInt(el.getAttribute('tabindex'), 10);
+    if (!Number.isFinite(ti) || ti <= 0) continue;
+    out.push({
+      selector: cssPath(el),
+      html: (el.outerHTML || '').slice(0, 300),
+      tabindex: ti,
+    });
+  }
+  return out;
+}
+"""
+
+
 @dataclass
 class FocusProbe:
     """Runs the SC 2.4.11 focus-obscured check against a live page."""
@@ -84,14 +118,22 @@ class FocusProbe:
     max_focusable: int = MAX_FOCUSABLE
 
     async def run(self, page: Page) -> list[FocusFinding]:
-        """Return findings for focusable elements hidden by a sticky/fixed
-        overlay. Never raises — a probe failure must not kill the crawl."""
+        """Run both focus checks. Never raises — each check is isolated so
+        one failing doesn't lose the other's findings."""
+        findings: list[FocusFinding] = []
         try:
-            raw: Any = await page.evaluate(_OBSCURED_JS, self.max_focusable)
+            findings.extend(await self._check_obscured(page))
         except Exception as exc:  # pragma: no cover - defensive
-            log.warning("focus.probe_failed", error=str(exc))
-            return []
+            log.warning("focus.obscured_failed", error=str(exc))
+        try:
+            findings.extend(await self._check_positive_tabindex(page))
+        except Exception as exc:  # pragma: no cover - defensive
+            log.warning("focus.tabindex_failed", error=str(exc))
+        return findings
 
+    async def _check_obscured(self, page: Page) -> list[FocusFinding]:
+        """SC 2.4.11 — elements hidden behind a sticky/fixed overlay."""
+        raw: Any = await page.evaluate(_OBSCURED_JS, self.max_focusable)
         findings: list[FocusFinding] = []
         seen: set[str] = set()
         for item in raw or []:
@@ -117,6 +159,41 @@ class FocusProbe:
                         "scroll-padding so they aren't hidden behind sticky headers, "
                         "or reduce the sticky element's height."
                     ),
+                )
+            )
+        return findings
+
+    async def _check_positive_tabindex(self, page: Page) -> list[FocusFinding]:
+        """SC 2.4.3 (WCAG F44) — positive tabindex forces a manual tab order."""
+        raw: Any = await page.evaluate(_POSITIVE_TABINDEX_JS, self.max_focusable)
+        findings: list[FocusFinding] = []
+        seen: set[str] = set()
+        for item in raw or []:
+            if not isinstance(item, dict):
+                continue
+            selector = str(item.get("selector") or "").strip()
+            if not selector or selector in seen:
+                continue
+            seen.add(selector)
+            ti = item.get("tabindex")
+            findings.append(
+                FocusFinding(
+                    rule_id=RULE_POSITIVE_TABINDEX,
+                    target_selector=selector,
+                    failure_summary=(
+                        f'This element has tabindex="{ti}", forcing a manual tab '
+                        f"order that overrides the natural DOM order (WCAG failure "
+                        f"F44). Positive tab orders are fragile and usually break "
+                        f"the reading/operation sequence."
+                    ),
+                    html_snippet=str(item.get("html") or ""),
+                    help=(
+                        'Remove the positive tabindex. Use tabindex="0" (or rely on '
+                        "the natural order) and reorder the DOM/CSS so source order "
+                        "matches visual order."
+                    ),
+                    criterion_sc="2.4.3",
+                    wcag_level="A",
                 )
             )
         return findings

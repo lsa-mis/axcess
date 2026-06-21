@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Focus order — positive tabindex</title></head>
+<body style="margin:0;">
+  <!-- F44 failure: positive tabindex forces this to the front of the order. -->
+  <input id="jumps-first" type="text" tabindex="3">
+  <!-- tabindex="0" is fine — natural order, must NOT be flagged. -->
+  <input id="natural" type="text" tabindex="0">
+  <!-- tabindex="-1" is fine (programmatic focus only), must NOT be flagged. -->
+  <div id="prog" tabindex="-1">Programmatic</div>
+  <a href="#x">A normal link</a>
+</body>
+</html>

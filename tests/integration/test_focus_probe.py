@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from audit.analyzer.focus import FocusProbe
-from audit.analyzer.focus.base import RULE_FOCUS_OBSCURED
+from audit.analyzer.focus.base import RULE_FOCUS_OBSCURED, RULE_POSITIVE_TABINDEX
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "focus"
 
@@ -75,3 +75,18 @@ async def test_detects_element_under_fixed_header(page) -> None:  # type: ignore
     assert flagged.rule_id == RULE_FOCUS_OBSCURED
     assert flagged.criterion_sc == "2.4.11"
     assert flagged.to_repo_kwargs()["pipeline"] == "focus"
+
+
+@pytest.mark.asyncio
+async def test_flags_positive_tabindex_only(page) -> None:  # type: ignore[no-untyped-def]
+    await page.goto(_file_url("tabindex.html"))
+    findings = await FocusProbe().run(page)
+    ti = [f for f in findings if f.rule_id == RULE_POSITIVE_TABINDEX]
+    selectors = {f.target_selector for f in ti}
+    # Only tabindex="3" is flagged; tabindex 0 / -1 / no-tabindex are fine.
+    assert selectors == {"input#jumps-first"}, f"got {selectors}"
+    f0 = ti[0]
+    assert f0.criterion_sc == "2.4.3"
+    assert f0.wcag_level == "A"
+    assert "focus-order" in f0.help_url
+    assert f0.to_repo_kwargs()["pipeline"] == "focus"

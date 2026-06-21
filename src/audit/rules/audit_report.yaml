@@ -827,6 +827,45 @@ semantic_criteria:
       receives keyboard focus.
     confidence_default: medium
 
+  "2.4.3":
+    title: "Positive tabindex forces a broken tab order"
+    wcag_sc: "2.4.3"
+    wcag_name: "Focus Order"
+    wcag_level: "A"
+    abilities_affected: [vision, motor, cognition]
+    what_happening: >-
+      The focus probe found an element with a positive
+      <code>tabindex</code> (e.g. <code>tabindex="1"</code>). Positive
+      values pull elements to the front of the tab sequence regardless of
+      where they sit in the document — WCAG failure technique F44 — so the
+      tab order stops matching the visual/reading order.
+    why_matters: >-
+      Keyboard and screen-reader users navigate in tab order. When a manual
+      positive tabindex reorders it, focus jumps around unpredictably —
+      skipping fields, looping oddly, or landing in the wrong place — which
+      breaks meaning and operability, especially in forms.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Remove the positive value. Use <code>tabindex="0"</code> to make a
+        custom element focusable in natural order, or no tabindex at all for
+        native controls.
+      - >-
+        If an element needs to come earlier in the sequence, move it earlier
+        in the DOM (and use CSS for visual position) rather than forcing
+        order with tabindex.
+    verify_manual: >-
+      Tab through the page. Focus moves in a sensible reading order with no
+      surprising jumps, and no control is reached out of sequence.
+    verify_automated: >-
+      Re-run the crawl — the focus probe re-checks for positive tabindex on
+      every page.
+    acceptance: >-
+      No element uses a positive tabindex; the tab order follows DOM/visual
+      order.
+    confidence_default: high
+
   "1.4.4":
     title: "Text clipped when zoomed to 200%"
     wcag_sc: "1.4.4"

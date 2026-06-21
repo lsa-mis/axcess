@@ -78,8 +78,8 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
     ShippedPipeline(
         name="Focus probe",
         pipeline="focus",
-        engine="Deterministic Playwright (focus each element + elementFromPoint)",
-        scs="2.4.11 Focus Not Obscured (Minimum)",
+        engine="Deterministic Playwright (focus geometry + tabindex)",
+        scs="2.4.11 Focus Not Obscured, 2.4.3 Focus Order (positive tabindex)",
         needs_ai=False,
     ),
     ShippedPipeline(
@@ -201,11 +201,12 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         wcag="2.4.3",
         issue="Focus Order",
         ai_fit="Strong",
-        model_class="VLM + Playwright",
-        what="Tab through, capture focus bounding boxes; does the order "
-        "match the visual reading order?",
-        status="planned",
-        reuse="VLM + Playwright runtime",
+        model_class="Deterministic Playwright",
+        what="Flag positive tabindex (F44) that forces a broken manual tab order.",
+        status="shipped",
+        reuse="live-page focus probe (no model needed)",
+        note="Positive-tabindex check shipped; full reading-order judgement "
+        "still needs a human.",
     ),
     RoadmapItem(
         wcag="2.4.11",

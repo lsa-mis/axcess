@@ -11,30 +11,38 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
-# Rule id — grep-able + prefixed so issues.py routes the pipeline the same
+# Rule ids — grep-able + prefixed so issues.py routes the pipeline the same
 # way it does for keyboard-trap-* / responsive-*.
 RULE_FOCUS_OBSCURED = "focus-not-obscured"  # SC 2.4.11
+RULE_POSITIVE_TABINDEX = "focus-order-positive-tabindex"  # SC 2.4.3 (WCAG F44)
 
-SC = "2.4.11"
-HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"
+# Canonical WCAG "Understanding" pages per criterion this pipeline covers.
+HELP_URLS = {
+    "2.4.3": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html",
+    "2.4.11": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
+}
 
 
 @dataclass(frozen=True)
 class FocusFinding:
-    """One focusable element that gets hidden behind a sticky/fixed overlay."""
+    """One focus-pipeline failure (SC 2.4.11 or 2.4.3) on one element.
+
+    ``criterion_sc`` / ``wcag_level`` are per-finding because this pipeline
+    now spans two criteria (2.4.11 Level AA, 2.4.3 Level A).
+    """
 
     rule_id: str
     target_selector: str
     failure_summary: str
     html_snippet: str
     help: str
-    criterion_sc: str = SC
+    criterion_sc: str = "2.4.11"
     wcag_level: str = "AA"
     impact: str = "serious"
 
     @property
     def help_url(self) -> str:
-        return HELP_URL
+        return HELP_URLS.get(self.criterion_sc, HELP_URLS["2.4.11"])
 
     @property
     def target_hash(self) -> str:

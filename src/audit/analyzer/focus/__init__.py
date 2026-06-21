@@ -7,7 +7,16 @@ elements and reading geometry that only exists at runtime. 2.4.11
 element and check whether a position:fixed/sticky overlay covers it.
 """
 
-from audit.analyzer.focus.base import RULE_FOCUS_OBSCURED, FocusFinding
+from audit.analyzer.focus.base import (
+    RULE_FOCUS_OBSCURED,
+    RULE_POSITIVE_TABINDEX,
+    FocusFinding,
+)
 from audit.analyzer.focus.probe import FocusProbe
 
-__all__ = ["RULE_FOCUS_OBSCURED", "FocusFinding", "FocusProbe"]
+__all__ = [
+    "RULE_FOCUS_OBSCURED",
+    "RULE_POSITIVE_TABINDEX",
+    "FocusFinding",
+    "FocusProbe",
+]
