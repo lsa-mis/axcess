@@ -16,7 +16,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from audit.analyzer.model_registry import get_pick
-from audit.analyzer.semantic.analyzers import LinkPurposeInContextAnalyzer
+from audit.analyzer.semantic.analyzers import (
+    HeadingsAndLabelsAnalyzer,
+    LinkPurposeInContextAnalyzer,
+)
 from audit.analyzer.semantic.base import SemanticAnalyzer
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.logging import get_logger
@@ -28,7 +31,7 @@ log = get_logger(__name__)
 # "2.4.04" is caught loudly).
 _REGISTRY: dict[str, type[SemanticAnalyzer]] = {
     "2.4.4": LinkPurposeInContextAnalyzer,
-    # Wave-1 SCs land in Phase 9.2; each adds one row here.
+    "2.4.6": HeadingsAndLabelsAnalyzer,
 }
 
 

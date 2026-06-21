@@ -1,0 +1,184 @@
+"""SC 2.4.6 — Headings and Labels (descriptiveness) analyzer.
+
+Scope: HEADINGS. Judges whether each heading describes the content it
+introduces (the core 2.4.6 question that no rule engine can answer —
+axe only catches *empty* headings). Label descriptiveness is a planned
+follow-up; the coverage matrix says so honestly.
+
+Mirrors the SC 2.4.4 analyzer's shape exactly: extract the focused slice,
+send one bounded prompt to a local Ollama text model, parse the JSON into
+:class:`SemanticFinding` rows, and fail gracefully (empty list + a logged
+warning) on any model/IO problem.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from importlib import resources
+from typing import Any
+
+from audit.analyzer.ollama_base import OllamaError, prompt_content_version
+from audit.analyzer.semantic.base import AnalysisContext, SemanticFinding
+from audit.analyzer.semantic.extractor import HeadingRecord, extract_headings
+from audit.analyzer.semantic.ollama_text import OllamaTextProvider
+from audit.logging import get_logger
+
+log = get_logger(__name__)
+
+_PROMPT_PACKAGE = "audit.analyzer.semantic.prompts"
+PROMPT_NAME = "sc_2_4_6_headings_descriptive.txt"
+
+# Cap headings per call so a heading-heavy page can't blow the prompt budget.
+MAX_HEADINGS_PER_CALL = 60
+
+_HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html"
+
+
+def _load_prompt() -> str:
+    return (resources.files(_PROMPT_PACKAGE) / PROMPT_NAME).read_text(encoding="utf-8")
+
+
+class HeadingsAndLabelsAnalyzer:
+    """LLM-driven SC 2.4.6 analyzer (headings descriptiveness)."""
+
+    criterion_sc = "2.4.6"
+
+    def __init__(
+        self,
+        provider: OllamaTextProvider,
+        *,
+        model: str | None = None,
+        prompt_template: str | None = None,
+    ) -> None:
+        self._provider = provider
+        self._model = model
+        self._prompt_template = prompt_template or _load_prompt()
+        self.prompt_version = prompt_content_version(self._prompt_template)
+
+    async def analyze(self, ctx: AnalysisContext) -> list[SemanticFinding]:
+        headings = extract_headings(ctx.body)
+        if not headings:
+            return []
+
+        chunk = headings[:MAX_HEADINGS_PER_CALL]
+        if len(headings) > MAX_HEADINGS_PER_CALL:
+            log.info(
+                "sc_2_4_6.headings_truncated",
+                page_url=ctx.page_url,
+                total=len(headings),
+                kept=MAX_HEADINGS_PER_CALL,
+            )
+
+        prompt = self._render_prompt(chunk)
+        try:
+            raw = await self._provider.generate_json(prompt, model=self._model)
+        except OllamaError as exc:
+            log.warning("sc_2_4_6.llm_failed", page_url=ctx.page_url, error=str(exc))
+            return []
+
+        return list(self._parse_response(raw, chunk))
+
+    def _render_prompt(self, headings: list[HeadingRecord]) -> str:
+        return self._prompt_template.format(elements=_format_headings(headings))
+
+    def _parse_response(
+        self,
+        raw: dict[str, Any] | list[Any],
+        headings: list[HeadingRecord],
+    ) -> list[SemanticFinding]:
+        if not isinstance(raw, dict):
+            log.warning("sc_2_4_6.bad_response_shape", got=type(raw).__name__)
+            return []
+        violations = raw.get("violations")
+        if not isinstance(violations, list):
+            log.warning("sc_2_4_6.missing_violations_array", payload_keys=list(raw.keys()))
+            return []
+
+        out: list[SemanticFinding] = []
+        seen: set[int] = set()
+        for entry in violations:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                idx = int(entry.get("index"))  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                log.warning("sc_2_4_6.bad_index", entry=entry)
+                continue
+            if idx < 0 or idx >= len(headings):
+                log.warning("sc_2_4_6.index_out_of_range", index=idx, count=len(headings))
+                continue
+            if idx in seen:
+                continue
+            seen.add(idx)
+
+            h = headings[idx]
+            reason = _str_or_default(entry.get("reason"), "")
+            recommendation = _str_or_default(entry.get("recommendation"), "")
+            confidence = _normalize_confidence(entry.get("confidence"))
+
+            failure_summary = reason
+            if recommendation:
+                failure_summary = f"{reason} Suggested heading: {recommendation}"
+
+            impact = {"high": "serious", "medium": "moderate", "low": "minor"}.get(
+                confidence, "moderate"
+            )
+            out.append(
+                SemanticFinding(
+                    criterion_sc=self.criterion_sc,
+                    wcag_level="AA",
+                    impact=impact,
+                    help=reason or "Heading does not describe the content it introduces.",
+                    target_selector=h.selector,
+                    failure_summary=failure_summary,
+                    html_snippet=h.snippet,
+                    target_hash=_hash_target(
+                        criterion_sc=self.criterion_sc,
+                        selector=h.selector,
+                        snippet=h.snippet,
+                    ),
+                    help_url=_HELP_URL,
+                    wcag_scs="2.4.6",
+                )
+            )
+        return out
+
+
+def _format_headings(headings: list[HeadingRecord]) -> str:
+    """Render the HEADINGS section of the prompt as a readable numbered list."""
+    lines: list[str] = []
+    for i, h in enumerate(headings):
+        level = f"h{h.level}" if h.level else "heading"
+        lines.append(f"---- HEADING {i} ({level}) ----")
+        lines.append(f"  heading_text: {h.text!r}")
+        if h.following_text:
+            lines.append(f"  introduces_content: {h.following_text!r}")
+        else:
+            lines.append("  introduces_content: (none captured — do not flag)")
+    return "\n".join(lines)
+
+
+def _str_or_default(value: Any, default: str) -> str:
+    if isinstance(value, str):
+        return value.strip()[:500]
+    return default
+
+
+def _normalize_confidence(value: Any) -> str:
+    if not isinstance(value, str):
+        return "medium"
+    lowered = value.strip().lower()
+    return lowered if lowered in ("high", "medium", "low") else "medium"
+
+
+def _hash_target(*, criterion_sc: str, selector: str, snippet: str) -> str:
+    h = hashlib.sha256()
+    h.update(criterion_sc.encode("utf-8"))
+    h.update(b"\x00")
+    h.update(selector.encode("utf-8"))
+    h.update(b"\x00")
+    h.update(snippet.encode("utf-8"))
+    return h.hexdigest()
+
+
+__all__ = ["MAX_HEADINGS_PER_CALL", "PROMPT_NAME", "HeadingsAndLabelsAnalyzer"]

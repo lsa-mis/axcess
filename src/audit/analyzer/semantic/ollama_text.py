@@ -123,13 +123,9 @@ class OllamaTextProvider(OllamaBase):
         try:
             parsed: Any = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise OllamaError(
-                f"model did not return valid JSON: {raw[:200]}"
-            ) from exc
+            raise OllamaError(f"model did not return valid JSON: {raw[:200]}") from exc
         if not isinstance(parsed, (dict, list)):
-            raise OllamaError(
-                f"expected JSON object or array, got {type(parsed).__name__}"
-            )
+            raise OllamaError(f"expected JSON object or array, got {type(parsed).__name__}")
         return parsed
 
 

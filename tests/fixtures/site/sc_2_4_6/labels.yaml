@@ -1,0 +1,17 @@
+# Ground truth for SC 2.4.6 (headings descriptiveness) fixtures.
+# Indices are into the extract_headings() order (document order).
+clean:
+  file: clean.html
+  expect_violation_count: 0
+  violations: []
+  notes: "All three headings describe the content that follows them."
+
+vague_headings:
+  file: vague_headings.html
+  expect_violation_count: 3
+  violations: [1, 2, 3]
+  notes: >-
+    'Welcome' (index 0) is generic but conventional for a landing intro, so
+    it's borderline-allowed. 'Section' (1), 'More' (2), and 'Stuff' (3)
+    describe nothing about the refund / shipping / contact content beneath
+    them and should be flagged.

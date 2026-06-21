@@ -446,14 +446,15 @@ criteria:
   - sc: "2.4.6"
     name: "Headings and Labels"
     level: AA
-    method: partial
-    pipelines: [axe]
-    confidence: low
+    method: ai-assisted
+    pipelines: [axe, semantic]
+    confidence: medium
     automated_check: >-
-      axe flags empty headings and form controls missing a label.
+      axe flags empty headings / unlabelled controls; the semantic LLM judges
+      whether each heading actually describes the content it introduces.
     manual_check: >-
-      Whether headings and labels are *descriptive* of their content is the core
-      of this SC — an AI analyzer for it is in progress.
+      Confirm the LLM's borderline heading calls, and check that form-control
+      LABELS are descriptive — label descriptiveness is not yet AI-assisted.
 
   - sc: "2.4.7"
     name: "Focus Visible"

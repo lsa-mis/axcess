@@ -4,12 +4,15 @@ One class per WCAG SC. Each class implements the
 :class:`audit.analyzer.semantic.base.SemanticAnalyzer` protocol and is
 registered in :mod:`audit.analyzer.semantic.registry`.
 
-Phase 9.1 ships SC 2.4.4 only. Phases 9.2+ add the rest of the
-wave-1 SCs (see :doc:`PLAN.md`).
+Ships SC 2.4.4 (Link Purpose) and SC 2.4.6 (Headings descriptiveness);
+more wave-1 SCs land one class at a time.
 """
 
 from audit.analyzer.semantic.analyzers.sc_2_4_4 import (
     LinkPurposeInContextAnalyzer,
 )
+from audit.analyzer.semantic.analyzers.sc_2_4_6 import (
+    HeadingsAndLabelsAnalyzer,
+)
 
-__all__ = ["LinkPurposeInContextAnalyzer"]
+__all__ = ["HeadingsAndLabelsAnalyzer", "LinkPurposeInContextAnalyzer"]

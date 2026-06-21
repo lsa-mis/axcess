@@ -247,4 +247,113 @@ def _collapse(text: str) -> str:
     return " ".join(text.split())
 
 
-__all__ = ["ANCESTOR_DEPTH", "LinkRecord", "extract_links"]
+# --------------------------------------------------------------------
+# Headings (SC 2.4.6 — Headings and Labels).
+# --------------------------------------------------------------------
+
+_HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6, [role=heading]"
+
+# How much of the content a heading introduces to feed the model. Enough to
+# judge "does this heading describe what follows?" without bloating the prompt.
+_SECTION_TEXT_LIMIT = 400
+
+
+@dataclass(frozen=True, slots=True)
+class HeadingRecord:
+    """One heading element ready for SC 2.4.6 (descriptiveness) analysis."""
+
+    selector: str
+    level: int  # 1-6 (or aria-level); 0 if a role=heading with no level
+    text: str  # the heading's own text
+    following_text: str  # the content it introduces (next siblings' text)
+    ancestors: list[str] = field(default_factory=list)
+    snippet: str = ""
+
+
+def extract_headings(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> list[HeadingRecord]:
+    """Pull every non-empty heading + the content it introduces.
+
+    SC 2.4.6 asks whether headings *describe topic or purpose*. Empty
+    headings are a different failure (axe covers those), so we skip them —
+    this analyzer judges descriptiveness, which needs heading text to judge.
+    """
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        return []
+
+    out: list[HeadingRecord] = []
+    for idx, node in enumerate(tree.css(_HEADING_SELECTOR)):
+        text = _collapse(node.text() or "")
+        if not text:
+            continue
+        out.append(
+            HeadingRecord(
+                selector=_stable_selector_for(node, "h", idx),
+                level=_heading_level(node),
+                text=text,
+                following_text=_following_section_text(node),
+                ancestors=_ancestor_texts(node, depth=ancestor_depth),
+                snippet=_truncated_html(node, limit=300),
+            )
+        )
+    return out
+
+
+def _heading_level(node: Node) -> int:
+    """Heading level from the tag (h1-h6) or aria-level; 0 if unknown."""
+    tag = (node.tag or "").lower()
+    if len(tag) == 2 and tag[0] == "h" and tag[1].isdigit():
+        return int(tag[1])
+    aria_level = node.attributes.get("aria-level")
+    if aria_level and aria_level.strip().isdigit():
+        return int(aria_level.strip())
+    return 0
+
+
+def _following_section_text(node: Node) -> str:
+    """Text of the siblings a heading introduces, up to the next heading.
+
+    Walks forward over next siblings, accumulating their text, and stops at
+    the next heading (its content belongs to that heading, not this one).
+    """
+    parts: list[str] = []
+    cur = node.next
+    total = 0
+    while cur is not None and total < _SECTION_TEXT_LIMIT:
+        tag = (cur.tag or "").lower()
+        if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            break
+        if cur.attributes.get("role") == "heading":
+            break
+        text = _collapse(cur.text() or "")
+        if text:
+            parts.append(text)
+            total += len(text)
+        cur = cur.next
+    return _collapse(" ".join(parts))[:_SECTION_TEXT_LIMIT]
+
+
+def _stable_selector_for(node: Node, tag_hint: str, ordinal: int) -> str:
+    """Like ``_stable_selector`` but for non-anchor elements.
+
+    Uses the element's real tag (``node.tag``) when available so the hint
+    reads naturally in a report (``h2#intro`` rather than ``a#intro``).
+    """
+    tag = (node.tag or tag_hint).lower()
+    id_attr = node.attributes.get("id")
+    if id_attr:
+        return f"{tag}#{id_attr}"
+    klass = node.attributes.get("class")
+    if klass:
+        return f"{tag}.{klass.split()[0]}[ord={ordinal}]"
+    return f"{tag}[ord={ordinal}]"
+
+
+__all__ = [
+    "ANCESTOR_DEPTH",
+    "HeadingRecord",
+    "LinkRecord",
+    "extract_headings",
+    "extract_links",
+]

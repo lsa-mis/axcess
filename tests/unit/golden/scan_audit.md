@@ -68,8 +68,8 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
-| **Partly automated** | 15 | Automated checks catch the mechanical failures; the rest needs a human. |
-| **AI-assisted** | 2 | A local model flags candidates — a human confirms before counting them. |
+| **Partly automated** | 14 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **AI-assisted** | 3 | A local model flags candidates — a human confirms before counting them. |
 | **Manual only** | 32 | No automated detection — a human must test this criterion. |
 
 ### Automated &amp; AI-assisted (23 criteria)
@@ -90,7 +90,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 2.4.1 | Bypass Blocks | A | Partly automated | axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. | Confirm the skip link actually moves focus and works with the keyboard. |
 | 2.4.2 | Page Titled | A | Automated | axe checks that every page has a non-empty <title>. | Confirm the title is descriptive and distinguishes the page (a light human check). |
 | 2.4.4 | Link Purpose (In Context) | A | AI-assisted | axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes. | Confirm the LLM's borderline calls ("read more", icon links) — it flags strong leads, not verdicts. |
-| 2.4.6 | Headings and Labels | AA | Partly automated | axe flags empty headings and form controls missing a label. | Whether headings and labels are *descriptive* of their content is the core of this SC — an AI analyzer for it is in progress. |
+| 2.4.6 | Headings and Labels | AA | AI-assisted | axe flags empty headings / unlabelled controls; the semantic LLM judges whether each heading actually describes the content it introduces. | Confirm the LLM's borderline heading calls, and check that form-control LABELS are descriptive — label descriptiveness is not yet AI-assisted. |
 | 2.4.7 | Focus Visible | AA | Partly automated | axe has limited checks for suppressed focus indicators. | Tab the whole page and confirm a clearly visible focus indicator on every interactive element — largely manual. |
 | 2.5.3 | Label in Name | A | Partly automated | axe flags controls whose accessible name doesn't contain the visible label text (label-content-name-mismatch). | Confirm the visible text is fully contained in the accessible name for voice-control users. |
 | 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
