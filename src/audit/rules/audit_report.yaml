@@ -866,6 +866,43 @@ semantic_criteria:
       order.
     confidence_default: high
 
+  "1.3.2":
+    title: "Visual reading order doesn't match the DOM order"
+    wcag_sc: "1.3.2"
+    wcag_name: "Meaningful Sequence"
+    wcag_level: "A"
+    abilities_affected: [vision, cognition]
+    what_happening: >-
+      Our visual probe screenshotted the page and a vision model judged that
+      the visual reading order doesn't match the DOM/source order — usually
+      because CSS (flex/grid <code>order</code>, floats, or absolute
+      positioning) places content somewhere other than where it sits in the
+      markup.
+    why_matters: >-
+      Screen readers and keyboard users follow the DOM order; sighted users
+      follow the visual order. When the two diverge, screen-reader users hear
+      content in a different, often nonsensical sequence — a form's submit
+      button before its fields, a caption before its image, steps out of order.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Reorder the DOM so the source order matches the intended reading
+        order, then use CSS for visual placement.
+      - >-
+        Avoid using flex/grid <code>order</code> or absolute positioning to
+        move meaningful content out of its logical sequence.
+    verify_manual: >-
+      Read the page with a screen reader (or tab through it) and confirm the
+      sequence matches what a sighted user sees.
+    verify_automated: >-
+      Re-run the crawl with a vision model available — the visual probe
+      re-checks the reading order on each page.
+    acceptance: >-
+      The DOM/source order matches the visual reading order on the affected
+      pages.
+    confidence_default: medium
+
   "1.4.4":
     title: "Text clipped when zoomed to 200%"
     wcag_sc: "1.4.4"

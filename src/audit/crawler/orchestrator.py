@@ -28,8 +28,10 @@ from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
+from audit.analyzer.visual import MeaningfulSequenceProbe, VisualFinding
 from audit.analyzer.vlm.base import VlmProvider
 from audit.analyzer.vlm.ollama import OllamaProvider
+from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import url_policy
@@ -145,6 +147,12 @@ class CrawlConfig:
     # (focuses each element, checks for a sticky/fixed overlay over its
     # centre); no model. Default on; disable with ``--skip-focus``.
     focus_checks_enabled: bool = True
+    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. Screenshots the page
+    # and asks a local vision model whether the visual reading order matches
+    # the DOM order. Needs Ollama + a vision model; no-ops cleanly without
+    # one. One VLM call per page, so it respects the same vlm_enabled gate.
+    # Default on; disable with ``--skip-visual``.
+    visual_checks_enabled: bool = True
 
 
 @dataclass
@@ -172,6 +180,8 @@ class CrawlSummary:
     responsive_findings_total: int = 0
     focus_pages_probed: int = 0
     focus_findings_total: int = 0
+    visual_pages_probed: int = 0
+    visual_findings_total: int = 0
     findings_written: int = 0
     findings_by_severity: dict[str, int] = field(
         default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -272,6 +282,14 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
+    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. Only built when a
+    # vision model is actually reachable; otherwise it would call a dead
+    # daemon once per page. No-ops cleanly when the provider is None.
+    visual_probe: MeaningfulSequenceProbe | None = None
+    if config.visual_checks_enabled and config.vlm_enabled:
+        vision_provider = await _build_vision_provider(config, client)
+        if vision_provider is not None:
+            visual_probe = MeaningfulSequenceProbe(provider=vision_provider)
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
         js_holder = _LazyJs(
@@ -282,6 +300,7 @@ async def run_crawl(
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
+            visual_probe=visual_probe,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -423,6 +442,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
+            "visual_checks_enabled": config.visual_checks_enabled,
         },
         sort_keys=True,
     )
@@ -502,6 +522,7 @@ class _LazyJs:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        visual_probe: MeaningfulSequenceProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -511,6 +532,7 @@ class _LazyJs:
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
+        self._visual_probe = visual_probe
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -521,6 +543,7 @@ class _LazyJs:
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
+                visual_probe=self._visual_probe,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -579,6 +602,31 @@ async def _build_vlm(
         )
         return None
     return VlmConfig(provider=ollama)
+
+
+async def _build_vision_provider(
+    config: CrawlConfig,
+    client: httpx.AsyncClient,
+) -> OllamaVisionProvider | None:
+    """Build the SC 1.3.2 vision provider, or None if no model is reachable.
+
+    Reuses the configured ``vlm_model`` (a vision model) + base URL. The
+    health probe avoids hammering a dead daemon once per page.
+    """
+    provider = OllamaVisionProvider(
+        client,
+        model=config.vlm_model,
+        base_url=config.vlm_base_url,
+        concurrency=config.vlm_concurrency,
+    )
+    if not await provider.healthy():
+        log.warning(
+            "visual.unavailable",
+            model=config.vlm_model,
+            hint="No reachable vision model; skipping the SC 1.3.2 visual probe.",
+        )
+        return None
+    return provider
 
 
 async def _build_semantic_analyzers(
@@ -755,6 +803,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # ``pipeline='focus'``.
         if render_mode == "js" and ctx.config.focus_checks_enabled:
             _persist_focus(ctx, page_id=page_id, findings=result.focus_findings)
+
+        # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
+        if render_mode == "js" and ctx.config.visual_checks_enabled:
+            _persist_visual(ctx, page_id=page_id, findings=result.visual_findings)
 
         # Phase 9+: per-criterion semantic analyzers. Works on both
         # static and JS-rendered fetches because the first wave is
@@ -997,6 +1049,32 @@ def _persist_focus(
             )
     ctx.summary.focus_pages_probed += 1
     ctx.summary.focus_findings_total += len(findings)
+
+
+def _persist_visual(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[VisualFinding, ...],
+) -> None:
+    """Write visual (VLM) probe findings (SC 1.3.2) + bump the counters."""
+    for f in findings:
+        try:
+            repo.upsert_visual_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "visual.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    ctx.summary.visual_pages_probed += 1
+    ctx.summary.visual_findings_total += len(findings)
 
 
 async def _run_semantic(

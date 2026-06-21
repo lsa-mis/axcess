@@ -626,9 +626,9 @@ def test_api_tracking_returns_shipped_and_roadmap(client: TestClient) -> None:
     by_wcag = {r["wcag"]: r for r in body["roadmap"]}
     assert by_wcag["1.4.5"]["status"] == "shipped"
     assert by_wcag["2.4.4"]["status"] == "shipped"
-    # The two rows the original triage mislabelled "in progress" have no
-    # code and must read "planned".
-    assert by_wcag["1.3.2"]["status"] == "planned"
+    # 1.3.2 shipped via the visual (VLM) probe this session.
+    assert by_wcag["1.3.2"]["status"] == "shipped"
+    # 3.2.3 still needs the cross-page embedding analyzer — not started.
     assert by_wcag["3.2.3"]["status"] == "planned"
     assert body["counts"]["shipped"] >= 2
 

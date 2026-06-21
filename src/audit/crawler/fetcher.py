@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
+    from audit.analyzer.visual import VisualFinding
 
 _HTML_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 
@@ -55,6 +56,9 @@ class FetchResult:
     # SC 2.4.11 Focus Not Obscured — live-page focus probe results. Same
     # population rules: JsFetcher only, default on, ``--skip-focus`` disables.
     focus_findings: tuple[FocusFinding, ...] = field(default=())
+    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. JsFetcher only;
+    # no-op without a vision model. ``--skip-visual`` disables.
+    visual_findings: tuple[VisualFinding, ...] = field(default=())
 
     @property
     def is_html(self) -> bool:

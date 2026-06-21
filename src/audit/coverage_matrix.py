@@ -26,7 +26,15 @@ _MATRIX_FILE = "wcag_coverage.yaml"
 
 # The four honesty buckets, ordered most → least automated for display.
 METHODS: tuple[str, ...] = ("automated", "partial", "ai-assisted", "manual")
-PIPELINES: tuple[str, ...] = ("axe", "keyboard", "responsive", "focus", "image", "semantic")
+PIPELINES: tuple[str, ...] = (
+    "axe",
+    "keyboard",
+    "responsive",
+    "focus",
+    "visual",
+    "image",
+    "semantic",
+)
 LEVELS: tuple[str, ...] = ("A", "AA")
 
 # Human-facing one-liners for each method (used in report + UI legends).

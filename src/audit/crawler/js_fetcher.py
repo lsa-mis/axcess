@@ -23,6 +23,7 @@ from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
+from audit.analyzer.visual import MeaningfulSequenceProbe, VisualFinding
 from audit.crawler.fetcher import FetchError, FetchResult
 
 if TYPE_CHECKING:
@@ -55,6 +56,7 @@ class JsFetcher:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        visual_probe: MeaningfulSequenceProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -75,6 +77,9 @@ class JsFetcher:
         # geometry at the normal viewport) but after axe/keyboard. It only
         # focuses elements + reads layout — no lasting DOM mutation.
         self._focus_probe = focus_probe
+        # SC 1.3.2 visual probe. Screenshots the page — must run before the
+        # responsive probe resizes the viewport. No-op without a vision model.
+        self._visual_probe = visual_probe
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
 
@@ -158,6 +163,16 @@ class JsFetcher:
             ):
                 focus_findings = await self._focus_probe.run(page)
 
+            # Visual (VLM) probe — screenshots, so also before the responsive
+            # probe mutates the viewport.
+            visual_findings: list[VisualFinding] = []
+            if (
+                self._visual_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                visual_findings = await self._visual_probe.run(page)
+
             responsive_findings: list[ResponsiveFinding] = []
             if (
                 self._responsive_probe is not None
@@ -175,6 +190,7 @@ class JsFetcher:
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
+                visual_findings=tuple(visual_findings),
             )
         finally:
             await ctx.close()

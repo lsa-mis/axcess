@@ -297,7 +297,7 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive", "focus"):
+    if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids — e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
@@ -325,7 +325,7 @@ def _pages_for_issue(
     ``page_images`` joins to ``pages``), so the query is heavier; the
     column shape comes out the same.
     """
-    if row.pipeline in ("axe", "semantic", "keyboard", "responsive", "focus"):
+    if row.pipeline in ("axe", "semantic", "keyboard", "responsive", "focus", "visual"):
         # All four DOM pipelines live in page_a11y_findings; the DB
         # rule_id carries the discriminator: bare rule_id for axe
         # ("color-contrast") and the dynamic probes
@@ -484,6 +484,8 @@ def _axe_issue_rows(
         # Focus probe rows ("focus-not-obscured", SC 2.4.11) — same
         # non-axe, SC-resolved pattern as keyboard/responsive.
         is_focus = raw_rule_id.startswith("focus-")
+        # Visual (VLM) probe rows ("visual-meaningful-sequence", SC 1.3.2).
+        is_visual = raw_rule_id.startswith("visual-")
         if is_semantic:
             sc = raw_rule_id.removeprefix("semantic:")
             meta = semantic_meta.get(sc, {})
@@ -519,6 +521,9 @@ def _axe_issue_rows(
         elif is_focus:
             issue_key = f"focus:{raw_rule_id}"
             default_title = f"Focus not visible: {raw_rule_id}"
+        elif is_visual:
+            issue_key = f"visual:{raw_rule_id}"
+            default_title = f"Visual order: {raw_rule_id}"
         else:
             issue_key = f"axe:{raw_rule_id}"
             default_title = f"axe rule: {raw_rule_id}"
@@ -533,6 +538,8 @@ def _axe_issue_rows(
                     if is_responsive
                     else "focus"
                     if is_focus
+                    else "visual"
+                    if is_visual
                     else "axe"
                 ),
                 issue_key=issue_key,

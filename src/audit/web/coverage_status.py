@@ -90,6 +90,14 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         needs_ai=True,
     ),
     ShippedPipeline(
+        name="Visual (VLM) probe",
+        pipeline="visual",
+        engine="Live-page screenshot + vision model via Ollama",
+        scs="1.3.2 Meaningful Sequence",
+        needs_ai=True,
+        note="Runs only when a local vision model is reachable.",
+    ),
+    ShippedPipeline(
         name="Semantic analyzer",
         pipeline="semantic",
         engine="Per-SC Text-LLM via Ollama",
@@ -132,9 +140,9 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         ai_fit="Strong",
         model_class="VLM",
         what="Screenshot + DOM-order text; does source order match the visual reading order?",
-        status="planned",
-        reuse="VLM + Playwright runtime",
-        note="No code yet — original triage marked in-progress.",
+        status="shipped",
+        reuse="visual (VLM) probe — OllamaVisionProvider + live-page screenshot",
+        note="MeaningfulSequenceProbe; runs when a local vision model is available.",
     ),
     RoadmapItem(
         wcag="3.2.3",

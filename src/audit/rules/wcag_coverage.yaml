@@ -117,13 +117,17 @@ criteria:
   - sc: "1.3.2"
     name: "Meaningful Sequence"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: ai-assisted
+    pipelines: [visual]
+    confidence: medium
+    automated_check: >-
+      The visual probe screenshots the page and asks a local vision model
+      whether the visual reading order matches the DOM/source order (CSS can
+      reorder content so screen readers hear a different sequence).
     manual_check: >-
-      Confirm the DOM/reading order matches the visual order (CSS can reorder
-      content). A screenshot-vs-DOM VLM analyzer is on the roadmap.
+      Confirm the model's call by tabbing/reading with a screen reader. Subtle
+      reorderings and content below the fold still need a human, and the probe
+      only runs when a local vision model is available.
 
   - sc: "1.3.3"
     name: "Sensory Characteristics"

@@ -112,6 +112,7 @@ _PIPELINE_LABEL = {
     "keyboard": "dynamic keyboard-trap probe",
     "responsive": "responsive & zoom probe",
     "focus": "live-page focus probe",
+    "visual": "visual (VLM) probe",
 }
 
 # Static description of each detection pipeline for the coverage section.
@@ -174,6 +175,16 @@ _PIPELINE_COVERAGE = [
         "checks": "SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays.",
         "confidence": "Medium — catches elements whose centre is covered; "
         "partial-overlap and post-click overlays still need a human.",
+    },
+    {
+        "key": "visual",
+        "name": "Visual (VLM) probe",
+        "method": "Screenshots the page and asks a local vision model whether the "
+        "visual reading order matches the DOM/source order.",
+        "checks": "SC 1.3.2 — content visually reordered by CSS so screen readers "
+        "get a different, confusing sequence.",
+        "confidence": "Medium — a vision-model judgement; treat as a lead and "
+        "confirm. Only runs when a local vision model is available.",
     },
 ]
 

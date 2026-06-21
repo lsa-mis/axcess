@@ -170,6 +170,16 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_visual: Annotated[
+        bool,
+        typer.Option(
+            "--skip-visual",
+            help=(
+                "Skip the visual (VLM) probe (SC 1.3.2 Meaningful Sequence). "
+                "Needs a local vision model; one screenshot + VLM call per page."
+            ),
+        ),
+    ] = False,
     use_js: Annotated[
         bool,
         typer.Option(
@@ -246,6 +256,7 @@ def crawl(
             keyboard_probe_max_focusable=keyboard_max_focusable,
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
+            visual_checks_enabled=not skip_visual,
         )
         if static_only:
             console.print(
@@ -319,6 +330,9 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     if summary.focus_pages_probed:
         table.add_row("Pages focus-probed (SC 2.4.11)", str(summary.focus_pages_probed))
         table.add_row("Focus-obscured findings total", str(summary.focus_findings_total))
+    if summary.visual_pages_probed:
+        table.add_row("Pages visually probed (SC 1.3.2)", str(summary.visual_pages_probed))
+        table.add_row("Visual-sequence findings total", str(summary.visual_findings_total))
     if summary.findings_written:
         table.add_row("Findings written", str(summary.findings_written))
         for level in ("critical", "major", "minor", "info"):
