@@ -34,6 +34,10 @@ capped (``_MAX_ELEMENTS_SCANNED``, ``_MAX_OFFENDERS_PER_CHECK``) so a
 pathological page can't stall the crawl.
 """
 
+# This module builds JS snippets with ``%``-formatting (str.format would
+# collide with the JS ``{}`` braces). UP031 is intentional throughout.
+# ruff: noqa: UP031
+
 from __future__ import annotations
 
 import contextlib
@@ -121,7 +125,7 @@ _CLIPPED_TEXT_JS = """
   }
   return out;
 }
-""" % {"scan_cap": _MAX_ELEMENTS_SCANNED}  # noqa: UP031 — JS braces break str.format
+""" % {"scan_cap": _MAX_ELEMENTS_SCANNED}
 
 # Reflow detector: does the document need a horizontal scrollbar at the
 # current (320px) viewport, and which elements are wider than it?
@@ -160,7 +164,7 @@ _REFLOW_JS = (
   return { overflow: overflow, viewport: doc.clientWidth, offenders: out };
 }
 """
-    % {  # noqa: UP031 — JS braces break str.format
+    % {
         "tolerance": _OVERFLOW_TOLERANCE_PX,
         "scan_cap": _MAX_ELEMENTS_SCANNED,
         "max_offenders": _MAX_OFFENDERS_PER_CHECK,
