@@ -59,16 +59,85 @@ This audit used multiple detection methods. Each sees different things; together
 
 _A “—” means this method produced no findings on this scan — it may have been disabled for the run, or it ran and found nothing. Only axe-core records a definitive ran-clean signal today._
 
-**What we did *not* check** (still needs manual testing):
+_The next section breaks this down to every WCAG 2.2 A/AA success criterion — what was automated, what was AI-assisted, and the full list of what still needs manual testing._
 
-- Focus *order* through a multi-step flow (we catch traps, not bad ordering).
-- Captions, transcripts, and audio description for video/audio (SC 1.2.*).
-- Reading level and plain-language quality (SC 3.1.5 — explicitly untestable).
-- Whether content that moves/auto-updates can be paused (SC 2.2.2).
-- Error-prevention and recovery flows on real form submissions (SC 3.3.*).
-- Anything behind a login, or traps/dialogs that only appear after a click.
-- Screen-reader announcement quality — the lived experience still needs a human.
-- Designed text truncation (ellipsis) at zoom — the probe skips it; a human should confirm nothing essential is lost.
+## WCAG 2.2 A/AA coverage — what's automated vs. manual
+
+Across all **55** Level A/AA success criteria, here is exactly what Axcess can and cannot determine for you. Automated coverage is high-confidence; AI-assisted findings are strong leads you should confirm; manual-only criteria are not detected by any pipeline.
+
+| Coverage | Criteria | What it means |
+|---|---:|---|
+| **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
+| **Partly automated** | 15 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **AI-assisted** | 2 | A local model flags candidates — a human confirms before counting them. |
+| **Manual only** | 32 | No automated detection — a human must test this criterion. |
+
+### Automated &amp; AI-assisted (23 criteria)
+
+| SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
+|---|---|---|---|---|---|
+| 1.1.1 | Non-text Content | A | Partly automated | axe flags missing alt on img / area / input[type=image] and unlabelled SVGs; the image-of-text VLM separately flags pictures that are really text. | Whether the alt text that IS present is a meaningful equivalent — and the decorative-vs-informative call — needs a human. |
+| 1.3.1 | Info and Relationships | A | Partly automated | axe checks list, table-header, definition-list, required-ARIA-children and heading-structure markup on the rendered DOM. | Relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they're also programmatic. |
+| 1.3.5 | Identify Input Purpose | AA | Partly automated | axe validates that any autocomplete tokens used are valid. | Confirm autocomplete IS present on fields collecting the user's own info (name, email, address) — missing autocomplete isn't auto-detected. |
+| 1.4.1 | Use of Color | A | Partly automated | axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). | Most colour-only meaning — form errors, chart series, required-field markers, status — needs a human to confirm a non-colour cue exists. |
+| 1.4.3 | Contrast (Minimum) | AA | Partly automated | axe measures text/background contrast on the rendered DOM against the 4.5:1 (3:1 large-text) thresholds. | Text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check. |
+| 1.4.4 | Resize Text | AA | Automated | The responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container. | Confirm no loss of content or function across the full zoom range in your target browsers. |
+| 1.4.5 | Images of Text | AA | AI-assisted | OCR + a local vision model judge whether each image is really rendered text rather than a photo/diagram. | Confirm flagged images aren't the allowed exceptions (logos, or text that's essential to a particular presentation). |
+| 1.4.10 | Reflow | AA | Automated | The responsive probe loads each page at 320 CSS px and flags horizontal scrolling / overflow. | Confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use). |
+| 1.4.12 | Text Spacing | AA | Automated | The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap. | Confirm no text is cut off or overlapping with the spacing applied. |
+| 2.1.1 | Keyboard | A | Partly automated | axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page. | Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard — the deepest part of this SC is manual. |
+| 2.1.2 | No Keyboard Trap | A | Automated | The keyboard probe tab-walks the page and tests Esc / iframe escape to detect focus traps. | Traps that only appear after interaction (a modal opened by a click) need a manual pass with the keyboard. |
+| 2.4.1 | Bypass Blocks | A | Partly automated | axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. | Confirm the skip link actually moves focus and works with the keyboard. |
+| 2.4.2 | Page Titled | A | Automated | axe checks that every page has a non-empty <title>. | Confirm the title is descriptive and distinguishes the page (a light human check). |
+| 2.4.4 | Link Purpose (In Context) | A | AI-assisted | axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes. | Confirm the LLM's borderline calls ("read more", icon links) — it flags strong leads, not verdicts. |
+| 2.4.6 | Headings and Labels | AA | Partly automated | axe flags empty headings and form controls missing a label. | Whether headings and labels are *descriptive* of their content is the core of this SC — an AI analyzer for it is in progress. |
+| 2.4.7 | Focus Visible | AA | Partly automated | axe has limited checks for suppressed focus indicators. | Tab the whole page and confirm a clearly visible focus indicator on every interactive element — largely manual. |
+| 2.5.3 | Label in Name | A | Partly automated | axe flags controls whose accessible name doesn't contain the visible label text (label-content-name-mismatch). | Confirm the visible text is fully contained in the accessible name for voice-control users. |
+| 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
+| 3.1.1 | Language of Page | A | Automated | axe checks <html> has a present and valid lang attribute. | Confirm the declared language actually matches the page's main content. |
+| 3.1.2 | Language of Parts | AA | Partly automated | axe validates lang attributes that are present on parts of the page. | Detecting foreign-language passages that are *missing* a lang attribute needs a human reader. |
+| 3.3.2 | Labels or Instructions | A | Partly automated | axe checks that form controls have a programmatic label. | Whether the label + instructions are *sufficient* to know what to enter (format, required) needs judgement — an AI analyzer is on the roadmap. |
+| 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
+| 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
+
+### Needs manual testing (32 criteria)
+
+No Axcess pipeline detects these — they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
+
+| SC | Criterion | Lvl | What to test |
+|---|---|---|---|
+| 1.2.1 | Audio-only and Video-only (Prerecorded) | A | Confirm a text transcript exists for audio-only and an equivalent (transcript or audio track) for video-only. Transcript-presence analyzer is on the roadmap. |
+| 1.2.2 | Captions (Prerecorded) | A | Play each video and confirm synchronized, accurate captions. Auto-caption diffing (Whisper) is on the roadmap. |
+| 1.2.3 | Audio Description or Media Alternative (Prerecorded) | A | Confirm an audio description or full text alternative for prerecorded video. |
+| 1.2.4 | Captions (Live) | AA | Confirm live audio in synchronized media has real-time captions. |
+| 1.2.5 | Audio Description (Prerecorded) | AA | Confirm prerecorded video has a synchronized audio description track. |
+| 1.3.2 | Meaningful Sequence | A | Confirm the DOM/reading order matches the visual order (CSS can reorder content). A screenshot-vs-DOM VLM analyzer is on the roadmap. |
+| 1.3.3 | Sensory Characteristics | A | Read instructions for reliance on shape/size/location/sound alone ("click the round button to the right") — judgement only a human can make. |
+| 1.3.4 | Orientation | AA | Confirm content isn't locked to portrait or landscape (rotate the device / check for orientation-locking CSS). |
+| 1.4.2 | Audio Control | A | Confirm any audio that plays automatically for >3s can be paused or muted. |
+| 1.4.11 | Non-text Contrast | AA | Check that UI component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. No reliable automated rule exists yet. |
+| 1.4.13 | Content on Hover or Focus | AA | For tooltips/popovers triggered by hover/focus, confirm they're dismissable, hoverable, and persistent. |
+| 2.1.4 | Character Key Shortcuts | A | If single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. |
+| 2.2.1 | Timing Adjustable | A | For any time limit, confirm it can be turned off, adjusted, or extended. |
+| 2.2.2 | Pause, Stop, Hide | A | Confirm moving/auto-updating content >5s can be paused/stopped/hidden. A motion-detection VLM analyzer is on the roadmap. |
+| 2.3.1 | Three Flashes or Below Threshold | A | Confirm nothing flashes more than three times per second. Flash analysis is not implemented. |
+| 2.4.3 | Focus Order | A | Tab through and confirm focus order matches the logical/visual order. A focus-order VLM+Playwright analyzer is on the roadmap. |
+| 2.4.5 | Multiple Ways | AA | Confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. |
+| 2.4.11 | Focus Not Obscured (Minimum) | AA | Tab through and confirm the focused element isn't hidden behind sticky headers / cookie banners. A VLM+Playwright analyzer is on the roadmap. |
+| 2.5.1 | Pointer Gestures | A | For any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. |
+| 2.5.2 | Pointer Cancellation | A | Confirm actions fire on the up-event and can be aborted (no critical action on down-press). |
+| 2.5.4 | Motion Actuation | A | If a function is triggered by device motion (shake/tilt), confirm a UI alternative and a way to disable motion actuation. |
+| 2.5.7 | Dragging Movements | AA | For any drag operation (sliders, reorder, kanban), confirm a single-pointer alternative (tap/click) exists. |
+| 3.2.1 | On Focus | A | Confirm moving focus to a control doesn't trigger an unexpected context change (auto-submit, new window). |
+| 3.2.2 | On Input | A | Confirm changing a setting (select, checkbox) doesn't auto-trigger a context change without warning. |
+| 3.2.3 | Consistent Navigation | AA | Confirm navigation repeated across pages stays in the same relative order. A cross-page embedding analyzer is on the roadmap. |
+| 3.2.4 | Consistent Identification | AA | Confirm components with the same function are labelled consistently across pages. A cross-page analyzer is on the roadmap. |
+| 3.2.6 | Consistent Help | A | Confirm help mechanisms (contact, self-help) appear in the same relative order on every page that has them. |
+| 3.3.1 | Error Identification | A | Submit forms with invalid data and confirm errors are identified in text. Requires interaction the crawler doesn't perform. |
+| 3.3.3 | Error Suggestion | AA | Trigger validation errors and confirm the page suggests how to fix them. |
+| 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | For legal/financial/data submissions, confirm reversal, checking, or confirmation is available. |
+| 3.3.7 | Redundant Entry | A | In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. |
+| 3.3.8 | Accessible Authentication (Minimum) | AA | Confirm login doesn't require a cognitive function test (puzzle, memorize) with no alternative. |
 
 ## Page hotspots
 

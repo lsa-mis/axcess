@@ -1,0 +1,673 @@
+# WCAG 2.2 Level A + AA coverage matrix — the authoritative source of truth
+# for "what Axcess checks automatically, what it AI-assists, and what still
+# needs manual testing." Every A/AA success criterion is listed exactly once.
+#
+# This file is deliberately HONEST and CONSERVATIVE. An accessibility tool
+# that over-claims coverage is worse than one that is upfront about its gaps.
+# So:
+#   - `automated`   only when a deterministic pipeline catches ~all testable
+#                   failures with high confidence (axe / keyboard / responsive).
+#   - `partial`     when an automated pipeline catches the *mechanical* failures
+#                   but meaningful manual testing remains (most axe rules).
+#   - `ai-assisted` when a local model flags candidates that a human must
+#                   confirm (image-of-text VLM, semantic LLM).
+#   - `manual`      when no Axcess pipeline detects it — a human must test it.
+#
+# EVERY criterion carries a `manual_check`: even fully automated SCs usually
+# leave a residual human judgement. This is what powers the per-scan
+# "still needs manual testing" report.
+#
+# When a new analyzer ships, flip that criterion's `method`/`pipelines`/
+# `confidence` here and the report, Tracking page, and landing page all update.
+#
+# `method`:     automated | partial | ai-assisted | manual
+# `pipelines`:  any of [axe, keyboard, responsive, image, semantic] ([] if manual)
+# `confidence`: high | medium | low | n/a   (n/a for manual-only)
+
+meta:
+  wcag_version: "2.2"
+  levels: [A, AA]
+  note: >-
+    Level A + AA only — the standard legal/conformance target. WCAG 2.2
+    removed 4.1.1 Parsing, so it is intentionally absent. AAA criteria are
+    out of scope for this matrix (the tool still audits its own UI at AAA).
+
+criteria:
+  # ---- Principle 1: Perceivable -------------------------------------------
+  - sc: "1.1.1"
+    name: "Non-text Content"
+    level: A
+    method: partial
+    pipelines: [axe, image]
+    confidence: medium
+    automated_check: >-
+      axe flags missing alt on img / area / input[type=image] and unlabelled
+      SVGs; the image-of-text VLM separately flags pictures that are really text.
+    manual_check: >-
+      Whether the alt text that IS present is a meaningful equivalent — and the
+      decorative-vs-informative call — needs a human.
+
+  - sc: "1.2.1"
+    name: "Audio-only and Video-only (Prerecorded)"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm a text transcript exists for audio-only and an equivalent
+      (transcript or audio track) for video-only. Transcript-presence analyzer
+      is on the roadmap.
+
+  - sc: "1.2.2"
+    name: "Captions (Prerecorded)"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Play each video and confirm synchronized, accurate captions. Auto-caption
+      diffing (Whisper) is on the roadmap.
+
+  - sc: "1.2.3"
+    name: "Audio Description or Media Alternative (Prerecorded)"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm an audio description or full text alternative for prerecorded video.
+
+  - sc: "1.2.4"
+    name: "Captions (Live)"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm live audio in synchronized media has real-time captions.
+
+  - sc: "1.2.5"
+    name: "Audio Description (Prerecorded)"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm prerecorded video has a synchronized audio description track.
+
+  - sc: "1.3.1"
+    name: "Info and Relationships"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe checks list, table-header, definition-list, required-ARIA-children and
+      heading-structure markup on the rendered DOM.
+    manual_check: >-
+      Relationships conveyed only visually (grouped fields, columns, emphasis
+      that implies meaning) need a human to confirm they're also programmatic.
+
+  - sc: "1.3.2"
+    name: "Meaningful Sequence"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm the DOM/reading order matches the visual order (CSS can reorder
+      content). A screenshot-vs-DOM VLM analyzer is on the roadmap.
+
+  - sc: "1.3.3"
+    name: "Sensory Characteristics"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Read instructions for reliance on shape/size/location/sound alone
+      ("click the round button to the right") — judgement only a human can make.
+
+  - sc: "1.3.4"
+    name: "Orientation"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm content isn't locked to portrait or landscape (rotate the device /
+      check for orientation-locking CSS).
+
+  - sc: "1.3.5"
+    name: "Identify Input Purpose"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe validates that any autocomplete tokens used are valid.
+    manual_check: >-
+      Confirm autocomplete IS present on fields collecting the user's own info
+      (name, email, address) — missing autocomplete isn't auto-detected.
+
+  - sc: "1.4.1"
+    name: "Use of Color"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe flags links distinguished from surrounding text by colour alone
+      (a narrow heuristic).
+    manual_check: >-
+      Most colour-only meaning — form errors, chart series, required-field
+      markers, status — needs a human to confirm a non-colour cue exists.
+
+  - sc: "1.4.2"
+    name: "Audio Control"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm any audio that plays automatically for >3s can be paused or muted.
+
+  - sc: "1.4.3"
+    name: "Contrast (Minimum)"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe measures text/background contrast on the rendered DOM against the
+      4.5:1 (3:1 large-text) thresholds.
+    manual_check: >-
+      Text baked into images, hover/focus/disabled states, and text over
+      gradients or photos need a human to check.
+
+  - sc: "1.4.4"
+    name: "Resize Text"
+    level: AA
+    method: automated
+    pipelines: [responsive]
+    confidence: high
+    automated_check: >-
+      The responsive probe zooms to a 200% proxy viewport and flags text that
+      clips or overflows its container.
+    manual_check: >-
+      Confirm no loss of content or function across the full zoom range in your
+      target browsers.
+
+  - sc: "1.4.5"
+    name: "Images of Text"
+    level: AA
+    method: ai-assisted
+    pipelines: [image]
+    confidence: medium
+    automated_check: >-
+      OCR + a local vision model judge whether each image is really rendered
+      text rather than a photo/diagram.
+    manual_check: >-
+      Confirm flagged images aren't the allowed exceptions (logos, or text that's
+      essential to a particular presentation).
+
+  - sc: "1.4.10"
+    name: "Reflow"
+    level: AA
+    method: automated
+    pipelines: [responsive]
+    confidence: high
+    automated_check: >-
+      The responsive probe loads each page at 320 CSS px and flags horizontal
+      scrolling / overflow.
+    manual_check: >-
+      Confirm no content or functionality is lost in the reflowed view (some loss
+      can pass the geometry check but still fail in use).
+
+  - sc: "1.4.11"
+    name: "Non-text Contrast"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Check that UI component boundaries (inputs, buttons, focus rings) and
+      meaningful graphics meet 3:1. No reliable automated rule exists yet.
+
+  - sc: "1.4.12"
+    name: "Text Spacing"
+    level: AA
+    method: automated
+    pipelines: [responsive]
+    confidence: high
+    automated_check: >-
+      The responsive probe injects the WCAG text-spacing override CSS
+      (line-height 1.5, etc.) and flags clipping/overlap.
+    manual_check: >-
+      Confirm no text is cut off or overlapping with the spacing applied.
+
+  - sc: "1.4.13"
+    name: "Content on Hover or Focus"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      For tooltips/popovers triggered by hover/focus, confirm they're
+      dismissable, hoverable, and persistent.
+
+  # ---- Principle 2: Operable ----------------------------------------------
+  - sc: "2.1.1"
+    name: "Keyboard"
+    level: A
+    method: partial
+    pipelines: [axe, keyboard]
+    confidence: medium
+    automated_check: >-
+      axe flags some keyboard-inaccessible patterns; the keyboard probe confirms
+      focus can move through the page.
+    manual_check: >-
+      Confirm every control (menus, custom widgets, drag handles) is fully
+      operable by keyboard — the deepest part of this SC is manual.
+
+  - sc: "2.1.2"
+    name: "No Keyboard Trap"
+    level: A
+    method: automated
+    pipelines: [keyboard]
+    confidence: high
+    automated_check: >-
+      The keyboard probe tab-walks the page and tests Esc / iframe escape to
+      detect focus traps.
+    manual_check: >-
+      Traps that only appear after interaction (a modal opened by a click) need
+      a manual pass with the keyboard.
+
+  - sc: "2.1.4"
+    name: "Character Key Shortcuts"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      If single-character shortcuts exist, confirm they can be turned off,
+      remapped, or are active only on focus.
+
+  - sc: "2.2.1"
+    name: "Timing Adjustable"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      For any time limit, confirm it can be turned off, adjusted, or extended.
+
+  - sc: "2.2.2"
+    name: "Pause, Stop, Hide"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm moving/auto-updating content >5s can be paused/stopped/hidden.
+      A motion-detection VLM analyzer is on the roadmap.
+
+  - sc: "2.3.1"
+    name: "Three Flashes or Below Threshold"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm nothing flashes more than three times per second. Flash analysis
+      is not implemented.
+
+  - sc: "2.4.1"
+    name: "Bypass Blocks"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe checks for a skip link, landmark regions, and a heading structure that
+      lets users bypass repeated content.
+    manual_check: >-
+      Confirm the skip link actually moves focus and works with the keyboard.
+
+  - sc: "2.4.2"
+    name: "Page Titled"
+    level: A
+    method: automated
+    pipelines: [axe]
+    confidence: high
+    automated_check: >-
+      axe checks that every page has a non-empty <title>.
+    manual_check: >-
+      Confirm the title is descriptive and distinguishes the page (a light
+      human check).
+
+  - sc: "2.4.3"
+    name: "Focus Order"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Tab through and confirm focus order matches the logical/visual order. A
+      focus-order VLM+Playwright analyzer is on the roadmap.
+
+  - sc: "2.4.4"
+    name: "Link Purpose (In Context)"
+    level: A
+    method: ai-assisted
+    pipelines: [axe, semantic]
+    confidence: medium
+    automated_check: >-
+      axe flags empty/unnamed links; the semantic LLM judges whether the link
+      text plus its context conveys where it goes.
+    manual_check: >-
+      Confirm the LLM's borderline calls ("read more", icon links) — it flags
+      strong leads, not verdicts.
+
+  - sc: "2.5.1"
+    name: "Pointer Gestures"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      For any multipoint/path gesture (swipe, pinch), confirm a single-pointer
+      alternative exists.
+
+  - sc: "2.5.2"
+    name: "Pointer Cancellation"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm actions fire on the up-event and can be aborted (no critical action
+      on down-press).
+
+  - sc: "2.5.3"
+    name: "Label in Name"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe flags controls whose accessible name doesn't contain the visible label
+      text (label-content-name-mismatch).
+    manual_check: >-
+      Confirm the visible text is fully contained in the accessible name for
+      voice-control users.
+
+  - sc: "2.5.4"
+    name: "Motion Actuation"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      If a function is triggered by device motion (shake/tilt), confirm a UI
+      alternative and a way to disable motion actuation.
+
+  # ---- Principle 2 (continued, AA) ---------------------------------------
+  - sc: "2.4.5"
+    name: "Multiple Ways"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm at least two ways to find pages (nav + search, or sitemap), except
+      for steps in a process.
+
+  - sc: "2.4.6"
+    name: "Headings and Labels"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe flags empty headings and form controls missing a label.
+    manual_check: >-
+      Whether headings and labels are *descriptive* of their content is the core
+      of this SC — an AI analyzer for it is in progress.
+
+  - sc: "2.4.7"
+    name: "Focus Visible"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe has limited checks for suppressed focus indicators.
+    manual_check: >-
+      Tab the whole page and confirm a clearly visible focus indicator on every
+      interactive element — largely manual.
+
+  - sc: "2.4.11"
+    name: "Focus Not Obscured (Minimum)"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Tab through and confirm the focused element isn't hidden behind sticky
+      headers / cookie banners. A VLM+Playwright analyzer is on the roadmap.
+
+  - sc: "2.5.7"
+    name: "Dragging Movements"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      For any drag operation (sliders, reorder, kanban), confirm a
+      single-pointer alternative (tap/click) exists.
+
+  - sc: "2.5.8"
+    name: "Target Size (Minimum)"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe checks interactive targets are at least 24x24 CSS px (with spacing).
+    manual_check: >-
+      Confirm the inline / essential / equivalent-control exceptions are
+      genuinely met for any flagged small targets.
+
+  # ---- Principle 3: Understandable ----------------------------------------
+  - sc: "3.1.1"
+    name: "Language of Page"
+    level: A
+    method: automated
+    pipelines: [axe]
+    confidence: high
+    automated_check: >-
+      axe checks <html> has a present and valid lang attribute.
+    manual_check: >-
+      Confirm the declared language actually matches the page's main content.
+
+  - sc: "3.1.2"
+    name: "Language of Parts"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe validates lang attributes that are present on parts of the page.
+    manual_check: >-
+      Detecting foreign-language passages that are *missing* a lang attribute
+      needs a human reader.
+
+  - sc: "3.2.1"
+    name: "On Focus"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm moving focus to a control doesn't trigger an unexpected context
+      change (auto-submit, new window).
+
+  - sc: "3.2.2"
+    name: "On Input"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm changing a setting (select, checkbox) doesn't auto-trigger a
+      context change without warning.
+
+  - sc: "3.2.3"
+    name: "Consistent Navigation"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm navigation repeated across pages stays in the same relative order.
+      A cross-page embedding analyzer is on the roadmap.
+
+  - sc: "3.2.4"
+    name: "Consistent Identification"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm components with the same function are labelled consistently across
+      pages. A cross-page analyzer is on the roadmap.
+
+  - sc: "3.2.6"
+    name: "Consistent Help"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm help mechanisms (contact, self-help) appear in the same relative
+      order on every page that has them.
+
+  - sc: "3.3.1"
+    name: "Error Identification"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Submit forms with invalid data and confirm errors are identified in text.
+      Requires interaction the crawler doesn't perform.
+
+  - sc: "3.3.2"
+    name: "Labels or Instructions"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe checks that form controls have a programmatic label.
+    manual_check: >-
+      Whether the label + instructions are *sufficient* to know what to enter
+      (format, required) needs judgement — an AI analyzer is on the roadmap.
+
+  - sc: "3.3.3"
+    name: "Error Suggestion"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Trigger validation errors and confirm the page suggests how to fix them.
+
+  - sc: "3.3.4"
+    name: "Error Prevention (Legal, Financial, Data)"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      For legal/financial/data submissions, confirm reversal, checking, or
+      confirmation is available.
+
+  - sc: "3.3.7"
+    name: "Redundant Entry"
+    level: A
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      In multi-step flows, confirm previously-entered info is auto-populated or
+      selectable rather than re-typed.
+
+  - sc: "3.3.8"
+    name: "Accessible Authentication (Minimum)"
+    level: AA
+    method: manual
+    pipelines: []
+    confidence: n/a
+    automated_check: ""
+    manual_check: >-
+      Confirm login doesn't require a cognitive function test (puzzle, memorize)
+      with no alternative.
+
+  # ---- Principle 4: Robust ------------------------------------------------
+  - sc: "4.1.2"
+    name: "Name, Role, Value"
+    level: A
+    method: partial
+    pipelines: [axe]
+    confidence: medium
+    automated_check: >-
+      axe checks names/roles/values for standard controls and ARIA widgets
+      (button-name, link-name, aria-* validity, roles).
+    manual_check: >-
+      Custom widgets' state changes (expanded, selected, checked) need a screen
+      reader to confirm they're announced.
+
+  - sc: "4.1.3"
+    name: "Status Messages"
+    level: AA
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe checks for some live-region / role=status markup.
+    manual_check: >-
+      Confirm dynamic updates (added-to-cart, validation, search counts) are
+      actually announced — needs screen-reader testing.

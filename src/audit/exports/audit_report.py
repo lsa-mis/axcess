@@ -43,6 +43,7 @@ from typing import Any
 
 import yaml
 
+from audit import coverage_matrix
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.web import issues as issues_mod
 
@@ -166,21 +167,9 @@ _PIPELINE_COVERAGE = [
     },
 ]
 
-# The honest "we did not check this automatically" list. Curated, not
-# derived — these are the high-value criteria/areas no pipeline in this
-# tool covers, so the reader never mistakes a clean report for full
-# conformance. Phrased as a teammate would, not as a spec citation.
-_NOT_CHECKED = [
-    "Focus *order* through a multi-step flow (we catch traps, not bad ordering).",
-    "Captions, transcripts, and audio description for video/audio (SC 1.2.*).",
-    "Reading level and plain-language quality (SC 3.1.5 — explicitly untestable).",
-    "Whether content that moves/auto-updates can be paused (SC 2.2.2).",
-    "Error-prevention and recovery flows on real form submissions (SC 3.3.*).",
-    "Anything behind a login, or traps/dialogs that only appear after a click.",
-    "Screen-reader announcement quality — the lived experience still needs a human.",
-    "Designed text truncation (ellipsis) at zoom — the probe skips it; a human "
-    "should confirm nothing essential is lost.",
-]
+# The honest "what still needs manual testing" list is no longer hardcoded
+# here — it is derived per-criterion from the WCAG coverage matrix
+# (rules/wcag_coverage.yaml), rendered by ``_wcag_coverage_matrix`` below.
 
 
 @dataclass(frozen=True)
@@ -290,8 +279,7 @@ def render_audit_report(
     lines: list[str] = []
     lines.append(f"# Accessibility audit — Scan #{scan.id}")
     lines.append("")
-    lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} "
-                 "by Axcess._")
+    lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
     lines.append(f"**Pages crawled:** {scan.page_count}")
@@ -305,6 +293,8 @@ def render_audit_report(
     lines.extend(_abilities_rollup(cards))
     lines.append("")
     lines.extend(_coverage_and_method(rows, scan))
+    lines.append("")
+    lines.extend(_wcag_coverage_matrix())
     lines.append("")
     lines.extend(_page_hotspots(conn, scan, cards))
     lines.append("")
@@ -388,9 +378,7 @@ def _executive_summary(
 
     estimate = _conformance_estimate(cards)
     if estimate:
-        sentences.append(
-            f"Rough effort to clear what this tool can see: **{estimate}**."
-        )
+        sentences.append(f"Rough effort to clear what this tool can see: **{estimate}**.")
     else:
         sentences.append(
             "The scope is already clean within the rules this tool can check — "
@@ -446,7 +434,7 @@ def _conformance_scorecard(cards: list[AuditCard]) -> list[str]:
         principle = _principle_for(c.wcag_sc)
         by_principle[principle] = by_principle.get(principle, 0) + 1
     if by_principle:
-        lines.append("By WCAG principle (the \"POUR\" model):")
+        lines.append('By WCAG principle (the "POUR" model):')
         lines.append("")
         lines.append("| Principle | Open issue types |")
         lines.append("|---|---:|")
@@ -519,14 +507,14 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
     lines.append("|---|---|---|---|")
     for p in _PIPELINE_COVERAGE:
         if p["key"] == "axe":
-            ran = "✅ found issues" if "axe" in pipelines_present else (
-                "ran, clean" if axe_ran else "—"
+            ran = (
+                "✅ found issues"
+                if "axe" in pipelines_present
+                else ("ran, clean" if axe_ran else "—")
             )
         else:
             ran = "✅ found issues" if p["key"] in pipelines_present else "—"
-        lines.append(
-            f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |"
-        )
+        lines.append(f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |")
     lines.append("")
     lines.append(
         "_A “—” means this method produced no findings on this scan — it may "
@@ -534,11 +522,79 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
         "axe-core records a definitive ran-clean signal today._"
     )
     lines.append("")
-    lines.append("**What we did *not* check** (still needs manual testing):")
-    lines.append("")
-    for item in _NOT_CHECKED:
-        lines.append(f"- {item}")
+    lines.append(
+        "_The next section breaks this down to every WCAG 2.2 A/AA success "
+        "criterion — what was automated, what was AI-assisted, and the full "
+        "list of what still needs manual testing._"
+    )
     return lines
+
+
+# ---------------------------------------------------------------------------
+# Section: WCAG 2.2 A/AA conformance coverage (from the coverage matrix).
+# ---------------------------------------------------------------------------
+
+
+def _wcag_coverage_matrix() -> list[str]:
+    """Per-criterion coverage: automated / AI-assisted / manual, from the
+    single source of truth in ``rules/wcag_coverage.yaml``.
+
+    This is the honest conformance picture — it does not depend on what this
+    particular scan found. It tells the reader, for all 55 Level A/AA
+    criteria, exactly which ones a tool can speak to and which ones a human
+    must test. That last list IS the manual-testing checklist.
+    """
+    crit = coverage_matrix.load_matrix()
+    s = coverage_matrix.summary()
+    lbl = coverage_matrix.METHOD_LABELS
+
+    lines = ["## WCAG 2.2 A/AA coverage — what's automated vs. manual", ""]
+    lines.append(
+        f"Across all **{s.total}** Level A/AA success criteria, here is exactly "
+        "what Axcess can and cannot determine for you. Automated coverage is "
+        "high-confidence; AI-assisted findings are strong leads you should "
+        "confirm; manual-only criteria are not detected by any pipeline."
+    )
+    lines.append("")
+    lines.append("| Coverage | Criteria | What it means |")
+    lines.append("|---|---:|---|")
+    for m in coverage_matrix.METHODS:
+        lines.append(
+            f"| **{lbl[m]}** | {s.by_method.get(m, 0)} | {coverage_matrix.METHOD_BLURB[m]} |"
+        )
+    lines.append("")
+
+    covered = [c for c in crit if c.method != "manual"]
+    manual = [c for c in crit if c.method == "manual"]
+
+    lines.append(f"### Automated &amp; AI-assisted ({len(covered)} criteria)")
+    lines.append("")
+    lines.append("| SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |")
+    lines.append("|---|---|---|---|---|---|")
+    for c in covered:
+        lines.append(
+            f"| {c.sc} | {c.name} | {c.level} | {lbl[c.method]} "
+            f"| {_clean(c.automated_check)} | {_clean(c.manual_check)} |"
+        )
+    lines.append("")
+
+    lines.append(f"### Needs manual testing ({len(manual)} criteria)")
+    lines.append("")
+    lines.append(
+        "No Axcess pipeline detects these — they require a human. Treat this "
+        "as your manual-test checklist for full Level A/AA conformance."
+    )
+    lines.append("")
+    lines.append("| SC | Criterion | Lvl | What to test |")
+    lines.append("|---|---|---|---|")
+    for c in manual:
+        lines.append(f"| {c.sc} | {c.name} | {c.level} | {_clean(c.manual_check)} |")
+    return lines
+
+
+def _clean(text: str) -> str:
+    """Collapse whitespace + escape pipes so prose survives a Markdown cell."""
+    return " ".join(text.split()).replace("|", "\\|")
 
 
 # ---------------------------------------------------------------------------
@@ -593,8 +649,7 @@ def _page_hotspots(
     for url, score in ranked:
         title = page_title_for.get(url)
         label = f"{url} ({title})" if title else url
-        lines.append(f"| {_md_escape(_short(label, 90))} | {score:.0f} | "
-                     f"{page_issue_count[url]} |")
+        lines.append(f"| {_md_escape(_short(label, 90))} | {score:.0f} | {page_issue_count[url]} |")
     lines.append("")
     lines.append(
         "_Weighted load = sum of severity weights (Critical 4 · Serious 3 · "
@@ -625,10 +680,7 @@ def _worklist_by_owner(cards: list[AuditCard]) -> list[str]:
         owner = _owner_key(card.owner)
         by_owner.setdefault(owner, []).append(card)
 
-    lines.append(
-        "The same findings, re-sliced by who fixes them. Hand each team "
-        "their pack."
-    )
+    lines.append("The same findings, re-sliced by who fixes them. Hand each team their pack.")
     lines.append("")
     # Known owners first, in a sensible order, then any custom labels.
     ordered = [o for o in _KNOWN_OWNERS if o in by_owner]
@@ -823,9 +875,7 @@ def _card_from_row(
     meta = _meta_for_row(row, rules)
     severity = _IMPACT_SEVERITY.get(row.impact or "", "Moderate")
     locations, overflow = _locations_for_row(conn, row)
-    triaged = sum(
-        v for k, v in row.status_summary.items() if k in _TRIAGED_STATUSES
-    )
+    triaged = sum(v for k, v in row.status_summary.items() if k in _TRIAGED_STATUSES)
     fix_steps = list(row.fix_steps) or [
         f"Human review needed — no templated fix for `{row.issue_key}` in "
         "`rules/audit_report.yaml` yet."
@@ -851,10 +901,8 @@ def _card_from_row(
         locations=locations,
         location_overflow=overflow,
         what_happening=row.description
-        or f"{row.occurrence_count} finding(s) for {row.title} across "
-        f"{row.page_count} page(s).",
-        why_matters=row.why_matters
-        or "Users relying on assistive technology hit a barrier here.",
+        or f"{row.occurrence_count} finding(s) for {row.title} across {row.page_count} page(s).",
+        why_matters=row.why_matters or "Users relying on assistive technology hit a barrier here.",
         fix_steps=fix_steps,
         verify_manual=meta.get("verify_manual"),
         verify_automated=meta.get("verify_automated"),
