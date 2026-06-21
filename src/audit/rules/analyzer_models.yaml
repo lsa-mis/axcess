@@ -101,6 +101,16 @@ criteria:
       classification is binary-ish (essential/informational/logo/
       decorative), 7B doesn't materially improve it.
 
+  "1.2.1":
+    title: "Audio-only (Prerecorded) — transcript presence"
+    kind: text
+    primary: "qwen2.5:7b-instruct"
+    fast: "llama3.2:3b-instruct"
+    rationale: |
+      Light judgement over nearby link labels + surrounding text — is a
+      transcript reachable for an <audio> element? Pure text; a small
+      model is plenty.
+
   "2.4.4":
     title: "Link Purpose (In Context)"
     kind: text

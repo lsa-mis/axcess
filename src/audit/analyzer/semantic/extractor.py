@@ -487,12 +487,78 @@ def _described_by_text(node: Node) -> str:
     return " ".join(parts)
 
 
+# --------------------------------------------------------------------
+# Media elements (SC 1.2.1 — Audio-only and Video-only (Prerecorded)).
+# --------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class MediaRecord:
+    """One ``<audio>`` / ``<video>`` element + its transcript context."""
+
+    selector: str
+    kind: str  # "audio" | "video"
+    src: str  # the src attribute, or the first <source> src ("" if none)
+    track_kinds: tuple[str, ...]  # <track kind> values (captions/subtitles/descriptions)
+    nearby_links: tuple[str, ...]  # nearby <a> texts — transcript-link candidates
+    nearby_text: str  # surrounding container text
+    snippet: str = ""
+
+
+def extract_media(body: bytes) -> list[MediaRecord]:
+    """Pull every ``<audio>`` / ``<video>`` element with its nearby transcript cues.
+
+    SC 1.2.1 needs a text transcript for audio-only content. We hand the
+    model the element, any captions/description tracks, and the surrounding
+    text + nearby link labels (a "Transcript" link is the common pattern) so
+    it can judge whether an alternative is present within reach.
+    """
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        return []
+
+    out: list[MediaRecord] = []
+    for idx, node in enumerate(tree.css("audio, video")):
+        kind = (node.tag or "").lower()
+        src = node.attributes.get("src") or ""
+        if not src:
+            source = node.css_first("source")
+            if source is not None:
+                src = source.attributes.get("src") or ""
+        track_kinds = tuple(
+            (t.attributes.get("kind") or "subtitles").strip().lower() for t in node.css("track")
+        )
+        parent = node.parent
+        nearby_links: tuple[str, ...] = ()
+        nearby_text = ""
+        if parent is not None:
+            nearby_links = tuple(
+                _collapse(a.text() or "") for a in parent.css("a") if _collapse(a.text() or "")
+            )[:8]
+            nearby_text = _collapse(parent.text() or "")[:300]
+        out.append(
+            MediaRecord(
+                selector=_stable_selector_for(node, kind, idx),
+                kind=kind,
+                src=_collapse(src)[:200],
+                track_kinds=track_kinds,
+                nearby_links=nearby_links,
+                nearby_text=nearby_text,
+                snippet=_truncated_html(node, limit=300),
+            )
+        )
+    return out
+
+
 __all__ = [
     "ANCESTOR_DEPTH",
     "FormFieldRecord",
     "HeadingRecord",
     "LinkRecord",
+    "MediaRecord",
     "extract_form_fields",
     "extract_headings",
     "extract_links",
+    "extract_media",
 ]

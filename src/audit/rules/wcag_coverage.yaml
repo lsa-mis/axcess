@@ -50,14 +50,15 @@ criteria:
   - sc: "1.2.1"
     name: "Audio-only and Video-only (Prerecorded)"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: ai-assisted
+    pipelines: [semantic]
+    confidence: medium
+    automated_check: >-
+      For <audio> elements, the semantic LLM checks whether a transcript or
+      text alternative is reachable (nearby "Transcript" link / surrounding text).
     manual_check: >-
-      Confirm a text transcript exists for audio-only and an equivalent
-      (transcript or audio track) for video-only. Transcript-presence analyzer
-      is on the roadmap.
+      Confirm the transcript is accurate and equivalent. Video-only (silent
+      video) can't be detected from the DOM — still a manual check.
 
   - sc: "1.2.2"
     name: "Captions (Prerecorded)"

@@ -167,8 +167,9 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         ai_fit="Strong",
         model_class="Text-LLM (~1B)",
         what="Read DOM around each <audio>; is a transcript present or linked within reach?",
-        status="planned",
+        status="shipped",
         reuse="Text-LLM static (extractor + registry)",
+        note="AudioTranscriptAnalyzer checks <audio> for a reachable transcript.",
     ),
     RoadmapItem(
         wcag="1.2.4",

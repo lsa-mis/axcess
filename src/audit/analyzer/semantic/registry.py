@@ -17,6 +17,7 @@ from collections.abc import Sequence
 
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.semantic.analyzers import (
+    AudioTranscriptAnalyzer,
     HeadingsAndLabelsAnalyzer,
     LabelsOrInstructionsAnalyzer,
     LinkPurposeInContextAnalyzer,
@@ -31,6 +32,7 @@ log = get_logger(__name__)
 # dotted string; we deliberately do NOT fuzzy-match (so a typo like
 # "2.4.04" is caught loudly).
 _REGISTRY: dict[str, type[SemanticAnalyzer]] = {
+    "1.2.1": AudioTranscriptAnalyzer,
     "2.4.4": LinkPurposeInContextAnalyzer,
     "2.4.6": HeadingsAndLabelsAnalyzer,
     "3.3.2": LabelsOrInstructionsAnalyzer,

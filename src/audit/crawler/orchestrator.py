@@ -122,6 +122,7 @@ class CrawlConfig:
         "1.3.1",  # Info and Relationships
         "4.1.2",  # Name, Role, Value (semantic)
         "1.1.1",  # Non-text Content descriptiveness
+        "1.2.1",  # Audio-only (prerecorded) transcript presence
     )
     semantic_concurrency: int = 1
     # SC 2.1.2 keyboard-trap probe (Phase 9.5). Default ON: it's the only

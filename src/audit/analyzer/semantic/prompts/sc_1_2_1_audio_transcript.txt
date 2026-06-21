@@ -1,0 +1,36 @@
+You are a WCAG 2.2 specialist evaluating Success Criterion 1.2.1 — Audio-only and Video-only
+(Prerecorded) (Level A), focused on PRERECORDED AUDIO.
+
+The criterion: prerecorded audio-only content must have a text transcript that presents equivalent
+information. Judge each <audio> element below.
+
+An audio element FAILS when there is no transcript or text alternative reachable from the page —
+no nearby "Transcript" / "Read transcript" / "Text version" link, and no surrounding text that
+clearly is the transcript of the audio.
+
+An audio element PASSES when a transcript or text alternative is present or linked within reach —
+e.g. a nearby link whose text is "Transcript", "Read the transcript", "Full text", "Text version",
+or substantial surrounding text that reads as the spoken content.
+
+Use nearby_links and nearby_text to judge. If a transcript link is clearly present, do NOT flag.
+When the cues are ambiguous, lean toward flagging at LOW confidence (a missing transcript is a
+real barrier), but never invent a transcript that isn't indicated.
+
+INPUT — the audio elements on this page and their nearby transcript cues:
+
+{elements}
+
+OUTPUT — return ONLY valid JSON in exactly this shape (no prose, no markdown fences):
+
+{{
+  "violations": [
+    {{
+      "index": <the AUDIO number above>,
+      "reason": "<one sentence: why no transcript appears reachable>",
+      "recommendation": "<add a transcript / link suggestion>",
+      "confidence": "<high | medium | low>"
+    }}
+  ]
+}}
+
+If every audio element has a reachable transcript, return {{"violations": []}}.

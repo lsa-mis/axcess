@@ -70,14 +70,15 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 |---|---:|---|
 | **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
 | **Partly automated** | 13 | Automated checks catch the mechanical failures; the rest needs a human. |
-| **AI-assisted** | 4 | A local model flags candidates — a human confirms before counting them. |
-| **Manual only** | 32 | No automated detection — a human must test this criterion. |
+| **AI-assisted** | 5 | A local model flags candidates — a human confirms before counting them. |
+| **Manual only** | 31 | No automated detection — a human must test this criterion. |
 
-### Automated &amp; AI-assisted (23 criteria)
+### Automated &amp; AI-assisted (24 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
 | 1.1.1 | Non-text Content | A | Partly automated | axe flags missing alt on img / area / input[type=image] and unlabelled SVGs; the image-of-text VLM separately flags pictures that are really text. | Whether the alt text that IS present is a meaningful equivalent — and the decorative-vs-informative call — needs a human. |
+| 1.2.1 | Audio-only and Video-only (Prerecorded) | A | AI-assisted | For <audio> elements, the semantic LLM checks whether a transcript or text alternative is reachable (nearby "Transcript" link / surrounding text). | Confirm the transcript is accurate and equivalent. Video-only (silent video) can't be detected from the DOM — still a manual check. |
 | 1.3.1 | Info and Relationships | A | Partly automated | axe checks list, table-header, definition-list, required-ARIA-children and heading-structure markup on the rendered DOM. | Relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they're also programmatic. |
 | 1.3.5 | Identify Input Purpose | AA | Partly automated | axe validates that any autocomplete tokens used are valid. | Confirm autocomplete IS present on fields collecting the user's own info (name, email, address) — missing autocomplete isn't auto-detected. |
 | 1.4.1 | Use of Color | A | Partly automated | axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). | Most colour-only meaning — form errors, chart series, required-field markers, status — needs a human to confirm a non-colour cue exists. |
@@ -101,13 +102,12 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
 
-### Needs manual testing (32 criteria)
+### Needs manual testing (31 criteria)
 
 No Axcess pipeline detects these — they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
 | SC | Criterion | Lvl | What to test |
 |---|---|---|---|
-| 1.2.1 | Audio-only and Video-only (Prerecorded) | A | Confirm a text transcript exists for audio-only and an equivalent (transcript or audio track) for video-only. Transcript-presence analyzer is on the roadmap. |
 | 1.2.2 | Captions (Prerecorded) | A | Play each video and confirm synchronized, accurate captions. Auto-caption diffing (Whisper) is on the roadmap. |
 | 1.2.3 | Audio Description or Media Alternative (Prerecorded) | A | Confirm an audio description or full text alternative for prerecorded video. |
 | 1.2.4 | Captions (Live) | AA | Confirm live audio in synchronized media has real-time captions. |
