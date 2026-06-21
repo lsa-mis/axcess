@@ -1,7 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { Card, PageHeader } from "../components/ui";
-import type { RoadmapItem, TrackingStatus } from "../api/types";
+import type {
+  CoverageCriterion,
+  CoverageData,
+  CoverageMethod,
+  RoadmapItem,
+  TrackingStatus,
+} from "../api/types";
 
 /**
  * Coverage & feature tracker — what the tool detects today versus what's
@@ -44,6 +50,8 @@ export default function TrackingRoute() {
           </span>
         </div>
       )}
+
+      {data?.coverage && <CoverageSection coverage={data.coverage} />}
 
       <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
@@ -201,5 +209,109 @@ function StatusBadge({
     >
       {children}
     </span>
+  );
+}
+
+// Method fills: dark tones paired with white for AAA contrast (≥7:1).
+const METHOD_TONE: Record<CoverageMethod, string> = {
+  automated: "bg-[#0f5132]",
+  partial: "bg-[#0b4f6c]",
+  "ai-assisted": "bg-[#6b3a00]",
+  manual: "bg-[#374151]",
+};
+
+function CoverageMethodBadge({
+  method,
+  label,
+}: {
+  method: CoverageMethod;
+  label: string;
+}) {
+  return (
+    <span
+      className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-2xs font-bold text-white ${METHOD_TONE[method]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
+ * The honest WCAG 2.2 A/AA coverage breakdown — what Axcess checks
+ * automatically, what it AI-assists, and (the long tail) what still needs
+ * manual testing. Rendered straight from the coverage matrix so it can't
+ * over-claim. The "What you must still test" column is the whole point.
+ */
+function CoverageSection({ coverage }: { coverage: CoverageData }) {
+  const label = (m: CoverageMethod) => coverage.method_labels[m];
+  return (
+    <section aria-labelledby="cov-h" className="mb-8">
+      <h2 id="cov-h" className="mb-1 text-base font-semibold text-fg">
+        WCAG 2.2 A/AA coverage — automated vs. manual
+      </h2>
+      <p className="mb-3 text-sm text-fg-muted">
+        Across all {coverage.total} Level A/AA success criteria, exactly what
+        Axcess can determine for you — and what still needs a human.{" "}
+        {coverage.covered} have automated or AI-assisted coverage;{" "}
+        {coverage.manual_only} are manual-only.
+      </p>
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {coverage.methods.map((m) => (
+          <Card key={m} className="p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <CoverageMethodBadge method={m} label={label(m)} />
+              <span className="text-lg font-bold tabular-nums text-fg">
+                {coverage.by_method[m] ?? 0}
+              </span>
+            </div>
+            <p className="mt-1.5 text-2xs leading-snug text-fg-subtle">
+              {coverage.method_blurb[m]}
+            </p>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <caption className="sr-only">
+            Every WCAG 2.2 A/AA success criterion and how Axcess covers it
+          </caption>
+          <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+            <tr>
+              <Th>SC</Th>
+              <Th>Criterion</Th>
+              <Th>Lvl</Th>
+              <Th>Coverage</Th>
+              <Th>What Axcess does</Th>
+              <Th>What you must still test</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border align-top">
+            {coverage.criteria.map((c: CoverageCriterion) => (
+              <tr key={c.sc} className="hover:bg-surface-muted/60">
+                <th
+                  scope="row"
+                  className="whitespace-nowrap px-4 py-3 text-left font-mono text-xs text-fg"
+                >
+                  {c.sc}
+                </th>
+                <td className="px-4 py-3 text-fg">{c.name}</td>
+                <td className="px-4 py-3 text-xs text-fg-muted">{c.level}</td>
+                <td className="px-4 py-3">
+                  <CoverageMethodBadge method={c.method} label={label(c.method)} />
+                </td>
+                <td className="px-4 py-3 text-xs text-fg-muted">
+                  {c.automated_check || <span className="text-fg-subtle">—</span>}
+                </td>
+                <td className="px-4 py-3 text-xs text-fg-muted">
+                  {c.manual_check}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </section>
   );
 }

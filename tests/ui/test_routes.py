@@ -628,6 +628,17 @@ def test_api_tracking_returns_shipped_and_roadmap(client: TestClient) -> None:
     assert by_wcag["3.2.3"]["status"] == "planned"
     assert body["counts"]["shipped"] >= 2
 
+    # The WCAG 2.2 A/AA coverage matrix rides along (the transparency model).
+    cov = body["coverage"]
+    assert cov["total"] == 55
+    assert cov["covered"] + cov["manual_only"] == cov["total"]
+    assert sum(cov["by_method"].values()) == cov["total"]
+    # Every criterion carries the "what to test manually" promise.
+    assert all(c["manual_check"] for c in cov["criteria"])
+    # A known shipped SC is non-manual and names its pipeline.
+    kb = next(c for c in cov["criteria"] if c["sc"] == "2.1.2")
+    assert kb["method"] != "manual" and "keyboard" in kb["pipelines"]
+
 
 # --------------------------------------------------------------- blob serving
 

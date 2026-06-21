@@ -14,13 +14,16 @@ Run from the repo root:  ``python site/build.py``
 from __future__ import annotations
 
 import html
-import importlib.util
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COVERAGE = ROOT / "src" / "audit" / "web" / "coverage_status.py"
 OUT = ROOT / "site" / "index.html"
+
+# Import the real package so the page is generated from the same source of
+# truth as the app. Run with ``uv run python site/build.py`` (needs PyYAML +
+# the audit package, both in the dev env).
+sys.path.insert(0, str(ROOT / "src"))
 
 # Axcess is a private repo, so the public landing page links out to the
 # portfolio (which hosts it) and to on-page sections — never to private
@@ -28,26 +31,18 @@ OUT = ROOT / "site" / "index.html"
 PORTFOLIO_URL = "https://reganmaharjan.com.np/"
 
 
-def _load_coverage():  # type: ignore[no-untyped-def]
-    spec = importlib.util.spec_from_file_location("coverage_status", COVERAGE)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)
-    # Register before exec so dataclass field introspection can resolve
-    # the module via __module__ (importlib gotcha on 3.9).
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def e(s: str) -> str:
     return html.escape(str(s))
 
 
 def render() -> str:
-    cov = _load_coverage()
+    from audit import coverage_matrix
+    from audit.web import coverage_status as cov
+
     shipped = cov.SHIPPED
     roadmap = cov.ROADMAP
     counts = cov.roadmap_counts()
+    matrix = coverage_matrix.summary()
 
     pipeline_cards = "\n".join(
         f"""        <li class="card">
@@ -80,6 +75,9 @@ def render() -> str:
         ai_pipelines=ai_ct,
         rule_pipelines=shipped_ct - ai_ct,
         planned_count=counts.planned,
+        wcag_total=matrix.total,
+        wcag_covered=matrix.covered,
+        wcag_manual=matrix.manual_only,
         portfolio=PORTFOLIO_URL,
     )
 
@@ -236,12 +234,14 @@ TEMPLATE = (
 <section class="soft" id="coverage">
   <div class="wrap">
     <h2>Honest about coverage</h2>
-    <p class="sub">Axcess never claims coverage it doesn't have. The shipped pipelines and the
-      AI roadmap below are generated from the same source of truth as the code — so this page,
-      the in-app Tracking view, and the docs can't drift apart.</p>
+    <p class="sub">Axcess never claims coverage it doesn't have. Of all {wcag_total} WCAG 2.2
+      Level A/AA success criteria, it's upfront about exactly which ones it checks for you and
+      which still need a human — and tells you what to test for each. These numbers come straight
+      from the code, so this page, the in-app Tracking view, and the docs can't drift apart.</p>
     <div class="stats">
-      <div class="stat"><b>{shipped_pipelines}</b><span>pipelines shipped<br>({rule_pipelines} browser · {ai_pipelines} AI)</span></div>
-      <div class="stat"><b>{planned_count}</b><span>AI criteria on the roadmap</span></div>
+      <div class="stat"><b>{wcag_covered}/{wcag_total}</b><span>A/AA criteria with<br>automated or AI coverage</span></div>
+      <div class="stat"><b>{wcag_manual}</b><span>criteria flagged for<br>manual testing (with guidance)</span></div>
+      <div class="stat"><b>{shipped_pipelines}</b><span>detection pipelines<br>({rule_pipelines} browser · {ai_pipelines} AI)</span></div>
       <div class="stat"><b>AAA</b><span>the tool audits itself at<br>WCAG 2.2 AAA</span></div>
     </div>
     <h3 style="margin:1.5rem 0 .25rem; font-size:1.05rem;">Next up — AI judgment criteria in the queue</h3>

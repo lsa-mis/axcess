@@ -447,8 +447,38 @@ export interface RoadmapItem {
   note: string;
 }
 
+// Per-WCAG coverage breakdown — mirrors src/audit/coverage_matrix.py.
+export type CoverageMethod =
+  | "automated"
+  | "partial"
+  | "ai-assisted"
+  | "manual";
+
+export interface CoverageCriterion {
+  sc: string;
+  name: string;
+  level: "A" | "AA";
+  method: CoverageMethod;
+  pipelines: string[];
+  confidence: string;
+  automated_check: string;
+  manual_check: string;
+}
+
+export interface CoverageData {
+  total: number;
+  by_method: Record<CoverageMethod, number>;
+  covered: number;
+  manual_only: number;
+  methods: CoverageMethod[];
+  method_labels: Record<CoverageMethod, string>;
+  method_blurb: Record<CoverageMethod, string>;
+  criteria: CoverageCriterion[];
+}
+
 export interface TrackingData {
   shipped: ShippedPipeline[];
   roadmap: RoadmapItem[];
   counts: { shipped: number; in_progress: number; planned: number };
+  coverage: CoverageData;
 }

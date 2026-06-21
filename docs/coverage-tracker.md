@@ -6,6 +6,16 @@
 > `src/audit/web/coverage_status.py` — flip a status there and both
 > update. This file is the long-form version with the verification map.
 
+> **Per-criterion coverage matrix.** For the complete, honest breakdown of
+> all 55 WCAG 2.2 Level A/AA success criteria — which are checked
+> automatically, which are AI-assisted, and which still need manual testing
+> (with what to test for each) — see
+> [`src/audit/rules/wcag_coverage.yaml`](../src/audit/rules/wcag_coverage.yaml).
+> It's the single source of truth behind the audit report's "WCAG 2.2 A/AA
+> coverage" section, the in-app **Tracking** page, and the landing page.
+> Today: **23 of 55** covered (6 automated, 15 partly automated, 2
+> AI-assisted), **32** manual-only.
+
 A living view of **what's shipped, what's in progress, and what's planned**
 across all detection pipelines. Status here is reconciled against the
 *actual code* (the registry, the probes, the migrations) — not intentions.

@@ -28,7 +28,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from audit import __version__
+from audit import __version__, coverage_matrix
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import url_policy
@@ -803,11 +803,26 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
     def api_tracking() -> JSONResponse:
         """Coverage & feature tracker data for the SPA /tracking page.
 
-        Served from ``coverage_status`` (the single source of truth shared
-        with ``docs/coverage-tracker.md``) so the page can't drift from
-        the code.
+        Pipeline/roadmap data comes from ``coverage_status``; the per-WCAG
+        coverage breakdown comes from the ``coverage_matrix`` (the
+        authoritative A/AA source of truth). Both drive the page directly
+        so it can't drift from the code.
         """
         counts = roadmap_counts()
+        cov = coverage_matrix.summary()
+        criteria = [
+            {
+                "sc": c.sc,
+                "name": c.name,
+                "level": c.level,
+                "method": c.method,
+                "pipelines": list(c.pipelines),
+                "confidence": c.confidence,
+                "automated_check": c.automated_check,
+                "manual_check": c.manual_check,
+            }
+            for c in coverage_matrix.load_matrix()
+        ]
         return JSONResponse(
             {
                 "shipped": [vars(p) for p in SHIPPED],
@@ -816,6 +831,16 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                     "shipped": counts.shipped,
                     "in_progress": counts.in_progress,
                     "planned": counts.planned,
+                },
+                "coverage": {
+                    "total": cov.total,
+                    "by_method": cov.by_method,
+                    "covered": cov.covered,
+                    "manual_only": cov.manual_only,
+                    "methods": list(coverage_matrix.METHODS),
+                    "method_labels": coverage_matrix.METHOD_LABELS,
+                    "method_blurb": coverage_matrix.METHOD_BLURB,
+                    "criteria": criteria,
                 },
             }
         )
