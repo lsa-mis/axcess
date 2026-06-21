@@ -69,8 +69,8 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
-| **Partly automated** | 14 | Automated checks catch the mechanical failures; the rest needs a human. |
-| **AI-assisted** | 3 | A local model flags candidates — a human confirms before counting them. |
+| **Partly automated** | 13 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **AI-assisted** | 4 | A local model flags candidates — a human confirms before counting them. |
 | **Manual only** | 32 | No automated detection — a human must test this criterion. |
 
 ### Automated &amp; AI-assisted (23 criteria)
@@ -97,7 +97,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
 | 3.1.1 | Language of Page | A | Automated | axe checks <html> has a present and valid lang attribute. | Confirm the declared language actually matches the page's main content. |
 | 3.1.2 | Language of Parts | AA | Partly automated | axe validates lang attributes that are present on parts of the page. | Detecting foreign-language passages that are *missing* a lang attribute needs a human reader. |
-| 3.3.2 | Labels or Instructions | A | Partly automated | axe checks that form controls have a programmatic label. | Whether the label + instructions are *sufficient* to know what to enter (format, required) needs judgement — an AI analyzer is on the roadmap. |
+| 3.3.2 | Labels or Instructions | A | AI-assisted | axe checks a programmatic label exists; the semantic LLM judges whether each control's label/instructions are sufficient to know what to enter. | Confirm the LLM's sufficiency calls, and test real form submissions — error-time instructions (SC 3.3.x) still need a human. |
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
 

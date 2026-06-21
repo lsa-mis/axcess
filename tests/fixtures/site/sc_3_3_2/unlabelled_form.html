@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Poorly-labelled form</title></head>
+<body>
+  <form>
+    <!-- 0: placeholder-only — placeholder disappears on focus, not a label -->
+    <input type="text" placeholder="Search">
+    <!-- 1: no label, no instruction at all -->
+    <input type="text">
+    <!-- 2: vague label -->
+    <label for="f">Field</label>
+    <input id="f" type="text">
+    <!-- 3: properly labelled (control, should NOT be flagged) -->
+    <label for="zip">ZIP code</label>
+    <input id="zip" type="text">
+  </form>
+</body>
+</html>

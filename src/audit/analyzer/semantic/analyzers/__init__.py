@@ -14,5 +14,12 @@ from audit.analyzer.semantic.analyzers.sc_2_4_4 import (
 from audit.analyzer.semantic.analyzers.sc_2_4_6 import (
     HeadingsAndLabelsAnalyzer,
 )
+from audit.analyzer.semantic.analyzers.sc_3_3_2 import (
+    LabelsOrInstructionsAnalyzer,
+)
 
-__all__ = ["HeadingsAndLabelsAnalyzer", "LinkPurposeInContextAnalyzer"]
+__all__ = [
+    "HeadingsAndLabelsAnalyzer",
+    "LabelsOrInstructionsAnalyzer",
+    "LinkPurposeInContextAnalyzer",
+]

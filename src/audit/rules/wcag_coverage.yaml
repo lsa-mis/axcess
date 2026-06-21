@@ -595,14 +595,15 @@ criteria:
   - sc: "3.3.2"
     name: "Labels or Instructions"
     level: A
-    method: partial
-    pipelines: [axe]
+    method: ai-assisted
+    pipelines: [axe, semantic]
     confidence: medium
     automated_check: >-
-      axe checks that form controls have a programmatic label.
+      axe checks a programmatic label exists; the semantic LLM judges whether
+      each control's label/instructions are sufficient to know what to enter.
     manual_check: >-
-      Whether the label + instructions are *sufficient* to know what to enter
-      (format, required) needs judgement — an AI analyzer is on the roadmap.
+      Confirm the LLM's sufficiency calls, and test real form submissions —
+      error-time instructions (SC 3.3.x) still need a human.
 
   - sc: "3.3.3"
     name: "Error Suggestion"

@@ -350,10 +350,149 @@ def _stable_selector_for(node: Node, tag_hint: str, ordinal: int) -> str:
     return f"{tag}[ord={ordinal}]"
 
 
+# --------------------------------------------------------------------
+# Form fields (SC 3.3.2 — Labels or Instructions).
+# --------------------------------------------------------------------
+
+# Input types that don't take free-form user input the way 3.3.2 means
+# (buttons trigger actions; hidden isn't user-facing). Everything else —
+# text, email, tel, number, date, password, search, url, checkbox, radio,
+# file, range, color — is in scope.
+_SKIP_INPUT_TYPES = frozenset({"hidden", "submit", "reset", "button", "image"})
+
+
+@dataclass(frozen=True, slots=True)
+class FormFieldRecord:
+    """One form control ready for SC 3.3.2 (labels/instructions) analysis."""
+
+    selector: str
+    control: str  # "input[type=email]" | "select" | "textarea"
+    label: str  # the accessible label text ("" if none)
+    label_source: str  # aria-labelledby | aria-label | label-for | wrapping-label | title | none
+    placeholder: str  # placeholder attribute ("" if none)
+    described_by: str  # resolved aria-describedby text ("" if none)
+    required: bool
+    snippet: str = ""
+
+
+def extract_form_fields(body: bytes) -> list[FormFieldRecord]:
+    """Pull every user-input control with its label / placeholder / instructions.
+
+    SC 3.3.2 asks whether labels OR instructions are provided (and clear
+    enough) when content requires user input. We hand the model the
+    control's type plus every textual cue a user could rely on — the model
+    judges sufficiency; a *missing* programmatic label is also flagged
+    (that overlaps with axe, but the sufficiency call is the unique value).
+    """
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        return []
+
+    out: list[FormFieldRecord] = []
+    for idx, node in enumerate(tree.css("input, select, textarea")):
+        tag = (node.tag or "").lower()
+        if tag == "input":
+            input_type = (node.attributes.get("type") or "text").strip().lower()
+            if input_type in _SKIP_INPUT_TYPES:
+                continue
+            control = f"input[type={input_type}]"
+        else:
+            control = tag
+
+        label, source = _field_label(node)
+        out.append(
+            FormFieldRecord(
+                selector=_stable_selector_for(node, tag, idx),
+                control=control,
+                label=label,
+                label_source=source,
+                placeholder=_collapse(node.attributes.get("placeholder") or ""),
+                described_by=_described_by_text(node),
+                required=node.attributes.get("required") is not None
+                or (node.attributes.get("aria-required") or "").lower() == "true",
+                snippet=_truncated_html(node, limit=300),
+            )
+        )
+    return out
+
+
+def _field_label(node: Node) -> tuple[str, str]:
+    """Resolve a form control's accessible label, with the source it came from."""
+    labelledby = node.attributes.get("aria-labelledby")
+    if labelledby:
+        names = []
+        for ref_id in labelledby.split():
+            ref = _find_by_id(node, ref_id)
+            if ref is not None:
+                text = _collapse(ref.text() or "")
+                if text:
+                    names.append(text)
+        if names:
+            return " ".join(names), "aria-labelledby"
+
+    aria_label = node.attributes.get("aria-label")
+    if aria_label and aria_label.strip():
+        return _collapse(aria_label), "aria-label"
+
+    # <label for="control-id">
+    control_id = node.attributes.get("id")
+    if control_id:
+        label_el = _find_label_for(node, control_id)
+        if label_el is not None:
+            text = _collapse(label_el.text() or "")
+            if text:
+                return text, "label-for"
+
+    # Wrapping <label>…<input>…</label>
+    cur = node.parent
+    while cur is not None:
+        if (cur.tag or "").lower() == "label":
+            text = _collapse(cur.text() or "")
+            if text:
+                return text, "wrapping-label"
+            break
+        cur = cur.parent
+
+    title = node.attributes.get("title")
+    if title and title.strip():
+        return _collapse(title), "title"
+
+    return "", "none"
+
+
+def _find_label_for(start: Node, control_id: str) -> Node | None:
+    """Find a ``<label for="control_id">`` anywhere in the document."""
+    root = start
+    while root.parent is not None:
+        root = root.parent
+    for label in root.css("label"):
+        if label.attributes.get("for") == control_id:
+            return label
+    return None
+
+
+def _described_by_text(node: Node) -> str:
+    """Resolve aria-describedby id refs to their combined text."""
+    describedby = node.attributes.get("aria-describedby")
+    if not describedby:
+        return ""
+    parts = []
+    for ref_id in describedby.split():
+        ref = _find_by_id(node, ref_id)
+        if ref is not None:
+            text = _collapse(ref.text() or "")
+            if text:
+                parts.append(text)
+    return " ".join(parts)
+
+
 __all__ = [
     "ANCESTOR_DEPTH",
+    "FormFieldRecord",
     "HeadingRecord",
     "LinkRecord",
+    "extract_form_fields",
     "extract_headings",
     "extract_links",
 ]

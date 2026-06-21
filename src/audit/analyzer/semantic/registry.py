@@ -18,6 +18,7 @@ from collections.abc import Sequence
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.semantic.analyzers import (
     HeadingsAndLabelsAnalyzer,
+    LabelsOrInstructionsAnalyzer,
     LinkPurposeInContextAnalyzer,
 )
 from audit.analyzer.semantic.base import SemanticAnalyzer
@@ -32,6 +33,7 @@ log = get_logger(__name__)
 _REGISTRY: dict[str, type[SemanticAnalyzer]] = {
     "2.4.4": LinkPurposeInContextAnalyzer,
     "2.4.6": HeadingsAndLabelsAnalyzer,
+    "3.3.2": LabelsOrInstructionsAnalyzer,
 }
 
 

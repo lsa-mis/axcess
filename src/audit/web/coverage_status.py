@@ -145,9 +145,10 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         ai_fit="Strong",
         model_class="Text-LLM (~1B)",
         what="Does a heading describe its section? Would a user know what a field wants?",
-        status="planned",
+        status="shipped",
         reuse="Text-LLM static (extractor + registry)",
-        note="In default criteria but no analyzer class → skipped at runtime. Cheapest next win.",
+        note="Heading descriptiveness shipped (HeadingsAndLabelsAnalyzer); "
+        "label descriptiveness still pending.",
     ),
     RoadmapItem(
         wcag="3.3.2",
@@ -156,9 +157,9 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         model_class="Text-LLM",
         what="Per field: combine label + placeholder + aria-describedby; "
         "is it enough to know what to enter?",
-        status="planned",
+        status="shipped",
         reuse="Text-LLM static (extractor + registry)",
-        note="In default criteria but no analyzer class → skipped at runtime. Cheapest next win.",
+        note="LabelsOrInstructionsAnalyzer judges label/instruction sufficiency.",
     ),
     RoadmapItem(
         wcag="1.2.1",
