@@ -90,12 +90,13 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         needs_ai=True,
     ),
     ShippedPipeline(
-        name="Visual (VLM) probe",
+        name="Visual probe",
         pipeline="visual",
-        engine="Live-page screenshot + vision model via Ollama",
-        scs="1.3.2 Meaningful Sequence",
+        engine="Live-page screenshot + vision model (1.3.2); deterministic DOM (2.2.2)",
+        scs="1.3.2 Meaningful Sequence, 2.2.2 Pause/Stop/Hide",
         needs_ai=True,
-        note="Runs only when a local vision model is reachable.",
+        note="1.3.2 needs a local vision model; 2.2.2 (autoplay/marquee) is "
+        "deterministic and always runs.",
     ),
     ShippedPipeline(
         name="Semantic analyzer",
@@ -200,10 +201,11 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         wcag="2.2.2",
         issue="Pause, Stop, Hide",
         ai_fit="Strong",
-        model_class="VLM (video)",
-        what="3-second capture; anything auto-moving >5s with no pause control?",
-        status="planned",
-        reuse="VLM + Playwright runtime (short capture)",
+        model_class="Deterministic Playwright",
+        what="Flag autoplay <video>/<audio> without controls and <marquee> (no pause).",
+        status="shipped",
+        reuse="visual pipeline (deterministic check, no model)",
+        note="Clear no-pause cases shipped; CSS animations / carousels still manual.",
     ),
     RoadmapItem(
         wcag="2.4.3",

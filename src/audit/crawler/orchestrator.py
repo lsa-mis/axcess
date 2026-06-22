@@ -28,7 +28,7 @@ from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
-from audit.analyzer.visual import MeaningfulSequenceProbe, VisualFinding
+from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.analyzer.vlm.base import VlmProvider
 from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.analyzer.vlm.vision import OllamaVisionProvider
@@ -282,14 +282,15 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
-    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. Only built when a
-    # vision model is actually reachable; otherwise it would call a dead
-    # daemon once per page. No-ops cleanly when the provider is None.
-    visual_probe: MeaningfulSequenceProbe | None = None
-    if config.visual_checks_enabled and config.vlm_enabled:
-        vision_provider = await _build_vision_provider(config, client)
-        if vision_provider is not None:
-            visual_probe = MeaningfulSequenceProbe(provider=vision_provider)
+    # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
+    # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
+    # the provider only when one is reachable (else that check no-ops).
+    visual_probe: VisualProbe | None = None
+    if config.visual_checks_enabled:
+        vision_provider = None
+        if config.vlm_enabled:
+            vision_provider = await _build_vision_provider(config, client)
+        visual_probe = VisualProbe(provider=vision_provider)
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
         js_holder = _LazyJs(
@@ -522,7 +523,7 @@ class _LazyJs:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
-        visual_probe: MeaningfulSequenceProbe | None = None,
+        visual_probe: VisualProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected

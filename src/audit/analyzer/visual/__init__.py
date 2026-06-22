@@ -7,11 +7,16 @@ the DOM/source order?). The vision capability is
 :class:`audit.analyzer.vlm.vision.OllamaVisionProvider`.
 """
 
-from audit.analyzer.visual.base import RULE_MEANINGFUL_SEQUENCE, VisualFinding
-from audit.analyzer.visual.probe import MeaningfulSequenceProbe
+from audit.analyzer.visual.base import (
+    RULE_MEANINGFUL_SEQUENCE,
+    RULE_MOTION_NO_PAUSE,
+    VisualFinding,
+)
+from audit.analyzer.visual.probe import VisualProbe
 
 __all__ = [
     "RULE_MEANINGFUL_SEQUENCE",
-    "MeaningfulSequenceProbe",
+    "RULE_MOTION_NO_PAUSE",
     "VisualFinding",
+    "VisualProbe",
 ]

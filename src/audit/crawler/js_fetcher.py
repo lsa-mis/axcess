@@ -23,7 +23,7 @@ from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
-from audit.analyzer.visual import MeaningfulSequenceProbe, VisualFinding
+from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler.fetcher import FetchError, FetchResult
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ class JsFetcher:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
-        visual_probe: MeaningfulSequenceProbe | None = None,
+        visual_probe: VisualProbe | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT

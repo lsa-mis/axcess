@@ -17,7 +17,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.ollama_base import OllamaError
-from audit.analyzer.visual.base import RULE_MEANINGFUL_SEQUENCE, VisualFinding
+from audit.analyzer.visual.base import (
+    RULE_MEANINGFUL_SEQUENCE,
+    RULE_MOTION_NO_PAUSE,
+    VisualFinding,
+)
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
@@ -39,6 +43,44 @@ _DOM_ORDER_JS = """
     if (out.length >= cap) break;
     const t = (el.innerText || '').trim().replace(/\\s+/g, ' ');
     if (t) out.push(t.slice(0, 120));
+  }
+  return out;
+}
+"""
+
+# SC 2.2.2 (deterministic): auto-moving content with no pause mechanism.
+# High-confidence signals only — autoplay <video>/<audio> without a controls
+# attribute (no built-in pause) and <marquee> (auto-scrolls, no pause). CSS
+# animations / carousels are deliberately NOT flagged here: most are short or
+# decorative, so flagging them would bury the real failures (a human checks
+# those). Returns {selector, html, detail} per offender.
+_MOTION_JS = """
+() => {
+  const cssPath = (el) => {
+    if (el.id) return el.tagName.toLowerCase() + '#' + el.id;
+    let p = el.tagName.toLowerCase();
+    if (el.className && typeof el.className === 'string') {
+      const c = el.className.trim().split(/\\s+/)[0];
+      if (c) p += '.' + c;
+    }
+    return p;
+  };
+  const out = [];
+  for (const v of document.querySelectorAll('video[autoplay], audio[autoplay]')) {
+    if (!v.hasAttribute('controls')) {
+      out.push({
+        selector: cssPath(v),
+        html: (v.outerHTML || '').slice(0, 240),
+        detail: v.tagName.toLowerCase() + ' autoplays with no controls (no pause mechanism)',
+      });
+    }
+  }
+  for (const m of document.querySelectorAll('marquee')) {
+    out.push({
+      selector: cssPath(m),
+      html: (m.outerHTML || '').slice(0, 240),
+      detail: '<marquee> auto-scrolls with no pause/stop control',
+    });
   }
   return out;
 }
@@ -70,28 +112,72 @@ _MAX_BLOCKS = 60
 
 
 @dataclass
-class MeaningfulSequenceProbe:
-    """SC 1.3.2 probe. Construct with a vision provider; ``run`` per page."""
+class VisualProbe:
+    """Runs the visual-pipeline checks on a live page.
+
+    - SC 2.2.2 (deterministic): auto-moving content with no pause mechanism.
+      Always runs — no model needed.
+    - SC 1.3.2 (VLM): visual reading order vs DOM order. Only runs when a
+      vision ``provider`` is supplied; no-ops otherwise.
+    """
 
     provider: OllamaVisionProvider | None = None
     max_blocks: int = _MAX_BLOCKS
 
     async def run(self, page: Page) -> list[VisualFinding]:
-        """Return at most one finding. Never raises; no-op without a provider."""
+        """Run both checks. Never raises — each is isolated."""
+        findings: list[VisualFinding] = []
+        try:
+            findings.extend(await self._check_motion(page))
+        except Exception as exc:  # pragma: no cover - defensive
+            log.warning("visual.motion_failed", error=str(exc))
+        try:
+            findings.extend(await self._check_meaningful_sequence(page))
+        except Exception as exc:  # pragma: no cover - defensive
+            log.warning("visual.sequence_failed", error=str(exc))
+        return findings
+
+    async def _check_motion(self, page: Page) -> list[VisualFinding]:
+        """SC 2.2.2 — autoplay media without controls / <marquee>."""
+        raw: Any = await page.evaluate(_MOTION_JS)
+        findings: list[VisualFinding] = []
+        seen: set[str] = set()
+        for item in raw or []:
+            if not isinstance(item, dict):
+                continue
+            selector = str(item.get("selector") or "").strip()
+            if not selector or selector in seen:
+                continue
+            seen.add(selector)
+            detail = str(item.get("detail") or "auto-moving content with no pause control")
+            findings.append(
+                VisualFinding(
+                    rule_id=RULE_MOTION_NO_PAUSE,
+                    target_selector=selector,
+                    failure_summary=(
+                        f"{detail}. Content that moves for more than 5 seconds must have a "
+                        f"way to pause, stop, or hide it."
+                    ),
+                    html_snippet=str(item.get("html") or ""),
+                    help=(
+                        "Add a visible pause/stop control (e.g. the <video controls> "
+                        "attribute), or don't autoplay; replace <marquee> with static "
+                        "or user-controlled motion."
+                    ),
+                    criterion_sc="2.2.2",
+                    wcag_level="A",
+                )
+            )
+        return findings
+
+    async def _check_meaningful_sequence(self, page: Page) -> list[VisualFinding]:
+        """SC 1.3.2 — visual reading order vs DOM order (VLM)."""
         if self.provider is None:
             return []
-        try:
-            blocks: Any = await page.evaluate(_DOM_ORDER_JS, self.max_blocks)
-        except Exception as exc:  # pragma: no cover - defensive
-            log.warning("visual.dom_order_failed", error=str(exc))
-            return []
+        blocks: Any = await page.evaluate(_DOM_ORDER_JS, self.max_blocks)
         if not blocks:
             return []
-        try:
-            screenshot = await page.screenshot()
-        except Exception as exc:  # pragma: no cover - defensive
-            log.warning("visual.screenshot_failed", error=str(exc))
-            return []
+        screenshot = await page.screenshot()
 
         numbered = "\n".join(f"{i}. {b}" for i, b in enumerate(blocks))
         prompt = _PROMPT.format(blocks=numbered)

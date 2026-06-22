@@ -71,11 +71,11 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
-| **Partly automated** | 15 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **Partly automated** | 16 | Automated checks catch the mechanical failures; the rest needs a human. |
 | **AI-assisted** | 6 | A local model flags candidates — a human confirms before counting them. |
-| **Manual only** | 28 | No automated detection — a human must test this criterion. |
+| **Manual only** | 27 | No automated detection — a human must test this criterion. |
 
-### Automated &amp; AI-assisted (27 criteria)
+### Automated &amp; AI-assisted (28 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
@@ -92,6 +92,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 1.4.12 | Text Spacing | AA | Automated | The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap. | Confirm no text is cut off or overlapping with the spacing applied. |
 | 2.1.1 | Keyboard | A | Partly automated | axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page. | Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard — the deepest part of this SC is manual. |
 | 2.1.2 | No Keyboard Trap | A | Automated | The keyboard probe tab-walks the page and tests Esc / iframe escape to detect focus traps. | Traps that only appear after interaction (a modal opened by a click) need a manual pass with the keyboard. |
+| 2.2.2 | Pause, Stop, Hide | A | Partly automated | The visual probe flags the clear no-pause-mechanism cases: autoplaying <video>/<audio> without a controls attribute, and <marquee>. | CSS animations, auto-advancing carousels, and auto-updating regions aren't auto-detected — confirm any content that moves >5s can be paused, stopped, or hidden. |
 | 2.4.1 | Bypass Blocks | A | Partly automated | axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. | Confirm the skip link actually moves focus and works with the keyboard. |
 | 2.4.2 | Page Titled | A | Automated | axe checks that every page has a non-empty <title>. | Confirm the title is descriptive and distinguishes the page (a light human check). |
 | 2.4.3 | Focus Order | A | Partly automated | The focus probe flags positive tabindex (WCAG failure F44) — a manual tab order that overrides the natural DOM order and usually breaks the sequence. | Tab through the whole page and confirm the focus order preserves meaning and operability — the order can break without a positive tabindex (e.g. CSS-reordered columns), which still needs a human. |
@@ -107,7 +108,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
 
-### Needs manual testing (28 criteria)
+### Needs manual testing (27 criteria)
 
 No Axcess pipeline detects these — they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
@@ -124,7 +125,6 @@ No Axcess pipeline detects these — they require a human. Treat this as your ma
 | 1.4.13 | Content on Hover or Focus | AA | For tooltips/popovers triggered by hover/focus, confirm they're dismissable, hoverable, and persistent. |
 | 2.1.4 | Character Key Shortcuts | A | If single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. |
 | 2.2.1 | Timing Adjustable | A | For any time limit, confirm it can be turned off, adjusted, or extended. |
-| 2.2.2 | Pause, Stop, Hide | A | Confirm moving/auto-updating content >5s can be paused/stopped/hidden. A motion-detection VLM analyzer is on the roadmap. |
 | 2.3.1 | Three Flashes or Below Threshold | A | Confirm nothing flashes more than three times per second. Flash analysis is not implemented. |
 | 2.4.5 | Multiple Ways | AA | Confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. |
 | 2.5.1 | Pointer Gestures | A | For any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. |

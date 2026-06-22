@@ -866,6 +866,44 @@ semantic_criteria:
       order.
     confidence_default: high
 
+  "2.2.2":
+    title: "Auto-moving content with no way to pause it"
+    wcag_sc: "2.2.2"
+    wcag_name: "Pause, Stop, Hide"
+    wcag_level: "A"
+    abilities_affected: [cognition, vision]
+    what_happening: >-
+      The visual probe found content that moves automatically with no pause
+      mechanism — an autoplaying <code>&lt;video&gt;</code> /
+      <code>&lt;audio&gt;</code> without a <code>controls</code> attribute, or
+      a <code>&lt;marquee&gt;</code>. Anything that moves for more than 5
+      seconds must be pausable.
+    why_matters: >-
+      Motion that can't be stopped is a barrier for people with attention,
+      reading, or vestibular disorders — it pulls focus, makes text impossible
+      to read, and can trigger nausea or migraines. Autoplaying audio also
+      stomps on screen-reader output.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Add the <code>controls</code> attribute to autoplay media (or don't
+        autoplay), so users have a built-in pause/stop button.
+      - >-
+        Replace <code>&lt;marquee&gt;</code> with static content, or motion the
+        user explicitly starts and can stop.
+    verify_manual: >-
+      Confirm every piece of auto-moving content (including CSS animations and
+      carousels, which this check doesn't catch) can be paused, stopped, or
+      hidden.
+    verify_automated: >-
+      Re-run the crawl — the visual probe re-checks autoplay media and marquee
+      on every page.
+    acceptance: >-
+      No content moves for more than 5 seconds without a pause/stop/hide
+      mechanism.
+    confidence_default: high
+
   "1.3.2":
     title: "Visual reading order doesn't match the DOM order"
     wcag_sc: "1.3.2"

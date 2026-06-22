@@ -323,13 +323,16 @@ criteria:
   - sc: "2.2.2"
     name: "Pause, Stop, Hide"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [visual]
+    confidence: medium
+    automated_check: >-
+      The visual probe flags the clear no-pause-mechanism cases: autoplaying
+      <video>/<audio> without a controls attribute, and <marquee>.
     manual_check: >-
-      Confirm moving/auto-updating content >5s can be paused/stopped/hidden.
-      A motion-detection VLM analyzer is on the roadmap.
+      CSS animations, auto-advancing carousels, and auto-updating regions
+      aren't auto-detected — confirm any content that moves >5s can be paused,
+      stopped, or hidden.
 
   - sc: "2.3.1"
     name: "Three Flashes or Below Threshold"
