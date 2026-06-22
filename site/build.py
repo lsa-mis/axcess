@@ -65,12 +65,31 @@ def render() -> str:
         for r in planned[:8]
     )
 
+    # The covered criteria, grouped by method (the "what's covered" section).
+    crit = coverage_matrix.load_matrix()
+    groups = []
+    for method in ("automated", "partial", "ai-assisted"):
+        items = [c for c in crit if c.method == method]
+        if not items:
+            continue
+        chips = "\n".join(
+            f'          <li><span class="wcag">{e(c.sc)}</span> {e(c.name)}</li>' for c in items
+        )
+        label = coverage_matrix.METHOD_LABELS[method]
+        groups.append(
+            f'      <h3 class="cov-h"><span class="dot {method}"></span>{e(label)} '
+            f'<span class="cov-n">{len(items)}</span></h3>\n'
+            f'      <ul class="chips">\n{chips}\n      </ul>'
+        )
+    covered_criteria = "\n".join(groups)
+
     shipped_ct = sum(1 for p in shipped)
     ai_ct = sum(1 for p in shipped if p.needs_ai)
 
     return TEMPLATE.format(
         pipeline_cards=pipeline_cards,
         roadmap_chips=roadmap_chips,
+        covered_criteria=covered_criteria,
         shipped_pipelines=shipped_ct,
         ai_pipelines=ai_ct,
         rule_pipelines=shipped_ct - ai_ct,
@@ -99,7 +118,7 @@ TEMPLATE = (
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Axcess — local-first, AI-augmented accessibility auditor</title>
-<meta name="description" content="Axcess crawls a site, renders every page, and runs five detection pipelines — a rule engine, two browser probes, and two local AI models — to find the WCAG failures rule engines miss. Runs entirely on your machine.">
+<meta name="description" content="Axcess crawls a site, renders every page, and runs {shipped_pipelines} detection pipelines — a rule engine, behavioural probes, and local AI models — covering {wcag_covered} of {wcag_total} WCAG 2.2 A/AA criteria. Runs entirely on your machine.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,"""
     + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2300274C'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23FFCB05' font-family='Arial' font-size='18' font-weight='800'%3EAx%3C/text%3E%3C/svg%3E"
     + """">
@@ -155,6 +174,12 @@ TEMPLATE = (
   .card-top h3 {{ margin: 0; font-size: 1.1rem; flex: 1; }}
   .dot {{ width: 10px; height: 10px; border-radius: 50%; flex: none; }}
   .dot.ai {{ background: var(--ai); }} .dot.rule {{ background: var(--rule); }}
+  .dot.automated {{ background: var(--rule); }} .dot.partial {{ background: #0b4f6c; }}
+  .dot.ai-assisted {{ background: var(--ai); }}
+  .cov-title {{ margin: 2rem 0 .25rem; font-size: 1.15rem; }}
+  .cov-h {{ display: flex; align-items: center; gap: .5rem; margin: 1.25rem 0 .25rem; font-size: 1rem; }}
+  .cov-h .dot {{ width: 10px; height: 10px; border-radius: 50%; }}
+  .cov-n {{ background: var(--blue); color: #fff; border-radius: 999px; font-size: .72rem; font-weight: 800; padding: .05rem .5rem; }}
   .badge {{ font-size: .68rem; font-weight: 800; letter-spacing: .03em; padding: .12rem .45rem; border-radius: 5px; color: #fff; }}
   .badge-ai {{ background: var(--ai); }} .badge-rule {{ background: var(--rule); }}
   .engine {{ color: var(--muted); margin: 0 0 .55rem; font-size: .95rem; }}
@@ -203,9 +228,9 @@ TEMPLATE = (
     <span class="tag">Local-first · WCAG 2.2 AAA · MIT</span>
     <h1>Find the accessibility failures rule engines <span class="hl">miss</span>.</h1>
     <p class="lede">Axcess crawls your site, renders every page in a real browser, and runs
-      <strong>five detection pipelines</strong> — a rule engine, two behavioural probes, and two
-      local AI models — to catch the WCAG issues that need judgment, not just a checklist.
-      It all runs on your machine. No cloud, no telemetry.</p>
+      <strong>{shipped_pipelines} detection pipelines</strong> — a rule engine, behavioural probes,
+      and local AI models — covering <strong>{wcag_covered} of {wcag_total}</strong> WCAG 2.2 A/AA
+      success criteria. It all runs on your machine. No cloud, no telemetry.</p>
     <div class="cta">
       <a class="btn btn-primary" href="#pipelines">See what it checks ↓</a>
       <a class="btn btn-ghost" href="{portfolio}">← Back to portfolio</a>
@@ -217,10 +242,11 @@ TEMPLATE = (
 
 <section id="pipelines">
   <div class="wrap">
-    <h2>Five pipelines, one crawl</h2>
-    <p class="sub">Three pipelines need only a browser. Two add a local AI model for the
-      criteria a rule engine can't decide — <em>is this image really text?</em>,
-      <em>does this link make sense out of context?</em></p>
+    <h2>{shipped_pipelines} pipelines, one crawl</h2>
+    <p class="sub">{rule_pipelines} pipelines need only a browser. {ai_pipelines} add a local AI
+      model for the criteria a rule engine can't decide — <em>is this image really text?</em>,
+      <em>does this link make sense out of context?</em>, <em>does the reading order match the
+      visual layout?</em></p>
     <ul class="cards">
 {pipeline_cards}
     </ul>
@@ -244,7 +270,12 @@ TEMPLATE = (
       <div class="stat"><b>{shipped_pipelines}</b><span>detection pipelines<br>({rule_pipelines} browser · {ai_pipelines} AI)</span></div>
       <div class="stat"><b>AAA</b><span>the tool audits itself at<br>WCAG 2.2 AAA</span></div>
     </div>
-    <h3 style="margin:1.5rem 0 .25rem; font-size:1.05rem;">Next up — AI judgment criteria in the queue</h3>
+    <h3 class="cov-title">What Axcess checks for you</h3>
+    <p class="sub">The {wcag_covered} criteria with automated or AI coverage today, grouped by how
+      Axcess detects them. Generated straight from the code.</p>
+{covered_criteria}
+
+    <h3 class="cov-title">Next up — on the roadmap</h3>
     <ul class="chips">
 {roadmap_chips}
     </ul>
@@ -256,7 +287,7 @@ TEMPLATE = (
   <div class="wrap">
     <h2>Up and running in three commands</h2>
     <p class="sub">macOS or Linux · Python 3.11+ · a browser. Ollama is optional — skip it and
-      the three browser-only pipelines still run.</p>
+      the browser-only pipelines still run.</p>
     <pre><span class="c"># install (uv + chromium + data dirs), then the DB schema</span>
 make setup &amp;&amp; make migrate
 

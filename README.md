@@ -5,9 +5,10 @@
 **A local-first, AI-augmented web accessibility auditor.**
 
 Axcess crawls a website, renders every page in a real browser, and runs
-**five complementary detection pipelines** — a rule engine, two behavioural
-probes, and two AI models — to find the WCAG failures that matter. It runs
-entirely on your machine. No cloud, no telemetry, no data leaving your laptop.
+**seven complementary detection pipelines** — a rule engine, three behavioural
+probes, and three AI-assisted analyzers — covering **28 of 55 WCAG 2.2 A/AA
+success criteria**. It runs entirely on your machine. No cloud, no telemetry,
+no data leaving your laptop.
 
 [Landing page](https://reganmaharjan.com.np/axcess) ·
 [Documentation](./docs/README.md) ·
@@ -31,20 +32,22 @@ criteria that actually need **judgment**:
 - Does this link's text make sense out of context? (WCAG 2.4.4)
 - Does the page reflow at 320px, or trap the keyboard in a modal?
 
-Axcess closes that gap by combining four kinds of detection in one crawl:
+Axcess closes that gap by combining seven kinds of detection in one crawl:
 
-| | Pipeline | How it decides | Needs a model? |
-|---|---|---|---|
-| 🟦 | **axe-core** | Rule engine on the rendered DOM — dozens of SCs | No |
-| 🟦 | **Keyboard-trap probe** | A real browser tabs through every focusable element | No |
-| 🟦 | **Responsive / zoom probe** | Mutates viewport + injects WCAG text-spacing CSS | No |
-| 🟨 | **Image-of-text (VLM)** | OCR + a local vision model judge each image | Yes (Ollama) |
-| 🟨 | **Semantic analyzer** | A local text model reads context like a human would | Yes (Ollama) |
+| | Pipeline | How it decides | SCs | Needs a model? |
+|---|---|---|---|---|
+| 🟦 | **axe-core** | Rule engine on the rendered DOM | dozens | No |
+| 🟦 | **Keyboard-trap probe** | Tabs through every focusable element | 2.1.2 | No |
+| 🟦 | **Responsive / zoom probe** | Mutates viewport + injects text-spacing CSS | 1.4.4/.10/.12 | No |
+| 🟦 | **Focus probe** | Focus geometry + positive-tabindex (F44) | 2.4.11, 2.4.3 | No |
+| 🟨 | **Image-of-text (VLM)** | OCR + a vision model judge each image | 1.4.5 | Yes (Ollama) |
+| 🟨 | **Semantic analyzer** | A text model reads context like a human | 2.4.4/.6, 3.3.2, 1.2.1 | Yes (Ollama) |
+| 🟨 | **Visual probe** | Screenshot + vision model (1.3.2); autoplay/marquee (2.2.2) | 1.3.2, 2.2.2 | 1.3.2 only |
 
 The blue pipelines need only a browser — run Axcess with **zero AI** and still
-get axe + keyboard + responsive coverage. The yellow pipelines add the
-judgment calls, all via a **local [Ollama](https://ollama.com) daemon** so your
-content never leaves the machine.
+get axe + keyboard + responsive + focus + motion coverage. The yellow pipelines
+add the judgment calls, all via a **local [Ollama](https://ollama.com) daemon**
+so your content never leaves the machine.
 
 👉 **See exactly what's covered today vs. planned:** the in-app **Tracking**
 page (`/app/tracking`) and [`docs/coverage-tracker.md`](./docs/coverage-tracker.md),
@@ -89,8 +92,10 @@ render each page  ──►  static HTTP first, Playwright chromium when needed
    ├─► axe-core ........... rule violations on the live DOM
    ├─► keyboard probe ..... tab-walk / Esc / iframe traps        (SC 2.1.2)
    ├─► responsive probe ... reflow @320px, zoom clip, text-spacing (1.4.4/10/12)
+   ├─► focus probe ........ focus hidden by overlay / positive tabindex (2.4.11/2.4.3)
    ├─► image-of-text ...... OCR → VLM: is this image really text?  (SC 1.4.5)
-   └─► semantic ........... text LLM: does the link/context read right? (2.4.4)
+   ├─► semantic ........... text LLM: headings/labels/links read right? (2.4.x/3.3.2/1.2.1)
+   └─► visual ............. VLM reading-order + autoplay/marquee motion (1.3.2/2.2.2)
    │
    ▼  synthesize
 prioritized findings  ──►  React review UI · CSV / JSON / Jira / Markdown exports · rescan diffs

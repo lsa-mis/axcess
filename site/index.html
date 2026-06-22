@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Axcess — local-first, AI-augmented accessibility auditor</title>
-<meta name="description" content="Axcess crawls a site, renders every page, and runs five detection pipelines — a rule engine, two browser probes, and two local AI models — to find the WCAG failures rule engines miss. Runs entirely on your machine.">
+<meta name="description" content="Axcess crawls a site, renders every page, and runs 7 detection pipelines — a rule engine, behavioural probes, and local AI models — covering 28 of 55 WCAG 2.2 A/AA criteria. Runs entirely on your machine.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2300274C'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23FFCB05' font-family='Arial' font-size='18' font-weight='800'%3EAx%3C/text%3E%3C/svg%3E">
 <style>
   :root {
@@ -58,6 +58,12 @@
   .card-top h3 { margin: 0; font-size: 1.1rem; flex: 1; }
   .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .dot.ai { background: var(--ai); } .dot.rule { background: var(--rule); }
+  .dot.automated { background: var(--rule); } .dot.partial { background: #0b4f6c; }
+  .dot.ai-assisted { background: var(--ai); }
+  .cov-title { margin: 2rem 0 .25rem; font-size: 1.15rem; }
+  .cov-h { display: flex; align-items: center; gap: .5rem; margin: 1.25rem 0 .25rem; font-size: 1rem; }
+  .cov-h .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .cov-n { background: var(--blue); color: #fff; border-radius: 999px; font-size: .72rem; font-weight: 800; padding: .05rem .5rem; }
   .badge { font-size: .68rem; font-weight: 800; letter-spacing: .03em; padding: .12rem .45rem; border-radius: 5px; color: #fff; }
   .badge-ai { background: var(--ai); } .badge-rule { background: var(--rule); }
   .engine { color: var(--muted); margin: 0 0 .55rem; font-size: .95rem; }
@@ -104,9 +110,9 @@
     <span class="tag">Local-first · WCAG 2.2 AAA · MIT</span>
     <h1>Find the accessibility failures rule engines <span class="hl">miss</span>.</h1>
     <p class="lede">Axcess crawls your site, renders every page in a real browser, and runs
-      <strong>five detection pipelines</strong> — a rule engine, two behavioural probes, and two
-      local AI models — to catch the WCAG issues that need judgment, not just a checklist.
-      It all runs on your machine. No cloud, no telemetry.</p>
+      <strong>7 detection pipelines</strong> — a rule engine, behavioural probes,
+      and local AI models — covering <strong>28 of 55</strong> WCAG 2.2 A/AA
+      success criteria. It all runs on your machine. No cloud, no telemetry.</p>
     <div class="cta">
       <a class="btn btn-primary" href="#pipelines">See what it checks ↓</a>
       <a class="btn btn-ghost" href="https://reganmaharjan.com.np/">← Back to portfolio</a>
@@ -118,10 +124,11 @@
 
 <section id="pipelines">
   <div class="wrap">
-    <h2>Five pipelines, one crawl</h2>
-    <p class="sub">Three pipelines need only a browser. Two add a local AI model for the
-      criteria a rule engine can't decide — <em>is this image really text?</em>,
-      <em>does this link make sense out of context?</em></p>
+    <h2>7 pipelines, one crawl</h2>
+    <p class="sub">4 pipelines need only a browser. 3 add a local AI
+      model for the criteria a rule engine can't decide — <em>is this image really text?</em>,
+      <em>does this link make sense out of context?</em>, <em>does the reading order match the
+      visual layout?</em></p>
     <ul class="cards">
         <li class="card">
           <div class="card-top">
@@ -207,7 +214,48 @@
       <div class="stat"><b>7</b><span>detection pipelines<br>(4 browser · 3 AI)</span></div>
       <div class="stat"><b>AAA</b><span>the tool audits itself at<br>WCAG 2.2 AAA</span></div>
     </div>
-    <h3 style="margin:1.5rem 0 .25rem; font-size:1.05rem;">Next up — AI judgment criteria in the queue</h3>
+    <h3 class="cov-title">What Axcess checks for you</h3>
+    <p class="sub">The 28 criteria with automated or AI coverage today, grouped by how
+      Axcess detects them. Generated straight from the code.</p>
+      <h3 class="cov-h"><span class="dot automated"></span>Automated <span class="cov-n">6</span></h3>
+      <ul class="chips">
+          <li><span class="wcag">1.4.4</span> Resize Text</li>
+          <li><span class="wcag">1.4.10</span> Reflow</li>
+          <li><span class="wcag">1.4.12</span> Text Spacing</li>
+          <li><span class="wcag">2.1.2</span> No Keyboard Trap</li>
+          <li><span class="wcag">2.4.2</span> Page Titled</li>
+          <li><span class="wcag">3.1.1</span> Language of Page</li>
+      </ul>
+      <h3 class="cov-h"><span class="dot partial"></span>Partly automated <span class="cov-n">16</span></h3>
+      <ul class="chips">
+          <li><span class="wcag">1.1.1</span> Non-text Content</li>
+          <li><span class="wcag">1.3.1</span> Info and Relationships</li>
+          <li><span class="wcag">1.3.5</span> Identify Input Purpose</li>
+          <li><span class="wcag">1.4.1</span> Use of Color</li>
+          <li><span class="wcag">1.4.3</span> Contrast (Minimum)</li>
+          <li><span class="wcag">2.1.1</span> Keyboard</li>
+          <li><span class="wcag">2.2.2</span> Pause, Stop, Hide</li>
+          <li><span class="wcag">2.4.1</span> Bypass Blocks</li>
+          <li><span class="wcag">2.4.3</span> Focus Order</li>
+          <li><span class="wcag">2.4.7</span> Focus Visible</li>
+          <li><span class="wcag">2.4.11</span> Focus Not Obscured (Minimum)</li>
+          <li><span class="wcag">2.5.3</span> Label in Name</li>
+          <li><span class="wcag">2.5.8</span> Target Size (Minimum)</li>
+          <li><span class="wcag">3.1.2</span> Language of Parts</li>
+          <li><span class="wcag">4.1.2</span> Name, Role, Value</li>
+          <li><span class="wcag">4.1.3</span> Status Messages</li>
+      </ul>
+      <h3 class="cov-h"><span class="dot ai-assisted"></span>AI-assisted <span class="cov-n">6</span></h3>
+      <ul class="chips">
+          <li><span class="wcag">1.2.1</span> Audio-only and Video-only (Prerecorded)</li>
+          <li><span class="wcag">1.3.2</span> Meaningful Sequence</li>
+          <li><span class="wcag">1.4.5</span> Images of Text</li>
+          <li><span class="wcag">2.4.4</span> Link Purpose (In Context)</li>
+          <li><span class="wcag">2.4.6</span> Headings and Labels</li>
+          <li><span class="wcag">3.3.2</span> Labels or Instructions</li>
+      </ul>
+
+    <h3 class="cov-title">Next up — on the roadmap</h3>
     <ul class="chips">
           <li><span class="wcag">3.2.3</span> Consistent Navigation</li>
           <li><span class="wcag">1.2.4</span> Captions (prerecorded video)</li>
@@ -222,7 +270,7 @@
   <div class="wrap">
     <h2>Up and running in three commands</h2>
     <p class="sub">macOS or Linux · Python 3.11+ · a browser. Ollama is optional — skip it and
-      the three browser-only pipelines still run.</p>
+      the browser-only pipelines still run.</p>
     <pre><span class="c"># install (uv + chromium + data dirs), then the DB schema</span>
 make setup &amp;&amp; make migrate
 
