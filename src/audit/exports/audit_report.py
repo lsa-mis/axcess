@@ -252,29 +252,23 @@ class DroppedFinding:
     reason: str
 
 
-def render_audit_report(
-    scan: ExportScan,
-    *,
+def _bucket_rows_into_cards(
     conn: sqlite3.Connection,
-    generated_at: datetime | None = None,
-) -> str:
-    """Build the holistic Markdown audit report for ``scan``.
+    rows: list[Any],
+) -> tuple[list[AuditCard], list[DroppedFinding], list[Any]]:
+    """Split unified issue rows into the framework's three buckets.
 
-    Takes a live ``conn`` because the renderer reuses the unified
-    :func:`audit.web.issues.list_issues` (which fans out to every
-    detection pipeline) and then pulls element-level locations on
-    demand.
+    Returns ``(cards, dropped, best_practice)``:
+
+    * **cards** — open WCAG issues (a real SC, at least one un-triaged
+      finding), built into :class:`AuditCard`s and sorted by severity then
+      reach. This is the substantive content both the Markdown report and
+      the Excel workbook render, so they share this one builder and can't
+      drift apart.
+    * **dropped** — every finding already triaged → Appendix A.
+    * **best_practice** — no WCAG SC (axe best-practice rules) → Appendix B.
     """
     rules = _load_rules()
-    when = generated_at or datetime.now(UTC)
-
-    rows = issues_mod.list_issues(conn, scan.id)
-
-    # Split the unified rows into the three buckets the framework's
-    # self-critique pass produces:
-    #   * open WCAG cards (have a real SC, at least one un-triaged finding)
-    #   * dropped (every finding already triaged) → Appendix A
-    #   * best-practice (no WCAG SC) → Appendix B
     open_rows: list[Any] = []
     dropped: list[DroppedFinding] = []
     best_practice: list[Any] = []
@@ -296,6 +290,40 @@ def render_audit_report(
 
     cards = [_card_from_row(conn, row, rules) for row in open_rows]
     cards.sort(key=lambda c: (_severity_rank(c.severity), -c.affected_page_count))
+    return cards, dropped, best_practice
+
+
+def build_audit_cards(
+    conn: sqlite3.Connection,
+    scan: ExportScan,
+) -> tuple[list[AuditCard], list[DroppedFinding], list[Any]]:
+    """Public entry point: the audit model for ``scan`` as structured data.
+
+    Wraps :func:`audit.web.issues.list_issues` + :func:`_bucket_rows_into_cards`
+    so other renderers (the Excel workbook) can build their own tables from
+    exactly the cards the Markdown report uses.
+    """
+    rows = issues_mod.list_issues(conn, scan.id)
+    return _bucket_rows_into_cards(conn, rows)
+
+
+def render_audit_report(
+    scan: ExportScan,
+    *,
+    conn: sqlite3.Connection,
+    generated_at: datetime | None = None,
+) -> str:
+    """Build the holistic Markdown audit report for ``scan``.
+
+    Takes a live ``conn`` because the renderer reuses the unified
+    :func:`audit.web.issues.list_issues` (which fans out to every
+    detection pipeline) and then pulls element-level locations on
+    demand.
+    """
+    when = generated_at or datetime.now(UTC)
+
+    rows = issues_mod.list_issues(conn, scan.id)
+    cards, dropped, best_practice = _bucket_rows_into_cards(conn, rows)
 
     lines: list[str] = []
     lines.append(f"# Accessibility audit — Scan #{scan.id}")

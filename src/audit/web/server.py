@@ -41,6 +41,7 @@ from audit.exports.csv_export import render_csv
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
+from audit.exports.xlsx_export import render_xlsx
 from audit.logging import get_logger
 from audit.synthesizer.diff import compute_diff
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
@@ -72,12 +73,13 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
-    # `audit` is rendered via a special-case branch in the route handler
-    # because it needs the live `conn` (not just the collector result)
-    # to call the per-pipeline grouping helpers. The entry here exists
-    # only so the format-validation check (`fmt in _EXPORT_RENDERERS`)
-    # accepts "audit"; the value is unused for that format.
+    # `audit` and `xlsx` are rendered via a special-case branch in the route
+    # handler because they need the live `conn` (not just the collector
+    # result) to build their issue tables. The entries here exist only so
+    # the format-validation check (`fmt in _EXPORT_RENDERERS`) accepts them;
+    # the values are unused for those formats.
     "audit": render_audit_report,
+    "xlsx": render_xlsx,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -85,6 +87,7 @@ _EXPORT_MEDIA_TYPES = {
     "jira": "text/csv; charset=utf-8",
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -92,6 +95,7 @@ _EXPORT_EXTENSIONS = {
     "jira": "jira.csv",
     "markdown": "md",
     "audit": "audit.md",
+    "xlsx": "xlsx",
 }
 
 _BASE_DIR = Path(__file__).resolve().parent
@@ -890,8 +894,11 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             # The audit-report renderer needs the live connection so it
             # can call the grouping helpers. The other renderers operate
             # on the pre-collected `scan` only.
+            rendered: str | bytes
             if fmt_lower == "audit":
                 rendered = render_audit_report(scan, conn=conn)
+            elif fmt_lower == "xlsx":
+                rendered = render_xlsx(scan, conn=conn)
             else:
                 rendered = _EXPORT_RENDERERS[fmt_lower](scan)
         media = _EXPORT_MEDIA_TYPES[fmt_lower]

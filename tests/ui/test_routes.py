@@ -710,6 +710,15 @@ def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, obje
     assert resp.text.startswith(f"# Accessibility audit — Scan #{scan_id}")
 
 
+def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
+    _, _, scan_id = seeded_db
+    resp = client.get(f"/api/scans/{scan_id}/export/xlsx")
+    assert resp.status_code == 200
+    assert "spreadsheetml.sheet" in resp.headers["content-type"]
+    assert f'filename="scan_{scan_id}.xlsx"' in resp.headers["content-disposition"]
+    assert resp.content[:2] == b"PK"  # a real .xlsx (zip) body
+
+
 def test_export_unknown_format_rejected(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:

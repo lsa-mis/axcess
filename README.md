@@ -98,7 +98,7 @@ render each page  ──►  static HTTP first, Playwright chromium when needed
    └─► visual ............. VLM reading-order + autoplay/marquee motion (1.3.2/2.2.2)
    │
    ▼  synthesize
-prioritized findings  ──►  React review UI · CSV / JSON / Jira / Markdown exports · rescan diffs
+prioritized findings  ──►  React review UI · CSV / JSON / Jira / Markdown / Excel exports · rescan diffs
 ```
 
 Everything persists to one **SQLite** database (WAL mode, content-addressed
@@ -121,7 +121,10 @@ in the AAA tag pack that fail the build on any violation.
   affected abilities, and a what / why / how fix card.
 - **Findings** — filterable, paginated, with image previews and OCR/VLM evidence.
 - **Tracking** — what the tool detects today vs. the AI roadmap.
-- **Exports** — CSV · JSON · Jira CSV · Markdown · a holistic audit report.
+- **Exports** — CSV · JSON · Jira CSV · Markdown · a holistic audit report ·
+  an Excel workbook with every report section as its own filterable sheet
+  (Summary · Issues · Owner Worklist · Page Hotspots · Who's Affected ·
+  Coverage · Test Tracking).
 
 ---
 
@@ -190,7 +193,7 @@ src/audit/
 ├── extractor/        # HTML image parsing, content-addressed blob store
 ├── analyzer/         # OCR, VLM, semantic, keyboard + responsive probes
 ├── synthesizer/      # alt-compare, priority, remediation, diff
-├── exports/          # CSV / JSON / Jira / Markdown / audit report / webhook
+├── exports/          # CSV / JSON / Jira / Markdown / Excel / audit report / webhook
 ├── web/              # FastAPI /api/* + the React SPA (frontend/)
 ├── db/               # schema + migrations + typed upserts + job queue
 └── rules/            # YAML rule packs (remediation, audit cards, models)

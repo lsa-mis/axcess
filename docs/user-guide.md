@@ -109,6 +109,16 @@ From the scan detail page:
   Labels (`wcag-1-4-5`, `sev-<level>`, `class-<vlm_label>`), Component.
 - **Markdown report** — stakeholder-friendly: exec summary, severity
   breakdown table, top 20 findings, full findings table.
+- **Excel workbook (.xlsx)** — the hand-off deliverable: the whole audit
+  report with every section as its own filterable, trackable sheet —
+  **Summary** (the at-a-glance dashboard), **Issues Overview** (the
+  remediation-guide table: conformance level, owner, status, what-to-fix,
+  locations, action, resources), **Owner Worklist** (issues sliced by who
+  fixes them), **Page Hotspots** (pages ranked by severity-weighted load),
+  **Who's Affected** (issues by the ability each blocks), **Coverage &
+  Method** (per-criterion automated-vs-manual coverage), and **Test
+  Tracking** (the manual Pass / Fail checklist). Built from the same data as
+  the Markdown audit report, so the two never drift.
 
 From the CLI:
 
@@ -121,6 +131,9 @@ uv run audit export 4 --format markdown -o /tmp/report.md
 
 # Use a different base URL for the deep links inside the export
 uv run audit export --format jira --ui-base https://audit.internal/
+
+# The Excel remediation-guide workbook (Issues Overview + Test Tracking)
+uv run audit export 4 --format xlsx -o /tmp/report.xlsx
 ```
 
 ## Rescan + diff

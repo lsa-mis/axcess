@@ -18,6 +18,7 @@ from audit.exports.csv_export import render_csv
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
+from audit.exports.xlsx_export import render_xlsx
 from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
@@ -398,8 +399,14 @@ def synthesize(
         conn.close()
 
 
-_EXPORT_FORMATS = ("csv", "json", "jira", "markdown")
-_EXPORT_EXT = {"csv": "csv", "json": "json", "jira": "jira.csv", "markdown": "md"}
+_EXPORT_FORMATS = ("csv", "json", "jira", "markdown", "xlsx")
+_EXPORT_EXT = {
+    "csv": "csv",
+    "json": "json",
+    "jira": "jira.csv",
+    "markdown": "md",
+    "xlsx": "xlsx",
+}
 
 
 @app.command()
@@ -410,7 +417,7 @@ def export(
     ] = None,
     fmt: Annotated[
         str,
-        typer.Option("--format", "-f", help="csv | json | jira | markdown"),
+        typer.Option("--format", "-f", help="csv | json | jira | markdown | xlsx"),
     ] = "csv",
     output: Annotated[
         Path | None,
@@ -445,19 +452,26 @@ def export(
             scan_id = int(row["id"])
 
         scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
+        rendered: str | bytes
+        if fmt_lower == "xlsx":
+            # xlsx builds its issue table live from the open connection.
+            rendered = render_xlsx(scan, conn=conn)
+        else:
+            rendered = {
+                "csv": render_csv,
+                "json": render_json,
+                "jira": render_jira_csv,
+                "markdown": render_markdown,
+            }[fmt_lower](scan)
     finally:
         conn.close()
 
-    rendered = {
-        "csv": render_csv,
-        "json": render_json,
-        "jira": render_jira_csv,
-        "markdown": render_markdown,
-    }[fmt_lower](scan)
-
     target = output or (settings.data_dir / "exports" / f"scan_{scan_id}.{_EXPORT_EXT[fmt_lower]}")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(rendered, encoding="utf-8")
+    if isinstance(rendered, bytes):
+        target.write_bytes(rendered)
+    else:
+        target.write_text(rendered, encoding="utf-8")
     console.print(
         f"[green]Wrote[/green] {target}  ([cyan]{fmt_lower}[/cyan], {scan.finding_count} findings)"
     )

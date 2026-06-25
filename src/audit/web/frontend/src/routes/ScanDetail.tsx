@@ -361,6 +361,7 @@ export default function ScanDetailRoute() {
               // import into other tools (Jira, spreadsheets) or feeds
               // (JSON for downstream pipelines).
               ["audit", "Audit report (cards, fixes, verify steps)"],
+              ["xlsx", "Excel workbook (full report — every section as a table)"],
               ["csv", "CSV (one row per occurrence)"],
               ["json", "JSON (nested per finding)"],
               ["jira", "Jira CSV (import template)"],
