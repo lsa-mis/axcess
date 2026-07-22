@@ -174,6 +174,19 @@ class LinkPurposeInContextAnalyzer:
             recommendation = _str_or_default(entry.get("recommendation"), "")
             confidence = _normalize_confidence(entry.get("confidence"))
 
+            # Confidence floor. Link purpose is a judgment call where false
+            # positives ("could be more specific") erode trust fast, so a
+            # low-confidence flag is dropped rather than surfaced. The prompt
+            # already instructs the model to omit these; this enforces it even
+            # when the model includes one anyway.
+            if confidence == "low":
+                log.debug(
+                    "sc_2_4_4.dropped_low_confidence",
+                    selector=link.selector,
+                    reason=reason[:120],
+                )
+                continue
+
             # We pack "reason" into help (one-line) and "reason +
             # recommendation" into failure_summary (longer). The UI
             # shows help in the card header and failure_summary in the

@@ -109,6 +109,83 @@ async def test_modal_with_proper_escape_handler_clean(page) -> None:  # type: ig
 
 
 # --------------------------------------------------------------------
+# Regression: false-positive classes found by dogfooding the probe
+# against real, trap-free pages. These build the page with set_content
+# (no fixture file needed) because the markup is small and self-contained.
+# --------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_shadow_dom_component_is_not_a_stuck_trap(page) -> None:  # type: ignore[no-untyped-def]
+    """A web component with several internal focusable controls.
+
+    document.activeElement reports the shadow HOST while focus actually
+    moves through the inner controls. Without piercing the shadow root the
+    tab-walk reads that as focus "stuck" on the host — a false trap. This
+    is common on modern sites (design systems, embedded widgets).
+    """
+    await page.set_content(
+        "<!doctype html><html lang=en><body><main>"
+        "<my-toolbar></my-toolbar><a href='/after'>After</a></main>"
+        "<script>customElements.define('my-toolbar', class extends HTMLElement{"
+        "constructor(){super();this.attachShadow({mode:'open'}).innerHTML="
+        "'<button>1</button><button>2</button><button>3</button>"
+        "<button>4</button><button>5</button>';}});</script>"
+        "</body></html>"
+    )
+    probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
+    findings = await probe.run(page)
+    stuck = [f for f in findings if f.rule_id == RULE_STUCK]
+    assert stuck == [], (
+        "A shadow-DOM component with internal controls must not be flagged as "
+        f"a stuck keyboard trap; got: {[f.target_selector for f in stuck]}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_hidden_iframes_are_not_flagged(page) -> None:  # type: ignore[no-untyped-def]
+    """Tracking / ad / pixel iframes aren't keyboard-reachable.
+
+    display:none, 0x0, hidden, and aria-hidden iframes can't receive Tab
+    focus, so the iframe heuristic must skip them — otherwise nearly every
+    real page (analytics, ads) lights up with phantom keyboard traps.
+    """
+    await page.set_content(
+        "<!doctype html><html lang=en><body>"
+        "<iframe src='https://a.example/p' style='display:none'></iframe>"
+        "<iframe src='https://b.example/px' width=0 height=0></iframe>"
+        "<iframe src='https://c.example/x' style='visibility:hidden'></iframe>"
+        "<iframe src='https://d.example' hidden></iframe>"
+        "<iframe src='https://e.example' aria-hidden='true' "
+        "style='position:absolute;left:-9999px'></iframe>"
+        "<a href='/n'>Next</a></body></html>"
+    )
+    probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
+    findings = await probe.run(page)
+    iframe_finds = [f for f in findings if f.rule_id == RULE_IFRAME]
+    assert iframe_finds == [], (
+        "Hidden / zero-size iframes are not in the tab order and must not be "
+        f"flagged as keyboard traps; got: {[f.html_snippet for f in iframe_finds]}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_visible_untitled_iframe_still_flagged(page) -> None:  # type: ignore[no-untyped-def]
+    """The visibility gate must not suppress the genuine case: a visible,
+    Tab-reachable, untitled content iframe is still the real risk."""
+    await page.set_content(
+        "<!doctype html><html lang=en><body>"
+        "<iframe src='https://maps.example/embed' width=600 height=400></iframe>"
+        "</body></html>"
+    )
+    probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
+    findings = await probe.run(page)
+    assert [f for f in findings if f.rule_id == RULE_IFRAME], (
+        "A visible untitled content iframe should still be flagged."
+    )
+
+
+# --------------------------------------------------------------------
 # Positive cases — each fixture has the named trap shape.
 # --------------------------------------------------------------------
 

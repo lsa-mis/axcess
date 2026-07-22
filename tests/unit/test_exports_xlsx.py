@@ -108,6 +108,22 @@ def test_issues_overview_header_block_and_table(tmp_db: sqlite3.Connection) -> N
     assert conformance & {"A", "AA"}  # real SCs present too
 
 
+def test_xlsx_without_blob_store_still_renders_and_has_evidence_column(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """``blob_store=None`` is back-compatible (no images), and the Issues
+    Overview header now ends with the new 'Evidence' column."""
+    scan_id = _scan_with_real_findings(tmp_db)
+    scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
+    data = render_xlsx(scan, conn=tmp_db, blob_store=None)
+    assert data[:2] == b"PK"
+    wb = load_workbook(io.BytesIO(data))
+    ws = wb["Issues Overview"]
+    header = tuple(ws.cell(row=8, column=c).value for c in range(1, len(_ISSUE_HEADERS) + 1))
+    assert header == _ISSUE_HEADERS
+    assert header[-1] == "Evidence"
+
+
 def test_test_tracking_is_the_full_manual_checklist(tmp_db: sqlite3.Connection) -> None:
     wb = load_workbook(io.BytesIO(_render(tmp_db)))
     ws = wb["Test Tracking"]

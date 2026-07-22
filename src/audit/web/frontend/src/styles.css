@@ -37,6 +37,13 @@
 }
 
 @layer components {
+  /* Shared form control: visible border, large hit area, and no colour-only state. */
+  .field {
+    @apply min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg shadow-sm;
+  }
+  .field:focus-visible {
+    @apply border-umich-blue;
+  }
   /* Severity chip */
   .sev-chip {
     @apply inline-flex items-center gap-1 rounded-xs px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide;

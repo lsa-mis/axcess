@@ -15,6 +15,7 @@ import contextlib
 import hashlib
 import json
 import sqlite3
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin
@@ -153,6 +154,13 @@ class CrawlConfig:
     # one. One VLM call per page, so it respects the same vlm_enabled gate.
     # Default on; disable with ``--skip-visual``.
     visual_checks_enabled: bool = True
+    # Per-finding element screenshots. When on (default), the JS fetcher
+    # captures a highlighted screenshot of each live-page finding's element
+    # at scan time; the orchestrator stores it in the blob store and threads
+    # the hash onto the row, so the Excel report can embed the exact spot of
+    # each issue. Bounded per page (see ``js_fetcher.MAX_SHOTS_PER_PAGE``);
+    # disable with ``--skip-screenshots`` when crawl speed matters more.
+    capture_screenshots: bool = True
 
 
 @dataclass
@@ -302,6 +310,7 @@ async def run_crawl(
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
             visual_probe=visual_probe,
+            capture_screenshots=config.capture_screenshots,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -323,6 +332,7 @@ async def run_crawl(
         static=fetcher,
         js=js_holder,
         downloader=downloader,
+        blob_store=blob_store,
         ocr=ocr_config,
         vlm=vlm_config,
         in_flight=0,
@@ -524,6 +534,7 @@ class _LazyJs:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        capture_screenshots: bool = False,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -534,6 +545,7 @@ class _LazyJs:
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
         self._visual_probe = visual_probe
+        self._capture_screenshots = capture_screenshots
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -545,6 +557,7 @@ class _LazyJs:
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
                 visual_probe=self._visual_probe,
+                capture_screenshots=self._capture_screenshots,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -567,6 +580,9 @@ class _WorkerContext:
     static: StaticFetcher
     js: _LazyJs | None
     downloader: ImageDownloader
+    # Shared content-addressed store. Used to persist per-finding element
+    # screenshots captured at scan time (the hash lands on the finding row).
+    blob_store: BlobStore
     ocr: OcrConfig | None
     vlm: VlmConfig | None
     in_flight: int
@@ -784,7 +800,12 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
         if render_mode == "js" and ctx.config.axe_enabled:
-            _persist_axe(ctx, page_id=page_id, violations=result.axe_violations)
+            _persist_axe(
+                ctx,
+                page_id=page_id,
+                violations=result.axe_violations,
+                screenshots=result.screenshots,
+            )
 
         # SC 2.1.2 keyboard-trap probe. Only runs when the page was
         # JS-rendered (the probe needs a live page; static fetches
@@ -792,22 +813,42 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # ``--skip-keyboard`` disables. Persist via the dedicated
         # keyboard helper so the row is tagged ``pipeline='keyboard'``.
         if render_mode == "js" and ctx.config.keyboard_probe_enabled:
-            _persist_keyboard(ctx, page_id=page_id, traps=result.keyboard_traps)
+            _persist_keyboard(
+                ctx,
+                page_id=page_id,
+                traps=result.keyboard_traps,
+                screenshots=result.screenshots,
+            )
 
         # Responsive/zoom/text-spacing probe (SC 1.4.4/1.4.10/1.4.12).
         # Same gating shape as the keyboard probe; rows are tagged
         # ``pipeline='responsive'``.
         if render_mode == "js" and ctx.config.responsive_checks_enabled:
-            _persist_responsive(ctx, page_id=page_id, findings=result.responsive_findings)
+            _persist_responsive(
+                ctx,
+                page_id=page_id,
+                findings=result.responsive_findings,
+                screenshots=result.screenshots,
+            )
 
         # SC 2.4.11 focus-obscured probe. Same gating; rows tagged
         # ``pipeline='focus'``.
         if render_mode == "js" and ctx.config.focus_checks_enabled:
-            _persist_focus(ctx, page_id=page_id, findings=result.focus_findings)
+            _persist_focus(
+                ctx,
+                page_id=page_id,
+                findings=result.focus_findings,
+                screenshots=result.screenshots,
+            )
 
         # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
         if render_mode == "js" and ctx.config.visual_checks_enabled:
-            _persist_visual(ctx, page_id=page_id, findings=result.visual_findings)
+            _persist_visual(
+                ctx,
+                page_id=page_id,
+                findings=result.visual_findings,
+                screenshots=result.screenshots,
+            )
 
         # Phase 9+: per-criterion semantic analyzers. Works on both
         # static and JS-rendered fetches because the first wave is
@@ -914,11 +955,31 @@ def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
     return is_challenge_response(result.status_code, body)
 
 
+def _store_screenshot(
+    ctx: _WorkerContext, target_hash: str, screenshots: Mapping[str, bytes]
+) -> str | None:
+    """Persist a finding's element screenshot to the blob store.
+
+    Returns its content hash, or ``None`` when there's no screenshot for
+    this finding or the store write fails.
+    """
+    png = screenshots.get(target_hash)
+    if not png:
+        return None
+    try:
+        content_hash, _rel = ctx.blob_store.store(png, "image/png")
+        return content_hash
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("screenshot.persist_failed", target_hash=target_hash, error=str(exc))
+        return None
+
+
 def _persist_axe(
     ctx: _WorkerContext,
     *,
     page_id: int,
     violations: tuple[AxeViolation, ...],
+    screenshots: Mapping[str, bytes],
 ) -> None:
     """Write the page's axe violations to the DB + bump the scan counters.
 
@@ -944,6 +1005,7 @@ def _persist_axe(
                 failure_summary=v.failure_summary,
                 html_snippet=v.html_snippet,
                 target_hash=v.target_hash,
+                screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
             )
         except sqlite3.Error as exc:
             # One bad row must not kill the rest of the page's findings.
@@ -968,6 +1030,7 @@ def _persist_keyboard(
     *,
     page_id: int,
     traps: tuple[KeyboardTrap, ...],
+    screenshots: Mapping[str, bytes],
 ) -> None:
     """Write keyboard-trap findings + bump the keyboard counters.
 
@@ -982,6 +1045,7 @@ def _persist_keyboard(
                 ctx.conn,
                 page_id=page_id,
                 scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, t.target_hash, screenshots),
                 **t.to_repo_kwargs(),
             )
         except sqlite3.Error as exc:
@@ -1000,6 +1064,7 @@ def _persist_responsive(
     *,
     page_id: int,
     findings: tuple[ResponsiveFinding, ...],
+    screenshots: Mapping[str, bytes],
 ) -> None:
     """Write responsive-probe findings + bump the responsive counters.
 
@@ -1013,6 +1078,7 @@ def _persist_responsive(
                 ctx.conn,
                 page_id=page_id,
                 scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
                 **f.to_repo_kwargs(),
             )
         except sqlite3.Error as exc:
@@ -1031,6 +1097,7 @@ def _persist_focus(
     *,
     page_id: int,
     findings: tuple[FocusFinding, ...],
+    screenshots: Mapping[str, bytes],
 ) -> None:
     """Write focus-probe findings (SC 2.4.11) + bump the focus counters."""
     for f in findings:
@@ -1039,6 +1106,7 @@ def _persist_focus(
                 ctx.conn,
                 page_id=page_id,
                 scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
                 **f.to_repo_kwargs(),
             )
         except sqlite3.Error as exc:
@@ -1057,6 +1125,7 @@ def _persist_visual(
     *,
     page_id: int,
     findings: tuple[VisualFinding, ...],
+    screenshots: Mapping[str, bytes],
 ) -> None:
     """Write visual (VLM) probe findings (SC 1.3.2) + bump the counters."""
     for f in findings:
@@ -1065,6 +1134,7 @@ def _persist_visual(
                 ctx.conn,
                 page_id=page_id,
                 scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
                 **f.to_repo_kwargs(),
             )
         except sqlite3.Error as exc:
@@ -1117,6 +1187,11 @@ def _persist_semantic(
     Same row-by-row insert pattern as ``_persist_axe`` — SQLite at our
     scale handles 100k inserts cleanly. A per-row sqlite3 error logs
     + drops; the rest of the page's findings still land.
+
+    Note: semantic findings carry no element screenshot — the semantic
+    pass runs against the static HTML body with no live Playwright page,
+    so there's no rendered element to capture (out of scope for the
+    scan-time screenshot feature).
     """
     written = 0
     for f in findings:

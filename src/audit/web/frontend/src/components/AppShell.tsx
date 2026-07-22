@@ -39,7 +39,7 @@ const NAV: NavItem[] = [
     // to a scan) — the user never loses context for which section
     // they're in.
     to: "/scans",
-    label: "Scans",
+    label: "Reports",
     icon: Radar,
     isActive: (p) =>
       p === "/scans" || p.startsWith("/scans/") || p.startsWith("/findings/"),

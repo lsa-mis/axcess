@@ -15,11 +15,32 @@ links list, for example) must be able to tell where that link will take
 them, using the link's text AND its nearby ancestor context — section
 heading, paragraph, list-item, figure caption, table row label.
 
+THE ONLY TEST — apply this to every link before flagging it
+-----------------------------------------------------------
+Ask: "From this link's text plus its context, can I tell WHAT KIND OF PAGE
+or action it leads to?" If yes → it PASSES, do not flag it. Flag it ONLY if
+the answer is genuinely no.
+
+"The text could be more specific" is NEVER a reason to flag. SC 2.4.4 (Level
+A) only requires the purpose to be DETERMINABLE, not maximally descriptive.
+Requiring link text to be specific enough to stand alone is SC 2.4.9 (Level
+AAA) — that is OUT OF SCOPE here. Do not apply an AAA standard.
+
+Concretely, a single common word or short phrase that NAMES a topic, section,
+page, product, brand, or tool is COMPLIANT — e.g. "Privacy", "Careers",
+"Connect", "Contact", "About", "Workshops", "Canvas", "Video", "Resources",
+"Documents", "Events", "News", "Newsletter", "Funding", "Get Help". A sighted
+or screen-reader user knows "Privacy" goes to the privacy page and "Workshops"
+goes to a workshops page. These are NOT violations, even with no surrounding
+heading. Flagging them as "too general / too broad / lacks context" is the
+single most common mistake — do not make it.
+
 COMMON FAILURES (these are violations)
 --------------------------------------
 * Link text is one of: "click here", "here", "read more", "more", "more
   info", "details", "this", "this link", "link", "learn more", or any
-  other label that says nothing about the destination.
+  other FILLER label that points at nothing — it could sit in front of any
+  destination on any site and still "make sense" grammatically.
 * Link text is the bare URL ("https://example.com/foo/bar/12345") with
   no human-readable companion. Screen readers will announce the URL
   character-by-character; users can't easily distinguish destinations.
@@ -38,6 +59,11 @@ COMMON FAILURES (these are violations)
 
 NOT FAILURES (do NOT flag these)
 --------------------------------
+* ANY link whose text names a topic, section, page, product, tool, or
+  brand — even one common word ("Privacy", "Connect", "Workshops",
+  "Canvas", "Video", "Careers", "Contact", "Resources"). Naming the
+  destination IS determinable purpose. "It could be more specific" does
+  not make it a failure.
 * A short link like "Acme Corp" or "Documentation" that names the
   destination clearly on its own.
 * "Read more" / "More details" when the ancestors (heading, paragraph
@@ -88,12 +114,18 @@ Return a JSON object with exactly this shape:
 Rules:
 * Use the integer `index` exactly as shown in the LINKS list. Do not
   invent indices.
-* Only include links you genuinely believe violate SC 2.4.4. If you
-  are uncertain, set `confidence: "low"` and still include the row —
-  the operator can filter.
-* If no link on the page violates the criterion, return:
-  `{{"violations": []}}`.
-* Be conservative. A descriptive-enough link should NOT be flagged.
-  False positives erode operator trust more than false negatives do.
-* `reason` must be specific to THIS link, not a generic restatement
-  of the criterion.
+* Include a link ONLY if you are confident its purpose is genuinely
+  undeterminable — i.e. it matches one of the COMMON FAILURES above. If
+  you are not sure, DO NOT include it. When in doubt, leave it out: a
+  borderline or merely-could-be-better link is NOT a violation.
+* `confidence` reflects how sure you are it is a real failure. Reserve
+  "high" for textbook cases ("click here", a bare URL, an icon-only link
+  with no name). Never emit a flag you would describe as "low" confidence
+  — if it is that uncertain, omit it instead.
+* If no link on the page violates the criterion, return
+  `{{"violations": []}}`. On a typical page that is the correct answer for
+  MOST or ALL links — most sites use reasonable link text.
+* Be conservative. A descriptive-enough link must NOT be flagged. False
+  positives erode operator trust far more than false negatives do.
+* `reason` must be specific to THIS link and must explain why the purpose
+  is UNDETERMINABLE — not merely that the text could be more descriptive.

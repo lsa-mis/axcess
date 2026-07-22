@@ -299,6 +299,7 @@ export default function IssueDetailRoute() {
                     <td className="px-3 py-2 align-top">
                       <PageLink
                         pageId={p.page_id}
+                        scanId={scan.id}
                         pageUrl={p.page_url}
                         pageTitle={p.page_title}
                       />

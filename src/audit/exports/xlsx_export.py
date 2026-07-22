@@ -9,7 +9,8 @@ you can sort, filter, and track in a spreadsheet:
   the University of Michigan Digital Accessibility Services format: a
   metadata header block + Issues · Conformance Level · Remediation Ownership ·
   Status · What to Fix · Page Links / Locations · Action · Helpful Resources ·
-  Notes.
+  Notes · Evidence (a highlighted screenshot of the issue's element, embedded
+  when a ``blob_store`` is supplied and the finding has one).
 * **Owner Worklist** — the same open issues sliced by who fixes them.
 * **Page Hotspots** — pages ranked by a severity-weighted load.
 * **Who's Affected** — open issues by the user ability each one blocks.
@@ -31,12 +32,14 @@ from datetime import datetime
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
-from audit import coverage_matrix
+from audit import coverage_matrix, evaluation
+from audit.blob_store import BlobStore
 from audit.exports.audit_report import (
     MAX_HOTSPOTS,
     AuditCard,
@@ -47,7 +50,15 @@ from audit.exports.audit_report import (
     build_audit_cards,
 )
 from audit.exports.collector import ExportScan
+from audit.logging import get_logger
 from audit.web import issues
+
+log = get_logger(__name__)
+
+# Embedded-evidence sizing: scale screenshots down to this pixel width so a
+# wide element capture doesn't blow out the Evidence column; the height is
+# scaled proportionally and the row grown to fit.
+_EVIDENCE_MAX_WIDTH = 240
 
 # --- palette (matches the source template) --------------------------------
 _HEADER_FILL = PatternFill("solid", fgColor="FF356854")  # dark teal-green
@@ -110,12 +121,13 @@ _ISSUE_HEADERS = (
     "Action",
     "Helpful Resources",
     "Notes",
+    "Evidence",
 )
-_ISSUE_WIDTHS = (34.75, 17.5, 19.13, 15.38, 40.0, 41.25, 48.88, 30.5, 24.0)
+_ISSUE_WIDTHS = (34.75, 17.5, 19.13, 15.38, 40.0, 41.25, 48.88, 30.5, 24.0, 22.0)
 
 _TRACK_HEADERS = ("Focus", "What to check", "Pass / Fail")
 _TRACK_WIDTHS = (28.0, 70.0, 14.0)
-_PASS_FAIL_CHOICES = ["Pass", "Fail", "N/A", "Not tested"]
+_PASS_FAIL_CHOICES = ["Pass", "Fail", "Needs follow-up", "N/A", "Not tested"]
 
 _LOCATION_CAP = 6  # page links listed before collapsing to "+N more"
 
@@ -189,6 +201,46 @@ def _style_header_row(ws: Worksheet, row: int, ncols: int) -> None:
         cell.border = _BORDER
 
 
+def _embed_evidence(
+    ws: Worksheet,
+    *,
+    row: int,
+    col: int,
+    detail: issues.IssueDetail | None,
+    blob_store: BlobStore,
+) -> None:
+    """Embed the first available finding screenshot into the row's Evidence cell.
+
+    Pulls the first screenshot hash across ``detail.pages``, resolves it to a
+    PNG in the blob store, scales it to fit the column, and anchors it to the
+    Evidence cell — growing the row to fit. A missing or corrupt file never
+    breaks the export (the whole body is defensive); the cell stays blank.
+    """
+    if detail is None:
+        return
+    hash_ = next(
+        (h for p in detail.pages for h in p.screenshot_hashes if h),
+        None,
+    )
+    if not hash_:
+        return
+    try:
+        path = blob_store.path_for(BlobStore._rel_path(hash_, "png"))
+        if not path.exists():
+            return
+        img = XLImage(str(path))
+        if img.width and img.width > _EVIDENCE_MAX_WIDTH:
+            img.height = int(img.height * _EVIDENCE_MAX_WIDTH / img.width)
+            img.width = _EVIDENCE_MAX_WIDTH
+        col_letter = get_column_letter(col)
+        img.anchor = f"{col_letter}{row}"
+        ws.add_image(img)
+        existing = ws.row_dimensions[row].height or 0
+        ws.row_dimensions[row].height = max(existing, img.height * 0.75)
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("xlsx.evidence_embed_failed", hash=hash_, error=str(exc))
+
+
 def _build_issues_sheet(
     ws: Worksheet,
     scan: ExportScan,
@@ -196,6 +248,7 @@ def _build_issues_sheet(
     *,
     auditor: str,
     audit_date: str,
+    blob_store: BlobStore | None = None,
 ) -> None:
     ncols = len(_ISSUE_HEADERS)
     for i, w in enumerate(_ISSUE_WIDTHS, start=1):
@@ -242,6 +295,7 @@ def _build_issues_sheet(
             _bullets(fix),
             help_url,
             "",  # Notes — left blank for the auditor
+            "",  # Evidence — image is anchored here below (when available)
         )
         for c, v in enumerate(values, start=1):
             cell = ws.cell(row=r, column=c, value=v)
@@ -249,6 +303,10 @@ def _build_issues_sheet(
             cell.border = _BORDER
             if idx % 2 == 1:
                 cell.fill = _BAND_FILL
+        # Embed a highlighted element screenshot in the Evidence column
+        # (last column) when a blob store is supplied and the finding has one.
+        if blob_store is not None:
+            _embed_evidence(ws, row=r, col=ncols, detail=detail, blob_store=blob_store)
 
     last_row = max(r, header_row + 1)
     ws.auto_filter.ref = f"A{header_row}:{get_column_letter(ncols)}{last_row}"
@@ -261,7 +319,7 @@ def _build_issues_sheet(
         dv.add(f"D{header_row + 1}:D{last_row}")
 
 
-def _build_tracking_sheet(ws: Worksheet) -> None:
+def _build_tracking_sheet(ws: Worksheet, *, manual_outcomes: dict[str, str] | None = None) -> None:
     for i, w in enumerate(_TRACK_WIDTHS, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -294,7 +352,11 @@ def _build_tracking_sheet(ws: Worksheet) -> None:
     r = header_row
     for idx, cr in enumerate(crit):
         r += 1
-        values = (f"{cr.sc} {cr.name} (Level {cr.level})", cr.manual_check, "")
+        values = (
+            f"{cr.sc} {cr.name} (Level {cr.level})",
+            cr.manual_check,
+            (manual_outcomes or {}).get(cr.sc, ""),
+        )
         for col, v in enumerate(values, start=1):
             cell = ws.cell(row=r, column=col, value=v)
             cell.alignment = _WRAP_TOP_CENTER if col == 3 else _WRAP_TOP
@@ -624,6 +686,7 @@ def render_xlsx(
     conn: sqlite3.Connection,
     auditor: str = "Axcess",
     audit_date: str | None = None,
+    blob_store: BlobStore | None = None,
 ) -> bytes:
     """Render the full Excel audit workbook and return the .xlsx bytes.
 
@@ -642,6 +705,11 @@ def render_xlsx(
     ``issues.list_issues()`` / audit-report card model the Markdown report
     uses, so the two deliverables can't drift. ``audit_date`` defaults to the
     scan's finish time formatted as a human date.
+
+    ``blob_store`` is optional: when supplied, the Issues Overview sheet
+    embeds the highlighted element screenshot captured for each finding at
+    scan time into a trailing "Evidence" column. When ``None`` (the default)
+    the behaviour is unchanged — no images, just the textual table.
     """
     date_str = audit_date or _fmt_date(scan.finished_at or scan.started_at)
     cards, dropped, best_practice = build_audit_cards(conn, scan)
@@ -652,13 +720,27 @@ def render_xlsx(
     _build_summary_sheet(summary, scan, cards, dropped, best_practice, audit_date=date_str)
 
     _build_issues_sheet(
-        wb.create_sheet("Issues Overview"), scan, conn, auditor=auditor, audit_date=date_str
+        wb.create_sheet("Issues Overview"),
+        scan,
+        conn,
+        auditor=auditor,
+        audit_date=date_str,
+        blob_store=blob_store,
     )
     _build_worklist_sheet(wb.create_sheet("Owner Worklist"), cards)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
     _build_coverage_sheet(wb.create_sheet("Coverage & Method"))
-    _build_tracking_sheet(wb.create_sheet("Test Tracking"))
+    manual_outcomes = {
+        check["criterion"]["sc"]: {
+            "pass": "Pass",
+            "fail": "Fail",
+            "not_tested": "Not tested",
+            "needs_follow_up": "Needs follow-up",
+        }.get(check["outcome"], "")
+        for check in evaluation.list_manual_checks(conn, scan.id)
+    }
+    _build_tracking_sheet(wb.create_sheet("Test Tracking"), manual_outcomes=manual_outcomes)
 
     buf = io.BytesIO()
     wb.save(buf)

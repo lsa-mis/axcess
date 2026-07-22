@@ -11,6 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, exportUrl } from "../api/client";
+import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
 import {
   Button,
   Card,
@@ -38,6 +39,11 @@ export default function ScanDetailRoute() {
   const cancel = useMutation({
     mutationFn: () => api.cancelScan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
+  });
+  const { data: issueSummary } = useQuery({
+    queryKey: ["issues", id, "workspace-summary"],
+    queryFn: () => api.listIssues(id),
+    enabled: Number.isFinite(id) && data?.status === "completed",
   });
 
   // Delete sends the user back to the scans list. We invalidate the list
@@ -69,6 +75,10 @@ export default function ScanDetailRoute() {
   // end-of-crawl, so the count is always 0 and an export would be empty.
   // Disable the contextual buttons (with a tooltip) until the scan settles.
   const isRunning = data.status === "running";
+  const issueOccurrences = issueSummary?.rows.reduce(
+    (total, issue) => total + issue.occurrence_count,
+    0,
+  );
   const lockedTip =
     "Available once the crawl completes — findings are synthesized at end of scan.";
 
@@ -107,12 +117,12 @@ export default function ScanDetailRoute() {
               // secondary actions below for operators who already know
               // which slice they want.
               <LinkButton
-                to={`/scans/${data.id}/issues`}
+                to={`/scans/${data.id}/review`}
                 variant="primary"
                 size="lg"
               >
                 <ListFilter className="h-5 w-5" aria-hidden />
-                Issues ({data.finding_count + data.axe_violations_total})
+                Review {issueSummary?.total_unfiltered ?? "…"} issue groups
               </LinkButton>
             )}
             {!isRunning && (
@@ -169,6 +179,23 @@ export default function ScanDetailRoute() {
           </>
         }
       />
+
+      {!isRunning && (
+        <ReportWorkspaceNav
+          scanId={data.id}
+          previousScanId={data.previous_scan_id}
+        />
+      )}
+
+      {!isRunning && issueSummary && (
+        <Card className="mb-4 border-umich-blue/20 bg-umich-blue/5 p-4">
+          <h2 className="text-sm font-semibold text-fg">Expert review starts with issue groups</h2>
+          <p className="mt-1 text-sm text-fg-muted">
+            This report has <strong>{issueSummary.total_unfiltered}</strong> actionable issue groups and {" "}
+            <strong>{issueOccurrences?.toLocaleString() ?? 0}</strong> detected occurrences. Machine and AI results are evidence for review, not a conformance determination.
+          </p>
+        </Card>
+      )}
 
       {deleteScan.error && (
         <Card

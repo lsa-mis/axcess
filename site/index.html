@@ -77,6 +77,20 @@
   ul.chips { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
   ul.chips li { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: .35rem .8rem; font-size: .9rem; }
   .chips .wcag { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; color: var(--blue); font-weight: 700; }
+  table.cmp { width: 100%; border-collapse: collapse; margin: .25rem 0 1.25rem; }
+  table.cmp th, table.cmp td { text-align: left; padding: .7rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; font-size: .98rem; }
+  table.cmp th { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+  table.cmp td b { color: var(--blue); }
+  table.cmp tr.me td { background: #fff7d6; border-bottom-color: var(--maize); }
+  table.cmp tr.me td:first-child { border-left: 3px solid var(--maize); }
+  table.cmp .dim { color: var(--muted); font-weight: 400; }
+  /* On the maize-tinted Axcess row, muted text drops below AAA 7:1 — use ink. */
+  table.cmp tr.me .dim { color: var(--ink); }
+  table.cmp sup { color: var(--muted); font-size: .7rem; }
+  .sub.small { font-size: .96rem; max-width: 74ch; margin-bottom: 1rem; }
+  .src { color: var(--muted); font-size: .82rem; max-width: 74ch; line-height: 1.6; }
+  .src a { color: var(--muted); }
+  @media (max-width: 560px) { table.cmp td, table.cmp th { padding: .5rem .4rem; font-size: .86rem; } }
 
   pre { background: #0d1b2a; color: #e6edf3; padding: 1.25rem 1.4rem; border-radius: 12px; overflow-x: auto; font: .92rem/1.6 ui-monospace, Menlo, monospace; }
   pre .c { color: #b8c6d8; } pre .m { color: var(--maize); }  /* comment colour at ~9.7:1 on the dark block — clears AAA */
@@ -98,6 +112,7 @@
     <a class="brand" href="#top"><svg viewBox="0 0 32 32" width="36" height="36" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg> Axcess</a>
     <nav aria-label="Primary">
       <a href="#pipelines">What it checks</a>
+      <a href="#compare">Compare</a>
       <a href="#start">How it works</a>
       <a class="btn btn-primary" href="https://reganmaharjan.com.np/">← Portfolio</a>
     </nav>
@@ -263,6 +278,44 @@
           <li><span class="wcag">3.2.6</span> Consistent Help</li>
     </ul>
     <p style="margin-top:1.25rem; color:var(--muted); font-size:.95rem;">Every surface — this page, the in-app Tracking view, and the docs — is generated from one source of truth, so the coverage above always matches the code.</p>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <h2>How Axcess compares</h2>
+    <p class="sub">Rule engines like <strong>axe-core</strong>, <strong>Alfa</strong>, and
+      <strong>Siteimprove</strong> are fast and high-confidence — but they can only check what's
+      <em>mechanically decidable</em>. Axcess runs a rule engine too, then adds behavioural probes
+      and local AI to reach the judgment criteria a rule engine structurally can't. The numbers
+      below count WCAG 2.2 Level A/AA success criteria a tool gives you an automated signal on.</p>
+    <table class="cmp">
+      <thead>
+        <tr><th>Tool</th><th>Approach</th><th>A/AA criteria<br>with a signal</th><th>Judgment<br>criteria?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>axe-core</td><td>DOM rule engine</td><td><b>21</b> <span class="dim">/ 55</span><sup>1</sup></td><td>No</td></tr>
+        <tr><td>Alfa <span class="dim">(Siteimprove OSS)</span></td><td>ACT-rules engine</td><td><span class="dim">not published</span><sup>2</sup></td><td>No</td></tr>
+        <tr><td>Siteimprove</td><td>ACT-rules engine</td><td><span class="dim">not published</span><sup>3</sup></td><td>No</td></tr>
+        <tr class="me"><td><b>Axcess</b></td><td>Rule engine + 3 behavioural probes + 3 local-AI analyzers</td><td><b>28</b> <span class="dim">/ 55</span></td><td><b>Yes</b></td></tr>
+      </tbody>
+    </table>
+    <p class="sub small">Axcess's 28 break down as <strong>6 deterministic</strong> ·
+      <strong>16 partly automated</strong> · <strong>6 AI-assisted</strong> (leads a human
+      confirms). It runs axe-core as its rule engine, so it covers that deterministic baseline and then
+      reaches criteria no pure rule engine can — <em>“is this image really text?”</em> (1.4.5),
+      <em>“does this link make sense out of context?”</em> (2.4.4), <em>“does the reading order match the
+      layout?”</em> (1.3.2). The trade-off is stated plainly: AI-assisted findings are strong leads, not
+      certainties, so every finding carries a confidence label and 27 criteria are flagged
+      manual-only with guidance.</p>
+    <p class="src">Sources, June 2026: <a href="https://github.com/dequelabs/axe-core/blob/develop/doc/rule-descriptions.md">axe-core 4.12 rule map</a>
+      (21 distinct A/AA criteria, counted from source) ·
+      <a href="https://www.w3.org/WAI/standards-guidelines/act/implementations/alfa/">Alfa ACT implementation</a>
+      (40 automated / 54 semi-automated ACT <em>rules</em>) ·
+      <a href="https://help.siteimprove.com/support/solutions/articles/80000448514-a-guide-to-the-siteimprove-accessibility-checks">Siteimprove checks guide</a>.
+      <sup>2,3</sup> Alfa and Siteimprove publish <em>rule</em> counts (and span Level AAA too), not a
+      deduplicated A/AA success-criterion count — so a like-for-like SC number isn't available for them;
+      both share the same structural ceiling as any rule engine.</p>
   </div>
 </section>
 

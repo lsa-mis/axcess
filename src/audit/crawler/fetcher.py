@@ -59,6 +59,9 @@ class FetchResult:
     # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())
+    # target_hash -> highlighted element PNG bytes, captured at scan time
+    # (empty for static fetches / when capture is disabled).
+    screenshots: dict[str, bytes] = field(default_factory=dict)
 
     @property
     def is_html(self) -> bool:

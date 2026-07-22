@@ -292,7 +292,7 @@ function RuleGroupCard({
               </thead>
               <tbody className="divide-y divide-border">
                 {group.findings.map((f) => (
-                  <FindingRow key={f.id} finding={f} />
+                  <FindingRow key={f.id} finding={f} scanId={scanId} />
                 ))}
               </tbody>
             </table>
@@ -303,12 +303,13 @@ function RuleGroupCard({
   );
 }
 
-function FindingRow({ finding }: { finding: A11yRuleGroupFinding }) {
+function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId: number }) {
   return (
     <tr className="align-top">
       <td className="max-w-xs px-3 py-2">
         <PageLink
           pageId={finding.page_id}
+          scanId={scanId}
           pageUrl={finding.page_url}
           pageTitle={finding.page_title}
         />

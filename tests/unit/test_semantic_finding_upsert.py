@@ -259,3 +259,62 @@ def test_pipeline_filter_query(tmp_db: sqlite3.Connection) -> None:
     ).fetchone()["n"]
     assert axe_count == 1
     assert semantic_count == 1
+
+
+def test_upsert_axe_violation_round_trips_screenshot_hash(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """The 0008 ``screenshot_hash`` column persists and is readable back."""
+    scan_id, page_id = _seed_scan_page(tmp_db)
+    fid = repo.upsert_axe_violation(
+        tmp_db,
+        page_id=page_id,
+        scan_id=scan_id,
+        rule_id="color-contrast",
+        wcag_sc="1.4.3",
+        wcag_scs="1.4.3",
+        wcag_level="AA",
+        impact="serious",
+        help="x",
+        help_url="",
+        target_selector="p",
+        failure_summary="",
+        html_snippet="<p>x</p>",
+        target_hash="h-shot",
+        screenshot_hash="abc123",
+    )
+    row = tmp_db.execute(
+        "SELECT screenshot_hash FROM page_a11y_findings WHERE id = ?",
+        (fid,),
+    ).fetchone()
+    assert row["screenshot_hash"] == "abc123"
+
+
+def test_upsert_keyboard_finding_round_trips_screenshot_hash(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """The shared keyboard/responsive/focus/visual upsert threads the hash too."""
+    scan_id, page_id = _seed_scan_page(tmp_db)
+    fid = repo.upsert_keyboard_finding(
+        tmp_db,
+        page_id=page_id,
+        scan_id=scan_id,
+        rule_id="keyboard-trap-stuck",
+        wcag_sc="2.1.2",
+        wcag_scs="2.1.2",
+        wcag_level="A",
+        impact="serious",
+        help="x",
+        help_url="",
+        target_selector="button",
+        failure_summary="",
+        html_snippet="<button>x</button>",
+        target_hash="h-kbd",
+        criterion_sc="2.1.2",
+        screenshot_hash="def456",
+    )
+    row = tmp_db.execute(
+        "SELECT screenshot_hash FROM page_a11y_findings WHERE id = ?",
+        (fid,),
+    ).fetchone()
+    assert row["screenshot_hash"] == "def456"

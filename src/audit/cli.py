@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
@@ -181,6 +182,17 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_screenshots: Annotated[
+        bool,
+        typer.Option(
+            "--skip-screenshots",
+            help=(
+                "Skip capturing a highlighted element screenshot for each "
+                "live-page finding. Those images are embedded in the Excel "
+                "report as visual evidence; skipping saves crawl time."
+            ),
+        ),
+    ] = False,
     use_js: Annotated[
         bool,
         typer.Option(
@@ -258,6 +270,7 @@ def crawl(
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
             visual_checks_enabled=not skip_visual,
+            capture_screenshots=not skip_screenshots,
         )
         if static_only:
             console.print(
@@ -454,8 +467,9 @@ def export(
         scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
         rendered: str | bytes
         if fmt_lower == "xlsx":
-            # xlsx builds its issue table live from the open connection.
-            rendered = render_xlsx(scan, conn=conn)
+            # xlsx builds its issue table live from the open connection;
+            # the blob store lets it embed per-finding evidence screenshots.
+            rendered = render_xlsx(scan, conn=conn, blob_store=BlobStore(get_settings().blob_dir))
         else:
             rendered = {
                 "csv": render_csv,

@@ -14,10 +14,11 @@ import re
 import secrets
 import sqlite3
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -27,8 +28,9 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict, Field
 
-from audit import __version__, coverage_matrix
+from audit import __version__, coverage_matrix, evaluation
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import url_policy
@@ -67,6 +69,39 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class EvaluationUpdate(BaseModel):
+    """Editable expert-review metadata; crawler evidence remains immutable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target_standard: str | None = Field(default=None, max_length=64)
+    target_level: Literal["A", "AA", "AAA"] | None = None
+    purpose: str | None = Field(default=None, max_length=4000)
+    scope_included: str | None = Field(default=None, max_length=12000)
+    scope_excluded: str | None = Field(default=None, max_length=12000)
+    sample_description: str | None = Field(default=None, max_length=12000)
+    reviewer: str | None = Field(default=None, max_length=256)
+    methods_note: str | None = Field(default=None, max_length=12000)
+    limitations: str | None = Field(default=None, max_length=12000)
+    status: Literal["draft", "in_progress", "completed"] | None = None
+
+
+class ManualCheckUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["not_started", "pass", "fail", "not_tested", "needs_follow_up"]
+    rationale: str = Field(default="", max_length=12000)
+
+
+class ManualEvidenceCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    note: str = Field(min_length=1, max_length=12000)
+    page_id: int | None = Field(default=None, ge=1)
+    evidence_url: str = Field(default="", max_length=4096)
+
 
 _EXPORT_RENDERERS: dict[str, Any] = {
     "csv": render_csv,
@@ -392,6 +427,100 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
                 )
                 conn.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
         return JSONResponse({"ok": True, "deleted_scan_id": scan_id})
+
+    @app.get("/api/scans/{scan_id}/evaluation")
+    def api_get_evaluation(scan_id: int) -> JSONResponse:
+        """Return expert-review metadata without mutating the scan record."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            payload = evaluation.get_evaluation(conn, scan_id)
+        return JSONResponse(jsonable_encoder(payload))
+
+    @app.put("/api/scans/{scan_id}/evaluation")
+    def api_put_evaluation(scan_id: int, body: EvaluationUpdate) -> JSONResponse:
+        """Persist the human-authored evaluation context for a completed scan."""
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_completed_scan(scan)
+            existing = evaluation.get_evaluation(conn, scan_id)
+            changes = body.model_dump(exclude_none=True)
+            values = {
+                key: str(changes.get(key, existing[key]))
+                for key in (
+                    "target_standard",
+                    "target_level",
+                    "purpose",
+                    "scope_included",
+                    "scope_excluded",
+                    "sample_description",
+                    "reviewer",
+                    "methods_note",
+                    "limitations",
+                    "status",
+                )
+            }
+            payload = evaluation.upsert_evaluation(conn, scan_id, values)
+        return JSONResponse(jsonable_encoder(payload))
+
+    @app.get("/api/scans/{scan_id}/manual-checks")
+    def api_list_manual_checks(scan_id: int) -> JSONResponse:
+        """Return the full WCAG 2.2 A/AA expert-review matrix for a report."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            payload = {
+                "evaluation": evaluation.get_evaluation(conn, scan_id),
+                "checks": evaluation.list_manual_checks(conn, scan_id),
+            }
+        return JSONResponse(jsonable_encoder(payload))
+
+    @app.patch("/api/scans/{scan_id}/manual-checks/{criterion_sc}")
+    def api_update_manual_check(
+        scan_id: int, criterion_sc: str, body: ManualCheckUpdate
+    ) -> JSONResponse:
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_completed_scan(scan)
+            try:
+                payload = evaluation.update_manual_check(
+                    conn,
+                    scan_id=scan_id,
+                    criterion_sc=criterion_sc,
+                    outcome=body.outcome,
+                    rationale=body.rationale,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(jsonable_encoder(payload))
+
+    @app.post("/api/scans/{scan_id}/manual-checks/{criterion_sc}/evidence")
+    def api_add_manual_evidence(
+        scan_id: int, criterion_sc: str, body: ManualEvidenceCreate
+    ) -> JSONResponse:
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_completed_scan(scan)
+            try:
+                payload = evaluation.add_manual_evidence(
+                    conn,
+                    scan_id=scan_id,
+                    criterion_sc=criterion_sc,
+                    note=body.note,
+                    page_id=body.page_id,
+                    evidence_url=body.evidence_url,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(jsonable_encoder(payload), status_code=201)
+
+    @app.get("/api/scans/{scan_id}/pages/{page_id}")
+    def api_page_evidence(scan_id: int, page_id: int) -> JSONResponse:
+        """Return page evidence only when the page belongs to this report."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            payload = evaluation.get_page_evidence(conn, scan_id=scan_id, page_id=page_id)
+        if payload is None:
+            raise HTTPException(status_code=404, detail="Page is not part of this report")
+        return JSONResponse(jsonable_encoder(payload))
 
     @app.get("/api/scans/{scan_id}/findings")
     def api_list_findings(
@@ -898,7 +1027,9 @@ def create_app(db_path: Path | None = None, blob_dir: Path | None = None) -> Fas
             if fmt_lower == "audit":
                 rendered = render_audit_report(scan, conn=conn)
             elif fmt_lower == "xlsx":
-                rendered = render_xlsx(scan, conn=conn)
+                # Pass the blob store so the Issues Overview sheet can embed
+                # each finding's highlighted element screenshot as evidence.
+                rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
             else:
                 rendered = _EXPORT_RENDERERS[fmt_lower](scan)
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
@@ -1260,6 +1391,15 @@ def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     return dict(row)
+
+
+def _require_completed_scan(scan: dict[str, Any]) -> None:
+    """Guard review writes: a live crawl cannot be a stable evaluation."""
+    if scan["status"] != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="Expert review can begin after this scan completes.",
+        )
 
 
 def _severity_breakdown(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:

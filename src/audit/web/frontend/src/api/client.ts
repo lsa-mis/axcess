@@ -5,6 +5,10 @@ import type {
   AbilityLabel,
   ConformanceLabel,
   IssueDetail,
+  EvaluationRecord,
+  ManualChecksResponse,
+  ManualOutcome,
+  PageEvidence,
   DiffReport,
   FindingDetail,
   FindingsFilter,
@@ -45,6 +49,35 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
 export const api = {
   listScans: () => request<ScanSummary[]>("/api/scans"),
   getScan: (id: number) => request<ScanDetail>(`/api/scans/${id}`),
+  getEvaluation: (scanId: number) =>
+    request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`),
+  updateEvaluation: (scanId: number, payload: Partial<EvaluationRecord>) =>
+    request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  getManualChecks: (scanId: number) =>
+    request<ManualChecksResponse>(`/api/scans/${scanId}/manual-checks`),
+  updateManualCheck: (
+    scanId: number,
+    criterion: string,
+    payload: { outcome: ManualOutcome; rationale: string },
+  ) =>
+    request(`/api/scans/${scanId}/manual-checks/${encodeURIComponent(criterion)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  addManualEvidence: (
+    scanId: number,
+    criterion: string,
+    payload: { note: string; page_id?: number; evidence_url?: string },
+  ) =>
+    request(`/api/scans/${scanId}/manual-checks/${encodeURIComponent(criterion)}/evidence`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  getPageEvidence: (scanId: number, pageId: number) =>
+    request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   scopePreview: (url: string, wholeHost: boolean) => {
     const params = new URLSearchParams({ url });
     if (wholeHost) params.set("whole_host", "1");

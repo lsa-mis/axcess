@@ -367,10 +367,28 @@ class KeyboardProbe:
                     const title = (f.getAttribute('title') || '').trim();
                     const ti = f.getAttribute('tabindex');
                     const hasContent = !!(f.src || f.srcdoc);
-                    // Heuristic: iframe with content that's reachable by Tab
-                    // (tabindex !== '-1') and no title is the canonical
-                    // "user gets stuck in the embedded doc" shape.
-                    if (hasContent && title === '' && ti !== '-1') {
+                    // Only an iframe a keyboard user can actually Tab INTO can
+                    // trap focus. Tracking / ad / pixel iframes are
+                    // display:none, 0x0, hidden, or aria-hidden — never in the
+                    // tab order — so flagging them as keyboard traps is a false
+                    // positive (and they're on nearly every real page). Gate on
+                    // real visibility.
+                    // clientWidth/Height are the content-box size: 0 for a
+                    // display:none or width=0/height=0 iframe (getBoundingClientRect
+                    // would report ~4px for the latter because of the default 2px
+                    // frame border, which let tracking pixels slip through).
+                    const cs = getComputedStyle(f);
+                    const reachable = (
+                      cs.display !== 'none' &&
+                      cs.visibility !== 'hidden' &&
+                      !f.hasAttribute('hidden') &&
+                      f.getAttribute('aria-hidden') !== 'true' &&
+                      f.clientWidth > 2 && f.clientHeight > 2
+                    );
+                    // Heuristic: a visible, Tab-reachable iframe (tabindex !==
+                    // '-1') with content and no title is the canonical "user
+                    // gets stuck in the embedded doc" shape.
+                    if (hasContent && reachable && title === '' && ti !== '-1') {
                       out.push({
                         selector: 'iframe' + (f.id ? '#' + f.id : ''),
                         snippet: f.outerHTML.slice(0, 240),
@@ -429,7 +447,17 @@ class KeyboardProbe:
             raw: object = await page.evaluate(
                 """
                 () => {
-                  const ae = document.activeElement;
+                  // Descend through (open) shadow roots to the innermost
+                  // focused element. Without this, a web component's HOST
+                  // shows up as document.activeElement for every Tab press
+                  // while focus actually moves through its internal
+                  // controls — which the tab-walk misreads as focus being
+                  // "stuck" on the host (a false trap). Closed shadow roots
+                  // expose no activeElement, so those stay opaque.
+                  let ae = document.activeElement;
+                  while (ae && ae.shadowRoot && ae.shadowRoot.activeElement) {
+                    ae = ae.shadowRoot.activeElement;
+                  }
                   if (!ae || ae === document.body) {
                     return { el_id: 0, selector: 'body', html: '' };
                   }

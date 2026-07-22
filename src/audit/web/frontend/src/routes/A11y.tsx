@@ -414,6 +414,7 @@ function DrillDownView({
                   <td className="max-w-xs px-3 py-2">
                     <PageLink
                       pageId={f.page_id}
+                      scanId={scanId}
                       pageUrl={f.page_url}
                       pageTitle={f.page_title}
                     />

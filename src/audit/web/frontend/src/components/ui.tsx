@@ -460,11 +460,14 @@ export function Checkbox({
  */
 export function PageLink({
   pageId,
+  scanId,
   pageUrl,
   pageTitle,
   showUrlBelow = true,
 }: {
   pageId: number;
+  /** Report scope required for the in-app evidence route. */
+  scanId?: number;
   pageUrl: string;
   pageTitle?: string | null;
   /** Show the raw URL as a microcopy line below the title. */
@@ -488,12 +491,14 @@ export function PageLink({
           {pageUrl}
         </div>
       )}
-      <Link
-        to={`/pages/${pageId}`}
-        className="mt-1 inline-block text-2xs text-fg-muted underline underline-offset-2 hover:text-fg"
-      >
-        view in audit →
-      </Link>
+      {scanId != null && (
+        <Link
+          to={`/scans/${scanId}/pages/${pageId}`}
+          className="mt-1 inline-block text-2xs text-fg-muted underline underline-offset-2 hover:text-fg"
+        >
+          view evidence →
+        </Link>
+      )}
     </div>
   );
 }

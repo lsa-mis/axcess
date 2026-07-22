@@ -482,3 +482,96 @@ export interface TrackingData {
   counts: { shipped: number; in_progress: number; planned: number };
   coverage: CoverageData;
 }
+
+// --- Expert evaluation workbench --------------------------------------
+
+export type EvaluationStatus = "draft" | "in_progress" | "completed";
+export type ManualOutcome =
+  | "not_started"
+  | "pass"
+  | "fail"
+  | "not_tested"
+  | "needs_follow_up";
+
+export interface EvaluationRecord {
+  id: number | null;
+  scan_id: number;
+  target_standard: string;
+  target_level: "A" | "AA" | "AAA";
+  purpose: string;
+  scope_included: string;
+  scope_excluded: string;
+  sample_description: string;
+  reviewer: string;
+  methods_note: string;
+  limitations: string;
+  status: EvaluationStatus;
+  created_at: string | null;
+  updated_at: string | null;
+  exists: boolean;
+}
+
+export interface ManualEvidence {
+  id: number;
+  manual_check_result_id: number;
+  page_id: number | null;
+  page_url?: string | null;
+  evidence_url: string;
+  note: string;
+  created_at: string;
+}
+
+export interface ManualCheck {
+  criterion: Omit<CoverageCriterion, "pipelines">;
+  result_id: number | null;
+  outcome: ManualOutcome;
+  rationale: string;
+  tested_at: string | null;
+  updated_at: string | null;
+  evidence: ManualEvidence[];
+}
+
+export interface ManualChecksResponse {
+  evaluation: EvaluationRecord;
+  checks: ManualCheck[];
+}
+
+export interface PageEvidence {
+  page: {
+    id: number;
+    scan_id: number;
+    url_normalized: string;
+    title: string | null;
+    status_code: number | null;
+    render_mode: string;
+    fetched_at: string | null;
+  };
+  a11y_findings: Array<{
+    id: number;
+    pipeline: string;
+    rule_id: string;
+    criterion_sc: string | null;
+    wcag_sc: string | null;
+    wcag_level: string | null;
+    impact: string | null;
+    help: string;
+    target_selector: string;
+    failure_summary: string | null;
+    html_snippet: string | null;
+    status: FindingStatus;
+    screenshot_hash: string | null;
+  }>;
+  image_occurrences: Array<{
+    occurrence_id: number;
+    alt_text: string | null;
+    context_snippet: string | null;
+    position: number;
+    above_fold: boolean;
+    content_hash: string;
+    src_url_canonical: string;
+    mime: string | null;
+    ocr_text: string | null;
+    vlm_classification: Classification | null;
+    vlm_rationale: string | null;
+  }>;
+}

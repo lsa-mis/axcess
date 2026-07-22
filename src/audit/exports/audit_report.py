@@ -43,7 +43,7 @@ from typing import Any
 
 import yaml
 
-from audit import coverage_matrix
+from audit import coverage_matrix, evaluation
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.web import issues as issues_mod
 
@@ -346,6 +346,10 @@ def render_audit_report(
     lines.append("")
     lines.extend(_wcag_coverage_matrix())
     lines.append("")
+    expert_record = evaluation.get_evaluation(conn, scan.id)
+    if expert_record["exists"]:
+        lines.extend(_expert_evaluation_record(conn, scan.id, expert_record))
+        lines.append("")
     lines.extend(_page_hotspots(conn, scan, cards))
     lines.append("")
     lines.extend(_worklist_by_owner(cards))
@@ -380,6 +384,47 @@ def render_audit_report(
     )
     lines.append("")
     return "\n".join(lines)
+
+
+def _expert_evaluation_record(
+    conn: sqlite3.Connection, scan_id: int, record: dict[str, Any]
+) -> list[str]:
+    """Render persisted expert context only when the reviewer has created it.
+
+    Existing machine-only exports remain byte-stable; the additional section
+    appears once an expert intentionally records an evaluation.
+    """
+    lines = ["## Expert evaluation record", ""]
+    lines.append(f"**Target:** {record['target_standard']} Level {record['target_level']}")
+    lines.append(f"**Review status:** {str(record['status']).replace('_', ' ')}")
+    if record["reviewer"]:
+        lines.append(f"**Reviewer:** {record['reviewer']}")
+    for label, key in (
+        ("Purpose", "purpose"),
+        ("Included scope", "scope_included"),
+        ("Excluded scope", "scope_excluded"),
+        ("Sample", "sample_description"),
+        ("Methods", "methods_note"),
+        ("Limitations", "limitations"),
+    ):
+        if record[key]:
+            lines.extend(["", f"**{label}:** {record[key]}"])
+
+    completed = [
+        check
+        for check in evaluation.list_manual_checks(conn, scan_id)
+        if check["outcome"] != "not_started"
+    ]
+    if completed:
+        lines.extend(
+            ["", "### Manual-check decisions", "", "| SC | Outcome | Rationale |", "|---|---|---|"]
+        )
+        for check in completed:
+            lines.append(
+                f"| {check['criterion']['sc']} | {str(check['outcome']).replace('_', ' ')} | "
+                f"{_clean(check['rationale']) or '—'} |"
+            )
+    return lines
 
 
 # ---------------------------------------------------------------------------

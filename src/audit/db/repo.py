@@ -289,6 +289,7 @@ def upsert_axe_violation(
     failure_summary: str,
     html_snippet: str,
     target_hash: str,
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert on ``(page_id, rule_id, target_hash)``.
 
@@ -303,9 +304,9 @@ def upsert_axe_violation(
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash
+            html_snippet, target_hash, screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -317,6 +318,7 @@ def upsert_axe_violation(
             target_selector = excluded.target_selector,
             failure_summary = excluded.failure_summary,
             html_snippet = excluded.html_snippet,
+            screenshot_hash = excluded.screenshot_hash,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -333,6 +335,7 @@ def upsert_axe_violation(
             failure_summary,
             html_snippet,
             target_hash,
+            screenshot_hash,
         ),
     )
     row = conn.execute(
@@ -360,6 +363,7 @@ def upsert_keyboard_finding(
     target_hash: str,
     criterion_sc: str,
     pipeline: str = "keyboard",
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
@@ -378,9 +382,9 @@ def upsert_keyboard_finding(
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, pipeline, criterion_sc
+            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -393,6 +397,7 @@ def upsert_keyboard_finding(
             failure_summary = excluded.failure_summary,
             html_snippet = excluded.html_snippet,
             criterion_sc = excluded.criterion_sc,
+            screenshot_hash = excluded.screenshot_hash,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -411,6 +416,7 @@ def upsert_keyboard_finding(
             target_hash,
             pipeline,
             criterion_sc,
+            screenshot_hash,
         ),
     )
     row = conn.execute(
@@ -438,6 +444,7 @@ def upsert_responsive_finding(
     target_hash: str,
     criterion_sc: str,
     pipeline: str = "responsive",
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a responsive/zoom probe finding.
 
@@ -465,6 +472,7 @@ def upsert_responsive_finding(
         target_hash=target_hash,
         criterion_sc=criterion_sc,
         pipeline=pipeline,
+        screenshot_hash=screenshot_hash,
     )
 
 
@@ -486,6 +494,7 @@ def upsert_focus_finding(
     target_hash: str,
     criterion_sc: str,
     pipeline: str = "focus",
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a live-page focus probe finding (SC 2.4.11).
 
@@ -509,6 +518,7 @@ def upsert_focus_finding(
         target_hash=target_hash,
         criterion_sc=criterion_sc,
         pipeline=pipeline,
+        screenshot_hash=screenshot_hash,
     )
 
 
@@ -530,6 +540,7 @@ def upsert_visual_finding(
     target_hash: str,
     criterion_sc: str,
     pipeline: str = "visual",
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a visual (VLM) probe finding (SC 1.3.2).
 
@@ -553,6 +564,7 @@ def upsert_visual_finding(
         target_hash=target_hash,
         criterion_sc=criterion_sc,
         pipeline=pipeline,
+        screenshot_hash=screenshot_hash,
     )
 
 

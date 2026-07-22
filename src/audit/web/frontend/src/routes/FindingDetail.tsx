@@ -285,6 +285,7 @@ export default function FindingDetailRoute() {
                   <td className="px-4 py-2">
                     <PageLink
                       pageId={o.page_id}
+                      scanId={data.scan_id}
                       pageUrl={o.page_url}
                       pageTitle={null}
                     />

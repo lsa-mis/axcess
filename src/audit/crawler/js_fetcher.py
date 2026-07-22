@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import contextlib
 from types import TracebackType
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -25,13 +25,21 @@ from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler.fetcher import FetchError, FetchResult
+from audit.logging import get_logger
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, Playwright, ViewportSize
+    from playwright.async_api import Browser, Page, Playwright, ViewportSize
+
+log = get_logger(__name__)
 
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
+# Per-page cap on highlighted element screenshots. Each capture costs a
+# scroll + a screenshot (~50-150 ms); capping the count bounds the
+# crawl-time cost on findings-dense pages without losing the typical
+# handful of issues a reviewer actually wants evidence for.
+MAX_SHOTS_PER_PAGE = 12
 
 
 class JsFetcher:
@@ -57,6 +65,7 @@ class JsFetcher:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        capture_screenshots: bool = False,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -80,6 +89,9 @@ class JsFetcher:
         # SC 1.3.2 visual probe. Screenshots the page — must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
+        # When set, capture a highlighted screenshot of each live-page
+        # finding's element before the context closes (see ``_capture_element``).
+        self._capture_screenshots = capture_screenshots
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
 
@@ -180,6 +192,38 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 responsive_findings = await self._responsive_probe.run(page)
+
+            # Per-finding element screenshots — captured LAST, after every
+            # probe has produced its findings but before the context closes
+            # (the page is still live). One bad selector or a screenshot
+            # failure must never break the crawl, so the whole loop is
+            # wrapped: on any error we log and ship whatever we captured.
+            screenshots: dict[str, bytes] = {}
+            if self._capture_screenshots:
+                try:
+                    all_findings: list[Any] = [
+                        *axe_violations,
+                        *keyboard_traps,
+                        *focus_findings,
+                        *visual_findings,
+                        *responsive_findings,
+                    ]
+                    for finding in all_findings:
+                        if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                            break
+                        kw = finding.to_repo_kwargs()
+                        selector = kw["target_selector"]
+                        th = kw["target_hash"]
+                        if th in screenshots:
+                            continue
+                        if selector in ("", "body", "html", "(unknown)", "(none)"):
+                            continue
+                        png = await self._capture_element(page, selector)
+                        if png:
+                            screenshots[th] = png
+                except Exception as exc:
+                    log.warning("screenshot.capture_failed", url=final_url, error=str(exc))
+
             return FetchResult(
                 url=final_url,
                 status_code=status,
@@ -191,6 +235,53 @@ class JsFetcher:
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
                 visual_findings=tuple(visual_findings),
+                screenshots=screenshots,
             )
         finally:
             await ctx.close()
+
+    async def _capture_element(self, page: Page, selector: str) -> bytes | None:
+        """Screenshot the element at ``selector`` with a highlight outline.
+
+        Returns padded-clip PNG bytes, or ``None`` if the element is
+        missing, off-screen, too small, or anything goes wrong. The whole
+        body is defensive — an invalid CSS selector, a detached node, or a
+        screenshot timeout returns ``None`` rather than raising, so one bad
+        finding never breaks the page's capture pass.
+        """
+        try:
+            loc = page.locator(selector).first
+            if await loc.count() == 0:
+                return None
+            box = await loc.bounding_box()
+            if box is None or box["width"] < 2 or box["height"] < 2:
+                return None
+            with contextlib.suppress(Exception):
+                await loc.scroll_into_view_if_needed(timeout=1500)
+            box = await loc.bounding_box()
+            if box is None:
+                return None
+            # Draw a red highlight outline so the reviewer sees the exact
+            # element; stash the old inline outline to restore it after.
+            with contextlib.suppress(Exception):
+                await loc.evaluate(
+                    "el => { el.setAttribute('data-axcess-old-outline', el.style.outline||''); "
+                    "el.style.outline='3px solid #ff3b30'; el.style.outlineOffset='2px'; }"
+                )
+            pad = 14
+            vp = page.viewport_size or {"width": 1440, "height": 900}
+            x = max(0, box["x"] - pad)
+            y = max(0, box["y"] - pad)
+            width = min(box["width"] + 2 * pad, vp["width"] - x)
+            height = min(box["height"] + 2 * pad, 700.0)
+            if width < 2 or height < 2:
+                return None
+            png = await page.screenshot(clip={"x": x, "y": y, "width": width, "height": height})
+            with contextlib.suppress(Exception):
+                await loc.evaluate(
+                    "el => { el.style.outline = el.getAttribute('data-axcess-old-outline')||''; "
+                    "el.removeAttribute('data-axcess-old-outline'); }"
+                )
+            return png
+        except Exception:
+            return None

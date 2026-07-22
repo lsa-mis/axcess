@@ -97,6 +97,10 @@ class IssuePage:
     page_title: str | None
     occurrence_count: int
     status_summary: dict[str, int]
+    # Blob content hashes of the per-finding element screenshots captured
+    # at scan time (empty when none were captured). The Excel export reads
+    # these to embed visual evidence next to each issue.
+    screenshot_hashes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -341,7 +345,8 @@ def _pages_for_issue(
                    p.url_normalized AS page_url,
                    p.title AS page_title,
                    COUNT(*) AS occurrence_count,
-                   GROUP_CONCAT(a.status) AS statuses
+                   GROUP_CONCAT(a.status) AS statuses,
+                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.scan_id = ? AND a.rule_id = ?
@@ -384,6 +389,14 @@ def _pages_for_issue(
             s = s.strip()
             if s:
                 counts[s] = counts.get(s, 0) + 1
+        # Screenshot hashes only come back on the a11y query (the image
+        # query has no such column). GROUP_CONCAT renders NULLs as the
+        # literal "None"/empty, so filter those out.
+        # sqlite3.Row's `in` iterates values, not keys, so we must check
+        # `.keys()` explicitly (the image query lacks this column).
+        row_keys = r.keys()
+        raw_shots = r["screenshot_hashes"] if "screenshot_hashes" in row_keys else None
+        shots = tuple(h for h in (raw_shots or "").split(",") if h and h != "None")
         out.append(
             IssuePage(
                 page_id=int(r["page_id"]),
@@ -391,6 +404,7 @@ def _pages_for_issue(
                 page_title=r["page_title"],
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
+                screenshot_hashes=shots,
             )
         )
     return out

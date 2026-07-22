@@ -205,11 +205,29 @@ def test_parser_well_formed_response_produces_findings() -> None:
     assert f.target_selector == "a[ord=0]"
 
 
-def test_parser_low_confidence_maps_to_minor_impact() -> None:
+def test_parser_low_confidence_is_dropped() -> None:
+    """Confidence floor: low-confidence link-purpose flags are the biggest
+    false-positive source ("could be more specific"), so they're dropped
+    rather than surfaced as minor findings."""
     analyzer = _make_analyzer()
     raw = {"violations": [{"index": 0, "reason": "Maybe ambiguous", "confidence": "low"}]}
     findings = list(analyzer._parse_response(raw, _stub_links(1)))
-    assert findings[0].impact == "minor"
+    assert findings == []
+
+
+def test_parser_low_confidence_dropped_but_higher_kept() -> None:
+    """A mixed batch keeps medium/high and drops only the low row."""
+    analyzer = _make_analyzer()
+    raw = {
+        "violations": [
+            {"index": 0, "reason": "bare url", "confidence": "high"},
+            {"index": 1, "reason": "could be more specific", "confidence": "low"},
+            {"index": 2, "reason": "filler text", "confidence": "medium"},
+        ]
+    }
+    findings = list(analyzer._parse_response(raw, _stub_links(3)))
+    assert {f.impact for f in findings} == {"serious", "moderate"}
+    assert len(findings) == 2  # the low-confidence row is gone
 
 
 def test_parser_medium_confidence_maps_to_moderate_impact() -> None:
