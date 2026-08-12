@@ -33,8 +33,16 @@ module.exports = {
   makers: [
     { name: "@electron-forge/maker-zip", platforms: ["darwin"] },
     { name: "@electron-forge/maker-squirrel", platforms: ["win32"] },
-    { name: "@electron-forge/maker-deb", platforms: ["linux"] },
-    { name: "@electron-forge/maker-rpm", platforms: ["linux"] },
+    {
+      name: "@electron-forge/maker-deb",
+      platforms: ["linux"],
+      config: { options: { bin: "Axcess" } },
+    },
+    {
+      name: "@electron-forge/maker-rpm",
+      platforms: ["linux"],
+      config: { options: { bin: "Axcess" } },
+    },
   ],
   plugins: [
     {

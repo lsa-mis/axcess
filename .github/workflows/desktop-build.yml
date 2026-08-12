@@ -69,7 +69,7 @@ jobs:
             if [ "$attempt" -eq 3 ]; then
               exit 1
             fi
-            echo "Packaging download failed; retrying (attempt $((attempt + 1)) of 3)."
+            echo "Packaging failed; retrying (attempt $((attempt + 1)) of 3)."
             sleep $((attempt * 10))
           done
       - uses: actions/upload-artifact@v4
