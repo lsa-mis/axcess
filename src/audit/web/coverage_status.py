@@ -109,19 +109,20 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         name="Semantic analyzer",
         pipeline="semantic",
         engine="Per-SC Text-LLM via Ollama",
-        scs="2.4.4 Link Purpose (In Context)",
+        scs=(
+            "1.2.1 Audio-only transcript cues, 2.4.4 Link Purpose, "
+            "2.4.6 Headings and Labels, 3.3.2 Labels or Instructions"
+        ),
         needs_ai=True,
-        note="Machinery is built; only 2.4.4 has a registered analyzer. "
-        "The roadmap below is the queue to close this gap.",
+        note="Four per-criterion analyzers are registered. Results are local-AI "
+        "review leads and require expert confirmation.",
     ),
 )
 
 
 # --- The AI roadmap --------------------------------------------------
-# Status reconciled against the repo on 2026-06-19. Two items the
-# original triage marked "in progress" have NO code and are corrected to
-# "planned"; 2.4.6 / 3.3.2 are in the orchestrator's default criteria but
-# have no analyzer class, so they're skipped at runtime — also "planned".
+# Status reconciled against the repo on 2026-08-12. Items are marked shipped
+# only when the layer persists evidence end to end.
 
 ROADMAP: tuple[RoadmapItem, ...] = (
     RoadmapItem(
