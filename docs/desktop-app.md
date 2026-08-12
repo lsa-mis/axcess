@@ -17,6 +17,12 @@ React workbench in a sandboxed Electron window.
   local web version.
 - Alfa can use Electron's bundled Node runtime. Users do not need a separate
   Node installation in a packaged build.
+- The installer includes the matching Playwright Chromium, Siteimprove Alfa
+  packages, Tesseract executable, and English OCR language data. Users do not
+  need Python, Node.js, Chromium, or Tesseract installed separately.
+- Ollama and its optional local language/vision models are not silently
+  installed or downloaded. Model-assisted checks remain optional and clearly
+  report when a separately configured loopback Ollama service is unavailable.
 
 Typical data locations are:
 
@@ -45,13 +51,15 @@ Electron chooses an available loopback port. It does not use or expose port
 
 ## Build a local installer
 
-The release build has four layers:
+The release build has five layers:
 
 1. Build the React application.
 2. Install the pinned Alfa runner.
 3. Bundle the Python backend with PyInstaller.
-4. Bundle the matching Playwright Chromium and create an installer with
-   Electron Forge.
+4. Bundle the matching Playwright Chromium and a relocatable Tesseract OCR
+   runtime with English language data.
+5. Create an installer with Electron Forge, then launch every bundled runtime
+   from inside the finished application as a release gate.
 
 Run:
 
@@ -88,7 +96,8 @@ The branch produces local, unsigned installers. Before institutional rollout:
 - create final `.icns`, `.ico`, and Linux icon assets;
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
-- decide how Tesseract language data will be bundled for OCR on each platform;
+- bundle and verify equivalent OCR runtimes before enabling Windows or Linux
+  release jobs;
 - add a signed update channel or document managed-software deployment;
 - run U-M security and privacy review on the packaged binaries;
 - test installation, upgrade, rollback, database retention, and uninstall on

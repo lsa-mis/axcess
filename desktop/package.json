@@ -11,9 +11,12 @@
   },
   "scripts": {
     "start": "electron-forge start",
+    "prepackage": "node scripts/verify-resources.cjs",
     "package": "electron-forge package",
+    "premake": "node scripts/verify-resources.cjs",
     "make": "electron-forge make && node scripts/make-macos-dmg.cjs",
-    "test": "node --check src/main.cjs && node --check forge.config.cjs && node --check scripts/make-macos-dmg.cjs && node --test test/*.test.cjs"
+    "postmake": "node scripts/verify-packaged.cjs",
+    "test": "node --check src/main.cjs && node --check src/runtime.cjs && node --check forge.config.cjs && node --check scripts/make-macos-dmg.cjs && node --check scripts/verify-resources.cjs && node --check scripts/verify-packaged.cjs && node --test test/*.test.cjs"
   },
   "devDependencies": {
     "@electron-forge/cli": "7.11.2",

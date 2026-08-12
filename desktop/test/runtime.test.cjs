@@ -32,4 +32,13 @@ test("desktop evidence uses the operating system application-data directory", ()
     env.PLAYWRIGHT_BROWSERS_PATH,
     path.join("Applications", "Axcess Resources", "playwright-browsers"),
   );
+  assert.equal(
+    env.TESSDATA_PREFIX,
+    path.join("Applications", "Axcess Resources", "ocr-runtime", "share", "tessdata"),
+  );
+  assert.ok(
+    env.PATH.startsWith(
+      path.join("Applications", "Axcess Resources", "ocr-runtime", "bin") + path.delimiter,
+    ),
+  );
 });

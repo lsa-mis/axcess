@@ -1,4 +1,4 @@
-.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-package
+.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
 
 PY := uv run
 DB := data/audit.db
@@ -94,7 +94,10 @@ desktop-backend: frontend-build alfa-install ## Bundle the Python/React/Alfa bac
 desktop-browsers: ## Bundle the platform-matched Chromium used by Playwright
 	PLAYWRIGHT_BROWSERS_PATH="$(CURDIR)/$(DESKTOP)/playwright-browsers" $(PY) playwright install chromium
 
-desktop-package: desktop-install desktop-backend desktop-browsers ## Build this platform's installer
+desktop-ocr: ## Bundle the relocatable macOS Tesseract OCR runtime
+	$(DESKTOP)/scripts/bundle-tesseract-macos.sh
+
+desktop-package: desktop-install desktop-backend desktop-browsers desktop-ocr ## Build this platform's installer
 	cd $(DESKTOP) && npm run make
 
 test: ## Run full test suite

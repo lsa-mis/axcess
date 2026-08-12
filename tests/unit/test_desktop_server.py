@@ -34,3 +34,10 @@ def test_desktop_server_migrations_are_idempotent(tmp_path: Path) -> None:
 def test_desktop_server_requires_a_port() -> None:
     with pytest.raises(SystemExit):
         build_parser().parse_args([])
+
+
+def test_desktop_server_runtime_verification_does_not_require_a_port() -> None:
+    args = build_parser().parse_args(["--verify-runtime"])
+
+    assert args.verify_runtime is True
+    assert args.port is None

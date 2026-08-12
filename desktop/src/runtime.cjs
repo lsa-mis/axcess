@@ -20,6 +20,7 @@ function isSafeExternalUrl(candidate) {
 
 function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, packaged }) {
   const dataRoot = path.join(userDataPath, "data");
+  const ocrRoot = path.join(resourcesPath, "ocr-runtime");
   const environment = {
     AUDIT_DATA_DIR: dataRoot,
     AUDIT_DB_PATH: path.join(dataRoot, "audit.db"),
@@ -32,6 +33,10 @@ function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, p
   };
   if (packaged) {
     environment.PLAYWRIGHT_BROWSERS_PATH = path.join(resourcesPath, "playwright-browsers");
+    environment.TESSDATA_PREFIX = path.join(ocrRoot, "share", "tessdata");
+    environment.PATH = [path.join(ocrRoot, "bin"), process.env.PATH || ""]
+      .filter(Boolean)
+      .join(path.delimiter);
   }
   return environment;
 }

@@ -10,6 +10,8 @@ application bundle.
 from __future__ import annotations
 
 import argparse
+import asyncio
+import json
 from pathlib import Path
 
 import uvicorn
@@ -42,14 +44,97 @@ def apply_desktop_migrations(db_path: Path, migrations_dir: Path | None = None) 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the Axcess desktop backend.")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, required=True)
+    launch = parser.add_mutually_exclusive_group(required=True)
+    launch.add_argument("--port", type=int)
+    launch.add_argument(
+        "--verify-runtime",
+        action="store_true",
+        help="verify bundled backend, browser, Alfa, and OCR dependencies, then exit",
+    )
     return parser
+
+
+async def verify_runtime() -> dict[str, str]:
+    """Exercise every external runtime required by a packaged desktop scan."""
+
+    from PIL import Image
+    from playwright.async_api import async_playwright
+
+    from audit.analyzer.alfa import AlfaAnalyzer, availability, chromium_executable_path
+    from audit.analyzer.ocr.tesseract import run_tesseract
+
+    package_dir = Path(__file__).resolve().parent
+    required_assets = {
+        "frontend": package_dir / "web" / "frontend" / "dist" / "index.html",
+        "migrations": package_dir / "db" / "migrations",
+        "rules": package_dir / "rules",
+        "alfa_runner": package_dir / "alfa_runner" / "runner.mjs",
+        "alfa_modules": package_dir / "alfa_runner" / "node_modules" / "@siteimprove" / "alfa-act",
+    }
+    missing = [name for name, path in required_assets.items() if not path.exists()]
+    if missing:
+        raise RuntimeError(f"Bundled desktop assets are missing: {', '.join(missing)}")
+
+    alfa_state = availability()
+    if not alfa_state.available:
+        raise RuntimeError(alfa_state.reason or "The bundled Alfa engine is unavailable.")
+
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(headless=True)
+        try:
+            page = await browser.new_page()
+            await page.set_content("<main><h1>Axcess runtime check</h1></main>")
+            heading = await page.locator("h1").inner_text()
+            if heading != "Axcess runtime check":
+                raise RuntimeError("Bundled Chromium did not render the verification page.")
+        finally:
+            await browser.close()
+
+    chromium_path = await chromium_executable_path()
+    if chromium_path is None:
+        raise RuntimeError("Bundled Chromium executable could not be resolved for Alfa.")
+    alfa = AlfaAnalyzer(
+        user_agent="Axcess desktop runtime verification",
+        chromium_path=chromium_path,
+    )
+    await alfa.run("data:text/html,<main>Axcess%20Alfa%20check</main>", level="AA")
+
+    import io
+
+    image_buffer = io.BytesIO()
+    Image.new("RGB", (120, 40), "white").save(image_buffer, format="PNG")
+    ocr = run_tesseract(image_buffer.getvalue(), "eng")
+    if "unknown" in ocr.engine_version:
+        raise RuntimeError("Bundled Tesseract OCR executable is unavailable.")
+
+    # Importing the application validates FastAPI and all report/export module
+    # imports after migrations have established the packaged schema.
+    from audit.web.server import app
+
+    if app.title != "Axcess":
+        raise RuntimeError("Packaged FastAPI application could not be initialized.")
+
+    return {
+        "alfa": "available",
+        "chromium": "available",
+        "frontend": "available",
+        "ocr": ocr.engine_version,
+        "python_backend": "available",
+    }
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
+    if args.verify_runtime:
+        settings = get_settings()
+        settings.ensure_dirs()
+        apply_desktop_migrations(settings.db_path)
+        print(json.dumps(asyncio.run(verify_runtime()), sort_keys=True))
+        return
     if args.host not in {"127.0.0.1", "::1", "localhost"}:
         raise SystemExit("The desktop backend may only bind to the loopback interface.")
+    if args.port is None:  # pragma: no cover - enforced by argparse
+        raise SystemExit("Desktop backend port is required.")
     if not 1 <= args.port <= 65535:
         raise SystemExit("Desktop backend port must be between 1 and 65535.")
 

@@ -49,6 +49,11 @@ jobs:
       - name: Bundle Chromium
         shell: bash
         run: PLAYWRIGHT_BROWSERS_PATH="$PWD/desktop/playwright-browsers" uv run playwright install chromium
+      - name: Bundle Tesseract OCR
+        shell: bash
+        run: |
+          brew install tesseract
+          desktop/scripts/bundle-tesseract-macos.sh
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
       - name: Package desktop installer

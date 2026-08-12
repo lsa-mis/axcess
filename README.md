@@ -25,7 +25,9 @@ issue table, and export a defensible report with source-level evidence.
 ## Desktop preview
 
 The current desktop build packages the React workbench, FastAPI service,
-Playwright Chromium, and the Siteimprove Alfa runner into one macOS app.
+Playwright Chromium, Siteimprove Alfa runner, Tesseract executable, and English
+OCR language data into one macOS app. It does not require separate Python,
+Node.js, Chromium, or Tesseract installations.
 
 **[Open the latest Electron branch build](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
 then download `axcess-macos-apple-silicon` for the DMG. GitHub requires sign-in
@@ -34,8 +36,9 @@ to download workflow artifacts, and each build is retained for 14 days.
 This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
 Apple-notarized and is not approved for institutional distribution. macOS may
 require right-clicking **Axcess** and choosing **Open** on first launch. An
-Intel Mac build is not included yet. OCR still requires a system Tesseract
-installation; local AI checks require Ollama and downloaded models.
+Intel Mac build is not included yet. Optional local AI checks still require an
+explicitly configured Ollama service and downloaded models; Axcess does not
+silently install or download them.
 
 ## The workflow
 

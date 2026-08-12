@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 
-const resources = ["backend-dist", "playwright-browsers"]
+const resources = ["backend-dist", "playwright-browsers", "ocr-runtime"]
   .map((name) => path.join(__dirname, name))
   .filter((candidate) => fs.existsSync(candidate));
 const macSigningIdentity = process.env.AXCESS_MAC_SIGN_IDENTITY || "-";
