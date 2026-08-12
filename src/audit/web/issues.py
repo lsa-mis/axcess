@@ -32,10 +32,12 @@ What this module deliberately does NOT do:
 
 from __future__ import annotations
 
+import json
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -53,6 +55,41 @@ ResponsibilityLabel = str
 
 # Abilities — what user populations this issue blocks.
 AbilityLabel = str  # vision | cognition | motor | hearing
+
+# A result is not automatically an "issue" just because a detector emitted
+# it.  This three-lane model is the product's quality boundary: deterministic
+# rule failures may enter the remediation worklist, ambiguous/AI-assisted
+# observations must be confirmed by an expert, and non-problems stay visible
+# only as informational evidence.  Keeping the lane on every row prevents UI,
+# MCP, and export renderers from silently turning review leads into WCAG
+# failures.
+ReviewLane = Literal["likely_barrier", "expert_review", "informational"]
+EvidenceConfidence = Literal["high", "medium", "low"]
+
+
+def _alfa_criterion_name(help_text: Any) -> str | None:
+    """Extract Alfa's criterion title from its stored WCAG help label."""
+    text = str(help_text or "").strip()
+    match = re.match(r"^WCAG\s+[\d.]+\s*:\s*(.+)$", text, flags=re.IGNORECASE)
+    return match.group(1).strip() if match and match.group(1).strip() else None
+
+
+def _alfa_diagnostics(findings: list[dict[str, Any]], *, limit: int = 2) -> list[str]:
+    """Return concise, unique Alfa diagnostics already stored as summaries."""
+    diagnostics: list[str] = []
+    prefix = "The test target fails the following requirements:"
+    for finding in findings:
+        raw = " ".join(str(finding.get("failure_summary") or "").split())
+        if raw.startswith(prefix):
+            raw = raw[len(prefix) :].strip()
+        raw = re.sub(r"^[-•]\s*", "", raw).strip()
+        raw = re.sub(r"\s+[-•]\s+", "; ", raw)
+        if raw and raw not in diagnostics:
+            diagnostics.append(raw)
+        if len(diagnostics) >= limit:
+            break
+    return diagnostics
+
 
 # Severity to priority weight. Used for sorting and for the "Priority"
 # column. Multiplied by log(1 + page_count) to give multi-page issues
@@ -129,6 +166,18 @@ class IssueDetail:
 
 
 @dataclass(frozen=True)
+class IssueLocation:
+    """One bounded, scan-scoped location sample for the unified table."""
+
+    page_id: int
+    page_url: str
+    page_title: str | None
+    target: str
+    context: str | None
+    evidence_url: str
+
+
+@dataclass(frozen=True)
 class IssueRow:
     """One row in the unified Issues table.
 
@@ -147,7 +196,7 @@ class IssueRow:
     """
 
     pipeline: str  # "axe" | "image" | "semantic"
-    issue_key: str  # `axe:<rule_id>` or `image:<classification>_<adequacy>`
+    issue_key: str  # e.g. `axe:<rule_id>`, `alfa:<rule_id>:<outcome>`, or `image:...`
     title: str
     conformance: ConformanceLabel
     wcag_sc: str | None
@@ -162,6 +211,13 @@ class IssueRow:
     status_summary: dict[str, int]  # bucket → count, including "new"
     detail_url: str  # Where clicking the row title goes
     finding_ids: tuple[int, ...]  # Backing finding ids (for bulk-status, exports)
+    review_lane: ReviewLane
+    evidence_confidence: EvidenceConfidence
+    evidence_summary: str
+    # Occurrences that came from a deterministic failed outcome. This is
+    # intentionally separate from occurrence_count, which also includes
+    # Alfa cantTell and other review-only evidence.
+    high_confidence_occurrence_count: int
     # Inline expansion content. Pulled from rules/audit_report.yaml so
     # the list view can answer "what/why/how" without a second request.
     description: str | None = None
@@ -169,6 +225,9 @@ class IssueRow:
     fix_steps: tuple[str, ...] = ()
     acceptance: str | None = None
     help_url: str | None = None
+    # First three unique locations only. The row's occurrence_count remains
+    # the authoritative total; the issue detail retains the full evidence.
+    locations: tuple[IssueLocation, ...] = ()
 
 
 def list_issues(
@@ -180,6 +239,7 @@ def list_issues(
     abilities: list[str] | None = None,
     status: str | None = None,
     search: str | None = None,
+    review_lane: str | None = None,
     sort: str = "priority_desc",
 ) -> list[IssueRow]:
     """Build the unified issues list with optional filters.
@@ -225,6 +285,8 @@ def list_issues(
     if search:
         needle = search.lower()
         rows = [r for r in rows if needle in r.title.lower() or (r.wcag_sc and needle in r.wcag_sc)]
+    if review_lane:
+        rows = [r for r in rows if r.review_lane == review_lane]
 
     return _sort_rows(rows, sort)
 
@@ -240,6 +302,7 @@ def get_issue_detail(
 
     ``issue_key`` shape:
       * ``axe:<rule_id>``  — e.g. ``axe:color-contrast``
+      * ``alfa:<rule_id>:<outcome>`` — explicit ``failed`` / ``cant_tell`` subgroup
       * ``image:<classification>_<adequacy>`` — e.g. ``image:essential_missing``
 
     Returns ``None`` if no matching IssueRow exists for this scan
@@ -253,6 +316,22 @@ def get_issue_detail(
     """
     rows = list_issues(conn, scan_id)
     row = next((r for r in rows if r.issue_key == issue_key), None)
+    if row is None:
+        # Compatibility for links emitted before Alfa outcome subgroups were
+        # introduced. Resolve the legacy `alfa:<rule>` key only when it is
+        # unambiguous. A mixed failed/cantTell rule intentionally has no
+        # legacy aggregate detail: recreating it would reintroduce the unsafe
+        # confidence and bulk-action boundary this split fixes.
+        legacy_rule, legacy_outcome = _alfa_rule_and_outcome(issue_key)
+        if issue_key.startswith("alfa:") and legacy_outcome is None:
+            candidates = [
+                candidate
+                for candidate in rows
+                if candidate.pipeline == "alfa"
+                and _alfa_rule_and_outcome(candidate.issue_key)[0] == legacy_rule
+            ]
+            if len(candidates) == 1:
+                row = candidates[0]
     if row is None:
         return None
 
@@ -280,8 +359,23 @@ def get_issue_detail(
         description=meta.get("what_happening"),
         why_matters=meta.get("why_matters"),
         fix_steps=list(meta.get("fix_steps") or []),
-        verify_manual=meta.get("verify_manual"),
-        verify_automated=meta.get("verify_automated"),
+        verify_manual=(
+            meta.get("verify_manual")
+            or (
+                "Review the stored Alfa evidence and manually test the mapped "
+                "WCAG success criterion."
+                if row.pipeline == "alfa"
+                else None
+            )
+        ),
+        verify_automated=(
+            meta.get("verify_automated")
+            or (
+                "Run the same Alfa rule in a fresh scan and compare its source-attributed outcomes."
+                if row.pipeline == "alfa"
+                else None
+            )
+        ),
         acceptance=meta.get("acceptance"),
         help_url=help_url,
     )
@@ -311,9 +405,23 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
             sc, {}
         )
         return dict(meta) if isinstance(meta, dict) else {}
+    if row.pipeline == "alfa":
+        # Alfa rule documentation and ACT diagnostics are the authoritative
+        # remediation lead; no axe-specific YAML card should be borrowed.
+        return {}
     image_key = row.issue_key.removeprefix("image:")
     meta = rules.get("image_findings", {}).get(image_key, {})
     return dict(meta) if isinstance(meta, dict) else {}
+
+
+def _alfa_rule_and_outcome(issue_key: str) -> tuple[str, str | None]:
+    """Parse an Alfa issue key while accepting the pre-subgroup key shape."""
+
+    value = issue_key.removeprefix("alfa:")
+    rule_id, separator, outcome = value.rpartition(":")
+    if separator and rule_id and outcome in {"failed", "cant_tell"}:
+        return rule_id, outcome
+    return value, None
 
 
 def _pages_for_issue(
@@ -329,7 +437,16 @@ def _pages_for_issue(
     ``page_images`` joins to ``pages``), so the query is heavier; the
     column shape comes out the same.
     """
-    if row.pipeline in ("axe", "semantic", "keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in (
+        "axe",
+        "alfa",
+        "semantic",
+        "keyboard",
+        "responsive",
+        "focus",
+        "visual",
+        "protected_image",
+    ):
         # All four DOM pipelines live in page_a11y_findings; the DB
         # rule_id carries the discriminator: bare rule_id for axe
         # ("color-contrast") and the dynamic probes
@@ -338,22 +455,50 @@ def _pages_for_issue(
         # axe/keyboard/responsive with "<pipeline>:" — strip that to
         # recover the DB value; semantic's issue_key already matches
         # the DB column exactly.
-        rule_id = row.issue_key if row.pipeline == "semantic" else row.issue_key.split(":", 1)[1]
-        rows = conn.execute(
-            """
-            SELECT p.id AS page_id,
-                   p.url_normalized AS page_url,
-                   p.title AS page_title,
-                   COUNT(*) AS occurrence_count,
-                   GROUP_CONCAT(a.status) AS statuses,
-                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
-              FROM page_a11y_findings a
-              JOIN pages p ON p.id = a.page_id
-             WHERE a.scan_id = ? AND a.rule_id = ?
-             GROUP BY p.id, p.url_normalized, p.title
-            """,
-            (scan_id, rule_id),
-        ).fetchall()
+        if row.pipeline == "semantic":
+            rule_id = row.issue_key
+            outcome: str | None = None
+        elif row.pipeline == "alfa":
+            rule_id, outcome = _alfa_rule_and_outcome(row.issue_key)
+        else:
+            rule_id = row.issue_key.split(":", 1)[1]
+            outcome = None
+        if row.pipeline == "alfa":
+            # Outcome is part of the public issue identity. Keep page counts,
+            # screenshots, and status summaries confined to that same
+            # evidence class; a failed row must never absorb cantTell pages.
+            rows = conn.execute(
+                """
+                SELECT p.id AS page_id,
+                       p.url_normalized AS page_url,
+                       p.title AS page_title,
+                       COUNT(*) AS occurrence_count,
+                       GROUP_CONCAT(a.status) AS statuses,
+                       GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+                  FROM page_a11y_findings a
+                  JOIN pages p ON p.id = a.page_id
+                 WHERE a.scan_id = ? AND a.pipeline = 'alfa'
+                   AND a.rule_id = ? AND a.engine_outcome = ?
+                 GROUP BY p.id, p.url_normalized, p.title
+                """,
+                (scan_id, rule_id, outcome),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT p.id AS page_id,
+                       p.url_normalized AS page_url,
+                       p.title AS page_title,
+                       COUNT(*) AS occurrence_count,
+                       GROUP_CONCAT(a.status) AS statuses,
+                       GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+                  FROM page_a11y_findings a
+                  JOIN pages p ON p.id = a.page_id
+                 WHERE a.scan_id = ? AND a.pipeline = ? AND a.rule_id = ?
+                 GROUP BY p.id, p.url_normalized, p.title
+                """,
+                (scan_id, row.pipeline, rule_id),
+            ).fetchall()
     else:
         # image pipeline: list every page that has at least one
         # `page_image` row pointing at an image that has a finding
@@ -457,6 +602,14 @@ def abilities_breakdown(rows: list[IssueRow]) -> dict[str, int]:
     return out
 
 
+def review_lane_breakdown(rows: list[IssueRow]) -> dict[str, int]:
+    """Count evidence groups without implying every group is a barrier."""
+    out = {"likely_barrier": 0, "expert_review": 0, "informational": 0}
+    for row in rows:
+        out[row.review_lane] = out.get(row.review_lane, 0) + 1
+    return out
+
+
 # --------------------------------------------------------------------------
 # Per-pipeline row builders.
 # --------------------------------------------------------------------------
@@ -469,100 +622,274 @@ def _axe_issue_rows(
 ) -> list[IssueRow]:
     """One row per ``rule_id`` group from the page_a11y_findings table.
 
-    The table stores both axe and semantic rows (distinguished by the
-    ``pipeline`` column added in migration 0003). Semantic rows have
-    a synthetic ``rule_id`` of the form ``semantic:<sc>``; we look
-    up the SC in the YAML's ``semantic_criteria`` block and tag the
-    IssueRow with ``pipeline='semantic'`` so the UI can distinguish
-    LLM-detected findings from deterministic axe findings.
+    ``pipeline`` is part of the group identity. This matters for a combined
+    axe+Alfa run: similar rules remain separate evidence groups rather than
+    becoming an unsupported claim that two engines saw one same result.
     """
     groups = a11y_queries.grouped_by_rule(conn, scan_id)
     out: list[IssueRow] = []
     axe_rules_meta = rules.get("axe_rules", {})
     semantic_meta = rules.get("semantic_criteria", {})
     for g in groups:
-        raw_rule_id: str = g["rule_id"]
-        is_semantic = raw_rule_id.startswith("semantic:")
-        # For semantic rows, look up the SC card; for axe rows, the
-        # axe-rule card. Both share the same YAML field shape.
-        # Keyboard probe (SC 2.1.2) writes rows with rule_id values
-        # like "keyboard-trap-stuck" that aren't axe rules and aren't
-        # tagged "semantic:". Detect them up front so the lookup
-        # routes correctly and the IssueRow's pipeline label is
-        # accurate (not silently "axe").
-        is_keyboard = raw_rule_id.startswith("keyboard-trap-")
-        # Responsive/zoom probe rows ("responsive-reflow-overflow",
-        # "responsive-text-clipped", …) follow the keyboard pattern:
-        # non-axe rule_ids resolved by SC through the YAML fallback.
-        is_responsive = raw_rule_id.startswith("responsive-")
-        # Focus probe rows ("focus-not-obscured", SC 2.4.11) — same
-        # non-axe, SC-resolved pattern as keyboard/responsive.
-        is_focus = raw_rule_id.startswith("focus-")
-        # Visual (VLM) probe rows ("visual-meaningful-sequence", SC 1.3.2).
-        is_visual = raw_rule_id.startswith("visual-")
-        if is_semantic:
+        raw_rule_id = str(g["rule_id"])
+        pipeline = str(g.get("pipeline") or "axe")
+        finding_rows = list(g.get("findings", []))
+        legacy_keyboard_observation = pipeline == "keyboard" and (
+            raw_rule_id in {"keyboard-trap-modal-no-escape", "keyboard-trap-iframe"}
+            or (
+                raw_rule_id == "keyboard-trap-stuck"
+                and not any(
+                    "Shift+Tab attempts" in str(finding.get("failure_summary") or "")
+                    for finding in finding_rows
+                )
+            )
+        )
+        legacy_visual_motion_observation = (
+            pipeline == "visual"
+            and raw_rule_id == "visual-motion-no-pause"
+            and not any(
+                "Runtime playback measurement:" in str(finding.get("failure_summary") or "")
+                for finding in finding_rows
+            )
+        )
+        if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
             meta = semantic_meta.get(sc, {})
+        elif pipeline == "alfa":
+            # Alfa/ACT metadata is source-specific. Never borrow an axe card
+            # merely because a third-party rule id happens to collide.
+            meta = {}
         else:
             meta = axe_rules_meta.get(raw_rule_id, {})
-            # Fallback: for non-axe rules (keyboard probe today,
-            # other dynamic checks later), look up by WCAG SC. Lets a
-            # single YAML card key on "2.1.2" cover all three
-            # keyboard rule_ids without duplication. We check both
-            # the axe_rules block AND the semantic_criteria block —
-            # whichever the YAML author chose to put the card in.
             if not meta:
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
                     meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
+        if legacy_keyboard_observation or legacy_visual_motion_observation:
+            # Earlier probe versions inferred SC 2.1.2 from one-way focus,
+            # Escape behavior, or iframe naming. Preserve that immutable scan
+            # evidence, but do not present it as an actionable conformance lead.
+            meta = {}
         wcag_sc = meta.get("wcag_sc") or g.get("wcag_sc")
         wcag_level = meta.get("wcag_level") or g.get("wcag_level")
         conformance = _conformance_label(wcag_level)
         impact = g.get("impact")
-        # Semantic rows: title comes from the YAML's curated text, not
-        # the LLM's per-finding rationale (which lands in `help` of
-        # each individual finding row, surfaced inside the detail view).
-        if is_semantic:
+        if legacy_keyboard_observation:
+            wcag_sc = None
+            wcag_level = None
+            conformance = "BP"
+            impact = "minor"
+        if legacy_visual_motion_observation:
+            wcag_sc = None
+            wcag_level = None
+            conformance = "BP"
+            impact = "minor"
+        alfa_outcomes = dict(g.get("engine_outcomes") or {})
+        alfa_failed = int(alfa_outcomes.get("failed") or 0)
+        alfa_cant_tell = int(alfa_outcomes.get("cant_tell") or 0)
+        alfa_description: str | None = None
+        alfa_why_matters: str | None = None
+        alfa_fix_steps: tuple[str, ...] = ()
+        review_lane: ReviewLane = "expert_review"
+        evidence_confidence: EvidenceConfidence = "medium"
+        evidence_summary = "Observed evidence requires expert confirmation."
+        high_confidence_occurrences = 0
+        if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
             issue_key = f"semantic:{sc}"
             default_title = f"WCAG SC {sc} (LLM-detected)"
-        elif is_keyboard:
-            issue_key = f"keyboard:{raw_rule_id}"
-            default_title = f"Keyboard trap: {raw_rule_id}"
-        elif is_responsive:
-            issue_key = f"responsive:{raw_rule_id}"
+            evidence_summary = "AI-assisted semantic lead; confirm in page context."
+        elif pipeline == "protected_image":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            default_title = "Protected image-of-text review lead"
+            alfa_description = (
+                "The local companion detected embedded text while handling a protected "
+                "image in memory. The image bytes and OCR text were not retained; "
+                "review the page manually to determine whether the text is essential."
+            )
+            alfa_why_matters = (
+                "This is an image-analysis lead, not a conformance verdict. Confirm "
+                "the applicable text alternative and WCAG criterion manually."
+            )
+            alfa_fix_steps = (
+                "Re-open the affected protected page in the companion browser.",
+                (
+                    "Determine whether the image text is essential and identify an "
+                    "equivalent text alternative."
+                ),
+                (
+                    "If confirmed, treat it as a remediation item; otherwise keep it "
+                    "labeled as unconfirmed evidence."
+                ),
+            )
+            evidence_summary = "Local image-analysis lead; no conformance decision was automated."
+        elif pipeline == "keyboard":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            if legacy_keyboard_observation:
+                default_title = "Legacy keyboard observation — not a confirmed trap"
+                review_lane = "informational"
+                evidence_confidence = "low"
+                evidence_summary = (
+                    "An older Axcess probe used a one-direction, Escape, or iframe "
+                    "heuristic that does not establish WCAG 2.1.2. Retained for audit "
+                    "history; do not report it as a barrier without manual evidence."
+                )
+                alfa_description = (
+                    "This result predates the bidirectional accuracy gate. The recorded "
+                    "observation may reflect ordinary focus movement, dialog behavior, "
+                    "or focus moving inside an opaque embedded document."
+                )
+                alfa_why_matters = (
+                    "Axcess preserves original scan evidence, but unsupported historical "
+                    "heuristics must not inflate the remediation worklist or a WCAG report."
+                )
+                alfa_fix_steps = (
+                    "Do not remediate from this observation alone.",
+                    "Test the component manually with Tab, Shift+Tab, and any "
+                    "documented exit command.",
+                    "Run a new scan to collect bidirectional keyboard-exit measurements.",
+                )
+            else:
+                default_title = "Keyboard exit blocked in both directions"
+                evidence_summary = (
+                    "Measured Tab and Shift+Tab exit attempts both remained on the same "
+                    "observable element; manually check for another documented exit command."
+                )
+        elif pipeline == "responsive":
+            issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = f"Responsive failure: {raw_rule_id}"
-        elif is_focus:
-            issue_key = f"focus:{raw_rule_id}"
+            evidence_summary = "Browser geometry signal; confirm at 320 CSS px and 200% zoom."
+        elif pipeline == "focus":
+            issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = f"Focus not visible: {raw_rule_id}"
-        elif is_visual:
-            issue_key = f"visual:{raw_rule_id}"
-            default_title = f"Visual order: {raw_rule_id}"
+            evidence_summary = (
+                "Browser focus probe lead; confirm across the full interaction state."
+            )
+        elif pipeline == "visual":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            if legacy_visual_motion_observation:
+                default_title = "Legacy autoplay markup observation — playback not verified"
+                review_lane = "informational"
+                evidence_confidence = "low"
+                evidence_summary = (
+                    "An older detector saw autoplay markup but did not establish that media "
+                    "loaded, played, or met the WCAG duration threshold. Retained for audit "
+                    "history; do not report it as a barrier without manual evidence."
+                )
+                alfa_description = (
+                    "This result predates runtime playback measurement. A missing or blocked "
+                    "media resource can carry an autoplay attribute while never producing "
+                    "audio or motion."
+                )
+                alfa_why_matters = (
+                    "Markup is not enough to establish SC 1.4.2 or SC 2.2.2. Unsupported "
+                    "historical observations must not inflate a remediation report."
+                )
+                alfa_fix_steps = (
+                    "Do not remediate from this observation alone.",
+                    "Verify that the media actually starts and continues playing.",
+                    "Run a new scan to collect a runtime playback measurement.",
+                )
+            elif raw_rule_id == "visual-autoplay-audio-no-control":
+                default_title = "Automatically playing audio may lack a usable control"
+                evidence_summary = (
+                    "Runtime playback advanced while audible audio had no detected native or "
+                    "explicitly associated custom control; confirm the interaction manually."
+                )
+            elif raw_rule_id == "visual-motion-no-pause":
+                default_title = "Moving content may lack pause, stop, or hide controls"
+                evidence_summary = (
+                    "Runtime motion or marquee evidence requires expert confirmation of duration, "
+                    "page context, and any custom controls."
+                )
+            else:
+                default_title = f"Visual order: {raw_rule_id}"
+                evidence_summary = (
+                    "Visual-model lead; compare DOM and visual reading order manually."
+                )
+        elif pipeline == "alfa":
+            outcome_group = str(g.get("outcome_group") or "failed")
+            issue_key = f"alfa:{raw_rule_id}:{outcome_group}"
+            criterion_name = _alfa_criterion_name(g.get("help"))
+            diagnostics = _alfa_diagnostics(finding_rows)
+            diagnostic_text = "; ".join(diagnostics)
+            if outcome_group == "cant_tell":
+                default_title = (
+                    f"{criterion_name or 'Alfa ACT result'} — expert decision needed "
+                    f"(Alfa {raw_rule_id})"
+                )
+                evidence_summary = (
+                    f"Alfa returned {alfa_cant_tell} cantTell occurrence(s); this is not a "
+                    f"failure. {diagnostic_text or 'Review the stored target in page context.'}"
+                )
+            else:
+                diagnostic_title = diagnostics[0] if diagnostics else "rule requirements failed"
+                default_title = (
+                    f"{criterion_name or 'Alfa ACT rule'} — {diagnostic_title} (Alfa {raw_rule_id})"
+                )
+                review_lane = "likely_barrier"
+                evidence_confidence = "high"
+                high_confidence_occurrences = alfa_failed
+                evidence_summary = (
+                    f"Alfa produced {alfa_failed} failed ACT occurrence(s). Observed: "
+                    f"{diagnostic_text or 'the stored rule requirements failed.'}"
+                )
+            outcome_parts: list[str] = []
+            if alfa_failed:
+                outcome_parts.append(f"{alfa_failed} failed ACT outcome(s)")
+            if alfa_cant_tell:
+                outcome_parts.append(f"{alfa_cant_tell} cantTell expert-review lead(s)")
+            alfa_description = (
+                f"Siteimprove Alfa returned {' and '.join(outcome_parts)} for this rule. "
+                f"WCAG {g.get('wcag_sc') or 'criterion not mapped'}"
+                f"{f' ({criterion_name})' if criterion_name else ''}; Alfa rule {raw_rule_id}. "
+                f"Observed diagnostic: {diagnostic_text or 'review the stored target evidence.'}"
+            )
+            if outcome_group == "cant_tell":
+                alfa_why_matters = (
+                    "A cantTell outcome is not a failure. Review the target in context and "
+                    "record a human decision before describing it as a barrier."
+                )
+            else:
+                alfa_why_matters = (
+                    "A failed ACT outcome is strong automated evidence, not a conformance "
+                    "verdict. Confirm that the rule applies and reproduce the barrier before "
+                    "presenting the row as a confirmed accessibility issue."
+                )
+            alfa_fix_steps = (
+                "Open the linked page evidence and review the Alfa target and diagnostic.",
+                "Manually test the applicable WCAG success criterion with the "
+                "relevant assistive technology.",
+                (
+                    "Apply the correction, then rescan the same scope to verify the "
+                    "ACT outcome is resolved."
+                ),
+            )
         else:
             issue_key = f"axe:{raw_rule_id}"
             default_title = f"axe rule: {raw_rule_id}"
+            review_lane = "likely_barrier"
+            evidence_confidence = "high"
+            high_confidence_occurrences = int(g["violation_count"])
+            evidence_summary = "Deterministic axe-core rule failure; verify after remediation."
         out.append(
             IssueRow(
-                pipeline=(
-                    "semantic"
-                    if is_semantic
-                    else "keyboard"
-                    if is_keyboard
-                    else "responsive"
-                    if is_responsive
-                    else "focus"
-                    if is_focus
-                    else "visual"
-                    if is_visual
-                    else "axe"
-                ),
+                pipeline=pipeline,
                 issue_key=issue_key,
                 title=meta.get("title")
-                or (g.get("help") if not is_semantic else None)
+                or (
+                    default_title
+                    if pipeline in {"alfa", "protected_image", "visual"}
+                    or legacy_keyboard_observation
+                    or legacy_visual_motion_observation
+                    else None
+                )
+                or (g.get("help") if pipeline != "semantic" else None)
                 or default_title,
                 conformance=conformance,
                 wcag_sc=wcag_sc,
-                wcag_name=meta.get("wcag_name"),
+                wcag_name=meta.get("wcag_name")
+                or (_alfa_criterion_name(g.get("help")) if pipeline == "alfa" else None),
                 responsibility=(meta.get("owner") or "dev"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
@@ -580,17 +907,22 @@ def _axe_issue_rows(
                 # so the detail route can also distinguish them later.
                 detail_url=f"/scans/{scan_id}/issues/{issue_key}",
                 finding_ids=tuple(int(f["id"]) for f in g.get("findings", [])),
+                review_lane=review_lane,
+                evidence_confidence=evidence_confidence,
+                evidence_summary=evidence_summary,
+                high_confidence_occurrence_count=high_confidence_occurrences,
                 # Inline expansion content. Title's already on the row;
                 # the YAML's `what_happening` / `why_matters` / fix steps
                 # / `acceptance` ride along so the list view can show
                 # what/why/how without a second API call. `help_url`
                 # falls back to the axe-supplied URL when the YAML
                 # doesn't pin one.
-                description=meta.get("what_happening"),
-                why_matters=meta.get("why_matters"),
-                fix_steps=tuple(meta.get("fix_steps") or ()),
+                description=meta.get("what_happening") or alfa_description,
+                why_matters=meta.get("why_matters") or alfa_why_matters,
+                fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url") or g.get("help_url") or None,
+                locations=_a11y_location_samples(finding_rows, scan_id=scan_id),
             )
         )
     return out
@@ -610,14 +942,41 @@ def _image_issue_rows(
         adequacy = g.get("alt_adequacy") or "unknown"
         key = f"{cls}_{adequacy}"
         meta = image_meta.get(key, {})
-        wcag_sc = meta.get("wcag_sc") or "1.4.5"
-        wcag_level = meta.get("wcag_level") or "AA"
+        # An unclassified image does not support a criterion-level claim. An
+        # apparently adequate alternative is evidence of a checked image, not
+        # an accessibility failure. Preserve both as visible evidence without
+        # assigning an invented WCAG 1.4.5 failure.
+        is_informational = adequacy == "adequate"
+        is_unclassified = cls == "unclassified"
+        wcag_sc = meta.get("wcag_sc") if (not is_informational and not is_unclassified) else None
+        wcag_level = meta.get("wcag_level") if wcag_sc else None
         conformance = _conformance_label(wcag_level)
         # Status bucket: the image-finding group already ships
         # status_breakdown; default to empty if missing.
         status_summary = dict(g.get("status_breakdown") or {})
         # Fall back to severity weight if the YAML has no metadata.
         worst_severity = g.get("worst_severity") or "minor"
+        findings = list(g.get("findings", []))
+        page_ids = {
+            int(occurrence["page_id"])
+            for finding in findings
+            for occurrence in finding.get("occurrences", [])
+            if occurrence.get("page_id") is not None
+        }
+        review_lane: ReviewLane = "informational" if is_informational else "expert_review"
+        evidence_confidence: EvidenceConfidence = "low" if is_unclassified else "medium"
+        if is_informational:
+            evidence_summary = (
+                "Alt comparison appears adequate; retained as non-actionable evidence."
+            )
+        elif is_unclassified:
+            evidence_summary = (
+                "Image analysis was inconclusive; classify manually before reporting a barrier."
+            )
+        else:
+            evidence_summary = (
+                "OCR/VLM-assisted image lead; confirm purpose and alternative in context."
+            )
         out.append(
             IssueRow(
                 pipeline="image",
@@ -630,19 +989,24 @@ def _image_issue_rows(
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
                 occurrence_count=g.get("occurrence_count", g["finding_count"]),
-                page_count=g.get("page_count", 0),
-                priority=_priority(worst_severity, g.get("page_count", 0)),
+                page_count=len(page_ids),
+                priority=_priority(worst_severity, len(page_ids)),
                 impact=worst_severity,
                 status_summary=status_summary,
                 # Deep-link to the dedicated Issue Detail view, same
                 # shape the axe rows use (above).
                 detail_url=f"/scans/{scan_id}/issues/image:{key}",
-                finding_ids=tuple(int(f["id"]) for f in g.get("findings", [])),
+                finding_ids=tuple(int(f["id"]) for f in findings),
+                review_lane=review_lane,
+                evidence_confidence=evidence_confidence,
+                evidence_summary=evidence_summary,
+                high_confidence_occurrence_count=0,
                 description=meta.get("what_happening"),
                 why_matters=meta.get("why_matters"),
                 fix_steps=tuple(meta.get("fix_steps") or ()),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url"),
+                locations=_image_location_samples(findings, scan_id=scan_id),
             )
         )
     return out
@@ -651,6 +1015,111 @@ def _image_issue_rows(
 # --------------------------------------------------------------------------
 # Helpers.
 # --------------------------------------------------------------------------
+
+
+def _a11y_location_samples(
+    findings: list[dict[str, Any]], *, scan_id: int, limit: int = 3
+) -> tuple[IssueLocation, ...]:
+    """Return unique page/selector samples without loading another query."""
+
+    samples: list[IssueLocation] = []
+    seen: set[tuple[int, str]] = set()
+    for finding in findings:
+        page_id = int(finding["page_id"])
+        target = _humanize_location_target(finding.get("target_selector"))
+        identity = (page_id, target)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        context = " ".join(str(finding.get("failure_summary") or "").split())[:300]
+        samples.append(
+            IssueLocation(
+                page_id=page_id,
+                page_url=str(finding["page_url"]),
+                page_title=finding.get("page_title"),
+                target=target,
+                context=context or None,
+                evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+            )
+        )
+        if len(samples) >= limit:
+            break
+    return tuple(samples)
+
+
+def _humanize_location_target(raw_target: Any) -> str:
+    """Turn Alfa's structured target hint into a compact element locator."""
+
+    target = " ".join(str(raw_target or "").split())
+    if not target:
+        return "Page-level result"
+    try:
+        parsed = json.loads(target)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return target[:240]
+    if not isinstance(parsed, dict):
+        return target[:240]
+    target_type = str(parsed.get("type") or "")
+    if target_type == "document":
+        return "Document root"
+    if target_type == "attribute":
+        name = str(parsed.get("name") or "attribute")
+        value = str(parsed.get("value") or "")
+        return f'[{name}="{value[:120]}"]'
+    if target_type == "element":
+        name = str(parsed.get("name") or "element")
+        attributes = parsed.get("attributes")
+        selectors: list[str] = []
+        if isinstance(attributes, list):
+            preferred = {"id", "class", "name", "role", "type", "href", "src"}
+            for attribute in attributes:
+                if not isinstance(attribute, dict):
+                    continue
+                attr_name = str(attribute.get("name") or "")
+                if attr_name not in preferred:
+                    continue
+                value = str(attribute.get("value") or "")[:100]
+                selectors.append(f'[{attr_name}="{value}"]')
+                if len(selectors) >= 2:
+                    break
+        return f"{name}{''.join(selectors)}"[:240]
+    return target[:240]
+
+
+def _image_location_samples(
+    findings: list[dict[str, Any]], *, scan_id: int, limit: int = 3
+) -> tuple[IssueLocation, ...]:
+    """Return page and image-position samples for OCR/VLM issue groups."""
+
+    samples: list[IssueLocation] = []
+    seen: set[tuple[int, int]] = set()
+    for finding in findings:
+        for occurrence in finding.get("occurrences", []):
+            page_id = int(occurrence["page_id"])
+            position = int(occurrence.get("position") or 0)
+            identity = (page_id, position)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            placement = "above the fold" if occurrence.get("above_fold") else "in the page"
+            context_parts = []
+            if occurrence.get("alt_text"):
+                context_parts.append(f'Alt: "{occurrence["alt_text"]}"')
+            if occurrence.get("context_snippet"):
+                context_parts.append(str(occurrence["context_snippet"]))
+            samples.append(
+                IssueLocation(
+                    page_id=page_id,
+                    page_url=str(occurrence["page_url"]),
+                    page_title=occurrence.get("page_title"),
+                    target=f"Image occurrence {position + 1} ({placement})",
+                    context=" · ".join(context_parts)[:300] or None,
+                    evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+                )
+            )
+            if len(samples) >= limit:
+                return tuple(samples)
+    return tuple(samples)
 
 
 def _conformance_label(wcag_level: str | None) -> ConformanceLabel:

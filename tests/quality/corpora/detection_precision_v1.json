@@ -1,0 +1,482 @@
+{
+  "schema_version": 1,
+  "corpus_id": "axcess-detection-precision",
+  "corpus_version": "1.0.2",
+  "label_method": "synthetic_by_construction",
+  "scope_statement": "Frozen Axcess outputs for adversarial synthetic accessibility scenarios with binary labels known from fixture construction.",
+  "limitations": [
+    "This synthetic regression corpus is not representative of all U-M sites, frameworks, assistive technologies, languages, or authenticated applications.",
+    "The percentages are point estimates for these named samples; they are not confidence bounds or proof of real-world conformance accuracy.",
+    "Model-backed outputs are frozen snapshots. Model, prompt, OCR, or inference-runtime changes require an explicit corpus-version update and fresh review.",
+    "A production accuracy claim requires a separately governed, expert-labeled and representative U-M validation corpus that is not included here."
+  ],
+  "producers": {
+    "axe": "axe-core 4.10.2 bundled runner",
+    "alfa": "Siteimprove Alfa pinned local runner",
+    "behavioral": "Axcess keyboard, responsive, focus, and deterministic motion probes",
+    "ocr_vlm": "Axcess Tesseract plus local image/visual-model review leads",
+    "semantic": "Axcess local semantic-model review leads"
+  },
+  "gate": {
+    "max_false_discovery_rate_exclusive": 0.05,
+    "min_surfaced_per_layer": 20,
+    "min_negative_controls_per_layer": 5,
+    "min_recall": 0.8
+  },
+  "cohorts": [
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "label",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Visible form controls have no programmatic label.",
+      "sample_ids": ["axe-label-input", "axe-label-select", "axe-label-textarea", "axe-label-checkbox"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "color-contrast",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Rendered text has a contrast ratio below the applicable AA threshold.",
+      "sample_ids": ["axe-contrast-body", "axe-contrast-link", "axe-contrast-button", "axe-contrast-large"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "button-name",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Focusable buttons have no accessible name.",
+      "sample_ids": ["axe-button-empty", "axe-button-svg-hidden", "axe-button-css-icon", "axe-button-input-image"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "image-alt",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Informative images omit an alt attribute.",
+      "sample_ids": ["axe-alt-photo", "axe-alt-chart", "axe-alt-map", "axe-alt-diagram"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "aria-valid-attr-value",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "ARIA attributes contain values forbidden by their value grammar.",
+      "sample_ids": ["axe-aria-expanded", "axe-aria-current", "axe-aria-checked", "axe-aria-level"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "label",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Inputs have explicit, unique labels.",
+      "sample_ids": ["axe-control-label-ok"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "color-contrast",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Text meets the applicable AA contrast threshold in its rendered state.",
+      "sample_ids": ["axe-contrast-ok"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "button-name",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Icon-only button receives a non-empty name from aria-label.",
+      "sample_ids": ["axe-button-name-ok"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "image-alt",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Decorative image explicitly uses empty alt text.",
+      "sample_ids": ["axe-decorative-alt-ok"]
+    },
+    {
+      "layer": "axe",
+      "pipeline": "axe",
+      "rule_id": "aria-valid-attr-value",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "ARIA token values are valid for their attributes.",
+      "sample_ids": ["axe-aria-values-ok"]
+    },
+
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r2",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Alfa failed outcomes are retained for constructed ACT failures.",
+      "sample_ids": ["alfa-r2-a", "alfa-r2-b", "alfa-r2-c", "alfa-r2-d"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r12",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Alfa failed outcomes identify programmatic-name failures in varied markup.",
+      "sample_ids": ["alfa-r12-a", "alfa-r12-b", "alfa-r12-c", "alfa-r12-d"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r14",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "finding",
+      "scenario": "Alfa failed outcomes identify constructed relationship failures.",
+      "sample_ids": ["alfa-r14-a", "alfa-r14-b", "alfa-r14-c", "alfa-r14-d"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r53",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Alfa cantTell evidence is surfaced as a lead and fixture review confirms a barrier.",
+      "sample_ids": ["alfa-r53-a", "alfa-r53-b", "alfa-r53-c", "alfa-r53-d"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r55",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Alfa cantTell table evidence is surfaced as a lead and fixture review confirms a barrier.",
+      "sample_ids": ["alfa-r55-a", "alfa-r55-b", "alfa-r55-c", "alfa-r55-d"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r2",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The applicable ACT expectation passes for the constructed control.",
+      "sample_ids": ["alfa-r2-pass"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r12",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The programmatic name satisfies the constructed ACT expectation.",
+      "sample_ids": ["alfa-r12-pass"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r14",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The constructed relationship satisfies the applicable ACT expectation.",
+      "sample_ids": ["alfa-r14-pass"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r53",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "No failed or cantTell outcome remains after the synthetic ambiguity is removed.",
+      "sample_ids": ["alfa-r53-pass"]
+    },
+    {
+      "layer": "alfa",
+      "pipeline": "alfa",
+      "rule_id": "sia-r55",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The table fixture has unambiguous, programmatic header relationships.",
+      "sample_ids": ["alfa-r55-pass"]
+    },
+
+    {
+      "layer": "behavioral",
+      "pipeline": "keyboard",
+      "rule_id": "keyboard-trap-stuck",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Repeated Tab and Shift+Tab exit attempts both remain on the identical observable element, with no documented alternative exit.",
+      "sample_ids": ["behavior-stuck-button", "behavior-stuck-editor", "behavior-stuck-menu", "behavior-stuck-canvas", "behavior-stuck-custom-control", "behavior-stuck-reverse", "behavior-stuck-nested", "behavior-stuck-plugin"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "keyboard",
+      "rule_id": "keyboard-trap-modal-no-escape",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Escape alone does not dismiss a contained component; this observation does not prove that no keyboard exit method exists.",
+      "sample_ids": ["behavior-modal-dialog", "behavior-modal-alert", "behavior-modal-drawer", "behavior-modal-overlay"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "responsive",
+      "rule_id": "responsive-reflow-overflow",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "At the 320 CSS-pixel viewport, two-dimensional scrolling is required for ordinary content.",
+      "sample_ids": ["behavior-reflow-tableless", "behavior-reflow-fixed", "behavior-reflow-grid", "behavior-reflow-pre"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "focus",
+      "rule_id": "focus-not-obscured",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Keyboard focus is completely hidden by sticky or overlay content.",
+      "sample_ids": ["behavior-focus-header", "behavior-focus-cookie", "behavior-focus-footer", "behavior-focus-drawer"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "visual",
+      "rule_id": "visual-motion-no-pause",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Autoplaying or marquee content has no pause, stop, or hide mechanism.",
+      "sample_ids": ["behavior-motion-video", "behavior-motion-audio", "behavior-motion-marquee", "behavior-motion-multiple"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "keyboard",
+      "rule_id": "keyboard-trap-stuck",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Focus wraps normally, cycles across a small page, moves inside an opaque iframe, or can exit in the reverse direction.",
+      "sample_ids": ["behavior-keyboard-exit-ok", "behavior-two-control-wrap", "behavior-opaque-iframe", "behavior-reverse-exit-ok"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "keyboard",
+      "rule_id": "keyboard-trap-modal-no-escape",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "A modal closes with Escape and restores focus to its invoker.",
+      "sample_ids": ["behavior-modal-escape-ok"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "responsive",
+      "rule_id": "responsive-reflow-overflow",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Ordinary content reflows at 320 CSS pixels without two-dimensional scrolling.",
+      "sample_ids": ["behavior-reflow-ok"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "focus",
+      "rule_id": "focus-not-obscured",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The focused target remains visible outside sticky and overlay regions.",
+      "sample_ids": ["behavior-focus-visible-ok"]
+    },
+    {
+      "layer": "behavioral",
+      "pipeline": "visual",
+      "rule_id": "visual-motion-no-pause",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Autoplay is absent or the media exposes an operable pause control.",
+      "sample_ids": ["behavior-motion-controls-ok"]
+    },
+
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:essential_missing",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "OCR and visual review identify essential text in an image whose alternative is missing.",
+      "sample_ids": ["image-essential-date", "image-essential-phone", "image-essential-instruction", "image-essential-deadline"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:informational_inadequate",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "An informational graphic's alternative does not convey its visible text.",
+      "sample_ids": ["image-info-chart", "image-info-event", "image-info-process", "image-info-stat"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:logo_missing",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A wordmark or linked logo has no alternative identifying its text or destination.",
+      "sample_ids": ["image-logo-unit", "image-logo-partner", "image-logo-program", "image-logo-linked"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:essential_partial",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "The alternative conveys only part of load-bearing text in the image.",
+      "sample_ids": ["image-partial-location", "image-partial-time", "image-partial-step", "image-partial-warning"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "visual",
+      "rule_id": "visual-meaningful-sequence",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A frozen visual-model output flags a meaning-changing visual/source order mismatch confirmed by fixture construction.",
+      "sample_ids": ["visual-order-cards", "visual-order-steps", "visual-order-definition", "visual-order-timeline"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:no_meaningful_text",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Compression noise and texture do not produce a retained text candidate.",
+      "sample_ids": ["image-noise-suppressed"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:decorative_adequate",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "A decorative graphic has no meaningful embedded text and uses empty alt.",
+      "sample_ids": ["image-decorative-suppressed"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:informational_adequate",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "The image alternative conveys all visible informational text.",
+      "sample_ids": ["image-equivalent-suppressed"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "visual",
+      "rule_id": "visual-meaningful-sequence",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Visual and DOM reading orders agree for the constructed layout.",
+      "sample_ids": ["visual-order-aligned"]
+    },
+    {
+      "layer": "ocr_vlm",
+      "pipeline": "image",
+      "rule_id": "image:logo_adequate",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "A wordmark's alternative identifies its visible wording and link purpose.",
+      "sample_ids": ["image-logo-equivalent"]
+    },
+
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.4",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A frozen semantic output identifies a generic link whose surrounding context cannot establish purpose.",
+      "sample_ids": ["semantic-link-read-more", "semantic-link-click-here", "semantic-link-learn-more", "semantic-link-details"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.6",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A frozen semantic output identifies headings that do not describe their topic or purpose.",
+      "sample_ids": ["semantic-heading-untitled", "semantic-heading-more", "semantic-heading-section", "semantic-heading-next"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:3.3.2",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A frozen semantic output identifies inputs missing necessary labels or format instructions.",
+      "sample_ids": ["semantic-input-date", "semantic-input-id", "semantic-input-phone", "semantic-input-required-format"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:1.2.1",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "A frozen semantic output identifies prerecorded audio without a transcript or equivalent.",
+      "sample_ids": ["semantic-audio-lecture", "semantic-audio-interview", "semantic-audio-podcast", "semantic-audio-instruction"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.4",
+      "reference_label": "confirmed_barrier",
+      "system_disposition": "review_lead",
+      "scenario": "Duplicate generic links lead to different destinations and remain ambiguous in their local contexts.",
+      "sample_ids": ["semantic-link-duplicate-a", "semantic-link-duplicate-b", "semantic-link-card-a", "semantic-link-card-b"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.4",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Link purpose is unambiguous from its link text and programmatically determined context.",
+      "sample_ids": ["semantic-link-context-ok"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.6",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Headings concisely identify the content that follows.",
+      "sample_ids": ["semantic-heading-purpose-ok"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:3.3.2",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Labels and format instructions provide the information needed to complete each input.",
+      "sample_ids": ["semantic-label-instruction-ok"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:1.2.1",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Prerecorded audio has a complete adjacent transcript.",
+      "sample_ids": ["semantic-transcript-ok"]
+    },
+    {
+      "layer": "semantic",
+      "pipeline": "semantic",
+      "rule_id": "semantic:2.4.4",
+      "reference_label": "not_a_barrier",
+      "system_disposition": "suppressed",
+      "scenario": "Repeated card links share the same purpose and have differentiating accessible context.",
+      "sample_ids": ["semantic-card-context-ok"]
+    }
+  ]
+}

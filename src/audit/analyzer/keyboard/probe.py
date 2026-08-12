@@ -3,31 +3,28 @@
 What it does
 ============
 
-The probe runs three checks against an already-loaded Playwright page:
+The probe runs one conservative check against an already-loaded Playwright page:
 
-1. **Tab-walk** — focus the body, press Tab in a loop, record
-   ``document.activeElement`` after each press. If the same element
-   stays focused across several consecutive Tab presses, focus is
-   stuck — a trap.
+1. **Bidirectional Tab-walk** — press Tab through the page and record
+   ``document.activeElement`` after each press. A review lead is emitted
+   only when the same observable element blocks several consecutive
+   Tab attempts *and* several consecutive Shift+Tab attempts.
 
-2. **Modal-Esc** — find every open ``<dialog>`` and every
-   ``[role="dialog"][aria-modal="true"]``. Focus the first focusable
-   inside, press Escape, check whether focus left the dialog subtree.
-   If not, the modal traps focus.
-
-3. **Iframe sanity** — iframes without ``tabindex="-1"`` and without a
-   ``title`` are a common trap source. This is a heuristic, not a hard
-   trap, so it's recorded with ``impact='serious'`` instead of
-   ``'critical'``.
+The probe deliberately does not infer a trap from a two-element focus
+cycle, Escape behavior, or an iframe remaining ``document.activeElement``.
+Those observations all have common conforming explanations. Missing iframe
+titles are covered by the DOM engines and belong to accessible-name testing,
+not SC 2.1.2.
 
 What it does NOT detect
 =======================
 
 * Traps that only appear after user interaction (clicking to mount a
   modal we never see).
-* Traps inside shadow DOM that doesn't delegate focus.
+* Traps inside closed shadow DOM or embedded browsing contexts.
 * Pages behind login.
 * Traps that only manifest with screen-reader virtual cursors.
+* Components that use a documented non-standard keyboard command to exit.
 
 These limits are surfaced in the Issues view via the existing
 scope-honesty banner pattern.
@@ -35,12 +32,11 @@ scope-honesty banner pattern.
 Safety
 ======
 
-Every check is wrapped in a try/except that logs and returns ``[]``.
-A bad page must never crash the crawl. We also bound the work: at
-most ``max_focusable * 2`` Tab presses, at most ``max_modals``
-dialog checks. A page with 800 focusable controls won't make us
-press Tab 1600 times in production — the cap is configurable from
-the orchestrator via :attr:`max_focusable`.
+The check is wrapped in a try/except that logs and returns ``[]``.
+A bad page must never crash the crawl. Work is bounded to roughly
+``max_focusable * 2`` forward Tab presses plus a small, fixed reverse
+confirmation. A page with 800 focusable controls therefore cannot make
+the production probe run without a cap.
 """
 
 from __future__ import annotations
@@ -67,10 +63,9 @@ log = logging.getLogger(__name__)
 # orchestrator can override via construction. ---
 
 # How many Tab presses count as "stuck on this element" before flagging.
-# K=4 means: same element focused after Tab pressed 4 consecutive
-# times. A real focus cycle should rotate within the page's focusable
-# count; staying glued for 4 presses is overwhelming evidence the Tab
-# handler swallowed every keypress.
+# K=4 means: four attempts in each direction failed to move away from
+# the same element. One direction alone is not enough: a component may
+# intentionally use Tab internally while Shift+Tab provides an exit.
 DEFAULT_STUCK_THRESHOLD = 4
 
 # Hard cap on Tab presses per page. focusable_count * 2 + slack covers
@@ -78,8 +73,9 @@ DEFAULT_STUCK_THRESHOLD = 4
 # move focus into iframes / sub-documents we walk through.
 DEFAULT_MAX_FOCUSABLE = 50
 
-# Hard cap on modals to probe per page. A page with 20 modals is
-# pathological; checking the first 5 covers the realistic case.
+# Retained for source compatibility with callers that configured the old
+# Escape observation. The production run no longer treats Escape behavior as
+# proof of SC 2.1.2.
 DEFAULT_MAX_MODALS = 5
 
 # How many chars of the element's outerHTML we keep on the finding for
@@ -94,6 +90,9 @@ class KeyboardProbe:
     max_focusable: int = DEFAULT_MAX_FOCUSABLE
     stuck_threshold: int = DEFAULT_STUCK_THRESHOLD
     max_modals: int = DEFAULT_MAX_MODALS
+    # Browser errors can include an authenticated URL or target text. The
+    # protected companion opts into terse, non-evidence diagnostics instead.
+    suppress_diagnostics: bool = False
 
     async def run(self, page: Page) -> list[KeyboardTrap]:
         """Probe ``page`` for keyboard traps. Returns a (possibly empty) list.
@@ -106,15 +105,7 @@ class KeyboardProbe:
         try:
             findings.extend(await self._probe_tab_walk(page))
         except Exception as exc:
-            log.warning("keyboard.tab_walk_failed: %s", exc)
-        try:
-            findings.extend(await self._probe_modal_escape(page))
-        except Exception as exc:
-            log.warning("keyboard.modal_escape_failed: %s", exc)
-        try:
-            findings.extend(await self._probe_iframe_sanity(page))
-        except Exception as exc:
-            log.warning("keyboard.iframe_sanity_failed: %s", exc)
+            self._log_failure("tab_walk", exc)
         return findings
 
     # -----------------------------------------------------------------
@@ -131,13 +122,10 @@ class KeyboardProbe:
         app produced false positives on nav links that share one long
         class string. Exact identity removes that whole failure class.)
 
-        Two trap shapes are detected:
-          stuck:     the same element id repeats for stuck_threshold
-                     consecutive presses (a keydown handler swallows Tab)
-          ping-pong: a full sliding window of recent presses contains
-                     at most two distinct ids and never reaches body
-                     (focus bounces inside a tiny cluster and cannot
-                     leave, the classic two-element modal loop)
+        One high-precision review-lead shape is detected: the same
+        observable element resists ``stuck_threshold`` exit attempts in
+        both directions. Ordinary page wrapping and bounded composite-widget
+        cycles are not treated as failures.
         """
         # Move focus to a deterministic starting point. Without this,
         # the walk starts wherever the page's autofocus landed, which
@@ -152,15 +140,13 @@ class KeyboardProbe:
         # headroom even for chrome that injects pseudo-focusable
         # elements (scrollbars, etc.).
         max_tabs = self.max_focusable * 2 + 4
-        window: list[int] = []  # sliding window of recent element ids
-        window_size = max(10, self.stuck_threshold * 2)
         last_id: int | None = None
         stuck_count = 0
         for _ in range(max_tabs):
             try:
                 await page.keyboard.press("Tab")
             except Exception as exc:
-                log.warning("keyboard.tab_press_failed: %s", exc)
+                self._log_failure("tab_press", exc)
                 break
             sig = await self._active_element_signature(page)
             if sig is None:
@@ -173,7 +159,15 @@ class KeyboardProbe:
             # the document. Reset all trap state.
             if el_id == 0:
                 stuck_count = 0
-                window.clear()
+                last_id = None
+                continue
+
+            # The parent document reports an iframe/object/embed (and a
+            # closed-shadow custom element) as the active element while focus
+            # may be moving normally inside it. We cannot observe that internal
+            # movement, so repeated outer identity is not trap evidence.
+            if sig.get("opaque") == "true":
+                stuck_count = 0
                 last_id = None
                 continue
 
@@ -181,50 +175,67 @@ class KeyboardProbe:
             if last_id is not None and el_id == last_id:
                 stuck_count += 1
                 if stuck_count >= self.stuck_threshold:
-                    return [
-                        KeyboardTrap(
-                            rule_id=RULE_STUCK,
-                            impact="critical",
-                            target_selector=str(sig.get("selector", "(unknown)")),
-                            failure_summary=(
-                                "Focus stayed on this element after "
-                                f"{self.stuck_threshold + 1} consecutive Tab key "
-                                "presses. Standard keyboard navigation cannot move "
-                                "focus past it."
-                            ),
-                            html_snippet=str(sig.get("html", ""))[:_SNIPPET_CHARS],
-                        )
-                    ]
+                    reverse_blocked = await self._confirm_reverse_exit_blocked(page, el_id)
+                    if reverse_blocked:
+                        attempts = self.stuck_threshold
+                        return [
+                            KeyboardTrap(
+                                rule_id=RULE_STUCK,
+                                impact="critical",
+                                target_selector=str(sig.get("selector", "(unknown)")),
+                                failure_summary=(
+                                    "Measured focus exit behavior: focus remained on this "
+                                    f"same element after {attempts} Tab attempts and "
+                                    f"{attempts} Shift+Tab attempts ({attempts * 2} failed "
+                                    "exit attempts total). Axcess does not count ordinary "
+                                    "focus wrapping, two-control cycles, modal containment, "
+                                    "or opaque iframe focus as a trap. Confirm manually that "
+                                    "the component has no documented keyboard exit command "
+                                    "before recording a WCAG 2.1.2 failure."
+                                ),
+                                html_snippet=str(sig.get("html", ""))[:_SNIPPET_CHARS],
+                            )
+                        ]
+                    # Shift+Tab moved away, so this is demonstrably escapable.
+                    # Continue from the new focus position without carrying the
+                    # forward-only observation into another candidate.
+                    stuck_count = 0
+                    last_id = None
+                    continue
             else:
                 stuck_count = 0
             last_id = el_id
 
-            # Shape 2: ping-pong inside a tiny cluster, never reaching
-            # body. A healthy page cycles through many distinct ids.
-            window.append(el_id)
-            if len(window) > window_size:
-                window.pop(0)
-            if len(window) == window_size and len(set(window)) <= 2:
-                return [
-                    KeyboardTrap(
-                        rule_id=RULE_STUCK,
-                        impact="critical",
-                        target_selector=str(sig.get("selector", "(unknown)")),
-                        failure_summary=(
-                            f"Across {window_size} consecutive Tab presses, focus "
-                            "stayed inside a cluster of at most two elements and "
-                            "never returned to the page. Keyboard users cannot "
-                            "leave this component."
-                        ),
-                        html_snippet=str(sig.get("html", ""))[:_SNIPPET_CHARS],
-                    )
-                ]
-
         return []
 
+    async def _confirm_reverse_exit_blocked(self, page: Page, candidate_id: int) -> bool:
+        """Require the same focus identity after repeated reverse exits.
+
+        This second direction is the precision gate. If Shift+Tab moves focus
+        anywhere else, the component is keyboard-escapable and cannot support
+        an automated SC 2.1.2 review lead from this observation.
+        """
+        for _ in range(self.stuck_threshold):
+            try:
+                await page.keyboard.press("Shift+Tab")
+            except Exception as exc:
+                self._log_failure("reverse_tab_press", exc)
+                return False
+            sig = await self._active_element_signature(page)
+            if sig is None or sig.get("opaque") == "true":
+                return False
+            if int(sig["el_id"]) != candidate_id:
+                return False
+        return True
+
     # -----------------------------------------------------------------
-    # Check 2 — Modal escape.
+    # Legacy observations — intentionally excluded from run().
     # -----------------------------------------------------------------
+
+    # These helpers remain temporarily for direct downstream callers. Escape
+    # behavior and missing iframe titles are useful manual-review signals, but
+    # neither proves a keyboard trap. Axcess therefore does not persist their
+    # output as SC 2.1.2 findings.
 
     async def _probe_modal_escape(self, page: Page) -> list[KeyboardTrap]:
         """For each open dialog, focus inside and press Esc — verify exit."""
@@ -262,7 +273,7 @@ class KeyboardProbe:
                 self.max_modals,
             )
         except Exception as exc:
-            log.warning("keyboard.modal_enumerate_failed: %s", exc)
+            self._log_failure("modal_enumerate", exc)
             return []
 
         if not modals:
@@ -331,7 +342,7 @@ class KeyboardProbe:
                         )
                     )
             except Exception as exc:
-                log.warning("keyboard.modal_escape_check_failed: %s", exc)
+                self._log_failure("modal_escape_check", exc)
                 continue
 
         # Clean up our markers so we don't leak DOM artifacts into the
@@ -400,7 +411,7 @@ class KeyboardProbe:
                 """
             )
         except Exception as exc:
-            log.warning("keyboard.iframe_scan_failed: %s", exc)
+            self._log_failure("iframe_scan", exc)
             return []
 
         return [
@@ -459,7 +470,7 @@ class KeyboardProbe:
                     ae = ae.shadowRoot.activeElement;
                   }
                   if (!ae || ae === document.body) {
-                    return { el_id: 0, selector: 'body', html: '' };
+                    return { el_id: 0, selector: 'body', html: '', opaque: false };
                   }
                   if (!window.__kbprobe_ids) {
                     window.__kbprobe_ids = { map: new WeakMap(), next: 1 };
@@ -470,6 +481,13 @@ class KeyboardProbe:
                     reg.next += 1;
                   }
                   const tag = ae.tagName.toLowerCase();
+                  // Focus movement inside these boundaries is not observable
+                  // from the parent document. Repeated host identity must not
+                  // be mistaken for repeated focus on the same inner control.
+                  const opaque = (
+                    ['iframe', 'object', 'embed'].includes(tag) ||
+                    (tag.includes('-') && !ae.shadowRoot)
+                  );
                   const id = ae.id ? '#' + ae.id : '';
                   // Try to build something selector-ish for reporting.
                   let sel = tag + id;
@@ -478,12 +496,14 @@ class KeyboardProbe:
                     if (cls) sel = tag + '.' + cls;
                   }
                   const html = (ae.outerHTML || '').slice(0, 240);
-                  return { el_id: reg.map.get(ae), selector: sel, html: html };
+                  return {
+                    el_id: reg.map.get(ae), selector: sel, html: html, opaque: opaque
+                  };
                 }
                 """
             )
         except Exception as exc:
-            log.debug("keyboard.active_element_failed: %s", exc)
+            self._log_failure("active_element", exc, debug=True)
             return None
         # `page.evaluate` is typed as Any in Playwright's stubs; we
         # know our JS returns either a 3-key object or undefined.
@@ -494,5 +514,15 @@ class KeyboardProbe:
                 "el_id": str(raw.get("el_id", 0)),
                 "selector": str(raw.get("selector", "(unknown)")),
                 "html": str(raw.get("html", "")),
+                "opaque": "true" if bool(raw.get("opaque", False)) else "false",
             }
         return None
+
+    def _log_failure(self, check: str, exc: Exception, *, debug: bool = False) -> None:
+        """Log safely for public scans and without target data for protected ones."""
+
+        logger = log.debug if debug else log.warning
+        if self.suppress_diagnostics:
+            logger("keyboard.%s_failed_in_protected_context", check)
+        else:
+            logger("keyboard.%s_failed: %s", check, exc)

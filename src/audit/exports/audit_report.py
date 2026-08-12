@@ -35,8 +35,9 @@ policy, rewrite it as something a teammate would Slack you.
 
 from __future__ import annotations
 
+import json
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
@@ -80,6 +81,8 @@ _OWNER_LABELS = {
 # the live worklist and into Appendix A.
 _TRIAGED_STATUSES = frozenset({"remediated", "accepted_risk", "false_positive"})
 _OPEN_STATUSES = frozenset({"new", "reviewing", "in_progress"})
+_CONFIRMED_REVIEW_STATUSES = frozenset({"in_progress"})
+_UNCONFIRMED_REVIEW_STATUSES = frozenset({"new", "reviewing"})
 
 # axe / keyboard impact → framework severity word. The pipelines already
 # emit critical/serious/moderate/minor, so this is mostly identity; image
@@ -107,12 +110,13 @@ _PRINCIPLE = {
 # coverage section and the per-card method note.
 _PIPELINE_LABEL = {
     "axe": "axe-core (deterministic DOM rules)",
+    "alfa": "Siteimprove Alfa (ACT rules)",
     "image": "image-of-text VLM",
     "semantic": "per-criterion LLM analyzer",
     "keyboard": "dynamic keyboard-trap probe",
     "responsive": "responsive & zoom probe",
     "focus": "live-page focus probe",
-    "visual": "visual (VLM) probe",
+    "visual": "visual order and media playback probe",
 }
 
 # Static description of each detection pipeline for the coverage section.
@@ -125,7 +129,18 @@ _PIPELINE_COVERAGE = [
         "method": "Deterministic DOM + computed-style rules run in a real browser.",
         "checks": "Contrast, missing alt/labels, ARIA misuse, landmark structure, "
         "heading order, link/button names, target size.",
-        "confidence": "High — near-zero false positives; this is the industry baseline.",
+        "confidence": "High-confidence deterministic evidence, but rule applicability and "
+        "remediation still need expert verification; no fixed real-world false-positive "
+        "rate is claimed.",
+    },
+    {
+        "key": "alfa",
+        "name": "Siteimprove Alfa",
+        "method": "Independent ACT-rule evaluation on a separate local-browser capture.",
+        "checks": "ACT rules mapped to WCAG 2.2 at the selected level; unresolved "
+        "`cantTell` outcomes are review leads.",
+        "confidence": "High for failed outcomes; `cantTell` is explicitly not a "
+        "conformance failure.",
     },
     {
         "key": "image",
@@ -134,8 +149,8 @@ _PIPELINE_COVERAGE = [
         "cross-checked against the authored alt text.",
         "checks": "WCAG 1.4.5 (images of text) and whether the alt conveys the "
         "same information the image does.",
-        "confidence": "Medium-high — the model occasionally over-flags decorative "
-        "images; triage filters those.",
+        "confidence": "Medium — OCR/model classification can misread decorative or "
+        "context-dependent images; every result remains an expert-review lead.",
     },
     {
         "key": "semantic",
@@ -149,13 +164,15 @@ _PIPELINE_COVERAGE = [
     },
     {
         "key": "keyboard",
-        "name": "Dynamic keyboard-trap probe",
-        "method": "Drives a real browser, presses Tab/Shift-Tab/Escape, and watches "
-        "where focus actually goes.",
-        "checks": "WCAG 2.1.2 — focus stuck on an element, modals that don't release "
-        "on Escape, untitled tabbable iframes.",
-        "confidence": "High for what it reaches — but only the initial DOM; "
-        "interaction-triggered traps need manual testing.",
+        "name": "Bidirectional keyboard-exit probe",
+        "method": "Drives a real browser and watches focus while attempting repeated "
+        "Tab and Shift+Tab exits from the same observable element.",
+        "checks": "WCAG 2.1.2 review leads — both directions must remain blocked. "
+        "Normal wrapping, two-control cycles, modal containment, and opaque embedded "
+        "contexts are not counted as traps.",
+        "confidence": "Medium — repeatable browser-observed evidence with exact attempt "
+        "counts. Manually check for documented or state-specific exit commands before "
+        "recording a failure.",
     },
     {
         "key": "responsive",
@@ -164,8 +181,8 @@ _PIPELINE_COVERAGE = [
         "applies WCAG's text-spacing override, looking for overflow and clipped text.",
         "checks": "SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, "
         "SC 1.4.12 clipping under user text-spacing.",
-        "confidence": "High for reflow (deterministic geometry); medium for the "
-        "clipping checks — designed truncation needs a human eye.",
+        "confidence": "Medium — deterministic geometry is useful evidence, but designed "
+        "truncation and state-specific clipping need an expert decision.",
     },
     {
         "key": "focus",
@@ -206,6 +223,7 @@ class IssueLocation:
 
     page_url: str
     page_title: str | None
+    description: str
     selector: str | None
     image_url: str | None
     detail: str | None
@@ -266,7 +284,9 @@ def _bucket_rows_into_cards(
       the Excel workbook render, so they share this one builder and can't
       drift apart.
     * **dropped** — every finding already triaged → Appendix A.
-    * **best_practice** — no WCAG SC (axe best-practice rules) → Appendix B.
+    * **best_practice** — expert-review leads, informational evidence, or
+      results without a WCAG SC → Appendix B. These are never promoted to
+      stakeholder-facing failures without an expert decision.
     """
     rules = _load_rules()
     open_rows: list[Any] = []
@@ -283,14 +303,133 @@ def _bucket_rows_into_cards(
                 )
             )
             continue
-        if row.conformance == "BP" or not row.wcag_sc:
-            best_practice.append(row)
+
+        terminal_summary = {
+            status: count
+            for status, count in dict(row.status_summary or {}).items()
+            if status in _TRIAGED_STATUSES and count
+        }
+        if terminal_summary:
+            dropped.append(
+                DroppedFinding(
+                    pipeline=row.pipeline,
+                    location=row.title,
+                    wcag_sc=row.wcag_sc,
+                    reason="Triaged subset: " + _status_phrase(terminal_summary),
+                )
+            )
+
+        if row.review_lane == "expert_review":
+            # ``in_progress`` is the current persisted decision that the expert
+            # confirmed a barrier and remediation is still open. It belongs in
+            # the substantive worklist; ``new`` and ``reviewing`` remain review
+            # leads. Project each subset independently so a mixed group cannot
+            # promote its unreviewed occurrences or hide its confirmed ones.
+            confirmed = _project_row_for_statuses(conn, row, _CONFIRMED_REVIEW_STATUSES)
+            if confirmed is not None:
+                open_rows.append(confirmed)
+            unconfirmed = _project_row_for_statuses(conn, row, _UNCONFIRMED_REVIEW_STATUSES)
+            if unconfirmed is not None:
+                best_practice.append(unconfirmed)
             continue
-        open_rows.append(row)
+
+        # Terminal occurrences in a partly triaged group must not remain in an
+        # open card's affected counts, pages, locations, or finding ids. The
+        # Appendix-A receipt above retains their disposition.
+        open_row = _project_row_for_statuses(conn, row, _OPEN_STATUSES)
+        if open_row is None:
+            continue
+        if row.review_lane != "likely_barrier" or row.conformance == "BP" or not row.wcag_sc:
+            best_practice.append(open_row)
+            continue
+        open_rows.append(open_row)
 
     cards = [_card_from_row(conn, row, rules) for row in open_rows]
     cards.sort(key=lambda c: (_severity_rank(c.severity), -c.affected_page_count))
     return cards, dropped, best_practice
+
+
+def _project_row_for_statuses(
+    conn: sqlite3.Connection,
+    row: Any,
+    statuses: frozenset[str],
+) -> Any | None:
+    """Return an issue-row projection containing only selected statuses.
+
+    Issue rows are intentionally grouped for review, but stakeholder report
+    counts and locations must describe only the backing records in the report
+    bucket being rendered. Querying the immutable finding ids here avoids
+    inferring a per-record status from aggregate ``status_summary`` counts.
+    """
+
+    finding_ids = list(row.finding_ids)
+    if not finding_ids:
+        return None
+    table = "findings" if row.pipeline == "image" else "page_a11y_findings"
+    finding_ids_json = json.dumps(finding_ids)
+    status_rows = conn.execute(
+        f"""
+        SELECT id, status FROM {table}
+         WHERE id IN (SELECT value FROM json_each(?))
+        """,  # noqa: S608 — table is selected from two fixed identifiers
+        (finding_ids_json,),
+    ).fetchall()
+    status_by_id = {int(item["id"]): str(item["status"]) for item in status_rows}
+    selected_ids = tuple(
+        finding_id for finding_id in finding_ids if status_by_id.get(finding_id) in statuses
+    )
+    if not selected_ids:
+        return None
+
+    selected_summary: dict[str, int] = {}
+    for finding_id in selected_ids:
+        status = status_by_id[finding_id]
+        selected_summary[status] = selected_summary.get(status, 0) + 1
+    occurrence_count, page_count = _projected_scope_counts(conn, row.pipeline, selected_ids)
+    high_confidence_occurrences = min(int(row.high_confidence_occurrence_count), occurrence_count)
+    return replace(
+        row,
+        finding_ids=selected_ids,
+        status_summary=selected_summary,
+        occurrence_count=occurrence_count,
+        page_count=page_count,
+        high_confidence_occurrence_count=high_confidence_occurrences,
+    )
+
+
+def _projected_scope_counts(
+    conn: sqlite3.Connection,
+    pipeline: str,
+    finding_ids: tuple[int, ...],
+) -> tuple[int, int]:
+    """Return occurrence/page counts for one status-filtered finding subset."""
+
+    finding_ids_json = json.dumps(finding_ids)
+    if pipeline == "image":
+        result = conn.execute(
+            """
+            SELECT COUNT(*) AS occurrence_count,
+                   COUNT(DISTINCT p.id) AS page_count
+              FROM findings f
+              JOIN page_images pi ON pi.image_id = f.image_id
+              JOIN pages p ON p.id = pi.page_id AND p.scan_id = f.scan_id
+             WHERE f.id IN (SELECT value FROM json_each(?))
+            """,
+            (finding_ids_json,),
+        ).fetchone()
+    else:
+        result = conn.execute(
+            """
+            SELECT COUNT(*) AS occurrence_count,
+                   COUNT(DISTINCT page_id) AS page_count
+              FROM page_a11y_findings
+             WHERE id IN (SELECT value FROM json_each(?))
+            """,
+            (finding_ids_json,),
+        ).fetchone()
+    if result is None:  # pragma: no cover - aggregate SELECT always returns one row
+        return (0, 0)
+    return (int(result["occurrence_count"] or 0), int(result["page_count"] or 0))
 
 
 def build_audit_cards(
@@ -324,6 +463,7 @@ def render_audit_report(
 
     rows = issues_mod.list_issues(conn, scan.id)
     cards, dropped, best_practice = _bucket_rows_into_cards(conn, rows)
+    blocked_seed = _blocked_seed_details(conn, scan)
 
     lines: list[str] = []
     lines.append(f"# Accessibility audit — Scan #{scan.id}")
@@ -335,10 +475,13 @@ def render_audit_report(
     lines.append(f"**Pages crawled:** {scan.page_count}")
     lines.append(f"**Detection methods used:** {_methods_line(rows)}")
     lines.append("")
+    if blocked_seed is not None:
+        lines.extend(_blocked_seed_warning(blocked_seed))
+        lines.append("")
 
-    lines.extend(_executive_summary(cards, dropped, best_practice))
+    lines.extend(_executive_summary(cards, dropped, best_practice, blocked_seed=blocked_seed))
     lines.append("")
-    lines.extend(_conformance_scorecard(cards))
+    lines.extend(_conformance_scorecard(cards, blocked_seed=blocked_seed))
     lines.append("")
     lines.extend(_abilities_rollup(cards))
     lines.append("")
@@ -375,12 +518,11 @@ def render_audit_report(
     lines.append("---")
     lines.append("")
     lines.append(
-        "**Scope note.** Automated tooling detects roughly 30-40% of WCAG "
-        "2.x AA success criteria. This report combines four methods (see "
-        "*Coverage and method* above) to push past the usual axe-only "
-        "ceiling, but a clean run is **necessary, not sufficient** for "
-        "conformance. The criteria listed under *What we did not check* "
-        "still require a human."
+        "**Scope note.** Automated tooling evaluates only defined conditions within a "
+        "subset of WCAG success criteria and reached page states. This report combines "
+        "multiple methods, but a clean run is **necessary, not sufficient** for "
+        "conformance. The manual matrix and recorded limitations remain part of the "
+        "evaluation."
     )
     lines.append("")
     return "\n".join(lines)
@@ -410,11 +552,8 @@ def _expert_evaluation_record(
         if record[key]:
             lines.extend(["", f"**{label}:** {record[key]}"])
 
-    completed = [
-        check
-        for check in evaluation.list_manual_checks(conn, scan_id)
-        if check["outcome"] != "not_started"
-    ]
+    checks = evaluation.list_manual_checks(conn, scan_id)
+    completed = [check for check in checks if check["outcome"] != "not_started"]
     if completed:
         lines.extend(
             ["", "### Manual-check decisions", "", "| SC | Outcome | Rationale |", "|---|---|---|"]
@@ -424,7 +563,84 @@ def _expert_evaluation_record(
                 f"| {check['criterion']['sc']} | {str(check['outcome']).replace('_', ' ')} | "
                 f"{_clean(check['rationale']) or '—'} |"
             )
+    not_tested = [check for check in checks if check["outcome"] == "not_tested"]
+    if not_tested:
+        lines.extend(
+            [
+                "",
+                "### Not-tested criteria — documented evaluation limitations",
+                "",
+                "These criteria were not tested. Their expert rationales are part of the "
+                "evaluation's documented limitations.",
+                "",
+                "| SC | Criterion | Limitation rationale |",
+                "|---|---|---|",
+            ]
+        )
+        for check in not_tested:
+            lines.append(
+                f"| {check['criterion']['sc']} | {_clean(check['criterion']['name'])} | "
+                f"{_clean(check['rationale'])} |"
+            )
+    evidence_references = [
+        (check["criterion"]["sc"], item) for check in checks for item in check["evidence"]
+    ]
+    if evidence_references:
+        lines.extend(
+            [
+                "",
+                "### Evidence references",
+                "",
+                "| SC | Page | External reference | Expert note |",
+                "|---|---|---|---|",
+            ]
+        )
+        for criterion_sc, item in evidence_references:
+            page = _clean(str(item.get("page_url") or "—"))
+            reference = _clean(str(item.get("evidence_url") or "—"))
+            note = _clean(str(item.get("note") or "—"))
+            lines.append(f"| {criterion_sc} | {page} | {reference} | {note} |")
     return lines
+
+
+def _blocked_seed_details(
+    conn: sqlite3.Connection, scan: ExportScan
+) -> tuple[int | None, str | None] | None:
+    """Return a coverage limitation when the seed was not successfully read.
+
+    A report with no open findings after a 403, login wall, or fetch failure is
+    incomplete evidence—not a clean accessibility result.
+    """
+    row = conn.execute(
+        "SELECT status_code, title FROM pages WHERE scan_id = ? AND url_normalized = ? LIMIT 1",
+        (scan.id, scan.seed_url),
+    ).fetchone()
+    if row is None:
+        if scan.page_count == 0 and scan.error_count:
+            return (None, None)
+        return None
+    status_code = row["status_code"]
+    if status_code is None or 200 <= int(status_code) < 300:
+        return None
+    return (int(status_code), str(row["title"] or "") or None)
+
+
+def _blocked_seed_warning(blocked_seed: tuple[int | None, str | None]) -> list[str]:
+    """State the evidence gap prominently before any summary prose."""
+    status_code, title = blocked_seed
+    if status_code is None:
+        return [
+            "> **Coverage warning:** The crawler recorded errors before it could retrieve "
+            "the seed page. No findings should be interpreted as a pass; retry with "
+            "authorized access before relying on this report."
+        ]
+    title_note = f" ({_clean(title)})" if title else ""
+    return [
+        "> **Coverage warning:** The seed page returned HTTP "
+        f"{status_code}{title_note}. Axcess did not obtain the audited page; "
+        "no findings should be interpreted as a pass. Request authorized access "
+        "or scan an approved test environment."
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +652,8 @@ def _executive_summary(
     cards: list[AuditCard],
     dropped: list[DroppedFinding],
     best_practice: list[Any],
+    *,
+    blocked_seed: tuple[int | None, str | None] | None = None,
 ) -> list[str]:
     """Eight-sentence executive summary, framework-shaped."""
     lines: list[str] = ["## Executive summary", ""]
@@ -446,13 +664,13 @@ def _executive_summary(
     sentences.append(
         f"After self-critique, **{len(cards)} open issue type(s)** need work "
         f"({len(dropped)} already-triaged item(s) moved to Appendix A; "
-        f"{len(best_practice)} best-practice item(s) to Appendix B)."
+        f"{len(best_practice)} review-only or informational item(s) to Appendix B)."
     )
     if cards:
         sentences.append(
-            f"Of those, **{level_a} fail WCAG Level A** (the legal floor) and "
-            f"**{level_aa} fail Level AA** — Level A issues lock users out "
-            "entirely and should be fixed first."
+            f"Of those, **{level_a} map to WCAG Level A** and "
+            f"**{level_aa} map to Level AA**. These are likely barriers, not a "
+            "standalone conformance determination; Level A items should be triaged first."
         )
 
     themes = sorted(cards, key=lambda c: -c.affected_page_count)[:3]
@@ -472,12 +690,17 @@ def _executive_summary(
         )
 
     estimate = _conformance_estimate(cards)
-    if estimate:
+    if blocked_seed is not None:
+        sentences.append(
+            "This scan could not establish usable seed-page coverage. The absence of "
+            "findings is not a passing result; obtain authorized access and rescan."
+        )
+    elif estimate:
         sentences.append(f"Rough effort to clear what this tool can see: **{estimate}**.")
     else:
         sentences.append(
-            "The scope is already clean within the rules this tool can check — "
-            "remaining conformance work is the ~60% of WCAG that needs a human."
+            "No likely automated barriers remain in this evidence set. Review Appendix B "
+            "and complete the manual matrix before drawing any conformance conclusion."
         )
 
     for s in sentences[:SUMMARY_MAX_SENTENCES]:
@@ -491,15 +714,26 @@ def _executive_summary(
 # ---------------------------------------------------------------------------
 
 
-def _conformance_scorecard(cards: list[AuditCard]) -> list[str]:
+def _conformance_scorecard(
+    cards: list[AuditCard], *, blocked_seed: tuple[int | None, str | None] | None = None
+) -> list[str]:
     """A table by WCAG level + a POUR-principle rollup.
 
     Answers the stakeholder question "where do we stand on Level AA?"
     without making them count cards.
     """
-    lines = ["## Conformance scorecard", ""]
+    lines = ["## Open barrier summary", ""]
     if not cards:
-        lines.append("_No open WCAG failures — nothing to score._")
+        if blocked_seed is not None:
+            lines.append(
+                "_No open barrier evidence was collected because coverage was not established; "
+                "this is not a passing result._"
+            )
+        else:
+            lines.append(
+                "_No confirmed open barriers in this evidence set. Review the appendices and "
+                "manual matrix before drawing a conformance conclusion._"
+            )
         return lines
 
     by_level: dict[str, int] = {}
@@ -509,14 +743,17 @@ def _conformance_scorecard(cards: list[AuditCard]) -> list[str]:
         by_level[level] = by_level.get(level, 0) + 1
         by_level_pages.setdefault(level, set())
 
-    lines.append("Open issue types by WCAG conformance level (lower level = more urgent):")
+    lines.append(
+        "Confirmed open issue groups by mapped WCAG level; prioritize user impact and "
+        "foundational dependencies:"
+    )
     lines.append("")
     lines.append("| Level | Open issue types | What it means |")
     lines.append("|---|---:|---|")
     level_meaning = {
-        "A": "Minimum bar. Failing locks users out — fix first.",
-        "AA": "The legal/industry target in most jurisdictions.",
-        "AAA": "Enhanced. Aspirational; fix after A and AA.",
+        "A": "Foundational requirements; triage promptly alongside actual user impact.",
+        "AA": "Selected report target; confirm the applicable U-M and legal context.",
+        "AAA": "Beyond the selected AA target; prioritize where it materially helps users.",
     }
     for level in ("A", "AA", "AAA"):
         if by_level.get(level):
@@ -591,6 +828,7 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
     # axe leaves a definitive "I ran" trace in the scan row even when it
     # finds nothing; the other pipelines only signal via their findings.
     axe_ran = scan.axe_pages_scanned > 0 or "axe" in pipelines_present
+    alfa_ran = scan.alfa_pages_scanned > 0 or "alfa" in pipelines_present
 
     lines.append(
         "This audit used multiple detection methods. Each sees different "
@@ -607,15 +845,36 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
                 if "axe" in pipelines_present
                 else ("ran, clean" if axe_ran else "—")
             )
+        elif p["key"] == "alfa":
+            ran = (
+                "✅ found outcomes"
+                if "alfa" in pipelines_present
+                else ("ran, clean" if alfa_ran else "—")
+            )
         else:
             ran = "✅ found issues" if p["key"] in pipelines_present else "—"
         lines.append(f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |")
     lines.append("")
     lines.append(
         "_A “—” means this method produced no findings on this scan — it may "
-        "have been disabled for the run, or it ran and found nothing. Only "
-        "axe-core records a definitive ran-clean signal today._"
+        "have been disabled for the run, or it ran and found nothing. axe-core "
+        "and Alfa record definitive ran-clean signals when selected._"
     )
+    if alfa_ran and scan.alfa_pages_scanned < scan.page_count:
+        lines.append(
+            f"_Alfa completed on {scan.alfa_pages_scanned} of {scan.page_count} crawled page(s); "
+            "its evidence is partial for this report._"
+        )
+        lines.append("")
+    alfa_total = scan.alfa_failed_total + scan.alfa_cant_tell_total
+    retained_alfa = sum(1 for finding in scan.a11y_findings if finding.pipeline == "alfa")
+    if alfa_total > retained_alfa:
+        lines.append(
+            f"_Alfa reported {alfa_total} actionable outcome(s), while {retained_alfa} "
+            "page-level evidence record(s) are retained. Per-page evidence may have been capped; "
+            "use the totals as coverage context, not as a complete evidence inventory._"
+        )
+        lines.append("")
     lines.append("")
     lines.append(
         "_The next section breaks this down to every WCAG 2.2 A/AA success "
@@ -646,9 +905,9 @@ def _wcag_coverage_matrix() -> list[str]:
     lines = ["## WCAG 2.2 A/AA coverage — what's automated vs. manual", ""]
     lines.append(
         f"Across all **{s.total}** Level A/AA success criteria, here is exactly "
-        "what Axcess can and cannot determine for you. Automated coverage is "
-        "high-confidence; AI-assisted findings are strong leads you should "
-        "confirm; manual-only criteria are not detected by any pipeline."
+        "what Axcess can and cannot test. Automated results are bounded evidence, "
+        "AI-assisted findings are review leads, and manual-only criteria are not "
+        "detected by any pipeline. Every final decision remains part of expert review."
     )
     lines.append("")
     lines.append("| Coverage | Criteria | What it means |")
@@ -808,11 +1067,18 @@ def _render_card(idx: int, card: AuditCard) -> list[str]:
     lines.append(f"### {idx}. {card.title}")
     if card.needs_human_review:
         lines.append("")
-        lines.append(
-            "> ⚠ **Human review needed** — this finding doesn't have a "
-            "templated fix in our rule book yet. The data is real; the "
-            "prescriptive guidance below is light."
-        )
+        if card.pipeline == "alfa":
+            lines.append(
+                "> ⚠ **Human review needed** — Alfa ACT evidence is a review lead, "
+                "not a conformance verdict. Confirm any `cantTell` outcome manually "
+                "before reporting it as a barrier."
+            )
+        else:
+            lines.append(
+                "> ⚠ **Human review needed** — this finding doesn't have a "
+                "templated fix in our rule book yet. The data is real; the "
+                "prescriptive guidance below is light."
+            )
     lines.append("")
 
     if card.wcag_sc:
@@ -903,12 +1169,20 @@ def _appendix_a(dropped: list[DroppedFinding]) -> list[str]:
             "(every finding is still `new`), or no synthesis ran._"
         )
         return lines
-    lines.append(
-        "These issue types *were* detected but every finding in them has "
-        "already been triaged (remediated, accepted as a risk, or marked a "
-        "false positive). Listed here so the reader can confirm the "
-        "self-critique didn't quietly hide a real bug."
-    )
+    if any(item.reason.startswith("Triaged subset:") for item in dropped):
+        lines.append(
+            "These detected findings or finding subsets were set aside after triage "
+            "(remediated, accepted as a risk, or marked a false positive). Listed "
+            "here so the reader can confirm the self-critique didn't quietly hide "
+            "a real bug."
+        )
+    else:
+        lines.append(
+            "These issue types *were* detected but every finding in them has "
+            "already been triaged (remediated, accepted as a risk, or marked a "
+            "false positive). Listed here so the reader can confirm the "
+            "self-critique didn't quietly hide a real bug."
+        )
     lines.append("")
     lines.append("| Method | Issue | WCAG | Reason set aside |")
     lines.append("|---|---|---|---|")
@@ -923,18 +1197,26 @@ def _appendix_a(dropped: list[DroppedFinding]) -> list[str]:
 
 
 def _appendix_b(best_practice: list[Any]) -> list[str]:
-    """Best-practice findings with no WCAG SC mapping."""
-    lines = ["## Appendix B — Out of scope but worth knowing", ""]
+    """Evidence that must not be represented as an automated WCAG failure."""
+    lines = ["## Appendix B — Review leads and informational evidence", ""]
     if not best_practice:
         lines.append("_No best-practice or out-of-scope findings to flag for this scan._")
         return lines
     lines.append(
-        "Best-practice findings (mostly from axe-core) that don't map to a "
-        "specific WCAG success criterion. They catch real issues — missing "
-        "landmarks, heading-order quirks — but they aren't WCAG fails in the "
-        "strict sense. Worth tracking, not blocking."
+        "These results are preserved for transparency but are not included in "
+        "the remediation scorecard. They are AI-assisted or ambiguous review "
+        "leads, informational/pass evidence, or best-practice observations with "
+        "no criterion mapping. An expert decision is required before a review "
+        "lead can be described as a barrier."
     )
     lines.append("")
+    if any(row.pipeline == "alfa" for row in best_practice):
+        lines.append(
+            "**Alfa note:** Alfa ACT evidence is a review lead when the engine "
+            "returns `cantTell`; it is not a conformance failure until an expert "
+            "reviews the stored evidence."
+        )
+        lines.append("")
     for row in best_practice[:TOP_GROUPS_PER_SECTION]:
         plural = "s" if row.page_count != 1 else ""
         # Show the underlying rule id (stripped of the ``axe:`` UI prefix)
@@ -942,7 +1224,9 @@ def _appendix_b(best_practice: list[Any]) -> list[str]:
         rule_id = row.issue_key.split(":", 1)[-1]
         lines.append(
             f"- **{row.title}** (`{rule_id}`) — {row.occurrence_count} "
-            f"finding(s) on {row.page_count} page{plural}."
+            f"finding(s) on {row.page_count} page{plural}; "
+            f"**{row.review_lane.replace('_', ' ')} / {row.evidence_confidence} confidence**. "
+            f"{row.evidence_summary}"
         )
     if len(best_practice) > TOP_GROUPS_PER_SECTION:
         lines.append(f"- _…+{len(best_practice) - TOP_GROUPS_PER_SECTION} more._")
@@ -1003,7 +1287,7 @@ def _card_from_row(
         verify_automated=meta.get("verify_automated"),
         acceptance=row.acceptance,
         confidence=(meta.get("confidence_default") or "medium").title(),
-        needs_human_review=not row.fix_steps,
+        needs_human_review=(row.pipeline == "alfa") or not row.fix_steps,
         note=row.help_url,
         finding_ids=list(row.finding_ids),
     )
@@ -1026,11 +1310,12 @@ def _locations_for_row(
     placeholders = ",".join("?" for _ in sample)
     locations: list[IssueLocation] = []
 
-    if row.pipeline in ("axe", "semantic", "keyboard"):
+    if row.pipeline in ("axe", "alfa", "semantic", "keyboard", "responsive", "focus", "visual"):
         db_rows = conn.execute(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
-                   a.target_selector AS selector, a.failure_summary AS detail
+                   a.target_selector AS selector, a.html_snippet AS html_snippet,
+                   a.failure_summary AS detail
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.id IN ({placeholders})
@@ -1043,6 +1328,10 @@ def _locations_for_row(
                 IssueLocation(
                     page_url=str(r["page_url"] or ""),
                     page_title=r["page_title"],
+                    description=_describe_dom_location(
+                        str(r["selector"] or ""),
+                        str(r["html_snippet"] or ""),
+                    ),
                     selector=str(r["selector"] or "") or None,
                     image_url=None,
                     detail=_short(" ".join(detail.split()), 120) or None,
@@ -1064,22 +1353,28 @@ def _locations_for_row(
             tuple(sample),
         ).fetchall()
         for r in db_rows:
-            bits = ["above the fold" if r["above_fold"] else "below the fold"]
             pos = r["position"]
-            if pos is not None:
-                bits.append(f"image #{int(pos) + 1} on the page")
             locations.append(
                 IssueLocation(
                     page_url=str(r["page_url"] or ""),
                     page_title=r["page_title"],
+                    description=_describe_image_location(
+                        above_fold=bool(r["above_fold"]),
+                        position=int(pos) if pos is not None else None,
+                    ),
                     selector=None,
                     image_url=str(r["image_url"] or "") or None,
-                    detail="; ".join(bits) or None,
+                    detail=None,
                 )
             )
 
     overflow = max(0, len(ids) - len(locations))
     return locations, overflow
+
+
+def issue_locations(conn: sqlite3.Connection, row: Any) -> tuple[list[IssueLocation], int]:
+    """Expose retained locations for review-only rows that have no issue card."""
+    return _locations_for_row(conn, row)
 
 
 # ---------------------------------------------------------------------------
@@ -1106,7 +1401,11 @@ def _status_phrase(summary: dict[str, int]) -> str:
 def _methods_line(rows: list[Any]) -> str:
     """Comma-joined human labels for the pipelines that produced findings."""
     present = {r.pipeline for r in rows}
-    labels = [_PIPELINE_LABEL[p] for p in ("axe", "image", "semantic", "keyboard") if p in present]
+    labels = [
+        _PIPELINE_LABEL[p]
+        for p in ("axe", "alfa", "image", "semantic", "keyboard", "responsive", "focus", "visual")
+        if p in present
+    ]
     return ", ".join(labels) if labels else "none (no findings produced)"
 
 
@@ -1139,18 +1438,153 @@ def _severity_reason(row: Any, severity: str) -> str:
 
 
 def _format_location(loc: IssueLocation) -> str:
-    """Render one location as a Markdown bullet: page → element — detail."""
-    page = loc.page_url or "(unknown page)"
-    if loc.page_title:
-        page = f"{page} ({loc.page_title})"
+    """Render a plain-language location with technical evidence retained."""
+    if loc.page_url.startswith(("https://", "http://")):
+        page_label = loc.page_title or _short(loc.page_url, 80)
+        page_label = _md_escape(page_label).replace("[", "\\[").replace("]", "\\]")
+        page = f"[{page_label}](<{loc.page_url}>)"
+    else:
+        page = loc.page_title or loc.page_url or "(unknown page)"
     if loc.selector:
-        target = f" → `{loc.selector}`"
+        target = f" **Technical target:** `{loc.selector}`."
     elif loc.image_url:
-        target = f" → image `{_short(loc.image_url, 80)}`"
+        target = f" **Image asset:** `{_short(loc.image_url, 80)}`."
     else:
         target = ""
-    detail = f" — {loc.detail}" if loc.detail else ""
-    return f"- {_short(page, 90)}{target}{detail}"
+    detail = f" **Observed evidence:** {loc.detail}" if loc.detail else ""
+    return f"- **Page:** {page}. **Location on page:** {loc.description}.{target}{detail}"
+
+
+def _describe_dom_location(selector: str, html_snippet: str) -> str:
+    """Describe an observed DOM target without guessing visual coordinates."""
+    import html
+    import json
+    import re
+
+    if selector.lstrip().startswith(("{", "[")):
+        try:
+            target = json.loads(selector)
+        except (TypeError, ValueError):
+            return "Document or element recorded in Alfa's structured target evidence"
+        if isinstance(target, list) and target:
+            target = target[0]
+        if isinstance(target, dict):
+            node_type = str(target.get("type") or "")
+            if node_type == "document":
+                return "Document root (the page as a whole)"
+            if node_type == "attribute":
+                name = str(target.get("name") or "attribute")
+                value = target.get("value")
+                suffix = f" with value “{_short(str(value), 60)}”" if value else ""
+                return f"The {name} attribute{suffix}"
+            if node_type == "text":
+                data = " ".join(str(target.get("data") or "").split())
+                return (
+                    f"Text node containing “{_short(data, 60)}”" if data else "An empty text node"
+                )
+            if node_type == "element":
+                tag = str(target.get("name") or "element").lower()
+                structured_attrs = {
+                    str(item.get("name") or "").lower(): str(item.get("value") or "")
+                    for item in target.get("attributes") or []
+                    if isinstance(item, dict) and item.get("name")
+                }
+                text_parts = [
+                    str(child.get("data") or "")
+                    for child in target.get("children") or []
+                    if isinstance(child, dict) and child.get("type") == "text"
+                ]
+                text_value = _short(" ".join(" ".join(text_parts).split()), 60)
+                kind = {
+                    "a": "link",
+                    "button": "button",
+                    "img": "image",
+                    "input": f"{structured_attrs.get('type', 'text')} input",
+                    "iframe": "embedded frame",
+                    "meta": "metadata element",
+                }.get(tag, f"{tag} element")
+                label = (
+                    structured_attrs.get("aria-label")
+                    or structured_attrs.get("alt")
+                    or structured_attrs.get("title")
+                )
+                if label:
+                    return f"{kind.capitalize()} labeled “{_short(label, 60)}”"
+                if text_value:
+                    return f"{kind.capitalize()} containing “{text_value}”"
+                for attr in ("href", "src", "name", "placeholder", "type", "id"):
+                    if structured_attrs.get(attr):
+                        return (
+                            f"{kind.capitalize()} with {attr} "
+                            f"“{_short(structured_attrs[attr], 60)}”"
+                        )
+                return f"Empty {kind}"
+        return "Element recorded in Alfa's structured target evidence"
+
+    snippet = " ".join(html_snippet.split())
+    tag_match = re.search(r"<\s*([a-zA-Z][\w:-]*)\b", snippet)
+    tag = tag_match.group(1).lower() if tag_match else ""
+    attrs: dict[str, str] = {}
+    if tag_match:
+        opening_end = snippet.find(">", tag_match.end())
+        opening = snippet[tag_match.end() : opening_end if opening_end >= 0 else len(snippet)]
+        for name, _quote, value in re.findall(
+            r"([\w:-]+)\s*=\s*(['\"])(.*?)\2",
+            opening,
+        ):
+            attrs[name.lower()] = html.unescape(value.strip())
+
+    kind = {
+        "a": "link",
+        "button": "button",
+        "img": "image",
+        "input": f"{attrs.get('type', 'text')} input",
+        "select": "selection control",
+        "textarea": "text area",
+        "label": "form label",
+        "h1": "level 1 heading",
+        "h2": "level 2 heading",
+        "h3": "level 3 heading",
+        "h4": "level 4 heading",
+        "nav": "navigation region",
+        "main": "main content region",
+        "aside": "complementary region",
+        "table": "table",
+        "li": "list item",
+        "p": "paragraph",
+        "span": "text element",
+        "div": "content container",
+    }.get(tag, f"{tag} element" if tag else "affected element")
+
+    accessible_label = attrs.get("aria-label") or attrs.get("alt") or attrs.get("title")
+    visible_text = html.unescape(re.sub(r"<[^>]+>", " ", snippet))
+    visible_text = _short(" ".join(visible_text.split()), 60)
+    if accessible_label:
+        description = f"{kind} labeled “{_short(accessible_label, 60)}”"
+    elif visible_text and tag not in {"input", "img"}:
+        description = f"{kind} containing “{visible_text}”"
+    elif attrs.get("name"):
+        description = f"{kind} named “{_short(attrs['name'], 60)}”"
+    elif attrs.get("placeholder"):
+        description = f"{kind} with placeholder “{_short(attrs['placeholder'], 60)}”"
+    else:
+        description = kind.capitalize()
+
+    if attrs.get("id"):
+        description += f" with ID “{_short(attrs['id'], 50)}”"
+    elif attrs.get("class"):
+        classes = " ".join(attrs["class"].split()[:3])
+        description += f" with class “{_short(classes, 60)}”"
+    elif selector:
+        description += " identified by the recorded page selector"
+    return description
+
+
+def _describe_image_location(*, above_fold: bool, position: int | None) -> str:
+    """Turn stored image order/fold evidence into reader-friendly language."""
+    order = f"Image {position + 1}" if position is not None else "Image"
+    viewport = "near the top of the page" if above_fold else "farther down the page"
+    return f"{order}, {viewport}"
 
 
 def _owner_key(label: str) -> str:

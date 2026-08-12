@@ -214,7 +214,7 @@ def test_json_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> N
     assert payload["scan"]["by_severity"]["critical"] + payload["scan"]["by_severity"]["major"] >= 1
     # v2 schema additions — the a11y section is present but empty on a
     # legacy fixture scan (no axe pages run).
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["a11y_findings"] == []
     assert payload["scan"]["axe_pages_scanned"] == 0
     assert payload["scan"]["axe_violations_total"] == 0
@@ -306,9 +306,10 @@ def test_axe_findings_propagate_to_all_exports(
         "best_practice": 0,
     }
 
-    # Markdown report includes a WCAG axe section.
+    # Markdown report preserves the engine source in its WCAG section.
     md = render_markdown(scan)
-    assert "## WCAG axe-core findings" in md
+    assert "## WCAG DOM-engine findings" in md
+    assert "**Source:** axe-core" in md
     assert "color-contrast" in md
     assert "SC 1.4.3" in md
 
@@ -330,3 +331,38 @@ def test_axe_findings_propagate_to_all_exports(
     assert "wcag-1-4-3" in labels
     assert "wcag-level-aa" in labels
     assert priority == "High"  # serious → High
+
+
+def test_behavioral_and_ai_sources_are_not_mislabeled_as_axe(
+    tmp_db: sqlite3.Connection, scan_fixture: int
+) -> None:
+    from audit.exports.jira_export import render_jira_csv
+    from audit.exports.markdown_report import render_markdown
+
+    page_id = int(
+        tmp_db.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_fixture,)
+        ).fetchone()["id"]
+    )
+    finding_id = _seed_axe_finding(
+        tmp_db,
+        scan_id=scan_fixture,
+        page_id=page_id,
+        rule_id="semantic:2.4.4",
+        wcag_sc="2.4.4",
+        wcag_level="A",
+        impact=None,
+    )
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET pipeline = 'semantic' WHERE id = ?", (finding_id,)
+    )
+
+    scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
+    markdown = render_markdown(scan)
+    jira = render_jira_csv(scan)
+
+    assert "**Source:** Semantic analyzer" in markdown
+    assert "**Source:** Semantic analyzer" in jira
+    assert "Needs expert review (observed lead" in markdown
+    assert "Needs expert review (observed lead" in jira
+    assert "**Source:** axe-core" not in jira

@@ -1,0 +1,3 @@
+-- 0017 rollback — revoked legacy pairing codes cannot be safely reconstructed.
+-- The application remains compatible with the nullable historical column,
+-- but all new enrollments require an explicit certificate fingerprint.

@@ -1,9 +1,10 @@
-.PHONY: help setup run serve test test-unit test-integration test-ui lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-build frontend-dev
+.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install
 
 PY := uv run
 DB := data/audit.db
 MIGRATIONS := src/audit/db/migrations
 FRONTEND := src/audit/web/frontend
+ALFA_RUNNER := src/audit/alfa_runner
 HOST ?= 127.0.0.1
 PORT ?= 8765
 
@@ -54,14 +55,23 @@ serve: ## Host for LAN/Tailscale: no reload, binds 0.0.0.0 (set AUDIT_ACCESS_TOK
 	fi
 	$(PY) uvicorn audit.web.server:app --host $(SERVE_HOST) --port $(PORT)
 
+protected-maintenance: ## Run required managed-KMS retention cleanup for protected reports
+	$(PY) audit protected-maintenance
+
 frontend-install: ## Install React SPA dependencies (one-time)
 	cd $(FRONTEND) && npm install
+
+frontend-lint: ## Run JSX accessibility and React lint rules
+	cd $(FRONTEND) && npm run lint
 
 frontend-build: ## Build the React SPA into dist/ (served by FastAPI at /app/)
 	cd $(FRONTEND) && npm run build
 
 frontend-dev: ## Run Vite dev server on :5173 (proxies /api to FastAPI)
 	cd $(FRONTEND) && npm run dev
+
+alfa-install: ## Install the optional, pinned Siteimprove Alfa local runner
+	cd $(ALFA_RUNNER) && npm ci
 
 test: ## Run full test suite
 	$(PY) pytest
@@ -75,19 +85,26 @@ test-integration: ## Run integration tests only
 test-ui: ## Run UI tests (Playwright + axe-core)
 	$(PY) pytest tests/ui -m ui
 
+quality-gate: ## Enforce the versioned labeled detector precision gate (<5% corpus FDR)
+	$(PY) python -m audit.quality_benchmark tests/quality/corpora/detection_precision_v1.json
+	$(PY) pytest tests/quality
+
 a11y-check: ## Run axe-core accessibility checks against the UI
 	$(PY) pytest tests/ui -m ui -k axe
 
 lint: ## Check lint + format
 	$(PY) ruff check src tests scripts
 	$(PY) ruff format --check src tests scripts
+	cd $(FRONTEND) && npm run lint
 
 lint-fix: ## Apply lint + format fixes
 	$(PY) ruff check --fix src tests scripts
 	$(PY) ruff format src tests scripts
+	cd $(FRONTEND) && npm run lint:fix
 
 typecheck: ## Run mypy strict on src/
 	$(PY) mypy
+	cd $(FRONTEND) && npm run typecheck
 
 clean: ## Remove database and blob storage (irreversible)
 	rm -rf data/audit.db data/audit.db-wal data/audit.db-shm data/blobs data/logs

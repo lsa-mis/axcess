@@ -206,5 +206,6 @@ def test_markdown_for_empty_scan_does_not_crash(tmp_db: sqlite3.Connection) -> N
     scan_id = int(cur.lastrowid or 0)
     scan = collect_scan(tmp_db, scan_id)
     md = render_markdown(scan, generated_at=datetime(2026, 4, 22, tzinfo=UTC))
-    assert "No WCAG 1.4.5 failures detected" in md
+    assert "No image-analysis evidence was retained" in md
+    assert "not a pass or conformance conclusion" in md
     assert "_No findings._" in md

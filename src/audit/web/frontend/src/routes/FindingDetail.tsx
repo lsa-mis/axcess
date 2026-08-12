@@ -1,6 +1,6 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { api, blobUrl } from "../api/client";
 import {
@@ -13,6 +13,7 @@ import {
   SeverityChip,
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
+import { requestStatusRationale } from "../statusDecision";
 
 const STATUSES: FindingStatus[] = [
   "new",
@@ -51,14 +52,32 @@ export default function FindingDetailRoute() {
   }, [data]);
 
   const save = useMutation({
-    mutationFn: (s: FindingStatus) => api.setStatus(id, s),
-    onSuccess: (_, s) => {
+    mutationFn: ({ next, rationale }: { next: FindingStatus; rationale: string }) =>
+      api.setStatus(id, next, rationale || undefined),
+    onSuccess: (_, { next }) => {
       qc.invalidateQueries({ queryKey: ["finding", id] });
       qc.invalidateQueries({ queryKey: ["findings"] });
-      setToast(`Status updated to ${s}`);
+      setToast(`Status updated to ${next}`);
+      window.setTimeout(() => setToast(null), 1800);
+    },
+    onError: () => {
+      setStatus(data?.status ?? null);
+      setToast("Status not saved");
       window.setTimeout(() => setToast(null), 1800);
     },
   });
+
+  const attemptSave = useCallback((next: FindingStatus) => {
+    const rationale = requestStatusRationale(next, `finding #${id}`);
+    if (rationale === null) {
+      setStatus(data?.status ?? null);
+      setToast("Status unchanged");
+      window.setTimeout(() => setToast(null), 1800);
+      return;
+    }
+    setStatus(next);
+    save.mutate({ next, rationale });
+  }, [data?.status, id, save]);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -74,13 +93,12 @@ export default function FindingDetailRoute() {
       const mapped = STATUS_KEY_MAP[ev.key];
       if (mapped) {
         ev.preventDefault();
-        setStatus(mapped);
-        save.mutate(mapped);
+        attemptSave(mapped);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [save]);
+  }, [attemptSave]);
 
   if (error) {
     return (
@@ -244,7 +262,7 @@ export default function FindingDetailRoute() {
               <Button
                 variant="primary"
                 size="lg"
-                onClick={() => status && save.mutate(status)}
+                onClick={() => status && attemptSave(status)}
                 disabled={save.isPending || status === data.status}
               >
                 Save

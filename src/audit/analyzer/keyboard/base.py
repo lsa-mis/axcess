@@ -16,8 +16,8 @@ from typing import Any
 # Rule ids, kept narrow so the audit-report YAML can pin per-rule
 # remediation copy without globbing.
 RULE_STUCK = "keyboard-trap-stuck"  # focus glued to one element
-RULE_NO_ESCAPE = "keyboard-trap-modal-no-escape"  # Esc doesn't release modal
-RULE_IFRAME = "keyboard-trap-iframe"  # untitled / untabindexed iframe
+RULE_NO_ESCAPE = "keyboard-trap-modal-no-escape"  # legacy; no longer emitted
+RULE_IFRAME = "keyboard-trap-iframe"  # legacy; no longer emitted
 
 # WCAG SC + level. We expose them as constants so callers don't
 # hardcode them (they appear in IssueRow rendering, exports, etc.).
@@ -27,7 +27,7 @@ LEVEL = "A"
 # Documentation pointer. WCAG 2.2 publishes the canonical
 # "Understanding" page per criterion; this one is stable across
 # revisions and is what an editor / developer would search for.
-HELP_URL = "https://www.w3.org/WAI/WCAG21/Understanding/no-keyboard-trap.html"
+HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html"
 
 
 @dataclass(frozen=True)

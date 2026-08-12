@@ -52,8 +52,10 @@ const config: Config = {
         // Semantic surface tokens so components don't hardcode grays
         surface: {
           DEFAULT: "#FFFFFF",
-          subtle: "#F9FAFB",
-          muted: "#F3F4F6",
+          // Cool, quiet neutrals give the evidence-heavy workspace clear
+          // depth without competing with U-M blue or severity signals.
+          subtle: "#F7F9FC",
+          muted: "#F1F4F8",
           raised: "#FFFFFF",
           inverse: "#00274C",
           // Sidebar-specific text colors so dark-on-blue pairs stay AAA.
@@ -61,8 +63,8 @@ const config: Config = {
           "inverse-fg-subtle": "#C9D4E0", // 10.02:1 on UMich Blue
         },
         border: {
-          DEFAULT: "#E5E7EB",
-          strong: "#D1D5DB",
+          DEFAULT: "#DCE3EC",
+          strong: "#B8C4D2",
           focus: "#00274C",
         },
         fg: {
@@ -93,9 +95,10 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        card: "0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 1px rgba(17, 24, 39, 0.04)",
+        card:
+          "0 1px 2px rgba(0, 39, 76, 0.05), 0 6px 18px rgba(0, 39, 76, 0.045)",
         raised:
-          "0 4px 12px rgba(17, 24, 39, 0.08), 0 2px 4px rgba(17, 24, 39, 0.04)",
+          "0 18px 42px rgba(0, 39, 76, 0.12), 0 4px 12px rgba(0, 39, 76, 0.08)",
         // Focus ring: solid UMich Blue (15:1 on white; SC 1.4.11 needs ≥3:1).
         // Use `shadow-focus-inverse` for elements on the dark sidebar.
         focus: "0 0 0 3px #00274C",
@@ -109,8 +112,8 @@ const config: Config = {
         target: "44px",
       },
       borderRadius: {
-        "2xs": "3px",
-        xs: "4px",
+        "2xs": "5px",
+        xs: "8px",
       },
       fontSize: {
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],

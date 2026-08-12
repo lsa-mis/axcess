@@ -8,33 +8,32 @@
 
 ## Executive summary
 
-After self-critique, **6 open issue type(s)** need work (1 already-triaged item(s) moved to Appendix A; 1 best-practice item(s) to Appendix B).
+After self-critique, **3 open issue type(s)** need work (1 already-triaged item(s) moved to Appendix A; 4 review-only or informational item(s) to Appendix B).
 
-Of those, **3 fail WCAG Level A** (the legal floor) and **2 fail Level AA** — Level A issues lock users out entirely and should be fixed first.
+Of those, **1 map to WCAG Level A** and **1 map to Level AA**. These are likely barriers, not a standalone conformance determination; Level A items should be triaged first.
 
-The biggest themes by reach are: *Images don't announce text to screen readers* (on 1 page); *Keyboard users can't escape this element* (on 1 page); *Text doesn't meet the 4.5:1 contrast ratio* (on 1 page).
+The biggest themes by reach are: *Images don't announce text to screen readers* (on 1 page); *Text doesn't meet the 4.5:1 contrast ratio* (on 1 page); *Elements must meet enhanced color contrast* (on 1 page).
 
 **Highest-impact fix this team could ship this week:** *Images don't announce text to screen readers* — Critical, Under 15 minutes, 1 page(s).
 
-Rough effort to clear what this tool can see: **3 quick win(s) (< 15 min each) · 2 medium item(s) (< 2 hr each)**.
+Rough effort to clear what this tool can see: **1 quick win(s) (< 15 min each) · 1 medium item(s) (< 2 hr each)**.
 
 
-## Conformance scorecard
+## Open barrier summary
 
-Open issue types by WCAG conformance level (lower level = more urgent):
+Confirmed open issue groups by mapped WCAG level; prioritize user impact and foundational dependencies:
 
 | Level | Open issue types | What it means |
 |---|---:|---|
-| **A** | 3 | Minimum bar. Failing locks users out — fix first. |
-| **AA** | 2 | The legal/industry target in most jurisdictions. |
-| **AAA** | 1 | Enhanced. Aspirational; fix after A and AA. |
+| **A** | 1 | Foundational requirements; triage promptly alongside actual user impact. |
+| **AA** | 1 | Selected report target; confirm the applicable U-M and legal context. |
+| **AAA** | 1 | Beyond the selected AA target; prioritize where it materially helps users. |
 
 By WCAG principle (the "POUR" model):
 
 | Principle | Open issue types |
 |---|---:|
-| Perceivable | 4 |
-| Operable | 2 |
+| Perceivable | 3 |
 
 ## Who is affected
 
@@ -42,9 +41,7 @@ Each issue is tagged with the user groups it blocks. One issue can affect severa
 
 | User group | Issue types affecting them | Across (page-instances) |
 |---|---:|---:|
-| Vision (blind / low-vision / color-blind) | 5 | 4 |
-| Cognition (memory / attention / language) | 3 | 2 |
-| Motor (keyboard-only / switch / tremor) | 1 | 1 |
+| Vision (blind / low-vision / color-blind) | 2 | 2 |
 
 ## Coverage and method
 
@@ -52,30 +49,31 @@ This audit used multiple detection methods. Each sees different things; together
 
 | Method | Findings here? | What it checks | Confidence |
 |---|---|---|---|
-| **axe-core** | ✅ found issues | Contrast, missing alt/labels, ARIA misuse, landmark structure, heading order, link/button names, target size. | High — near-zero false positives; this is the industry baseline. |
-| **Image-of-text VLM** | ✅ found issues | WCAG 1.4.5 (images of text) and whether the alt conveys the same information the image does. | Medium-high — the model occasionally over-flags decorative images; triage filters those. |
+| **axe-core** | ✅ found issues | Contrast, missing alt/labels, ARIA misuse, landmark structure, heading order, link/button names, target size. | High-confidence deterministic evidence, but rule applicability and remediation still need expert verification; no fixed real-world false-positive rate is claimed. |
+| **Siteimprove Alfa** | — | ACT rules mapped to WCAG 2.2 at the selected level; unresolved `cantTell` outcomes are review leads. | High for failed outcomes; `cantTell` is explicitly not a conformance failure. |
+| **Image-of-text VLM** | ✅ found issues | WCAG 1.4.5 (images of text) and whether the alt conveys the same information the image does. | Medium — OCR/model classification can misread decorative or context-dependent images; every result remains an expert-review lead. |
 | **Per-criterion LLM analyzer** | ✅ found issues | Judgment calls automated tools miss — e.g. SC 2.4.4, whether a link's text actually describes where it goes. | Medium — semantic judgments are inherently fuzzier; treat as strong leads, confirm before mass edits. |
-| **Dynamic keyboard-trap probe** | ✅ found issues | WCAG 2.1.2 — focus stuck on an element, modals that don't release on Escape, untitled tabbable iframes. | High for what it reaches — but only the initial DOM; interaction-triggered traps need manual testing. |
-| **Responsive & zoom probe** | — | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | High for reflow (deterministic geometry); medium for the clipping checks — designed truncation needs a human eye. |
+| **Bidirectional keyboard-exit probe** | ✅ found issues | WCAG 2.1.2 review leads — both directions must remain blocked. Normal wrapping, two-control cycles, modal containment, and opaque embedded contexts are not counted as traps. | Medium — repeatable browser-observed evidence with exact attempt counts. Manually check for documented or state-specific exit commands before recording a failure. |
+| **Responsive & zoom probe** | — | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | Medium — deterministic geometry is useful evidence, but designed truncation and state-specific clipping need an expert decision. |
 | **Live-page focus probe** | — | SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays. | Medium — catches elements whose centre is covered; partial-overlap and post-click overlays still need a human. |
 | **Visual (VLM) probe** | — | SC 1.3.2 — content visually reordered by CSS so screen readers get a different, confusing sequence. | Medium — a vision-model judgement; treat as a lead and confirm. Only runs when a local vision model is available. |
 
-_A “—” means this method produced no findings on this scan — it may have been disabled for the run, or it ran and found nothing. Only axe-core records a definitive ran-clean signal today._
+_A “—” means this method produced no findings on this scan — it may have been disabled for the run, or it ran and found nothing. axe-core and Alfa record definitive ran-clean signals when selected._
 
 _The next section breaks this down to every WCAG 2.2 A/AA success criterion — what was automated, what was AI-assisted, and the full list of what still needs manual testing._
 
 ## WCAG 2.2 A/AA coverage — what's automated vs. manual
 
-Across all **55** Level A/AA success criteria, here is exactly what Axcess can and cannot determine for you. Automated coverage is high-confidence; AI-assisted findings are strong leads you should confirm; manual-only criteria are not detected by any pipeline.
+Across all **55** Level A/AA success criteria, here is exactly what Axcess can and cannot test. Automated results are bounded evidence, AI-assisted findings are review leads, and manual-only criteria are not detected by any pipeline. Every final decision remains part of expert review.
 
 | Coverage | Criteria | What it means |
 |---|---:|---|
-| **Automated** | 6 | A deterministic pipeline catches essentially all testable failures. |
-| **Partly automated** | 16 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **Automated** | 5 | Deterministic checks cover defined machine-testable conditions; an expert verifies applicability and remaining states. |
+| **Partly automated** | 18 | Automated checks catch the mechanical failures; the rest needs a human. |
 | **AI-assisted** | 6 | A local model flags candidates — a human confirms before counting them. |
-| **Manual only** | 27 | No automated detection — a human must test this criterion. |
+| **Manual only** | 26 | No automated detection — a human must test this criterion. |
 
-### Automated &amp; AI-assisted (28 criteria)
+### Automated &amp; AI-assisted (29 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
@@ -85,14 +83,15 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 1.3.2 | Meaningful Sequence | A | AI-assisted | The visual probe screenshots the page and asks a local vision model whether the visual reading order matches the DOM/source order (CSS can reorder content so screen readers hear a different sequence). | Confirm the model's call by tabbing/reading with a screen reader. Subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available. |
 | 1.3.5 | Identify Input Purpose | AA | Partly automated | axe validates that any autocomplete tokens used are valid. | Confirm autocomplete IS present on fields collecting the user's own info (name, email, address) — missing autocomplete isn't auto-detected. |
 | 1.4.1 | Use of Color | A | Partly automated | axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). | Most colour-only meaning — form errors, chart series, required-field markers, status — needs a human to confirm a non-colour cue exists. |
+| 1.4.2 | Audio Control | A | Partly automated | The visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. Autoplay markup alone is not flagged. | Confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy. |
 | 1.4.3 | Contrast (Minimum) | AA | Partly automated | axe measures text/background contrast on the rendered DOM against the 4.5:1 (3:1 large-text) thresholds. | Text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check. |
 | 1.4.4 | Resize Text | AA | Automated | The responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container. | Confirm no loss of content or function across the full zoom range in your target browsers. |
 | 1.4.5 | Images of Text | AA | AI-assisted | OCR + a local vision model judge whether each image is really rendered text rather than a photo/diagram. | Confirm flagged images aren't the allowed exceptions (logos, or text that's essential to a particular presentation). |
 | 1.4.10 | Reflow | AA | Automated | The responsive probe loads each page at 320 CSS px and flags horizontal scrolling / overflow. | Confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use). |
 | 1.4.12 | Text Spacing | AA | Automated | The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap. | Confirm no text is cut off or overlapping with the spacing applied. |
 | 2.1.1 | Keyboard | A | Partly automated | axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page. | Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard — the deepest part of this SC is manual. |
-| 2.1.2 | No Keyboard Trap | A | Automated | The keyboard probe tab-walks the page and tests Esc / iframe escape to detect focus traps. | Traps that only appear after interaction (a modal opened by a click) need a manual pass with the keyboard. |
-| 2.2.2 | Pause, Stop, Hide | A | Partly automated | The visual probe flags the clear no-pause-mechanism cases: autoplaying <video>/<audio> without a controls attribute, and <marquee>. | CSS animations, auto-advancing carousels, and auto-updating regions aren't auto-detected — confirm any content that moves >5s can be paused, stopped, or hidden. |
+| 2.1.2 | No Keyboard Trap | A | Partly automated | The keyboard probe emits a review lead only when the same observable element resists repeated Tab and Shift+Tab exit attempts. It suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus. | Reproduce every lead and test components that appear after interaction. Confirm whether arrow keys, Escape, a close control, or a documented non-standard command lets the user leave before recording a failure. |
+| 2.2.2 | Pause, Stop, Hide | A | Partly automated | The visual probe measures actual playback advancement for visible video longer than five seconds without a detected control. It also records <marquee> as an expert-review lead. | CSS animations, auto-advancing carousels, and auto-updating regions aren't auto-detected — confirm any content that moves >5s can be paused, stopped, or hidden. |
 | 2.4.1 | Bypass Blocks | A | Partly automated | axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. | Confirm the skip link actually moves focus and works with the keyboard. |
 | 2.4.2 | Page Titled | A | Automated | axe checks that every page has a non-empty <title>. | Confirm the title is descriptive and distinguishes the page (a light human check). |
 | 2.4.3 | Focus Order | A | Partly automated | The focus probe flags positive tabindex (WCAG failure F44) — a manual tab order that overrides the natural DOM order and usually breaks the sequence. | Tab through the whole page and confirm the focus order preserves meaning and operability — the order can break without a positive tabindex (e.g. CSS-reordered columns), which still needs a human. |
@@ -108,7 +107,7 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. |
 
-### Needs manual testing (27 criteria)
+### Needs manual testing (26 criteria)
 
 No Axcess pipeline detects these — they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
@@ -120,7 +119,6 @@ No Axcess pipeline detects these — they require a human. Treat this as your ma
 | 1.2.5 | Audio Description (Prerecorded) | AA | Confirm prerecorded video has a synchronized audio description track. |
 | 1.3.3 | Sensory Characteristics | A | Read instructions for reliance on shape/size/location/sound alone ("click the round button to the right") — judgement only a human can make. |
 | 1.3.4 | Orientation | AA | Confirm content isn't locked to portrait or landscape (rotate the device / check for orientation-locking CSS). |
-| 1.4.2 | Audio Control | A | Confirm any audio that plays automatically for >3s can be paused or muted. |
 | 1.4.11 | Non-text Contrast | AA | Check that UI component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. No reliable automated rule exists yet. |
 | 1.4.13 | Content on Hover or Focus | AA | For tooltips/popovers triggered by hover/focus, confirm they're dismissable, hoverable, and persistent. |
 | 2.1.4 | Character Key Shortcuts | A | If single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. |
@@ -140,7 +138,7 @@ No Axcess pipeline detects these — they require a human. Treat this as your ma
 | 3.3.3 | Error Suggestion | AA | Trigger validation errors and confirm the page suggests how to fix them. |
 | 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | For legal/financial/data submissions, confirm reversal, checking, or confirmation is available. |
 | 3.3.7 | Redundant Entry | A | In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. |
-| 3.3.8 | Accessible Authentication (Minimum) | AA | Confirm login doesn't require a cognitive function test (puzzle, memorize) with no alternative. |
+| 3.3.8 | Accessible Authentication (Minimum) | AA | Manually test each in-scope sign-in and MFA step. Confirm it does not require a cognitive function test (for example, solving a puzzle or memorizing/transcribing information) without an accessible alternative. A successful post-MFA crawl only proves that an auditor established a temporary browser session; it does not automatically evaluate or pass the authentication experience. Do not record passwords, OTPs, passkeys, recovery codes, cookies, or session details in this report. |
 
 ## Page hotspots
 
@@ -148,7 +146,7 @@ Pages carrying the most (and most severe) open findings. Fixing shared templates
 
 | Page | Weighted load | Findings shown |
 |---|---:|---:|
-| http://example.com/ (Home) | 20 | 6 |
+| http://example.com/ (Home) | 10 | 3 |
 
 _Weighted load = sum of severity weights (Critical 4 · Serious 3 · Moderate 2 · Minor 1) for the sample locations shown per card._
 
@@ -156,16 +154,13 @@ _Weighted load = sum of severity weights (Critical 4 · Serious 3 · Moderate 2 
 
 The same findings, re-sliced by who fixes them. Hand each team their pack.
 
-### Developers (2 item(s))
+### Developers (1 item(s))
 
-- [ ] **Keyboard users can't escape this element** — Critical, Under 2 hours, 1 page.
 - [ ] **Elements must meet enhanced color contrast** — Serious, Effort: see fix steps, 1 page.
 
-### Content editors (3 item(s))
+### Content editors (1 item(s))
 
 - [ ] **Images don't announce text to screen readers** — Critical, Under 15 minutes, 1 page.
-- [ ] **Images of text have no alt and can't be read** — Critical, Under 15 minutes, 0 pages.
-- [ ] **Links don't describe their purpose (LLM-detected)** — Moderate, Under 15 minutes, 1 page.
 
 ### Designers (1 item(s))
 
@@ -183,7 +178,7 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 **Where:** 1 finding(s) on **1** page(s).
 
 Specific locations:
-- http://example.com/ (Home) → `main > img.banner` — Element has no alt attribute.
+- **Page:** [Home](<http://example.com/>). **Location on page:** Image with class “banner”. **Technical target:** `main > img.banner`. **Observed evidence:** Element has no alt attribute.
 
 **What is happening:**
 
@@ -217,90 +212,7 @@ Blind, low-vision, and screen-reader users get a broken version of the page — 
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/image-alt_
 
-### 2. Keyboard users can't escape this element
-
-**WCAG:** SC 2.1.2 No Keyboard Trap — Level A
-
-**Detected by:** dynamic keyboard-trap probe.
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- http://example.com/ (Home) → `#modal-trap` — Focus stayed on #modal-trap after 5 consecutive Tab presses.
-
-**What is happening:**
-
-Our dynamic keyboard probe pressed Tab repeatedly on the live page and watched <code>document.activeElement</code>. Either focus got stuck on a single element across several consecutive Tab presses (a custom keydown handler swallowed Tab), an open modal dialog held focus inside itself even after Escape, or an iframe is reachable by Tab but has no <code>title</code> and no <code>tabindex="-1"</code> escape valve.
-
-**Why it matters:**
-
-Keyboard-only users — including people who use sip-and-puff, head-tracking, voice control, or simply mice with broken right buttons — can't interact with any content past a trap. Screen reader users hit the same wall when navigating in focus mode. WCAG 2.1.2 is Level A: the lowest possible bar. Failing this criterion functionally locks a portion of your users out of the page entirely.
-
-**Affects:** Motor, Vision, Cognition.
-
-**Severity:** Critical — Completely blocks an assistive-technology user from the affected content — no workaround.
-
-**Effort:** Under 2 hours
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. For stuck-focus findings: open the page, find the element matching the reported selector, and look at any `keydown` / `keypress` handlers attached to it (or its parents). Find the `event.preventDefault()` call that runs on the Tab key. Either remove it or guard it with a check that lets Tab through (`if (e.key === 'Tab') return;`).
-2. For modal-no-escape findings: add an `onKeyDown` handler on the dialog that closes it on `Escape`, OR move to the native `&lt;dialog&gt;` element (which gets this behavior for free). The fix is usually a one-line keyboard listener.
-3. For iframe findings: set `title="..."` on the iframe so screen readers announce what the user is entering. If the embedded document doesn't need keyboard access, set `tabindex="-1"` on the iframe so keyboard users skip past it entirely.
-
-**Verify it is fixed:**
-
-- **Manual:** Open the page. Press Tab repeatedly from the top. Focus should visibly move through every interactive element and eventually reach the browser's address bar. Reverse with Shift+Tab. Open any modals and press Escape — focus should return to the element that opened the modal.
-- **Automated:** Re-run the crawl with `--keyboard-probe` enabled. The same target should not produce a finding on the next pass.
-- **Acceptance:** All affected elements allow keyboard focus to move past them via Tab (or Shift+Tab in reverse), and all modal dialogs release focus to the calling element when the user presses Escape.
-
-**My confidence:** High.
-
-_Rule docs: https://www.w3.org/WAI/WCAG21/Understanding/no-keyboard-trap.html_
-
-### 3. Images of text have no alt and can't be read
-
-**WCAG:** SC 1.4.5 Images of Text — Level AA
-
-**Detected by:** image-of-text VLM.
-
-**Where:** 1 finding(s) on **0** page(s).
-
-Specific locations:
-- http://example.com/ (Home) → image `http://example.com/banner.png` — above the fold; image #1 on the page
-
-**What is happening:**
-
-One or more images contain essential text (headlines, calls to action, signage) but have no alt attribute, or alt="" marking them decorative. Screen readers skip the content entirely.
-
-**Why it matters:**
-
-Blind and low-vision users get a broken version of the page — the headline is silently dropped. Additionally, image text can't be zoomed without pixelation, translated, or selected.
-
-**Affects:** Vision, Cognition.
-
-**Severity:** Critical — Completely blocks an assistive-technology user from the affected content — no workaround.
-
-**Effort:** Under 15 minutes
-
-**Owner:** Editor
-
-**Fix (do this):**
-
-1. Best path: replace the image with real HTML text styled in CSS so users can zoom, translate, and copy it.
-2. Short-term fix: add an alt attribute matching the image's full visible text exactly.
-
-**Verify it is fixed:**
-
-- **Manual:** With a screen reader, tab to each affected image — it should announce the visible text verbatim. Better: see real HTML text in the DOM where the image used to be.
-- **Automated:** Re-run the audit; finding moves to alt_adequacy=adequate or disappears.
-- **Acceptance:** Each affected image either has alt text matching its visible text or has been replaced with semantic HTML text.
-
-**My confidence:** High.
-
-### 4. Text doesn't meet the 4.5:1 contrast ratio
+### 2. Text doesn't meet the 4.5:1 contrast ratio
 
 **WCAG:** SC 1.4.3 Contrast (Minimum) — Level AA
 
@@ -309,7 +221,7 @@ Blind and low-vision users get a broken version of the page — the headline is 
 **Where:** 1 finding(s) on **1** page(s).
 
 Specific locations:
-- http://example.com/ (Home) → `p > span.muted` — Foreground/background contrast is 2.1.
+- **Page:** [Home](<http://example.com/>). **Location on page:** text element containing “low text” with class “muted”. **Technical target:** `p > span.muted`. **Observed evidence:** Foreground/background contrast is 2.1.
 
 **What is happening:**
 
@@ -343,7 +255,7 @@ Users with low vision, color blindness, or who view the site in bright sunlight 
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast_
 
-### 5. Elements must meet enhanced color contrast
+### 3. Elements must meet enhanced color contrast
 
 > ⚠ **Human review needed** — this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
 
@@ -354,7 +266,7 @@ _Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast_
 **Where:** 1 finding(s) on **1** page(s).
 
 Specific locations:
-- http://example.com/ (Home) → `p.subtle` — Contrast 6.1 — fails AAA threshold of 7.
+- **Page:** [Home](<http://example.com/>). **Location on page:** paragraph containing “subtle text” with class “subtle”. **Technical target:** `p.subtle`. **Observed evidence:** Contrast 6.1 — fails AAA threshold of 7.
 
 **What is happening:**
 
@@ -378,49 +290,6 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced_
 
-### 6. Links don't describe their purpose (LLM-detected)
-
-**WCAG:** SC 2.4.4 Link Purpose (In Context) — Level A
-
-**Detected by:** per-criterion LLM analyzer.
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- http://example.com/ (Home) → `a.cta[ord=3]` — Link text 'click here' is not descriptive.
-
-**What is happening:**
-
-Our per-criterion language model reviewed every link on the page, together with up to five levels of ancestor context, and flagged cases where the link text — alone OR with its surrounding paragraph / heading / list-item — doesn't tell a user where the link goes. Common offenders: "click here", "read more", "details", raw URLs, and icon-only links with no aria-label.
-
-**Why it matters:**
-
-Screen-reader users pull up a list of every link on the page and jump between them. A link whose text is "click here" has no meaning out of context, so users either pick wrong or read the surrounding paragraph (an extra read step that ought not be necessary). This is one of the most-reported barriers in real accessibility audits.
-
-**Affects:** Vision, Cognition.
-
-**Severity:** Moderate — 1 finding(s) on 1 page(s).
-
-**Effort:** Under 15 minutes
-
-**Owner:** Editor
-
-**Fix (do this):**
-
-1. Rewrite link text so it names the destination. "Click here to download" becomes "Download the 2025 annual report (PDF)".
-2. For icon-only links, add an `aria-label` that names the action — e.g. `aria-label="Search the catalog"`.
-3. When the link wraps an image, give the image meaningful alt text describing the destination, not the picture.
-
-**Verify it is fixed:**
-
-- **Manual:** Run a screen reader's links-list view (VoiceOver: VO+U then Links; NVDA: K key). Every link should announce its destination clearly without needing the surrounding paragraph for context.
-- **Automated:** Re-run a scan with semantic analyzers enabled — the same model shouldn't flag fixed links on the next pass. Watch for false positives that the model can't reliably distinguish (very long brand names, abbreviations).
-- **Acceptance:** Every link on the affected pages tells a screen-reader user where it goes from its text alone, or from text + immediate heading / paragraph context.
-
-**My confidence:** Medium.
-
-_Rule docs: https://www.w3.org/WAI/WCAG22/Understanding/link-purpose-in-context.html_
-
 ## Appendix A — Findings dropped during self-critique
 
 These issue types *were* detected but every finding in them has already been triaged (remediated, accepted as a risk, or marked a false positive). Listed here so the reader can confirm the self-critique didn't quietly hide a real bug.
@@ -429,12 +298,15 @@ These issue types *were* detected but every finding in them has already been tri
 |---|---|---|---|
 | axe | Form controls have no programmatic label | 4.1.2 | Already triaged: accepted_risk (1) |
 
-## Appendix B — Out of scope but worth knowing
+## Appendix B — Review leads and informational evidence
 
-Best-practice findings (mostly from axe-core) that don't map to a specific WCAG success criterion. They catch real issues — missing landmarks, heading-order quirks — but they aren't WCAG fails in the strict sense. Worth tracking, not blocking.
+These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
-- **Page should contain a level-one heading** (`page-has-heading-one`) — 1 finding(s) on 1 page.
+- **Keyboard users can't escape this element** (`keyboard-trap-stuck`) — 1 finding(s) on 1 page; **expert review / medium confidence**. Measured Tab and Shift+Tab exit attempts both remained on the same observable element; manually check for another documented exit command.
+- **Images of text have no alt and can't be read** (`essential_missing`) — 1 finding(s) on 1 page; **expert review / medium confidence**. OCR/VLM-assisted image lead; confirm purpose and alternative in context.
+- **Page should contain a level-one heading** (`page-has-heading-one`) — 1 finding(s) on 1 page; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
+- **Links don't describe their purpose (LLM-detected)** (`2.4.4`) — 1 finding(s) on 1 page; **expert review / medium confidence**. AI-assisted semantic lead; confirm in page context.
 
 ---
 
-**Scope note.** Automated tooling detects roughly 30-40% of WCAG 2.x AA success criteria. This report combines four methods (see *Coverage and method* above) to push past the usual axe-only ceiling, but a clean run is **necessary, not sufficient** for conformance. The criteria listed under *What we did not check* still require a human.
+**Scope note.** Automated tooling evaluates only defined conditions within a subset of WCAG success criteria and reached page states. This report combines multiple methods, but a clean run is **necessary, not sufficient** for conformance. The manual matrix and recorded limitations remain part of the evaluation.

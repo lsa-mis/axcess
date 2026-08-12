@@ -1,0 +1,6 @@
+-- Rollback 0018.
+--
+-- This migration deliberately cannot recreate a v2 encrypted work item: that
+-- would restore retry-unsafe random evidence aliases. The schema is unchanged
+-- by 0018; invalidated reports stay interrupted and an auditor must create a
+-- new protected report with a v3 work spec.

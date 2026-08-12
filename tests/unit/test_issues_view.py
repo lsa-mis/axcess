@@ -121,6 +121,74 @@ def test_list_issues_unifies_both_pipelines(tmp_db: sqlite3.Connection) -> None:
     assert len(rows) >= 3
 
 
+def test_issue_rows_include_bounded_exact_locations(tmp_db: sqlite3.Connection) -> None:
+    """The primary table gets scan-scoped page and target samples inline."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    contrast = next(row for row in rows if row.issue_key == "axe:color-contrast")
+    assert len(contrast.locations) == 2
+    assert contrast.locations[0].page_url.startswith("http://example.com/")
+    assert contrast.locations[0].target.startswith("p:nth-child(")
+    assert contrast.locations[0].evidence_url == (
+        f"/scans/{scan_id}/pages/{contrast.locations[0].page_id}"
+    )
+
+    image = next(row for row in rows if row.pipeline == "image")
+    assert len(image.locations) == 1
+    assert image.locations[0].target == "Image occurrence 1 (above the fold)"
+    assert "Buy widgets" in (image.locations[0].context or "")
+
+
+def test_alfa_structured_target_is_humanized_for_the_location_column() -> None:
+    raw = (
+        '{"type":"element","name":"img","attributes":['
+        '{"type":"attribute","name":"src","value":"/hero.svg"},'
+        '{"type":"attribute","name":"width","value":"48"}]}'
+    )
+    assert issues_mod._humanize_location_target(raw) == 'img[src="/hero.svg"]'
+    assert issues_mod._humanize_location_target('{"type":"document"}') == "Document root"
+
+
+def test_issue_lanes_keep_review_leads_out_of_barrier_totals(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Only deterministic failures enter the likely-barrier lane."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+    axe_rows = [row for row in rows if row.pipeline == "axe"]
+    image_row = next(row for row in rows if row.pipeline == "image")
+
+    assert all(row.review_lane == "likely_barrier" for row in axe_rows)
+    assert all(row.evidence_confidence == "high" for row in axe_rows)
+    assert all(row.high_confidence_occurrence_count == row.occurrence_count for row in axe_rows)
+    assert image_row.review_lane == "expert_review"
+    assert image_row.evidence_confidence == "medium"
+    assert image_row.high_confidence_occurrence_count == 0
+
+    lanes = issues_mod.review_lane_breakdown(rows)
+    assert lanes["likely_barrier"] == len(axe_rows)
+    assert lanes["expert_review"] >= 1
+
+
+def test_adequate_unclassified_image_is_informational_with_real_page_count(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """An adequate alt comparison is evidence, never an actionable issue."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    tmp_db.execute("UPDATE page_images SET alt_text = 'BUY WIDGETS NOW'")
+    tmp_db.execute("UPDATE analyses SET vlm_classification = NULL")
+
+    row = next(row for row in issues_mod.list_issues(tmp_db, scan_id) if row.pipeline == "image")
+    assert row.issue_key == "image:unclassified_adequate"
+    assert row.review_lane == "informational"
+    assert row.evidence_confidence == "low"
+    assert row.wcag_sc is None
+    assert row.conformance == "BP"
+    assert row.page_count == 1
+    assert row.occurrence_count == 1
+
+
 def test_list_issues_priority_sort_default(tmp_db: sqlite3.Connection) -> None:
     """Default sort is priority_desc — highest-impact row appears first."""
     scan_id = _seed_two_pipelines(tmp_db)
@@ -341,6 +409,190 @@ def _seed_responsive_finding(conn: sqlite3.Connection, scan_id: int, page_id: in
         """,
         (page_id, scan_id),
     )
+
+
+def _seed_keyboard_finding(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    page_id: int,
+    *,
+    rule_id: str,
+    failure_summary: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO page_a11y_findings
+            (page_id, scan_id, pipeline, criterion_sc, rule_id, wcag_sc,
+             wcag_scs, wcag_level, impact, help, help_url, target_selector,
+             failure_summary, html_snippet, target_hash, status)
+        VALUES (?, ?, 'keyboard', '2.1.2', ?, '2.1.2', '2.1.2', 'A',
+            'critical', 'Keyboard users must be able to leave the component.',
+            'https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html',
+            'button#editor', ?, '<button id="editor">Editor</button>', ?, 'new')
+        """,
+        (page_id, scan_id, rule_id, failure_summary, f"hash-{rule_id}"),
+    )
+
+
+def test_legacy_keyboard_heuristic_is_informational_not_a_barrier(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_two_pipelines(tmp_db)
+    page = tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
+    _seed_keyboard_finding(
+        tmp_db,
+        scan_id,
+        int(page["id"]),
+        rule_id="keyboard-trap-iframe",
+        failure_summary="Iframe is reachable by Tab but has no title.",
+    )
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "keyboard")
+    assert row.review_lane == "informational"
+    assert row.evidence_confidence == "low"
+    assert row.wcag_sc is None
+    assert row.conformance == "BP"
+    assert "not a confirmed trap" in row.title.lower()
+    assert "do not report it as a barrier" in row.evidence_summary.lower()
+
+
+def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_two_pipelines(tmp_db)
+    page = tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
+    _seed_keyboard_finding(
+        tmp_db,
+        scan_id,
+        int(page["id"]),
+        rule_id="keyboard-trap-stuck",
+        failure_summary=(
+            "Measured focus exit behavior: 4 Tab attempts and 4 Shift+Tab attempts "
+            "remained on the same element."
+        ),
+    )
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "keyboard")
+    assert row.review_lane == "expert_review"
+    assert row.evidence_confidence == "medium"
+    assert row.wcag_sc == "2.1.2"
+    assert row.conformance == "A"
+    assert row.title == "Keyboard users can't escape this element"
+    assert "both remained" in row.evidence_summary
+
+
+def _seed_visual_motion_finding(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    page_id: int,
+    *,
+    failure_summary: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO page_a11y_findings
+            (page_id, scan_id, pipeline, criterion_sc, rule_id, wcag_sc,
+             wcag_scs, wcag_level, impact, help, help_url, target_selector,
+             failure_summary, html_snippet, target_hash, status)
+        VALUES (?, ?, 'visual', '2.2.2', 'visual-motion-no-pause', '2.2.2',
+            '2.2.2', 'A', 'serious', 'Provide a pause control.',
+            'https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html',
+            'video#hero', ?, '<video id="hero" autoplay></video>', ?, 'new')
+        """,
+        (page_id, scan_id, failure_summary, f"visual-{failure_summary}"),
+    )
+
+
+def test_legacy_autoplay_markup_is_informational_not_a_barrier(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_two_pipelines(tmp_db)
+    page_id = int(
+        tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()[
+            "id"
+        ]
+    )
+    _seed_visual_motion_finding(
+        tmp_db,
+        scan_id,
+        page_id,
+        failure_summary="video autoplays with no controls (no pause mechanism)",
+    )
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "visual")
+    assert row.review_lane == "informational"
+    assert row.evidence_confidence == "low"
+    assert row.wcag_sc is None
+    assert row.conformance == "BP"
+    assert "playback not verified" in row.title.lower()
+
+
+def test_runtime_motion_measurement_remains_an_expert_review_lead(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_two_pipelines(tmp_db)
+    page_id = int(
+        tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()[
+            "id"
+        ]
+    )
+    _seed_visual_motion_finding(
+        tmp_db,
+        scan_id,
+        page_id,
+        failure_summary=(
+            "Runtime playback measurement: video currentTime advanced 0.34 seconds; "
+            "duration is 12.00 seconds"
+        ),
+    )
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "visual")
+    assert row.review_lane == "expert_review"
+    assert row.evidence_confidence == "medium"
+    assert row.wcag_sc == "2.2.2"
+    assert row.wcag_name == "Pause, Stop, Hide"
+
+
+def test_alfa_rows_expose_rule_name_diagnostic_and_outcome_boundary(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_two_pipelines(tmp_db)
+    page_id = int(
+        tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()[
+            "id"
+        ]
+    )
+    for outcome, summary in (
+        (
+            "failed",
+            "The test target fails the following requirements: - The link does not have an "
+            "accessible name",
+        ),
+        ("cant_tell", "The rule has outstanding questions that must be answered"),
+    ):
+        tmp_db.execute(
+            """
+            INSERT INTO page_a11y_findings
+                (page_id, scan_id, pipeline, engine_outcome, criterion_sc, rule_id, wcag_sc,
+                 wcag_scs, wcag_level, help, help_url, target_selector, failure_summary,
+                 target_hash, status)
+            VALUES (?, ?, 'alfa', ?, '2.4.4', 'sia-r11', '2.4.4', '2.4.4', 'A',
+                'WCAG 2.4.4: Link Purpose (In Context)',
+                'https://alfa.siteimprove.com/rules/sia-r11',
+                '{"type":"element","name":"a","attributes":[]}', ?, ?, 'new')
+            """,
+            (page_id, scan_id, outcome, summary, f"alfa-{outcome}"),
+        )
+
+    alfa_rows = [row for row in issues_mod.list_issues(tmp_db, scan_id) if row.pipeline == "alfa"]
+    assert len(alfa_rows) == 2
+    failed = next(row for row in alfa_rows if row.issue_key.endswith(":failed"))
+    review = next(row for row in alfa_rows if row.issue_key.endswith(":cant_tell"))
+    assert failed.review_lane == "likely_barrier"
+    assert failed.wcag_name == "Link Purpose (In Context)"
+    assert "link does not have an accessible name" in failed.title.lower()
+    assert review.review_lane == "expert_review"
+    assert "this is not a failure" in review.evidence_summary.lower()
 
 
 def test_responsive_rows_get_their_own_pipeline_label(

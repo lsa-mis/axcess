@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.ollama_base import OllamaError
 from audit.analyzer.visual.base import (
+    RULE_AUTOPLAY_AUDIO_NO_CONTROL,
     RULE_MEANINGFUL_SEQUENCE,
     RULE_MOTION_NO_PAUSE,
     VisualFinding,
@@ -48,14 +49,14 @@ _DOM_ORDER_JS = """
 }
 """
 
-# SC 2.2.2 (deterministic): auto-moving content with no pause mechanism.
-# High-confidence signals only — autoplay <video>/<audio> without a controls
-# attribute (no built-in pause) and <marquee> (auto-scrolls, no pause). CSS
-# animations / carousels are deliberately NOT flagged here: most are short or
-# decorative, so flagging them would bury the real failures (a human checks
-# those). Returns {selector, html, detail} per offender.
+# Runtime media check. Markup alone is not evidence that media played: a
+# missing/blocked resource, browser autoplay policy, or a zero-length asset can
+# all leave an ``autoplay`` element inert. Measure ``currentTime`` instead and
+# apply the correct criterion: visible video motion is SC 2.2.2; audible audio
+# is SC 1.4.2. Marquee remains a manual-review lead because its duration and
+# any custom control still require page-context review.
 _MOTION_JS = """
-() => {
+async () => {
   const cssPath = (el) => {
     if (el.id) return el.tagName.toLowerCase() + '#' + el.id;
     let p = el.tagName.toLowerCase();
@@ -65,21 +66,59 @@ _MOTION_JS = """
     }
     return p;
   };
+  const hasCustomControl = (media) => {
+    if (media.controls || media.hasAttribute('controls')) return true;
+    if (!media.id) return false;
+    const escaped = (window.CSS && CSS.escape) ? CSS.escape(media.id) : media.id;
+    const controls = document.querySelectorAll(`[aria-controls~="${escaped}"]`);
+    return Array.from(controls).some((control) => {
+      const label = [control.getAttribute('aria-label'), control.getAttribute('title'),
+        control.textContent].filter(Boolean).join(' ').toLowerCase();
+      return /\b(pause|stop|mute|audio|video|playback)\b/.test(label);
+    });
+  };
+  const candidates = Array.from(
+    document.querySelectorAll('video[autoplay], audio[autoplay]')
+  ).filter((media) => !hasCustomControl(media)).map((media) => ({
+    media,
+    start: Number(media.currentTime || 0),
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 350));
   const out = [];
-  for (const v of document.querySelectorAll('video[autoplay], audio[autoplay]')) {
-    if (!v.hasAttribute('controls')) {
-      out.push({
-        selector: cssPath(v),
-        html: (v.outerHTML || '').slice(0, 240),
-        detail: v.tagName.toLowerCase() + ' autoplays with no controls (no pause mechanism)',
-      });
+  for (const {media, start} of candidates) {
+    const end = Number(media.currentTime || 0);
+    const advanced = end - start;
+    const duration = Number(media.duration);
+    const active = !media.paused && !media.ended && media.readyState >= 2 && advanced > 0.05;
+    if (!active) continue;
+    const tag = media.tagName.toLowerCase();
+    const longEnough = !Number.isFinite(duration) || duration > (tag === 'audio' ? 3 : 5);
+    if (!longEnough) continue;
+    if (tag === 'video') {
+      const rect = media.getBoundingClientRect();
+      const style = getComputedStyle(media);
+      const visible = rect.width > 2 && rect.height > 2 && style.display !== 'none' &&
+        style.visibility !== 'hidden' && Number(style.opacity || 1) > 0;
+      if (!visible) continue;
+    } else if (media.muted || media.volume <= 0) {
+      continue;
     }
+    out.push({
+      kind: tag === 'audio' ? 'audio' : 'video',
+      selector: cssPath(media),
+      html: (media.outerHTML || '').slice(0, 240),
+      detail: `Runtime playback measurement: ${tag} currentTime advanced ` +
+        `${advanced.toFixed(2)} seconds; duration is ` +
+        `${Number.isFinite(duration) ? duration.toFixed(2) + ' seconds' : 'continuous'}`,
+    });
   }
   for (const m of document.querySelectorAll('marquee')) {
     out.push({
+      kind: 'motion_review',
       selector: cssPath(m),
       html: (m.outerHTML || '').slice(0, 240),
-      detail: '<marquee> auto-scrolls with no pause/stop control',
+      detail: '<marquee> creates moving content; confirm that it lasts more than 5 seconds ' +
+        'or repeats, and that no custom pause, stop, or hide control is available',
     });
   }
   return out;
@@ -115,7 +154,7 @@ _MAX_BLOCKS = 60
 class VisualProbe:
     """Runs the visual-pipeline checks on a live page.
 
-    - SC 2.2.2 (deterministic): auto-moving content with no pause mechanism.
+    - SC 1.4.2 / 2.2.2 (runtime): playing audio or moving video without controls.
       Always runs — no model needed.
     - SC 1.3.2 (VLM): visual reading order vs DOM order. Only runs when a
       vision ``provider`` is supplied; no-ops otherwise.
@@ -138,7 +177,7 @@ class VisualProbe:
         return findings
 
     async def _check_motion(self, page: Page) -> list[VisualFinding]:
-        """SC 2.2.2 — autoplay media without controls / <marquee>."""
+        """SC 1.4.2 / 2.2.2 — measured autoplay media and marquee leads."""
         raw: Any = await page.evaluate(_MOTION_JS)
         findings: list[VisualFinding] = []
         seen: set[str] = set()
@@ -150,21 +189,37 @@ class VisualProbe:
                 continue
             seen.add(selector)
             detail = str(item.get("detail") or "auto-moving content with no pause control")
+            kind = str(item.get("kind") or "motion_review")
+            if kind == "audio":
+                rule_id = RULE_AUTOPLAY_AUDIO_NO_CONTROL
+                criterion_sc = "1.4.2"
+                help_text = (
+                    "Do not start audible audio automatically, or provide a visible way to "
+                    "pause or stop it or control its volume independently of system volume."
+                )
+                criterion_note = (
+                    "Audio that plays automatically for more than 3 seconds needs an "
+                    "independent pause, stop, or volume control."
+                )
+            else:
+                rule_id = RULE_MOTION_NO_PAUSE
+                criterion_sc = "2.2.2"
+                help_text = (
+                    "Add a visible pause, stop, or hide control, or avoid automatic motion. "
+                    "For video, native controls are acceptable when they expose that control."
+                )
+                criterion_note = (
+                    "Moving content that lasts more than 5 seconds and appears alongside "
+                    "other content needs a way to pause, stop, or hide it."
+                )
             findings.append(
                 VisualFinding(
-                    rule_id=RULE_MOTION_NO_PAUSE,
+                    rule_id=rule_id,
                     target_selector=selector,
-                    failure_summary=(
-                        f"{detail}. Content that moves for more than 5 seconds must have a "
-                        f"way to pause, stop, or hide it."
-                    ),
+                    failure_summary=f"{detail}. {criterion_note}",
                     html_snippet=str(item.get("html") or ""),
-                    help=(
-                        "Add a visible pause/stop control (e.g. the <video controls> "
-                        "attribute), or don't autoplay; replace <marquee> with static "
-                        "or user-controlled motion."
-                    ),
-                    criterion_sc="2.2.2",
+                    help=help_text,
+                    criterion_sc=criterion_sc,
                     wcag_level="A",
                 )
             )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import getpass
 from pathlib import Path
 from typing import Annotated
 
@@ -20,6 +21,18 @@ from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.exports.xlsx_export import render_xlsx
+from audit.protected.companion import (
+    CompanionCrawlStats,
+    CompanionError,
+    CompanionTlsConfig,
+    ProtectedCompanionClient,
+    ProtectedCompanionRunner,
+)
+from audit.protected.repository import purge_expired_protected_data
+from audit.protected.vaults import (
+    has_irreversible_protected_vault,
+    resolve_configured_protected_vault,
+)
 from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
@@ -31,6 +44,186 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+protected_companion_app = typer.Typer(
+    help=(
+        "Run the paired local browser for an authorized protected scan. "
+        "It never accepts site passwords, MFA factors, or browser session state."
+    ),
+    no_args_is_help=True,
+    add_completion=False,
+)
+app.add_typer(protected_companion_app, name="protected-companion")
+
+
+def _companion_tls(
+    certificate: Path,
+    private_key: Path,
+    ca_bundle: Path | None,
+) -> CompanionTlsConfig:
+    try:
+        return CompanionTlsConfig(
+            certificate=certificate,
+            private_key=private_key,
+            ca_bundle=ca_bundle,
+        )
+    except CompanionError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2) from None
+
+
+@protected_companion_app.command("pair")
+def protected_companion_pair(
+    server: Annotated[str, typer.Option("--server", help="Exact HTTPS Axcess service origin.")],
+    enrollment_id: Annotated[str, typer.Option("--enrollment-id", help="One-time enrollment id.")],
+    certificate: Annotated[
+        Path,
+        typer.Option(
+            "--certificate",
+            exists=True,
+            readable=True,
+            help="Local companion mTLS certificate.",
+        ),
+    ],
+    private_key: Annotated[
+        Path,
+        typer.Option(
+            "--private-key",
+            exists=True,
+            readable=True,
+            help="Local companion mTLS private key.",
+        ),
+    ],
+    ca_bundle: Annotated[
+        Path | None,
+        typer.Option("--ca-bundle", exists=True, readable=True, help="Optional private CA bundle."),
+    ] = None,
+) -> None:
+    """Claim one scan-bound pairing with a one-time code entered privately."""
+    tls = _companion_tls(certificate, private_key, ca_bundle)
+    # The pairing code is deliberately prompted, never accepted as a command
+    # argument (shell history/process listings), config value, or environment
+    # variable. It is not a target password or MFA factor.
+    pairing_code = getpass.getpass("One-time pairing code: ")
+
+    async def claim() -> dict[str, object]:
+        async with ProtectedCompanionClient(
+            server=server, enrollment_id=enrollment_id, tls=tls
+        ) as client:
+            return await client.claim(pairing_code)
+
+    try:
+        response = asyncio.run(claim())
+    except CompanionError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+    finally:
+        pairing_code = ""
+    console.print(
+        f"[green]Paired[/green] companion for protected scan #{response.get('scan_id', '?')}. "
+        "Run the companion command next to open the headed manual sign-in browser."
+    )
+
+
+@protected_companion_app.command("run")
+def protected_companion_run(
+    server: Annotated[str, typer.Option("--server", help="Exact HTTPS Axcess service origin.")],
+    enrollment_id: Annotated[str, typer.Option("--enrollment-id", help="Claimed enrollment id.")],
+    certificate: Annotated[
+        Path,
+        typer.Option(
+            "--certificate",
+            exists=True,
+            readable=True,
+            help="Local companion mTLS certificate.",
+        ),
+    ],
+    private_key: Annotated[
+        Path,
+        typer.Option(
+            "--private-key",
+            exists=True,
+            readable=True,
+            help="Local companion mTLS private key.",
+        ),
+    ],
+    ca_bundle: Annotated[
+        Path | None,
+        typer.Option("--ca-bundle", exists=True, readable=True, help="Optional private CA bundle."),
+    ] = None,
+) -> None:
+    """Open a headed browser, wait for human sign-in, then crawl read-only."""
+    tls = _companion_tls(certificate, private_key, ca_bundle)
+
+    async def run() -> CompanionCrawlStats:
+        async with ProtectedCompanionClient(
+            server=server, enrollment_id=enrollment_id, tls=tls
+        ) as client:
+            return await ProtectedCompanionRunner(client).run()
+
+    try:
+        stats = asyncio.run(run())
+    except KeyboardInterrupt:
+        console.print("[yellow]Protected scan interrupted; browser session was closed.[/yellow]")
+        raise typer.Exit(code=130) from None
+    except CompanionError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+    console.print(
+        "[green]Protected scan completed.[/green] "
+        f"{stats.pages_indexed} page(s) indexed; {stats.issue_leads_indexed} issue lead(s); "
+        f"{stats.images_checked} image(s) checked."
+    )
+
+
+@app.command("protected-maintenance")
+def protected_maintenance() -> None:
+    """Perform scheduled, KMS-backed seven-day protected-evidence cleanup.
+
+    This command is intentionally independent of ``protected_scans_enabled``:
+    an emergency feature disable must not suspend mandatory retention cleanup.
+    It accepts no target, scan ID, KMS path, credential, or key argument. The
+    deployment's reviewed vault factory is the only supported source of a
+    production KMS, and output reports a count only so cron/system logs never
+    become another protected-report metadata channel.
+    """
+
+    settings = get_settings()
+    vault = resolve_configured_protected_vault(settings)
+    if not has_irreversible_protected_vault(vault):
+        console.print(
+            "[red]Protected maintenance requires a configured production KMS "
+            "with irreversible per-scan key destruction.[/red]"
+        )
+        raise typer.Exit(code=2)
+    if not settings.db_path.is_file():
+        console.print(
+            "[red]Protected maintenance could not open the configured audit database.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    conn = None
+    try:
+        conn = connect(settings.db_path)
+        purged_scan_ids = purge_expired_protected_data(conn, vault=vault)
+    except Exception:
+        # KMS adapters can raise provider diagnostics containing endpoint or
+        # account details. The repository has already failed closed (no row is
+        # marked erased until its key revoke succeeds); keep scheduler output
+        # equally non-sensitive and rely on approved deployment observability
+        # to diagnose the provider integration.
+        console.print(
+            "[red]Protected maintenance did not complete; protected evidence "
+            "was not marked erased.[/red]"
+        )
+        raise typer.Exit(code=1) from None
+    finally:
+        if conn is not None:
+            conn.close()
+
+    console.print(
+        "[green]Protected maintenance completed.[/green] "
+        f"{len(purged_scan_ids)} protected report(s) cryptographically erased."
+    )
 
 
 @app.command()
@@ -133,8 +326,8 @@ def crawl(
             "--skip-keyboard",
             help=(
                 "Skip the SC 2.1.2 (No Keyboard Trap) dynamic probe. "
-                "Saves ~1-3s per rendered page at the cost of losing the "
-                "only automated Level-A keyboard-trap coverage."
+                "Saves ~1-3s per rendered page at the cost of losing "
+                "bidirectional keyboard-exit review leads."
             ),
         ),
     ] = False,
@@ -464,6 +657,20 @@ def export(
                 raise typer.Exit(code=1)
             scan_id = int(row["id"])
 
+        # The CLI has no identity-aware-proxy assertion or protected-report
+        # permission. Never let its ordinary filesystem writers become a
+        # bypass for authenticated-site evidence; the browser workflow has a
+        # dedicated, explicit redacted in-memory download instead.
+        protected = conn.execute(
+            "SELECT 1 FROM protected_scans WHERE scan_id = ?", (scan_id,)
+        ).fetchone()
+        if protected is not None:
+            console.print(
+                "[red]Protected scans cannot be exported from the CLI.[/red] "
+                "Use the identity-protected redacted export in the protected report UI."
+            )
+            raise typer.Exit(code=1)
+
         scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
         rendered: str | bytes
         if fmt_lower == "xlsx":
@@ -552,6 +759,17 @@ def status() -> None:
     table.add_row("Started", str(row["started_at"]))
     table.add_row("Finished", str(row["finished_at"] or "-"))
     console.print(table)
+
+
+def companion_main() -> None:
+    """Run the standalone local companion command.
+
+    This is intentionally a narrow alias for ``audit protected-companion``:
+    it exposes only the pre-bound pairing and headed manual-authentication
+    subcommands, rather than the public crawler, exports, or database tools.
+    """
+
+    protected_companion_app()
 
 
 if __name__ == "__main__":

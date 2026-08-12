@@ -45,7 +45,8 @@ METHOD_LABELS: dict[str, str] = {
     "manual": "Manual only",
 }
 METHOD_BLURB: dict[str, str] = {
-    "automated": "A deterministic pipeline catches essentially all testable failures.",
+    "automated": "Deterministic checks cover defined machine-testable conditions; "
+    "an expert verifies applicability and remaining states.",
     "partial": "Automated checks catch the mechanical failures; the rest needs a human.",
     "ai-assisted": "A local model flags candidates — a human confirms before counting them.",
     "manual": "No automated detection — a human must test this criterion.",

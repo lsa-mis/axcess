@@ -17,6 +17,14 @@ from audit import coverage_matrix
 OUTCOMES = frozenset({"not_started", "pass", "fail", "not_tested", "needs_follow_up"})
 EVALUATION_STATUSES = frozenset({"draft", "in_progress", "completed"})
 
+_COMPLETION_CONTEXT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("reviewer", "reviewer"),
+    ("purpose", "purpose"),
+    ("scope_included", "included scope"),
+    ("methods_note", "methods used"),
+    ("limitations", "limitations"),
+)
+
 _DEFAULT_EVALUATION: dict[str, str] = {
     "target_standard": "WCAG 2.2",
     "target_level": "AA",
@@ -29,6 +37,14 @@ _DEFAULT_EVALUATION: dict[str, str] = {
     "limitations": "",
     "status": "draft",
 }
+
+
+class EvaluationCompletionError(ValueError):
+    """An evaluation cannot enter or remain in an invalid completed state."""
+
+    def __init__(self, blockers: list[str]) -> None:
+        self.blockers = tuple(blockers)
+        super().__init__("Evaluation cannot be completed. " + " ".join(blockers))
 
 
 def get_evaluation(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
@@ -62,6 +78,10 @@ def upsert_evaluation(
         raise ValueError("target_level must be A, AA, or AAA")
     if merged["status"] not in EVALUATION_STATUSES:
         raise ValueError("invalid evaluation status")
+    if merged["status"] == "completed":
+        blockers = evaluation_completion_blockers(conn, scan_id, merged)
+        if blockers:
+            raise EvaluationCompletionError(blockers)
     conn.execute(
         """
         INSERT INTO evaluation_reports (
@@ -159,6 +179,108 @@ def list_manual_checks(conn: sqlite3.Connection, scan_id: int) -> list[dict[str,
     return checks
 
 
+def evaluation_completion_blockers(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    record: dict[str, Any],
+) -> list[str]:
+    """Explain every bounded condition preventing a final evaluation.
+
+    A final state is a claim about review completeness, not merely a display
+    preference. Required context must be explicit, every WCAG matrix row must
+    have a terminal expert decision, and each decision must explain its basis.
+    A ``not_tested`` rationale is the criterion-level documentation of that
+    evaluation limitation; the report-level limitations field is required too.
+    """
+
+    blockers: list[str] = []
+    missing_context = [
+        label
+        for field, label in _COMPLETION_CONTEXT_FIELDS
+        if not str(record.get(field) or "").strip()
+    ]
+    if missing_context:
+        blockers.append("Required context is missing: " + ", ".join(missing_context) + ".")
+
+    checks = list_manual_checks(conn, scan_id)
+    not_started = [
+        check["criterion"]["sc"] for check in checks if check["outcome"] == "not_started"
+    ]
+    needs_follow_up = [
+        check["criterion"]["sc"] for check in checks if check["outcome"] == "needs_follow_up"
+    ]
+    missing_rationale = [
+        check["criterion"]["sc"]
+        for check in checks
+        if check["outcome"] != "not_started" and not str(check["rationale"] or "").strip()
+    ]
+    if not_started:
+        blockers.append(_criterion_blocker(not_started, "not started"))
+    if needs_follow_up:
+        blockers.append(_criterion_blocker(needs_follow_up, "still need follow-up"))
+    if missing_rationale:
+        blockers.append(
+            _criterion_blocker(
+                missing_rationale,
+                "have no rationale; Pass, Fail, Not tested, and Needs follow-up decisions "
+                "require one",
+            )
+        )
+    return blockers
+
+
+def _criterion_blocker(criteria: list[str], description: str) -> str:
+    """Return a bounded completion message with useful example criterion IDs."""
+
+    preview = ", ".join(criteria[:5])
+    suffix = f", and {len(criteria) - 5} more" if len(criteria) > 5 else ""
+    noun = "criterion" if len(criteria) == 1 else "criteria"
+    return f"{len(criteria)} manual {noun} {description}: {preview}{suffix}."
+
+
+def list_manual_check_outcomes(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
+    """Return the WCAG matrix without loading any free-text review evidence.
+
+    This projection is for constrained workflows such as protected reports,
+    where an outcome is safe to retain but an evaluator's rationale, page
+    reference, or evidence note must not be read from the public-report
+    tables. It intentionally does *not* call :func:`list_manual_checks`.
+    """
+
+    # Do not use ``get_evaluation`` here. It intentionally selects the
+    # public-report scope, reviewer, methods, and limitation prose, which a
+    # protected outcome-only view must neither return *nor load at all*.
+    evaluation_row = conn.execute(
+        "SELECT id FROM evaluation_reports WHERE scan_id = ?", (scan_id,)
+    ).fetchone()
+    result_rows: list[sqlite3.Row] = []
+    if evaluation_row is not None:
+        result_rows = conn.execute(
+            "SELECT criterion_sc, outcome, tested_at, updated_at "
+            "FROM manual_check_results WHERE evaluation_report_id = ?",
+            (int(evaluation_row["id"]),),
+        ).fetchall()
+    by_sc = {str(row["criterion_sc"]): row for row in result_rows}
+    checks: list[dict[str, Any]] = []
+    for criterion in coverage_matrix.load_matrix():
+        result = by_sc.get(criterion.sc)
+        checks.append(
+            {
+                "criterion": {
+                    "sc": criterion.sc,
+                    "name": criterion.name,
+                    "level": criterion.level,
+                    "method": criterion.method,
+                    "manual_check": criterion.manual_check,
+                },
+                "outcome": str(result["outcome"]) if result is not None else "not_started",
+                "tested_at": result["tested_at"] if result is not None else None,
+                "updated_at": result["updated_at"] if result is not None else None,
+            }
+        )
+    return checks
+
+
 def update_manual_check(
     conn: sqlite3.Connection,
     *,
@@ -172,6 +294,22 @@ def update_manual_check(
         raise ValueError("Unknown WCAG criterion")
     if outcome not in OUTCOMES:
         raise ValueError("Unknown manual-check outcome")
+    rationale = rationale.strip()
+    if outcome != "not_started" and not rationale:
+        raise ValueError(
+            "A rationale is required for Pass, Fail, Not tested, and Needs follow-up decisions."
+        )
+    current_evaluation = get_evaluation(conn, scan_id)
+    if current_evaluation["status"] == "completed" and outcome in {
+        "not_started",
+        "needs_follow_up",
+    }:
+        raise EvaluationCompletionError(
+            [
+                "Reopen the evaluation before setting a manual criterion to "
+                f"{outcome.replace('_', ' ')}."
+            ]
+        )
     evaluation_id = _ensure_evaluation_id(conn, scan_id)
     conn.execute(
         """
@@ -195,6 +333,63 @@ def update_manual_check(
         for check in list_manual_checks(conn, scan_id)
         if check["criterion"]["sc"] == criterion_sc
     )
+
+
+def update_manual_check_outcome_only(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    criterion_sc: str,
+    outcome: str,
+) -> dict[str, Any]:
+    """Persist a bounded manual result without accepting or loading prose.
+
+    Existing public-report free text is overwritten with an empty rationale on
+    this specific result. The function neither selects nor returns evidence
+    rows, so callers can safely use it at a protected-report boundary.
+    """
+
+    if coverage_matrix.by_sc(criterion_sc) is None:
+        raise ValueError("Unknown WCAG criterion")
+    if outcome not in OUTCOMES:
+        raise ValueError("Unknown manual-check outcome")
+    # This dedicated helper avoids reading or copying an existing public
+    # evaluation record's free-text fields into a protected workflow.
+    evaluation_id = _ensure_evaluation_id_outcome_only(conn, scan_id)
+    conn.execute(
+        """
+        INSERT INTO manual_check_results (
+            evaluation_report_id, criterion_sc, outcome, rationale, tested_at
+        )
+        VALUES (?, ?, ?, '', CASE WHEN ? = 'not_started' THEN NULL ELSE CURRENT_TIMESTAMP END)
+        ON CONFLICT(evaluation_report_id, criterion_sc) DO UPDATE SET
+            outcome = excluded.outcome,
+            rationale = '',
+            tested_at = CASE
+                WHEN excluded.outcome = 'not_started' THEN NULL
+                ELSE CURRENT_TIMESTAMP
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (evaluation_id, criterion_sc, outcome, outcome),
+    )
+    return next(
+        check
+        for check in list_manual_check_outcomes(conn, scan_id)
+        if check["criterion"]["sc"] == criterion_sc
+    )
+
+
+def _ensure_evaluation_id_outcome_only(conn: sqlite3.Connection, scan_id: int) -> int:
+    """Return/create an evaluation row without selecting its prose fields."""
+
+    row = conn.execute("SELECT id FROM evaluation_reports WHERE scan_id = ?", (scan_id,)).fetchone()
+    if row is not None:
+        return int(row["id"])
+    cur = conn.execute("INSERT INTO evaluation_reports (scan_id) VALUES (?)", (scan_id,))
+    if cur.lastrowid is None:  # pragma: no cover - SQLite insert invariant
+        raise RuntimeError("manual outcome evaluation record was not created")
+    return int(cur.lastrowid)
 
 
 def add_manual_evidence(
@@ -263,7 +458,7 @@ def get_page_evidence(
             """
             SELECT id, pipeline, rule_id, criterion_sc, wcag_sc, wcag_level,
                    impact, help, target_selector, failure_summary, html_snippet,
-                   status, screenshot_hash
+                   status, screenshot_hash, engine_outcome, engine_evidence_json
               FROM page_a11y_findings
              WHERE page_id = ? AND scan_id = ?
              ORDER BY CASE impact WHEN 'critical' THEN 0 WHEN 'serious' THEN 1

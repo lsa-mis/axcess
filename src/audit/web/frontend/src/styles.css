@@ -6,10 +6,20 @@
 @layer base {
   html {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Wide evidence tables scroll in their named local region; they must not
+       create a second, document-level horizontal scroll area at 320px. */
+    overflow-x: hidden;
+    background: theme("colors.surface.subtle");
   }
   body {
     @apply bg-surface-subtle text-fg;
     font-synthesis-weight: none;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: theme("colors.umich.maize");
+    color: theme("colors.umich.blue");
   }
   :focus-visible {
     outline: 3px solid theme("colors.umich.maize");
@@ -21,6 +31,21 @@
   }
   a:hover {
     @apply underline;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  tbody tr {
+    transition: background-color 140ms ease;
   }
   /* Visually-hidden utility */
   .sr-only-focusable:not(:focus):not(:focus-within) {
@@ -39,10 +64,10 @@
 @layer components {
   /* Shared form control: visible border, large hit area, and no colour-only state. */
   .field {
-    @apply min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg shadow-sm;
+    @apply min-h-target w-full rounded-xs border border-border-strong bg-surface px-3 py-2 text-sm text-fg shadow-sm transition-colors;
   }
   .field:focus-visible {
-    @apply border-umich-blue;
+    @apply border-umich-blue shadow-none;
   }
   /* Severity chip */
   .sev-chip {

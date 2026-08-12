@@ -34,6 +34,15 @@ def _completed_scan(conn: sqlite3.Connection, scan_id: int) -> sqlite3.Row:
     ).fetchone()
     if scan is None:
         raise ValueError("Report not found")
+    # Protected scans may contain authenticated-site evidence.  The first
+    # MCP release is intentionally read-only and has no user/proxy identity
+    # context, so it must fail closed rather than becoming a data-egress
+    # bypass.  Authorized reviewers use the protected browser UI instead.
+    protected = conn.execute(
+        "SELECT 1 FROM protected_scans WHERE scan_id = ?", (scan_id,)
+    ).fetchone()
+    if protected is not None:
+        raise ValueError("Protected reports are unavailable through MCP")
     if scan["status"] != "completed":
         raise ValueError("Report is not complete")
     return cast(sqlite3.Row, scan)

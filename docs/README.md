@@ -26,7 +26,11 @@ diff across rescans.
 5. **[Hosting](./hosting.md)** — run it for a small team on an always-on
    machine (LAN / Tailscale + the opt-in shared-token gate).
 
-6. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
+6. **[Protected scans](./protected-scans.md)** — the U-M deployment controls,
+   companion handoff, retention model, and manual authentication review for an
+   authorized 1FA/MFA target. This is not part of the normal LAN quick start.
+
+7. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
    gets stuck, when a site blocks the crawler, when Ollama isn't
    answering, when scope creeps.
 

@@ -8,8 +8,20 @@ and the optional shared-token gate.
 
 from __future__ import annotations
 
+import csv
+import sqlite3
+from io import BytesIO, StringIO
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
+
+from audit import coverage_matrix, evaluation
+from audit.db import repo
+from audit.db.schema import connect
+from audit.web import issues
 
 pytestmark = pytest.mark.ui
 
@@ -96,6 +108,71 @@ def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, in
     assert body["previous_scan_id"] is None  # only one scan seeded
     assert body["blocked"] is None
     assert body["progress"] is None  # not running
+    methods = {method["key"]: method for method in body["methods_used"]}
+    assert "Accessibility Conformance Testing" in methods["alfa"]["label"]
+    assert "specific accessibility conditions" in methods["alfa"]["description"]
+    assert "not proof" in methods["alfa"]["caveat"]
+    assert methods["semantic"]["label"] == "Semantic review (local AI)"
+    assert "link purpose" in methods["semantic"]["description"]
+    assert methods["semantic"]["state"] == "coverage_unknown"
+    assert methods["semantic"]["result"] == "Coverage not recorded for this older scan"
+
+
+def test_api_scan_detail_reports_actual_method_coverage(
+    client: TestClient, seeded_db: tuple[object, object, int]
+) -> None:
+    import json as _json
+    import sqlite3 as _sqlite3
+
+    db_path, _, _ = seeded_db
+    config = _json.dumps(
+        {
+            "js_eager": True,
+            "axe_enabled": True,
+            "alfa_enabled": True,
+            "ocr_enabled": True,
+            "vlm_enabled": True,
+            "semantic_enabled": True,
+            "keyboard_probe_enabled": True,
+            "responsive_checks_enabled": True,
+            "method_coverage_version": 1,
+        }
+    )
+    conn = _sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, config_json, "
+            "axe_pages_scanned, alfa_pages_scanned, semantic_pages_analyzed, "
+            "keyboard_pages_probed, responsive_pages_probed) "
+            "VALUES ('https://coverage.example/', 'completed', 2, ?, 2, 1, 2, 2, 1)",
+            (config,),
+        )
+        scan_id = int(cur.lastrowid or 0)
+        conn.execute(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, render_mode) "
+            "VALUES (?, 'https://coverage.example/', 200, 'js')",
+            (scan_id,),
+        )
+        conn.execute(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, render_mode) "
+            "VALUES (?, 'https://coverage.example/about', 200, 'js')",
+            (scan_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    response = client.get(f"/api/scans/{scan_id}")
+    assert response.status_code == 200
+    methods = {method["key"]: method for method in response.json()["methods_used"]}
+    assert methods["axe"]["state"] == "checked"
+    assert methods["axe"]["result"] == "2 pages checked"
+    assert methods["alfa"]["state"] == "partial"
+    assert methods["alfa"]["result"] == "1 of 2 pages checked"
+    assert methods["semantic"]["state"] == "checked"
+    assert methods["keyboard"]["state"] == "checked"
+    assert methods["responsive"]["state"] == "partial"
+    assert methods["image"]["result"] == "No images found to analyze"
 
 
 def test_api_scan_detail_404(client: TestClient) -> None:
@@ -197,6 +274,202 @@ def test_api_create_scan_rejects_bad_url(client: TestClient) -> None:
     assert "error" in resp.json()
 
 
+def test_local_login_scan_rejects_non_loopback_browser(client: TestClient) -> None:
+    """The certificate-free convenience flow must never become a LAN API."""
+
+    response = client.post(
+        "/api/local-login-scans",
+        headers={"origin": "http://testserver"},
+        json={
+            "seed_url": "https://app.example.test/secure/",
+            "approved_auth_origins": ["https://login.example.test"],
+            "authorization_acknowledged": True,
+            "max_pages": 10,
+            "max_depth": 2,
+            "rps": 1,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == (
+        "Direct login scanning is restricted to this Axcess computer."
+    )
+
+
+def test_local_login_scan_starts_from_same_loopback_origin(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The local UI can create its in-memory headed-browser handoff."""
+
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    monkeypatch.setattr(
+        server,
+        "alfa_availability",
+        lambda: SimpleNamespace(available=True, reason=None),
+    )
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        capability = local_client.get("/api/capabilities/protected-scans")
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "approved_auth_origins": ["https://login.example.test"],
+                "authorization_acknowledged": True,
+                "max_pages": 10,
+                "max_depth": 4,
+                "rps": 0.5,
+                "whole_host": True,
+                "scan_engine": "both",
+                "axe_level": "AAA",
+                "skip_keyboard": True,
+                "skip_responsive": True,
+                "skip_ocr": True,
+                "skip_vlm": True,
+            },
+        )
+
+    assert capability.status_code == 200
+    assert capability.json()["local_available"] is True
+    assert response.status_code == 201
+    assert response.json()["status"] == "opening_browser"
+    assert isinstance(response.json()["scan_id"], int)
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.max_pages == 10
+    assert config.max_depth == 4
+    assert config.rps == 0.5
+    assert config.whole_host is True
+    assert config.axe_level == "AAA"
+    assert config.axe_enabled is True
+    assert config.keyboard_probe_enabled is False
+    assert config.responsive_checks_enabled is False
+    assert config.workers == 1
+    assert config.alfa_enabled is True
+    assert config.browser_only is True
+    assert config.image_extraction_enabled is False
+
+
+def test_local_login_scan_rejects_selected_unavailable_alfa(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A selected login engine must fail loudly instead of producing zero coverage."""
+
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    monkeypatch.setattr(
+        server,
+        "alfa_availability",
+        lambda: SimpleNamespace(available=False, reason="Install the pinned Alfa runner."),
+    )
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "scan_engine": "alfa",
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Install the pinned Alfa runner."}
+
+
+def test_local_login_scan_enables_acknowledged_local_image_analysis(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "approved_auth_origins": [],
+                "authorization_acknowledged": True,
+                "skip_ocr": False,
+                "skip_vlm": False,
+                "image_analysis_acknowledged": True,
+            },
+        )
+
+    assert response.status_code == 201
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.browser_only is True
+    assert config.image_extraction_enabled is True
+    assert config.ocr_enabled is True
+    assert config.vlm_enabled is True
+    assert config.vlm_base_url == "http://127.0.0.1:11434"
+
+
+def test_local_login_image_analysis_requires_storage_acknowledgement(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/local-login-scans",
+        json={
+            "seed_url": "https://app.example.test/secure/",
+            "authorization_acknowledged": True,
+            "skip_ocr": False,
+            "skip_vlm": True,
+            "image_analysis_acknowledged": False,
+        },
+    )
+
+    # Validation happens before the loopback-only convenience-flow guard.
+    assert response.status_code == 422
+
+
 def test_api_create_scan_kicks_off_crawl(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -250,6 +523,7 @@ def test_api_create_scan_respects_whole_host(
         captured["whole_host"] = config.whole_host
         captured["seed_url"] = config.seed_url
         captured["axe_level"] = config.axe_level
+        captured["browser_headless"] = config.browser_headless
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -261,6 +535,7 @@ def test_api_create_scan_respects_whole_host(
             "rps": 1.0,
             "workers": 1,
             "whole_host": True,
+            "show_browser": True,
             "axe_level": "AAA",
             "skip_ocr": True,
             "skip_vlm": True,
@@ -278,6 +553,68 @@ def test_api_create_scan_respects_whole_host(
     assert captured.get("seed_url") == "https://example.test/docs"
     # The chosen conformance target reaches the crawl config.
     assert captured.get("axe_level") == "AAA"
+    assert captured.get("browser_headless") is False
+
+
+def test_api_create_scan_selects_alfa_engine(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The browser-facing engine selector maps to mutually clear config flags."""
+    from audit.analyzer.alfa import AlfaAvailability
+    from audit.web import server as _server
+
+    captured: dict[str, object] = {}
+
+    async def _capture(db_path, config):  # type: ignore[no-untyped-def]
+        captured["axe_enabled"] = config.axe_enabled
+        captured["alfa_enabled"] = config.alfa_enabled
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _capture)
+    monkeypatch.setattr(_server, "alfa_availability", lambda: AlfaAvailability(True))
+    response = client.post(
+        "/api/scans",
+        json={
+            "url": "https://example.test/docs",
+            "max_pages": 1,
+            "max_depth": 1,
+            "rps": 1,
+            "workers": 1,
+            "scan_engine": "alfa",
+            "skip_ocr": True,
+            "skip_vlm": True,
+        },
+    )
+    assert response.status_code == 201
+    import asyncio as _asyncio
+
+    loop = _asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    assert captured == {"axe_enabled": False, "alfa_enabled": True}
+
+
+def test_api_create_scan_rejects_unavailable_alfa(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from audit.analyzer.alfa import AlfaAvailability
+    from audit.web import server as _server
+
+    monkeypatch.setattr(
+        _server,
+        "alfa_availability",
+        lambda: AlfaAvailability(False, "Alfa dependencies are unavailable."),
+    )
+    response = client.post(
+        "/api/scans", json={"url": "https://example.test/", "scan_engine": "alfa"}
+    )
+    assert response.status_code == 422
+    assert "Alfa dependencies" in response.json()["error"]
 
 
 def test_api_cancel_endpoint(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
@@ -364,6 +701,17 @@ def test_api_running_scan_includes_in_flight_and_recent(
     assert in_flight[0]["attempts"] == 0
     assert progress["pending"] == 1
     assert progress["leased"] == 1
+    assert progress["completed"] == 0
+    assert progress["discovered"] == 2
+    assert progress["stage"] == "scanning"
+    assert progress["rendered_pages"] == 0
+    assert progress["static_pages"] == 1
+    assert progress["eta"] == {
+        "state": "estimating",
+        "min_seconds": None,
+        "max_seconds": None,
+        "based_on_pages": 0,
+    }
 
 
 def test_api_diff_404s_on_missing_compare_target(
@@ -674,28 +1022,104 @@ def test_blob_returns_404_for_unknown_hash(client: TestClient) -> None:
 # gone with the rest of the Jinja routes.
 
 
+def _set_actionable_finding_statuses(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    status: str,
+) -> None:
+    for row in issues.list_issues(conn, scan_id):
+        if row.review_lane == "informational":
+            continue
+        rationale = f"Expert reviewed {row.issue_key} and recorded {status}."
+        if row.pipeline == "image":
+            repo.bulk_set_findings_status(
+                conn,
+                finding_ids=row.finding_ids,
+                status=status,
+                rationale=rationale,
+            )
+        else:
+            repo.bulk_set_a11y_findings_status(
+                conn,
+                finding_ids=row.finding_ids,
+                status=status,
+                rationale=rationale,
+            )
+
+
+def _complete_evaluation(
+    client: TestClient,
+    db_path: object,
+    scan_id: int,
+    *,
+    actionable_status: str | None = "remediated",
+) -> None:
+    conn = connect(Path(db_path))
+    try:
+        record = evaluation.upsert_evaluation(
+            conn,
+            scan_id,
+            {
+                "reviewer": "A. Expert",
+                "purpose": "Prepare an accessibility remediation handoff.",
+                "scope_included": "Pages captured in this scan.",
+                "methods_note": "Automated evidence plus criterion-by-criterion expert review.",
+                "limitations": "Results are limited to the recorded pages and review date.",
+                "status": "in_progress",
+            },
+        )
+        conn.executemany(
+            "INSERT INTO manual_check_results "
+            "(evaluation_report_id, criterion_sc, outcome, rationale, tested_at) "
+            "VALUES (?, ?, 'pass', ?, CURRENT_TIMESTAMP)",
+            (
+                (
+                    int(record["id"]),
+                    criterion.sc,
+                    f"Expert reviewed {criterion.sc} against the documented scope.",
+                )
+                for criterion in coverage_matrix.load_matrix()
+            ),
+        )
+        if actionable_status is not None:
+            _set_actionable_finding_statuses(conn, scan_id, actionable_status)
+    finally:
+        conn.close()
+    response = client.put(
+        f"/api/scans/{scan_id}/evaluation",
+        json={"status": "completed"},
+    )
+    assert response.status_code == 200, response.text
+
+
 def test_export_csv_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
-    _, _, scan_id = seeded_db
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
     resp = client.get(f"/api/scans/{scan_id}/export/csv")
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
     assert "attachment" in resp.headers["content-disposition"]
     assert f"scan_{scan_id}.csv" in resp.headers["content-disposition"]
+    assert "DRAFT" not in resp.headers["content-disposition"]
+    assert "x-axcess-export-state" not in resp.headers
     assert "finding_id,severity" in resp.text
 
 
 def test_export_json_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
-    _, _, scan_id = seeded_db
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
     resp = client.get(f"/api/scans/{scan_id}/export/json")
     assert resp.status_code == 200
     assert "application/json" in resp.headers["content-type"]
     body = resp.json()
+    assert "export_notice" not in body
     assert body["scan"]["id"] == scan_id
     assert isinstance(body["findings"], list)
 
 
 def test_export_jira_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
-    _, _, scan_id = seeded_db
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
     resp = client.get(f"/api/scans/{scan_id}/export/jira")
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
@@ -703,20 +1127,173 @@ def test_export_jira_route(client: TestClient, seeded_db: tuple[object, object, 
 
 
 def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
-    _, _, scan_id = seeded_db
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
     resp = client.get(f"/api/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
     assert "text/markdown" in resp.headers["content-type"]
-    assert resp.text.startswith(f"# Accessibility audit — Scan #{scan_id}")
+    assert resp.text.startswith(f"# Accessibility evidence inventory — Scan #{scan_id}")
 
 
 def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
-    _, _, scan_id = seeded_db
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
     resp = client.get(f"/api/scans/{scan_id}/export/xlsx")
     assert resp.status_code == 200
     assert "spreadsheetml.sheet" in resp.headers["content-type"]
     assert f'filename="scan_{scan_id}.xlsx"' in resp.headers["content-disposition"]
     assert resp.content[:2] == b"PK"  # a real .xlsx (zip) body
+    assert load_workbook(BytesIO(resp.content)).sheetnames[0] == "Summary"
+
+
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+def test_incomplete_evaluation_export_requires_explicit_draft_acknowledgement(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    fmt: str,
+) -> None:
+    _, _, scan_id = seeded_db
+
+    response = client.get(f"/api/scans/{scan_id}/export/{fmt}")
+
+    assert response.status_code == 409
+    assert "expert evaluation is not completed" in response.json()["detail"]
+    assert "draft=acknowledged" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    fmt: str,
+) -> None:
+    _, _, scan_id = seeded_db
+
+    response = client.get(
+        f"/api/scans/{scan_id}/export/{fmt}",
+        params={"draft": "acknowledged"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert f"scan_{scan_id}_DRAFT." in response.headers["content-disposition"]
+    assert response.headers["x-axcess-export-state"] == "draft"
+    if fmt in {"markdown", "audit"}:
+        assert response.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+        assert "do not treat it as a conformance determination" in response.text
+    elif fmt == "json":
+        notice = response.json()["export_notice"]
+        assert notice["draft"] is True
+        assert notice["evaluation_status"] == "draft"
+        assert notice["label"] == "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+    elif fmt == "xlsx":
+        workbook = load_workbook(BytesIO(response.content))
+        assert workbook.sheetnames[0] == "DRAFT NOTICE"
+        assert workbook["DRAFT NOTICE"]["A1"].value == (
+            "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+        )
+        assert workbook["DRAFT NOTICE"]["B3"].value == "draft"
+    elif fmt == "csv":
+        assert response.text.startswith("finding_kind,finding_id,")
+        assert response.text.splitlines()[0].endswith(",Axcess export state")
+        assert response.text.splitlines()[1].endswith(",DRAFT")
+    else:
+        assert response.text.startswith("Summary,Description,Priority,")
+        rows = list(csv.reader(StringIO(response.text)))
+        assert rows[0][-1] == "Axcess export state"
+        assert all(row[-1] == "DRAFT" for row in rows[1:])
+
+
+@pytest.mark.parametrize("draft_value", (None, "true", "Acknowledged", "ACKNOWLEDGED"))
+def test_only_exact_draft_acknowledgement_parameter_unlocks_an_incomplete_export(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    draft_value: str | None,
+) -> None:
+    _, _, scan_id = seeded_db
+    params = {} if draft_value is None else {"draft": draft_value}
+
+    response = client.get(
+        f"/api/scans/{scan_id}/export/csv",
+        params=params,
+        headers={"X-Axcess-Acknowledge-Draft": "true"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_unreviewed_actionable_findings_block_final_but_allow_acknowledged_draft(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+) -> None:
+    db_path, _, scan_id = seeded_db
+    conn = connect(Path(db_path))
+    try:
+        page_id = int(
+            conn.execute(
+                "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+            ).fetchone()["id"]
+        )
+        repo.upsert_axe_violation(
+            conn,
+            page_id=page_id,
+            scan_id=scan_id,
+            rule_id="label",
+            wcag_sc="1.3.1",
+            wcag_scs="1.3.1,3.3.2",
+            wcag_level="A",
+            impact="serious",
+            help="Form elements must have labels",
+            help_url="https://dequeuniversity.com/rules/axe/4.10/label",
+            target_selector="#email",
+            failure_summary="Fix the missing label.",
+            html_snippet='<input id="email">',
+            target_hash="export-readiness-likely-barrier",
+        )
+    finally:
+        conn.close()
+    _complete_evaluation(
+        client,
+        db_path,
+        scan_id,
+        actionable_status=None,
+    )
+
+    final = client.get(f"/api/scans/{scan_id}/export/markdown")
+    assert final.status_code == 409
+    assert "actionable evidence" in final.json()["detail"]
+    assert "unreviewed backing" in final.json()["detail"]
+    assert "axe:label" in final.json()["detail"]
+
+    draft = client.get(
+        f"/api/scans/{scan_id}/export/markdown",
+        params={"draft": "acknowledged"},
+    )
+    assert draft.status_code == 200
+    assert f"scan_{scan_id}_DRAFT.md" in draft.headers["content-disposition"]
+    assert draft.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+
+
+@pytest.mark.parametrize(
+    "reviewed_status", ("in_progress", "remediated", "accepted_risk", "false_positive")
+)
+def test_reviewed_actionable_findings_allow_final_export(
+    client: TestClient,
+    seeded_db: tuple[object, object, int],
+    reviewed_status: str,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(
+        client,
+        db_path,
+        scan_id,
+        actionable_status=reviewed_status,
+    )
+
+    response = client.get(f"/api/scans/{scan_id}/export/markdown")
+
+    assert response.status_code == 200
+    assert f'filename="scan_{scan_id}.md"' in response.headers["content-disposition"]
+    assert "DRAFT" not in response.headers["content-disposition"]
 
 
 def test_export_unknown_format_rejected(

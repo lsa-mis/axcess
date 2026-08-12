@@ -49,6 +49,17 @@ _IMPACT_TO_PRIORITY = {
 _ISSUE_TYPE = "Bug"
 _COMPONENT = "Accessibility"
 
+_SOURCE_LABELS = {
+    "axe": "axe-core",
+    "alfa": "Siteimprove Alfa",
+    "semantic": "Semantic analyzer",
+    "keyboard": "Keyboard probe",
+    "responsive": "Reflow and zoom probe",
+    "focus": "Focus visibility probe",
+    "visual": "Visual analysis",
+    "protected_image": "Protected image analysis",
+}
+
 # Statuses that mean "we're not opening a ticket for this." Jira import
 # would silently create issues for accepted_risk / false_positive rows
 # otherwise — Sam would have to delete them manually. Filter out here.
@@ -58,7 +69,7 @@ _TRIAGE_SKIP = frozenset({"remediated", "accepted_risk", "false_positive"})
 def render_jira_csv(scan: ExportScan) -> str:
     """One Jira issue per finding. Multi-page findings list every page.
 
-    Axe findings join image findings in the same CSV — each row carries
+    DOM-engine findings join image findings in the same CSV — each row carries
     the same column shape, just different ``Labels`` and ``Description``
     content. Findings already triaged as remediated / accepted_risk /
     false_positive are skipped so re-running an export against a
@@ -85,24 +96,33 @@ def render_jira_csv(scan: ExportScan) -> str:
             continue
         writer.writerow(
             [
-                _axe_summary(af),
-                _axe_description(af),
+                _a11y_summary(af),
+                _a11y_description(af),
                 _IMPACT_TO_PRIORITY.get(af.impact or "", "Low"),
                 _ISSUE_TYPE,
-                " ".join(_axe_labels(af)),
+                " ".join(_a11y_labels(af)),
                 _COMPONENT,
             ]
         )
     return buf.getvalue()
 
 
-def _axe_summary(af: ExportA11yFinding) -> str:
+def _a11y_summary(af: ExportA11yFinding) -> str:
     sc = f" — SC {af.wcag_sc}" if af.wcag_sc else " — best-practice"
     return f"WCAG {af.rule_id}{sc}: {af.page_url}"
 
 
-def _axe_description(af: ExportA11yFinding) -> str:
+def _a11y_description(af: ExportA11yFinding) -> str:
     lines: list[str] = []
+    lines.append(f"**Source:** {_a11y_source_label(af)}")
+    if af.status == "in_progress":
+        lines.append("**Outcome:** Barrier confirmed by expert; remediation planned")
+    elif af.pipeline == "alfa" and af.engine_outcome == "cant_tell":
+        lines.append("**Outcome:** Needs expert review (Alfa cantTell; not a conformance failure)")
+    elif af.pipeline not in {"axe", "alfa"}:
+        lines.append("**Outcome:** Needs expert review (observed lead; not a conformance failure)")
+    else:
+        lines.append("**Outcome:** Failed automated rule outcome")
     lines.append(f"**Rule:** {af.rule_id}")
     if af.impact:
         lines.append(f"**Impact:** {af.impact}")
@@ -126,14 +146,14 @@ def _axe_description(af: ExportA11yFinding) -> str:
         lines.append(af.html_snippet)
         lines.append("```")
     if af.help_url:
-        lines.append(f"**Axe rule docs:** {af.help_url}")
+        lines.append(f"**Rule docs:** {af.help_url}")
     lines.append("")
     lines.append(f"Review locally: {af.ui_url}")
     return "\n".join(lines)
 
 
-def _axe_labels(af: ExportA11yFinding) -> list[str]:
-    labels = ["accessibility", f"axe-{af.rule_id}"]
+def _a11y_labels(af: ExportA11yFinding) -> list[str]:
+    labels = ["accessibility", f"{af.pipeline or 'axe'}-{af.rule_id}"]
     if af.impact:
         labels.append(f"impact-{af.impact}")
     if af.wcag_sc:
@@ -143,8 +163,12 @@ def _axe_labels(af: ExportA11yFinding) -> list[str]:
     if af.wcag_level:
         labels.append(f"wcag-level-{af.wcag_level.lower()}")
     else:
-        labels.append("axe-best-practice")
+        labels.append(f"{af.pipeline or 'axe'}-best-practice")
     return labels
+
+
+def _a11y_source_label(af: ExportA11yFinding) -> str:
+    return _SOURCE_LABELS.get(af.pipeline, af.pipeline or "Unknown detector")
 
 
 def _summary(finding: ExportFinding) -> str:

@@ -32,11 +32,19 @@ _IMPACT_RANK = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3, None: 4}
 def coverage(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     """Top-line counts for the per-scan header card."""
     row = conn.execute(
-        "SELECT axe_pages_scanned, axe_violations_total FROM scans WHERE id = ?",
+        "SELECT axe_pages_scanned, axe_violations_total, alfa_pages_scanned, "
+        "alfa_failed_total, alfa_cant_tell_total FROM scans WHERE id = ?",
         (scan_id,),
     ).fetchone()
     if row is None:
-        return {"axe_pages_scanned": 0, "axe_violations_total": 0, "pages_total": 0}
+        return {
+            "axe_pages_scanned": 0,
+            "axe_violations_total": 0,
+            "alfa_pages_scanned": 0,
+            "alfa_failed_total": 0,
+            "alfa_cant_tell_total": 0,
+            "pages_total": 0,
+        }
     pages_total = int(
         conn.execute("SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()[
             "n"
@@ -45,6 +53,9 @@ def coverage(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     return {
         "axe_pages_scanned": int(row["axe_pages_scanned"] or 0),
         "axe_violations_total": int(row["axe_violations_total"] or 0),
+        "alfa_pages_scanned": int(row["alfa_pages_scanned"] or 0),
+        "alfa_failed_total": int(row["alfa_failed_total"] or 0),
+        "alfa_cant_tell_total": int(row["alfa_cant_tell_total"] or 0),
         "pages_total": pages_total,
     }
 
@@ -119,12 +130,12 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
     """
     rule_rows = conn.execute(
         """
-        SELECT wcag_sc, wcag_level, rule_id, impact, help, help_url,
+        SELECT pipeline, wcag_sc, wcag_level, rule_id, impact, help, help_url,
                COUNT(*) AS violation_count,
                COUNT(DISTINCT page_id) AS page_count
           FROM page_a11y_findings
          WHERE scan_id = ?
-         GROUP BY wcag_sc, wcag_level, rule_id, impact, help, help_url
+         GROUP BY pipeline, wcag_sc, wcag_level, rule_id, impact, help, help_url
         """,
         (scan_id,),
     ).fetchall()
@@ -158,6 +169,7 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
         entry["rules"].append(
             {
                 "rule_id": r["rule_id"],
+                "pipeline": r["pipeline"],
                 "impact": impact,
                 "help": r["help"],
                 "help_url": r["help_url"],
@@ -249,7 +261,7 @@ def findings_for_sc(
     # input. Caller-supplied values (`scan_id`, `wcag_sc`, `status`,
     # `limit`, `offset`) all flow through parameter binding.
     sql = f"""
-        SELECT a.id, a.rule_id, a.impact, a.help, a.help_url,
+        SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.impact, a.help, a.help_url,
                a.target_selector, a.failure_summary, a.html_snippet,
                a.status, a.wcag_sc, a.wcag_level,
                p.id AS page_id, p.url_normalized AS page_url,
@@ -286,6 +298,12 @@ def grouped_by_rule(
     failing 800 times is usually one CSS class on one template; the
     operator wants to see one group of 800, not 800 separate rows.
 
+    Alfa is deliberately one level narrower: ``failed`` and ``cant_tell``
+    are separate outcome subgroups even when they share a rule id. A
+    ``cantTell`` observation is an expert-review lead, not a failed ACT
+    outcome, and combining the two would let a bulk action or confidence
+    label from the failed subgroup silently apply to ambiguous evidence.
+
     Each group carries:
 
     * ``rule_id``, ``impact``, ``help``, ``help_url``, ``wcag_sc``,
@@ -306,26 +324,35 @@ def grouped_by_rule(
 
     rows = conn.execute(
         f"""
-        SELECT a.id, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
+        SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
                a.impact, a.help, a.help_url, a.target_selector,
-               a.failure_summary, a.html_snippet, a.status,
+               a.failure_summary, a.html_snippet, a.engine_evidence_json, a.status,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
           JOIN pages p ON p.id = a.page_id
          WHERE a.scan_id = ?{extra_clause}
-         ORDER BY a.rule_id, p.url_normalized
+         ORDER BY a.pipeline, a.rule_id, p.url_normalized
         """,  # noqa: S608 — extra_clause is one of two fixed strings
         tuple(params),
     ).fetchall()
 
-    groups: dict[str, dict[str, Any]] = {}
+    groups: dict[tuple[str, str, str | None], dict[str, Any]] = {}
     for r in rows:
         rule_id = str(r["rule_id"])
+        pipeline = str(r["pipeline"])
+        raw_outcome = str(r["engine_outcome"] or "failed")
+        # Non-Alfa pipelines keep their established per-rule grouping. Alfa's
+        # two outcome types have materially different evidentiary meaning and
+        # therefore may never share a group or a list of bulk-action ids.
+        outcome_group = raw_outcome if pipeline == "alfa" else None
+        key = (pipeline, rule_id, outcome_group)
         entry = groups.setdefault(
-            rule_id,
+            key,
             {
                 "rule_id": rule_id,
+                "pipeline": pipeline,
+                "outcome_group": outcome_group,
                 "impact": r["impact"],
                 "help": str(r["help"] or ""),
                 "help_url": str(r["help_url"] or ""),
@@ -335,6 +362,7 @@ def grouped_by_rule(
                 "violation_count": 0,
                 "page_count_set": set(),
                 "status_breakdown": dict.fromkeys(_STATUSES, 0),
+                "engine_outcomes": {"failed": 0, "cant_tell": 0},
                 "findings": [],
             },
         )
@@ -343,15 +371,21 @@ def grouped_by_rule(
         entry["status_breakdown"][str(r["status"])] = (
             entry["status_breakdown"].get(str(r["status"]), 0) + 1
         )
+        outcome = raw_outcome
+        if outcome in entry["engine_outcomes"]:
+            entry["engine_outcomes"][outcome] += 1
         entry["findings"].append(
             {
                 "id": int(r["id"]),
+                "pipeline": pipeline,
+                "engine_outcome": r["engine_outcome"],
                 "page_id": int(r["page_id"]),
                 "page_url": str(r["page_url"]),
                 "page_title": r["page_title"],
                 "target_selector": str(r["target_selector"] or ""),
                 "failure_summary": r["failure_summary"],
                 "html_snippet": r["html_snippet"],
+                "engine_evidence_json": r["engine_evidence_json"],
                 "status": str(r["status"]),
             }
         )
@@ -367,6 +401,7 @@ def grouped_by_rule(
             _IMPACT_RANK.get(g["impact"], 4),
             -g["page_count"],
             g["rule_id"],
+            0 if g["outcome_group"] == "failed" else 1,
         ),
     )
 

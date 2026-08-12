@@ -60,6 +60,7 @@ def test_gallery_page_persists_images_and_svg_text(
             rps=100.0,
             workers=2,
             vlm_enabled=False,
+            semantic_enabled=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
@@ -113,6 +114,7 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
             rps=100.0,
             workers=1,
             vlm_enabled=False,
+            semantic_enabled=False,
         )
         asyncio.run(run_crawl(tmp_db, config))
 
@@ -134,6 +136,7 @@ def test_blob_store_contents_match_db(tmp_db: sqlite3.Connection, blob_dir: Path
             rps=100.0,
             workers=1,
             vlm_enabled=False,
+            semantic_enabled=False,
         )
         asyncio.run(run_crawl(tmp_db, config))
 

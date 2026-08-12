@@ -179,12 +179,16 @@ criteria:
   - sc: "1.4.2"
     name: "Audio Control"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [visual]
+    confidence: medium
+    automated_check: >-
+      The visual probe measures actual playback advancement and flags audible
+      audio longer than three seconds when no native or explicitly associated
+      custom control is detected. Autoplay markup alone is not flagged.
     manual_check: >-
-      Confirm any audio that plays automatically for >3s can be paused or muted.
+      Confirm every audible autoplay source can be paused, stopped, or volume
+      controlled independently; test custom controls and browser autoplay policy.
 
   - sc: "1.4.3"
     name: "Contrast (Minimum)"
@@ -289,15 +293,18 @@ criteria:
   - sc: "2.1.2"
     name: "No Keyboard Trap"
     level: A
-    method: automated
+    method: partial
     pipelines: [keyboard]
-    confidence: high
+    confidence: medium
     automated_check: >-
-      The keyboard probe tab-walks the page and tests Esc / iframe escape to
-      detect focus traps.
+      The keyboard probe emits a review lead only when the same observable
+      element resists repeated Tab and Shift+Tab exit attempts. It suppresses
+      normal focus wrapping, small focus cycles, modal containment, and opaque
+      iframe or closed-shadow focus.
     manual_check: >-
-      Traps that only appear after interaction (a modal opened by a click) need
-      a manual pass with the keyboard.
+      Reproduce every lead and test components that appear after interaction.
+      Confirm whether arrow keys, Escape, a close control, or a documented
+      non-standard command lets the user leave before recording a failure.
 
   - sc: "2.1.4"
     name: "Character Key Shortcuts"
@@ -327,8 +334,9 @@ criteria:
     pipelines: [visual]
     confidence: medium
     automated_check: >-
-      The visual probe flags the clear no-pause-mechanism cases: autoplaying
-      <video>/<audio> without a controls attribute, and <marquee>.
+      The visual probe measures actual playback advancement for visible video
+      longer than five seconds without a detected control. It also records
+      <marquee> as an expert-review lead.
     manual_check: >-
       CSS animations, auto-advancing carousels, and auto-updating regions
       aren't auto-detected — confirm any content that moves >5s can be paused,
@@ -661,8 +669,13 @@ criteria:
     confidence: n/a
     automated_check: ""
     manual_check: >-
-      Confirm login doesn't require a cognitive function test (puzzle, memorize)
-      with no alternative.
+      Manually test each in-scope sign-in and MFA step. Confirm it does not
+      require a cognitive function test (for example, solving a puzzle or
+      memorizing/transcribing information) without an accessible alternative.
+      A successful post-MFA crawl only proves that an auditor established a
+      temporary browser session; it does not automatically evaluate or pass
+      the authentication experience. Do not record passwords, OTPs, passkeys,
+      recovery codes, cookies, or session details in this report.
 
   # ---- Principle 4: Robust ------------------------------------------------
   - sc: "4.1.2"

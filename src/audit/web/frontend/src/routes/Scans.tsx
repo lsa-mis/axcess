@@ -1,8 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListChecks, PlusCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api/client";
+import {
+  protectedQueryKey,
+  useProtectedIdentityContext,
+} from "../hooks/useProtectedIdentityContext";
 import {
   Button,
   Card,
@@ -12,7 +16,7 @@ import {
   ScanStatusBadge,
   relativeTime,
 } from "../components/ui";
-import type { ScanSummary } from "../api/types";
+import type { ProtectedScanSummary, ScanSummary } from "../api/types";
 
 /**
  * Scans list — the SPA's home page. Each row tells the operator three
@@ -30,29 +34,54 @@ export default function ScansRoute() {
     queryKey: ["scans"],
     queryFn: api.listScans,
   });
+  const protectedIdentity = useProtectedIdentityContext();
+  const protectedReports = useQuery({
+    queryKey: protectedQueryKey("reports", protectedIdentity.fingerprint),
+    queryFn: api.listProtectedScans,
+    enabled: protectedIdentity.isReady,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    // A 403/404 simply means this browser is not in a protected deployment;
+    // public report browsing remains fully usable and does not surface a
+    // misleading error card.
+    retry: false,
+  });
+  const protectedScans =
+    protectedIdentity.isReady && !protectedReports.isFetching
+      ? protectedReports.data?.reports ?? []
+      : [];
 
   return (
     <>
       {/* No header "New scan" action — the topbar carries the single
           global CTA. The empty state below keeps its contextual one. */}
       <PageHeader
-        title="Scans"
-        subtitle={isLoading ? "Loading…" : `${scans.length} total`}
+        title="Reports"
+        subtitle={isLoading ? "Loading…" : `${scans.length} public reports`}
       />
 
-      {scans.length === 0 && !isLoading ? (
+      {scans.length === 0 && protectedScans.length === 0 && !isLoading ? (
         <EmptyState
           title="No scans yet"
           message="Point the crawler at a URL to start auditing."
           action={
-            <LinkButton to="/scans/new" variant="primary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> New scan
-            </LinkButton>
+            <div className="flex flex-wrap justify-center gap-2">
+              <LinkButton to="/scans/new" variant="primary">
+                <PlusCircle className="h-4 w-4" aria-hidden /> New public scan
+              </LinkButton>
+              {protectedIdentity.isReady && (
+                <LinkButton to="/scans/new?mode=login" variant="secondary">
+                  <PlusCircle className="h-4 w-4" aria-hidden /> 2FA / login scan
+                </LinkButton>
+              )}
+            </div>
           }
         />
       ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
+        <Card className="overflow-x-auto">
+          <table className="min-w-[58rem] w-full text-sm">
             <caption className="sr-only">Scans, newest first</caption>
             <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
               <tr>
@@ -87,7 +116,79 @@ export default function ScansRoute() {
           </table>
         </Card>
       )}
+
+      {protectedIdentity.isChecking && (
+        <p className="mt-4 text-sm text-fg-muted" aria-live="polite">
+          Checking protected-report access…
+        </p>
+      )}
+
+      {protectedIdentity.isReady && (
+        <section className="mt-6" aria-labelledby="protected-reports-heading">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h2 id="protected-reports-heading" className="text-lg font-semibold text-fg">
+                Protected reports
+              </h2>
+              <p className="mt-1 text-sm text-fg-muted">
+                Your authorized reports only. Target locations and detailed evidence are not listed here.
+              </p>
+            </div>
+            <LinkButton to="/scans/new?mode=login" variant="secondary">
+              <PlusCircle className="h-4 w-4" aria-hidden /> 2FA / login scan
+            </LinkButton>
+          </div>
+          {protectedReports.isFetching ? (
+            <p className="text-sm text-fg-muted" aria-live="polite">
+              Loading your protected reports…
+            </p>
+          ) : protectedScans.length === 0 ? (
+            <Card className="p-5 text-sm text-fg-muted">
+              No protected reports yet. Start one only after the target owner has authorized
+              the scope and a least-privilege audit account is ready.
+            </Card>
+          ) : (
+            <Card className="overflow-x-auto">
+              <table className="min-w-[58rem] w-full text-sm">
+                <caption className="sr-only">Your protected reports, newest activity first</caption>
+                <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+                  <tr>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">Report</th>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">Status</th>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">Handling</th>
+                    <th scope="col" className="px-4 py-2 text-right font-semibold">Pages</th>
+                    <th scope="col" className="px-4 py-2 text-right font-semibold">Issue leads</th>
+                    <th scope="col" className="px-4 py-2 text-left font-semibold">Updated</th>
+                    <th scope="col" className="px-4 py-2 text-right font-semibold">Open</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {protectedScans.map((report) => <ProtectedReportRow key={report.scan_id} report={report} />)}
+                </tbody>
+              </table>
+            </Card>
+          )}
+        </section>
+      )}
     </>
+  );
+}
+
+function ProtectedReportRow({ report }: { report: ProtectedScanSummary }) {
+  return (
+    <tr className="transition-colors hover:bg-surface-muted/60">
+      <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-fg-muted">#{report.scan_id}</td>
+      <td className="px-4 py-2"><span className="font-medium text-fg">{report.protection_status.replaceAll("_", " ")}</span></td>
+      <td className="px-4 py-2 text-fg-muted">{report.environment} · {report.data_classification}</td>
+      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.page_count.toLocaleString()}</td>
+      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.issue_occurrences.toLocaleString()}</td>
+      <td className="px-4 py-2 text-xs text-fg-subtle" title={report.updated_at}>{relativeTime(report.updated_at)}</td>
+      <td className="px-4 py-2 text-right">
+        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
+          Open protected report
+        </LinkButton>
+      </td>
+    </tr>
   );
 }
 

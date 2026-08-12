@@ -65,7 +65,7 @@ class ExportFinding:
 
 @dataclass(frozen=True)
 class ExportA11yFinding:
-    """One axe-core WCAG violation, flattened for export.
+    """One DOM-engine finding, flattened for export.
 
     Parallels :class:`ExportFinding` but for the page-scoped axe pipeline.
     Each row is a distinct DOM target — duplicates of the same rule
@@ -90,6 +90,9 @@ class ExportA11yFinding:
     page_url: str
     page_title: str | None
     ui_url: str = ""
+    pipeline: str = "axe"
+    engine_outcome: str = "failed"
+    engine_evidence_json: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -116,6 +119,9 @@ class ExportScan:
     a11y_findings: list[ExportA11yFinding] = field(default_factory=list)
     axe_pages_scanned: int = 0
     axe_violations_total: int = 0
+    alfa_pages_scanned: int = 0
+    alfa_failed_total: int = 0
+    alfa_cant_tell_total: int = 0
     by_wcag_level: dict[str, int] = field(
         default_factory=lambda: {"A": 0, "AA": 0, "AAA": 0, "best_practice": 0}
     )
@@ -135,7 +141,8 @@ def collect_scan(
     scan_row = conn.execute(
         "SELECT id, seed_url, status, started_at, finished_at, page_count, "
         "finding_count, error_count, "
-        "axe_pages_scanned, axe_violations_total, config_json "
+        "axe_pages_scanned, axe_violations_total, alfa_pages_scanned, "
+        "alfa_failed_total, alfa_cant_tell_total, config_json "
         "FROM scans WHERE id = ?",
         (scan_id,),
     ).fetchone()
@@ -182,6 +189,9 @@ def collect_scan(
         a11y_findings=a11y_findings,
         axe_pages_scanned=int(scan_row["axe_pages_scanned"] or 0),
         axe_violations_total=int(scan_row["axe_violations_total"] or 0),
+        alfa_pages_scanned=int(scan_row["alfa_pages_scanned"] or 0),
+        alfa_failed_total=int(scan_row["alfa_failed_total"] or 0),
+        alfa_cant_tell_total=int(scan_row["alfa_cant_tell_total"] or 0),
         by_wcag_level=by_wcag_level,
         axe_level=axe_level,
     )
@@ -201,7 +211,8 @@ def _collect_a11y_findings(
     """
     rows = conn.execute(
         """
-        SELECT a.id, a.scan_id, a.rule_id, a.wcag_sc, a.wcag_scs,
+        SELECT a.id, a.scan_id, a.pipeline, a.engine_outcome, a.engine_evidence_json,
+               a.rule_id, a.wcag_sc, a.wcag_scs,
                a.wcag_level, a.impact, a.help, a.help_url,
                a.target_selector, a.failure_summary, a.html_snippet,
                a.status,
@@ -249,6 +260,9 @@ def _collect_a11y_findings(
                     f"{ui_base_url.rstrip('/')}/scans/{scan_id}/a11y"
                     + (f"?wcag_sc={r['wcag_sc']}" if r["wcag_sc"] else "")
                 ),
+                pipeline=str(r["pipeline"] or "axe"),
+                engine_outcome=str(r["engine_outcome"] or "failed"),
+                engine_evidence_json=r["engine_evidence_json"],
             )
         )
     return out

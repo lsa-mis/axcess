@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Literal
+
+from audit.protected.redaction import redact_text
 
 
 def upsert_page(
@@ -190,6 +195,59 @@ _VALID_STATUSES = frozenset(
         "false_positive",
     }
 )
+_DECISIVE_STATUSES = frozenset({"in_progress", "remediated", "accepted_risk", "false_positive"})
+_VALID_HISTORY_ACTORS = frozenset({"system", "user"})
+MAX_STATUS_RATIONALE_LENGTH = 2000
+
+
+def normalize_status_rationale(status: str, rationale: str | None) -> str | None:
+    """Validate, bound, and redact a human status-decision rationale.
+
+    A confirmed barrier or terminal disposition needs a defensible reason.
+    Non-decisive workflow transitions remain backward-compatible and may omit
+    it. Common bearer,
+    cookie, token, and identifier shapes are redacted before persistence; API
+    responses never return the stored note.
+    """
+
+    if status not in _VALID_STATUSES:
+        raise ValueError(f"Unknown status: {status!r}")
+    if rationale is not None and not isinstance(rationale, str):
+        raise ValueError("rationale must be text")
+    normalized = rationale.strip() if rationale is not None else ""
+    if len(normalized) > MAX_STATUS_RATIONALE_LENGTH:
+        raise ValueError(f"rationale must be at most {MAX_STATUS_RATIONALE_LENGTH} characters")
+    safe = redact_text(normalized) if normalized else ""
+    if len(safe) > MAX_STATUS_RATIONALE_LENGTH:
+        safe = safe[:MAX_STATUS_RATIONALE_LENGTH].rstrip()
+    if status in _DECISIVE_STATUSES and not safe:
+        raise ValueError(
+            "A rationale is required for confirmed barriers, remediated, accepted risk, "
+            "and false positive decisions."
+        )
+    return safe or None
+
+
+def _validate_history_actor(actor: str) -> None:
+    if actor not in _VALID_HISTORY_ACTORS:
+        raise ValueError("Unknown history actor")
+
+
+@contextmanager
+def _status_transaction(conn: sqlite3.Connection) -> Iterator[None]:
+    """Make each status update and its history rows one atomic operation."""
+
+    if conn.in_transaction:
+        yield
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    else:
+        conn.execute("COMMIT")
 
 
 def bulk_set_findings_status(
@@ -198,6 +256,7 @@ def bulk_set_findings_status(
     finding_ids: list[int],
     status: str,
     actor: str = "user",
+    rationale: str | None = None,
 ) -> int:
     """Update many ``findings`` rows to the same status in one transaction.
 
@@ -211,37 +270,51 @@ def bulk_set_findings_status(
     later diff or rollback can reason about transitions correctly even
     when many rows had different starting states.
     """
-    if status not in _VALID_STATUSES:
-        raise ValueError(f"Unknown status: {status!r}")
+    note = normalize_status_rationale(status, rationale)
+    _validate_history_actor(actor)
     if not finding_ids:
         return 0
     # Pull current status for each id so finding_history is accurate
     # (the bulk UPDATE later loses the prior value).
     placeholders = ",".join("?" for _ in finding_ids)
-    rows = conn.execute(
-        f"SELECT id, scan_id, status FROM findings WHERE id IN ({placeholders})",  # noqa: S608 — fixed-shape IN list
-        tuple(finding_ids),
-    ).fetchall()
-    if not rows:
-        return 0
-    history = [(int(r["id"]), int(r["scan_id"]), str(r["status"]), status, actor) for r in rows]
-    conn.executemany(
-        """
-        INSERT INTO finding_history
-            (finding_id, scan_id, change_type, from_status, to_status, actor, note)
-        VALUES (?, ?, 'status_change', ?, ?, ?, NULL)
-        """,
-        history,
+    select_sql = (
+        "SELECT id, scan_id, status FROM findings "  # noqa: S608 — placeholders only
+        f"WHERE id IN ({placeholders}) AND status <> ?"
     )
-    cur = conn.execute(
-        f"""
-        UPDATE findings
-           SET status = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id IN ({placeholders})
-        """,  # noqa: S608 — fixed-shape IN list
-        (status, *finding_ids),
-    )
-    return int(cur.rowcount or 0)
+    with _status_transaction(conn):
+        rows = conn.execute(select_sql, (*finding_ids, status)).fetchall()
+        if not rows:
+            return 0
+        history = [
+            (
+                int(row["id"]),
+                int(row["scan_id"]),
+                str(row["status"]),
+                status,
+                actor,
+                note,
+            )
+            for row in rows
+        ]
+        conn.executemany(
+            """
+            INSERT INTO finding_history
+                (finding_id, scan_id, change_type, from_status, to_status, actor, note)
+            VALUES (?, ?, 'status_change', ?, ?, ?, ?)
+            """,
+            history,
+        )
+        changed_ids = [int(row["id"]) for row in rows]
+        changed_placeholders = ",".join("?" for _ in changed_ids)
+        cur = conn.execute(
+            f"""
+            UPDATE findings
+               SET status = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id IN ({changed_placeholders})
+            """,  # noqa: S608 — fixed-shape IN list
+            (status, *changed_ids),
+        )
+        return int(cur.rowcount or 0)
 
 
 def bulk_set_a11y_findings_status(
@@ -249,28 +322,58 @@ def bulk_set_a11y_findings_status(
     *,
     finding_ids: list[int],
     status: str,
+    actor: str = "user",
+    rationale: str | None = None,
 ) -> int:
     """Update many ``page_a11y_findings`` rows to the same status.
 
-    Mirrors :func:`bulk_set_findings_status` for the axe pipeline. No
-    history table for v1 — same call-out as the single-finding endpoint:
-    we can promote ``a11y_finding_history`` later if an audit trail is
-    requested. The status enum is validated; empty input is a no-op.
+    Mirrors :func:`bulk_set_findings_status` for every page-scoped detection
+    pipeline and writes one ``a11y_finding_history`` row per changed finding.
+    The status enum is validated; empty input is a no-op.
     """
-    if status not in _VALID_STATUSES:
-        raise ValueError(f"Unknown status: {status!r}")
+    note = normalize_status_rationale(status, rationale)
+    _validate_history_actor(actor)
     if not finding_ids:
         return 0
     placeholders = ",".join("?" for _ in finding_ids)
-    cur = conn.execute(
-        f"""
-        UPDATE page_a11y_findings
-           SET status = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id IN ({placeholders})
-        """,  # noqa: S608 — fixed-shape IN list
-        (status, *finding_ids),
+    select_sql = (
+        "SELECT id, scan_id, status FROM page_a11y_findings "  # noqa: S608 — placeholders only
+        f"WHERE id IN ({placeholders}) AND status <> ?"
     )
-    return int(cur.rowcount or 0)
+    with _status_transaction(conn):
+        rows = conn.execute(select_sql, (*finding_ids, status)).fetchall()
+        if not rows:
+            return 0
+        history = [
+            (
+                int(row["id"]),
+                int(row["scan_id"]),
+                str(row["status"]),
+                status,
+                actor,
+                note,
+            )
+            for row in rows
+        ]
+        conn.executemany(
+            """
+            INSERT INTO a11y_finding_history
+                (finding_id, scan_id, change_type, from_status, to_status, actor, note)
+            VALUES (?, ?, 'status_change', ?, ?, ?, ?)
+            """,
+            history,
+        )
+        changed_ids = [int(row["id"]) for row in rows]
+        changed_placeholders = ",".join("?" for _ in changed_ids)
+        cur = conn.execute(
+            f"""
+            UPDATE page_a11y_findings
+               SET status = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id IN ({changed_placeholders})
+            """,  # noqa: S608 — fixed-shape IN list
+            (status, *changed_ids),
+        )
+        return int(cur.rowcount or 0)
 
 
 def upsert_axe_violation(
@@ -672,6 +775,137 @@ def increment_scan_axe_counters(
         """,
         (pages_delta, violations_delta, scan_id),
     )
+
+
+def increment_scan_alfa_counters(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    pages_delta: int = 0,
+    failed_delta: int = 0,
+    cant_tell_delta: int = 0,
+) -> None:
+    """Bump the independent Siteimprove Alfa coverage counters.
+
+    ``cantTell`` is not a failure in ACT. It gets a separate counter so
+    reports and exports can distinguish a deterministic finding from a lead
+    that needs an expert answer.
+    """
+    if pages_delta == 0 and failed_delta == 0 and cant_tell_delta == 0:
+        return
+    conn.execute(
+        """
+        UPDATE scans
+           SET alfa_pages_scanned = alfa_pages_scanned + ?,
+               alfa_failed_total = alfa_failed_total + ?,
+               alfa_cant_tell_total = alfa_cant_tell_total + ?
+         WHERE id = ?
+        """,
+        (pages_delta, failed_delta, cant_tell_delta, scan_id),
+    )
+
+
+def increment_scan_method_coverage(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    method: Literal["semantic", "keyboard", "responsive"],
+    pages_delta: int = 1,
+) -> None:
+    """Record pages actually evaluated by a non-engine scan method.
+
+    ``method`` is a closed literal mapped to a trusted column name; callers
+    cannot supply SQL.  Counting completed evaluations separately from
+    findings lets reports distinguish "checked and found no issue" from
+    "selected but never ran".
+    """
+
+    if pages_delta == 0:
+        return
+    columns = {
+        "semantic": "semantic_pages_analyzed",
+        "keyboard": "keyboard_pages_probed",
+        "responsive": "responsive_pages_probed",
+    }
+    column = columns[method]
+    conn.execute(
+        f"UPDATE scans SET {column} = {column} + ? WHERE id = ?",  # noqa: S608
+        (pages_delta, scan_id),
+    )
+
+
+def upsert_alfa_finding(
+    conn: sqlite3.Connection,
+    *,
+    page_id: int,
+    scan_id: int,
+    rule_id: str,
+    wcag_sc: str | None,
+    wcag_scs: str | None,
+    wcag_level: str | None,
+    help: str,
+    help_url: str,
+    target_selector: str,
+    failure_summary: str,
+    html_snippet: str,
+    target_hash: str,
+    engine_outcome: str,
+    engine_evidence_json: str,
+) -> int:
+    """Idempotently persist a Siteimprove Alfa actionable ACT outcome.
+
+    Alfa's rule identifiers are engine-qualified by ``pipeline='alfa'`` and
+    its outcome is retained verbatim enough to separate ``failed`` from
+    ``cant_tell``. ``impact`` stays NULL: Alfa does not supply axe-compatible
+    impact labels, and assigning one here would manufacture severity.
+    """
+    conn.execute(
+        """
+        INSERT INTO page_a11y_findings (
+            page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+            impact, help, help_url, target_selector, failure_summary,
+            html_snippet, target_hash, pipeline, criterion_sc,
+            engine_outcome, engine_evidence_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'alfa', ?, ?, ?)
+        ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
+            scan_id = excluded.scan_id,
+            wcag_sc = excluded.wcag_sc,
+            wcag_scs = excluded.wcag_scs,
+            wcag_level = excluded.wcag_level,
+            help = excluded.help,
+            help_url = excluded.help_url,
+            target_selector = excluded.target_selector,
+            failure_summary = excluded.failure_summary,
+            html_snippet = excluded.html_snippet,
+            criterion_sc = excluded.criterion_sc,
+            engine_outcome = excluded.engine_outcome,
+            engine_evidence_json = excluded.engine_evidence_json,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            page_id,
+            scan_id,
+            rule_id,
+            wcag_sc,
+            wcag_scs,
+            wcag_level,
+            help,
+            help_url,
+            target_selector,
+            failure_summary,
+            html_snippet,
+            target_hash,
+            wcag_sc,
+            engine_outcome,
+            engine_evidence_json,
+        ),
+    )
+    row = conn.execute(
+        "SELECT id FROM page_a11y_findings WHERE page_id = ? AND rule_id = ? AND target_hash = ?",
+        (page_id, rule_id, target_hash),
+    ).fetchone()
+    return int(row["id"])
 
 
 def upsert_page_image(

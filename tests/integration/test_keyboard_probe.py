@@ -1,13 +1,13 @@
 """Integration tests for the dynamic keyboard-trap probe (SC 2.1.2).
 
 The probe runs against real Playwright on hand-built fixture pages in
-``tests/fixtures/site/sc_2_1_2/``. Five fixtures, two classes:
+``tests/fixtures/site/sc_2_1_2/``. The accuracy contract is deliberately
+asymmetric: normal wrapping, modal containment, and iframe focus must be
+suppressed; only a repeatable bidirectional exit failure becomes a lead.
 
-  * Negative (must produce zero findings): ``clean.html``, ``modal_clean.html``
-  * Positive (must detect the named trap shape):
-    - ``tab_loop.html`` → ``keyboard-trap-stuck``
-    - ``modal_no_escape.html`` → ``keyboard-trap-modal-no-escape``
-    - ``iframe_no_exit.html`` → ``keyboard-trap-iframe``
+  * Negative: ``clean.html``, both modal fixtures, and the iframe fixture.
+  * Positive: ``tab_loop.html`` → ``keyboard-trap-stuck`` only after
+    Tab and Shift+Tab both fail repeatedly.
 
 Skipped when Playwright + chromium aren't installed. The local dev
 machine has them after ``make setup``; CI installs them in the
@@ -25,11 +25,7 @@ from pathlib import Path
 import pytest
 
 from audit.analyzer.keyboard import KeyboardProbe
-from audit.analyzer.keyboard.base import (
-    RULE_IFRAME,
-    RULE_NO_ESCAPE,
-    RULE_STUCK,
-)
+from audit.analyzer.keyboard.base import RULE_STUCK
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "sc_2_1_2"
 
@@ -99,13 +95,7 @@ async def test_modal_with_proper_escape_handler_clean(page) -> None:  # type: ig
     await page.goto(_file_url("modal_clean.html"))
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     findings = await probe.run(page)
-    # We don't require strict zero (the page may have other shapes
-    # the probe flags) — but the modal-no-escape rule must NOT fire.
-    no_escape_findings = [f for f in findings if f.rule_id == RULE_NO_ESCAPE]
-    assert no_escape_findings == [], (
-        "Modal with a working Escape handler must not be flagged as "
-        f"no-escape; found: {[f.target_selector for f in no_escape_findings]}"
-    )
+    assert findings == []
 
 
 # --------------------------------------------------------------------
@@ -162,17 +152,12 @@ async def test_hidden_iframes_are_not_flagged(page) -> None:  # type: ignore[no-
     )
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     findings = await probe.run(page)
-    iframe_finds = [f for f in findings if f.rule_id == RULE_IFRAME]
-    assert iframe_finds == [], (
-        "Hidden / zero-size iframes are not in the tab order and must not be "
-        f"flagged as keyboard traps; got: {[f.html_snippet for f in iframe_finds]}"
-    )
+    assert findings == []
 
 
 @pytest.mark.asyncio
-async def test_visible_untitled_iframe_still_flagged(page) -> None:  # type: ignore[no-untyped-def]
-    """The visibility gate must not suppress the genuine case: a visible,
-    Tab-reachable, untitled content iframe is still the real risk."""
+async def test_visible_untitled_iframe_is_not_called_a_keyboard_trap(page) -> None:  # type: ignore[no-untyped-def]
+    """A missing frame title does not establish that keyboard focus is trapped."""
     await page.set_content(
         "<!doctype html><html lang=en><body>"
         "<iframe src='https://maps.example/embed' width=600 height=400></iframe>"
@@ -180,9 +165,32 @@ async def test_visible_untitled_iframe_still_flagged(page) -> None:  # type: ign
     )
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     findings = await probe.run(page)
-    assert [f for f in findings if f.rule_id == RULE_IFRAME], (
-        "A visible untitled content iframe should still be flagged."
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_two_control_page_wrap_is_not_a_trap(page) -> None:  # type: ignore[no-untyped-def]
+    """A normal A→B→A tab sequence is page wrapping, not a focus trap."""
+    await page.set_content(
+        "<!doctype html><html lang=en><body>"
+        "<a href='#a'>First</a><button type=button>Second</button>"
+        "</body></html>"
     )
+    findings = await KeyboardProbe(max_focusable=20, stuck_threshold=3).run(page)
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_opaque_iframe_focus_is_not_misread_as_stuck(page) -> None:  # type: ignore[no-untyped-def]
+    """The parent sees only the iframe while focus moves through inner controls."""
+    await page.set_content(
+        "<!doctype html><html lang=en><body><a href='#before'>Before</a>"
+        "<iframe title='Editor' srcdoc=\"<button>One</button><button>Two</button>"
+        '<button>Three</button><button>Four</button><button>Five</button>"></iframe>'
+        "<a href='#after'>After</a></body></html>"
+    )
+    findings = await KeyboardProbe(max_focusable=20, stuck_threshold=3).run(page)
+    assert findings == []
 
 
 # --------------------------------------------------------------------
@@ -210,39 +218,42 @@ async def test_detects_stuck_focus_from_swallowed_tab(page) -> None:  # type: ig
     assert any("button" in f.target_selector.lower() for f in stuck), (
         f"Stuck finding's selector should mention 'button': {[f.target_selector for f in stuck]}"
     )
+    assert all("3 Tab attempts" in f.failure_summary for f in stuck)
+    assert all("3 Shift+Tab attempts" in f.failure_summary for f in stuck)
+    assert all("6 failed exit attempts total" in f.failure_summary for f in stuck)
 
 
 @pytest.mark.asyncio
-async def test_detects_modal_without_escape_handler(page) -> None:  # type: ignore[no-untyped-def]
-    """A modal where Escape doesn't release focus → keyboard-trap-modal-no-escape."""
+async def test_forward_only_block_is_suppressed_when_reverse_exits(page) -> None:  # type: ignore[no-untyped-def]
+    """A forward observation alone cannot support a no-keyboard-trap lead."""
+    await page.set_content(
+        "<!doctype html><html lang=en><body><a href='#before'>Before</a>"
+        "<button id=widget>Widget</button><a href='#after'>After</a>"
+        "<script>widget.addEventListener('keydown', e => {"
+        "if (e.key === 'Tab' && !e.shiftKey) e.preventDefault();"
+        "});</script></body></html>"
+    )
+    await page.evaluate("document.getElementById('widget').focus()")
+    findings = await KeyboardProbe(max_focusable=20, stuck_threshold=3).run(page)
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_modal_without_escape_is_not_automatically_a_trap(page) -> None:  # type: ignore[no-untyped-def]
+    """Escape is not the only conforming keyboard method for leaving a component."""
     await page.goto(_file_url("modal_no_escape.html"))
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     findings = await probe.run(page)
-    no_escape = [f for f in findings if f.rule_id == RULE_NO_ESCAPE]
-    assert no_escape, (
-        "Expected at least one keyboard-trap-modal-no-escape finding; got rules: "
-        + ", ".join(f.rule_id for f in findings)
-    )
-    # The finding's failure_summary should mention Escape (so triagers
-    # know what to test manually).
-    assert any("escape" in f.failure_summary.lower() for f in no_escape)
+    assert findings == []
 
 
 @pytest.mark.asyncio
-async def test_detects_untitled_iframe(page) -> None:  # type: ignore[no-untyped-def]
-    """Iframe without title + reachable by Tab → keyboard-trap-iframe (soft)."""
+async def test_untitled_iframe_fixture_is_not_a_keyboard_trap(page) -> None:  # type: ignore[no-untyped-def]
+    """Frame naming is left to the DOM engines and not mapped to SC 2.1.2."""
     await page.goto(_file_url("iframe_no_exit.html"))
     probe = KeyboardProbe(max_focusable=20, stuck_threshold=4)
     findings = await probe.run(page)
-    iframe_finds = [f for f in findings if f.rule_id == RULE_IFRAME]
-    assert iframe_finds, (
-        "Expected at least one keyboard-trap-iframe finding; got rules: "
-        + ", ".join(f.rule_id for f in findings)
-    )
-    # Iframe heuristic is `serious` (not critical) — a heuristic is
-    # softer than a confirmed trap, and we don't want it to outrank
-    # the real ones in the Issues view's priority sort.
-    assert all(f.impact == "serious" for f in iframe_finds)
+    assert findings == []
 
 
 # --------------------------------------------------------------------

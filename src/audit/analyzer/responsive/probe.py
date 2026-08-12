@@ -129,8 +129,7 @@ _CLIPPED_TEXT_JS = """
 
 # Reflow detector: does the document need a horizontal scrollbar at the
 # current (320px) viewport, and which elements are wider than it?
-_REFLOW_JS = (
-    """
+_REFLOW_JS = """
 () => {
   const doc = document.scrollingElement || document.documentElement;
   const overflow = doc.scrollWidth - doc.clientWidth;
@@ -163,13 +162,11 @@ _REFLOW_JS = (
   }
   return { overflow: overflow, viewport: doc.clientWidth, offenders: out };
 }
-"""
-    % {
-        "tolerance": _OVERFLOW_TOLERANCE_PX,
-        "scan_cap": _MAX_ELEMENTS_SCANNED,
-        "max_offenders": _MAX_OFFENDERS_PER_CHECK,
-    }
-)
+""" % {
+    "tolerance": _OVERFLOW_TOLERANCE_PX,
+    "scan_cap": _MAX_ELEMENTS_SCANNED,
+    "max_offenders": _MAX_OFFENDERS_PER_CHECK,
+}
 
 
 @dataclass
@@ -178,6 +175,9 @@ class ResponsiveProbe:
 
     base_viewport_width: int = 1440
     base_viewport_height: int = 900
+    # Protected browsers may surface URL/content fragments in an exception.
+    # Keep logs terse when the companion asks for a private diagnostic mode.
+    suppress_diagnostics: bool = False
 
     async def run(self, page: Page) -> list[ResponsiveFinding]:
         """Probe ``page``; returns findings, never raises.
@@ -189,21 +189,27 @@ class ResponsiveProbe:
         try:
             findings.extend(await self._check_reflow(page))
         except Exception as exc:
-            log.warning("responsive.reflow_failed: %s", exc)
+            self._log_failure("reflow", exc)
         try:
             findings.extend(await self._check_zoom_clipping(page))
         except Exception as exc:
-            log.warning("responsive.zoom_clipping_failed: %s", exc)
+            self._log_failure("zoom_clipping", exc)
         try:
             findings.extend(await self._check_text_spacing(page))
         except Exception as exc:
-            log.warning("responsive.text_spacing_failed: %s", exc)
+            self._log_failure("text_spacing", exc)
         # Always restore the crawl's standard viewport.
         with contextlib.suppress(Exception):
             await page.set_viewport_size(
                 {"width": self.base_viewport_width, "height": self.base_viewport_height}
             )
         return findings
+
+    def _log_failure(self, check: str, exc: Exception) -> None:
+        if self.suppress_diagnostics:
+            log.warning("responsive.%s_failed_in_protected_context", check)
+        else:
+            log.warning("responsive.%s_failed: %s", check, exc)
 
     # -----------------------------------------------------------------
     # Check 1 — reflow at 320 px (SC 1.4.10).

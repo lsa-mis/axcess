@@ -11,12 +11,18 @@ you can sort, filter, and track in a spreadsheet:
   Status · What to Fix · Page Links / Locations · Action · Helpful Resources ·
   Notes · Evidence (a highlighted screenshot of the issue's element, embedded
   when a ``blob_store`` is supplied and the finding has one).
+* **Decision History** — reviewer, time, source layer, prior/new status,
+  rationale, and a clickable evidence link for every triage decision.
 * **Owner Worklist** — the same open issues sliced by who fixes them.
 * **Page Hotspots** — pages ranked by a severity-weighted load.
+* **Page References** — every affected page as a clickable link, with a
+  plain-language element location and the retained technical target.
 * **Who's Affected** — open issues by the user ability each one blocks.
 * **Coverage & Method** — per-criterion automated-vs-manual coverage.
 * **Test Tracking** — the manual Pass / Fail checklist, one row per WCAG 2.2
   A/AA criterion.
+* **Manual Review Evidence** — human outcomes, rationale, page references,
+  and external evidence links kept with the workbook handoff.
 
 Every issue-derived sheet is built from :func:`audit_report.build_audit_cards`
 — the exact card model the Markdown audit report renders — so the two
@@ -41,6 +47,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from audit import coverage_matrix, evaluation
 from audit.blob_store import BlobStore
 from audit.exports.audit_report import (
+    _PIPELINE_LABEL,
     MAX_HOTSPOTS,
     AuditCard,
     DroppedFinding,
@@ -48,6 +55,7 @@ from audit.exports.audit_report import (
     _principle_for,
     _severity_rank,
     build_audit_cards,
+    issue_locations,
 )
 from audit.exports.collector import ExportScan
 from audit.logging import get_logger
@@ -100,7 +108,10 @@ _OWNER_DISPLAY = {
 }
 
 _GUIDANCE = (
-    "Prioritization Guidance — Fix issues in conformance-level order. "
+    "Prioritization Guidance — Start with rows whose Evidence decision is "
+    "Likely Barrier. Rows marked Expert Review require a human decision before "
+    "they are described as barriers; Informational rows are not worklist items. "
+    "Within the Likely Barrier lane, fix issues in conformance-level order. "
     "Level A flags the most significant barriers that block people with "
     "disabilities outright; remediate these first. Level AA issues are "
     "required for WCAG 2.2 AA conformance (the standard most policies and "
@@ -113,6 +124,9 @@ _GUIDANCE = (
 
 _ISSUE_HEADERS = (
     "Issues",
+    "Evidence decision",
+    "Detection source",
+    "Confidence",
     "Conformance Level",
     "Remediation Ownership",
     "Status",
@@ -123,7 +137,21 @@ _ISSUE_HEADERS = (
     "Notes",
     "Evidence",
 )
-_ISSUE_WIDTHS = (34.75, 17.5, 19.13, 15.38, 40.0, 41.25, 48.88, 30.5, 24.0, 22.0)
+_ISSUE_WIDTHS = (
+    34.75,
+    22.0,
+    29.0,
+    14.0,
+    17.5,
+    19.13,
+    15.38,
+    40.0,
+    29.0,
+    48.88,
+    30.5,
+    24.0,
+    22.0,
+)
 
 _TRACK_HEADERS = ("Focus", "What to check", "Pass / Fail")
 _TRACK_WIDTHS = (28.0, 70.0, 14.0)
@@ -178,18 +206,14 @@ def _bullets(steps: tuple[str, ...] | list[str]) -> str:
 
 
 def _locations(pages: list[issues.IssuePage], total_pages: int) -> str:
-    """Affected-page URLs for the 'Page Links / Locations' cell."""
+    """A concise link to the separate sheet of individually clickable pages."""
     urls = [p.page_url for p in pages if p.page_url]
     if not urls:
-        return ""
+        return "No page-level location was recorded."
     # Site-wide problem (every crawled page) reads better as a phrase.
     if total_pages > 1 and len(set(urls)) >= total_pages:
-        return "All pages."
-    shown = urls[:_LOCATION_CAP]
-    out = "\n".join(shown)
-    if len(urls) > _LOCATION_CAP:
-        out += f"\n…and {len(urls) - _LOCATION_CAP} more"
-    return out
+        return "All scanned pages — open Page References."
+    return f"{len(set(urls))} linked page(s) — open Page References."
 
 
 def _style_header_row(ws: Worksheet, row: int, ncols: int) -> None:
@@ -250,8 +274,19 @@ def _build_issues_sheet(
     audit_date: str,
     blob_store: BlobStore | None = None,
 ) -> None:
-    ncols = len(_ISSUE_HEADERS)
-    for i, w in enumerate(_ISSUE_WIDTHS, start=1):
+    include_evidence = (
+        blob_store is not None
+        and conn.execute(
+            "SELECT 1 FROM page_a11y_findings WHERE scan_id = ? "
+            "AND screenshot_hash IS NOT NULL AND screenshot_hash <> '' LIMIT 1",
+            (scan.id,),
+        ).fetchone()
+        is not None
+    )
+    headers = _ISSUE_HEADERS if include_evidence else _ISSUE_HEADERS[:-1]
+    widths = _ISSUE_WIDTHS if include_evidence else _ISSUE_WIDTHS[:-1]
+    ncols = len(headers)
+    for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # --- metadata header block (rows 1-5, merged across the table width) ---
@@ -268,11 +303,14 @@ def _build_issues_sheet(
         cell.fill = _META_FILL
         cell.alignment = _WRAP_TOP
         cell.font = _META_LABEL_FONT if label != "Prioritization Guidance" else Font(size=10)
+        if value.startswith(("https://", "http://")):
+            cell.hyperlink = value
+            cell.style = "Hyperlink"
     ws.row_dimensions[5].height = 96  # the guidance paragraph needs room
 
     # --- the issues table (header on row 8, data from row 9) --------------
     header_row = 8
-    for c, name in enumerate(_ISSUE_HEADERS, start=1):
+    for c, name in enumerate(headers, start=1):
         ws.cell(row=header_row, column=c, value=name)
     _style_header_row(ws, header_row, ncols)
 
@@ -285,8 +323,11 @@ def _build_issues_sheet(
         fix = (detail.fix_steps if detail else None) or list(row.fix_steps)
         help_url = (detail.help_url if detail else None) or row.help_url or ""
         locations = _locations(detail.pages, scan.page_count) if detail else ""
-        values = (
+        values: tuple[Any, ...] = (
             row.title,
+            row.review_lane.replace("_", " ").title(),
+            _PIPELINE_LABEL.get(row.pipeline, row.pipeline),
+            row.evidence_confidence.title(),
             _CONFORMANCE_DISPLAY.get(row.conformance, row.conformance),
             _OWNER_DISPLAY.get(row.responsibility, row.responsibility.title()),
             _dominant_status(row.status_summary),
@@ -295,17 +336,26 @@ def _build_issues_sheet(
             _bullets(fix),
             help_url,
             "",  # Notes — left blank for the auditor
-            "",  # Evidence — image is anchored here below (when available)
         )
+        if include_evidence:
+            values += ("",)  # Evidence — image is anchored here below.
         for c, v in enumerate(values, start=1):
             cell = ws.cell(row=r, column=c, value=v)
-            cell.alignment = _WRAP_TOP_CENTER if c in (2, 3, 4) else _WRAP_TOP
+            cell.alignment = _WRAP_TOP_CENTER if c in (2, 4, 5, 6, 7) else _WRAP_TOP
             cell.border = _BORDER
             if idx % 2 == 1:
                 cell.fill = _BAND_FILL
+        if locations and detail is not None and detail.pages:
+            location_cell = ws.cell(row=r, column=9)
+            location_cell.hyperlink = "#'Page References'!A1"
+            location_cell.style = "Hyperlink"
+        if help_url.startswith(("https://", "http://")):
+            resource_cell = ws.cell(row=r, column=11)
+            resource_cell.hyperlink = help_url
+            resource_cell.style = "Hyperlink"
         # Embed a highlighted element screenshot in the Evidence column
         # (last column) when a blob store is supplied and the finding has one.
-        if blob_store is not None:
+        if include_evidence and blob_store is not None:
             _embed_evidence(ws, row=r, col=ncols, detail=detail, blob_store=blob_store)
 
     last_row = max(r, header_row + 1)
@@ -316,7 +366,7 @@ def _build_issues_sheet(
     dv = DataValidation(type="list", formula1=f'"{",".join(_STATUS_CHOICES)}"', allow_blank=True)
     ws.add_data_validation(dv)
     if r > header_row:
-        dv.add(f"D{header_row + 1}:D{last_row}")
+        dv.add(f"G{header_row + 1}:G{last_row}")
 
 
 def _build_tracking_sheet(ws: Worksheet, *, manual_outcomes: dict[str, str] | None = None) -> None:
@@ -447,6 +497,7 @@ def _build_summary_sheet(
     best_practice: list[Any],
     *,
     audit_date: str,
+    evaluation_record: dict[str, Any],
 ) -> None:
     """A one-screen dashboard: scan metadata + every headline rollup."""
     ws.column_dimensions["A"].width = 40
@@ -479,7 +530,7 @@ def _build_summary_sheet(
         cell.alignment = _WRAP_TOP
         r += 1
 
-    def metric(label: str, value: Any) -> None:
+    def metric(label: str, value: Any) -> Any:
         nonlocal r
         lc = ws.cell(row=r, column=1, value=label)
         lc.font = Font(bold=True, size=11)
@@ -489,26 +540,52 @@ def _build_summary_sheet(
         vc.alignment = _WRAP_TOP
         vc.border = _BORDER
         r += 1
+        return vc
 
     section("Scan")
-    metric("Seed URL", scan.seed_url or "—")
+    seed_url_cell = metric("Seed URL", scan.seed_url or "—")
+    if scan.seed_url.startswith(("https://", "http://")):
+        seed_url_cell.hyperlink = scan.seed_url
+        seed_url_cell.style = "Hyperlink"
     metric("Audited against", f"WCAG 2.2 Level {scan.axe_level}")
     metric("Pages crawled", scan.page_count)
     metric("Audit date", audit_date)
     r += 1
 
-    open_occurrences = sum(c.affected_finding_count for c in cards)
+    if evaluation_record["exists"]:
+        section("Expert evaluation")
+        metric(
+            "Target",
+            f"{evaluation_record['target_standard']} Level {evaluation_record['target_level']}",
+        )
+        metric("Review status", str(evaluation_record["status"]).replace("_", " "))
+        for label, key in (
+            ("Reviewer", "reviewer"),
+            ("Purpose", "purpose"),
+            ("Included scope", "scope_included"),
+            ("Excluded scope", "scope_excluded"),
+            ("Sample", "sample_description"),
+            ("Methods", "methods_note"),
+            ("Limitations", "limitations"),
+        ):
+            if evaluation_record[key]:
+                metric(label, evaluation_record[key])
+        r += 1
+
+    likely_occurrences = sum(c.affected_finding_count for c in cards)
+    review_occurrences = sum(int(row.occurrence_count) for row in best_practice)
     section("Issue counts")
-    metric("Open issue types", len(cards))
-    metric("Open findings (occurrences)", open_occurrences)
-    metric("Best-practice items (beyond WCAG)", len(best_practice))
+    metric("Likely-barrier issue groups", len(cards))
+    metric("Likely-barrier occurrences", likely_occurrences)
+    metric("Review-only / informational groups", len(best_practice))
+    metric("Review-only / informational occurrences", review_occurrences)
     metric("Already-triaged issue types", len(dropped))
     r += 1
 
     by_sev: dict[str, int] = {}
     for c in cards:
         by_sev[c.severity] = by_sev.get(c.severity, 0) + 1
-    section("Open issues by severity")
+    section("Likely barriers by severity")
     for sev in _SEVERITY_ORDER:
         metric(sev, by_sev.get(sev, 0))
     r += 1
@@ -516,7 +593,7 @@ def _build_summary_sheet(
     by_level: dict[str, int] = {}
     for c in cards:
         by_level[c.wcag_level or "—"] = by_level.get(c.wcag_level or "—", 0) + 1
-    section("Open issues by WCAG level")
+    section("Likely barriers by WCAG level")
     for lvl in ("A", "AA", "AAA"):
         if by_level.get(lvl):
             metric(f"Level {lvl}", by_level[lvl])
@@ -526,7 +603,7 @@ def _build_summary_sheet(
     for c in cards:
         p = _principle_for(c.wcag_sc)
         by_principle[p] = by_principle.get(p, 0) + 1
-    section("Open issues by WCAG principle (POUR)")
+    section("Likely barriers by WCAG principle (POUR)")
     for principle in ("Perceivable", "Operable", "Understandable", "Robust"):
         if by_principle.get(principle):
             metric(principle, by_principle[principle])
@@ -556,7 +633,7 @@ def _build_worklist_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
     rows: list[tuple[Any, ...]] = []
     for c in ordered:
         key = _owner_key(c.owner)
-        sc = f"{c.wcag_sc} {c.wcag_name}".strip() if c.wcag_sc else "Best practice"
+        sc = f"{c.wcag_sc} {c.wcag_name or ''}".strip() if c.wcag_sc else "Best practice"
         rows.append(
             (
                 _OWNER_ROW_LABEL.get(key, key.capitalize()),
@@ -565,6 +642,7 @@ def _build_worklist_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
                 c.effort,
                 c.affected_page_count,
                 sc,
+                _PIPELINE_LABEL.get(c.pipeline, c.pipeline),
             )
         )
     _styled_table(
@@ -574,9 +652,9 @@ def _build_worklist_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
             "The same open issues, re-sliced by the team that fixes them. "
             "Filter the Owner column to hand each team their pack."
         ),
-        headers=("Owner", "Issue", "Severity", "Effort", "Pages", "WCAG"),
+        headers=("Owner", "Issue", "Severity", "Effort", "Pages", "WCAG", "Detection source"),
         rows=rows,
-        widths=(18.0, 46.0, 13.0, 20.0, 9.0, 30.0),
+        widths=(18.0, 46.0, 13.0, 20.0, 9.0, 30.0, 29.0),
         center_cols=(3, 5),
         empty_note="No open issues to assign.",
     )
@@ -612,6 +690,116 @@ def _build_hotspots_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
         center_cols=(3, 4),
         empty_note="No open findings pinned to specific pages.",
     )
+    for row_number, (url, _score) in enumerate(ranked, start=5):
+        if url.startswith(("https://", "http://")):
+            ws.cell(row=row_number, column=1).hyperlink = url
+            ws.cell(row=row_number, column=1).style = "Hyperlink"
+
+
+def _build_page_references_sheet(
+    ws: Worksheet,
+    scan: ExportScan,
+    conn: sqlite3.Connection,
+    cards: list[AuditCard],
+) -> None:
+    """List every issue/page pairing with plain-language element locations."""
+    rows: list[tuple[Any, ...]] = []
+    page_urls: list[str] = []
+    asset_urls: list[str | None] = []
+    cards_by_issue = {(card.pipeline, card.title): card for card in cards}
+    for issue in issues.list_issues(conn, scan.id):
+        detail = issues.get_issue_detail(conn, scan.id, issue.issue_key)
+        if detail is None:
+            continue
+        card = cards_by_issue.get((issue.pipeline, issue.title))
+        for page in detail.pages:
+            locations = (
+                [location for location in card.locations if location.page_url == page.page_url]
+                if card is not None
+                else [
+                    location
+                    for location in issue_locations(conn, issue)[0]
+                    if location.page_url == page.page_url
+                ]
+            )
+            descriptions = list(dict.fromkeys(location.description for location in locations))
+            if descriptions:
+                shown_descriptions = descriptions[:3]
+                location_description = "\n".join(
+                    f"• {description}" for description in shown_descriptions
+                )
+                if len(descriptions) > len(shown_descriptions):
+                    location_description += (
+                        f"\n…and {len(descriptions) - len(shown_descriptions)} more locations"
+                    )
+            else:
+                location_description = "Affected page; no element-level location was recorded."
+            selectors = list(
+                dict.fromkeys(location.selector for location in locations if location.selector)
+            )
+            first_asset = next(
+                (location.image_url for location in locations if location.image_url),
+                None,
+            )
+            if selectors and any(
+                selector.lstrip().startswith(("{", "[")) or len(selector) > 240
+                for selector in selectors
+            ):
+                technical_target = (
+                    "Structured engine target recorded — open the issue evidence in Axcess."
+                )
+            elif selectors:
+                shown = selectors[:5]
+                technical_target = "\n".join(shown)
+                if len(selectors) > len(shown):
+                    technical_target += f"\n…and {len(selectors) - len(shown)} more targets"
+            else:
+                technical_target = "Open image asset" if first_asset else "Not recorded"
+            rows.append(
+                (
+                    issue.title,
+                    _PIPELINE_LABEL.get(issue.pipeline, issue.pipeline),
+                    page.page_url,
+                    page.page_title or "",
+                    location_description,
+                    technical_target,
+                    page.occurrence_count,
+                    _dominant_status(page.status_summary),
+                )
+            )
+            page_urls.append(page.page_url)
+            asset_urls.append(first_asset)
+    _styled_table(
+        ws,
+        title="Page references",
+        subtitle=(
+            "Every affected page is a direct link. Location on page describes the "
+            "observed element in plain language; Technical target retains the CSS "
+            "selector or a link to the image asset when available."
+        ),
+        headers=(
+            "Issue",
+            "Detection source",
+            "Page",
+            "Page title",
+            "Location on page",
+            "Technical target",
+            "Occurrences",
+            "Status",
+        ),
+        rows=rows,
+        widths=(38.0, 29.0, 58.0, 30.0, 46.0, 38.0, 14.0, 24.0),
+        center_cols=(7,),
+        empty_note="No issue-to-page references were recorded for this scan.",
+    )
+    for row_number, url in enumerate(page_urls, start=5):
+        if url.startswith(("https://", "http://")):
+            ws.cell(row=row_number, column=3).hyperlink = url
+            ws.cell(row=row_number, column=3).style = "Hyperlink"
+    for row_number, asset_url in enumerate(asset_urls, start=5):
+        if asset_url and asset_url.startswith(("https://", "http://")):
+            ws.cell(row=row_number, column=6).hyperlink = asset_url
+            ws.cell(row=row_number, column=6).style = "Hyperlink"
 
 
 def _build_affected_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
@@ -680,6 +868,169 @@ def _build_coverage_sheet(ws: Worksheet) -> None:
     )
 
 
+def _build_manual_review_evidence_sheet(ws: Worksheet, checks: list[dict[str, Any]]) -> None:
+    """Keep manual decisions and their evidence with the XLSX handoff.
+
+    One row is emitted for every recorded manual decision. A decision with
+    several pieces of evidence gets one row per reference, which keeps page
+    and external links independently reviewable and filterable.
+    """
+    outcome_labels = {
+        "pass": "Pass",
+        "fail": "Fail",
+        "not_tested": "Not tested",
+        "needs_follow_up": "Needs follow-up",
+    }
+    rows: list[tuple[Any, ...]] = []
+    external_urls: list[str] = []
+    for check in checks:
+        outcome = str(check["outcome"])
+        if outcome == "not_started":
+            continue
+        criterion = check["criterion"]
+        evidence = check["evidence"] or [None]
+        for item in evidence:
+            rows.append(
+                (
+                    criterion["sc"],
+                    criterion["name"],
+                    outcome_labels.get(outcome, outcome.replace("_", " ").title()),
+                    check["rationale"],
+                    item.get("page_url", "") if item else "",
+                    item.get("evidence_url", "") if item else "",
+                    item.get("note", "") if item else "",
+                )
+            )
+            external_urls.append(str(item.get("evidence_url") or "") if item else "")
+
+    _styled_table(
+        ws,
+        title="Manual review evidence",
+        subtitle=(
+            "Human decisions and the page/external evidence supporting them. "
+            "Rows without evidence are decisions that still need supporting references."
+        ),
+        headers=(
+            "SC",
+            "Criterion",
+            "Outcome",
+            "Rationale",
+            "Page reference",
+            "External reference",
+            "Expert note",
+        ),
+        rows=rows,
+        widths=(10.0, 34.0, 18.0, 42.0, 48.0, 48.0, 42.0),
+        center_cols=(1, 3),
+        empty_note="No manual decisions have been recorded yet.",
+    )
+    for offset, url in enumerate(external_urls, start=5):
+        page_url = str(rows[offset - 5][4] or "")
+        if page_url.startswith(("https://", "http://")):
+            ws.cell(row=offset, column=5).hyperlink = page_url
+            ws.cell(row=offset, column=5).style = "Hyperlink"
+        if url.startswith(("https://", "http://")):
+            ws.cell(row=offset, column=6).hyperlink = url
+            ws.cell(row=offset, column=6).style = "Hyperlink"
+
+
+def _build_decision_history_sheet(
+    ws: Worksheet,
+    scan: ExportScan,
+    conn: sqlite3.Connection,
+) -> None:
+    """Export the durable finding-status audit trail with evidence links."""
+
+    image_links = {finding.id: finding.ui_url for finding in scan.findings}
+    a11y_links = {finding.id: finding.ui_url for finding in scan.a11y_findings}
+    history: list[dict[str, Any]] = [
+        {
+            **dict(row),
+            "source": "Image analysis",
+            "evidence_url": image_links.get(int(row["finding_id"]), ""),
+        }
+        for row in conn.execute(
+            """
+            SELECT id, finding_id, from_status, to_status, actor, changed_at, note
+              FROM finding_history
+             WHERE scan_id = ? AND change_type = 'status_change'
+            """,
+            (scan.id,),
+        ).fetchall()
+    ]
+    has_a11y_history = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'a11y_finding_history'"
+    ).fetchone()
+    if has_a11y_history is not None:
+        history.extend(
+            {
+                **dict(row),
+                "source": str(row["pipeline"] or "DOM evidence"),
+                "evidence_url": a11y_links.get(int(row["finding_id"]), ""),
+            }
+            for row in conn.execute(
+                """
+                SELECT h.id, h.finding_id, h.from_status, h.to_status,
+                       h.actor, h.changed_at, h.note, f.pipeline
+                  FROM a11y_finding_history h
+                  JOIN page_a11y_findings f ON f.id = h.finding_id
+                 WHERE h.scan_id = ? AND h.change_type = 'status_change'
+                """,
+                (scan.id,),
+            ).fetchall()
+        )
+    history.sort(key=lambda item: (str(item["changed_at"]), int(item["id"])))
+    evaluation_reviewer = str(
+        evaluation.get_evaluation(conn, scan.id).get("reviewer") or ""
+    ).strip()
+    rows = [
+        (
+            str(item["changed_at"]),
+            str(item["source"]),
+            int(item["finding_id"]),
+            str(item["from_status"] or ""),
+            str(item["to_status"] or ""),
+            (
+                evaluation_reviewer
+                if item["actor"] == "user" and evaluation_reviewer
+                else str(item["actor"])
+            ),
+            str(item["note"] or ""),
+            "Open evidence" if item["evidence_url"] else "",
+        )
+        for item in history
+    ]
+    _styled_table(
+        ws,
+        title="Expert decision history",
+        subtitle=(
+            "Every status decision, attributed to its evidence source and reviewer. "
+            "User actions use the evaluation reviewer named in Summary. Final dispositions "
+            "require a rationale; use the last column to reopen the evidence."
+        ),
+        headers=(
+            "Changed at",
+            "Evidence source",
+            "Finding ID",
+            "From status",
+            "To status",
+            "Reviewer / actor",
+            "Decision rationale",
+            "Evidence link",
+        ),
+        rows=rows,
+        widths=(22.0, 24.0, 12.0, 18.0, 18.0, 14.0, 54.0, 24.0),
+        center_cols=(3, 4, 5, 6),
+        empty_note="No finding-status decisions have been recorded yet.",
+    )
+    for offset, item in enumerate(history, start=5):
+        url = str(item["evidence_url"] or "")
+        if url.startswith(("https://", "http://")):
+            cell = ws.cell(row=offset, column=8)
+            cell.hyperlink = url
+            cell.style = "Hyperlink"
+
+
 def render_xlsx(
     scan: ExportScan,
     *,
@@ -690,26 +1041,30 @@ def render_xlsx(
 ) -> bytes:
     """Render the full Excel audit workbook and return the .xlsx bytes.
 
-    Seven sheets, every report section as a filterable table:
+    Ten sheets, every report section as a filterable table:
 
     1. **Summary** — the at-a-glance dashboard (counts, severity, level,
        principle, coverage headline).
     2. **Issues Overview** — the remediation table (one row per issue).
-    3. **Owner Worklist** — the same issues sliced by who fixes them.
-    4. **Page Hotspots** — pages ranked by severity-weighted load.
-    5. **Who's Affected** — open issues by the ability each blocks.
-    6. **Coverage & Method** — per-criterion automated-vs-manual coverage.
-    7. **Test Tracking** — the manual Pass / Fail checklist.
+    3. **Decision History** — review dispositions, rationales, actors, and links.
+    4. **Owner Worklist** — the same issues sliced by who fixes them.
+    5. **Page Hotspots** — pages ranked by severity-weighted load.
+    6. **Page References** — affected pages, plain-language locations, and
+       retained technical targets.
+    7. **Who's Affected** — open issues by the ability each blocks.
+    8. **Coverage & Method** — per-criterion automated-vs-manual coverage.
+    9. **Test Tracking** — the manual Pass / Fail checklist.
+    10. **Manual Review Evidence** — criterion outcomes and supporting notes.
 
     ``conn`` is required: the issue tables are built live from the same
     ``issues.list_issues()`` / audit-report card model the Markdown report
     uses, so the two deliverables can't drift. ``audit_date`` defaults to the
     scan's finish time formatted as a human date.
 
-    ``blob_store`` is optional: when supplied, the Issues Overview sheet
-    embeds the highlighted element screenshot captured for each finding at
-    scan time into a trailing "Evidence" column. When ``None`` (the default)
-    the behaviour is unchanged — no images, just the textual table.
+    ``blob_store`` is optional: when supplied and the scan has retained
+    screenshot hashes, the Issues Overview sheet embeds the first available
+    highlighted screenshot in a trailing "Evidence" column. The column is
+    omitted when there is no embeddable evidence so the table stays compact.
     """
     date_str = audit_date or _fmt_date(scan.finished_at or scan.started_at)
     cards, dropped, best_practice = build_audit_cards(conn, scan)
@@ -717,7 +1072,16 @@ def render_xlsx(
     wb = Workbook()
     summary = wb.active
     summary.title = "Summary"
-    _build_summary_sheet(summary, scan, cards, dropped, best_practice, audit_date=date_str)
+    evaluation_record = evaluation.get_evaluation(conn, scan.id)
+    _build_summary_sheet(
+        summary,
+        scan,
+        cards,
+        dropped,
+        best_practice,
+        audit_date=date_str,
+        evaluation_record=evaluation_record,
+    )
 
     _build_issues_sheet(
         wb.create_sheet("Issues Overview"),
@@ -727,10 +1091,13 @@ def render_xlsx(
         audit_date=date_str,
         blob_store=blob_store,
     )
+    _build_decision_history_sheet(wb.create_sheet("Decision History"), scan, conn)
     _build_worklist_sheet(wb.create_sheet("Owner Worklist"), cards)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
+    _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
     _build_coverage_sheet(wb.create_sheet("Coverage & Method"))
+    manual_checks = evaluation.list_manual_checks(conn, scan.id)
     manual_outcomes = {
         check["criterion"]["sc"]: {
             "pass": "Pass",
@@ -738,9 +1105,10 @@ def render_xlsx(
             "not_tested": "Not tested",
             "needs_follow_up": "Needs follow-up",
         }.get(check["outcome"], "")
-        for check in evaluation.list_manual_checks(conn, scan.id)
+        for check in manual_checks
     }
     _build_tracking_sheet(wb.create_sheet("Test Tracking"), manual_outcomes=manual_outcomes)
+    _build_manual_review_evidence_sheet(wb.create_sheet("Manual Review Evidence"), manual_checks)
 
     buf = io.BytesIO()
     wb.save(buf)

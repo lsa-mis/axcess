@@ -219,17 +219,26 @@ class AxeAnalyzer:
     """Reusable axe-core runner. Construct once per crawl, reuse per page."""
 
     axe_source: str
+    # Protected scans keep page diagnostics out of logs: browser exceptions
+    # can echo an authenticated URL, a fragment of a selector, or a response
+    # detail. Public scans retain the existing actionable diagnostic output.
+    suppress_diagnostics: bool = False
     _injected: bool = field(default=False, init=False)
 
     @classmethod
-    def from_bundled(cls, path: Path | None = None) -> AxeAnalyzer:
+    def from_bundled(
+        cls, path: Path | None = None, *, suppress_diagnostics: bool = False
+    ) -> AxeAnalyzer:
         """Load the axe-core bundle from disk and return a ready analyzer."""
         bundle = path or DEFAULT_AXE_BUNDLE
         if not bundle.is_file():
             raise FileNotFoundError(
                 f"axe bundle not found at {bundle} — run `make setup` to fetch it."
             )
-        return cls(axe_source=bundle.read_text(encoding="utf-8"))
+        return cls(
+            axe_source=bundle.read_text(encoding="utf-8"),
+            suppress_diagnostics=suppress_diagnostics,
+        )
 
     async def run(self, page: Page, level: Level = "AA") -> list[AxeViolation]:
         """Inject axe into ``page`` and return the flattened violations.
@@ -239,7 +248,21 @@ class AxeAnalyzer:
         ``best-practice`` set. ``"AAA"`` adds the AAA rules; ``"A"``
         narrows to Level A only.
         """
-        await page.add_script_tag(content=self.axe_source)
+        # Execute the bundled source through Playwright's evaluation channel
+        # instead of appending an inline <script>.  Authenticated applications
+        # such as Canvas commonly use a strict script-src policy with per-page
+        # nonces; add_script_tag(content=...) is correctly rejected by those
+        # pages even though the auditor controls the browser.  page.evaluate
+        # runs in Playwright's execution context, does not weaken or modify the
+        # target's CSP, and keeps the bundle entirely local.
+        try:
+            await page.evaluate(self.axe_source)
+        except Exception as exc:
+            if self.suppress_diagnostics:
+                log.warning("axe-core installation failed in protected context")
+            else:
+                log.warning("axe-core installation failed on page: %s", exc)
+            return []
         tags = tags_for_level(level)
         # axe.run returns the full result object; we only keep `violations`.
         # The `runOnly: {type: 'tag', values: tags}` filter is what gives
@@ -256,7 +279,10 @@ class AxeAnalyzer:
             )
         except Exception as exc:
             # Don't kill the crawl on an axe failure — log and return empty.
-            log.warning("axe.run failed on page: %s", exc)
+            if self.suppress_diagnostics:
+                log.warning("axe.run failed in protected context")
+            else:
+                log.warning("axe.run failed on page: %s", exc)
             return []
         return list(_flatten(raw))
 

@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Info, Lightbulb } from "lucide-react";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import type {
   FindingsGroup,
   GroupedFinding,
 } from "../api/types";
+import { requestStatusRationale } from "../statusDecision";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -279,9 +280,9 @@ function GroupCard({
  * Reused by both the image-of-text grouped view and the WCAG axe
  * grouped view (once that lands) — switch by `kind`. The destructive
  * transitions (`accepted_risk`, `false_positive`, `remediated`) get a
- * `confirm()` gate naming exactly how many findings the action will
- * touch and which group; the non-destructive ones (`new`, `reviewing`,
- * `in_progress`) just submit. UD #5 (Tolerance for Error) applies more
+ * rationale prompt naming exactly how many findings the action will touch and
+ * which group. `in_progress` also requires rationale because it now means the
+ * expert confirmed an open barrier. UD #5 (Tolerance for Error) applies more
  * here than for single-finding edits because the blast radius is bigger.
  */
 function BulkStatusBar({
@@ -298,10 +299,10 @@ function BulkStatusBar({
   const qc = useQueryClient();
   const [target, setTarget] = useState<FindingStatus>("reviewing");
   const mutation = useMutation({
-    mutationFn: (next: FindingStatus) =>
+    mutationFn: ({ next, rationale }: { next: FindingStatus; rationale: string }) =>
       kind === "image"
-        ? api.bulkSetStatus(findingIds, next)
-        : api.bulkSetA11yStatus(findingIds, next),
+        ? api.bulkSetStatus(findingIds, next, rationale || undefined)
+        : api.bulkSetA11yStatus(findingIds, next, rationale || undefined),
     onSuccess: () => {
       // Refresh the grouped view so counts + status breakdowns update.
       // Also bust the scan/finding caches because the per-finding
@@ -313,21 +314,13 @@ function BulkStatusBar({
       void qc.invalidateQueries({ queryKey: ["scan", scanId] });
     },
   });
-  const destructive: FindingStatus[] = [
-    "remediated",
-    "accepted_risk",
-    "false_positive",
-  ];
-
   const onApply = () => {
-    if (destructive.includes(target)) {
-      const ok = window.confirm(
-        `Mark all ${findingIds.length} findings in "${groupLabel}" as ${target}? ` +
-          "This is reversible — you can update the status again afterward.",
-      );
-      if (!ok) return;
-    }
-    mutation.mutate(target);
+    const rationale = requestStatusRationale(
+      target,
+      `all ${findingIds.length} findings in "${groupLabel}"`,
+    );
+    if (rationale === null) return;
+    mutation.mutate({ next: target, rationale });
   };
 
   return (

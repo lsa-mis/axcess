@@ -121,6 +121,43 @@ It stops a network-reachable instance from being wide open. It does
 *not* give people separate accounts, separate data, or audit logs —
 that's Path B/C.
 
+## Protected authenticated scans are a separate deployment
+
+The LAN/Tailscale and shared-token setup above is for **public scans only**.
+It does not authorize a person to view protected evidence or a companion to
+use an authenticated browser session. Do not enable protected scans on this
+quick-start deployment.
+
+Protected scans require a U-M-approved identity-aware proxy with group claims,
+short-lived signed identity assertions, mTLS termination and certificate
+binding for each companion, a managed KMS/secret manager, and a private HTTPS
+service path. The stock local development KMS adapter is not production key
+management, and `AUDIT_ACCESS_TOKEN` is never a protected-report credential.
+
+Protected deployments must also set the administrator-owned
+`AUDIT_PROTECTED_KMS_VAULT_FACTORY` and schedule `audit protected-maintenance`
+with catch-up and failure alerting; this performs the required seven-day
+KMS-backed evidence crypto-erasure even when the web process has been offline.
+See the retention runbook in [Protected scans](./protected-scans.md#required-retention-maintenance).
+
+Set `AUDIT_PROTECTED_PUBLIC_ORIGIN` to the exact external HTTPS origin served
+by that proxy. It is the authoritative browser Origin and companion-command
+origin for protected operations; Axcess does not derive either from `Host`,
+`Forwarded`, or `X-Forwarded-*` request headers. The proxy must strip all
+client-supplied protected identity/JTI/signature and companion-mTLS headers,
+then inject its verified values. It must mint a fresh high-entropy JTI/nonce
+and HMAC assertion for every state-changing protected browser request. On
+`/api/agents/*`, it must additionally HMAC-sign its verified mTLS assertion
+with the separate `AUDIT_PROTECTED_AGENT_PROXY_HMAC_SECRET`; Axcess rejects
+unsigned `X-SSL-Client-*` headers. See [Protected scans](./protected-scans.md)
+for the exact method/path/timestamp/verification/fingerprint signing format.
+
+Read [Protected scans](./protected-scans.md) before deploying or piloting this
+mode. It contains the required proxy header-stripping rules, companion setup,
+read-only egress boundary, retention/crypto-erasure model, and manual WCAG
+3.3.8 authentication review. Run a staging pilot with the target owner and
+U-M security team before approving a production target.
+
 ---
 
 ## Running without Ollama

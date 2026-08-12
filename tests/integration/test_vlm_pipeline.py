@@ -97,6 +97,9 @@ def _config(base: str, *, vlm_enabled: bool = True) -> CrawlConfig:
         workers=2,
         ocr_max_workers=0,
         vlm_enabled=vlm_enabled,
+        # VLM routing is injected below. Semantic rules are intentionally not
+        # part of these fixture tests and must never use a live model.
+        semantic_enabled=False,
     )
 
 

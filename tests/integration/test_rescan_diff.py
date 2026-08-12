@@ -93,6 +93,9 @@ def _config(base: str, **overrides: object) -> CrawlConfig:
         "workers": 1,
         "ocr_max_workers": 0,
         "vlm_enabled": True,
+        # This suite uses a stub VLM; semantic rules are tested separately and
+        # must not turn fixture tests into live Ollama calls.
+        "semantic_enabled": False,
     }
     defaults.update(overrides)
     return CrawlConfig(**defaults)  # type: ignore[arg-type]

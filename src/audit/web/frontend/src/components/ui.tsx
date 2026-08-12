@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
 
@@ -18,12 +18,15 @@ export function StatusChip({ value }: { value: FindingStatus }) {
   );
 }
 
-/** Card container with a subtle shadow; Siteimprove-inspired. */
+/** Shared workspace surface with a quiet border and evidence-friendly depth. */
 export function Card({
   children,
   className,
   ...rest
-}: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
+}: {
+  children: ReactNode;
+  className?: string;
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
@@ -37,7 +40,7 @@ export function Card({
   );
 }
 
-/** Stat "pill" — big number, small label. Dashboard grid's bread + butter. */
+/** Compact metric surface with strong numeric hierarchy. */
 export function StatCard({
   label,
   value,
@@ -50,13 +53,13 @@ export function StatCard({
   tone?: "default" | "critical" | "major" | "minor" | "info";
 }) {
   return (
-    <Card className="p-4">
-      <div className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <Card className="relative overflow-hidden p-5 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-umich-blue">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
         {label}
       </div>
       <div
         className={cn(
-          "mt-1 text-3xl font-semibold tabular-nums",
+          "mt-2 text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
           tone === "critical" && "text-sev-critical",
           tone === "major" && "text-sev-major",
           tone === "minor" && "text-sev-minor",
@@ -66,7 +69,7 @@ export function StatCard({
       >
         {value}
       </div>
-      {hint && <div className="mt-0.5 text-xs text-fg-muted">{hint}</div>}
+      {hint && <div className="mt-2 text-xs text-fg-muted">{hint}</div>}
     </Card>
   );
 }
@@ -84,10 +87,13 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-6">
+    <header className="mb-7">
       {crumbs && (
-        <nav aria-label="Breadcrumb" className="mb-1 text-xs text-fg-subtle">
-          <ol className="flex items-center gap-1">
+        <nav
+          aria-label="Breadcrumb"
+          className="mb-2 text-xs font-medium text-fg-subtle"
+        >
+          <ol className="flex flex-wrap items-center gap-1">
             {crumbs.map((c, i) => (
               <li key={i} className="flex items-center gap-1">
                 {c.to ? (
@@ -114,15 +120,19 @@ export function PageHeader({
         </nav>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-fg">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 text-sm text-fg-muted">{subtitle}</p>
+            <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">
+              {subtitle}
+            </p>
           )}
         </div>
-        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        {actions && (
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
     </header>
   );
@@ -141,9 +151,7 @@ export function EmptyState({
   return (
     <Card className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
       <h2 className="text-base font-semibold text-fg">{title}</h2>
-      {message && (
-        <p className="max-w-md text-sm text-fg-muted">{message}</p>
-      )}
+      {message && <p className="max-w-md text-sm text-fg-muted">{message}</p>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
   );
@@ -180,7 +188,7 @@ type Variant = "primary" | "secondary" | "danger" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-xs font-semibold transition-colors no-underline disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex items-center justify-center gap-2 rounded-xs font-semibold shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 no-underline disabled:cursor-not-allowed disabled:opacity-60 active:translate-y-px";
 
 const SIZE_CLASSES: Record<Size, string> = {
   // `sm` is sub-44px on its own — callers must wrap in a min-h-target cell
@@ -193,11 +201,14 @@ const SIZE_CLASSES: Record<Size, string> = {
 };
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-umich-blue text-fg-inverse hover:bg-umich-blue-600",
+  primary:
+    "border border-umich-blue bg-umich-blue text-fg-inverse hover:bg-umich-blue-600 hover:shadow-card",
   secondary:
-    "border border-border bg-surface text-fg hover:bg-surface-muted",
-  danger: "bg-sev-critical text-fg-inverse hover:brightness-110",
-  ghost: "bg-transparent text-fg hover:bg-surface-muted",
+    "border border-border-strong bg-surface text-fg hover:border-umich-blue hover:bg-surface-muted",
+  danger:
+    "border border-sev-critical bg-sev-critical text-fg-inverse hover:brightness-110",
+  ghost:
+    "border border-transparent bg-transparent text-fg shadow-none hover:bg-surface-muted",
 };
 
 /** Flat button variants. */
@@ -323,10 +334,7 @@ export function AltTag({ value }: { value: string | null }) {
     );
   }
   return (
-    <span
-      className="block max-w-full truncate text-xs text-fg"
-      title={value}
-    >
+    <span className="block max-w-full truncate text-xs text-fg" title={value}>
       &ldquo;{value}&rdquo;
     </span>
   );
@@ -393,6 +401,7 @@ export function Checkbox({
   tone = "neutral",
   id,
   name,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -401,14 +410,17 @@ export function Checkbox({
   tone?: "neutral" | "warning";
   id?: string;
   name?: string;
+  disabled?: boolean;
 }) {
   const showWarning = tone === "warning" && checked;
   return (
     <label
       className={cn(
         // Full-row hit target: SC 2.5.5 AAA (44×44).
-        "group flex min-h-target cursor-pointer items-start gap-3 rounded-xs border border-transparent px-2 py-2 text-sm",
-        "hover:bg-surface-muted",
+        "group flex min-h-target items-start gap-3 rounded-xs border border-transparent px-2 py-2 text-sm",
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-pointer hover:bg-surface-muted",
         showWarning && "border-sev-major/60 bg-sev-major-bg/40",
       )}
     >
@@ -418,11 +430,13 @@ export function Checkbox({
         onChange={(e) => onChange(e.target.checked)}
         id={id}
         name={name}
+        disabled={disabled}
         // 22×22 visual control. Padding on the parent label provides the
         // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
         // surface for the unchecked state — SC 1.4.11.
         className={cn(
-          "mt-0.5 h-[22px] w-[22px] shrink-0 cursor-pointer rounded-2xs",
+          "mt-0.5 h-[22px] w-[22px] shrink-0 rounded-2xs",
+          disabled ? "cursor-not-allowed" : "cursor-pointer",
           "border-2 border-border-strong bg-surface",
           "checked:border-umich-blue checked:bg-umich-blue",
           "focus:outline-none",
@@ -483,7 +497,9 @@ export function PageLink({
         className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
       >
         <span className="break-words">{display}</span>
-        <span aria-hidden className="text-2xs">↗</span>
+        <span aria-hidden className="text-2xs">
+          ↗
+        </span>
         <span className="sr-only">opens in a new tab</span>
       </a>
       {showUrlBelow && pageTitle && (

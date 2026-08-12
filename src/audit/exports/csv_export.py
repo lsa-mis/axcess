@@ -123,7 +123,7 @@ def _image_row(
 
 def _axe_row(af: ExportA11yFinding) -> list[str]:
     return [
-        "wcag_axe",
+        f"wcag_{af.pipeline}",
         str(af.id),
         af.impact or "",
         af.status,

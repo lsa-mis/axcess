@@ -28,7 +28,11 @@ from audit.analyzer.vlm.base import Classification, ClassifyContext, VlmProvider
 from audit.analyzer.vlm.ollama import VlmError
 from audit.blob_store import BlobStore
 from audit.db import repo
-from audit.extractor.downloader import DownloadedImage, ImageDownloader, ImageDownloadError
+from audit.extractor.downloader import (
+    DownloadedImage,
+    ImageDownloaderProtocol,
+    ImageDownloadError,
+)
 from audit.extractor.html_images import ImageRef, extract_image_refs
 from audit.extractor.svg_text import find_inline_svg_text
 from audit.logging import get_logger
@@ -73,7 +77,7 @@ async def process_page(
     scan_id: int,
     page_url: str,
     body: bytes,
-    downloader: ImageDownloader,
+    downloader: ImageDownloaderProtocol,
     ocr: OcrConfig | None = None,
     vlm: VlmConfig | None = None,
 ) -> PageExtractionResult:

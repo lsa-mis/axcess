@@ -28,7 +28,7 @@ from audit.crawler.fetcher import FetchError, FetchResult
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, Page, Playwright, ViewportSize
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright, ViewportSize
 
 log = get_logger(__name__)
 
@@ -40,6 +40,15 @@ _IDLE_TIMEOUT_MS = 10_000
 # crawl-time cost on findings-dense pages without losing the typical
 # handful of issues a reviewer actually wants evidence for.
 MAX_SHOTS_PER_PAGE = 12
+
+
+class RenderedPageTooLargeError(FetchError):
+    """The caller-set rendered-HTML bound was exceeded before extraction.
+
+    This is distinct from a navigation failure so a protected companion can
+    record a safe coverage limitation instead of incorrectly asking the
+    auditor to repeat MFA.
+    """
 
 
 class JsFetcher:
@@ -66,6 +75,10 @@ class JsFetcher:
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
         capture_screenshots: bool = False,
+        shared_context: BrowserContext | None = None,
+        private_context: bool = False,
+        max_rendered_html_chars: int | None = None,
+        headless: bool = True,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -92,14 +105,34 @@ class JsFetcher:
         # When set, capture a highlighted screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
+        # Protected scans own one manually-authenticated BrowserContext in the
+        # local companion.  Reusing it here keeps cookies/session state in
+        # memory without serialising them or creating a fresh anonymous
+        # context per page.  Public scans keep the original isolated-context
+        # behavior.
+        self._shared_context = shared_context
+        # A protected companion must never put target paths, redirect URLs, or
+        # browser exception text (which can contain query/session material)
+        # into the application log. Public crawling keeps the useful existing
+        # diagnostics; the companion receives a generic FetchError instead.
+        self._private_context = private_context
+        # Public local scans can opt into a visible browser so the auditor can
+        # watch page navigation. Protected scans inject their already-headed
+        # shared context and ignore this launch preference.
+        self._headless = headless
+        if max_rendered_html_chars is not None and max_rendered_html_chars <= 0:
+            raise ValueError("max_rendered_html_chars must be positive when configured")
+        self._max_rendered_html_chars = max_rendered_html_chars
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
 
     async def __aenter__(self) -> Self:
+        if self._shared_context is not None:
+            return self
         from playwright.async_api import async_playwright
 
         self._pw = await async_playwright().start()
-        self._browser = await self._pw.chromium.launch(headless=True)
+        self._browser = await self._pw.chromium.launch(headless=self._headless)
         return self
 
     async def __aexit__(
@@ -120,22 +153,48 @@ class JsFetcher:
 
         Raises :class:`FetchError` on navigation failure or timeout.
         """
-        if self._browser is None:
+        if self._browser is None and self._shared_context is None:
             raise RuntimeError("JsFetcher used outside its async context")
-        ctx = await self._browser.new_context(
-            user_agent=self._user_agent,
-            viewport=self._viewport,
-        )
+        if self._shared_context is not None:
+            ctx = self._shared_context
+            owns_context = False
+        else:
+            browser = self._browser
+            if browser is None:  # Defensive narrowing for static type checking.
+                raise RuntimeError("JsFetcher browser is unavailable")
+            ctx = await browser.new_context(
+                user_agent=self._user_agent,
+                viewport=self._viewport,
+            )
+            owns_context = True
+        page: Page | None = None
         try:
             page = await ctx.new_page()
             try:
                 resp = await page.goto(url, timeout=self._nav_timeout_ms, wait_until="load")
             except Exception as exc:
+                if self._private_context:
+                    raise FetchError("Protected browser navigation failed.") from exc
                 raise FetchError(f"{url}: {exc}") from exc
             # networkidle can reasonably time out on pages with live connections;
             # we still want the rendered HTML in that case.
             with contextlib.suppress(Exception):
                 await page.wait_for_load_state("networkidle", timeout=self._idle_timeout_ms)
+            if self._max_rendered_html_chars is not None:
+                # Transfer only a scalar bound check to Python before asking
+                # Playwright to serialize the full DOM. This prevents an
+                # unexpectedly enormous authenticated document becoming a
+                # retained FetchResult/evidence candidate in the companion.
+                rendered_chars = await page.evaluate(
+                    "() => document.documentElement ? document.documentElement.outerHTML.length : 0"
+                )
+                if (
+                    not isinstance(rendered_chars, int)
+                    or rendered_chars > self._max_rendered_html_chars
+                ):
+                    raise RenderedPageTooLargeError(
+                        "Rendered page exceeded the configured extraction limit."
+                    )
             html = await page.content()
             status = resp.status if resp is not None else 0
             headers = resp.headers if resp is not None else {}
@@ -222,7 +281,10 @@ class JsFetcher:
                         if png:
                             screenshots[th] = png
                 except Exception as exc:
-                    log.warning("screenshot.capture_failed", url=final_url, error=str(exc))
+                    if self._private_context:
+                        log.warning("screenshot.capture_failed", protected_context=True)
+                    else:
+                        log.warning("screenshot.capture_failed", url=final_url, error=str(exc))
 
             return FetchResult(
                 url=final_url,
@@ -238,7 +300,15 @@ class JsFetcher:
                 screenshots=screenshots,
             )
         finally:
-            await ctx.close()
+            # A shared authenticated context belongs to the companion, which
+            # wipes it only when the scan reaches a terminal state.  Close the
+            # per-page tab, never the session itself.  Public scans retain the
+            # old "new context per fetch" isolation guarantee.
+            if owns_context:
+                await ctx.close()
+            elif page is not None:
+                with contextlib.suppress(Exception):
+                    await page.close()
 
     async def _capture_element(self, page: Page, selector: str) -> bytes | None:
         """Screenshot the element at ``selector`` with a highlight outline.

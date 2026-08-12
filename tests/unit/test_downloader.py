@@ -11,7 +11,11 @@ import respx
 from PIL import Image
 
 from audit.blob_store import BlobStore
-from audit.extractor.downloader import ImageDownloader, ImageDownloadError
+from audit.extractor.downloader import (
+    AuthenticatedImageDownloader,
+    ImageDownloader,
+    ImageDownloadError,
+)
 
 
 def _png_bytes(size: tuple[int, int] = (10, 10)) -> bytes:
@@ -116,3 +120,89 @@ async def test_download_svg_has_no_dimensions(tmp_path: Path) -> None:
     assert result.width is None
     assert result.height is None
     assert result.blob_path.endswith(".svg")
+
+
+class _BrowserResponse:
+    def __init__(self, status: int, body: bytes, headers: dict[str, str]) -> None:
+        self.status = status
+        self.headers = headers
+        self._body = body
+        self.disposed = False
+
+    async def body(self) -> bytes:
+        return self._body
+
+    async def dispose(self) -> None:
+        self.disposed = True
+
+
+class _BrowserRequest:
+    def __init__(self, responses: list[_BrowserResponse]) -> None:
+        self.responses = responses
+        self.urls: list[str] = []
+
+    async def get(self, url: str, **_kwargs: object) -> _BrowserResponse:
+        self.urls.append(url)
+        return self.responses.pop(0)
+
+
+@pytest.mark.asyncio
+async def test_authenticated_download_validates_redirect_and_persists_image(
+    tmp_path: Path,
+) -> None:
+    png = _png_bytes((16, 12))
+    redirect = _BrowserResponse(302, b"", {"location": "/media/final.png"})
+    image = _BrowserResponse(
+        200,
+        png,
+        {"content-type": "image/png", "content-length": str(len(png))},
+    )
+    request = _BrowserRequest([redirect, image])
+    approved: list[str] = []
+
+    def validate(url: str) -> str:
+        if not url.startswith("https://app.example.test/"):
+            raise ValueError("outside scope")
+        approved.append(url)
+        return url
+
+    downloader = AuthenticatedImageDownloader(
+        request,  # type: ignore[arg-type]
+        BlobStore(tmp_path),
+        validate_url=validate,
+    )
+    result = await downloader.download("https://app.example.test/media/start.png")
+
+    assert result.width == 16
+    assert result.height == 12
+    assert request.urls == [
+        "https://app.example.test/media/start.png",
+        "https://app.example.test/media/final.png",
+    ]
+    assert approved == request.urls
+    assert redirect.disposed is True
+    assert image.disposed is True
+
+
+@pytest.mark.asyncio
+async def test_authenticated_download_rejects_redirect_scope_escape(tmp_path: Path) -> None:
+    redirect = _BrowserResponse(
+        302,
+        b"",
+        {"location": "https://outside.example.test/private.png"},
+    )
+    request = _BrowserRequest([redirect])
+
+    def validate(url: str) -> str:
+        if not url.startswith("https://app.example.test/"):
+            raise ValueError("outside scope")
+        return url
+
+    downloader = AuthenticatedImageDownloader(
+        request,  # type: ignore[arg-type]
+        BlobStore(tmp_path),
+        validate_url=validate,
+    )
+    with pytest.raises(ImageDownloadError, match="left the approved scope"):
+        await downloader.download("https://app.example.test/media/start.png")
+    assert redirect.disposed is True

@@ -17,12 +17,20 @@ import json
 import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urljoin
 
 import httpx
 from selectolax.parser import HTMLParser
 
+from audit.analyzer.alfa import (
+    AlfaAnalyzer,
+    AlfaError,
+    AlfaFinding,
+    AlfaResult,
+    chromium_executable_path,
+)
+from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -43,7 +51,7 @@ from audit.crawler.render_detect import is_challenge_response, is_js_only
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
-from audit.extractor.downloader import ImageDownloader
+from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
@@ -51,6 +59,12 @@ from audit.synthesizer.findings import synthesize_findings
 log = get_logger(__name__)
 
 JOB_KIND = "fetch"
+
+
+class AlfaPageAnalyzer(Protocol):
+    """Narrow per-page Alfa contract, including authenticated adapters."""
+
+    async def run(self, url: str, *, level: str) -> AlfaResult: ...
 
 
 @dataclass(frozen=True)
@@ -96,6 +110,16 @@ class CrawlConfig:
     # crawl when rendered-DOM checks aren't needed.
     js_enabled: bool = True
     js_eager: bool = True
+    # Run Axcess' public Playwright browser in the background by default.
+    # Local operators can opt into a headed window to watch page navigation.
+    browser_headless: bool = True
+    # Authenticated scans must not make an anonymous HTTP request before the
+    # shared browser fetch. When true, every document is retrieved directly
+    # through the injected Playwright context.
+    browser_only: bool = False
+    # Protected direct-login mode can omit image extraction entirely unless
+    # the auditor explicitly enables local OCR/image analysis.
+    image_extraction_enabled: bool = True
     # Scope: by default, the crawler stays under the seed URL's path prefix
     # (so ``https://example.com/docs/`` only follows ``/docs/*`` links).
     # Set ``whole_host`` to follow every link on the seed host.
@@ -107,6 +131,12 @@ class CrawlConfig:
     # or "AAA" (all). Best-practice rules are always included.
     axe_enabled: bool = True
     axe_level: str = "AA"
+    # Independent Siteimprove Alfa ACT-rule engine. It is opt-in because it
+    # runs a second local-browser capture per page. It can run alongside axe
+    # or alone; Axcess still owns scope, page inventory, and evidence storage.
+    alfa_enabled: bool = False
+    alfa_timeout_s: float = 75.0
+    alfa_concurrency: int = 1
     # Per-criterion semantic analyzers (Phase 9+). Each enabled SC runs
     # one LLM call per page; the criteria list is the SCs to evaluate.
     # Default is the Phase 9 wave-1 set (the 10 SCs picked for first
@@ -129,12 +159,12 @@ class CrawlConfig:
         "1.2.1",  # Audio-only (prerecorded) transcript presence
     )
     semantic_concurrency: int = 1
-    # SC 2.1.2 keyboard-trap probe (Phase 9.5). Default ON: it's the only
-    # automated coverage for WCAG's lowest bar (Level A keyboard traps),
-    # the cost is bounded (≤ max_focusable*2+4 Tab presses, typically far
-    # fewer — the walk resets when focus wraps to body), and the page is
-    # already open in Playwright for axe. Disable with ``--skip-keyboard``
-    # when crawl speed matters more than 2.1.2 coverage.
+    # SC 2.1.2 keyboard-exit probe. Default ON, but intentionally partial:
+    # only repeated bidirectional exit failure on the same observable element
+    # becomes a review lead. Cost is bounded (≤ max_focusable*2+4 forward
+    # presses plus a small reverse confirmation), and the page is already open
+    # in Playwright for axe. Disable with ``--skip-keyboard`` when crawl speed
+    # matters more than this evidence.
     keyboard_probe_enabled: bool = True
     keyboard_probe_max_focusable: int = 50
     # Responsive/zoom/text-spacing probe (Phase 10). Three dynamic checks
@@ -182,6 +212,9 @@ class CrawlSummary:
     semantic_findings_total: int = 0
     axe_pages_scanned: int = 0
     axe_violations_total: int = 0
+    alfa_pages_scanned: int = 0
+    alfa_failed_total: int = 0
+    alfa_cant_tell_total: int = 0
     keyboard_pages_probed: int = 0
     keyboard_traps_total: int = 0
     responsive_pages_probed: int = 0
@@ -209,6 +242,8 @@ async def run_crawl(
     http_client: httpx.AsyncClient | None = None,
     js_fetcher: JsFetcher | None = None,
     vlm_provider: VlmProvider | None = None,
+    image_downloader: ImageDownloaderProtocol | None = None,
+    alfa_analyzer: AlfaPageAnalyzer | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``."""
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
@@ -240,7 +275,7 @@ async def run_crawl(
     robots = RobotsChecker(client, user_agent=config.user_agent)
     fetcher = StaticFetcher(client)
     blob_store = BlobStore(get_settings().blob_dir)
-    downloader = ImageDownloader(client, blob_store)
+    downloader = image_downloader or ImageDownloader(client, blob_store)
     ocr_pool: OcrPool | None = None
     ocr_config: OcrConfig | None = None
     if config.ocr_enabled:
@@ -274,6 +309,20 @@ async def run_crawl(
             log.warning("crawl.axe_disabled_missing_bundle", error=str(exc))
             summary.notes.append("Axe scan disabled: bundle missing.")
             axe_analyzer = None
+    if config.alfa_enabled:
+        state = alfa_availability()
+        if not state.available:
+            # A selected engine must never quietly become a clean result.
+            raise RuntimeError(state.reason or "Siteimprove Alfa is unavailable.")
+        if alfa_analyzer is None:
+            alfa_analyzer = AlfaAnalyzer(
+                user_agent=config.user_agent,
+                timeout_s=config.alfa_timeout_s,
+                concurrency=config.alfa_concurrency,
+                chromium_path=await chromium_executable_path(),
+            )
+    else:
+        alfa_analyzer = None
     # SC 2.1.2 keyboard probe — default on. Constructed once per crawl
     # and reused across all pages; cheap to allocate, no state.
     keyboard_probe: KeyboardProbe | None = None
@@ -311,6 +360,7 @@ async def run_crawl(
             focus_probe=focus_probe,
             visual_probe=visual_probe,
             capture_screenshots=config.capture_screenshots,
+            headless=config.browser_headless,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -335,6 +385,7 @@ async def run_crawl(
         blob_store=blob_store,
         ocr=ocr_config,
         vlm=vlm_config,
+        alfa=alfa_analyzer,
         in_flight=0,
         summary=summary,
         semantic_analyzers=semantic_analyzers,
@@ -402,6 +453,9 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         """
         SELECT id FROM scans
          WHERE seed_url = ? AND status IN ('running', 'interrupted')
+           AND NOT EXISTS (
+               SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id
+           )
          ORDER BY id DESC
          LIMIT 1
         """,
@@ -445,15 +499,26 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "user_agent": config.user_agent,
             # Pipeline switches — drives the "methods used" UI row.
             "js_eager": config.js_eager,
+            "browser_headless": config.browser_headless,
+            "browser_only": config.browser_only,
+            "image_extraction_enabled": config.image_extraction_enabled,
             "ocr_enabled": config.ocr_enabled,
             "vlm_enabled": config.vlm_enabled,
             "axe_enabled": config.axe_enabled,
             "axe_level": config.axe_level,
+            "alfa_enabled": config.alfa_enabled,
+            "alfa_timeout_s": config.alfa_timeout_s,
+            "alfa_concurrency": config.alfa_concurrency,
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,
+            # Version 1 means completed-page counters for semantic, keyboard,
+            # and responsive checks are persisted on the scan row. Older
+            # reports omit this key and must be labeled "coverage not recorded"
+            # rather than inferred from configuration or finding counts.
+            "method_coverage_version": 1,
         },
         sort_keys=True,
     )
@@ -535,6 +600,7 @@ class _LazyJs:
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
         capture_screenshots: bool = False,
+        headless: bool = True,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -546,6 +612,7 @@ class _LazyJs:
         self._focus_probe = focus_probe
         self._visual_probe = visual_probe
         self._capture_screenshots = capture_screenshots
+        self._headless = headless
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -558,6 +625,7 @@ class _LazyJs:
                 focus_probe=self._focus_probe,
                 visual_probe=self._visual_probe,
                 capture_screenshots=self._capture_screenshots,
+                headless=self._headless,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -579,12 +647,13 @@ class _WorkerContext:
     robots: RobotsChecker
     static: StaticFetcher
     js: _LazyJs | None
-    downloader: ImageDownloader
+    downloader: ImageDownloaderProtocol
     # Shared content-addressed store. Used to persist per-finding element
     # screenshots captured at scan time (the hash lands on the finding row).
     blob_store: BlobStore
     ocr: OcrConfig | None
     vlm: VlmConfig | None
+    alfa: AlfaPageAnalyzer | None
     in_flight: int
     summary: CrawlSummary
     # Phase 9+: list of per-criterion semantic analyzers to run per
@@ -752,16 +821,28 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         return
 
     async with ctx.limiter.throttle(url):
-        try:
-            result = await ctx.static.fetch(url)
-        except FetchError as exc:
-            log.warning("crawl.fetch_failed", url=url, error=str(exc))
-            ctx.summary.errors += 1
-            _record_page(ctx, url, status_code=None, result=None, render_mode="static")
-            return
+        if ctx.config.browser_only:
+            if ctx.js is None:
+                raise RuntimeError("Browser-only crawling requires an injected browser fetcher.")
+            try:
+                result = await (await ctx.js.get()).fetch(url)
+                render_mode = "js"
+            except FetchError:
+                log.warning("crawl.js_fetch_failed", protected_context=True)
+                ctx.summary.errors += 1
+                _record_page(ctx, url, status_code=None, result=None, render_mode="js")
+                return
+        else:
+            try:
+                result = await ctx.static.fetch(url)
+            except FetchError as exc:
+                log.warning("crawl.fetch_failed", url=url, error=str(exc))
+                ctx.summary.errors += 1
+                _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+                return
+            render_mode = "static"
 
-    render_mode = "static"
-    if ctx.js is not None and _should_escalate_to_js(ctx, result):
+    if not ctx.config.browser_only and ctx.js is not None and _should_escalate_to_js(ctx, result):
         try:
             js_fetcher = await ctx.js.get()
             result = await js_fetcher.fetch(url)
@@ -774,7 +855,12 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     )
     ctx.summary.pages_fetched += 1
 
-    if result.is_html and result.is_ok and page_id is not None:
+    if (
+        ctx.config.image_extraction_enabled
+        and result.is_html
+        and result.is_ok
+        and page_id is not None
+    ):
         extraction = await process_page(
             ctx.conn,
             page_id=page_id,
@@ -806,6 +892,34 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 violations=result.axe_violations,
                 screenshots=result.screenshots,
             )
+
+        # Alfa is a distinct ACT-rule engine, not an axe wrapper. It makes
+        # its own local browser capture of this already in-scope URL; capture
+        # details and outcome type are retained on each row so the report can
+        # never suggest both engines observed one identical DOM snapshot.
+        if ctx.alfa is not None:
+            try:
+                alfa_result = await ctx.alfa.run(result.url, level=ctx.config.axe_level)
+                _persist_alfa(
+                    ctx,
+                    page_id=page_id,
+                    findings=alfa_result.findings,
+                    failed_total=alfa_result.failed_total,
+                    cant_tell_total=alfa_result.cant_tell_total,
+                )
+                if alfa_result.truncated:
+                    _add_note_once(
+                        ctx.summary,
+                        "Alfa capped page-level evidence at 200 actionable outcomes; "
+                        "see source rule links for follow-up.",
+                    )
+            except AlfaError as exc:
+                log.warning("alfa.page_failed", url=result.url, error=str(exc))
+                _add_note_once(
+                    ctx.summary,
+                    "Alfa could not evaluate one or more pages; its coverage counts "
+                    "show only completed Alfa captures.",
+                )
 
         # SC 2.1.2 keyboard-trap probe. Only runs when the page was
         # JS-rendered (the probe needs a live page; static fetches
@@ -1025,6 +1139,64 @@ def _persist_axe(
     ctx.summary.axe_violations_total += len(violations)
 
 
+def _persist_alfa(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[AlfaFinding, ...],
+    failed_total: int,
+    cant_tell_total: int,
+) -> None:
+    """Write retained Alfa evidence and record the engine's true outcome totals.
+
+    The runner caps stored per-page evidence to keep SQLite bounded. Coverage
+    counters must still retain the complete Alfa result so the report cannot
+    mislabel a truncated evidence set as the engine's full finding total.
+    """
+    for finding in findings:
+        try:
+            repo.upsert_alfa_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                rule_id=finding.rule_id,
+                wcag_sc=finding.wcag_sc,
+                wcag_scs=finding.wcag_scs,
+                wcag_level=finding.wcag_level,
+                help=finding.help,
+                help_url=finding.rule_uri,
+                target_selector=finding.target_hint,
+                failure_summary=finding.failure_summary,
+                html_snippet=finding.target_hint,
+                target_hash=finding.target_hash,
+                engine_outcome=finding.outcome,
+                engine_evidence_json=finding.evidence_json,
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "alfa.persist_failed",
+                rule_id=finding.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    repo.increment_scan_alfa_counters(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        pages_delta=1,
+        failed_delta=failed_total,
+        cant_tell_delta=cant_tell_total,
+    )
+    ctx.summary.alfa_pages_scanned += 1
+    ctx.summary.alfa_failed_total += failed_total
+    ctx.summary.alfa_cant_tell_total += cant_tell_total
+
+
+def _add_note_once(summary: CrawlSummary, note: str) -> None:
+    """Keep repeated per-page engine limitations readable in the summary."""
+    if note not in summary.notes:
+        summary.notes.append(note)
+
+
 def _persist_keyboard(
     ctx: _WorkerContext,
     *,
@@ -1055,6 +1227,11 @@ def _persist_keyboard(
                 page_id=page_id,
                 error=str(exc),
             )
+    repo.increment_scan_method_coverage(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        method="keyboard",
+    )
     ctx.summary.keyboard_pages_probed += 1
     ctx.summary.keyboard_traps_total += len(traps)
 
@@ -1088,6 +1265,11 @@ def _persist_responsive(
                 page_id=page_id,
                 error=str(exc),
             )
+    repo.increment_scan_method_coverage(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        method="responsive",
+    )
     ctx.summary.responsive_pages_probed += 1
     ctx.summary.responsive_findings_total += len(findings)
 
@@ -1211,6 +1393,11 @@ def _persist_semantic(
                 error=str(exc),
             )
     if written > 0 or ctx.semantic_analyzers:
+        repo.increment_scan_method_coverage(
+            ctx.conn,
+            scan_id=ctx.scan_id,
+            method="semantic",
+        )
         ctx.summary.semantic_pages_analyzed += 1
         ctx.summary.semantic_findings_total += written
 

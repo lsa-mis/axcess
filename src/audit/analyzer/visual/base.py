@@ -12,9 +12,11 @@ from typing import Any
 
 RULE_MEANINGFUL_SEQUENCE = "visual-meaningful-sequence"  # SC 1.3.2
 RULE_MOTION_NO_PAUSE = "visual-motion-no-pause"  # SC 2.2.2
+RULE_AUTOPLAY_AUDIO_NO_CONTROL = "visual-autoplay-audio-no-control"  # SC 1.4.2
 
 HELP_URLS = {
     "1.3.2": "https://www.w3.org/WAI/WCAG22/Understanding/meaningful-sequence.html",
+    "1.4.2": "https://www.w3.org/WAI/WCAG22/Understanding/audio-control.html",
     "2.2.2": "https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html",
 }
 

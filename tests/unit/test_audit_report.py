@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from audit.db import repo
-from audit.exports.audit_report import render_audit_report
+from audit.exports.audit_report import build_audit_cards, render_audit_report
 from audit.exports.collector import collect_scan
 from audit.synthesizer.findings import synthesize_findings
 
@@ -205,12 +205,13 @@ def _scan_with_real_findings(conn: sqlite3.Connection) -> int:
             (page_id, scan_id, pipeline, criterion_sc, rule_id, wcag_sc,
              wcag_scs, wcag_level, impact, help, help_url, target_selector,
              failure_summary, html_snippet, target_hash, status)
-        VALUES (?, ?, 'keyboard', '2.1.2', 'keyboard-trap-stuck', '2.1.2',
-            '2.1.2', 'A', 'critical',
-            'Focus cannot leave this element with the keyboard.',
-            'https://www.w3.org/WAI/WCAG21/Understanding/no-keyboard-trap.html',
-            '#modal-trap',
-            'Focus stayed on #modal-trap after 5 consecutive Tab presses.',
+            VALUES (?, ?, 'keyboard', '2.1.2', 'keyboard-trap-stuck', '2.1.2',
+                '2.1.2', 'A', 'critical',
+                'Keyboard users must be able to leave the component.',
+                'https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html',
+                '#modal-trap',
+                'Measured focus exit behavior: 4 Tab attempts and 4 Shift+Tab attempts ' ||
+                'remained on #modal-trap (8 failed exit attempts total).',
             '<div id="modal-trap" tabindex="0">',
             'hash-kbd', 'new')
         """,
@@ -235,14 +236,14 @@ def test_audit_report_structure(tmp_db: sqlite3.Connection) -> None:
     expected_in_order = [
         "# Accessibility audit",
         "## Executive summary",
-        "## Conformance scorecard",
+        "## Open barrier summary",
         "## Who is affected",
         "## Coverage and method",
         "## Page hotspots",
         "## Remediation worklist by owner",
         "## Issue cards",
         "## Appendix A — Findings dropped during self-critique",
-        "## Appendix B — Out of scope but worth knowing",
+        "## Appendix B — Review leads and informational evidence",
     ]
     last = -1
     for heading in expected_in_order:
@@ -268,13 +269,18 @@ def test_audit_report_unifies_all_four_pipelines(
     # The coverage table marks all four methods, and the ones that
     # produced findings here (axe, semantic, keyboard) are flagged as ran.
     assert "## Coverage and method" in md
-    assert "Dynamic keyboard-trap probe" in md
+    assert "Bidirectional keyboard-exit probe" in md
     assert "Per-criterion LLM analyzer" in md
 
-    # The semantic + keyboard cards carry the correct "Detected by" line —
-    # never "axe-core" for these two.
-    assert "**Detected by:** per-criterion LLM analyzer." in md
-    assert "**Detected by:** dynamic keyboard-trap probe." in md
+    # Semantic + keyboard output is preserved as expert-review evidence,
+    # never promoted into the stakeholder failure scorecard.
+    issue_cards = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
+    appendix_b = md.split("## Appendix B", 1)[1]
+    assert "AI-assisted semantic lead" not in issue_cards
+    assert "keyboard-trap" not in issue_cards
+    assert "AI-assisted semantic lead" in appendix_b
+    assert "keyboard-trap" in appendix_b
+    assert "expert review / medium confidence" in appendix_b
 
     # And the methods line in the header names them.
     methods_line = md.split("**Detection methods used:**", 1)[1].split("\n", 1)[0]
@@ -288,8 +294,8 @@ def test_audit_report_has_holistic_rollups(tmp_db: sqlite3.Connection) -> None:
     scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
     md = render_audit_report(scan, conn=tmp_db)
 
-    # Conformance scorecard surfaces the WCAG level table + POUR rollup.
-    scorecard = md.split("## Conformance scorecard", 1)[1].split("## Who is affected", 1)[0]
+    # Open-barrier summary surfaces the mapped WCAG level table + POUR rollup.
+    scorecard = md.split("## Open barrier summary", 1)[1].split("## Who is affected", 1)[0]
     assert "Level" in scorecard and "Open issue types" in scorecard
     assert "POUR" in scorecard
 
@@ -385,18 +391,92 @@ def test_audit_report_executive_summary_has_quick_win(
     assert "Images don't announce text" in summary or "image" in summary.lower()
 
 
-def test_audit_report_image_card_uses_yaml_template(
+def test_audit_report_image_lead_uses_yaml_title_without_claiming_failure(
     tmp_db: sqlite3.Connection,
 ) -> None:
-    """The essential-missing image card pulls from `image_findings.essential_missing`."""
+    """Image analysis stays a review lead until an expert confirms it."""
     scan_id = _scan_with_real_findings(tmp_db)
     scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
     md = render_audit_report(scan, conn=tmp_db)
 
     # Title from the YAML.
     assert "Images of text have no alt and can't be read" in md
-    # WCAG SC mapping from the YAML.
-    assert "**WCAG:** SC 1.4.5" in md
+    issue_cards = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
+    appendix_b = md.split("## Appendix B", 1)[1]
+    assert "Images of text have no alt and can't be read" not in issue_cards
+    assert "Images of text have no alt and can't be read" in appendix_b
+    assert "expert review / medium confidence" in appendix_b
+
+
+def test_open_card_excludes_terminal_occurrences_and_keeps_appendix_receipt(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A partial false-positive/remediation decision cannot inflate an open card."""
+
+    scan_id = _scan_with_real_findings(tmp_db)
+    for index, status in enumerate(("false_positive", "remediated", "accepted_risk"), start=1):
+        page_id = repo.upsert_page(
+            tmp_db,
+            scan_id=scan_id,
+            url_normalized=f"http://example.com/terminal-{index}",
+            status_code=200,
+            title=f"Terminal {index}",
+            render_mode="js",
+            html_hash=str(index) * 64,
+        )
+        tmp_db.execute(
+            """
+            INSERT INTO page_a11y_findings
+                (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+                 impact, help, help_url, target_selector, failure_summary,
+                 html_snippet, target_hash, status)
+            VALUES (?, ?, 'color-contrast', '1.4.3', '1.4.3', 'AA', 'serious',
+                'Elements must meet minimum color contrast',
+                'https://dequeuniversity.com/rules/axe/4.10/color-contrast',
+                ?, 'Terminal occurrence must not remain in the open worklist.',
+                '<span>terminal</span>', ?, ?)
+            """,
+            (page_id, scan_id, f".terminal-{index}", f"hash-terminal-{index}", status),
+        )
+
+    scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
+    cards, dropped, _ = build_audit_cards(tmp_db, scan)
+    contrast = next(card for card in cards if card.wcag_sc == "1.4.3")
+
+    assert contrast.affected_finding_count == 1
+    assert contrast.affected_page_count == 1
+    assert len(contrast.finding_ids) == 1
+    assert [location.selector for location in contrast.locations] == ["p > span.muted"]
+    assert [location.description for location in contrast.locations] == [
+        "text element containing “low text” with class “muted”"
+    ]
+    receipt = next(item for item in dropped if item.wcag_sc == "1.4.3")
+    assert "false_positive (1)" in receipt.reason
+    assert "remediated (1)" in receipt.reason
+    assert "accepted_risk (1)" in receipt.reason
+
+
+def test_confirmed_expert_review_group_becomes_substantive_open_card(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """An expert-confirmed open barrier belongs in the worklist, not Appendix B."""
+
+    scan_id = _scan_with_real_findings(tmp_db)
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET status = 'in_progress' "
+        "WHERE scan_id = ? AND pipeline = 'semantic' AND rule_id = 'semantic:2.4.4'",
+        (scan_id,),
+    )
+    scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
+    cards, _, review_leads = build_audit_cards(tmp_db, scan)
+
+    semantic = next(card for card in cards if card.pipeline == "semantic")
+    assert semantic.wcag_sc == "2.4.4"
+    assert semantic.affected_finding_count == 1
+    assert semantic.affected_page_count == 1
+    assert [location.selector for location in semantic.locations] == ["a.cta[ord=3]"]
+    assert semantic.locations[0].description == "link containing “click here” with class “cta”"
+    assert not any(row.pipeline == "semantic" for row in review_leads)
 
 
 @pytest.mark.skipif(
@@ -413,6 +493,7 @@ def test_audit_report_matches_golden(tmp_db: sqlite3.Connection) -> None:
     scan_id = _scan_with_real_findings(tmp_db)
     scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
     actual = render_audit_report(scan, conn=tmp_db)
+    assert "**Page:** [Home](<http://example.com/>)" in actual
     # Strip the "Generated YYYY-MM-DD HH:MM UTC" line — non-deterministic.
     actual_no_ts = "\n".join(
         line for line in actual.splitlines() if not line.startswith("_Generated ")
@@ -421,7 +502,12 @@ def test_audit_report_matches_golden(tmp_db: sqlite3.Connection) -> None:
     if UPDATE_GOLDEN or not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(actual_no_ts, encoding="utf-8")
-    expected = path.read_text(encoding="utf-8")
+    # ``actual_no_ts`` is normalized through ``splitlines``/``join`` above,
+    # which intentionally produces no terminal newline.  Golden files are
+    # ordinary Markdown and editors commonly restore one, so normalize only
+    # that transport-level difference rather than treating it as report
+    # content.
+    expected = path.read_text(encoding="utf-8").rstrip("\r\n")
     assert actual_no_ts == expected, (
         "Golden mismatch for scan_audit.md. "
         "Re-run with AUDIT_UPDATE_GOLDEN=1 if the change was deliberate "

@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronRight, ExternalLink, Info } from "lucide-react";
 import { api } from "../api/client";
@@ -16,6 +16,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { requestStatusRationale } from "../statusDecision";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -27,7 +28,7 @@ const STATUS_OPTIONS: FindingStatus[] = [
 ];
 
 /**
- * Per-scan WCAG axe-core view, segregated by success criterion.
+ * Per-scan WCAG DOM-engine view, segregated by success criterion.
  *
  * This is the second product surface — distinct from the original
  * `Findings` route which only covers WCAG 1.4.5 (Images of Text).
@@ -37,14 +38,12 @@ const STATUS_OPTIONS: FindingStatus[] = [
  *
  * Two modes, controlled by the `wcag_sc` URL param:
  *   • Roll-up: counts by SC, level, and impact, with per-rule nesting.
- *   • Drill-down: a list of every individual axe violation for one SC,
+ *   • Drill-down: a list of every individual DOM-engine finding for one SC,
  *     each row carrying the page URL and the failing element's
  *     selector and HTML snippet.
  *
- * Honest-scope banner sits above everything else: axe auto-detects only
- * ~30-40% of WCAG 2.x AA SCs, so a clean axe pass is *necessary, not
- * sufficient*. The accessibility lead reading this view needs to know
- * what we did and didn't check.
+ * Evidence stays attributable to the engine that produced it. Neither an
+ * automated pass nor an Alfa `cantTell` outcome is a conformance verdict.
  */
 export default function A11yRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -98,13 +97,14 @@ export default function A11yRoute() {
     { label: wcagSc ? `SC ${wcagSc}` : "WCAG findings" },
   ];
   const coverage = rollup.coverage;
-  const noPagesScanned = coverage.axe_pages_scanned === 0;
+  const noDomPagesScanned =
+    coverage.axe_pages_scanned === 0 && coverage.alfa_pages_scanned === 0;
 
   return (
     <>
       <PageHeader
         crumbs={crumbs}
-        title="WCAG axe-core findings"
+        title="WCAG DOM-engine findings"
         subtitle={scan.seed_url}
         actions={
           <>
@@ -128,13 +128,20 @@ export default function A11yRoute() {
 
       <ScopeBanner />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         <StatCard
-          label="Pages scanned"
+          label="Axe pages"
           value={coverage.axe_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
-        <StatCard label="Total" value={coverage.axe_violations_total} />
+        <StatCard
+          label="Alfa pages"
+          value={coverage.alfa_pages_scanned}
+          hint={`of ${coverage.pages_total}`}
+        />
+        <StatCard label="Axe violations" value={coverage.axe_violations_total} />
+        <StatCard label="Alfa failed" value={coverage.alfa_failed_total} />
+        <StatCard label="Alfa review leads" value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
         <StatCard label="Level AA" value={rollup.by_level.AA} tone="major" />
         <StatCard label="Level AAA" value={rollup.by_level.AAA} tone="minor" />
@@ -145,10 +152,10 @@ export default function A11yRoute() {
         />
       </div>
 
-      {noPagesScanned ? (
+      {noDomPagesScanned ? (
         <EmptyState
-          title="No pages were axe-scanned"
-          message="Axe requires Playwright rendering. Re-run the scan with “Use real browser (Playwright) for every page” checked to cover every page."
+          title="No pages were evaluated by a DOM engine"
+          message="Start a new scan and select axe-core, Siteimprove Alfa, or both. Axe requires Axcess browser rendering; Alfa can also run when static-only crawl mode is selected."
           action={
             <LinkButton to="/scans/new" variant="primary">
               New scan
@@ -168,8 +175,8 @@ export default function A11yRoute() {
         />
       ) : rollup.groups.length === 0 ? (
         <EmptyState
-          title="No WCAG axe-core violations detected"
-          message="Axe ran cleanly on every Playwright-rendered page. Remember the scope caveat above — axe can't speak for the criteria that need human review."
+          title="No retained WCAG DOM-engine findings"
+          message="The selected engine(s) returned no failed or expert-review outcomes. Manual review is still required before making a conformance claim."
         />
       ) : (
         <RollupView scanId={id} groups={rollup.groups} />
@@ -191,14 +198,15 @@ function ScopeBanner() {
           aria-hidden
         />
         <p className="text-sm text-fg">
-          <strong>What this view shows.</strong> Axe-core auto-detects roughly
-          30-40% of WCAG 2.x AA success criteria — the ones that can be
-          checked from the rendered DOM alone (color contrast, missing
-          labels, ARIA misuse, focus order). The other ~60% require human
-          judgment (whether alt text is <em>meaningful</em>, whether a
-          heading is <em>descriptive</em>, whether a label is{" "}
-          <em>clear</em>) and are not represented here. A clean axe pass
-          is necessary, not sufficient, for WCAG conformance.
+          <strong>What this view shows.</strong> Each finding retains its source:
+          <strong> axe-core</strong> or <strong> Siteimprove Alfa</strong>. Axe
+          evaluates deterministic browser rules. Alfa evaluates independent
+          <strong> ACT (Accessibility Conformance Testing) rules</strong> on its
+          own local browser capture. Each standardized ACT rule checks one
+          specific condition and can return pass, fail, or <code>cantTell</code>.
+          A failed rule is evidence about that condition—not proof that the whole
+          page or site fails WCAG. A <code>cantTell</code> result needs an expert
+          decision.
         </p>
       </div>
     </Card>
@@ -253,11 +261,14 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
       <ul className="grid gap-2">
         {group.rules.map((r) => (
           <li
-            key={r.rule_id}
+            key={`${r.pipeline}:${r.rule_id}`}
             className="rounded-xs border border-border bg-surface-muted/40 p-3"
           >
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <code className="font-mono text-sm text-fg">{r.rule_id}</code>
+              <span className="rounded-full bg-surface px-2 py-0.5 text-2xs font-semibold text-fg-muted">
+                {r.pipeline === "alfa" ? "Siteimprove Alfa" : r.pipeline === "axe" ? "axe-core" : r.pipeline}
+              </span>
               {r.impact && <ImpactChip value={r.impact} />}
               <span className="text-xs text-fg-muted">
                 {r.violation_count} ×, on {r.page_count} page
@@ -272,7 +283,8 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                 rel="noopener noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
               >
-                axe rule docs <ExternalLink className="h-3 w-3" aria-hidden />
+                {r.pipeline === "alfa" ? "Alfa rule docs" : "rule docs"}{" "}
+                <ExternalLink className="h-3 w-3" aria-hidden />
               </a>
             )}
           </li>
@@ -370,12 +382,15 @@ function DrillDownView({
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <caption className="sr-only">
-              Axe violations for SC {wcagSc}, sorted by impact
+              DOM-engine findings for SC {wcagSc}, sorted by impact
             </caption>
             <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left font-semibold">
                   Rule
+                </th>
+                <th scope="col" className="px-3 py-2 text-left font-semibold">
+                  Source
                 </th>
                 <th scope="col" className="px-3 py-2 text-left font-semibold">
                   Impact
@@ -404,6 +419,12 @@ function DrillDownView({
                           ? `${f.help.slice(0, 140)}…`
                           : f.help}
                       </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-fg-muted">
+                    {f.pipeline === "alfa" ? "Siteimprove Alfa" : f.pipeline === "axe" ? "axe-core" : f.pipeline}
+                    {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
+                      <span className="mt-1 block">Needs expert review</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -480,7 +501,8 @@ function StatusCell({
 }) {
   const qc = useQueryClient();
   const mutation = useMutation({
-    mutationFn: (next: FindingStatus) => api.setA11yStatus(findingId, next),
+    mutationFn: ({ next, rationale }: { next: FindingStatus; rationale: string }) =>
+      api.setA11yStatus(findingId, next, rationale || undefined),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["a11y-rollup", scanId] });
       void qc.invalidateQueries({ queryKey: ["a11y-drill", scanId] });
@@ -494,7 +516,15 @@ function StatusCell({
       <select
         id={`status-${findingId}`}
         value={current}
-        onChange={(e) => mutation.mutate(e.target.value as FindingStatus)}
+        onChange={(e) => {
+          const next = e.target.value as FindingStatus;
+          const rationale = requestStatusRationale(next, `finding #${findingId}`);
+          if (rationale === null) {
+            e.currentTarget.value = current;
+            return;
+          }
+          mutation.mutate({ next, rationale });
+        }}
         disabled={mutation.isPending}
         className="min-h-target rounded-xs border border-border bg-surface px-2 py-1 text-sm text-fg focus:border-umich-blue focus:outline-none disabled:opacity-60"
       >

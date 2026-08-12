@@ -16,10 +16,13 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, cast
 
+import httpx
 import pytest
 
-from audit.crawler.orchestrator import CrawlConfig, run_crawl
+from audit.crawler.fetcher import FetchResult
+from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db import queue
 
 pytestmark = pytest.mark.integration
@@ -54,7 +57,13 @@ def _page_urls(conn: sqlite3.Connection, scan_id: int) -> set[str]:
 def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
         config = CrawlConfig(
-            js_eager=False, seed_url=base, max_pages=50, rps=100.0, workers=2, vlm_enabled=False
+            js_eager=False,
+            seed_url=base,
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
@@ -78,7 +87,13 @@ def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
 def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
         config = CrawlConfig(
-            js_eager=False, seed_url=base, max_pages=2, rps=100.0, workers=1, vlm_enabled=False
+            js_eager=False,
+            seed_url=base,
+            max_pages=2,
+            rps=100.0,
+            workers=1,
+            vlm_enabled=False,
+            semantic_enabled=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
@@ -91,7 +106,13 @@ def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
 def test_crawl_skips_out_of_scope_and_non_http(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
         config = CrawlConfig(
-            js_eager=False, seed_url=base, max_pages=50, rps=100.0, workers=2, vlm_enabled=False
+            js_eager=False,
+            seed_url=base,
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
 
@@ -130,6 +151,7 @@ def test_crawl_resumes_interrupted_scan(tmp_db: sqlite3.Connection) -> None:
                     rps=100.0,
                     workers=2,
                     vlm_enabled=False,
+                    semantic_enabled=False,
                 ),
             )
         )
@@ -160,6 +182,7 @@ def test_crawl_interrupt_mid_run_leaves_queue_intact(tmp_db: sqlite3.Connection)
                         rps=1.0,
                         workers=1,
                         vlm_enabled=False,
+                        semantic_enabled=False,
                     ),
                 )
             )
@@ -191,6 +214,7 @@ def test_crawl_records_html_hash_and_title(tmp_db: sqlite3.Connection) -> None:
             rps=100.0,
             workers=2,
             vlm_enabled=False,
+            semantic_enabled=False,
             js_enabled=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
@@ -203,3 +227,56 @@ def test_crawl_records_html_hash_and_title(tmp_db: sqlite3.Connection) -> None:
     assert row["title"] == "Fixture home"
     assert row["render_mode"] == "static"
     assert row["html_hash"] and len(row["html_hash"]) == 64
+
+
+def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection) -> None:
+    """Authenticated mode obtains documents only from its injected browser."""
+
+    seed = "https://app.example.test/secure/"
+
+    class _AuthenticatedBrowser:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def fetch(self, url: str) -> FetchResult:
+            self.calls.append(url)
+            return FetchResult(
+                url=url,
+                status_code=200,
+                content_type="text/html",
+                body=b"<!doctype html><html lang='en'><title>Private</title><main>OK</main>",
+                retry_after=None,
+            )
+
+    browser = _AuthenticatedBrowser()
+
+    def reject_anonymous_request(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"anonymous HTTP request attempted: {request.method}")
+
+    async def run() -> CrawlSummary:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(reject_anonymous_request),
+            trust_env=False,
+        ) as client:
+            return await run_crawl(
+                tmp_db,
+                CrawlConfig(
+                    seed_url=seed,
+                    max_pages=1,
+                    workers=1,
+                    ignore_robots=True,
+                    browser_only=True,
+                    image_extraction_enabled=False,
+                    ocr_enabled=False,
+                    vlm_enabled=False,
+                    semantic_enabled=False,
+                    alfa_enabled=False,
+                ),
+                http_client=client,
+                js_fetcher=cast(Any, browser),
+            )
+
+    summary = asyncio.run(run())
+
+    assert summary.pages_fetched == 1
+    assert browser.calls == [seed]

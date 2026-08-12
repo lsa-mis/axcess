@@ -1,4 +1,4 @@
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
@@ -25,6 +25,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { requestStatusRationale } from "../statusDecision";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -36,7 +37,7 @@ const STATUS_OPTIONS: FindingStatus[] = [
 ];
 
 /**
- * WCAG axe findings, grouped by rule — the actionable cut.
+ * WCAG DOM-engine findings, grouped by rule — the actionable cut.
  *
  * The existing /a11y route groups by WCAG SC (the *reporting* axis: "we
  * fail 1.4.3 on 47 pages"). This one groups by axe `rule_id` (the
@@ -93,7 +94,7 @@ export default function A11yByRuleRoute() {
           { label: "WCAG findings", to: `/scans/${scan.id}/a11y` },
           { label: "by rule" },
         ]}
-        title="WCAG findings — grouped by rule"
+        title="WCAG DOM-engine findings — grouped by rule"
         subtitle={scan.seed_url}
         actions={
           <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
@@ -111,7 +112,7 @@ export default function A11yByRuleRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this view groups findings.</strong> Findings are
-            grouped by axe <code>rule_id</code> — the <em>fixing</em>{" "}
+            grouped by source and rule ID — the <em>fixing</em>{" "}
             axis. A rule like <code>color-contrast</code> failing 800
             times is usually one CSS class on one template; seeing one
             group of 800 tells you where one fix has the biggest payoff.{" "}
@@ -128,8 +129,10 @@ export default function A11yByRuleRoute() {
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Rules with failures" value={groups.length} />
-        <StatCard label="Total violations" value={coverage.axe_violations_total} />
+        <StatCard label="Rule groups" value={groups.length} />
+        <StatCard label="Axe violations" value={coverage.axe_violations_total} />
+        <StatCard label="Alfa failed" value={coverage.alfa_failed_total} />
+        <StatCard label="Alfa review leads" value={coverage.alfa_cant_tell_total} />
         <StatCard
           label="Pages scanned"
           value={coverage.axe_pages_scanned}
@@ -161,22 +164,22 @@ export default function A11yByRuleRoute() {
         <EmptyState
           title={
             status
-              ? "No axe violations match this filter"
-              : "No axe violations to triage"
+              ? "No rule findings match this filter"
+              : "No DOM-engine findings to triage"
           }
           message={
             status
-              ? "Clear the filter to see violations in other statuses."
-              : coverage.axe_pages_scanned === 0
-                ? "Axe didn't run on this scan — re-run with “Use real browser” enabled."
-                : "Axe ran cleanly. Remember the scope caveat: axe checks ~30-40% of WCAG SCs."
+              ? "Clear the filter to see findings in other statuses."
+              : coverage.axe_pages_scanned === 0 && coverage.alfa_pages_scanned === 0
+                ? "No DOM engine ran on this scan — start a new scan and select axe-core, Alfa, or both."
+                : "The selected DOM engine(s) returned no retained findings. Manual review is still required for conformance."
           }
         />
       ) : (
         <div className="space-y-3">
           {groups.map((g, i) => (
             <RuleGroupCard
-              key={g.rule_id}
+              key={`${g.pipeline}:${g.rule_id}:${g.outcome_group ?? "all"}`}
               group={g}
               defaultOpen={i < 2}
               scanId={id}
@@ -214,6 +217,14 @@ function RuleGroupCard({
             <ChevronRight className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
           )}
           {group.impact && <ImpactChip value={group.impact} />}
+          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-fg-muted">
+            {group.pipeline === "alfa" ? "Siteimprove Alfa" : group.pipeline === "axe" ? "axe-core" : group.pipeline}
+          </span>
+          {group.pipeline === "alfa" && group.outcome_group && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${group.outcome_group === "failed" ? "bg-sev-critical-bg text-sev-critical" : "bg-sev-minor-bg text-sev-minor"}`}>
+              {group.outcome_group === "failed" ? "Standardized ACT test failed" : "Needs expert review (cannot tell)"}
+            </span>
+          )}
           <code className="font-mono text-base font-semibold text-fg">
             {group.rule_id}
           </code>
@@ -226,7 +237,7 @@ function RuleGroupCard({
         </span>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          violation{group.violation_count !== 1 ? "s" : ""} on{" "}
+          {group.pipeline === "alfa" ? "result" : "violation"}{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -242,7 +253,7 @@ function RuleGroupCard({
                   aria-hidden
                 />
                 <p className="text-sm text-fg">
-                  <strong>What axe says:</strong> {group.help}
+                  <strong>{group.pipeline === "alfa" ? "What Alfa reports:" : "What the engine reports:"}</strong> {group.help}
                   {group.help_url && (
                     <>
                       {" "}
@@ -268,6 +279,13 @@ function RuleGroupCard({
               .map(([k, v]) => `${k} (${v})`)
               .join(" · ") || "—"}
           </div>
+          {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
+            <p className="mb-2 text-xs text-fg-muted">
+              <strong className="text-fg">Expert review leads:</strong>{" "}
+              {group.engine_outcomes.cant_tell} Alfa <code>cantTell</code> outcome
+              {group.engine_outcomes.cant_tell === 1 ? " needs" : "s need"} manual confirmation; they are not conformance failures.
+            </p>
+          )}
 
           <RuleBulkBar
             scanId={scanId}
@@ -353,29 +371,21 @@ function RuleBulkBar({
   const qc = useQueryClient();
   const [target, setTarget] = useState<FindingStatus>("reviewing");
   const mutation = useMutation({
-    mutationFn: (next: FindingStatus) =>
-      api.bulkSetA11yStatus(findingIds, next),
+    mutationFn: ({ next, rationale }: { next: FindingStatus; rationale: string }) =>
+      api.bulkSetA11yStatus(findingIds, next, rationale || undefined),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["a11y-by-rule", scanId] });
       void qc.invalidateQueries({ queryKey: ["a11y-rollup", scanId] });
       void qc.invalidateQueries({ queryKey: ["a11y-drill", scanId] });
     },
   });
-  const destructive: FindingStatus[] = [
-    "remediated",
-    "accepted_risk",
-    "false_positive",
-  ];
-
   const onApply = () => {
-    if (destructive.includes(target)) {
-      const ok = window.confirm(
-        `Mark all ${findingIds.length} violations of "${ruleId}" as ${target}? ` +
-          "This is reversible.",
-      );
-      if (!ok) return;
-    }
-    mutation.mutate(target);
+    const rationale = requestStatusRationale(
+      target,
+      `all ${findingIds.length} results for "${ruleId}"`,
+    );
+    if (rationale === null) return;
+    mutation.mutate({ next: target, rationale });
   };
 
   return (

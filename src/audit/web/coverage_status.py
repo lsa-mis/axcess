@@ -64,9 +64,11 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
     ShippedPipeline(
         name="Keyboard-trap probe",
         pipeline="keyboard",
-        engine="Deterministic Playwright (Tab-walk, Esc, iframe checks)",
-        scs="2.1.2 No Keyboard Trap",
+        engine="Deterministic Playwright (bidirectional Tab/Shift+Tab exit attempts)",
+        scs="2.1.2 No Keyboard Trap — conservative review leads",
         needs_ai=False,
+        note="Suppresses ordinary focus wrapping, small cycles, modal containment, "
+        "and opaque iframe/closed-shadow focus; every lead still needs expert confirmation.",
     ),
     ShippedPipeline(
         name="Responsive / zoom probe",
@@ -92,11 +94,16 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
     ShippedPipeline(
         name="Visual probe",
         pipeline="visual",
-        engine="Live-page screenshot + vision model (1.3.2); deterministic DOM (2.2.2)",
-        scs="1.3.2 Meaningful Sequence, 2.2.2 Pause/Stop/Hide",
+        engine=(
+            "Live-page screenshot + vision model (1.3.2); runtime media playback "
+            "measurement (1.4.2, 2.2.2)"
+        ),
+        scs="1.3.2 Meaningful Sequence, 1.4.2 Audio Control, 2.2.2 Pause/Stop/Hide",
         needs_ai=True,
-        note="1.3.2 needs a local vision model; 2.2.2 (autoplay/marquee) is "
-        "deterministic and always runs.",
+        note=(
+            "1.3.2 needs a local vision model; media playback measurement and "
+            "marquee review leads run locally without a model."
+        ),
     ),
     ShippedPipeline(
         name="Semantic analyzer",
@@ -202,10 +209,17 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         issue="Pause, Stop, Hide",
         ai_fit="Strong",
         model_class="Deterministic Playwright",
-        what="Flag autoplay <video>/<audio> without controls and <marquee> (no pause).",
+        what=(
+            "Measure playing video longer than five seconds without detected controls; "
+            "record <marquee> for expert review. Audible autoplay audio is evaluated "
+            "separately under 1.4.2."
+        ),
         status="shipped",
         reuse="visual pipeline (deterministic check, no model)",
-        note="Clear no-pause cases shipped; CSS animations / carousels still manual.",
+        note=(
+            "Markup-only autoplay is not flagged. CSS animations, carousels, duration, "
+            "and custom-control behavior still require manual confirmation."
+        ),
     ),
     RoadmapItem(
         wcag="2.4.3",
@@ -215,8 +229,7 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         what="Flag positive tabindex (F44) that forces a broken manual tab order.",
         status="shipped",
         reuse="live-page focus probe (no model needed)",
-        note="Positive-tabindex check shipped; full reading-order judgement "
-        "still needs a human.",
+        note="Positive-tabindex check shipped; full reading-order judgement still needs a human.",
     ),
     RoadmapItem(
         wcag="2.4.11",

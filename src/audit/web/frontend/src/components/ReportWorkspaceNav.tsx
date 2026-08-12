@@ -1,11 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { cn } from "../lib/cn";
 
-/**
- * The expert's report lifecycle. This is local navigation, not a claim that
- * a scan alone determines conformance: the Manual checks step stays visible
- * beside machine evidence and exports.
- */
+/** Minimal report navigation: summary, one issue table, and optional comparison. */
 export default function ReportWorkspaceNav({
   scanId,
   previousScanId,
@@ -15,10 +11,16 @@ export default function ReportWorkspaceNav({
 }) {
   const { pathname } = useLocation();
   const items = [
-    { label: "Overview", to: `/scans/${scanId}`, active: pathname === `/scans/${scanId}` },
-    { label: "Review queue", to: `/scans/${scanId}/review`, active: pathname.includes("/review") || pathname.includes("/issues") },
-    { label: "Manual checks", to: `/scans/${scanId}/manual-checks`, active: pathname.includes("/manual-checks") },
-    { label: "Handoff", to: `/scans/${scanId}/handoff`, active: pathname.includes("/handoff") },
+    {
+      label: "Overview",
+      to: `/scans/${scanId}`,
+      active: pathname === `/scans/${scanId}`,
+    },
+    {
+      label: "Issues",
+      to: `/scans/${scanId}/issues`,
+      active: pathname.includes("/issues"),
+    },
   ];
   if (previousScanId != null) {
     items.push({
@@ -29,21 +31,30 @@ export default function ReportWorkspaceNav({
   }
 
   return (
-    <nav aria-label="Report workspace" className="mb-5 border-b border-border">
-      <ul className="flex flex-wrap gap-x-1">
-        {items.map((item) => (
+    <nav
+      aria-label="Report workspace"
+      className="mb-6 overflow-x-auto rounded-xs border border-border bg-surface p-1.5 shadow-card"
+    >
+      <ul className="flex w-max min-w-full flex-nowrap gap-x-1">
+        {items.map((item, index) => (
           <li key={item.to}>
             <Link
               to={item.to}
               aria-current={item.active ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-target items-center border-b-2 px-3 text-sm font-semibold no-underline",
+                "inline-flex min-h-target items-center rounded-[6px] border px-3 text-sm font-semibold no-underline transition-colors",
                 item.active
-                  ? "border-umich-blue text-umich-blue"
-                  : "border-transparent text-fg-muted hover:border-border hover:text-fg",
+                  ? "border-umich-blue bg-umich-blue text-white shadow-sm"
+                  : "border-transparent text-fg-muted hover:bg-surface-muted hover:text-fg",
               )}
             >
-              {item.label}
+              <span
+                className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-current text-2xs"
+                aria-hidden
+              >
+                {index + 1}
+              </span>
+              <span className="whitespace-nowrap">{item.label}</span>
             </Link>
           </li>
         ))}

@@ -86,6 +86,9 @@ def _config(base: str, **overrides: object) -> CrawlConfig:
         "rps": 100.0,
         "workers": 1,
         "ocr_max_workers": 0,
+        # The injected VLM is a deterministic stub. Keep semantic analysis
+        # out of this fixture suite so it never contacts local Ollama.
+        "semantic_enabled": False,
     }
     defaults.update(overrides)
     return CrawlConfig(**defaults)  # type: ignore[arg-type]

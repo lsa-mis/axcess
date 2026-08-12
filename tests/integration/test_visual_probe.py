@@ -14,6 +14,7 @@ import pytest
 from audit.analyzer.ollama_base import OllamaError
 from audit.analyzer.visual import VisualProbe
 from audit.analyzer.visual.base import (
+    RULE_AUTOPLAY_AUDIO_NO_CONTROL,
     RULE_MEANINGFUL_SEQUENCE,
     RULE_MOTION_NO_PAUSE,
     VisualFinding,
@@ -128,10 +129,45 @@ async def test_motion_flags_autoplay_and_marquee(page) -> None:  # type: ignore[
     # provider=None: the deterministic 2.2.2 check still runs (no VLM needed).
     findings = await VisualProbe(provider=None).run(page)
     motion = [f for f in findings if f.rule_id == RULE_MOTION_NO_PAUSE]
-    # Autoplay video w/o controls + <marquee> flagged; autoplay+controls is not.
-    assert len(motion) == 2
+    # Neither missing video resource played. Only marquee remains as a review lead.
+    assert len(motion) == 1
+    assert motion[0].target_selector == "marquee"
     assert all(f.criterion_sc == "2.2.2" for f in motion)
     assert all(f.to_repo_kwargs()["pipeline"] == "visual" for f in motion)
+
+
+class _RuntimeMediaPage:
+    async def evaluate(self, _script: str, *_args: object) -> list[dict[str, str]]:
+        return [
+            {
+                "kind": "video",
+                "selector": "video#hero",
+                "html": '<video id="hero" autoplay></video>',
+                "detail": (
+                    "Runtime playback measurement: video currentTime advanced 0.34 seconds; "
+                    "duration is 12.00 seconds"
+                ),
+            },
+            {
+                "kind": "audio",
+                "selector": "audio#intro",
+                "html": '<audio id="intro" autoplay></audio>',
+                "detail": (
+                    "Runtime playback measurement: audio currentTime advanced 0.35 seconds; "
+                    "duration is 8.00 seconds"
+                ),
+            },
+        ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_media_uses_distinct_wcag_criteria() -> None:
+    findings = await VisualProbe(provider=None)._check_motion(_RuntimeMediaPage())  # type: ignore[arg-type]
+    assert [(finding.rule_id, finding.criterion_sc) for finding in findings] == [
+        (RULE_MOTION_NO_PAUSE, "2.2.2"),
+        (RULE_AUTOPLAY_AUDIO_NO_CONTROL, "1.4.2"),
+    ]
+    assert all("Runtime playback measurement:" in finding.failure_summary for finding in findings)
 
 
 @pytest.mark.asyncio

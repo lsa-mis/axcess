@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router";
 import { EmptyState } from "../components/ui";
 
 export default function NotFoundRoute() {

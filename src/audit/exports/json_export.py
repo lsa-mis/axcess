@@ -7,12 +7,11 @@ from typing import Any
 
 from audit.exports.collector import ExportScan
 
-# Bumped to 2 with the addition of the ``a11y_findings`` array. Schema-v1
-# consumers (only `findings` is image-of-text) still parse v2 cleanly:
-# the new keys are additive, no existing key changed shape. Surfacing the
-# bump lets downstream pipelines decide whether to start reading the new
-# section.
-SCHEMA_VERSION = 2
+# Version 3 adds independently attributed Alfa coverage and per-finding ACT
+# outcomes alongside the existing axe-core evidence. Earlier consumers still
+# parse the additive fields, while the explicit version lets downstream users
+# opt in to source-aware reporting.
+SCHEMA_VERSION = 3
 
 
 def render_json(scan: ExportScan, *, indent: int | None = 2) -> str:
@@ -44,6 +43,9 @@ def to_payload(scan: ExportScan) -> dict[str, Any]:
             "by_severity": dict(scan.by_severity),
             "axe_pages_scanned": scan.axe_pages_scanned,
             "axe_violations_total": scan.axe_violations_total,
+            "alfa_pages_scanned": scan.alfa_pages_scanned,
+            "alfa_failed_total": scan.alfa_failed_total,
+            "alfa_cant_tell_total": scan.alfa_cant_tell_total,
             "by_wcag_level": dict(scan.by_wcag_level),
         },
         # Image-of-text findings (WCAG 1.4.5 pipeline) — unchanged shape.

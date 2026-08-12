@@ -5,15 +5,16 @@
 **A local-first, AI-augmented web accessibility auditor.**
 
 Axcess crawls a website, renders every page in a real browser, and runs
-**seven complementary detection pipelines** — a rule engine, three behavioural
-probes, and three AI-assisted analyzers — covering **28 of 55 WCAG 2.2 A/AA
+**seven complementary core detection pipelines**, plus an optional independent
+**Siteimprove Alfa ACT-rule engine** — covering **28 of 55 WCAG 2.2 A/AA
 success criteria**. It runs entirely on your machine. No cloud, no telemetry,
 no data leaving your laptop.
 
 [Landing page](https://reganmaharjan.com.np/axcess) ·
 [Documentation](./docs/README.md) ·
 [What it covers](./docs/coverage-tracker.md) ·
-[Hosting](./docs/hosting.md)
+[Hosting](./docs/hosting.md) ·
+[Protected scans](./docs/protected-scans.md)
 
 `Python 3.11+` · `WCAG 2.2 AAA` (the tool audits *itself* at AAA) · `MIT`
 
@@ -32,11 +33,13 @@ criteria that actually need **judgment**:
 - Does this link's text make sense out of context? (WCAG 2.4.4)
 - Does the page reflow at 320px, or trap the keyboard in a modal?
 
-Axcess closes that gap by combining seven kinds of detection in one crawl:
+Axcess closes that gap by combining seven core kinds of detection in one crawl,
+with an optional second rule engine for evidence comparison:
 
 | | Pipeline | How it decides | SCs | Needs a model? |
 |---|---|---|---|---|
 | 🟦 | **axe-core** | Rule engine on the rendered DOM | dozens | No |
+| 🟦 | **Siteimprove Alfa** *(optional)* | Independent ACT rules in its own local browser capture | selected WCAG 2.2 A/AA rules | No |
 | 🟦 | **Keyboard-trap probe** | Tabs through every focusable element | 2.1.2 | No |
 | 🟦 | **Responsive / zoom probe** | Mutates viewport + injects text-spacing CSS | 1.4.4/.10/.12 | No |
 | 🟦 | **Focus probe** | Focus geometry + positive-tabindex (F44) | 2.4.11, 2.4.3 | No |
@@ -45,7 +48,9 @@ Axcess closes that gap by combining seven kinds of detection in one crawl:
 | 🟨 | **Visual probe** | Screenshot + vision model (1.3.2); autoplay/marquee (2.2.2) | 1.3.2, 2.2.2 | 1.3.2 only |
 
 The blue pipelines need only a browser — run Axcess with **zero AI** and still
-get axe + keyboard + responsive + focus + motion coverage. The yellow pipelines
+get axe + keyboard + responsive + focus + motion coverage. Select Alfa in the
+new-scan **DOM rule engine** control when you want its independent ACT evidence
+as well (or instead of axe). The yellow pipelines
 add the judgment calls, all via a **local [Ollama](https://ollama.com) daemon**
 so your content never leaves the machine.
 
@@ -67,6 +72,7 @@ uv run audit crawl https://example.com --max-pages 50
 
 # 3. Open the review UI (React SPA)
 make frontend-build      # one time, builds the SPA
+make alfa-install        # optional: install the pinned Siteimprove Alfa runner
 uv run audit serve       # → http://127.0.0.1:8765/app/
 ```
 
@@ -75,9 +81,11 @@ Want the AI pipelines too? Start [Ollama](https://ollama.com), then
 `--skip-vlm --skip-ocr --skip-semantic` and the three browser-only pipelines
 still run.
 
-**Requirements:** macOS or Linux · Python 3.11+ ·
-[uv](https://github.com/astral-sh/uv) · Tesseract (`brew install tesseract`) ·
-optionally [Ollama](https://ollama.com) for the AI pipelines.
+**Requirements:** Windows, macOS, or Linux · Python 3.11+ · Node.js 22.22+ ·
+[uv](https://github.com/astral-sh/uv) · Tesseract (install it with your
+platform's package manager) · optionally [Ollama](https://ollama.com) for
+the AI pipelines. On Windows, WSL is recommended for the documented `make`
+commands.
 
 ---
 
@@ -90,6 +98,7 @@ seed URL
 render each page  ──►  static HTTP first, Playwright chromium when needed
    │
    ├─► axe-core ........... rule violations on the live DOM
+   ├─► Alfa (optional) .... independent ACT outcomes on a separate local capture
    ├─► keyboard probe ..... tab-walk / Esc / iframe traps        (SC 2.1.2)
    ├─► responsive probe ... reflow @320px, zoom clip, text-spacing (1.4.4/10/12)
    ├─► focus probe ........ focus hidden by overlay / positive tabindex (2.4.11/2.4.3)
@@ -113,18 +122,27 @@ For the full picture, read [`docs/architecture.md`](./docs/architecture.md).
 
 A single **React SPA** (Vite + Tailwind + TanStack Query) served at `/app/`,
 backed by a FastAPI `/api/*` JSON surface. It's a Michigan-palette design
-system that **audits itself at WCAG 2.2 AAA** — every view has axe-core tests
-in the AAA tag pack that fail the build on any violation.
+system with keyboard, screen-reader, 320px reflow, and axe-core regression
+coverage. Those checks support the UI's stronger internal AAA usability goal;
+they do not by themselves prove conformance.
 
-- **Dashboard / Scans** — start a crawl, watch live per-pipeline progress.
-- **Issues** — one row per issue across all pipelines, with conformance level,
-  affected abilities, and a what / why / how fix card.
+- **Report overview** — scope, coverage truth, evidence-lane counts, manual-review
+  progress, and the next defensible action.
+- **Review queue** — keyboard-first likely-barrier, expert-review, and
+  informational lanes. AI, image, behavioral, and Alfa `cantTell` evidence
+  cannot silently become a conformance verdict.
+- **Manual checks** — the complete WCAG 2.2 A/AA matrix, with rationale and
+  evidence retained per criterion.
+- **Handoff** — final exports require a documented expert disposition for
+  every actionable evidence group; incomplete work remains an unmistakably
+  labeled draft.
 - **Findings** — filterable, paginated, with image previews and OCR/VLM evidence.
 - **Tracking** — what the tool detects today vs. the AI roadmap.
-- **Exports** — CSV · JSON · Jira CSV · Markdown · a holistic audit report ·
-  an Excel workbook with every report section as its own filterable sheet
-  (Summary · Issues · Owner Worklist · Page Hotspots · Who's Affected ·
-  Coverage · Test Tracking).
+- **Exports** — CSV · JSON · Jira CSV · a status-bearing Markdown evidence
+  inventory · an expert-reviewed stakeholder audit report · an Excel workbook
+  with every report section as its own filterable sheet
+  (Summary · Issues · Decision History · Owner Worklist · Page Hotspots · Page
+  References · Who's Affected · Coverage · Test Tracking · Manual Evidence).
 
 ---
 
@@ -140,6 +158,14 @@ make serve     # binds 0.0.0.0; no token set = stays a local-only app
 ```
 
 Full runbook (Tailscale, autostart, the security model): [`docs/hosting.md`](./docs/hosting.md).
+
+### Authorized 1FA/MFA targets
+
+Protected scanning is a separate, deliberately strict mode: the auditor signs
+in manually in a paired local browser, while Axcess never receives credentials
+or reusable session state. It is disabled by default and requires U-M identity
+proxy, mTLS, and managed-KMS controls—not the shared LAN token. See
+[`docs/protected-scans.md`](./docs/protected-scans.md) before planning a pilot.
 
 ---
 
@@ -158,6 +184,7 @@ Axcess keeps **one front door and one hub**, so docs don't sprawl:
 | [developer-guide.md](./docs/developer-guide.md) | extending it | code layout, "add a page", tests |
 | [coverage-tracker.md](./docs/coverage-tracker.md) | scoping it | shipped vs. planned, the AI roadmap |
 | [hosting.md](./docs/hosting.md) | deploying it | LAN / Tailscale + token gate |
+| [protected-scans.md](./docs/protected-scans.md) | authorized protected targets | proxy + mTLS + KMS controls, companion handoff, retention |
 | [troubleshooting.md](./docs/troubleshooting.md) | unsticking it | Cloudflare, stuck scans, Ollama, scope |
 | [accessibility.md](./docs/accessibility.md) · [personas.md](./docs/personas.md) · [design-principles.md](./docs/design-principles.md) | building the UI | the AAA contract, who it serves |
 
@@ -172,15 +199,23 @@ surface updates.
 ## Development
 
 ```bash
-make test         # pytest (434 tests: unit + integration + Playwright/axe UI)
-make lint         # ruff check + format --check
-make typecheck    # mypy --strict on src/
-make help         # every target
+make test          # unit + integration + Playwright/axe UI
+make quality-gate  # strict <5% labeled-corpus false-discovery gate, per layer
+make lint          # Python format/lint + React/JSX accessibility lint
+make typecheck     # mypy strict + TypeScript
+make frontend-build
+make help          # every target
 ```
 
 The gates a change must pass: **ruff**, **mypy (strict)**, **pytest**, and the
-**frontend** lint/typecheck/build. The UI's own AAA axe tests run in CI against
-the built SPA.
+**frontend** lint/typecheck/build. The built SPA's core routes also run through
+axe checks plus focused keyboard and responsive-flow tests.
+
+The bundled detector-quality corpus is synthetic and adversarial: it prevents
+known precision regressions but is not evidence that arbitrary production
+sites have a sub-5% false-positive rate. A public real-world accuracy claim
+requires the representative, held-out, dual-expert U-M validation corpus
+described in [`tests/quality/README.md`](./tests/quality/README.md).
 
 ---
 

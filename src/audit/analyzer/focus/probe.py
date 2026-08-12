@@ -116,6 +116,9 @@ class FocusProbe:
     """Runs the SC 2.4.11 focus-obscured check against a live page."""
 
     max_focusable: int = MAX_FOCUSABLE
+    # The protected companion must not log browser exception text because it
+    # can include an authenticated route or page-provided diagnostic.
+    suppress_diagnostics: bool = False
 
     async def run(self, page: Page) -> list[FocusFinding]:
         """Run both focus checks. Never raises — each check is isolated so
@@ -124,12 +127,18 @@ class FocusProbe:
         try:
             findings.extend(await self._check_obscured(page))
         except Exception as exc:  # pragma: no cover - defensive
-            log.warning("focus.obscured_failed", error=str(exc))
+            self._log_failure("obscured", exc)
         try:
             findings.extend(await self._check_positive_tabindex(page))
         except Exception as exc:  # pragma: no cover - defensive
-            log.warning("focus.tabindex_failed", error=str(exc))
+            self._log_failure("tabindex", exc)
         return findings
+
+    def _log_failure(self, check: str, exc: Exception) -> None:
+        if self.suppress_diagnostics:
+            log.warning("focus.probe_failed_in_protected_context", check=check)
+        else:
+            log.warning(f"focus.{check}_failed", error=str(exc))
 
     async def _check_obscured(self, page: Page) -> list[FocusFinding]:
         """SC 2.4.11 — elements hidden behind a sticky/fixed overlay."""

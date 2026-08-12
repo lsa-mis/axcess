@@ -643,13 +643,12 @@ semantic_criteria:
     wcag_level: "A"
     abilities_affected: [motor, vision, cognition]
     what_happening: >-
-      Our dynamic keyboard probe pressed Tab repeatedly on the live
-      page and watched <code>document.activeElement</code>. Either
-      focus got stuck on a single element across several consecutive
-      Tab presses (a custom keydown handler swallowed Tab), an open
-      modal dialog held focus inside itself even after Escape, or an
-      iframe is reachable by Tab but has no <code>title</code> and no
-      <code>tabindex="-1"</code> escape valve.
+      Our keyboard-exit probe watched the exact focused element while
+      attempting repeated exits in both directions. The reported element
+      remained focused after the measured number of Tab attempts and the
+      same number of Shift+Tab attempts. Normal page wrapping, two-control
+      cycles, modal containment, and focus inside opaque iframes or closed
+      shadow roots are excluded because those observations do not prove a trap.
     why_matters: >-
       Keyboard-only users — including people who use sip-and-puff,
       head-tracking, voice control, or simply mice with broken right
@@ -662,39 +661,28 @@ semantic_criteria:
     effort: under_2h
     fix_steps:
       - >-
-        For <strong>stuck-focus</strong> findings: open the page,
-        find the element matching the reported selector, and look at
-        any <code>keydown</code> / <code>keypress</code> handlers
-        attached to it (or its parents). Find the <code>event.preventDefault()</code>
-        call that runs on the Tab key. Either remove it or guard it
-        with a check that lets Tab through (<code>if (e.key === 'Tab') return;</code>).
+        Reproduce the measured sequence on the reported element using both
+        Tab and Shift+Tab. Also try the component's documented keyboard
+        commands. Record a failure only if no keyboard method exits the component,
+        or a non-standard exit method exists but the user is not told about it.
       - >-
-        For <strong>modal-no-escape</strong> findings: add an
-        <code>onKeyDown</code> handler on the dialog that closes it
-        on <code>Escape</code>, OR move to the native
-        <code>&lt;dialog&gt;</code> element (which gets this behavior
-        for free). The fix is usually a one-line keyboard listener.
-      - >-
-        For <strong>iframe</strong> findings: set <code>title="..."</code>
-        on the iframe so screen readers announce what the user is
-        entering. If the embedded document doesn't need keyboard
-        access, set <code>tabindex="-1"</code> on the iframe so
-        keyboard users skip past it entirely.
+        If the lead reproduces, inspect Tab and Shift+Tab handlers on the
+        target and its ancestors. Remove an unconditional
+        <code>event.preventDefault()</code>, provide a keyboard-operable exit,
+        or document the non-standard exit command immediately before and
+        inside the component.
     verify_manual: >-
-      Open the page. Press Tab repeatedly from the top. Focus should
-      visibly move through every interactive element and eventually
-      reach the browser's address bar. Reverse with Shift+Tab. Open
-      any modals and press Escape — focus should return to the
-      element that opened the modal.
+      Open the page and reproduce the reported starting state. Confirm that
+      focus can leave the component using only the keyboard in both directions,
+      or that any required non-standard exit command is clearly explained.
     verify_automated: >-
       Re-run the crawl with <code>--keyboard-probe</code> enabled.
       The same target should not produce a finding on the next pass.
     acceptance: >-
-      All affected elements allow keyboard focus to move past them
-      via Tab (or Shift+Tab in reverse), and all modal dialogs
-      release focus to the calling element when the user presses
-      Escape.
-    confidence_default: high
+      Every affected component provides a keyboard-only way to leave. If the
+      method is not an unmodified arrow key, Tab, Shift+Tab, Escape, or another
+      standard exit method, instructions identify the required command.
+    confidence_default: medium
 
   "2.4.4":
     title: "Links don't describe their purpose (LLM-detected)"
@@ -866,6 +854,38 @@ semantic_criteria:
       order.
     confidence_default: high
 
+  "1.4.2":
+    title: "Automatically playing audio may lack a usable control"
+    wcag_sc: "1.4.2"
+    wcag_name: "Audio Control"
+    wcag_level: "A"
+    abilities_affected: [hearing, vision, cognition]
+    what_happening: >-
+      Runtime measurement found audible media whose playback time advanced,
+      whose duration exceeded three seconds, and which had no native or
+      explicitly associated custom pause, stop, mute, or volume control.
+    why_matters: >-
+      Unexpected audio can interfere with screen-reader speech and make it
+      difficult for people with attention or auditory-processing disabilities
+      to understand the page.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - Do not start audible audio automatically.
+      - >-
+        If autoplay is essential, provide a visible pause, stop, or independent
+        volume control that is keyboard and screen-reader accessible.
+    verify_manual: >-
+      Reload the page and confirm audio lasting more than three seconds can be
+      paused, stopped, or controlled independently of system volume.
+    verify_automated: >-
+      Re-run the crawl; the visual probe measures actual playback rather than
+      relying on the autoplay attribute alone.
+    acceptance: >-
+      No audible audio plays automatically for more than three seconds without
+      an accessible pause, stop, or independent volume control.
+    confidence_default: medium
+
   "2.2.2":
     title: "Auto-moving content with no way to pause it"
     wcag_sc: "2.2.2"
@@ -873,22 +893,20 @@ semantic_criteria:
     wcag_level: "A"
     abilities_affected: [cognition, vision]
     what_happening: >-
-      The visual probe found content that moves automatically with no pause
-      mechanism — an autoplaying <code>&lt;video&gt;</code> /
-      <code>&lt;audio&gt;</code> without a <code>controls</code> attribute, or
-      a <code>&lt;marquee&gt;</code>. Anything that moves for more than 5
-      seconds must be pausable.
+      Runtime measurement found visible video whose playback time advanced for
+      media longer than five seconds without a detected pause mechanism, or a
+      <code>&lt;marquee&gt;</code> that needs expert confirmation of duration
+      and controls.
     why_matters: >-
       Motion that can't be stopped is a barrier for people with attention,
       reading, or vestibular disorders — it pulls focus, makes text impossible
-      to read, and can trigger nausea or migraines. Autoplaying audio also
-      stomps on screen-reader output.
+      to read, and can trigger nausea or migraines.
     owner: dev
     effort: under_15m
     fix_steps:
       - >-
-        Add the <code>controls</code> attribute to autoplay media (or don't
-        autoplay), so users have a built-in pause/stop button.
+        Add an accessible pause, stop, or hide control to automatic motion, or
+        do not start the motion automatically.
       - >-
         Replace <code>&lt;marquee&gt;</code> with static content, or motion the
         user explicitly starts and can stop.
@@ -897,12 +915,12 @@ semantic_criteria:
       carousels, which this check doesn't catch) can be paused, stopped, or
       hidden.
     verify_automated: >-
-      Re-run the crawl — the visual probe re-checks autoplay media and marquee
-      on every page.
+      Re-run the crawl — the visual probe measures actual video playback and
+      re-checks marquee elements on every page.
     acceptance: >-
       No content moves for more than 5 seconds without a pause/stop/hide
       mechanism.
-    confidence_default: high
+    confidence_default: medium
 
   "1.3.2":
     title: "Visual reading order doesn't match the DOM order"

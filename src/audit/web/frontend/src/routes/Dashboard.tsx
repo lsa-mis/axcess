@@ -1,6 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, PlusCircle, ServerCrash } from "lucide-react";
+import {
+  ArrowRight,
+  MapPin,
+  PlusCircle,
+  ServerCrash,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
 import { api } from "../api/client";
 import {
   Card,
@@ -22,6 +29,12 @@ export default function DashboardRoute() {
   const totalPages = completed.reduce((acc, s) => acc + s.page_count, 0);
   const totalFindings = completed.reduce((acc, s) => acc + s.finding_count, 0);
   const running = scans.find((s) => s.status === "running");
+  const latest = completed[0];
+  const { data: latestIssues } = useQuery({
+    queryKey: ["issues", latest?.id, "dashboard"],
+    queryFn: () => api.listIssues(latest!.id),
+    enabled: !!latest,
+  });
 
   return (
     <>
@@ -29,8 +42,8 @@ export default function DashboardRoute() {
           global CTA. (The empty state below keeps its contextual one
           for the zero-scans first run.) */}
       <PageHeader
-        title="Dashboard"
-        subtitle="Local, offline accessibility review."
+        title="Accessibility workbench"
+        subtitle="Scan a site, inspect the evidence, and produce a clear remediation report."
       />
 
       {error && (
@@ -64,95 +77,163 @@ export default function DashboardRoute() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label="Completed scans"
-          value={isLoading ? "—" : completed.length}
-        />
-        <StatCard
-          label="Pages crawled"
-          value={isLoading ? "—" : totalPages.toLocaleString()}
-        />
-        <StatCard
-          label="Findings"
-          value={isLoading ? "—" : totalFindings.toLocaleString()}
-          hint="across all scans"
-        />
-        <StatCard
-          label="Most recent"
-          value={scans[0] ? `#${scans[0].id}` : "—"}
-          hint={scans[0]?.status}
-          tone={scans[0]?.status === "completed" ? "default" : "info"}
-        />
-      </div>
+      {!error && latest && latestIssues && (
+        <Card className="mb-6 overflow-hidden border-umich-blue bg-[linear-gradient(118deg,#001E3C_0%,#002F5D_58%,#00417B_100%)] shadow-raised">
+          <div className="grid gap-5 p-6 sm:p-7 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-inverse-fg-subtle">
+                Latest completed report · #{latest.id}
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                {latestIssues.total_unfiltered > 0
+                  ? `View ${latestIssues.total_unfiltered} accessibility issue groups`
+                  : "View the completed scan report"}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-surface-inverse-fg-subtle">
+                {latestIssues.occurrence_counts.high_confidence.toLocaleString()}{" "}
+                high-confidence occurrences are separated from{" "}
+                {latestIssues.review_lane_counts.expert_review} groups that
+                still need expert confirmation.
+              </p>
+            </div>
+            <LinkButton
+              to={`/scans/${latest.id}/issues`}
+              variant="secondary"
+              size="lg"
+              className="border-white bg-white text-umich-blue hover:bg-surface-muted"
+            >
+              Open issue table <ArrowRight className="h-5 w-5" aria-hidden />
+            </LinkButton>
+          </div>
+        </Card>
+      )}
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
-            Recent scans
-          </h2>
-          {scans.length === 0 ? (
-            <EmptyState
-              title="No scans yet"
-              message="Run a crawl to see findings here."
-              action={
-                <LinkButton to="/scans/new" variant="primary" size="lg">
-                  <PlusCircle className="h-5 w-5" aria-hidden /> New scan
-                </LinkButton>
-              }
-            />
-          ) : (
-            <ul className="divide-y divide-border">
-              {scans.slice(0, 6).map((s) => (
-                <li key={s.id} className="py-2.5">
-                  <Link
-                    to={`/scans/${s.id}`}
-                    className="flex items-center justify-between gap-3 no-underline"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-fg">
-                        #{s.id} · {s.seed_url}
-                      </div>
-                      <div className="text-xs text-fg-subtle">
-                        {s.status} · {s.page_count} pages ·{" "}
-                        {s.finding_count} findings
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-xs text-fg-subtle">
-                      {s.started_at?.slice(0, 16)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+      {!error && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Completed scans"
+            value={isLoading ? "—" : completed.length}
+          />
+          <StatCard
+            label="Pages crawled"
+            value={isLoading ? "—" : totalPages.toLocaleString()}
+          />
+          <StatCard
+            label="Image evidence"
+            value={isLoading ? "—" : totalFindings.toLocaleString()}
+            hint="raw image records"
+          />
+          <StatCard
+            label="Most recent"
+            value={scans[0] ? `#${scans[0].id}` : "—"}
+            hint={scans[0]?.status}
+            tone={scans[0]?.status === "completed" ? "default" : "info"}
+          />
+        </div>
+      )}
+
+      {!error && (
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+          <Card className="overflow-hidden">
+            <div className="border-b border-border bg-surface-subtle px-5 py-4">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                Recent scans
+              </h2>
+            </div>
+            <div className="px-5 py-2">
+              {scans.length === 0 ? (
+                <EmptyState
+                  title="No scans yet"
+                  message="Run a crawl to see findings here."
+                  action={
+                    <LinkButton to="/scans/new" variant="primary" size="lg">
+                      <PlusCircle className="h-5 w-5" aria-hidden /> New scan
+                    </LinkButton>
+                  }
+                />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {scans.slice(0, 6).map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        to={`/scans/${s.id}`}
+                        className="-mx-2 flex items-center justify-between gap-4 rounded-xs px-2 py-3 no-underline transition-colors hover:bg-surface-muted"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-fg">
+                            #{s.id} · {s.seed_url}
+                          </div>
+                          <div className="text-xs text-fg-subtle">
+                            {s.status} · {s.page_count} pages ·{" "}
+                            {s.finding_count} findings
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-xs text-fg-subtle">
+                          {s.started_at?.slice(0, 16)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-5 sm:p-6">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-umich-blue">
+              How Axcess works
+            </p>
+            <h2 className="mb-2 text-xl font-semibold tracking-tight text-fg">
+              One clear report
+            </h2>
+            <p className="text-sm leading-6 text-fg-muted">
+              Each report explains what was detected, why it matters, the
+              expected fix, and the exact stored locations. Axcess provides
+              evidence for expert review; it does not certify conformance.
+            </p>
+            <ul className="mt-5 space-y-4 text-sm text-fg-muted">
+              <li className="flex gap-3">
+                <ShieldCheck
+                  className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue"
+                  aria-hidden
+                />
+                <span>
+                  <strong className="block text-fg">
+                    Understand the issue
+                  </strong>
+                  See the source engine, WCAG criterion, user impact, and
+                  confidence.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <Wrench
+                  className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue"
+                  aria-hidden
+                />
+                <span>
+                  <strong className="block text-fg">
+                    Apply the expected fix
+                  </strong>
+                  Use concise remediation and acceptance guidance in the same
+                  row.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <MapPin
+                  className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue"
+                  aria-hidden
+                />
+                <span>
+                  <strong className="block text-fg">
+                    Open the exact location
+                  </strong>
+                  Follow the page, selector, and stored evidence links directly.
+                </span>
+              </li>
             </ul>
-          )}
-        </Card>
-
-        <Card className="p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
-            About this tool
-          </h2>
-          <p className="text-sm leading-relaxed text-fg-muted">
-            A local auditor that crawls a site, runs OCR + VLM against every
-            image it finds, and compares the image&rsquo;s text to the authored{" "}
-            <code className="rounded bg-surface-muted px-1 py-0.5 font-mono text-xs">
-              alt
-            </code>{" "}
-            attribute. Findings are prioritized by severity and exportable
-            to CSV, JSON, Jira, or a Markdown report. Fully offline after
-            the one-time model pull.
-          </p>
-          <ul className="mt-3 space-y-1 text-sm text-fg-muted">
-            <li className="flex gap-2">
-              <AlertTriangle
-                className="mt-0.5 h-4 w-4 shrink-0 text-umich-blue"
-                aria-hidden
-              />
-              WCAG 2.2 AAA — this UI itself passes axe-core on every view.
-            </li>
-          </ul>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 }

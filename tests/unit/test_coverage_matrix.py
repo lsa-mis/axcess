@@ -93,6 +93,17 @@ def test_automated_criteria_have_high_or_real_confidence() -> None:
             assert c.automated_check.strip(), f"{c.sc} automated but no automated_check"
 
 
+def test_accessible_authentication_stays_a_manual_review() -> None:
+    """A post-MFA browser session must never be treated as an SC 3.3.8 verdict."""
+    criterion = by_sc("3.3.8")
+    assert criterion is not None
+    assert criterion.level == "AA"
+    assert criterion.method == "manual"
+    assert criterion.pipelines == ()
+    assert "MFA" in criterion.manual_check
+    assert "does not automatically" in criterion.manual_check
+
+
 @pytest.mark.parametrize("sc", ["2.1.2", "1.4.10", "1.4.5", "2.4.4", "2.4.6", "1.1.1"])
 def test_known_criteria_present_by_name(sc: str) -> None:
     c = by_sc(sc)
