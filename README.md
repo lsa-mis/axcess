@@ -10,7 +10,7 @@ issue table, and export a defensible report with source-level evidence.
 [Desktop builds](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop) ·
 [Documentation](./docs/README.md) ·
 [Coverage](./docs/coverage-tracker.md) ·
-[Desktop guide](https://github.com/rayraycodes/Axcess/blob/feature/electron-desktop/docs/desktop-app.md) ·
+[Desktop guide](./docs/desktop-app.md) ·
 [Hosting](./docs/hosting.md)
 
 `WCAG 2.2 A/AA evidence` · `Local by default` · `MIT`
@@ -25,7 +25,9 @@ issue table, and export a defensible report with source-level evidence.
 ## Desktop preview
 
 The current desktop build packages the React workbench, FastAPI service,
-Playwright Chromium, and the Siteimprove Alfa runner into one macOS app.
+Playwright Chromium, Siteimprove Alfa runner, Tesseract executable, and English
+OCR language data into one macOS app. It does not require separate Python,
+Node.js, Chromium, or Tesseract installations.
 
 **[Open the latest Electron branch build](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
 then download `axcess-macos-apple-silicon` for the DMG. GitHub requires sign-in
@@ -34,8 +36,9 @@ to download workflow artifacts, and each build is retained for 14 days.
 This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
 Apple-notarized and is not approved for institutional distribution. macOS may
 require right-clicking **Axcess** and choosing **Open** on first launch. An
-Intel Mac build is not included yet. OCR still requires a system Tesseract
-installation; local AI checks require Ollama and downloaded models.
+Intel Mac build is not included yet. Optional local AI checks still require an
+explicitly configured Ollama service and downloaded models; Axcess does not
+silently install or download them.
 
 ## The workflow
 
@@ -257,7 +260,6 @@ Desktop work lives on `feature/electron-desktop` and reuses the same product UI
 and API rather than maintaining a second implementation.
 
 ```bash
-git switch feature/electron-desktop
 make desktop-setup      # install desktop, backend, Alfa, and frontend dependencies
 make desktop-run        # launch the development desktop app
 make desktop-test       # launcher + packaged-server tests
@@ -268,7 +270,7 @@ The Electron window uses an exact random loopback origin, Chromium sandboxing,
 context isolation, disabled renderer Node integration, denied permission
 requests, restricted navigation, and an integrity-checked ASAR. Scan data is
 stored in the operating system's application-data directory—not in the app
-bundle. Read the [desktop application guide](https://github.com/rayraycodes/Axcess/blob/feature/electron-desktop/docs/desktop-app.md) for signing,
+bundle. Read [`docs/desktop-app.md`](./docs/desktop-app.md) for signing,
 notarization, platform builds, and current release limitations.
 
 ## Local data and privacy
@@ -349,7 +351,7 @@ matches the task:
 | [Coverage tracker](./docs/coverage-tracker.md) | see exactly what is automated, assisted, or manual |
 | [Architecture](./docs/architecture.md) | understand the pipeline and stored evidence |
 | [Developer guide](./docs/developer-guide.md) | extend the crawler, analyzers, API, UI, or exports |
-| [Desktop app](https://github.com/rayraycodes/Axcess/blob/feature/electron-desktop/docs/desktop-app.md) | run and package Electron builds |
+| [Desktop app](./docs/desktop-app.md) | run and package Electron builds |
 | [Protected scans](./docs/protected-scans.md) | plan institutionally controlled authenticated scans |
 | [Hosting](./docs/hosting.md) | operate a private LAN or Tailscale instance |
 | [Accessibility](./docs/accessibility.md) | follow the UI accessibility contract |
