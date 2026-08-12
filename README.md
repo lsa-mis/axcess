@@ -2,250 +2,357 @@
 
 # Axcess
 
-**A local-first, AI-augmented web accessibility auditor.**
+**A local-first accessibility evidence workbench for expert web audits.**
 
-Axcess crawls a website, renders every page in a real browser, and runs
-**seven complementary core detection pipelines**, plus an optional independent
-**Siteimprove Alfa ACT-rule engine** — covering **28 of 55 WCAG 2.2 A/AA
-success criteria**. It runs entirely on your machine. No cloud, no telemetry,
-no data leaving your laptop.
+Scan a public or login-protected website, watch each test run, inspect a clear
+issue table, and export a defensible report with source-level evidence.
 
-[Landing page](https://reganmaharjan.com.np/axcess) ·
+[Download desktop preview](https://github.com/rayraycodes/Axcess/releases/download/desktop-v0.1.0-preview.1/Axcess-0.1.0-arm64.dmg) ·
 [Documentation](./docs/README.md) ·
-[What it covers](./docs/coverage-tracker.md) ·
-[Hosting](./docs/hosting.md) ·
-[Desktop app](./docs/desktop-app.md) ·
-[Protected scans](./docs/protected-scans.md)
+[Coverage](./docs/coverage-tracker.md) ·
+[Desktop guide](./docs/desktop-app.md) ·
+[Hosting](./docs/hosting.md)
 
-`Python 3.11+` · `WCAG 2.2 AAA` (the tool audits *itself* at AAA) · `MIT`
+`WCAG 2.2 A/AA evidence` · `Local by default` · `MIT`
 
 </div>
 
----
+> [!IMPORTANT]
+> Axcess produces accessibility evidence for expert review. Automated and
+> AI-assisted results do not prove WCAG conformance, legal compliance, or the
+> accessibility of an entire website.
 
-## Why Axcess
+## Desktop preview
 
-Most accessibility scanners are a single rule engine. Rule engines are fast and
-exact, but they can only check what's mechanically decidable — *is there an
-`alt` attribute?*, *does this text meet 4.5:1 contrast?* They go quiet on the
-criteria that actually need **judgment**:
+The current desktop build packages the React workbench, FastAPI service,
+Playwright Chromium, and the Siteimprove Alfa runner into one macOS app.
 
-- Is this image *really text* dressed up as a picture? (WCAG 1.4.5)
-- Does this link's text make sense out of context? (WCAG 2.4.4)
-- Does the page reflow at 320px, or trap the keyboard in a modal?
+**[Download Axcess 0.1.0 Preview for Apple Silicon](https://github.com/rayraycodes/Axcess/releases/download/desktop-v0.1.0-preview.1/Axcess-0.1.0-arm64.dmg)**
 
-Axcess closes that gap by combining seven core kinds of detection in one crawl,
-with an optional second rule engine for evidence comparison:
+This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
+Apple-notarized and is not approved for institutional distribution. macOS may
+require right-clicking **Axcess** and choosing **Open** on first launch. An
+Intel Mac build is not included yet. OCR still requires a system Tesseract
+installation; local AI checks require Ollama and downloaded models.
 
-| | Pipeline | How it decides | SCs | Needs a model? |
-|---|---|---|---|---|
-| 🟦 | **axe-core** | Rule engine on the rendered DOM | dozens | No |
-| 🟦 | **Siteimprove Alfa** *(optional)* | Independent ACT rules in its own local browser capture | selected WCAG 2.2 A/AA rules | No |
-| 🟦 | **Keyboard-trap probe** | Tabs through every focusable element | 2.1.2 | No |
-| 🟦 | **Responsive / zoom probe** | Mutates viewport + injects text-spacing CSS | 1.4.4/.10/.12 | No |
-| 🟦 | **Focus probe** | Focus geometry + positive-tabindex (F44) | 2.4.11, 2.4.3 | No |
-| 🟨 | **Image-of-text (VLM)** | OCR + a vision model judge each image | 1.4.5 | Yes (Ollama) |
-| 🟨 | **Semantic analyzer** | A text model reads context like a human | 2.4.4/.6, 3.3.2, 1.2.1 | Yes (Ollama) |
-| 🟨 | **Visual probe** | Screenshot + vision model (1.3.2); autoplay/marquee (2.2.2) | 1.3.2, 2.2.2 | 1.3.2 only |
+## The workflow
 
-The blue pipelines need only a browser — run Axcess with **zero AI** and still
-get axe + keyboard + responsive + focus + motion coverage. Select Alfa in the
-new-scan **DOM rule engine** control when you want its independent ACT evidence
-as well (or instead of axe). The yellow pipelines
-add the judgment calls, all via a **local [Ollama](https://ollama.com) daemon**
-so your content never leaves the machine.
+Axcess is organized around the way an accessibility expert works:
 
-👉 **See exactly what's covered today vs. planned:** the in-app **Tracking**
-page (`/app/tracking`) and [`docs/coverage-tracker.md`](./docs/coverage-tracker.md),
-both generated from one source of truth so they can't drift from the code.
+1. **Choose the site** — scan a public site, or open a visible browser and sign
+   in to an authorized login/2FA site yourself.
+2. **Set the scope** — preview the allowed URL path, page limit, crawl depth,
+   rate, browser visibility, and test engines.
+3. **Watch the scan** — see the current page, discovery and testing counts,
+   enabled and skipped methods, recent activity, and an estimated completion
+   time. Live updates do not move focus or auto-scroll the page.
+4. **Read the report** — use one scan-scoped table that answers: **What is the
+   issue? Why does it matter? What is the expected fix? Where exactly is it?**
+5. **Open the evidence** — follow page, selector, snippet, rule, screenshot, or
+   image references back to the stored scan evidence.
+6. **Export and verify** — download the workbook or stakeholder report, assign
+   remediation work, rescan, and compare new, resolved, and remaining barriers.
 
----
+```text
+site
+  → scoped crawl and browser rendering
+  → independent detection layers
+  → immutable scan evidence in SQLite and local blobs
+  → issue grouping and expert decisions
+  → issue table, workbook, report, and rescan comparison
+```
 
-## Quickstart
+## What Axcess includes
+
+### Crawl and browser evidence
+
+- Resumable, queue-driven crawling with exact path or whole-host scope.
+- Rendered-page testing through Playwright Chromium, with an optional visible
+  browser so the auditor can see which page is being tested.
+- Conservative rate and worker controls, robots.txt support, redirect checks,
+  and a static-only fast path when browser-dependent checks are not required.
+- Scan progress that distinguishes discovered, fetched, rendered, and tested
+  pages instead of presenting an unexplained percentage.
+- Page-scoped evidence routes that reject mismatched report and page IDs.
+- One active crawl per Axcess process, matching SQLite's local single-writer
+  operating model.
+
+### Detection layers
+
+Each result retains the layer that produced it. Axcess does not merge two
+engines into a single unexplained verdict.
+
+| Layer | What it checks | Result type | Local dependency |
+| --- | --- | --- | --- |
+| **axe-core** | Machine-testable DOM, ARIA, name, structure, and contrast rules on the rendered page | Deterministic rule evidence | Chromium |
+| **Siteimprove Alfa** | Independent ACT-rule outcomes from its own local browser capture | `passed`, `failed`, or `cantTell`; failures and uncertainty remain attributed to Alfa | Bundled Node runner + Chromium |
+| **Keyboard probe** | Bidirectional Tab and Shift+Tab exit attempts, Escape behavior, focus cycles, frames, and modal context | Conservative WCAG 2.1.2 review leads | Chromium |
+| **Responsive probe** | 320 CSS-pixel reflow, resize behavior, clipping, and text-spacing overrides | Browser-observed evidence for 1.4.4, 1.4.10, and 1.4.12 | Chromium |
+| **Focus probe** | Obscured focus and positive `tabindex` behavior | Browser-observed focus evidence | Chromium |
+| **Image-of-text** | OCR plus vision-model assessment of meaningful text embedded in images | AI-assisted evidence for 1.4.5 | Tesseract; Ollama for VLM classification |
+| **Semantic analyzer** | Whether contextual content such as a link purpose or heading is understandable | Local-LLM lead requiring expert confirmation | Ollama |
+| **Visual probe** | Screenshot reading-order leads plus measured autoplay, audio, and moving-content behavior | Mixed AI-assisted and browser-observed evidence | Chromium; Ollama for visual judgment |
+
+Alfa is not an axe-core wrapper. It is a separate Siteimprove engine using ACT
+rules and a separate capture. Choose **axe**, **Alfa**, or **both** when starting
+a scan. Running both is slower but makes corroboration and disagreement visible.
+
+### Honest WCAG coverage
+
+The versioned WCAG 2.2 A/AA matrix contains all **55** Level A and AA success
+criteria. Axcess currently contributes some evidence to **29** criteria:
+
+- 5 are categorized as automated for defined machine-testable conditions;
+- 18 are partly automated;
+- 6 are AI-assisted;
+- 26 remain manual-only.
+
+Every matrix entry states what Axcess tests and what an expert must still test.
+The in-app **Tracking** page and
+[`docs/coverage-tracker.md`](./docs/coverage-tracker.md) read from the same
+versioned source so the coverage claim cannot silently drift from the code.
+
+## Clear results, not raw scanner output
+
+The primary report groups repeated occurrences into actionable issue groups.
+It labels both numbers—for example, **19 issue groups / 965 detected
+occurrences**—instead of presenting a large raw count without context.
+
+Each issue brings together:
+
+- issue title, WCAG criterion and conformance level;
+- detection source, method, confidence, and review state;
+- affected users and why the barrier matters;
+- affected page count and occurrence count;
+- exact page URL, page title, selector or target, and bounded context;
+- expected remediation steps and acceptance criteria;
+- verification guidance and links to stored page evidence;
+- expert status, rationale, and decision history.
+
+AI-assisted results and Alfa `cantTell` outcomes are explicitly marked as
+needing confirmation. Informational evidence cannot silently become a barrier.
+
+## Reports and exports
+
+Completed public scans can produce:
+
+- **Excel workbook (`.xlsx`)** — the operational handoff artifact. Its sheets
+  include Summary, Issues, Decision History, Owner Worklist, Page Hotspots,
+  Page References, Who's Affected, Coverage, Test Tracking, and Manual Evidence.
+- **Stakeholder audit report (`.md`)** — evaluation context, scope, methods,
+  limitations, results, recommended actions, verification, and appendices.
+- **Evidence inventory (`.md`)**, **CSV**, **JSON**, and **Jira CSV** exports.
+- **Rescan comparison** — new, resolved, and still-open evidence for the same
+  normalized scope.
+
+Workbook URLs, evidence references, and in-app destinations are written as
+clickable hyperlinks. Issue rows include a **Source layer** field so recipients
+can see whether evidence came from axe, Alfa, a browser probe, OCR/VLM, or the
+semantic analyzer.
+
+Final expert reports are gated on review readiness. Unresolved automated leads
+remain visible, confirmed open barriers remain in the remediation worklist, and
+an incomplete export is unmistakably labeled **DRAFT**.
+
+## Public sites and login/2FA sites
+
+### Local manual-login scan
+
+The desktop and loopback web app support a practical local login flow:
+
+1. Select **Login or 2FA website**.
+2. Enter the authorized HTTPS application URL and any required sign-in origins.
+3. Axcess opens a visible Chromium window.
+4. Sign in directly with the website using password, passkey, push, OTP, or
+   another factor. Do not enter credentials into Axcess itself.
+5. Navigate to the approved post-login application page and select **I have
+   signed in**.
+6. Axcess verifies the page is in scope and begins the scan using that live
+   in-memory browser session.
+
+Axcess does not ask for the password or second factor. Login and identity
+provider pages are not report evidence. The local session ends with the scan or
+process and is not an authentication-bypass mechanism. Use only accounts and
+targets for which you have explicit authorization.
+
+### Managed protected scans
+
+The repository also contains a stricter deployment design for sensitive U-M
+targets: identity-aware proxy enforcement, a scan-bound mTLS companion,
+managed-KMS envelope encryption, redaction, seven-day protected-evidence
+retention, protected export controls, and fail-closed egress policy. That mode
+requires institutional infrastructure and is disabled by default. The shared
+`AUDIT_ACCESS_TOKEN` is not sufficient. See
+[`docs/protected-scans.md`](./docs/protected-scans.md).
+
+## Accuracy and false-positive controls
+
+Axcess is designed to reduce false discoveries without hiding uncertainty:
+
+- deterministic failures, behavioral observations, AI leads, and
+  informational evidence use separate lanes;
+- keyboard-trap detection suppresses ordinary focus wrapping, small benign
+  cycles, expected modal containment, and opaque frame/shadow cases;
+- source evidence is preserved instead of replacing it with generated prose;
+- every actionable group can be accepted, rejected as a false positive,
+  remediated, or retained as an open barrier with rationale;
+- partial groups exclude terminal false-positive and remediated occurrences
+  from active counts and locations while preserving their history;
+- a versioned adversarial corpus enforces a **less than 5% false-discovery
+  rate on that labeled corpus**.
+
+That last gate prevents known detector regressions; it is not a claim that
+every production website will be below 5%. A public real-world accuracy claim
+requires a representative held-out corpus reviewed independently by at least
+two accessibility experts. The validation protocol is documented in
+[`tests/quality/README.md`](./tests/quality/README.md).
+
+## Run from source
+
+### Requirements
+
+- macOS, Linux, or Windows (WSL is recommended for the documented `make`
+  commands on Windows)
+- Python 3.11 or newer
+- [uv](https://docs.astral.sh/uv/)
+- Node.js 22.22 or newer
+- Tesseract for OCR/image-text analysis
+- Ollama only when local semantic or vision-model checks are enabled
+
+### Setup
 
 ```bash
-# 1. Install (uv + Playwright chromium + data dirs), then the DB schema
-make setup
-make migrate
+git clone https://github.com/rayraycodes/Axcess.git
+cd Axcess
 
-# 2. Crawl a site — renders every page and runs axe + keyboard + responsive
+make setup             # Python dependencies + Playwright Chromium
+make migrate           # local SQLite schema
+make alfa-install      # optional Alfa engine
+make frontend-build    # build the React app
+make run               # http://127.0.0.1:8765/app/
+```
+
+For local AI-assisted checks:
+
+```bash
+# Start Ollama first, then fetch the configured local models.
+make fetch-models
+```
+
+The same scan can be started from the CLI:
+
+```bash
 uv run audit crawl https://example.com --max-pages 50
-
-# 3. Open the review UI (React SPA)
-make frontend-build      # one time, builds the SPA
-make alfa-install        # optional: install the pinned Siteimprove Alfa runner
-uv run audit serve       # → http://127.0.0.1:8765/app/
+uv run audit status
+uv run audit serve
 ```
 
-To run the same workbench as a desktop application during development, use
-`make desktop-setup` once and then `make desktop-run`. Platform-specific local
-installers are built with `make desktop-package`; see the
-[desktop application guide](./docs/desktop-app.md) for signing and release
-requirements.
+Use `uv run audit --help` and `make help` for the complete command surface.
 
-Want the AI pipelines too? Start [Ollama](https://ollama.com), then
-`make fetch-models` to pull the vision + text models. Don't want them? Add
-`--skip-vlm --skip-ocr --skip-semantic` and the three browser-only pipelines
-still run.
+## Desktop development and packaging
 
-**Requirements:** Windows, macOS, or Linux · Python 3.11+ · Node.js 22.22+ ·
-[uv](https://github.com/astral-sh/uv) · Tesseract (install it with your
-platform's package manager) · optionally [Ollama](https://ollama.com) for
-the AI pipelines. On Windows, WSL is recommended for the documented `make`
-commands.
-
----
-
-## How it works
-
-```
-seed URL
-   │
-   ▼  queue-driven crawl (SQLite job queue, resumable)
-render each page  ──►  static HTTP first, Playwright chromium when needed
-   │
-   ├─► axe-core ........... rule violations on the live DOM
-   ├─► Alfa (optional) .... independent ACT outcomes on a separate local capture
-   ├─► keyboard probe ..... tab-walk / Esc / iframe traps        (SC 2.1.2)
-   ├─► responsive probe ... reflow @320px, zoom clip, text-spacing (1.4.4/10/12)
-   ├─► focus probe ........ focus hidden by overlay / positive tabindex (2.4.11/2.4.3)
-   ├─► image-of-text ...... OCR → VLM: is this image really text?  (SC 1.4.5)
-   ├─► semantic ........... text LLM: headings/labels/links read right? (2.4.x/3.3.2/1.2.1)
-   └─► visual ............. VLM reading-order + autoplay/marquee motion (1.3.2/2.2.2)
-   │
-   ▼  synthesize
-prioritized findings  ──►  React review UI · CSV / JSON / Jira / Markdown / Excel exports · rescan diffs
-```
-
-Everything persists to one **SQLite** database (WAL mode, content-addressed
-image blobs). A crashed or `Ctrl-C`'d crawl resumes from the queue. Re-crawling
-the same site produces a **diff** — new / resolved / still-open findings.
-
-For the full picture, read [`docs/architecture.md`](./docs/architecture.md).
-
----
-
-## The review UI
-
-A single **React SPA** (Vite + Tailwind + TanStack Query) served at `/app/`,
-backed by a FastAPI `/api/*` JSON surface. It's a Michigan-palette design
-system with keyboard, screen-reader, 320px reflow, and axe-core regression
-coverage. Those checks support the UI's stronger internal AAA usability goal;
-they do not by themselves prove conformance.
-
-- **Report overview** — scope, coverage truth, evidence-lane counts, manual-review
-  progress, and the next defensible action.
-- **Review queue** — keyboard-first likely-barrier, expert-review, and
-  informational lanes. AI, image, behavioral, and Alfa `cantTell` evidence
-  cannot silently become a conformance verdict.
-- **Manual checks** — the complete WCAG 2.2 A/AA matrix, with rationale and
-  evidence retained per criterion.
-- **Handoff** — final exports require a documented expert disposition for
-  every actionable evidence group; incomplete work remains an unmistakably
-  labeled draft.
-- **Findings** — filterable, paginated, with image previews and OCR/VLM evidence.
-- **Tracking** — what the tool detects today vs. the AI roadmap.
-- **Exports** — CSV · JSON · Jira CSV · a status-bearing Markdown evidence
-  inventory · an expert-reviewed stakeholder audit report · an Excel workbook
-  with every report section as its own filterable sheet
-  (Summary · Issues · Decision History · Owner Worklist · Page Hotspots · Page
-  References · Who's Affected · Coverage · Test Tracking · Manual Evidence).
-
----
-
-## Hosting it for a team
-
-Axcess is local-first, but you can host it on an always-on machine for a small
-team over your LAN or [Tailscale](https://tailscale.com), behind an opt-in
-shared-token gate:
+Desktop work lives on `feature/electron-desktop` and reuses the same product UI
+and API rather than maintaining a second implementation.
 
 ```bash
-export AUDIT_ACCESS_TOKEN=$(openssl rand -hex 16)
-make serve     # binds 0.0.0.0; no token set = stays a local-only app
+make desktop-setup      # install desktop, backend, Alfa, and frontend dependencies
+make desktop-run        # launch the development desktop app
+make desktop-test       # launcher + packaged-server tests
+make desktop-package    # platform-specific installer under desktop/out/
 ```
 
-Full runbook (Tailscale, autostart, the security model): [`docs/hosting.md`](./docs/hosting.md).
+The Electron window uses an exact random loopback origin, Chromium sandboxing,
+context isolation, disabled renderer Node integration, denied permission
+requests, restricted navigation, and an integrity-checked ASAR. Scan data is
+stored in the operating system's application-data directory—not in the app
+bundle. Read [`docs/desktop-app.md`](./docs/desktop-app.md) for signing,
+notarization, platform builds, and current release limitations.
 
-### Authorized 1FA/MFA targets
+## Local data and privacy
 
-Protected scanning is a separate, deliberately strict mode: the auditor signs
-in manually in a paired local browser, while Axcess never receives credentials
-or reusable session state. It is disabled by default and requires U-M identity
-proxy, mTLS, and managed-KMS controls—not the shared LAN token. See
-[`docs/protected-scans.md`](./docs/protected-scans.md) before planning a pilot.
+For a source checkout, completed scan evidence lives in:
 
----
+```text
+data/audit.db   SQLite source of truth
+data/blobs/     content-addressed image evidence
+data/logs/      local operational logs
+```
+
+Generated CSV, Markdown, JSON, Jira, and Excel files are snapshots, not the
+authoritative record. Axcess has no telemetry and does not upload report data
+by default. It necessarily connects to the target site being audited. Ollama
+analysis is local; administrators must make an explicit product decision before
+configuring any external model, webhook, or integration that transmits data.
+
+LAN hosting must remain private or access-gated. Do not expose the crawler as
+an unrestricted public service. See [`docs/hosting.md`](./docs/hosting.md).
+
+## Architecture
+
+```text
+src/audit/
+├── crawler/          URL policy, fetchers, renderer, queue orchestration
+├── extractor/        image discovery, download policy, blob storage
+├── analyzer/         axe, Alfa, OCR/VLM, semantic, keyboard/focus/visual probes
+├── synthesizer/      grouping, priority, remediation, rescan diffs
+├── protected/        authenticated-session, encryption, redaction, retention
+├── exports/          workbook, report, CSV, JSON, Jira, Markdown
+├── web/              FastAPI API and React frontend
+├── db/               migrations, repositories, queue, status history
+└── rules/            coverage and remediation rule packs
+
+desktop/              Electron runtime, backend bundle, installers
+tests/                unit, integration, UI/accessibility, quality corpus
+docs/                 product, deployment, accessibility, and developer guides
+```
+
+The durable boundary is:
+
+```text
+target site
+  → crawler and Playwright renderer
+  → extraction, engines, and behavioral probes
+  → SQLite evidence and content-addressed blobs
+  → synthesis and issue grouping
+  → FastAPI + React + exports
+```
+
+Read [`docs/architecture.md`](./docs/architecture.md) for the detailed data
+flow and [`docs/developer-guide.md`](./docs/developer-guide.md) for extension
+points.
+
+## Development quality gates
+
+```bash
+make lint              # Ruff + frontend ESLint/accessibility rules
+make typecheck         # strict mypy + TypeScript
+make frontend-build    # production React build
+make quality-gate      # versioned labeled-corpus precision checks
+make test              # complete unit, integration, and UI suite
+```
+
+The UI has keyboard, screen-reader, focus, 200% zoom, 320-pixel reflow, and
+axe-core regression coverage. Export tests verify scope, methods, limitations,
+manual evidence, decision history, source attribution, and hyperlink behavior.
 
 ## Documentation
 
-Axcess keeps **one front door and one hub**, so docs don't sprawl:
+Start with the [documentation hub](./docs/README.md), then use the guide that
+matches the task:
 
-- **This README** — what Axcess is, why, and how to start. The single entry point.
-- **[`docs/README.md`](./docs/README.md)** — the documentation hub: read-in-order
-  guides plus the design contract for the UI.
-
-| Doc | For | Covers |
-|---|---|---|
-| [architecture.md](./docs/architecture.md) | understanding it | pipeline, data flow, storage |
-| [user-guide.md](./docs/user-guide.md) | running it | CLI + UI walkthroughs |
-| [developer-guide.md](./docs/developer-guide.md) | extending it | code layout, "add a page", tests |
-| [coverage-tracker.md](./docs/coverage-tracker.md) | scoping it | shipped vs. planned, the AI roadmap |
-| [hosting.md](./docs/hosting.md) | deploying it | LAN / Tailscale + token gate |
-| [protected-scans.md](./docs/protected-scans.md) | authorized protected targets | proxy + mTLS + KMS controls, companion handoff, retention |
-| [troubleshooting.md](./docs/troubleshooting.md) | unsticking it | Cloudflare, stuck scans, Ollama, scope |
-| [accessibility.md](./docs/accessibility.md) · [personas.md](./docs/personas.md) · [design-principles.md](./docs/design-principles.md) | building the UI | the AAA contract, who it serves |
-
-**Anti-drift principle:** anything that exists in two places is generated from
-one. The coverage tables (in-app + `coverage-tracker.md` + this README) trace
-back to [`src/audit/web/coverage_status.py`](./src/audit/web/coverage_status.py);
-exports are pinned by golden-file tests. Flip a status in the source, and every
-surface updates.
-
----
-
-## Development
-
-```bash
-make test          # unit + integration + Playwright/axe UI
-make quality-gate  # strict <5% labeled-corpus false-discovery gate, per layer
-make lint          # Python format/lint + React/JSX accessibility lint
-make typecheck     # mypy strict + TypeScript
-make frontend-build
-make help          # every target
-```
-
-The gates a change must pass: **ruff**, **mypy (strict)**, **pytest**, and the
-**frontend** lint/typecheck/build. The built SPA's core routes also run through
-axe checks plus focused keyboard and responsive-flow tests.
-
-The bundled detector-quality corpus is synthetic and adversarial: it prevents
-known precision regressions but is not evidence that arbitrary production
-sites have a sub-5% false-positive rate. A public real-world accuracy claim
-requires the representative, held-out, dual-expert U-M validation corpus
-described in [`tests/quality/README.md`](./tests/quality/README.md).
-
----
-
-## Project layout
-
-```
-src/audit/
-├── cli.py            # typer CLI: crawl / synthesize / export / serve / status
-├── crawler/          # URL policy, fetchers, rate limit, orchestrator
-├── extractor/        # HTML image parsing, content-addressed blob store
-├── analyzer/         # OCR, VLM, semantic, keyboard + responsive probes
-├── synthesizer/      # alt-compare, priority, remediation, diff
-├── exports/          # CSV / JSON / Jira / Markdown / Excel / audit report / webhook
-├── web/              # FastAPI /api/* + the React SPA (frontend/)
-├── db/               # schema + migrations + typed upserts + job queue
-└── rules/            # YAML rule packs (remediation, audit cards, models)
-tests/                # unit · integration (fixture site) · ui (Playwright + axe)
-docs/                 # the documentation hub
-site/                 # the static landing page (deployed to GitHub Pages)
-```
-
----
+| Guide | Purpose |
+| --- | --- |
+| [User guide](./docs/user-guide.md) | start scans, read results, export, and compare |
+| [Coverage tracker](./docs/coverage-tracker.md) | see exactly what is automated, assisted, or manual |
+| [Architecture](./docs/architecture.md) | understand the pipeline and stored evidence |
+| [Developer guide](./docs/developer-guide.md) | extend the crawler, analyzers, API, UI, or exports |
+| [Desktop app](./docs/desktop-app.md) | run and package Electron builds |
+| [Protected scans](./docs/protected-scans.md) | plan institutionally controlled authenticated scans |
+| [Hosting](./docs/hosting.md) | operate a private LAN or Tailscale instance |
+| [Accessibility](./docs/accessibility.md) | follow the UI accessibility contract |
+| [Troubleshooting](./docs/troubleshooting.md) | diagnose WAF, browser, model, and crawl problems |
 
 ## License
 
-[MIT](./LICENSE). Built at the University of Michigan. 〽️
+[MIT](./LICENSE). Built for evidence-led accessibility work at the University
+of Michigan. Axcess is not an official U-M conformance certification service.
