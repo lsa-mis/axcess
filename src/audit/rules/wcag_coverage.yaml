@@ -21,7 +21,8 @@
 # `confidence` here and the report, Tracking page, and landing page all update.
 #
 # `method`:     automated | partial | ai-assisted | manual
-# `pipelines`:  any of [axe, keyboard, responsive, image, semantic] ([] if manual)
+# `pipelines`:  any of [axe, keyboard, responsive, focus, visual, image,
+#                       semantic] ([] if manual)
 # `confidence`: high | medium | low | n/a   (n/a for manual-only)
 
 meta:
