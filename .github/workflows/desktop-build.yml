@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   build:
-    name: ${{ matrix.os }} desktop artifact
     name: Apple Silicon macOS desktop artifact
     runs-on: macos-15
     steps:
