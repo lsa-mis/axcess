@@ -3,6 +3,7 @@
   "productName": "Axcess",
   "version": "0.1.0",
   "description": "Local-first accessibility auditing workbench",
+  "author": "Axcess contributors",
   "private": true,
   "main": "src/main.cjs",
   "config": {
