@@ -15,6 +15,10 @@ requirePath(
   "Built React application",
 );
 requirePath(
+  path.join(backendRoot, "_internal", "audit", "web", "static", "axe.min.js"),
+  "axe-core browser rules",
+);
+requirePath(
   path.join(
     backendRoot,
     "_internal",

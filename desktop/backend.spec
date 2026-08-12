@@ -13,6 +13,7 @@ datas = [
     (str(audit_source / "analyzer" / "vlm" / "prompts"), "audit/analyzer/vlm/prompts"),
     (str(audit_source / "web" / "frontend" / "dist"), "audit/web/frontend/dist"),
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),
+    (str(audit_source / "web" / "static"), "audit/web/static"),
     (str(audit_source / "alfa_runner"), "audit/alfa_runner"),
 ]
 datas += copy_metadata("yoyo-migrations")

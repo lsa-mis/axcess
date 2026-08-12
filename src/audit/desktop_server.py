@@ -65,6 +65,7 @@ async def verify_runtime() -> dict[str, str]:
 
     package_dir = Path(__file__).resolve().parent
     required_assets = {
+        "axe_core": package_dir / "web" / "static" / "axe.min.js",
         "frontend": package_dir / "web" / "frontend" / "dist" / "index.html",
         "migrations": package_dir / "db" / "migrations",
         "rules": package_dir / "rules",
@@ -87,6 +88,11 @@ async def verify_runtime() -> dict[str, str]:
             heading = await page.locator("h1").inner_text()
             if heading != "Axcess runtime check":
                 raise RuntimeError("Bundled Chromium did not render the verification page.")
+            axe_source = required_assets["axe_core"].read_text(encoding="utf-8")
+            await page.evaluate(axe_source)
+            axe_version = await page.evaluate("window.axe && window.axe.version")
+            if not isinstance(axe_version, str) or not axe_version:
+                raise RuntimeError("Bundled axe-core rules could not run in Chromium.")
         finally:
             await browser.close()
 
@@ -107,6 +113,15 @@ async def verify_runtime() -> dict[str, str]:
     if "unknown" in ocr.engine_version:
         raise RuntimeError("Bundled Tesseract OCR executable is unavailable.")
 
+    from openpyxl import Workbook
+
+    workbook_buffer = io.BytesIO()
+    workbook = Workbook()
+    workbook.active["A1"] = "Axcess report runtime check"
+    workbook.save(workbook_buffer)
+    if not workbook_buffer.getvalue().startswith(b"PK"):
+        raise RuntimeError("Bundled Excel report engine could not create a workbook.")
+
     # Importing the application validates FastAPI and all report/export module
     # imports after migrations have established the packaged schema.
     from audit.web.server import app
@@ -116,10 +131,13 @@ async def verify_runtime() -> dict[str, str]:
 
     return {
         "alfa": "available",
+        "axe_core": "available",
+        "axe_core_version": axe_version,
         "chromium": "available",
         "frontend": "available",
         "ocr": ocr.engine_version,
         "python_backend": "available",
+        "reports": "available",
     }
 
 

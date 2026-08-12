@@ -54,7 +54,14 @@ try {
   }
   const lines = result.stdout.trim().split(/\r?\n/);
   const report = JSON.parse(lines.at(-1));
-  for (const component of ["alfa", "chromium", "frontend", "python_backend"]) {
+  for (const component of [
+    "alfa",
+    "axe_core",
+    "chromium",
+    "frontend",
+    "python_backend",
+    "reports",
+  ]) {
     if (report[component] !== "available") {
       throw new Error(`Packaged ${component} verification did not pass.`);
     }
