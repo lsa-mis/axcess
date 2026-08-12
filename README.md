@@ -28,9 +28,8 @@ The current desktop build packages the React workbench, FastAPI service,
 Playwright Chromium, and the Siteimprove Alfa runner into one macOS app.
 
 **[Open the latest Electron branch build](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
-then download `axcess-macos-15` for the Apple Silicon DMG. The same workflow
-also publishes Windows and Linux artifacts. GitHub requires sign-in to download
-workflow artifacts, and each build is retained for 14 days.
+then download `axcess-macos-apple-silicon` for the DMG. GitHub requires sign-in
+to download workflow artifacts, and each build is retained for 14 days.
 
 This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
 Apple-notarized and is not approved for institutional distribution. macOS may

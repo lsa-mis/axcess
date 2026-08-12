@@ -22,11 +22,8 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.os }} desktop artifact
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15, windows-2022, ubuntu-24.04]
-    runs-on: ${{ matrix.os }}
+    name: Apple Silicon macOS desktop artifact
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -41,9 +38,6 @@ jobs:
             desktop/package-lock.json
             src/audit/web/frontend/package-lock.json
             src/audit/alfa_runner/package-lock.json
-      - name: Linux packaging tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot rpm
       - run: npm ci
         working-directory: src/audit/web/frontend
       - run: npm run build
@@ -74,7 +68,7 @@ jobs:
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: axcess-${{ matrix.os }}
+          name: axcess-macos-apple-silicon
           path: desktop/out/make/**
           if-no-files-found: error
           retention-days: 14
