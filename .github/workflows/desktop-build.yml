@@ -32,6 +32,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+          python-version: "3.13"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -43,7 +44,6 @@ jobs:
       - name: Linux packaging tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y fakeroot rpm
-      - run: uv sync --group desktop
       - run: npm ci
         working-directory: src/audit/web/frontend
       - run: npm run build
@@ -52,6 +52,7 @@ jobs:
         working-directory: src/audit/alfa_runner
       - run: npm ci
         working-directory: desktop
+      - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: bash
         run: PLAYWRIGHT_BROWSERS_PATH="$PWD/desktop/playwright-browsers" uv run playwright install chromium
