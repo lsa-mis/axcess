@@ -1,10 +1,11 @@
-.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install
+.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-package
 
 PY := uv run
 DB := data/audit.db
 MIGRATIONS := src/audit/db/migrations
 FRONTEND := src/audit/web/frontend
 ALFA_RUNNER := src/audit/alfa_runner
+DESKTOP := desktop
 HOST ?= 127.0.0.1
 PORT ?= 8765
 
@@ -72,6 +73,29 @@ frontend-dev: ## Run Vite dev server on :5173 (proxies /api to FastAPI)
 
 alfa-install: ## Install the optional, pinned Siteimprove Alfa local runner
 	cd $(ALFA_RUNNER) && npm ci
+
+desktop-install: ## Install the Electron desktop-shell dependencies
+	cd $(DESKTOP) && npm ci
+
+desktop-setup: frontend-install alfa-install desktop-install ## Prepare desktop development
+	uv sync --group desktop
+
+desktop-run: frontend-build desktop-install ## Start Axcess as a desktop application
+	cd $(DESKTOP) && npm start
+
+desktop-test: ## Run desktop launcher and migration tests
+	cd $(DESKTOP) && npm test
+	$(PY) pytest tests/unit/test_desktop_server.py tests/unit/test_alfa_scan_engine.py
+
+desktop-backend: frontend-build alfa-install ## Bundle the Python/React/Alfa backend sidecar
+	uv sync --group desktop
+	$(PY) pyinstaller --clean --noconfirm --distpath $(DESKTOP)/backend-dist --workpath build/desktop-pyinstaller $(DESKTOP)/backend.spec
+
+desktop-browsers: ## Bundle the platform-matched Chromium used by Playwright
+	PLAYWRIGHT_BROWSERS_PATH="$(CURDIR)/$(DESKTOP)/playwright-browsers" $(PY) playwright install chromium
+
+desktop-package: desktop-install desktop-backend desktop-browsers ## Build this platform's installer
+	cd $(DESKTOP) && npm run make
 
 test: ## Run full test suite
 	$(PY) pytest

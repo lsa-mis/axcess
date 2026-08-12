@@ -45,10 +45,14 @@ dev = [
     "types-beautifulsoup4",
     "types-defusedxml",
 ]
+desktop = [
+    "pyinstaller>=6.16",
+]
 
 [project.scripts]
 audit = "audit.cli:app"
 axcess-companion = "audit.cli:companion_main"
+axcess-desktop-server = "audit.desktop_server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -60,6 +64,10 @@ packages = ["src/audit"]
 [tool.hatch.build.targets.wheel.force-include]
 "src/audit/analyzer/vlm/prompts" = "audit/analyzer/vlm/prompts"
 "src/audit/rules" = "audit/rules"
+"src/audit/db/migrations" = "audit/db/migrations"
+"src/audit/web/frontend/dist" = "audit/web/frontend/dist"
+"src/audit/web/frontend/public" = "audit/web/frontend/public"
+"src/audit/alfa_runner" = "audit/alfa_runner"
 
 [tool.pytest.ini_options]
 minversion = "8.0"

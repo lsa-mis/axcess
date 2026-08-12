@@ -14,6 +14,7 @@ no data leaving your laptop.
 [Documentation](./docs/README.md) ·
 [What it covers](./docs/coverage-tracker.md) ·
 [Hosting](./docs/hosting.md) ·
+[Desktop app](./docs/desktop-app.md) ·
 [Protected scans](./docs/protected-scans.md)
 
 `Python 3.11+` · `WCAG 2.2 AAA` (the tool audits *itself* at AAA) · `MIT`
@@ -75,6 +76,12 @@ make frontend-build      # one time, builds the SPA
 make alfa-install        # optional: install the pinned Siteimprove Alfa runner
 uv run audit serve       # → http://127.0.0.1:8765/app/
 ```
+
+To run the same workbench as a desktop application during development, use
+`make desktop-setup` once and then `make desktop-run`. Platform-specific local
+installers are built with `make desktop-package`; see the
+[desktop application guide](./docs/desktop-app.md) for signing and release
+requirements.
 
 Want the AI pipelines too? Start [Ollama](https://ollama.com), then
 `make fetch-models` to pull the vision + text models. Don't want them? Add

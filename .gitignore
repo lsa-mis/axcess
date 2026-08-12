@@ -28,6 +28,9 @@ data/logs/
 # Playwright
 playwright-report/
 test-results/
+desktop/backend-dist/
+desktop/playwright-browsers/
+desktop/out/
 
 # IDE / OS
 .vscode/

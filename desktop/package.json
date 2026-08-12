@@ -1,0 +1,31 @@
+{
+  "name": "axcess-desktop",
+  "productName": "Axcess",
+  "version": "0.1.0",
+  "description": "Local-first accessibility auditing workbench",
+  "private": true,
+  "main": "src/main.cjs",
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make && node scripts/make-macos-dmg.cjs",
+    "test": "node --check src/main.cjs && node --check forge.config.cjs && node --check scripts/make-macos-dmg.cjs && node --test test/*.test.cjs"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "7.11.2",
+    "@electron-forge/maker-deb": "7.11.2",
+    "@electron-forge/maker-rpm": "7.11.2",
+    "@electron-forge/maker-squirrel": "7.11.2",
+    "@electron-forge/maker-zip": "7.11.2",
+    "@electron-forge/plugin-fuses": "7.11.2",
+    "@electron/fuses": "1.8.0",
+    "electron": "43.4.0"
+  },
+  "overrides": {
+    "tar": "7.5.22",
+    "tmp": "0.2.7"
+  }
+}
