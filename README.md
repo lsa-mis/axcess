@@ -7,7 +7,7 @@
 Scan a public or login-protected website, watch each test run, inspect a clear
 issue table, and export a defensible report with source-level evidence.
 
-[Download desktop preview](https://github.com/rayraycodes/Axcess/releases/download/desktop-v0.1.0-preview.1/Axcess-0.1.0-arm64.dmg) ·
+[Desktop builds](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop) ·
 [Documentation](./docs/README.md) ·
 [Coverage](./docs/coverage-tracker.md) ·
 [Desktop guide](./docs/desktop-app.md) ·
@@ -27,7 +27,10 @@ issue table, and export a defensible report with source-level evidence.
 The current desktop build packages the React workbench, FastAPI service,
 Playwright Chromium, and the Siteimprove Alfa runner into one macOS app.
 
-**[Download Axcess 0.1.0 Preview for Apple Silicon](https://github.com/rayraycodes/Axcess/releases/download/desktop-v0.1.0-preview.1/Axcess-0.1.0-arm64.dmg)**
+**[Open the latest Electron branch build](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
+then download `axcess-macos-15` for the Apple Silicon DMG. The same workflow
+also publishes Windows and Linux artifacts. GitHub requires sign-in to download
+workflow artifacts, and each build is retained for 14 days.
 
 This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
 Apple-notarized and is not approved for institutional distribution. macOS may
