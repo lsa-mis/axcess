@@ -62,6 +62,7 @@ async def verify_runtime() -> dict[str, str]:
 
     from audit.analyzer.alfa import AlfaAnalyzer, availability, chromium_executable_path
     from audit.analyzer.ocr.tesseract import run_tesseract
+    from audit.crawler import url_policy
 
     package_dir = Path(__file__).resolve().parent
     required_assets = {
@@ -75,6 +76,10 @@ async def verify_runtime() -> dict[str, str]:
     missing = [name for name, path in required_assets.items() if not path.exists()]
     if missing:
         raise RuntimeError(f"Bundled desktop assets are missing: {', '.join(missing)}")
+
+    scope = url_policy.build_scope("https://subdomain.example.edu/section/")
+    if scope.seed_host != "subdomain.example.edu" or scope.path_prefix != "/section/":
+        raise RuntimeError("Bundled URL scope dependencies could not initialize.")
 
     alfa_state = availability()
     if not alfa_state.available:
@@ -138,6 +143,7 @@ async def verify_runtime() -> dict[str, str]:
         "ocr": ocr.engine_version,
         "python_backend": "available",
         "reports": "available",
+        "url_scope": "available",
     }
 
 

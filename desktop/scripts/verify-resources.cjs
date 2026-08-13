@@ -30,6 +30,10 @@ requirePath(
   ),
   "Siteimprove Alfa dependencies",
 );
+requirePath(
+  path.join(backendRoot, "_internal", "tldextract", ".tld_set_snapshot"),
+  "tldextract public-suffix snapshot",
+);
 
 const browserRoot = path.join(desktopRoot, "playwright-browsers");
 requirePath(browserRoot, "Playwright browser bundle");

@@ -61,6 +61,7 @@ try {
     "frontend",
     "python_backend",
     "reports",
+    "url_scope",
   ]) {
     if (report[component] !== "available") {
       throw new Error(`Packaged ${component} verification did not pass.`);

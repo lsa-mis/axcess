@@ -26,8 +26,8 @@ export default function NewScanRoute() {
   const [searchParams] = useSearchParams();
   const loginSelected = searchParams.get("mode") === "login";
   const [form, setForm] = useState<NewScanPayload>({
-    url: "",
-    max_pages: 100,
+    url: searchParams.get("url") ?? "",
+    max_pages: 50,
     max_depth: 10,
     rps: 2.0,
     workers: 4,
@@ -35,18 +35,24 @@ export default function NewScanRoute() {
     whole_host: false,
     ignore_robots: false,
     skip_ocr: false,
-    skip_vlm: false,
+    // The recommended profile keeps deterministic OCR but leaves repeated
+    // model calls off. They are useful expert-review leads, not prerequisites
+    // for the core accessibility report, and can dominate scan time.
+    skip_vlm: true,
     // Full rendering is the default — three of the four pipelines (axe,
     // keyboard, responsive) need the live DOM. `static_only` is the
     // opt-out fast path, exposed as a warning-toned checkbox below.
     static_only: false,
     show_browser: false,
-    // The standard profile corroborates deterministic evidence with two
-    // independent DOM engines. Capability detection below falls back to axe
-    // when Alfa is not installed, without making the simple path a dead end.
-    scan_engine: "both",
+    // axe runs inside the browser Axcess already opened. Alfa remains an
+    // explicit corroboration option because it starts a second browser pass
+    // for every page and is therefore substantially slower.
+    scan_engine: "axe",
     skip_keyboard: false,
     skip_responsive: false,
+    skip_semantic: true,
+    skip_focus: false,
+    skip_visual: true,
     axe_level: "AA",
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -67,6 +73,11 @@ export default function NewScanRoute() {
     queryKey: ["capabilities", "alfa"],
     queryFn: api.getAlfaCapability,
   });
+  const localAnalysisCapability = useQuery({
+    queryKey: ["capabilities", "local-analysis"],
+    queryFn: api.getLocalAnalysisCapability,
+    retry: false,
+  });
   const protectedCapability = useQuery({
     queryKey: ["capabilities", "protected-scans"],
     queryFn: api.getProtectedScanCapability,
@@ -80,6 +91,22 @@ export default function NewScanRoute() {
       setForm((previous) => ({ ...previous, scan_engine: "axe" }));
     }
   }, [alfaCapability.data?.available, form.scan_engine]);
+  useEffect(() => {
+    if (localAnalysisCapability.data?.vision.available === false && !form.skip_vlm) {
+      setForm((previous) => ({ ...previous, skip_vlm: true }));
+    }
+    if (
+      localAnalysisCapability.data?.semantic.available === false &&
+      !form.skip_semantic
+    ) {
+      setForm((previous) => ({ ...previous, skip_semantic: true }));
+    }
+  }, [
+    form.skip_semantic,
+    form.skip_vlm,
+    localAnalysisCapability.data?.semantic.available,
+    localAnalysisCapability.data?.vision.available,
+  ]);
 
   const create = useMutation({
     mutationFn: () => api.createScan(form),
@@ -293,12 +320,12 @@ export default function NewScanRoute() {
                   id="standard-profile-title"
                   className="font-semibold text-fg"
                 >
-                  Standard accessibility scan
+                  Balanced accessibility scan
                 </h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  WCAG 2.2 AA against the rendered site, with independent DOM
-                  evidence and interaction checks. You can change this profile
-                  under Advanced settings.
+                  WCAG 2.2 AA against the rendered site, with fast deterministic
+                  checks first. Slower corroboration and local-AI review remain
+                  available under Advanced settings.
                 </p>
                 <ul
                   className="mt-3 grid gap-2 text-sm sm:grid-cols-2"
@@ -310,8 +337,12 @@ export default function NewScanRoute() {
                       : form.scan_engine === "alfa"
                         ? "Siteimprove Alfa"
                         : "axe-core",
-                    "Keyboard and responsive checks",
-                    "Image text analysis",
+                    "Keyboard, focus, and responsive checks",
+                    form.skip_ocr
+                      ? "Image analysis skipped"
+                      : form.skip_vlm
+                        ? "Image text detection (OCR)"
+                        : "Image text detection and local-AI review",
                     `Up to ${form.max_pages.toLocaleString()} pages`,
                   ].map((label) => (
                     <li key={label} className="flex items-start gap-2">
@@ -534,16 +565,35 @@ export default function NewScanRoute() {
                         hint="Authorized testing only. The scan will be flagged in its config and audit log."
                       />
                       <Checkbox
-                        checked={form.skip_ocr}
-                        onChange={(v) => update("skip_ocr", v)}
-                        label="Skip OCR"
-                        hint="Faster, but findings won't include image-text extraction."
+                        checked={!form.skip_ocr}
+                        onChange={(enabled) => {
+                          update("skip_ocr", !enabled);
+                          if (!enabled) update("skip_vlm", true);
+                        }}
+                        disabled={localAnalysisCapability.data?.ocr.available === false}
+                        label="Detect text inside images with bundled OCR"
+                        hint={
+                          localAnalysisCapability.data?.ocr.available === false
+                            ? "Tesseract OCR is not available in this installation."
+                            : `Tesseract runs locally with up to ${localAnalysisCapability.data?.ocr.max_workers ?? 2} workers. It does not need an AI model or send images off this computer.`
+                        }
                       />
                       <Checkbox
-                        checked={form.skip_vlm}
-                        onChange={(v) => update("skip_vlm", v)}
-                        label="Skip VLM classification"
-                        hint="Faster, but findings won't include the essential / decorative / logo verdict."
+                        checked={!form.skip_vlm}
+                        onChange={(enabled) => update("skip_vlm", !enabled)}
+                        disabled={
+                          form.skip_ocr ||
+                          localAnalysisCapability.data?.vision.available === false
+                        }
+                        label="Classify image text with a local vision model"
+                        hint={
+                          form.skip_ocr
+                            ? "Turn on OCR first; the vision model only reviews images where OCR found text."
+                            : localAnalysisCapability.data?.vision.available
+                              ? `${localAnalysisCapability.data.vision.model} is installed locally (${formatBytes(localAnalysisCapability.data.vision.installed_size_bytes)}). Runs one at a time through Ollama.`
+                              : localAnalysisCapability.data?.vision.reason ??
+                                "Checking whether the configured local vision model is ready…"
+                        }
                       />
                       <Checkbox
                         checked={form.skip_keyboard}
@@ -556,6 +606,34 @@ export default function NewScanRoute() {
                         onChange={(v) => update("skip_responsive", v)}
                         label="Skip responsive & zoom checks"
                         hint="Saves ~1–2s per page; loses 320px reflow, 200% zoom, and text-spacing coverage (SC 1.4.4 / 1.4.10 / 1.4.12)."
+                      />
+                      <Checkbox
+                        checked={form.skip_focus}
+                        onChange={(v) => update("skip_focus", v)}
+                        label="Skip focus visibility checks"
+                        hint="Faster, but loses the browser check for keyboard focus hidden behind sticky or fixed content (SC 2.4.11)."
+                      />
+                      <Checkbox
+                        checked={!form.skip_semantic}
+                        onChange={(enabled) => update("skip_semantic", !enabled)}
+                        disabled={localAnalysisCapability.data?.semantic.available === false}
+                        label="Add semantic review with local AI"
+                        hint={
+                          localAnalysisCapability.data?.semantic.available
+                            ? `Ready. Runs up to ${localAnalysisCapability.data.semantic.checks_per_page} contextual checks per page through local Ollama; results require expert confirmation.`
+                            : localAnalysisCapability.data?.semantic.reason ??
+                              "Checking whether the required local text models are ready…"
+                        }
+                      />
+                      <Checkbox
+                        checked={!form.skip_visual}
+                        onChange={(enabled) => update("skip_visual", !enabled)}
+                        label="Add visual and motion analysis"
+                        hint={
+                          localAnalysisCapability.data?.vision.available
+                            ? "Adds deterministic motion checks and one local vision-model review per page."
+                            : "Adds deterministic motion checks. Vision review will remain unavailable until the configured local vision model is installed."
+                        }
                       />
                     </div>
                   </fieldset>
@@ -622,6 +700,12 @@ function NumberField({
       />
     </label>
   );
+}
+
+function formatBytes(value: number | null): string {
+  if (!value || value < 1) return "size unavailable";
+  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+  return `${Math.round(value / 1024 ** 2)} MB`;
 }
 
 // `Checkbox` lives in components/ui.tsx — see that file for the 44×44

@@ -32,9 +32,14 @@ export default function ProtectedReportGate({ children }: { children: ReactNode 
     // ordinary public reports remain usable.
     enabled: validId && !protectedIdentity.isChecking,
   });
+  const isKnownPublicReport = scan.data !== undefined && scan.data.protection === undefined;
 
   if (!validId) return <>{children}</>;
-  if (protectedIdentity.isChecking || scan.isLoading) {
+  // A background identity refresh must continue to hide an authorized
+  // protected report, but it must not unmount a report already established
+  // as public. Unmounting every public report on the 15-second identity poll
+  // collapsed long issue tables and reset the reader's scroll position.
+  if (scan.isLoading || (protectedIdentity.isChecking && !isKnownPublicReport)) {
     return <p className="text-sm text-fg-muted" aria-live="polite">Loading report…</p>;
   }
   if (scan.error) {

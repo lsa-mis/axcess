@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 
 root = Path(SPECPATH).resolve().parent
@@ -17,6 +17,11 @@ datas = [
     (str(audit_source / "alfa_runner"), "audit/alfa_runner"),
 ]
 datas += copy_metadata("yoyo-migrations")
+# tldextract loads its bundled public-suffix snapshot through importlib
+# resources during URL scope construction. PyInstaller's normal analysis sees
+# the Python package but not this extensionless data file, so a packaged scan
+# otherwise fails before its first queue job is created.
+datas += collect_data_files("tldextract")
 
 hiddenimports = collect_submodules("uvicorn") + collect_submodules("yoyo")
 

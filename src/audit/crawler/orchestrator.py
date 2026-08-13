@@ -464,8 +464,9 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
     if row is not None:
         scan_id = int(row["id"])
         conn.execute(
-            "UPDATE scans SET status = 'running' WHERE id = ?",
-            (scan_id,),
+            "UPDATE scans SET status = 'running', finished_at = NULL, failure_reason = NULL, "
+            "config_json = ? WHERE id = ?",
+            (config_json_for_scan(config), scan_id),
         )
         return scan_id
 
@@ -878,6 +879,12 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx.summary.ocr_text_candidates += extraction.ocr_text_candidates
         ctx.summary.vlm_classified += extraction.vlm_classified
         ctx.summary.vlm_errors += extraction.vlm_errors
+
+    # Browser and semantic evidence is independent of image extraction.
+    # Login scans intentionally disable protected-image persistence by
+    # default, but axe, keyboard, responsive, focus, Alfa, and semantic work
+    # must still be retained for every successfully rendered HTML page.
+    if result.is_html and result.is_ok and page_id is not None:
         # Persist axe-core violations attached by JsFetcher. Static fetches
         # never carry violations (axe needs a browser); we count an axe-page
         # only when violations is a real attached tuple, even an empty one
@@ -1436,6 +1443,7 @@ def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary
         UPDATE scans
            SET status = ?,
                finished_at = CURRENT_TIMESTAMP,
+               failure_reason = NULL,
                page_count = ?,
                error_count = ?
          WHERE id = ?
