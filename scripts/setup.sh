@@ -18,7 +18,7 @@ uv run yoyo apply --database "sqlite:///data/audit.db" --batch src/audit/db/migr
 
 echo "==> Fetch VLM models (optional; requires ollama daemon)"
 if command -v ollama >/dev/null 2>&1; then
-  ollama pull qwen2-vl:2b || true
+  ollama pull qwen3-vl:2b-instruct || true
   ollama pull moondream:2b || true
 else
   echo "ollama not installed — skipping model download. See https://ollama.com"

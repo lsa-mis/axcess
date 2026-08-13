@@ -26,7 +26,7 @@ This plan covers v1 per the spec in [image-text-audit-prompt.md](image-text-audi
 | HTML parser | selectolax primary, BeautifulSoup4 fallback | selectolax is ~10x faster; BS4 for edge cases |
 | URL utils | tldextract + urllib.robotparser | Registrable-domain detection; stdlib robots.txt (protego as fallback if edge cases bite) |
 | OCR | Tesseract via pytesseract | Spec default; PaddleOCR held as optional backend behind interface |
-| VLM | Ollama hosting `qwen2-vl:2b` default; `moondream:2b` alt | `VLMProvider` protocol; prompt versioned in `prompts/classify_v1.txt`; model version logged in `analyses.model_versions_json` |
+| VLM | Ollama hosting `qwen3-vl:2b-instruct` default; `moondream:2b` alt | `VLMProvider` protocol; prompt versioned in `prompts/classify_v1.txt`; model version logged in `analyses.model_versions_json` |
 | DB | SQLite + WAL | yoyo-migrations (simpler than Alembic, no SQLAlchemy dep) |
 | Backend | FastAPI + uvicorn | Spec default |
 | Frontend | Jinja templates + HTMX + hand-written CSS | No CSS framework needed for tabular UI; keeps offline footprint minimal, a11y surface small |
@@ -169,7 +169,7 @@ Repo skeleton, `pyproject.toml`, Makefile targets, first migration (all tables e
 - `VLMProvider` protocol: `classify(image_bytes, context) -> Classification(label, rationale, model_version, prompt_version)`.
 - `OllamaProvider` implementation with health check, retry+backoff, bounded concurrency against Ollama's queue.
 - Prompt file `prompts/classify_v1.txt`, content-hashed → `prompt_version`.
-- Hardware detection: default to `qwen2-vl:2b` on MPS/CUDA, `moondream:2b` on CPU-only.
+- Hardware detection: default to `qwen3-vl:2b-instruct` on MPS/CUDA, `moondream:2b` on CPU-only.
 - Only OCR-candidate images reach VLM.
 - `--skip-vlm` CLI flag for faster iteration.
 - Tests: mocked Ollama for unit; one live integration test gated on `AUDIT_OLLAMA_LIVE=1`.
@@ -270,7 +270,7 @@ Repo skeleton, `pyproject.toml`, Makefile targets, first migration (all tables e
 
 **Setup works offline after initial model pull:**
 ```bash
-make setup           # uv sync, playwright install chromium, ollama pull qwen2-vl:2b
+make setup           # uv sync, playwright install chromium, ollama pull qwen3-vl:2b-instruct
 make migrate         # yoyo apply
 make fetch-models    # idempotent; detects hardware
 ```

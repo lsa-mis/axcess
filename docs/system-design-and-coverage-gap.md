@@ -164,7 +164,7 @@ none replaces the others.
 | WCAG SCs covered | 1.4.5 (Images of Text) — *the* criterion no other open tool detects well |
 | Best at | Distinguishing intentional content-bearing text-in-image (a headline rendered as a JPEG) from decorative use (a logo, a stock photo with incidental text) |
 | Blind spot | Foreign-script OCR accuracy; very stylized fonts; OCR false positives on noisy images (VLM filters these but not perfectly) |
-| Precision | ~85 % in practice (on M-series with qwen2-vl:2b, against hand-labeled fixtures) |
+| Precision | The legacy Qwen2-VL baseline measured ~85% on hand-labeled fixtures; Qwen3-VL must be re-baselined before publishing a precision claim. |
 
 ### 2.3 Per-criterion LLM (semantic SCs) — Phase 9 (in progress)
 

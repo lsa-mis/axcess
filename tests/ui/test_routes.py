@@ -63,7 +63,7 @@ def test_local_analysis_capability_distinguishes_bundled_ocr_and_models(
         def json(self) -> dict[str, object]:
             return {
                 "models": [
-                    {"name": "qwen2-vl:2b", "size": 1_500_000_000},
+                    {"name": "qwen3-vl:2b-instruct", "size": 1_900_000_000},
                     {"name": "gemma2:9b", "size": 5_000_000_000},
                 ]
             }
@@ -86,8 +86,8 @@ def test_local_analysis_capability_distinguishes_bundled_ocr_and_models(
     assert body["ocr"]["engine"] == "Tesseract 5"
     assert body["vision"] == {
         "available": True,
-        "model": "qwen2-vl:2b",
-        "installed_size_bytes": 1_500_000_000,
+        "model": "qwen3-vl:2b-instruct",
+        "installed_size_bytes": 1_900_000_000,
         "reason": None,
     }
     assert body["semantic"]["available"] is False

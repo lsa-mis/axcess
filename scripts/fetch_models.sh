@@ -7,8 +7,8 @@ if ! command -v ollama >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "==> Pulling qwen2-vl:2b (default on Apple Silicon)"
-ollama pull qwen2-vl:2b
+echo "==> Pulling qwen3-vl:2b-instruct (default local vision model)"
+ollama pull qwen3-vl:2b-instruct
 
 echo "==> Pulling moondream:2b (CPU fallback)"
 ollama pull moondream:2b

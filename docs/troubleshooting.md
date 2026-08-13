@@ -52,7 +52,7 @@ showing the status code and the page title.
 
 - **Is the daemon running?** `curl -s http://localhost:11434/api/tags`
   should return JSON.
-- **Is the model pulled?** `ollama pull qwen2-vl:2b`. The default
+- **Is the model pulled?** `ollama pull qwen3-vl:2b-instruct`. The default
   model name lives in `Settings.vlm_model`; override with
   `AUDIT_VLM_MODEL=<name>`.
 - **Do you want VLM off?** `--skip-vlm` bypasses the stage entirely;

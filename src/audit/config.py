@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # VLM (Phase 4)
     ollama_base_url: str = "http://localhost:11434"
-    vlm_model: str = "qwen2-vl:2b"
+    vlm_model: str = "qwen3-vl:2b-instruct"
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
 

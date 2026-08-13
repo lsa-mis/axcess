@@ -22,7 +22,7 @@ from audit.analyzer.vlm.ollama import (
 )
 
 BASE = "http://ollama-test.local"
-MODEL = "qwen2-vl:2b"
+MODEL = "qwen3-vl:2b-instruct"
 
 
 def _ctx(ocr: str = "BUY NOW TODAY") -> ClassifyContext:

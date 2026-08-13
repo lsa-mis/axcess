@@ -733,7 +733,7 @@ class _ProtectedBrowserCrawler:
             return None
         client = ProtectedLocalOllama(
             base_url=base_url,
-            model=_config_text(self._config, "vlm_model", "qwen2-vl:2b"),
+            model=_config_text(self._config, "vlm_model", "qwen3-vl:2b-instruct"),
             timeout_s=_config_float(self._config, "protected_local_ai_timeout_s", 60.0),
         )
         await client.__aenter__()

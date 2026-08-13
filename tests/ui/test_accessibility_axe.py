@@ -608,8 +608,8 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
                         '{"ocr":{"available":true,"engine":"Tesseract 5",'
                         '"language":"eng","max_workers":2,"bundled_in_desktop":true},'
                         '"ollama":{"reachable":true},'
-                        '"vision":{"available":true,"model":"qwen2-vl:2b",'
-                        '"installed_size_bytes":1500000000,"reason":null},'
+                        '"vision":{"available":true,"model":"qwen3-vl:2b-instruct",'
+                        '"installed_size_bytes":1900000000,"reason":null},'
                         '"semantic":{"available":false,"models":[],"ready_models":[],'
                         '"missing_models":[],"checks_per_page":0,"reason":"Not configured"}}'
                     ),

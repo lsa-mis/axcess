@@ -113,3 +113,26 @@ Developer ID Application identity available in the build keychain. Without
 that value, the build is intentionally ad-hoc signed for local testing and
 does not enable hardened runtime; it cannot be treated as a distributable
 institutional release.
+
+For a warning-free direct download, configure notarization as well. Axcess
+accepts any one of Electron Forge's supported credential strategies:
+
+```bash
+# Apple ID app-specific password
+AXCESS_MAC_SIGN_IDENTITY="Developer ID Application: Organization (TEAMID)" \
+APPLE_ID="developer@example.edu" \
+APPLE_APP_SPECIFIC_PASSWORD="..." \
+APPLE_TEAM_ID="TEAMID" \
+AXCESS_REQUIRE_NOTARIZATION=1 \
+make desktop-package
+
+# Or a keychain profile created with `xcrun notarytool store-credentials`
+AXCESS_MAC_SIGN_IDENTITY="Developer ID Application: Organization (TEAMID)" \
+APPLE_NOTARY_KEYCHAIN_PROFILE="axcess-notary" \
+AXCESS_REQUIRE_NOTARIZATION=1 \
+make desktop-package
+```
+
+The build fails on partial credentials, on an Apple Development identity, or
+when notarization is required but unavailable. Never commit Apple credentials
+to this repository.

@@ -187,8 +187,8 @@ def test_skip_vlm_disables_routing(tmp_db: sqlite3.Connection, blob_dir: Path) -
     reason="set AUDIT_OLLAMA_LIVE=1 to exercise a real Ollama daemon",
 )
 def test_live_ollama_classifies_text_banner(tmp_db: sqlite3.Connection, blob_dir: Path) -> None:
-    """Hits the real Ollama daemon. Requires the model from AUDIT_VLM_MODEL (or qwen2-vl:2b)."""
-    model = os.environ.get("AUDIT_VLM_MODEL", "qwen2-vl:2b")
+    """Hits Ollama using AUDIT_VLM_MODEL or the Qwen3-VL local default."""
+    model = os.environ.get("AUDIT_VLM_MODEL", "qwen3-vl:2b-instruct")
 
     async def go() -> tuple[int, int]:
         async with httpx.AsyncClient() as client:
