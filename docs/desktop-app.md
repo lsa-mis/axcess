@@ -73,7 +73,10 @@ Linux builds on Linux.
 
 The macOS disk image is created directly with the operating system's
 `hdiutil`; Axcess does not use the currently vulnerable third-party ICNS image
-parser in the Electron Forge DMG maker.
+parser in the Electron Forge DMG maker. The build copies the application with
+macOS `ditto` so Electron framework symlinks remain relative, then mounts the
+finished DMG and rejects it if any app link is absolute/broken or its nested
+code-signature integrity fails.
 
 ## Security boundary
 
