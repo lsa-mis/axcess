@@ -49,7 +49,7 @@ class Classification:
     label: VlmLabel
     rationale: str
     model_version: str
-    """Identifier e.g. ``"qwen2-vl:2b"``; goes into ``analyses.model_versions_json``."""
+    """Identifier e.g. ``"qwen3-vl:2b-instruct"``; stored with the analysis."""
     prompt_version: str
     """Short content hash of the prompt template used."""
 

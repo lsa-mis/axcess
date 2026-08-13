@@ -24,9 +24,9 @@ migrate: ## Apply database migrations
 migrate-rollback: ## Roll back the last migration
 	$(PY) yoyo rollback --database sqlite:///$(DB) --batch $(MIGRATIONS)
 
-fetch-models: ## Pull VLM models via Ollama (qwen2-vl:2b, moondream:2b)
+fetch-models: ## Pull VLM models via Ollama (qwen3-vl:2b-instruct, moondream:2b)
 	@command -v ollama >/dev/null 2>&1 || { echo "ollama not installed; see https://ollama.com"; exit 1; }
-	ollama pull qwen2-vl:2b || true
+	ollama pull qwen3-vl:2b-instruct || true
 	ollama pull moondream:2b || true
 
 fetch-analyzer-models: ## Pull every model the analyzer_models.yaml recommends (required + recommended tiers)

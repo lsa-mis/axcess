@@ -19,11 +19,11 @@ def test_known_criterion_returns_pinned_model() -> None:
     """A criterion with an explicit `primary` entry returns that tag."""
     model_registry.reset_cache()
     pick = model_registry.get_pick("1.4.5")
-    # SC 1.4.5 is pinned to qwen2-vl:2b in analyzer_models.yaml — this
+    # SC 1.4.5 is pinned to the small Qwen3-VL instruct model — this
     # is our current default for the image-of-text pipeline. If the
     # YAML moves to something else, update this expectation; pinning
     # the test ensures the override path is actually being honored.
-    assert pick.primary == "qwen2-vl:2b"
+    assert pick.primary == "qwen3-vl:2b-instruct"
     assert pick.kind == "vision"
 
 
@@ -62,9 +62,9 @@ def test_fetch_set_tiers() -> None:
     required = model_registry.fetch_set("required")
     recommended = model_registry.fetch_set("recommended")
     assert len(required) >= 1
-    # qwen2-vl:2b is our existing image-of-text default — it must
+    # Qwen3-VL 2B instruct is our image-of-text default — it must
     # remain in the required tier so a fresh setup still works.
-    assert "qwen2-vl:2b" in required
+    assert "qwen3-vl:2b-instruct" in required
     # Recommended must include things beyond required (otherwise the
     # tier distinction is pointless).
     assert any(tag not in required for tag in recommended)

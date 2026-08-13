@@ -31,6 +31,6 @@ def test_crawl_help_lists_flags() -> None:
 
 def test_settings_defaults() -> None:
     settings = Settings()
-    assert settings.vlm_model == "qwen2-vl:2b"
+    assert settings.vlm_model == "qwen3-vl:2b-instruct"
     assert settings.default_rps > 0
     assert settings.ocr_min_confidence > 0

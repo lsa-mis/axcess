@@ -14,7 +14,7 @@
 # This is the cost-control argument vs. GenA11y's $4.78/page through
 # OpenAI: same idea, ~$0 marginal cost per page beyond electricity.
 #
-# Last reviewed: 2026-05.
+# Last reviewed: 2026-08.
 
 # ---------------------------------------------------------------------
 # Default models — used when an analyzer has no explicit override.
@@ -25,10 +25,11 @@ defaults:
   vision:
     # SC 1.4.5 image-of-text, SC 1.4.3/1.4.6 contrast verification,
     # SC 1.4.4 reflow screenshots, etc.
-    # qwen2.5-vl:7b ~5.5GB Q4, strongest open VLM at the 7B size.
-    # qwen2-vl:2b is faster but loses OCR precision on small text.
+    # qwen2.5-vl:7b remains the heavier precision option.
+    # qwen3-vl:2b-instruct is the official 1.9GB local default and is
+    # instruction-tuned for the pipeline's bounded JSON classifications.
     primary: "qwen2.5-vl:7b"
-    fast:    "qwen2-vl:2b"
+    fast:    "qwen3-vl:2b-instruct"
 
   text:
     # General text reasoning for "is this descriptive?" style judgments.
@@ -75,7 +76,7 @@ criteria:
     title: "Non-text Content — alt-text descriptiveness"
     kind: vision
     primary: "qwen2.5-vl:7b"
-    fast: "qwen2-vl:2b"
+    fast: "qwen3-vl:2b-instruct"
     rationale: |
       Needs to look at the image AND read the alt to judge match.
       qwen2.5-vl:7b's improved OCR and grounding beats the 2B at
@@ -94,12 +95,13 @@ criteria:
   "1.4.5":
     title: "Images of Text"
     kind: vision
-    primary: "qwen2-vl:2b"
+    primary: "qwen3-vl:2b-instruct"
     fast: "moondream:2b"
     rationale: |
-      Our existing pipeline. qwen2-vl:2b is the right default —
-      classification is binary-ish (essential/informational/logo/
-      decorative), 7B doesn't materially improve it.
+      The 2B Qwen3-VL instruct model keeps local memory and latency bounded
+      while following the pipeline's essential/informational/logo/decorative
+      classification schema. Treat results as review leads until the Qwen3
+      calibration suite establishes measured precision.
 
   "1.2.1":
     title: "Audio-only (Prerecorded) — transcript presence"
@@ -182,7 +184,7 @@ criteria:
 # ---------------------------------------------------------------------
 fetch_set:
   required:
-    - "qwen2-vl:2b"          # SC 1.4.5 — our existing default
+    - "qwen3-vl:2b-instruct" # SC 1.4.5 — 1.9GB local vision default
     - "qwen2.5:7b-instruct"  # default text + most criteria
   recommended:
     - "qwen2.5-vl:7b"        # vision criteria w/ improved OCR

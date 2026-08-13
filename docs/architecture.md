@@ -34,7 +34,7 @@ flags disagreements in a triage UI.
                            ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  3. ANALYZE    OCR (Tesseract in process pool) → text-candidate?    │
-│                → VLM (Ollama, qwen2-vl:2b) classification →         │
+│          → VLM (Ollama, qwen3-vl:2b-instruct) classification →      │
 │                persist analyses row                                  │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │  once the crawl is done
@@ -338,7 +338,7 @@ only writer and it's single-process.
 |---|---|
 | Python deps | `uv sync` locks via `uv.lock`; one-time install |
 | Playwright chromium | `playwright install chromium` is a one-time download |
-| Ollama model | `ollama pull qwen2-vl:2b` is a one-time download |
+| Ollama model | `ollama pull qwen3-vl:2b-instruct` downloads the 1.9GB local vision model once |
 | Public Suffix List | tldextract opened with `suffix_list_urls=()` → bundled snapshot |
 | axe-core | vendored under `src/audit/web/static/` (test harness) |
 | Defusedxml | local pure-Python parser for sitemaps |
