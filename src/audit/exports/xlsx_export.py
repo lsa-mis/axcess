@@ -8,7 +8,7 @@ you can sort, filter, and track in a spreadsheet:
 * **Issues Overview** — the remediation-guide table (one row per issue) in
   the University of Michigan Digital Accessibility Services format: a
   metadata header block + Issues · Conformance Level · Remediation Ownership ·
-  Status · What to Fix · Page Links / Locations · Action · Helpful Resources ·
+  Status · User Impact · Page Links / Locations · Action · Helpful Resources ·
   Notes · Evidence (a highlighted screenshot of the issue's element, embedded
   when a ``blob_store`` is supplied and the finding has one).
 * **Page Hotspots** — pages ranked by a severity-weighted load.
@@ -126,7 +126,7 @@ _ISSUE_HEADERS = (
     "Conformance Level",
     "Remediation Ownership",
     "Status",
-    "What to Fix",
+    "User Impact",
     "Page Links / Locations",
     "Action",
     "Helpful Resources",

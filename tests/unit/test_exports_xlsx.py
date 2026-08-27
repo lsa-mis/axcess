@@ -92,6 +92,8 @@ def test_issues_overview_header_block_and_table(tmp_db: sqlite3.Connection) -> N
     # Table header on row 8.
     header = tuple(ws.cell(row=8, column=c).value for c in range(1, len(_ISSUE_HEADERS)))
     assert header == _ISSUE_HEADERS[:-1]
+    assert ws.cell(row=8, column=8).value == "User Impact"
+    assert ws.cell(row=8, column=10).value == "Action"
     # Every grouped issue with page locations points to the dedicated
     # page-reference index with a true internal workbook destination.
     location_cells = [
