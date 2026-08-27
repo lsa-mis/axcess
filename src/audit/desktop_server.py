@@ -117,7 +117,32 @@ async def verify_runtime() -> dict[str, str]:
         user_agent="Axcess desktop runtime verification",
         chromium_path=chromium_path,
     )
-    await alfa.run("data:text/html,<main>Axcess%20Alfa%20check</main>", level="AA")
+
+    async def serve_alfa_fixture(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        try:
+            await reader.read(4096)
+            body = b"<!doctype html><html lang=en><title>Axcess</title><main>Alfa check</main>"
+            writer.write(
+                b"HTTP/1.1 200 OK\r\n"
+                b"Content-Type: text/html; charset=utf-8\r\n"
+                + f"Content-Length: {len(body)}\r\n".encode()
+                + b"Connection: close\r\n\r\n"
+                + body
+            )
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    fixture_server = await asyncio.start_server(serve_alfa_fixture, "127.0.0.1", 0)
+    try:
+        fixture_address = fixture_server.sockets[0].getsockname()
+        await alfa.run(f"http://127.0.0.1:{fixture_address[1]}/", level="AA")
+    finally:
+        fixture_server.close()
+        await fixture_server.wait_closed()
 
     import io
 
