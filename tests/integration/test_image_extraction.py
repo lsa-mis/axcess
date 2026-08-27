@@ -115,6 +115,7 @@ def test_same_image_on_two_pages_dedupes_to_one_images_row(
             workers=1,
             vlm_enabled=False,
             semantic_enabled=False,
+            capture_screenshots=False,
         )
         asyncio.run(run_crawl(tmp_db, config))
 
