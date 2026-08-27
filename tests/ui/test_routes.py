@@ -351,6 +351,13 @@ def test_local_login_scan_starts_from_same_loopback_origin(
 
     captured: dict[str, object] = {}
 
+    with connect(db_path) as conn:
+        interrupted = conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'interrupted', '{}')",
+            ("https://app.example.test/secure/",),
+        )
+        interrupted_scan_id = int(interrupted.lastrowid or 0)
+
     async def _no_browser_run(
         _db_path: object, _blob_dir: object, config: object, _run: object
     ) -> None:
@@ -400,6 +407,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert response.status_code == 201
     assert response.json()["status"] == "opening_browser"
     assert isinstance(response.json()["scan_id"], int)
+    assert response.json()["scan_id"] != interrupted_scan_id
     config = captured["config"]
     assert isinstance(config, server.CrawlConfig)
     assert config.max_pages == 10

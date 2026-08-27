@@ -495,6 +495,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "max_depth": config.max_depth,
             "allow_subdomains": config.allow_subdomains,
             "rps": config.rps,
+            "workers": config.workers,
             "ignore_robots": config.ignore_robots,
             "concurrency_per_host": config.concurrency_per_host,
             "user_agent": config.user_agent,
@@ -784,9 +785,12 @@ async def _worker(ctx: _WorkerContext) -> None:
     while True:
         if _page_limit_reached(ctx):
             return
-        job = queue.lease(ctx.conn, JOB_KIND, lease_secs=120)
+        job = queue.lease(ctx.conn, JOB_KIND, lease_secs=120, scan_id=ctx.scan_id)
         if job is None:
-            if ctx.in_flight == 0 and queue.pending_count(ctx.conn, JOB_KIND) == 0:
+            if (
+                ctx.in_flight == 0
+                and queue.pending_count(ctx.conn, JOB_KIND, scan_id=ctx.scan_id) == 0
+            ):
                 return
             await asyncio.sleep(0.05)
             continue
