@@ -122,6 +122,7 @@ class LocalLoginScanRequest(BaseModel):
     max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
+    workers: int = Field(default=2, ge=1, le=4)
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
@@ -938,8 +939,12 @@ def create_app(
             max_depth=body.max_depth,
             rps=body.rps,
             whole_host=body.whole_host,
-            concurrency_per_host=1,
-            workers=1,
+            # Login scans reuse one authenticated BrowserContext, but each
+            # crawler worker opens and closes its own tab. Keep the cap small
+            # so concurrent pages cannot overwhelm the shared session or the
+            # target application while still using modern laptop capacity.
+            concurrency_per_host=body.workers,
+            workers=body.workers,
             user_agent=settings.user_agent,
             request_timeout_s=settings.request_timeout_s,
             # Optional protected-image analysis uses the same authenticated

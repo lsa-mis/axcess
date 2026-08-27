@@ -630,6 +630,13 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
                 page.get_by_role("textbox", name="Page to scan after login")
             ).to_be_visible()
             await page.get_by_text("Advanced settings", exact=True).click()
+            workers = page.get_by_role("spinbutton", name="Workers")
+            await playwright_async.expect(workers).to_be_enabled()
+            await playwright_async.expect(workers).to_have_value("2")
+            await workers.fill("4")
+            await playwright_async.expect(
+                page.get_by_text("4 concurrent authenticated tabs", exact=True)
+            ).to_be_visible()
             both_engines = page.get_by_role(
                 "radio", name=re.compile(r"^axe-core \+ Siteimprove Alfa")
             )

@@ -54,6 +54,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     max_pages: 2500,
     max_depth: 10,
     rps: 1,
+    workers: 2,
     whole_host: false,
     scan_engine: "axe",
     axe_level: "AA",
@@ -278,6 +279,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     ? "Local OCR image-text analysis"
                     : "Local OCR and loopback VLM analysis",
                 `Up to ${form.max_pages.toLocaleString()} pages`,
+                `${form.workers} concurrent authenticated ${form.workers === 1 ? "tab" : "tabs"}`,
               ].map((label) => (
                 <li key={label} className="flex items-start gap-2">
                   <Check
@@ -321,13 +323,17 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 />
                 <LoginNumberField
                   label="Workers"
-                  value={1}
+                  value={form.workers}
                   min={1}
-                  max={1}
-                  disabled
-                  onChange={() => undefined}
+                  max={4}
+                  onChange={(value) => update("workers", value)}
                 />
               </div>
+              <p className="text-xs text-fg-muted">
+                Workers open concurrent tabs inside the same temporary,
+                authenticated browser session. Two is recommended; four is
+                the safety maximum for login and 2FA scans.
+              </p>
 
               <fieldset className="rounded-xs border border-border p-3">
                 <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">

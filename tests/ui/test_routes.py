@@ -384,6 +384,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
                 "max_pages": 10,
                 "max_depth": 4,
                 "rps": 0.5,
+                "workers": 4,
                 "whole_host": True,
                 "scan_engine": "both",
                 "axe_level": "AAA",
@@ -409,10 +410,25 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.axe_enabled is True
     assert config.keyboard_probe_enabled is False
     assert config.responsive_checks_enabled is False
-    assert config.workers == 1
+    assert config.workers == 4
+    assert config.concurrency_per_host == 4
     assert config.alfa_enabled is True
     assert config.browser_only is True
     assert config.image_extraction_enabled is False
+
+
+def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
+    response = client.post(
+        "/api/local-login-scans",
+        json={
+            "seed_url": "https://app.example.test/secure/",
+            "authorization_acknowledged": True,
+            "workers": 5,
+        },
+    )
+
+    # Request validation runs before the loopback-only convenience-flow guard.
+    assert response.status_code == 422
 
 
 def test_local_login_scan_rejects_selected_unavailable_alfa(

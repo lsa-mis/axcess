@@ -312,6 +312,8 @@ export interface LocalLoginScanPayload {
   max_pages: number;
   max_depth: number;
   rps: number;
+  /** Concurrent authenticated tabs; the local login API caps this at four. */
+  workers: number;
   whole_host: boolean;
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
