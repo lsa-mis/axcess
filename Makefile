@@ -4,6 +4,7 @@ PY := uv run
 DB := data/audit.db
 MIGRATIONS := src/audit/db/migrations
 FRONTEND := src/audit/web/frontend
+FRONTEND_DEPS := $(FRONTEND)/node_modules/.package-lock.json
 ALFA_RUNNER := src/audit/alfa_runner
 DESKTOP := desktop
 HOST ?= 127.0.0.1
@@ -62,13 +63,15 @@ serve: ## Host for LAN/Tailscale: no reload, binds 0.0.0.0 (set AUDIT_ACCESS_TOK
 protected-maintenance: ## Run required managed-KMS retention cleanup for protected reports
 	$(PY) audit protected-maintenance
 
-frontend-install: ## Install React SPA dependencies (one-time)
-	cd $(FRONTEND) && npm install
+frontend-install: $(FRONTEND_DEPS) ## Install React SPA dependencies when needed
+
+$(FRONTEND_DEPS): $(FRONTEND)/package.json $(FRONTEND)/package-lock.json
+	cd $(FRONTEND) && npm ci
 
 frontend-lint: ## Run JSX accessibility and React lint rules
 	cd $(FRONTEND) && npm run lint
 
-frontend-build: ## Build the React SPA into dist/ (served by FastAPI at /app/)
+frontend-build: frontend-install ## Build the React SPA into dist/ (served by FastAPI at /app/)
 	cd $(FRONTEND) && npm run build
 
 frontend-dev: ## Run Vite dev server on :5173 (proxies /api to FastAPI)
