@@ -51,7 +51,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     >
   >({
     seed_url: "",
-    max_pages: 50,
+    max_pages: 2500,
     max_depth: 10,
     rps: 1,
     whole_host: false,
@@ -301,7 +301,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                   label="Max pages"
                   value={form.max_pages}
                   min={1}
-                  max={500}
+                  max={2500}
                   onChange={(value) => update("max_pages", value)}
                 />
                 <LoginNumberField
@@ -479,6 +479,25 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                             "Checking whether the configured local vision model is ready…"
                     }
                   />
+                  {!form.skip_vlm && (
+                    <div
+                      className="rounded-xs border border-umich-maize/70 bg-umich-maize/10 p-3 text-sm text-fg"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <p className="font-semibold">
+                        Local AI—no automatic model downloads
+                      </p>
+                      <p className="mt-1 text-xs text-fg-muted">
+                        No model download will start with this scan. Axcess uses
+                        only the vision model already installed in loopback
+                        Ollama; the option stays disabled when it is missing.
+                        Protected image evidence never goes to a cloud model,
+                        but Ollama will use additional unified memory during
+                        analysis and may temporarily slow other apps.
+                      </p>
+                    </div>
+                  )}
                   <Checkbox
                     checked={form.skip_keyboard}
                     onChange={(value) => update("skip_keyboard", value)}
@@ -658,9 +677,10 @@ function LocalLoginHandoff({
           "Axcess is confirming that the browser returned to the approved application.",
       },
       scanning: {
-        title: "Scanning with your temporary session",
-        detail:
-          "The browser context is being reused in memory. Closing it will stop the scan.",
+        title: "Scanning in the background",
+        detail: status.data?.browser_backgrounded
+          ? "The signed-in Chromium window has been moved out of the way while Axcess reuses its in-memory session. You can keep working, but quitting Chromium will stop the scan."
+          : "Axcess is reusing the signed-in browser session in the background. You can keep working, but closing Chromium will stop the scan.",
       },
       authentication_required: {
         title: "Sign-in could not be confirmed",

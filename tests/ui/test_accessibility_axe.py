@@ -651,6 +651,13 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             await playwright_async.expect(use_vlm).to_be_disabled()
             await use_ocr.check()
             await playwright_async.expect(use_vlm).to_be_enabled()
+            await use_vlm.check()
+            await playwright_async.expect(
+                page.get_by_text("Local AI—no automatic model downloads", exact=True)
+            ).to_be_visible()
+            await playwright_async.expect(
+                page.get_by_text(re.compile(r"No model download will start with this scan"))
+            ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_role(
                     "checkbox", name=re.compile(r"^Store protected image-analysis evidence")
