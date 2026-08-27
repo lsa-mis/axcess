@@ -17,7 +17,6 @@ from openpyxl import load_workbook
 from test_audit_report import _scan_with_real_findings  # tests/unit on sys.path
 
 from audit import coverage_matrix
-from audit.db import repo
 from audit.exports.collector import collect_scan
 from audit.exports.xlsx_export import (
     _ISSUE_HEADERS,
@@ -39,7 +38,6 @@ def test_xlsx_is_a_valid_workbook_with_all_report_sheets(tmp_db: sqlite3.Connect
     assert wb.sheetnames == [
         "Summary",
         "Issues Overview",
-        "Decision History",
         "Page Hotspots",
         "Page References",
         "Who's Affected",
@@ -47,34 +45,6 @@ def test_xlsx_is_a_valid_workbook_with_all_report_sheets(tmp_db: sqlite3.Connect
         "Test Tracking",
         "Manual Review Evidence",
     ]
-
-
-def test_decision_history_keeps_rationale_source_and_clickable_evidence(
-    tmp_db: sqlite3.Connection,
-) -> None:
-    scan_id = _scan_with_real_findings(tmp_db)
-    finding_id = int(
-        tmp_db.execute(
-            "SELECT id FROM findings WHERE scan_id = ? AND status = 'new' ORDER BY id LIMIT 1",
-            (scan_id,),
-        ).fetchone()["id"]
-    )
-    repo.bulk_set_findings_status(
-        tmp_db,
-        finding_ids=[finding_id],
-        status="false_positive",
-        actor="user",
-        rationale="Reviewed the image and alternative in page context; no barrier was present.",
-    )
-    scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
-    wb = load_workbook(io.BytesIO(render_xlsx(scan, conn=tmp_db)))
-    ws = wb["Decision History"]
-
-    assert ws.cell(row=5, column=2).value == "Image analysis"
-    assert ws.cell(row=5, column=5).value == "false_positive"
-    assert "no barrier was present" in str(ws.cell(row=5, column=7).value)
-    assert ws.cell(row=5, column=8).hyperlink is not None
-    assert ws.cell(row=5, column=8).hyperlink.target.startswith("http://127.0.0.1:8765/findings/")
 
 
 def test_summary_dashboard_has_metadata_and_rollups(tmp_db: sqlite3.Connection) -> None:

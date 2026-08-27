@@ -142,7 +142,7 @@ needing confirmation. Informational evidence cannot silently become a barrier.
 Completed public scans can produce:
 
 - **Excel workbook (`.xlsx`)** — the operational handoff artifact. Its sheets
-  include Summary, Issues, Decision History, Page Hotspots,
+  include Summary, Issues, Page Hotspots,
   Page References, Who's Affected, Coverage, Test Tracking, and Manual Evidence.
 - **Stakeholder audit report (`.md`)** — evaluation context, scope, methods,
   limitations, results, recommended actions, verification, and appendices.
@@ -338,7 +338,7 @@ make test              # complete unit, integration, and UI suite
 
 The UI has keyboard, screen-reader, focus, 200% zoom, 320-pixel reflow, and
 axe-core regression coverage. Export tests verify scope, methods, limitations,
-manual evidence, decision history, source attribution, and hyperlink behavior.
+manual evidence, source attribution, and hyperlink behavior.
 
 ## Documentation
 

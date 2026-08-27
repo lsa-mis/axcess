@@ -11,8 +11,6 @@ you can sort, filter, and track in a spreadsheet:
   Status · What to Fix · Page Links / Locations · Action · Helpful Resources ·
   Notes · Evidence (a highlighted screenshot of the issue's element, embedded
   when a ``blob_store`` is supplied and the finding has one).
-* **Decision History** — reviewer, time, source layer, prior/new status,
-  rationale, and a clickable evidence link for every triage decision.
 * **Page Hotspots** — pages ranked by a severity-weighted load.
 * **Page References** — every affected page as a clickable link, with a
   plain-language element location and the retained technical target.
@@ -881,103 +879,6 @@ def _build_manual_review_evidence_sheet(ws: Worksheet, checks: list[dict[str, An
             ws.cell(row=offset, column=6).style = "Hyperlink"
 
 
-def _build_decision_history_sheet(
-    ws: Worksheet,
-    scan: ExportScan,
-    conn: sqlite3.Connection,
-) -> None:
-    """Export the durable finding-status audit trail with evidence links."""
-
-    image_links = {finding.id: finding.ui_url for finding in scan.findings}
-    a11y_links = {finding.id: finding.ui_url for finding in scan.a11y_findings}
-    history: list[dict[str, Any]] = [
-        {
-            **dict(row),
-            "source": "Image analysis",
-            "evidence_url": image_links.get(int(row["finding_id"]), ""),
-        }
-        for row in conn.execute(
-            """
-            SELECT id, finding_id, from_status, to_status, actor, changed_at, note
-              FROM finding_history
-             WHERE scan_id = ? AND change_type = 'status_change'
-            """,
-            (scan.id,),
-        ).fetchall()
-    ]
-    has_a11y_history = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'a11y_finding_history'"
-    ).fetchone()
-    if has_a11y_history is not None:
-        history.extend(
-            {
-                **dict(row),
-                "source": str(row["pipeline"] or "DOM evidence"),
-                "evidence_url": a11y_links.get(int(row["finding_id"]), ""),
-            }
-            for row in conn.execute(
-                """
-                SELECT h.id, h.finding_id, h.from_status, h.to_status,
-                       h.actor, h.changed_at, h.note, f.pipeline
-                  FROM a11y_finding_history h
-                  JOIN page_a11y_findings f ON f.id = h.finding_id
-                 WHERE h.scan_id = ? AND h.change_type = 'status_change'
-                """,
-                (scan.id,),
-            ).fetchall()
-        )
-    history.sort(key=lambda item: (str(item["changed_at"]), int(item["id"])))
-    evaluation_reviewer = str(
-        evaluation.get_evaluation(conn, scan.id).get("reviewer") or ""
-    ).strip()
-    rows = [
-        (
-            str(item["changed_at"]),
-            str(item["source"]),
-            int(item["finding_id"]),
-            str(item["from_status"] or ""),
-            str(item["to_status"] or ""),
-            (
-                evaluation_reviewer
-                if item["actor"] == "user" and evaluation_reviewer
-                else str(item["actor"])
-            ),
-            str(item["note"] or ""),
-            "Open evidence" if item["evidence_url"] else "",
-        )
-        for item in history
-    ]
-    _styled_table(
-        ws,
-        title="Expert decision history",
-        subtitle=(
-            "Every status decision, attributed to its evidence source and reviewer. "
-            "User actions use the evaluation reviewer named in Summary. Final dispositions "
-            "require a rationale; use the last column to reopen the evidence."
-        ),
-        headers=(
-            "Changed at",
-            "Evidence source",
-            "Finding ID",
-            "From status",
-            "To status",
-            "Reviewer / actor",
-            "Decision rationale",
-            "Evidence link",
-        ),
-        rows=rows,
-        widths=(22.0, 24.0, 12.0, 18.0, 18.0, 14.0, 54.0, 24.0),
-        center_cols=(3, 4, 5, 6),
-        empty_note="No finding-status decisions have been recorded yet.",
-    )
-    for offset, item in enumerate(history, start=5):
-        url = str(item["evidence_url"] or "")
-        if url.startswith(("https://", "http://")):
-            cell = ws.cell(row=offset, column=8)
-            cell.hyperlink = url
-            cell.style = "Hyperlink"
-
-
 def render_xlsx(
     scan: ExportScan,
     *,
@@ -988,19 +889,18 @@ def render_xlsx(
 ) -> bytes:
     """Render the full Excel audit workbook and return the .xlsx bytes.
 
-    Nine sheets, every report section as a filterable table:
+    Eight sheets, every report section as a filterable table:
 
     1. **Summary** — the at-a-glance dashboard (counts, severity, level,
        principle, coverage headline).
     2. **Issues Overview** — the remediation table (one row per issue).
-    3. **Decision History** — review dispositions, rationales, actors, and links.
-    4. **Page Hotspots** — pages ranked by severity-weighted load.
-    5. **Page References** — affected pages, plain-language locations, and
+    3. **Page Hotspots** — pages ranked by severity-weighted load.
+    4. **Page References** — affected pages, plain-language locations, and
        retained technical targets.
-    6. **Who's Affected** — open issues by the ability each blocks.
-    7. **Coverage & Method** — per-criterion automated-vs-manual coverage.
-    8. **Test Tracking** — the manual Pass / Fail checklist.
-    9. **Manual Review Evidence** — criterion outcomes and supporting notes.
+    5. **Who's Affected** — open issues by the ability each blocks.
+    6. **Coverage & Method** — per-criterion automated-vs-manual coverage.
+    7. **Test Tracking** — the manual Pass / Fail checklist.
+    8. **Manual Review Evidence** — criterion outcomes and supporting notes.
 
     ``conn`` is required: the issue tables are built live from the same
     ``issues.list_issues()`` / audit-report card model the Markdown report
@@ -1037,7 +937,6 @@ def render_xlsx(
         audit_date=date_str,
         blob_store=blob_store,
     )
-    _build_decision_history_sheet(wb.create_sheet("Decision History"), scan, conn)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
     _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
