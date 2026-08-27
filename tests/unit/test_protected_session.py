@@ -239,6 +239,8 @@ class _FakeContext:
     web_socket_route_calls: list[tuple[str, object]] = field(default_factory=list)
     event_handlers: dict[str, object] = field(default_factory=dict)
     init_scripts: list[str] = field(default_factory=list)
+    additional_pages: list[_FakePage] = field(default_factory=list)
+    new_page_calls: int = 0
     closed: bool = False
 
     async def route(self, pattern: str, handler: object) -> None:
@@ -254,10 +256,15 @@ class _FakeContext:
         self.event_handlers[event] = handler
 
     async def new_page(self) -> _FakePage:
-        return self.page
+        self.new_page_calls += 1
+        if self.new_page_calls == 1:
+            return self.page
+        page = _FakePage()
+        self.additional_pages.append(page)
+        return page
 
     async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
-        assert page is self.page
+        assert page is self.page or page in self.additional_pages
         return self.cdp_session
 
     async def close(self) -> None:
@@ -376,7 +383,18 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
     assert verified.url == "https://app.example.edu/dashboard"
     assert session.state is ManualAuthState.AUTHENTICATED
 
-    assert await session.minimize_for_background_scan()
+    scan_pages = await session.prepare_background_scan_pages(2)
+    assert scan_pages == tuple(context.additional_pages)
+    assert len(set(map(id, scan_pages))) == 2
+
+    # Prepare the fixed worker tabs before minimizing. Creating a new tab
+    # after this point restores a minimized Chromium window on macOS.
+    await session.discard_manual_auth_page()
+    assert page.closed
+    with pytest.raises(ManualAuthenticationError):
+        _ = session.page
+
+    assert await session.minimize_for_background_scan(scan_pages[0])
     assert context.cdp_session.calls == [
         ("Browser.getWindowForTarget", None),
         (
@@ -401,13 +419,6 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
     ]
     assert context.cdp_session.detached
 
-    # The authenticated context remains available for new crawl tabs, but
-    # the original headed sign-in tab is discarded as soon as it is safe.
-    await session.discard_manual_auth_page()
-    assert page.closed
-    with pytest.raises(ManualAuthenticationError):
-        _ = session.page
-
     after_auth_idp = _FakeRoute(_FakeRequest("GET", "https://login.example.edu/authorize"))
     unsafe_scan_post = _FakeRoute(_FakeRequest("POST", "https://app.example.edu/form", "fetch"))
     unsafe_worker = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/worker.js", "worker"))
@@ -431,8 +442,9 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
     assert chunked_image.actions == [("abort", "blockedbyclient")]
     assert session.consume_scan_egress_block() == "egress_policy_blocked"
 
-    fetcher = session.create_shared_js_fetcher()
+    fetcher = session.create_shared_js_fetcher(shared_pages=scan_pages)
     assert fetcher._shared_context is context  # Shared context, never exported state.
+    assert fetcher._shared_pages == scan_pages
 
     await session.close()
     assert session.state is ManualAuthState.CLOSED

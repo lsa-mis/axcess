@@ -57,6 +57,21 @@ def test_lease_filters_by_kind(tmp_db: sqlite3.Connection) -> None:
     assert queue.pending_count(tmp_db, "fetch") == 1
 
 
+def test_lease_and_pending_count_can_be_scoped_to_scan(tmp_db: sqlite3.Connection) -> None:
+    queue.enqueue(tmp_db, "fetch", {"url": "old", "scan_id": 12})
+    queue.enqueue(tmp_db, "fetch", {"url": "current", "scan_id": 13})
+
+    assert queue.pending_count(tmp_db, "fetch", scan_id=12) == 1
+    assert queue.pending_count(tmp_db, "fetch", scan_id=13) == 1
+
+    job = queue.lease(tmp_db, "fetch", lease_secs=30, scan_id=13)
+
+    assert job is not None
+    assert job.payload == {"url": "current", "scan_id": 13}
+    assert queue.pending_count(tmp_db, "fetch", scan_id=13) == 0
+    assert queue.pending_count(tmp_db, "fetch", scan_id=12) == 1
+
+
 def test_complete_marks_done(tmp_db: sqlite3.Connection) -> None:
     queue.enqueue(tmp_db, "fetch", {"u": "x"})
     job = queue.lease(tmp_db, "fetch", lease_secs=30)

@@ -15,6 +15,7 @@ between ``page.goto`` and ``ctx.close``.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 from types import TracebackType
@@ -125,6 +126,7 @@ class JsFetcher:
         visual_probe: VisualProbe | None = None,
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
+        shared_pages: tuple[Page, ...] = (),
         private_context: bool = False,
         max_rendered_html_chars: int | None = None,
         headless: bool = True,
@@ -160,6 +162,14 @@ class JsFetcher:
         # context per page.  Public scans keep the original isolated-context
         # behavior.
         self._shared_context = shared_context
+        if shared_pages and shared_context is None:
+            raise ValueError("shared_pages requires shared_context")
+        self._shared_pages = shared_pages
+        self._shared_page_pool: asyncio.Queue[Page] | None = None
+        if shared_pages:
+            self._shared_page_pool = asyncio.Queue(maxsize=len(shared_pages))
+            for shared_page in shared_pages:
+                self._shared_page_pool.put_nowait(shared_page)
         # A protected companion must never put target paths, redirect URLs, or
         # browser exception text (which can contain query/session material)
         # into the application log. Public crawling keeps the useful existing
@@ -217,8 +227,13 @@ class JsFetcher:
             )
             owns_context = True
         page: Page | None = None
+        pooled_page = False
         try:
-            page = await ctx.new_page()
+            if self._shared_page_pool is not None:
+                page = await self._shared_page_pool.get()
+                pooled_page = True
+            else:
+                page = await ctx.new_page()
             try:
                 resp = await page.goto(url, timeout=self._nav_timeout_ms, wait_until="load")
             except Exception as exc:
@@ -357,7 +372,9 @@ class JsFetcher:
             # wipes it only when the scan reaches a terminal state.  Close the
             # per-page tab, never the session itself.  Public scans retain the
             # old "new context per fetch" isolation guarantee.
-            if owns_context:
+            if pooled_page and page is not None and self._shared_page_pool is not None:
+                self._shared_page_pool.put_nowait(page)
+            elif owns_context:
                 await ctx.close()
             elif page is not None:
                 with contextlib.suppress(Exception):

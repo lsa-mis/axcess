@@ -429,7 +429,34 @@ class ManualAuthenticationSession:
         self._state = ManualAuthState.AUTHENTICATED
         return verified
 
-    async def minimize_for_background_scan(self) -> bool:
+    async def prepare_background_scan_pages(self, count: int) -> tuple[Page, ...]:
+        """Create the fixed authenticated tab pool before hiding Chromium.
+
+        macOS restores a minimized Chromium window whenever Playwright creates
+        a new top-level page. Preparing every worker tab first lets the crawl
+        reuse those pages without repeatedly bringing the browser to the
+        foreground. The pages and their shared authenticated context remain
+        memory-only and are destroyed together at session close.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before preparing scan tabs."
+            )
+        if count <= 0:
+            raise ValueError("Background scan page count must be positive.")
+        pages: list[Page] = []
+        try:
+            for _ in range(count):
+                pages.append(await self.context.new_page())
+        except Exception:
+            for page in pages:
+                with contextlib.suppress(Exception):
+                    await page.close(run_before_unload=False)
+            raise
+        return tuple(pages)
+
+    async def minimize_for_background_scan(self, page: Page | None = None) -> bool:
         """Minimize the headed sign-in window before reusing its context.
 
         Chromium cannot switch a live authenticated context from headed to
@@ -444,12 +471,12 @@ class ManualAuthenticationSession:
             raise ManualAuthenticationError(
                 "Complete and verify manual sign-in before backgrounding the browser."
             )
-        page = self._page
-        if page is None:
+        target_page = page or self._page
+        if target_page is None:
             return False
         cdp_session: Any | None = None
         try:
-            cdp_session = await self.context.new_cdp_session(page)
+            cdp_session = await self.context.new_cdp_session(target_page)
             window = await cdp_session.send("Browser.getWindowForTarget")
             window_id = window.get("windowId")
             if not isinstance(window_id, int):
@@ -552,6 +579,7 @@ class ManualAuthenticationSession:
         visual_probe: VisualProbe | None = None,
         capture_screenshots: bool = False,
         max_rendered_html_chars: int | None = None,
+        shared_pages: tuple[Page, ...] = (),
     ) -> JsFetcher:
         """Return a fetcher that reuses this in-memory authenticated context.
 
@@ -573,6 +601,7 @@ class ManualAuthenticationSession:
             visual_probe=visual_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,
+            shared_pages=shared_pages,
             private_context=True,
             max_rendered_html_chars=max_rendered_html_chars,
         )

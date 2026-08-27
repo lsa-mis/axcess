@@ -64,6 +64,7 @@ def lease(
     kind: str,
     lease_secs: float,
     *,
+    scan_id: int | None = None,
     now: datetime | None = None,
 ) -> Job | None:
     """Atomically claim one pending job of ``kind``. Returns ``None`` when queue is empty.
@@ -73,23 +74,43 @@ def lease(
     """
     current = _now(now)
     lease_until = current + timedelta(seconds=lease_secs)
-    cur = conn.execute(
-        """
-        UPDATE jobs
-           SET state       = 'leased',
-               lease_until = ?,
-               attempts    = attempts + 1,
-               updated_at  = ?
-         WHERE id = (
-               SELECT id FROM jobs
-                WHERE state = 'pending' AND kind = ?
-                ORDER BY id
-                LIMIT 1
-         )
-         RETURNING id, kind, payload_json, attempts
-        """,
-        (_iso(lease_until), _iso(current), kind),
-    )
+    if scan_id is None:
+        cur = conn.execute(
+            """
+            UPDATE jobs
+               SET state       = 'leased',
+                   lease_until = ?,
+                   attempts    = attempts + 1,
+                   updated_at  = ?
+             WHERE id = (
+                   SELECT id FROM jobs
+                    WHERE state = 'pending' AND kind = ?
+                    ORDER BY id
+                    LIMIT 1
+             )
+             RETURNING id, kind, payload_json, attempts
+            """,
+            (_iso(lease_until), _iso(current), kind),
+        )
+    else:
+        cur = conn.execute(
+            """
+            UPDATE jobs
+               SET state       = 'leased',
+                   lease_until = ?,
+                   attempts    = attempts + 1,
+                   updated_at  = ?
+             WHERE id = (
+                   SELECT id FROM jobs
+                    WHERE state = 'pending' AND kind = ?
+                      AND json_extract(payload_json, '$.scan_id') = ?
+                    ORDER BY id
+                    LIMIT 1
+             )
+             RETURNING id, kind, payload_json, attempts
+            """,
+            (_iso(lease_until), _iso(current), kind, scan_id),
+        )
     row = cur.fetchone()
     if row is None:
         return None
@@ -153,14 +174,31 @@ def reclaim_expired(conn: sqlite3.Connection, *, now: datetime | None = None) ->
     return int(cur.rowcount)
 
 
-def pending_count(conn: sqlite3.Connection, kind: str | None = None) -> int:
+def pending_count(
+    conn: sqlite3.Connection,
+    kind: str | None = None,
+    *,
+    scan_id: int | None = None,
+) -> int:
     """Count jobs currently in ``pending`` state."""
-    if kind is None:
+    if kind is None and scan_id is None:
         cur = conn.execute("SELECT COUNT(*) AS n FROM jobs WHERE state = 'pending'")
-    else:
+    elif kind is not None and scan_id is None:
         cur = conn.execute(
             "SELECT COUNT(*) AS n FROM jobs WHERE state = 'pending' AND kind = ?",
             (kind,),
+        )
+    elif kind is None:
+        cur = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE state = 'pending' "
+            "AND json_extract(payload_json, '$.scan_id') = ?",
+            (scan_id,),
+        )
+    else:
+        cur = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE state = 'pending' AND kind = ? "
+            "AND json_extract(payload_json, '$.scan_id') = ?",
+            (kind, scan_id),
         )
     row = cur.fetchone()
     return int(row["n"]) if row is not None else 0

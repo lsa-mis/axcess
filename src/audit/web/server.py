@@ -122,6 +122,7 @@ class LocalLoginScanRequest(BaseModel):
     max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
+    workers: int = Field(default=2, ge=1, le=4)
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
@@ -938,8 +939,12 @@ def create_app(
             max_depth=body.max_depth,
             rps=body.rps,
             whole_host=body.whole_host,
-            concurrency_per_host=1,
-            workers=1,
+            # Login scans reuse one authenticated BrowserContext, but each
+            # crawler worker opens and closes its own tab. Keep the cap small
+            # so concurrent pages cannot overwhelm the shared session or the
+            # target application while still using modern laptop capacity.
+            concurrency_per_host=body.workers,
+            workers=body.workers,
             user_agent=settings.user_agent,
             request_timeout_s=settings.request_timeout_s,
             # Optional protected-image analysis uses the same authenticated
@@ -969,7 +974,10 @@ def create_app(
             capture_screenshots=False,
             ignore_robots=True,
         )
-        scan_id = _prepare_scan_row(resolved_db, config)
+        # A manual-login session is deliberately memory-only and cannot be
+        # resumed after interruption. Always allocate a fresh report and job
+        # frontier even when the auditor scans the same URL again.
+        scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
         session = ManualAuthenticationSession(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
@@ -1153,6 +1161,7 @@ def create_app(
     async def api_cancel_scan(scan_id: int) -> JSONResponse:
         task = crawl_state.get("task")
         active_scan_id = crawl_state.get("scan_id")
+        is_local_login = scan_id in local_login_runs
         if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
             task.cancel()
         with get_conn() as conn:
@@ -1171,11 +1180,20 @@ def create_app(
                     "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (scan_id,),
                 )
-                conn.execute(
-                    "DELETE FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
-                    "AND state = 'pending'",
-                    (scan_id,),
-                )
+                if is_local_login:
+                    conn.execute(
+                        "DELETE FROM jobs "
+                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
+                        "AND state IN ('pending', 'leased')",
+                        (scan_id,),
+                    )
+                else:
+                    conn.execute(
+                        "DELETE FROM jobs "
+                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
+                        "AND state = 'pending'",
+                        (scan_id,),
+                    )
         return JSONResponse({"ok": True})
 
     @app.delete("/api/scans/{scan_id:int}")
@@ -2431,7 +2449,12 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     )
 
 
-def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
+def _prepare_scan_row(
+    db_path: Path,
+    config: CrawlConfig,
+    *,
+    resume_interrupted: bool = True,
+) -> int:
     """Create the scan row up front so the UI can redirect immediately.
 
     ``run_crawl`` canonicalizes directory-like seeds before discovering its
@@ -2445,7 +2468,9 @@ def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
     seed_url = _canonical_scan_seed(config.seed_url)
     conn = connect(db_path)
     try:
-        if _protected_scan_table_exists(conn):
+        if not resume_interrupted:
+            existing = None
+        elif _protected_scan_table_exists(conn):
             existing = conn.execute(
                 "SELECT id FROM scans "
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
@@ -2531,8 +2556,12 @@ async def _run_local_login_background(
         await run.confirmation.wait()
         run.status = "verifying_authentication"
         run.session.verify_authenticated_target()
-        run.browser_backgrounded = await run.session.minimize_for_background_scan()
+        # Chromium on macOS restores a minimized window whenever a new page is
+        # created. Allocate one reusable tab per worker before minimizing so
+        # the authenticated crawl stays out of the auditor's way throughout.
+        scan_pages = await run.session.prepare_background_scan_pages(config.workers)
         await run.session.discard_manual_auth_page()
+        run.browser_backgrounded = await run.session.minimize_for_background_scan(scan_pages[0])
 
         # The orchestrator normally constructs these around a fresh browser.
         # For an authenticated scan they must be attached before we inject the
@@ -2553,6 +2582,7 @@ async def _run_local_login_background(
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
             capture_screenshots=False,
+            shared_pages=scan_pages,
         )
         run.status = "scanning"
         authenticated_alfa: _AuthenticatedAlfaRunner | None = None
