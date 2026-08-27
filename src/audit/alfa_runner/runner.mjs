@@ -189,6 +189,10 @@ try {
   }
 } catch (error) {
   if (error instanceof RunnerFailure) throw error;
+  if (process.env.ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS === "1") {
+    const diagnostic = error instanceof Error ? (error.stack || error.message) : String(error);
+    process.stderr.write(`Axcess Alfa verification diagnostic: ${truncate(diagnostic, 8_000)}\n`);
+  }
   // Playwright/browser exceptions frequently include a URL or response
   // diagnostic.  Protected-mode stderr is deliberately generic so neither
   // the local child nor a parent error path turns it into report/log data.

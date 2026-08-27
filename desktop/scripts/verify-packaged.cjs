@@ -37,6 +37,7 @@ try {
     AUDIT_ACCESS_TOKEN: "",
     AUDIT_NODE_EXECUTABLE: electron,
     AUDIT_NODE_RUN_AS_NODE: "1",
+    AUDIT_RUNTIME_VERIFICATION_DIAGNOSTICS: "1",
     PLAYWRIGHT_BROWSERS_PATH: path.join(resources, "playwright-browsers"),
     TESSDATA_PREFIX: path.join(ocrRoot, "share", "tessdata"),
     PATH: [path.join(ocrRoot, "bin"), "/usr/bin", "/bin"].join(path.delimiter),

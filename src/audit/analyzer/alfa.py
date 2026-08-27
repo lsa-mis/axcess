@@ -167,6 +167,11 @@ class AlfaAnalyzer:
             # runtime to the bundled Alfa runner without requiring a separate
             # system installation. No application secrets are forwarded.
             env["ELECTRON_RUN_AS_NODE"] = "1"
+        if os.environ.get("AUDIT_RUNTIME_VERIFICATION_DIAGNOSTICS") == "1":
+            # Only the fixed, local desktop build fixture enables this. Normal
+            # scans keep browser diagnostics generic because exception text can
+            # contain target-controlled URLs or page content.
+            env["ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS"] = "1"
         if self._chromium_path:
             env["ALFA_CHROMIUM_PATH"] = self._chromium_path
         # The page URL can itself contain a protected path/record identifier.
