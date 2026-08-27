@@ -199,8 +199,42 @@ class _FakePage:
 
 
 @dataclass
+class _FakeCdpSession:
+    calls: list[tuple[str, object | None]] = field(default_factory=list)
+    detached: bool = False
+    window_state: str = "normal"
+    left: int = 0
+
+    async def send(self, method: str, params: object | None = None) -> dict[str, object]:
+        self.calls.append((method, params))
+        if method == "Browser.getWindowForTarget":
+            return {"windowId": 7}
+        if method == "Browser.setWindowBounds" and isinstance(params, dict):
+            bounds = params.get("bounds")
+            if isinstance(bounds, dict) and bounds.get("left") == -10_000:
+                # Match Chromium on macOS: it keeps a narrow edge reachable.
+                self.window_state = "normal"
+                self.left = -1240
+            # Deliberately ignore the first minimized request so the unit test
+            # exercises the macOS off-screen fallback.
+            return {}
+        if method == "Browser.getWindowBounds":
+            return {
+                "bounds": {
+                    "windowState": self.window_state,
+                    "left": self.left,
+                }
+            }
+        return {}
+
+    async def detach(self) -> None:
+        self.detached = True
+
+
+@dataclass
 class _FakeContext:
     page: _FakePage
+    cdp_session: _FakeCdpSession = field(default_factory=_FakeCdpSession)
     route_calls: list[tuple[str, object]] = field(default_factory=list)
     web_socket_route_calls: list[tuple[str, object]] = field(default_factory=list)
     event_handlers: dict[str, object] = field(default_factory=dict)
@@ -221,6 +255,10 @@ class _FakeContext:
 
     async def new_page(self) -> _FakePage:
         return self.page
+
+    async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
+        assert page is self.page
+        return self.cdp_session
 
     async def close(self) -> None:
         self.closed = True
@@ -298,6 +336,9 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"
         in chromium.context_options["args"]
     )
+    assert "--disable-background-timer-throttling" in chromium.context_options["args"]
+    assert "--disable-backgrounding-occluded-windows" in chromium.context_options["args"]
+    assert "--disable-renderer-backgrounding" in chromium.context_options["args"]
     assert len(context.init_scripts) == 1
     assert "RTCPeerConnection" in context.init_scripts[0]
     assert chromium.user_data_dir is not None
@@ -334,6 +375,31 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
     verified = session.verify_authenticated_target()
     assert verified.url == "https://app.example.edu/dashboard"
     assert session.state is ManualAuthState.AUTHENTICATED
+
+    assert await session.minimize_for_background_scan()
+    assert context.cdp_session.calls == [
+        ("Browser.getWindowForTarget", None),
+        (
+            "Browser.setWindowBounds",
+            {"windowId": 7, "bounds": {"windowState": "minimized"}},
+        ),
+        ("Browser.getWindowBounds", {"windowId": 7}),
+        (
+            "Browser.setWindowBounds",
+            {
+                "windowId": 7,
+                "bounds": {
+                    "windowState": "normal",
+                    "left": -10_000,
+                    "top": -10_000,
+                    "width": 1280,
+                    "height": 800,
+                },
+            },
+        ),
+        ("Browser.getWindowBounds", {"windowId": 7}),
+    ]
+    assert context.cdp_session.detached
 
     # The authenticated context remains available for new crawl tabs, but
     # the original headed sign-in tab is discarded as soon as it is safe.

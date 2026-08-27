@@ -27,10 +27,10 @@ export default function NewScanRoute() {
   const loginSelected = searchParams.get("mode") === "login";
   const [form, setForm] = useState<NewScanPayload>({
     url: searchParams.get("url") ?? "",
-    max_pages: 50,
+    max_pages: 2500,
     max_depth: 10,
     rps: 2.0,
-    workers: 4,
+    workers: 8,
     include_subdomain: false,
     whole_host: false,
     ignore_robots: false,
@@ -400,10 +400,17 @@ export default function NewScanRoute() {
                       label="Workers"
                       value={form.workers}
                       min={1}
-                      max={16}
+                      max={32}
                       onChange={(v) => update("workers", v)}
                     />
                   </div>
+                  <p className="text-xs text-fg-muted">
+                    Workers control local crawl and analysis concurrency; an
+                    M4 Pro can comfortably start at 8 and scale up to 32.
+                    Requests/sec limits traffic sent to the target site, so
+                    increase it only when the site owner has approved the
+                    additional load.
+                  </p>
 
                   <fieldset className="rounded-xs border border-border p-3">
                     <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
@@ -554,7 +561,7 @@ export default function NewScanRoute() {
                         hint={
                           form.static_only
                             ? "Unavailable in static-only mode because Axcess is not rendering pages."
-                            : "Opens Chromium on the computer running Axcess and shows each page while it is rendered and tested. Closing it stops browser-based checks."
+                            : "Leave this off to render invisibly in the background while you use other apps. Turn it on only when you want to watch page navigation; closing it stops browser-based checks."
                         }
                       />
                       <Checkbox
@@ -635,6 +642,28 @@ export default function NewScanRoute() {
                             : "Adds deterministic motion checks. Vision review will remain unavailable until the configured local vision model is installed."
                         }
                       />
+                      {(!form.skip_vlm ||
+                        !form.skip_semantic ||
+                        (!form.skip_visual &&
+                          localAnalysisCapability.data?.vision.available)) && (
+                        <div
+                          className="rounded-xs border border-umich-maize/70 bg-umich-maize/10 p-3 text-sm text-fg"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <p className="font-semibold">
+                            Local AI—no automatic model downloads
+                          </p>
+                          <p className="mt-1 text-xs text-fg-muted">
+                            No model download will start with this scan. Axcess
+                            uses only models already installed in local Ollama;
+                            unavailable model options stay disabled. Page and
+                            image evidence remains on this computer, but Ollama
+                            may load several GB into unified memory and make
+                            other apps feel slower while analysis is running.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </fieldset>
                 </div>

@@ -119,7 +119,7 @@ class LocalLoginScanRequest(BaseModel):
     seed_url: str = Field(min_length=12, max_length=2048)
     approved_auth_origins: tuple[str, ...] = Field(default=(), max_length=32)
     authorization_acknowledged: bool
-    max_pages: int = Field(default=100, ge=1, le=500)
+    max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
     whole_host: bool = False
@@ -178,6 +178,7 @@ class _LocalLoginRun:
     confirmation: asyncio.Event
     status: str = "opening_browser"
     error: str | None = None
+    browser_backgrounded: bool = False
     task: asyncio.Task[Any] | None = None
 
 
@@ -1008,7 +1009,12 @@ def create_app(
         run = local_login_runs.get(scan_id)
         if run is not None:
             return JSONResponse(
-                {"scan_id": scan_id, "status": run.status, "error": run.error},
+                {
+                    "scan_id": scan_id,
+                    "status": run.status,
+                    "error": run.error,
+                    "browser_backgrounded": run.browser_backgrounded,
+                },
                 headers={"Cache-Control": "no-store"},
             )
         with get_conn() as conn:
@@ -1030,6 +1036,7 @@ def create_app(
                         "Start a new login scan."
                     )
                 ),
+                "browser_backgrounded": False,
             },
             headers={"Cache-Control": "no-store"},
         )
@@ -1110,10 +1117,10 @@ def create_app(
 
         form = {
             "url": url,
-            "max_pages": int(body.get("max_pages") or 100),
+            "max_pages": int(body.get("max_pages") or 2500),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
-            "workers": int(body.get("workers") or 4),
+            "workers": int(body.get("workers") or 8),
             "include_subdomain": bool(body.get("include_subdomain")),
             "whole_host": bool(body.get("whole_host")),
             "ignore_robots": bool(body.get("ignore_robots")),
@@ -2524,6 +2531,7 @@ async def _run_local_login_background(
         await run.confirmation.wait()
         run.status = "verifying_authentication"
         run.session.verify_authenticated_target()
+        run.browser_backgrounded = await run.session.minimize_for_background_scan()
         await run.session.discard_manual_auth_page()
 
         # The orchestrator normally constructs these around a fresh browser.

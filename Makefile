@@ -1,4 +1,4 @@
-.PHONY: help setup run serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
+.PHONY: help setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
 
 PY := uv run
 DB := data/audit.db
@@ -43,6 +43,9 @@ fixture-site: ## Serve tests/fixtures/site on :8000 for crawler tests
 
 run: ## Start the review UI on http://$(HOST):$(PORT) (local dev, auto-reload)
 	$(PY) uvicorn audit.web.server:app --host $(HOST) --port $(PORT) --reload
+
+run-stable: ## Start the local review UI without reloads (safe for long login scans)
+	$(PY) uvicorn audit.web.server:app --host $(HOST) --port $(PORT)
 
 # SERVE_HOST defaults to 0.0.0.0 so other devices on your LAN / Tailscale
 # net can reach it. Set AUDIT_ACCESS_TOKEN first — see docs/hosting.md.

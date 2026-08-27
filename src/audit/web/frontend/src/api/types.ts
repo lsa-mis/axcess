@@ -338,6 +338,7 @@ export interface LocalLoginScanState {
   scan_id: number;
   status: LocalLoginScanStatus;
   error: string | null;
+  browser_backgrounded?: boolean;
   message?: string;
 }
 

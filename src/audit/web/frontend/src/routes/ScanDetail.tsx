@@ -59,10 +59,10 @@ export default function ScanDetailRoute() {
     mutationFn: () =>
       api.createScan({
         url: data?.seed_url ?? "",
-        max_pages: 50,
+        max_pages: 2500,
         max_depth: 10,
         rps: 2,
-        workers: 4,
+        workers: 8,
         include_subdomain: false,
         whole_host: false,
         ignore_robots: false,

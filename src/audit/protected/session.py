@@ -377,9 +377,12 @@ class ManualAuthenticationSession:
                 headless=False,
                 args=[
                     "--incognito",
+                    "--disable-background-timer-throttling",
                     "--disable-quic",
                     "--disable-background-networking",
+                    "--disable-backgrounding-occluded-windows",
                     "--disable-component-update",
+                    "--disable-renderer-backgrounding",
                     "--disable-sync",
                     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                     "--disk-cache-size=1",
@@ -425,6 +428,71 @@ class ManualAuthenticationSession:
         self._egress_proxy.set_policy(self._policies.scan)
         self._state = ManualAuthState.AUTHENTICATED
         return verified
+
+    async def minimize_for_background_scan(self) -> bool:
+        """Minimize the headed sign-in window before reusing its context.
+
+        Chromium cannot switch a live authenticated context from headed to
+        headless mode. Minimizing the existing window preserves the memory-only
+        session while allowing the auditor to keep using the computer. Some
+        macOS Chromium builds ignore the minimized state, so an off-screen
+        window is the verified fallback. CDP window management is best-effort
+        because a platform or Chromium build may not expose a native window.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before backgrounding the browser."
+            )
+        page = self._page
+        if page is None:
+            return False
+        cdp_session: Any | None = None
+        try:
+            cdp_session = await self.context.new_cdp_session(page)
+            window = await cdp_session.send("Browser.getWindowForTarget")
+            window_id = window.get("windowId")
+            if not isinstance(window_id, int):
+                return False
+            await cdp_session.send(
+                "Browser.setWindowBounds",
+                {
+                    "windowId": window_id,
+                    "bounds": {"windowState": "minimized"},
+                },
+            )
+            bounds = await cdp_session.send("Browser.getWindowBounds", {"windowId": window_id})
+            native_bounds = bounds.get("bounds", {})
+            if native_bounds.get("windowState") == "minimized":
+                return True
+
+            # macOS may acknowledge but ignore `windowState=minimized`.
+            # Move the persistent scan window out of the working area instead;
+            # Chromium clamps it to a small off-screen edge while keeping the
+            # renderer active for Playwright.
+            await cdp_session.send(
+                "Browser.setWindowBounds",
+                {
+                    "windowId": window_id,
+                    "bounds": {
+                        "windowState": "normal",
+                        "left": -10_000,
+                        "top": -10_000,
+                        "width": 1280,
+                        "height": 800,
+                    },
+                },
+            )
+            bounds = await cdp_session.send("Browser.getWindowBounds", {"windowId": window_id})
+            native_bounds = bounds.get("bounds", {})
+            left = native_bounds.get("left")
+            return isinstance(left, int) and left < 0
+        except Exception:
+            return False
+        finally:
+            if cdp_session is not None:
+                with contextlib.suppress(Exception):
+                    await cdp_session.detach()
 
     async def discard_manual_auth_page(self) -> None:
         """Close the original headed tab once its session has been verified.
