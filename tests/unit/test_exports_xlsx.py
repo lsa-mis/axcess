@@ -92,9 +92,21 @@ def test_issues_overview_header_block_and_table(tmp_db: sqlite3.Connection) -> N
     # Table header on row 8.
     header = tuple(ws.cell(row=8, column=c).value for c in range(1, len(_ISSUE_HEADERS)))
     assert header == _ISSUE_HEADERS[:-1]
-    # The grouped issue sheet points to the dedicated page-reference index
-    # instead of leaving a copy/paste list of URLs in one cell.
-    assert ws.cell(row=9, column=9).hyperlink is not None
+    # Every grouped issue with page locations points to the dedicated
+    # page-reference index with a true internal workbook destination.
+    location_cells = [
+        ws.cell(row=row, column=9)
+        for row in range(9, ws.max_row + 1)
+        if ws.cell(row=row, column=9).value
+    ]
+    assert location_cells
+    assert all(cell.hyperlink is not None for cell in location_cells)
+    assert all(cell.hyperlink.target is None for cell in location_cells if cell.hyperlink)
+    assert all(
+        cell.hyperlink.location == "'Page References'!A1"
+        for cell in location_cells
+        if cell.hyperlink
+    )
 
     # At least one data row, and the conformance column is mapped to the
     # template's letters. The best-practice axe rule (no SC) → "S".

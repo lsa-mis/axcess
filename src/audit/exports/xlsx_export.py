@@ -39,6 +39,7 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.worksheet.worksheet import Worksheet
 
 from audit import coverage_matrix, evaluation
@@ -334,7 +335,12 @@ def _build_issues_sheet(
                 cell.fill = _BAND_FILL
         if locations and detail is not None and detail.pages:
             location_cell = ws.cell(row=r, column=9)
-            location_cell.hyperlink = "#'Page References'!A1"
+            location_cell.hyperlink = Hyperlink(
+                ref=location_cell.coordinate,
+                location="'Page References'!A1",
+                display=str(location_cell.value or ""),
+                tooltip="Open the Page References worksheet",
+            )
             location_cell.style = "Hyperlink"
         if help_url.startswith(("https://", "http://")):
             resource_cell = ws.cell(row=r, column=11)
