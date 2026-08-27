@@ -58,9 +58,17 @@ jobs:
           enable-cache: true
           python-version: "3.13"
       - name: Install locked dependencies
-        run: uv sync --frozen
+        # The evaluator imports directly from src. Installing the Axcess wheel
+        # would require the packaged React dist, which this backend-only job
+        # intentionally does not build.
+        run: uv sync --frozen --no-install-project
       - name: Run detection evaluations
-        run: make detection-evals
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run --no-sync python -m audit.detection_evals \
+            --config tests/quality/detection_eval_config.json \
+            --output-dir artifacts/detection-evals
       - name: Publish job summary
         if: always()
         shell: bash
