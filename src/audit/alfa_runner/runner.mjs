@@ -27,6 +27,7 @@ const MAX_MESSAGE_CHARS = 2_000;
 const PROFILE_ROOT = join(tmpdir(), "axcess-protected-alfa");
 const PROFILE_PREFIX = "run-";
 const STALE_PROFILE_MAX_AGE_MS = 6 * 60 * 60 * 1_000;
+const RUNTIME_VERIFICATION_URL = "http://axcess-runtime.invalid/";
 // Alfa evaluates the rendered DOM. Authenticated raster/media/font loads do
 // not improve its v1 rule coverage, but can place raw protected bytes in the
 // short-lived Chromium profile/cache. Keep this mirror of the primary
@@ -61,7 +62,9 @@ const args = process.argv.slice(2);
 if (args.length !== 1 || args[0] !== "--input-stdin") {
   fail("Runner input must be supplied through stdin.");
 }
+verificationProgress("runner started");
 const input = await readRunnerInput();
+verificationProgress("input received");
 const url = input.url;
 const level = input.level;
 const userAgent = input.user_agent;
@@ -112,13 +115,26 @@ try {
     });
     context = await browser.newContext(contextOptions);
   }
+  verificationProgress("browser context ready");
   await context.addInitScript(WEBRTC_BLOCK_INIT_SCRIPT);
+  if (process.env.ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS === "1") {
+    // The packaged-app smoke test must exercise Alfa against a real 200 HTML
+    // response without depending on runner firewall or loopback socket policy.
+    await context.route(RUNTIME_VERIFICATION_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body: "<!doctype html><html lang=en><title>Axcess</title><main>Alfa check</main>",
+      }),
+    );
+  }
   if (auth) {
     await installReadOnlyRoute(context, auth.allowed_origins, auth.target_origins);
   }
   const page = await context.newPage();
   installNoArtifactHandlers(context, page);
   const response = await page.goto(url, { waitUntil: "load", timeout: 30_000 });
+  verificationProgress("document loaded");
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
   if (auth) await assertSafeAllowedDocument(page.url(), new Set(auth.target_origins));
 
@@ -149,6 +165,7 @@ try {
     const document = await page.evaluateHandle(() => window.document);
     const alfaPage = await AlfaPlaywright.toPage(document);
     await document.dispose();
+    verificationProgress("DOM captured");
 
     const conformance =
       level === "A"
@@ -159,7 +176,11 @@ try {
     const selectedRules = rules.filter((rule) =>
       rule.hasRequirement(Refinement.and(Criterion.isCriterion, conformance)),
     );
-    const outcomes = await Audit.of(alfaPage, selectedRules).evaluate();
+    const auditRules = process.env.ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS === "1"
+      ? selectedRules.slice(0, 1)
+      : selectedRules;
+    const outcomes = await Audit.of(alfaPage, auditRules).evaluate();
+    verificationProgress("rule evaluation complete");
     const counts = emptyCounts();
     const findings = [];
     for (const outcome of outcomes) {
@@ -198,9 +219,16 @@ try {
   // the local child nor a parent error path turns it into report/log data.
   fail("Alfa could not evaluate the approved page.");
 } finally {
+  verificationProgress("closing browser context");
   await context?.close().catch(() => undefined);
   await browser?.close().catch(() => undefined);
   if (profileDir) await rm(profileDir, { recursive: true, force: true, maxRetries: 1 }).catch(() => undefined);
+}
+
+function verificationProgress(stage) {
+  if (process.env.ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS === "1") {
+    process.stderr.write(`Axcess Alfa verification: ${stage}\n`);
+  }
 }
 
 function toFinding(outcome) {
