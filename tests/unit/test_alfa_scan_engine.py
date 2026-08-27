@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -187,6 +188,38 @@ async def test_protected_alfa_hides_runner_stderr_and_closes_its_input(
     assert str(raised.value) == "The protected Alfa engine could not complete this page."
     assert "secret" not in str(raised.value)
     assert process.stdin.closed
+
+
+@pytest.mark.asyncio
+async def test_alfa_runner_receives_only_bounded_runtime_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "protocol_version": 1,
+        "engine": "alfa",
+        "url": "https://example.test/",
+        "status": 200,
+        "outcome_counts": {"failed": 0, "cantTell": 0},
+        "findings": [],
+    }
+    process = _FakeAlfaProcess(stdout=json.dumps(payload).encode())
+    captured_env: dict[str, str] = {}
+
+    async def create_process(*_args: object, **kwargs: object) -> _FakeAlfaProcess:
+        captured_env.update(kwargs["env"])
+        return process
+
+    monkeypatch.setattr(alfa, "availability", lambda: alfa.AlfaAvailability(True))
+    monkeypatch.setattr(alfa, "_node_executable", lambda: "/safe/node")
+    monkeypatch.setattr(alfa.asyncio, "create_subprocess_exec", create_process)
+    monkeypatch.setenv("APPLICATION_SECRET", "must-not-leak")
+
+    await AlfaAnalyzer(user_agent="test-agent").run("https://example.test/", level="AA")
+
+    assert captured_env["TEMP"] == tempfile.gettempdir()
+    assert captured_env["TMP"] == tempfile.gettempdir()
+    assert captured_env["TMPDIR"] == tempfile.gettempdir()
+    assert "APPLICATION_SECRET" not in captured_env
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -161,7 +162,16 @@ class AlfaAnalyzer:
         node_executable = _node_executable()
         if node_executable is None:
             raise AlfaError("Node.js 22 or later is not available.")
-        env = {"PATH": os.environ.get("PATH", "")}
+        runtime_temp = tempfile.gettempdir()
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            # Node's os.tmpdir() requires TEMP or TMP on Windows. Supplying the
+            # resolved system temp directory keeps Playwright functional while
+            # the companion process remains isolated from application secrets.
+            "TEMP": runtime_temp,
+            "TMP": runtime_temp,
+            "TMPDIR": runtime_temp,
+        }
         if os.environ.get("AUDIT_NODE_RUN_AS_NODE") == "1":
             # A packaged Electron executable can provide its embedded Node
             # runtime to the bundled Alfa runner without requiring a separate
