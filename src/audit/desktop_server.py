@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 import uvicorn
@@ -57,6 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
 async def verify_runtime() -> dict[str, str]:
     """Exercise every external runtime required by a packaged desktop scan."""
 
+    def progress(component: str) -> None:
+        print(f"Verifying packaged {component}...", file=sys.stderr, flush=True)
+
     from PIL import Image
     from playwright.async_api import async_playwright
 
@@ -64,6 +68,7 @@ async def verify_runtime() -> dict[str, str]:
     from audit.analyzer.ocr.tesseract import run_tesseract
     from audit.crawler import url_policy
 
+    progress("application assets")
     package_dir = Path(__file__).resolve().parent
     required_assets = {
         "axe_core": package_dir / "web" / "static" / "axe.min.js",
@@ -77,14 +82,17 @@ async def verify_runtime() -> dict[str, str]:
     if missing:
         raise RuntimeError(f"Bundled desktop assets are missing: {', '.join(missing)}")
 
+    progress("URL scope")
     scope = url_policy.build_scope("https://subdomain.example.edu/section/")
     if scope.seed_host != "subdomain.example.edu" or scope.path_prefix != "/section/":
         raise RuntimeError("Bundled URL scope dependencies could not initialize.")
 
+    progress("Alfa availability")
     alfa_state = availability()
     if not alfa_state.available:
         raise RuntimeError(alfa_state.reason or "The bundled Alfa engine is unavailable.")
 
+    progress("Chromium and axe-core")
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=True)
         try:
@@ -101,6 +109,7 @@ async def verify_runtime() -> dict[str, str]:
         finally:
             await browser.close()
 
+    progress("Alfa browser analysis")
     chromium_path = await chromium_executable_path()
     if chromium_path is None:
         raise RuntimeError("Bundled Chromium executable could not be resolved for Alfa.")
@@ -112,6 +121,7 @@ async def verify_runtime() -> dict[str, str]:
 
     import io
 
+    progress("Tesseract OCR")
     image_buffer = io.BytesIO()
     Image.new("RGB", (120, 40), "white").save(image_buffer, format="PNG")
     ocr = run_tesseract(image_buffer.getvalue(), "eng")
@@ -120,6 +130,7 @@ async def verify_runtime() -> dict[str, str]:
 
     from openpyxl import Workbook
 
+    progress("Excel report generation")
     workbook_buffer = io.BytesIO()
     workbook = Workbook()
     workbook.active["A1"] = "Axcess report runtime check"
@@ -129,6 +140,7 @@ async def verify_runtime() -> dict[str, str]:
 
     # Importing the application validates FastAPI and all report/export module
     # imports after migrations have established the packaged schema.
+    progress("FastAPI application")
     from audit.web.server import app
 
     if app.title != "Axcess":

@@ -24,6 +24,7 @@ const electron =
     ? path.join(application, "Contents", "MacOS", "Axcess")
     : path.join(application, "Axcess.exe");
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "axcess-package-check-"));
+const verificationTimeoutMs = process.platform === "win32" ? 300_000 : 120_000;
 
 try {
   const ocrRoot = path.join(resources, "ocr-runtime");
@@ -44,9 +45,15 @@ try {
     cwd: path.dirname(backend),
     env,
     encoding: "utf8",
-    timeout: 120_000,
+    timeout: verificationTimeoutMs,
   });
-  if (result.error) throw result.error;
+  if (result.error) {
+    const diagnostics = [result.stderr, result.stdout].filter(Boolean).join("\n").trim();
+    throw new Error(
+      `Packaged runtime verification could not complete: ${result.error.message}` +
+        (diagnostics ? `\n${diagnostics}` : ""),
+    );
+  }
   if (result.status !== 0) {
     throw new Error(
       `Packaged runtime verification failed (${result.status}).\n${result.stderr || result.stdout}`,
