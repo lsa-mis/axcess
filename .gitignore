@@ -13,6 +13,7 @@ dist/
 .coverage
 htmlcov/
 coverage.xml
+artifacts/
 
 # Virtual environments
 .venv/

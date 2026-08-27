@@ -9,7 +9,7 @@ you can sort, filter, and track in a spreadsheet:
   the University of Michigan Digital Accessibility Services format: a
   metadata header block + Issues · Conformance Level · Remediation Ownership ·
   Status · User Impact · Page Links / Locations · Action · Helpful Resources ·
-  Notes · Evidence (a highlighted screenshot of the issue's element, embedded
+  Notes · Evidence (a circled screenshot of the issue's location, embedded
   when a ``blob_store`` is supplied and the finding has one).
 * **Page Hotspots** — pages ranked by a severity-weighted load.
 * **Page References** — every affected page as a clickable link, with a
@@ -346,7 +346,7 @@ def _build_issues_sheet(
             resource_cell = ws.cell(row=r, column=11)
             resource_cell.hyperlink = help_url
             resource_cell.style = "Hyperlink"
-        # Embed a highlighted element screenshot in the Evidence column
+        # Embed a circled location screenshot in the Evidence column
         # (last column) when a blob store is supplied and the finding has one.
         if include_evidence and blob_store is not None:
             _embed_evidence(ws, row=r, col=ncols, detail=detail, blob_store=blob_store)
@@ -915,7 +915,7 @@ def render_xlsx(
 
     ``blob_store`` is optional: when supplied and the scan has retained
     screenshot hashes, the Issues Overview sheet embeds the first available
-    highlighted screenshot in a trailing "Evidence" column. The column is
+    circled location screenshot in a trailing "Evidence" column. The column is
     omitted when there is no embeddable evidence so the table stays compact.
     """
     date_str = audit_date or _fmt_date(scan.finished_at or scan.started_at)

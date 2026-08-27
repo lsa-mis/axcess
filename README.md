@@ -333,8 +333,12 @@ make lint              # Ruff + frontend ESLint/accessibility rules
 make typecheck         # strict mypy + TypeScript
 make frontend-build    # production React build
 make quality-gate      # versioned labeled-corpus precision checks
+make detection-evals   # efficacy, evidence-path efficiency, and scale
 make test              # complete unit, integration, and UI suite
 ```
+
+See [`DETECTION_EFFICACY.md`](./DETECTION_EFFICACY.md) for metric definitions,
+gates, limitations, and the dedicated CI evaluation workflow.
 
 The UI has keyboard, screen-reader, focus, 200% zoom, 320-pixel reflow, and
 axe-core regression coverage. Export tests verify scope, methods, limitations,

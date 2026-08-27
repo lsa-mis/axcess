@@ -1980,7 +1980,7 @@ def create_app(
                 rendered = render_audit_report(scan, conn=conn)
             elif fmt_lower == "xlsx":
                 # Pass the blob store so the Issues Overview sheet can embed
-                # each finding's highlighted element screenshot as evidence.
+                # each finding's circled location screenshot as evidence.
                 rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
             else:
                 rendered = _EXPORT_RENDERERS[fmt_lower](scan)

@@ -1,7 +1,8 @@
+import { Fragment } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
-import { api } from "../api/client";
+import { api, blobUrl } from "../api/client";
 import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
 import {
   Card,
@@ -320,47 +321,95 @@ export default function IssueDetailRoute() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {pages.map((p) => (
-                  <tr key={p.page_id}>
-                    <td className="px-3 py-2 align-top">
-                      <PageLink
-                        pageId={p.page_id}
-                        scanId={scan.id}
-                        pageUrl={p.page_url}
-                        pageTitle={p.page_title}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right align-top tabular-nums">
-                      {p.occurrence_count}
-                    </td>
-                    {!isInformational && (
-                      <td className="px-3 py-2 align-top">
-                        <div className="flex flex-wrap gap-1">
-                          {STATUS_LABELS_ORDER.map((s) => {
-                            const n = p.status_summary[s] ?? 0;
-                            if (!n) return null;
-                            const isOpen =
-                              s === "new" ||
-                              s === "reviewing" ||
-                              s === "in_progress";
-                            return (
-                              <span
-                                key={s}
-                                className={
-                                  isOpen
-                                    ? "inline-block rounded-xs bg-sev-major-bg/15 px-1.5 py-0.5 text-2xs text-fg"
-                                    : "inline-block rounded-xs bg-surface-muted px-1.5 py-0.5 text-2xs text-fg-subtle"
-                                }
-                              >
-                                {n} {s.replace(/_/g, " ")}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                {pages.map((p) => {
+                  const missingScreenshots = Math.max(
+                    0,
+                    p.occurrence_count - p.screenshot_hashes.length,
+                  );
+                  const pageLabel = p.page_title || p.page_url;
+                  return (
+                    <Fragment key={p.page_id}>
+                      <tr>
+                        <td className="px-3 py-2 align-top">
+                          <PageLink
+                            pageId={p.page_id}
+                            scanId={scan.id}
+                            pageUrl={p.page_url}
+                            pageTitle={p.page_title}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right align-top tabular-nums">
+                          {p.occurrence_count}
+                        </td>
+                        {!isInformational && (
+                          <td className="px-3 py-2 align-top">
+                            <div className="flex flex-wrap gap-1">
+                              {STATUS_LABELS_ORDER.map((s) => {
+                                const n = p.status_summary[s] ?? 0;
+                                if (!n) return null;
+                                const isOpen =
+                                  s === "new" ||
+                                  s === "reviewing" ||
+                                  s === "in_progress";
+                                return (
+                                  <span
+                                    key={s}
+                                    className={
+                                      isOpen
+                                        ? "inline-block rounded-xs bg-sev-major-bg/15 px-1.5 py-0.5 text-2xs text-fg"
+                                        : "inline-block rounded-xs bg-surface-muted px-1.5 py-0.5 text-2xs text-fg-subtle"
+                                    }
+                                  >
+                                    {n} {s.replace(/_/g, " ")}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                      <tr className="bg-surface-muted/40">
+                        <td
+                          colSpan={isInformational ? 2 : 3}
+                          className="px-3 pb-4 pt-2"
+                        >
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                            Instance screenshots
+                          </h3>
+                          {p.screenshot_hashes.length > 0 ? (
+                            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                              {p.screenshot_hashes.map((hash, index) => (
+                                <figure
+                                  key={`${hash}-${index}`}
+                                  className="rounded-xs border border-border bg-surface p-2"
+                                >
+                                  <img
+                                    src={blobUrl(hash)}
+                                    alt={`Issue instance ${index + 1} on ${pageLabel}. A circular marker identifies the detected location.`}
+                                    className="max-h-80 w-full rounded-xs object-contain"
+                                    loading="lazy"
+                                  />
+                                  <figcaption className="mt-2 text-xs text-fg-muted">
+                                    Instance {index + 1} of {p.occurrence_count}. The circle marks the detected location.
+                                  </figcaption>
+                                </figure>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-xs text-fg-muted">
+                              No screenshot was captured for this page. The evidence may not have a locatable rendered selector.
+                            </p>
+                          )}
+                          {missingScreenshots > 0 && p.screenshot_hashes.length > 0 && (
+                            <p className="mt-2 text-xs text-fg-muted">
+                              {missingScreenshots} additional instance{missingScreenshots === 1 ? "" : "s"} had no locatable screenshot or exceeded the per-page safety limit.
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

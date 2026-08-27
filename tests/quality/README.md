@@ -4,6 +4,11 @@
 outputs and binary reference labels. Its purpose is to catch precision
 regressions and keep every detection layer visible in quality discussions.
 
+The root-level [`DETECTION_EFFICACY.md`](../../DETECTION_EFFICACY.md) defines
+the combined efficacy, efficiency, and scale pipeline. Run `make
+detection-evals` to produce its Markdown and JSON reports; `make quality-gate`
+remains the narrower corpus-only gate.
+
 The quality gate uses the **false-discovery rate** (`FP / (TP + FP)`): the
 share of surfaced findings or review leads that are not barriers. That is the
 report-noise measure behind the product target of “less than 5% false

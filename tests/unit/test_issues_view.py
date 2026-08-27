@@ -294,6 +294,31 @@ def test_get_issue_detail_axe_pipeline(tmp_db: sqlite3.Connection) -> None:
     assert detail.help_url and "dequeuniversity" in detail.help_url
 
 
+def test_issue_detail_exposes_each_captured_instance_screenshot(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Grouped issue pages retain every scan-time screenshot for the UI gallery."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    hashes = ("a" * 64, "c" * 64)
+    rows = tmp_db.execute(
+        "SELECT id FROM page_a11y_findings "
+        "WHERE scan_id = ? AND rule_id = 'color-contrast' ORDER BY id",
+        (scan_id,),
+    ).fetchall()
+    assert len(rows) == 2
+    for row, screenshot_hash in zip(rows, hashes, strict=True):
+        tmp_db.execute(
+            "UPDATE page_a11y_findings SET screenshot_hash = ? WHERE id = ?",
+            (screenshot_hash, int(row["id"])),
+        )
+
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, "axe:color-contrast")
+
+    assert detail is not None
+    assert sum(len(page.screenshot_hashes) for page in detail.pages) == 2
+    assert {shot for page in detail.pages for shot in page.screenshot_hashes} == set(hashes)
+
+
 def test_get_issue_detail_returns_none_for_stale_key(
     tmp_db: sqlite3.Connection,
 ) -> None:

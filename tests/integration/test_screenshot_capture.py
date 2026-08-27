@@ -13,7 +13,10 @@ server: ``page.set_content`` renders the markup in-process.
 
 from __future__ import annotations
 
+import io
+
 import pytest
+from PIL import Image
 
 from audit.crawler.js_fetcher import JsFetcher
 
@@ -57,6 +60,13 @@ async def test_capture_element_returns_png_for_known_element(page) -> None:  # t
     png = await _fetcher()._capture_element(page, "#x")
     assert png is not None
     assert png[:4] == b"\x89PNG"
+    image = Image.open(io.BytesIO(png)).convert("RGB")
+    red_pixels = sum(
+        1
+        for red, green, blue in image.get_flattened_data()
+        if red >= 170 and green <= 50 and blue <= 70
+    )
+    assert red_pixels > 20  # circular issue-location marker
 
 
 async def test_capture_element_returns_none_for_missing_element(page) -> None:  # type: ignore[no-untyped-def]

@@ -1,0 +1,78 @@
+name: Detection evaluations
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/detection-evals.yml
+      - DETECTION_EFFICACY.md
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - src/audit/analyzer/**
+      - src/audit/crawler/**
+      - src/audit/db/**
+      - src/audit/synthesizer/**
+      - src/audit/web/issues.py
+      - src/audit/quality_benchmark.py
+      - src/audit/detection_evals.py
+      - src/audit/rules/**
+      - tests/quality/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/detection-evals.yml
+      - DETECTION_EFFICACY.md
+      - Makefile
+      - pyproject.toml
+      - uv.lock
+      - src/audit/analyzer/**
+      - src/audit/crawler/**
+      - src/audit/db/**
+      - src/audit/synthesizer/**
+      - src/audit/web/issues.py
+      - src/audit/quality_benchmark.py
+      - src/audit/detection_evals.py
+      - src/audit/rules/**
+      - tests/quality/**
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: detection-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Efficacy, efficiency, and scale
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --frozen
+      - name: Run detection evaluations
+        run: make detection-evals
+      - name: Publish job summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/detection-evals/report.md ]; then
+            cat artifacts/detection-evals/report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload evaluation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axcess-detection-evals
+          path: artifacts/detection-evals/**
+          if-no-files-found: warn
+          retention-days: 30

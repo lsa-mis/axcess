@@ -16,8 +16,11 @@ between ``page.goto`` and ``ctx.close``.
 from __future__ import annotations
 
 import contextlib
+import io
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
+
+from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -35,11 +38,57 @@ log = get_logger(__name__)
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
-# Per-page cap on highlighted element screenshots. Each capture costs a
+# Per-page cap on circled element screenshots. Each capture costs a
 # scroll + a screenshot (~50-150 ms); capping the count bounds the
-# crawl-time cost on findings-dense pages without losing the typical
-# handful of issues a reviewer actually wants evidence for.
-MAX_SHOTS_PER_PAGE = 12
+# crawl-time and storage cost on pathological findings-dense pages. One
+# hundred covers the ordinary "one image per issue instance" case while
+# retaining a hard safety bound for generated or broken DOMs.
+MAX_SHOTS_PER_PAGE = 100
+
+
+def _draw_issue_circle(
+    png: bytes,
+    *,
+    center_x: float,
+    center_y: float,
+    target_width: float,
+    target_height: float,
+) -> bytes:
+    """Draw a high-contrast circular location marker onto screenshot bytes.
+
+    The marker is applied after capture instead of mutating the audited DOM.
+    A white halo keeps the circle distinguishable on dark or red content; the
+    circular shape and the UI caption ensure the annotation does not rely on
+    color alone.
+    """
+
+    with Image.open(io.BytesIO(png)) as source:
+        image = source.convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    available_radius = (
+        min(
+            center_x,
+            center_y,
+            image.width - center_x,
+            image.height - center_y,
+        )
+        - 4
+    )
+    if available_radius < 6:
+        return png
+    target_radius = max(24.0, min(48.0, max(target_width, target_height) / 2 + 10))
+    radius = int(min(target_radius, available_radius))
+    bounds = (
+        int(center_x - radius),
+        int(center_y - radius),
+        int(center_x + radius),
+        int(center_y + radius),
+    )
+    draw.ellipse(bounds, outline=(255, 255, 255, 255), width=10)
+    draw.ellipse(bounds, outline=(190, 0, 30, 255), width=5)
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
 
 
 class RenderedPageTooLargeError(FetchError):
@@ -102,7 +151,7 @@ class JsFetcher:
         # SC 1.3.2 visual probe. Screenshots the page — must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
-        # When set, capture a highlighted screenshot of each live-page
+        # When set, capture a circled screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
         # Protected scans own one manually-authenticated BrowserContext in the
@@ -315,9 +364,10 @@ class JsFetcher:
                     await page.close()
 
     async def _capture_element(self, page: Page, selector: str) -> bytes | None:
-        """Screenshot the element at ``selector`` with a highlight outline.
+        """Screenshot the element at ``selector`` with a circular marker.
 
-        Returns padded-clip PNG bytes, or ``None`` if the element is
+        Returns contextual PNG bytes with a circle centered on the detected
+        location, or ``None`` if the element is
         missing, off-screen, too small, or anything goes wrong. The whole
         body is defensive — an invalid CSS selector, a detached node, or a
         screenshot timeout returns ``None`` rather than raising, so one bad
@@ -335,14 +385,9 @@ class JsFetcher:
             box = await loc.bounding_box()
             if box is None:
                 return None
-            # Draw a red highlight outline so the reviewer sees the exact
-            # element; stash the old inline outline to restore it after.
-            with contextlib.suppress(Exception):
-                await loc.evaluate(
-                    "el => { el.setAttribute('data-axcess-old-outline', el.style.outline||''); "
-                    "el.style.outline='3px solid #ff3b30'; el.style.outlineOffset='2px'; }"
-                )
-            pad = 14
+            # Keep enough nearby page context for the marker to be useful.
+            # Annotation happens on the PNG, never in the audited page DOM.
+            pad = 56
             vp = page.viewport_size or {"width": 1440, "height": 900}
             x = max(0, box["x"] - pad)
             y = max(0, box["y"] - pad)
@@ -351,11 +396,14 @@ class JsFetcher:
             if width < 2 or height < 2:
                 return None
             png = await page.screenshot(clip={"x": x, "y": y, "width": width, "height": height})
-            with contextlib.suppress(Exception):
-                await loc.evaluate(
-                    "el => { el.style.outline = el.getAttribute('data-axcess-old-outline')||''; "
-                    "el.removeAttribute('data-axcess-old-outline'); }"
-                )
-            return png
+            center_x = box["x"] + box["width"] / 2 - x
+            center_y = box["y"] + box["height"] / 2 - y
+            return _draw_issue_circle(
+                png,
+                center_x=center_x,
+                center_y=center_y,
+                target_width=box["width"],
+                target_height=box["height"],
+            )
         except Exception:
             return None

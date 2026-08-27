@@ -691,6 +691,8 @@ export interface IssuePage {
   page_title: string | null;
   occurrence_count: number;
   status_summary: Record<string, number>;
+  /** Circled scan-time screenshots, one for each locatable captured instance. */
+  screenshot_hashes: string[];
 }
 
 export interface IssueDetail {

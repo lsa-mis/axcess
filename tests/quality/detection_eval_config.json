@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "config_version": "1.0.0",
+  "efficacy": {
+    "corpus": "tests/quality/corpora/detection_precision_v1.json"
+  },
+  "performance": {
+    "page_counts": [100, 500, 1000],
+    "findings_per_page": 8,
+    "efficiency_reference_pages": 500,
+    "min_write_findings_per_second": 100.0,
+    "max_projection_seconds": 5.0,
+    "max_per_finding_slowdown": 3.0
+  }
+}
