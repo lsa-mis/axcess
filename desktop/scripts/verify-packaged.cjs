@@ -3,26 +3,26 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-if (process.platform !== "darwin") {
-  console.log("Packaged runtime verification is currently implemented for macOS builds.");
+if (process.platform !== "darwin" && process.platform !== "win32") {
+  console.log("Packaged runtime verification is implemented for macOS and Windows builds.");
   process.exit(0);
 }
 
 const desktopRoot = path.resolve(__dirname, "..");
-const application = path.join(
-  desktopRoot,
-  "out",
-  `Axcess-darwin-${process.arch}`,
-  "Axcess.app",
-);
-const resources = path.join(application, "Contents", "Resources");
-const backend = path.join(
-  resources,
-  "backend-dist",
-  "axcess-server",
-  "axcess-server",
-);
-const electron = path.join(application, "Contents", "MacOS", "Axcess");
+const application =
+  process.platform === "darwin"
+    ? path.join(desktopRoot, "out", `Axcess-darwin-${process.arch}`, "Axcess.app")
+    : path.join(desktopRoot, "out", `Axcess-win32-${process.arch}`);
+const resources =
+  process.platform === "darwin"
+    ? path.join(application, "Contents", "Resources")
+    : path.join(application, "resources");
+const backendExecutable = process.platform === "win32" ? "axcess-server.exe" : "axcess-server";
+const backend = path.join(resources, "backend-dist", "axcess-server", backendExecutable);
+const electron =
+  process.platform === "darwin"
+    ? path.join(application, "Contents", "MacOS", "Axcess")
+    : path.join(application, "Axcess.exe");
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "axcess-package-check-"));
 
 try {

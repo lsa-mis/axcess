@@ -3,7 +3,7 @@ name: Desktop application build
 on:
   push:
     branches:
-      - feature/electron-desktop
+      - main
     paths:
       - .github/workflows/desktop-build.yml
       - desktop/**
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-macos:
     name: Apple Silicon macOS desktop artifact
     runs-on: macos-15
     steps:
@@ -73,6 +73,66 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-macos-apple-silicon
+          path: desktop/out/make/**
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows:
+    name: Windows x64 desktop artifact
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            src/audit/web/frontend/package-lock.json
+            src/audit/alfa_runner/package-lock.json
+      - run: npm ci
+        working-directory: src/audit/web/frontend
+      - run: npm run build
+        working-directory: src/audit/web/frontend
+      - run: npm ci
+        working-directory: src/audit/alfa_runner
+      - run: npm ci
+        working-directory: desktop
+      - run: uv sync --group desktop
+      - name: Bundle Chromium
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\desktop\playwright-browsers"
+          uv run playwright install chromium
+      - name: Bundle Tesseract OCR
+        shell: pwsh
+        run: |
+          choco install tesseract --yes --no-progress
+          desktop/scripts/bundle-tesseract-windows.ps1
+      - name: Bundle Python backend
+        run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      - name: Package desktop installer
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          foreach ($attempt in 1..3) {
+            npm run make
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+            if ($attempt -eq 3) {
+              exit $LASTEXITCODE
+            }
+            Write-Host "Packaging failed; retrying (attempt $($attempt + 1) of 3)."
+            Start-Sleep -Seconds ($attempt * 10)
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axcess-windows-x64
           path: desktop/out/make/**
           if-no-files-found: error
           retention-days: 14

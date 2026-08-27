@@ -41,9 +41,10 @@ if (!fs.readdirSync(browserRoot).some((name) => name.startsWith("chromium-"))) {
   throw new Error(`Playwright Chromium is missing from ${browserRoot}`);
 }
 
-if (process.platform === "darwin") {
+if (process.platform === "darwin" || process.platform === "win32") {
   const ocrRoot = path.join(desktopRoot, "ocr-runtime");
-  requirePath(path.join(ocrRoot, "bin", "tesseract"), "Tesseract executable");
+  const tesseractName = process.platform === "win32" ? "tesseract.exe" : "tesseract";
+  requirePath(path.join(ocrRoot, "bin", tesseractName), "Tesseract executable");
   requirePath(
     path.join(ocrRoot, "share", "tessdata", "eng.traineddata"),
     "Tesseract English language data",

@@ -1,7 +1,7 @@
 # Axcess desktop application
 
-Axcess has an Electron desktop shell on the `feature/electron-desktop`
-branch. The desktop application does not duplicate the product UI. It starts
+Axcess has an Electron desktop shell. The desktop application does not
+duplicate the product UI. It starts
 the existing FastAPI service on an unused loopback port and displays the same
 React workbench in a sandboxed Electron window.
 
@@ -94,13 +94,13 @@ from its integrity-checked ASAR archive.
 
 ## Release work still required
 
-The branch produces local, unsigned installers. Before institutional rollout:
+The build produces local, unsigned installers. Before institutional rollout:
 
 - create final `.icns`, `.ico`, and Linux icon assets;
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
-- bundle and verify equivalent OCR runtimes before enabling Windows or Linux
-  release jobs;
+- bundle and verify an equivalent OCR runtime before enabling a Linux release
+  job;
 - add a signed update channel or document managed-software deployment;
 - run U-M security and privacy review on the packaged binaries;
 - test installation, upgrade, rollback, database retention, and uninstall on

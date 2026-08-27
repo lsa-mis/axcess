@@ -94,8 +94,12 @@ desktop-backend: frontend-build alfa-install ## Bundle the Python/React/Alfa bac
 desktop-browsers: ## Bundle the platform-matched Chromium used by Playwright
 	PLAYWRIGHT_BROWSERS_PATH="$(CURDIR)/$(DESKTOP)/playwright-browsers" $(PY) playwright install chromium
 
-desktop-ocr: ## Bundle the relocatable macOS Tesseract OCR runtime
+desktop-ocr: ## Bundle the platform-matched relocatable Tesseract OCR runtime
+ifeq ($(OS),Windows_NT)
+	powershell -NoProfile -ExecutionPolicy Bypass -File "$(DESKTOP)/scripts/bundle-tesseract-windows.ps1"
+else
 	$(DESKTOP)/scripts/bundle-tesseract-macos.sh
+endif
 
 desktop-package: desktop-install desktop-backend desktop-browsers desktop-ocr ## Build this platform's installer
 	cd $(DESKTOP) && npm run make
