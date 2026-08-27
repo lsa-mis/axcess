@@ -157,6 +157,14 @@ def run_detection_evals(config: DetectionEvalConfig) -> dict[str, Any]:
             "corpus_version": corpus.corpus_version,
             "label_method": corpus.label_method,
             "scope_statement": corpus.scope_statement,
+            "thresholds": {
+                "max_false_discovery_rate_exclusive": (
+                    corpus.gate.max_false_discovery_rate_exclusive
+                ),
+                "min_recall": corpus.gate.min_recall,
+                "min_surfaced_per_layer": corpus.gate.min_surfaced_per_layer,
+                "min_negative_controls_per_layer": (corpus.gate.min_negative_controls_per_layer),
+            },
             "overall": _quality_metrics_dict(efficacy_report.overall),
             "by_layer": {
                 layer.value: _quality_metrics_dict(metrics)
@@ -240,41 +248,164 @@ def format_markdown(report: dict[str, Any]) -> str:
     efficiency = report["efficiency"]
     scale = report["scale"]
     overall = efficacy["overall"]
+    efficacy_thresholds = efficacy["thresholds"]
+    efficiency_thresholds = efficiency["thresholds"]
+    scale_thresholds = scale["thresholds"]
     lines = [
         "# Axcess detection evaluation",
         "",
-        f"**Status:** {str(report['status']).upper()}",
+        f"## Result: {str(report['status']).upper()}",
+        "",
+        (
+            "A pass means this revision met the configured regression gates. "
+            "It does **not** mean that Axcess proves WCAG conformance or has "
+            "100% real-world detection accuracy."
+        ),
+        "",
+        f"Configuration: `{report['config_version']}`  ",
+        f"Generated: `{report['generated_at']}`",
+        "",
+        "## What this workflow tests",
+        "",
+        "| Evaluation lane | Exact test | Why it matters |",
+        "| --- | --- | --- |",
+        (
+            "| **Efficacy** | Scores frozen Axcess outputs against labeled "
+            "barrier and negative-control answers, overall and by detection "
+            "layer. | Detects precision, report-noise, and recall regressions. |"
+        ),
+        (
+            "| **Efficiency** | Writes synthetic detector observations through "
+            "the production SQLite repository, then builds issues through the "
+            "production unified-issue projection. | Detects major evidence-ingest "
+            "or report-query slowdowns. |"
+        ),
+        (
+            "| **Scale** | Repeats the evidence path at increasing page and finding "
+            "counts, verifies every row and issue group, and compares time per "
+            "finding. | Detects lost evidence and non-linear degradation as reports grow. |"
+        ),
         "",
         "## Efficacy",
         "",
-        f"Corpus: `{efficacy['corpus_id']}@{efficacy['corpus_version']}`",
+        f"Corpus: `{efficacy['corpus_id']}@{efficacy['corpus_version']}`  ",
+        f"Label method: `{efficacy['label_method']}`",
         "",
-        "| Precision | FDR | FPR | Recall | Surfaced |",
-        "| ---: | ---: | ---: | ---: | ---: |",
+        f"> {efficacy['scope_statement']}",
+        "",
+        "### Overall labeled-corpus result",
+        "",
+        "| Labeled observations | Surfaced | Suppressed | Precision | FDR | FPR | Recall |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         (
-            f"| {_percent(overall['precision'])} | "
+            f"| {overall['total']} | {overall['surfaced']} | {overall['suppressed']} | "
+            f"{_percent(overall['precision'])} | "
             f"{_percent(overall['false_discovery_rate'])} | "
             f"{_percent(overall['false_positive_rate'])} | "
-            f"{_percent(overall['recall'])} | {overall['surfaced']} |"
+            f"{_percent(overall['recall'])} |"
         ),
         "",
-        "## Efficiency",
+        "### Results by detection layer",
         "",
-        (
-            f"At {efficiency['reference_pages']} pages / {efficiency['findings']} findings: "
-            f"**{efficiency['write_findings_per_second']:.1f} findings/s** written; "
-            f"issue projection took **{efficiency['projection_seconds']:.3f}s**."
-        ),
-        "",
-        "## Scale",
-        "",
-        "| Pages | Findings | Stored | Write seconds | Findings/s | Projection seconds |",
-        "| ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Layer | Total | Surfaced | Negative controls | Precision | FDR | Recall |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+    for layer, metrics in efficacy["by_layer"].items():
+        negative_controls = metrics["false_positives"] + metrics["true_negatives"]
+        lines.append(
+            f"| `{layer}` | {metrics['total']} | {metrics['surfaced']} | "
+            f"{negative_controls} | {_percent(metrics['precision'])} | "
+            f"{_percent(metrics['false_discovery_rate'])} | "
+            f"{_percent(metrics['recall'])} |"
+        )
+    lines.extend(
+        [
+            "",
+            "### What the efficacy metrics mean",
+            "",
+            "| Metric | Calculation | Interpretation |",
+            "| --- | --- | --- |",
+            (
+                "| **Precision** | `TP / (TP + FP)` | Of the surfaced results, "
+                "how many match the reference barrier label? Higher is better. |"
+            ),
+            (
+                "| **FDR** | `FP / (TP + FP)` | Of the surfaced results, how many "
+                "are report noise? Lower is better. This is the primary noise gate. |"
+            ),
+            (
+                "| **FPR** | `FP / (FP + TN)` | Of the negative controls, how many "
+                "were surfaced incorrectly? Lower is better. |"
+            ),
+            (
+                "| **Recall** | `TP / (TP + FN)` | Of the labeled barriers, how many "
+                "did Axcess surface? Higher is better. |"
+            ),
+            "",
+            "Efficacy passes only when:",
+            "",
+            (
+                f"- FDR is below "
+                f"{_percent(efficacy_thresholds['max_false_discovery_rate_exclusive'])} "
+                "overall and in every detection layer."
+            ),
+            (
+                f"- Recall is at least {_percent(efficacy_thresholds['min_recall'])} "
+                "overall and in every detection layer."
+            ),
+            (
+                f"- Every layer has at least "
+                f"{efficacy_thresholds['min_surfaced_per_layer']} surfaced labels and "
+                f"{efficacy_thresholds['min_negative_controls_per_layer']} negative controls."
+            ),
+            "",
+            "## Efficiency",
+            "",
+            (
+                "The reference workload creates a temporary, fully migrated SQLite "
+                "report. It inserts pages with `repo.upsert_page`, inserts observations "
+                "with `repo.upsert_axe_violation` inside one transaction, verifies the "
+                "stored row count, and builds report issues with `issues.list_issues`."
+            ),
+            "",
+            (
+                f"At {efficiency['reference_pages']} pages / {efficiency['findings']} "
+                f"findings: **{efficiency['write_findings_per_second']:.1f} findings/s** "
+                f"written; issue projection took "
+                f"**{efficiency['projection_seconds']:.3f}s**."
+            ),
+            "",
+            "Efficiency passes when:",
+            "",
+            (
+                f"- Write throughput is at least "
+                f"{efficiency_thresholds['min_write_findings_per_second']:.1f} findings/s."
+            ),
+            (
+                f"- Unified issue projection completes within "
+                f"{efficiency_thresholds['max_projection_seconds']:.3f}s."
+            ),
+            "",
+            "## Scale",
+            "",
+            (
+                "Each row below is a new temporary database. Every page receives the "
+                "configured number of findings spread across four representative axe "
+                "rules. Stored findings and grouped issues are checked for integrity."
+            ),
+            "",
+            (
+                "| Pages | Findings | Stored | Issue groups | Write seconds | "
+                "Findings/s | Projection seconds |"
+            ),
+            "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
     for point in scale["points"]:
         lines.append(
             f"| {point['pages']} | {point['findings']} | {point['stored_findings']} | "
-            f"{point['write_seconds']:.3f} | {point['write_findings_per_second']:.1f} | "
+            f"{point['issue_groups']} | {point['write_seconds']:.3f} | "
+            f"{point['write_findings_per_second']:.1f} | "
             f"{point['projection_seconds']:.3f} |"
         )
     lines.extend(
@@ -282,17 +413,38 @@ def format_markdown(report: dict[str, Any]) -> str:
             "",
             (
                 "Normalized largest/smallest per-finding slowdown: "
-                f"**{scale['normalized_per_finding_slowdown']:.2f}x**."
+                f"**{scale['normalized_per_finding_slowdown']:.2f}x** "
+                f"(maximum {scale_thresholds['max_per_finding_slowdown']:.2f}x)."
             ),
             "",
-            "## Scope limitations",
+            "Scale passes only when:",
+            "",
+            "- Every configured finding is present after the write.",
+            "- The four expected rule groups are present at every workload size.",
+            (
+                "- Seconds per finding at the largest workload are no more than "
+                f"{scale_thresholds['max_per_finding_slowdown']:.2f}x the smallest workload."
+            ),
+            "",
+            "## What this run does not test",
             "",
             *(f"- {item}" for item in report["limitations"]),
+            "",
+            (
+                "The efficacy corpus is synthetic regression evidence. It is not a "
+                "representative-site accuracy estimate or a legal/compliance conclusion."
+            ),
+            "",
+            "### Corpus-specific limitations",
+            "",
+            *(f"- {item}" for item in efficacy["limitations"]),
             "",
         ]
     )
     if report["failures"]:
-        lines.extend(["## Failures", "", *(f"- {item}" for item in report["failures"]), ""])
+        lines.extend(["## Failed gates", "", *(f"- {item}" for item in report["failures"]), ""])
+    else:
+        lines.extend(["## Gate outcome", "", "All configured gates passed.", ""])
     return "\n".join(lines)
 
 

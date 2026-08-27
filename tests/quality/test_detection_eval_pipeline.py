@@ -81,8 +81,14 @@ def test_small_pipeline_run_writes_both_artifacts(tmp_path: Path) -> None:
 
     assert report["status"] == "pass"
     assert report["efficacy"]["overall"]["false_discovery_rate"] < 0.05
+    assert report["efficacy"]["thresholds"]["min_recall"] == 0.8
     assert report["scale"]["points"][-1]["stored_findings"] == 16
     assert (tmp_path / "artifacts" / "report.json").is_file()
     markdown = (tmp_path / "artifacts" / "report.md").read_text(encoding="utf-8")
     assert markdown == format_markdown(report)
     assert "# Axcess detection evaluation" in markdown
+    assert "## What this workflow tests" in markdown
+    assert "### What the efficacy metrics mean" in markdown
+    assert "`repo.upsert_axe_violation`" in markdown
+    assert "## What this run does not test" in markdown
+    assert "All configured gates passed." in markdown
