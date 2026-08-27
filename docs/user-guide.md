@@ -113,12 +113,11 @@ From the scan detail page:
   report with every section as its own filterable, trackable sheet —
   **Summary** (the at-a-glance dashboard), **Issues Overview** (the
   remediation-guide table: conformance level, owner, status, what-to-fix,
-  locations, action, resources), **Owner Worklist** (issues sliced by who
-  fixes them), **Page Hotspots** (pages ranked by severity-weighted load),
-  **Who's Affected** (issues by the ability each blocks), **Coverage &
-  Method** (per-criterion automated-vs-manual coverage), and **Test
-  Tracking** (the manual Pass / Fail checklist). Built from the same data as
-  the Markdown audit report, so the two never drift.
+  locations, action, resources), **Page Hotspots** (pages ranked by
+  severity-weighted load), **Who's Affected** (issues by the ability each
+  blocks), **Coverage & Method** (per-criterion automated-vs-manual coverage),
+  and **Test Tracking** (the manual Pass / Fail checklist). Built from the
+  same data as the Markdown audit report, so the two never drift.
 
 From the CLI:
 

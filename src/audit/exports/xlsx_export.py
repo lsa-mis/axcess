@@ -13,7 +13,6 @@ you can sort, filter, and track in a spreadsheet:
   when a ``blob_store`` is supplied and the finding has one).
 * **Decision History** — reviewer, time, source layer, prior/new status,
   rationale, and a clickable evidence link for every triage decision.
-* **Owner Worklist** — the same open issues sliced by who fixes them.
 * **Page Hotspots** — pages ranked by a severity-weighted load.
 * **Page References** — every affected page as a clickable link, with a
   plain-language element location and the retained technical target.
@@ -51,9 +50,7 @@ from audit.exports.audit_report import (
     MAX_HOTSPOTS,
     AuditCard,
     DroppedFinding,
-    _owner_key,
     _principle_for,
-    _severity_rank,
     build_audit_cards,
     issue_locations,
 )
@@ -164,14 +161,6 @@ _SEVERITY_ORDER = ("Critical", "Serious", "Moderate", "Minor")
 # Page-hotspot weighting — mirrors audit_report._page_hotspots so the Excel
 # "Page Hotspots" sheet ranks pages identically to the Markdown report.
 _SEVERITY_WEIGHT = {"Critical": 4.0, "Serious": 3.0, "Moderate": 2.0, "Minor": 1.0}
-# Owner key → singular display label for the per-row Owner Worklist column.
-_OWNER_ROW_LABEL = {
-    "dev": "Developer",
-    "editor": "Content editor",
-    "designer": "Designer",
-    "content": "Content team",
-}
-_OWNER_ROW_ORDER = ("dev", "editor", "designer", "content")
 # User-group labels — mirrors audit_report._abilities_rollup.
 _ABILITY_LABEL = {
     "vision": "Vision (blind / low-vision / color-blind)",
@@ -615,49 +604,7 @@ def _build_summary_sheet(
         metric(coverage_matrix.METHOD_LABELS[m], cov.by_method.get(m, 0))
 
 
-# --- rollup sheets (Owner / Hotspots / Affected / Coverage) ---------------
-
-
-def _build_worklist_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
-    """One row per open issue, grouped by who fixes it — filter by Owner."""
-    ordered = sorted(
-        cards,
-        key=lambda c: (
-            _OWNER_ROW_ORDER.index(_owner_key(c.owner))
-            if _owner_key(c.owner) in _OWNER_ROW_ORDER
-            else len(_OWNER_ROW_ORDER),
-            _severity_rank(c.severity),
-            -c.affected_page_count,
-        ),
-    )
-    rows: list[tuple[Any, ...]] = []
-    for c in ordered:
-        key = _owner_key(c.owner)
-        sc = f"{c.wcag_sc} {c.wcag_name or ''}".strip() if c.wcag_sc else "Best practice"
-        rows.append(
-            (
-                _OWNER_ROW_LABEL.get(key, key.capitalize()),
-                c.title,
-                c.severity,
-                c.effort,
-                c.affected_page_count,
-                sc,
-                _PIPELINE_LABEL.get(c.pipeline, c.pipeline),
-            )
-        )
-    _styled_table(
-        ws,
-        title="Remediation worklist by owner",
-        subtitle=(
-            "The same open issues, re-sliced by the team that fixes them. "
-            "Filter the Owner column to hand each team their pack."
-        ),
-        headers=("Owner", "Issue", "Severity", "Effort", "Pages", "WCAG", "Detection source"),
-        rows=rows,
-        widths=(18.0, 46.0, 13.0, 20.0, 9.0, 30.0, 29.0),
-        center_cols=(3, 5),
-        empty_note="No open issues to assign.",
-    )
+# --- rollup sheets (Hotspots / Affected / Coverage) -----------------------
 
 
 def _build_hotspots_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
@@ -1041,20 +988,19 @@ def render_xlsx(
 ) -> bytes:
     """Render the full Excel audit workbook and return the .xlsx bytes.
 
-    Ten sheets, every report section as a filterable table:
+    Nine sheets, every report section as a filterable table:
 
     1. **Summary** — the at-a-glance dashboard (counts, severity, level,
        principle, coverage headline).
     2. **Issues Overview** — the remediation table (one row per issue).
     3. **Decision History** — review dispositions, rationales, actors, and links.
-    4. **Owner Worklist** — the same issues sliced by who fixes them.
-    5. **Page Hotspots** — pages ranked by severity-weighted load.
-    6. **Page References** — affected pages, plain-language locations, and
+    4. **Page Hotspots** — pages ranked by severity-weighted load.
+    5. **Page References** — affected pages, plain-language locations, and
        retained technical targets.
-    7. **Who's Affected** — open issues by the ability each blocks.
-    8. **Coverage & Method** — per-criterion automated-vs-manual coverage.
-    9. **Test Tracking** — the manual Pass / Fail checklist.
-    10. **Manual Review Evidence** — criterion outcomes and supporting notes.
+    6. **Who's Affected** — open issues by the ability each blocks.
+    7. **Coverage & Method** — per-criterion automated-vs-manual coverage.
+    8. **Test Tracking** — the manual Pass / Fail checklist.
+    9. **Manual Review Evidence** — criterion outcomes and supporting notes.
 
     ``conn`` is required: the issue tables are built live from the same
     ``issues.list_issues()`` / audit-report card model the Markdown report
@@ -1092,7 +1038,6 @@ def render_xlsx(
         blob_store=blob_store,
     )
     _build_decision_history_sheet(wb.create_sheet("Decision History"), scan, conn)
-    _build_worklist_sheet(wb.create_sheet("Owner Worklist"), cards)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
     _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)

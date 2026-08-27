@@ -40,7 +40,6 @@ def test_xlsx_is_a_valid_workbook_with_all_report_sheets(tmp_db: sqlite3.Connect
         "Summary",
         "Issues Overview",
         "Decision History",
-        "Owner Worklist",
         "Page Hotspots",
         "Page References",
         "Who's Affected",
@@ -97,24 +96,8 @@ def test_summary_dashboard_has_metadata_and_rollups(tmp_db: sqlite3.Connection) 
     assert {"Critical", "Serious", "Moderate", "Minor"} <= labels
 
 
-def test_owner_worklist_and_coverage_sheets(tmp_db: sqlite3.Connection) -> None:
+def test_coverage_sheet(tmp_db: sqlite3.Connection) -> None:
     wb = load_workbook(io.BytesIO(_render(tmp_db)))
-
-    work = wb["Owner Worklist"]
-    assert tuple(work.cell(row=4, column=c).value for c in range(1, 7)) == (
-        "Owner",
-        "Issue",
-        "Severity",
-        "Effort",
-        "Pages",
-        "WCAG",
-    )
-    owners = {str(work.cell(row=r, column=1).value or "") for r in range(5, work.max_row + 1)}
-    assert owners & {"Developer", "Content editor", "Designer", "Content team"}
-    assert all(
-        "None" not in str(work.cell(row=r, column=6).value or "")
-        for r in range(5, work.max_row + 1)
-    )
 
     cov = wb["Coverage & Method"]
     assert cov.cell(row=4, column=1).value == "SC"

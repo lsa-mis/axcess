@@ -142,7 +142,7 @@ needing confirmation. Informational evidence cannot silently become a barrier.
 Completed public scans can produce:
 
 - **Excel workbook (`.xlsx`)** — the operational handoff artifact. Its sheets
-  include Summary, Issues, Decision History, Owner Worklist, Page Hotspots,
+  include Summary, Issues, Decision History, Page Hotspots,
   Page References, Who's Affected, Coverage, Test Tracking, and Manual Evidence.
 - **Stakeholder audit report (`.md`)** — evaluation context, scope, methods,
   limitations, results, recommended actions, verification, and appendices.
