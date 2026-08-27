@@ -62,10 +62,10 @@ const INITIAL_FORM: ProtectedScanForm = {
   resource_origins: "",
   authorization_acknowledged: false,
   least_privilege_account_acknowledged: false,
-  scan_engine: "both",
+  scan_engine: "axe",
   allow_local_ai: false,
   local_ai_acknowledged: false,
-  max_pages: 100,
+  max_pages: 50,
   max_depth: 10,
   rps: 1,
 };
@@ -606,7 +606,7 @@ function ProtectedScanFormRoute({
                   onChange={(value) => update("scan_engine", value)}
                   disabled={alfaUnavailable}
                   label="axe-core + Siteimprove Alfa"
-                  hint="Recommended for independent engine coverage; slower because Alfa runs a separate local browser capture."
+                  hint="Adds independent engine coverage; slower because Alfa runs a separate local browser capture."
                 />
                 <EngineChoice
                   value="alfa"

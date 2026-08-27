@@ -19,6 +19,7 @@ import type {
   IssuesResponse,
   LocalLoginScanPayload,
   LocalLoginScanState,
+  LocalAnalysisCapability,
   NewScanPayload,
   ProtectedAgentEnrollmentResponse,
   ProtectedCompanionStartResponse,
@@ -97,6 +98,8 @@ export const api = {
   listScans: () => request<ScanSummary[]>("/api/scans"),
   getScan: (id: number) => request<ScanDetail>(`/api/scans/${id}`),
   getAlfaCapability: () => request<AlfaCapability>("/api/capabilities/alfa"),
+  getLocalAnalysisCapability: () =>
+    request<LocalAnalysisCapability>("/api/capabilities/local-analysis"),
   getProtectedScanCapability: () =>
     request<ProtectedScanCapability>("/api/capabilities/protected-scans"),
   createLocalLoginScan: (payload: LocalLoginScanPayload) =>

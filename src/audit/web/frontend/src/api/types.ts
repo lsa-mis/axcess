@@ -67,6 +67,7 @@ export interface ScanProgress {
 
 export interface ScanDetail extends ScanSummary {
   error_count: number;
+  failure_reason: string | null;
   by_severity: Record<Severity, number>;
   previous_scan_id: number | null;
   blocked: null | {
@@ -212,6 +213,31 @@ export interface ScopePreview {
   error: string | null;
 }
 
+export interface LocalAnalysisCapability {
+  ocr: {
+    available: boolean;
+    engine: string;
+    language: string;
+    max_workers: number;
+    bundled_in_desktop: boolean;
+  };
+  ollama: { reachable: boolean };
+  vision: {
+    available: boolean;
+    model: string;
+    installed_size_bytes: number | null;
+    reason: string | null;
+  };
+  semantic: {
+    available: boolean;
+    models: string[];
+    ready_models: string[];
+    missing_models: string[];
+    checks_per_page: number;
+    reason: string | null;
+  };
+}
+
 export interface NewScanPayload {
   url: string;
   max_pages: number;
@@ -236,6 +262,12 @@ export interface NewScanPayload {
   scan_engine: "axe" | "alfa" | "both";
   skip_keyboard: boolean;
   skip_responsive: boolean;
+  /** Skip local-AI review of contextual criteria such as link purpose. */
+  skip_semantic: boolean;
+  /** Skip the deterministic focus-obscured browser probe. */
+  skip_focus: boolean;
+  /** Skip motion and vision-assisted visual probes. */
+  skip_visual: boolean;
   axe_level: "A" | "AA" | "AAA";
 }
 

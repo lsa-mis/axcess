@@ -104,7 +104,7 @@ def availability() -> AlfaAvailability:
     This is intentionally a fast filesystem/process preflight, not a browser
     launch. Browser launch remains part of each selected page evaluation.
     """
-    if shutil.which("node") is None:
+    if _node_executable() is None:
         return AlfaAvailability(False, "Node.js 22 or later is not available.")
     if not _RUNNER_PATH.is_file() or not _PACKAGE_PATH.is_file():
         return AlfaAvailability(False, "The bundled Alfa runner is missing.")
@@ -158,13 +158,21 @@ class AlfaAnalyzer:
         # already-installed executable path.  Authenticated browser state is
         # supplied through an inherited stdin pipe, never arguments, env, or
         # a file.
+        node_executable = _node_executable()
+        if node_executable is None:
+            raise AlfaError("Node.js 22 or later is not available.")
         env = {"PATH": os.environ.get("PATH", "")}
+        if os.environ.get("AUDIT_NODE_RUN_AS_NODE") == "1":
+            # A packaged Electron executable can provide its embedded Node
+            # runtime to the bundled Alfa runner without requiring a separate
+            # system installation. No application secrets are forwarded.
+            env["ELECTRON_RUN_AS_NODE"] = "1"
         if self._chromium_path:
             env["ALFA_CHROMIUM_PATH"] = self._chromium_path
         # The page URL can itself contain a protected path/record identifier.
         # Send all runner input through the one-use stdin pipe, not argv,
         # environment, a file, or process-list-visible command arguments.
-        args = ["node", str(_RUNNER_PATH), "--input-stdin"]
+        args = [node_executable, str(_RUNNER_PATH), "--input-stdin"]
         runner_input: dict[str, Any] = {
             "url": url,
             "level": level,
@@ -247,6 +255,18 @@ class AlfaAnalyzer:
             message = stderr.decode("utf-8", errors="replace").strip()
             raise AlfaError(message or f"Alfa runner exited with code {process.returncode}.")
         return _parse_result(stdout)
+
+
+def _node_executable() -> str | None:
+    """Resolve the explicitly supplied desktop Node runtime or system Node."""
+
+    configured = os.environ.get("AUDIT_NODE_EXECUTABLE", "").strip()
+    if configured:
+        candidate = Path(configured).expanduser()
+        if candidate.is_file():
+            return str(candidate.resolve())
+        return None
+    return shutil.which("node")
 
 
 async def _read_runner_pipe(reader: asyncio.StreamReader, *, limit: int) -> bytes:

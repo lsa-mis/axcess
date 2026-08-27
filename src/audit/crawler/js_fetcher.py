@@ -270,9 +270,13 @@ class JsFetcher:
                     for finding in all_findings:
                         if len(screenshots) >= MAX_SHOTS_PER_PAGE:
                             break
-                        kw = finding.to_repo_kwargs()
-                        selector = kw["target_selector"]
-                        th = kw["target_hash"]
+                        # Every browser finding exposes these two evidence
+                        # attributes directly. AxeViolation intentionally does
+                        # not implement the probe-specific to_repo_kwargs()
+                        # adapter, so using that method here caused the first
+                        # axe result to abort screenshot capture for the page.
+                        selector = finding.target_selector
+                        th = finding.target_hash
                         if th in screenshots:
                             continue
                         if selector in ("", "body", "html", "(unknown)", "(none)"):

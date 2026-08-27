@@ -55,6 +55,37 @@ export default function ScanDetailRoute() {
     mutationFn: () => api.cancelScan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
   });
+  const retryBalanced = useMutation({
+    mutationFn: () =>
+      api.createScan({
+        url: data?.seed_url ?? "",
+        max_pages: 50,
+        max_depth: 10,
+        rps: 2,
+        workers: 4,
+        include_subdomain: false,
+        whole_host: false,
+        ignore_robots: false,
+        skip_ocr: false,
+        skip_vlm: true,
+        static_only: false,
+        show_browser: false,
+        scan_engine: "axe",
+        skip_keyboard: false,
+        skip_responsive: false,
+        skip_semantic: true,
+        skip_focus: false,
+        skip_visual: true,
+        axe_level: "AA",
+      }),
+    onSuccess: async ({ scan_id }) => {
+      setLiveUpdates(true);
+      qc.removeQueries({ queryKey: ["issues", id] });
+      await qc.invalidateQueries({ queryKey: ["scan", id] });
+      await qc.invalidateQueries({ queryKey: ["scans"] });
+      if (scan_id !== id) navigate(`/scans/${scan_id}`, { replace: true });
+    },
+  });
   const { data: issueSummary } = useQuery({
     queryKey: ["issues", id, "workspace-summary"],
     queryFn: () => api.listIssues(id),
@@ -185,13 +216,48 @@ export default function ScanDetailRoute() {
         <Card className="p-5">
           <h2 className="font-semibold text-fg">No report was produced</h2>
           <p className="mt-1 text-sm text-fg-muted">
-            This scan ended as <strong>{data.status}</strong>. Its partial crawl
-            evidence remains available, but Axcess did not present it as a
-            completed report.
+            {data.page_count > 0 ? (
+              <>
+                This scan ended as <strong>{data.status}</strong> after completing{" "}
+                {data.page_count.toLocaleString()} page
+                {data.page_count === 1 ? "" : "s"}. Partial evidence remains
+                available, but it is not a completed report.
+              </>
+            ) : (
+              <>
+                This scan ended as <strong>{data.status}</strong> before any page
+                finished. No report evidence was created.
+              </>
+            )}
           </p>
-          <LinkButton to="/scans/new" variant="primary" className="mt-4">
-            Start another scan
-          </LinkButton>
+          {data.failure_reason && (
+            <p className="mt-3 rounded-xs border border-sev-critical/30 bg-sev-critical-bg p-3 text-sm text-sev-critical">
+              <strong>Why it failed:</strong> {data.failure_reason}
+            </p>
+          )}
+          {retryBalanced.error && (
+            <p className="mt-3 text-sm text-sev-critical" role="alert">
+              Couldn&rsquo;t restart this scan: {retryBalanced.error.message}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => retryBalanced.mutate()}
+              disabled={retryBalanced.isPending}
+            >
+              {retryBalanced.isPending
+                ? "Restarting scan…"
+                : "Retry with balanced settings"}
+            </Button>
+            <LinkButton
+              to={`/scans/new?url=${encodeURIComponent(data.seed_url)}`}
+              variant="secondary"
+            >
+              Review settings first
+            </LinkButton>
+          </div>
         </Card>
       ) : (
         <>

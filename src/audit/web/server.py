@@ -15,6 +15,7 @@ import json
 import math
 import re
 import secrets
+import shutil
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,7 +45,9 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe
+from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
+from audit.analyzer.semantic.registry import supported_criteria
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import url_policy
@@ -753,6 +756,9 @@ def create_app(
             "alfa_pages_scanned": int(scan.get("alfa_pages_scanned") or 0),
             "alfa_failed_total": int(scan.get("alfa_failed_total") or 0),
             "alfa_cant_tell_total": int(scan.get("alfa_cant_tell_total") or 0),
+            "failure_reason": (
+                str(scan.get("failure_reason")) if scan.get("failure_reason") else None
+            ),
             # Coverage truth: which detection methods were on for this
             # scan (derived from config_json + counters). Lets the UI
             # show when a scan was a partial / static-only run.
@@ -771,6 +777,88 @@ def create_app(
         """Expose only local runner readiness for the new-scan form."""
         state = alfa_availability()
         return JSONResponse({"available": state.available, "reason": state.reason})
+
+    @app.get("/api/capabilities/local-analysis")
+    async def api_local_analysis_capability() -> JSONResponse:
+        """Report bundled OCR and local Ollama readiness without model downloads.
+
+        Merely opening the scan form must never pull a model or start an
+        analyzer.  This endpoint performs one short read-only Ollama tags
+        request and returns only model names/sizes already present locally.
+        """
+
+        installed: dict[str, int] = {}
+        ollama_reachable = False
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
+                response.raise_for_status()
+                payload = response.json()
+            models = payload.get("models", []) if isinstance(payload, dict) else []
+            for model in models if isinstance(models, list) else []:
+                if not isinstance(model, dict):
+                    continue
+                name = str(model.get("name") or "").strip()
+                if name:
+                    installed[name] = max(0, int(model.get("size") or 0))
+            ollama_reachable = True
+        except (httpx.HTTPError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+
+        def installed_size(model: str) -> int | None:
+            for candidate in (model, f"{model}:latest"):
+                if candidate in installed:
+                    return installed[candidate]
+            return None
+
+        vision_model = settings.vlm_model
+        vision_size = installed_size(vision_model)
+        semantic_models = sorted({get_pick(sc).primary for sc in supported_criteria()})
+        semantic_ready = [model for model in semantic_models if installed_size(model) is not None]
+        semantic_missing = [model for model in semantic_models if model not in semantic_ready]
+
+        return JSONResponse(
+            {
+                "ocr": {
+                    "available": shutil.which("tesseract") is not None,
+                    "engine": "Tesseract 5",
+                    "language": settings.ocr_language,
+                    "max_workers": settings.ocr_max_workers,
+                    "bundled_in_desktop": bool(shutil.which("tesseract")),
+                },
+                "ollama": {"reachable": ollama_reachable},
+                "vision": {
+                    "available": vision_size is not None,
+                    "model": vision_model,
+                    "installed_size_bytes": vision_size,
+                    "reason": (
+                        None
+                        if vision_size is not None
+                        else (
+                            f"Install the local model with: ollama pull {vision_model}"
+                            if ollama_reachable
+                            else "Ollama is not running on this computer."
+                        )
+                    ),
+                },
+                "semantic": {
+                    "available": ollama_reachable and not semantic_missing,
+                    "models": semantic_models,
+                    "ready_models": semantic_ready,
+                    "missing_models": semantic_missing,
+                    "checks_per_page": len(supported_criteria()),
+                    "reason": (
+                        None
+                        if ollama_reachable and not semantic_missing
+                        else (
+                            "Missing local model(s): " + ", ".join(semantic_missing)
+                            if ollama_reachable
+                            else "Ollama is not running on this computer."
+                        )
+                    ),
+                },
+            }
+        )
 
     @app.get("/api/capabilities/protected-scans")
     def api_protected_scan_capability(request: Request) -> JSONResponse:
@@ -1039,6 +1127,9 @@ def create_app(
             "scan_engine": requested_engine,
             "skip_keyboard": bool(body.get("skip_keyboard")),
             "skip_responsive": bool(body.get("skip_responsive")),
+            "skip_semantic": bool(body.get("skip_semantic")),
+            "skip_focus": bool(body.get("skip_focus")),
+            "skip_visual": bool(body.get("skip_visual")),
             "axe_level": str(body.get("axe_level", "AA")),
         }
         config = _build_crawl_config(form, settings)
@@ -2328,17 +2419,23 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         semantic_enabled=not bool(form.get("skip_semantic")),
         keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
+        focus_checks_enabled=not bool(form.get("skip_focus")),
+        visual_checks_enabled=not bool(form.get("skip_visual")),
     )
 
 
 def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
     """Create the scan row up front so the UI can redirect immediately.
 
-    ``run_crawl`` will discover and reuse this row via its seed-URL match,
-    so we don't end up with duplicates.
+    ``run_crawl`` canonicalizes directory-like seeds before discovering its
+    row (for example, ``/about`` becomes ``/about/``).  Store and match that
+    exact canonical value here as well.  Otherwise the browser can finish a
+    crawl under a second scan ID while the progress screen remains attached
+    to the original, permanently ``running`` row.
     """
     from audit.crawler.orchestrator import config_json_for_scan
 
+    seed_url = _canonical_scan_seed(config.seed_url)
     conn = connect(db_path)
     try:
         if _protected_scan_table_exists(conn):
@@ -2348,20 +2445,26 @@ def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
                 "AND NOT EXISTS ("
                 "SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id"
                 ") ORDER BY id DESC LIMIT 1",
-                (config.seed_url,),
+                (seed_url,),
             ).fetchone()
         else:
             existing = conn.execute(
                 "SELECT id FROM scans "
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
                 "ORDER BY id DESC LIMIT 1",
-                (config.seed_url,),
+                (seed_url,),
             ).fetchone()
         if existing is not None:
-            return int(existing["id"])
+            scan_id = int(existing["id"])
+            conn.execute(
+                "UPDATE scans SET status = 'running', finished_at = NULL, "
+                "failure_reason = NULL, config_json = ? WHERE id = ?",
+                (config_json_for_scan(config), scan_id),
+            )
+            return scan_id
         cur = conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', ?)",
-            (config.seed_url, config_json_for_scan(config)),
+            (seed_url, config_json_for_scan(config)),
         )
         return int(cur.lastrowid or 0)
     finally:
@@ -2375,10 +2478,28 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
     try:
         await run_crawl(conn, config)
     except Exception as exc:
-        # Log and swallow — the scans row status carries the outcome.
+        # A failure can happen before the durable queue is seeded (for
+        # example while starting Playwright or an optional analyzer).  Do not
+        # leave the up-front scan row looking "running" forever: that makes a
+        # failed startup indistinguishable from a very slow first page.
         log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
+        conn.execute(
+            "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
+            "failure_reason = ? "
+            "WHERE id = ("
+            "SELECT id FROM scans WHERE seed_url = ? AND status = 'running' "
+            "ORDER BY id DESC LIMIT 1"
+            ")",
+            (str(exc)[:1000], _canonical_scan_seed(config.seed_url)),
+        )
     finally:
         conn.close()
+
+
+def _canonical_scan_seed(seed_url: str) -> str:
+    """Return the same seed identity used by the crawler orchestrator."""
+
+    return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
 
 
 async def _run_local_login_background(

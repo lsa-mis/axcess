@@ -1,0 +1,78 @@
+name: Desktop application build
+
+on:
+  push:
+    branches:
+      - feature/electron-desktop
+    paths:
+      - .github/workflows/desktop-build.yml
+      - desktop/**
+      - src/**
+      - pyproject.toml
+      - uv.lock
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Apple Silicon macOS desktop artifact
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            src/audit/web/frontend/package-lock.json
+            src/audit/alfa_runner/package-lock.json
+      - run: npm ci
+        working-directory: src/audit/web/frontend
+      - run: npm run build
+        working-directory: src/audit/web/frontend
+      - run: npm ci
+        working-directory: src/audit/alfa_runner
+      - run: npm ci
+        working-directory: desktop
+      - run: uv sync --group desktop
+      - name: Bundle Chromium
+        shell: bash
+        run: PLAYWRIGHT_BROWSERS_PATH="$PWD/desktop/playwright-browsers" uv run playwright install chromium
+      - name: Bundle Tesseract OCR
+        shell: bash
+        run: |
+          brew install tesseract
+          desktop/scripts/bundle-tesseract-macos.sh
+      - name: Bundle Python backend
+        run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      - name: Package desktop installer
+        shell: bash
+        working-directory: desktop
+        run: |
+          for attempt in 1 2 3; do
+            if npm run make; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            echo "Packaging failed; retrying (attempt $((attempt + 1)) of 3)."
+            sleep $((attempt * 10))
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axcess-macos-apple-silicon
+          path: desktop/out/make/**
+          if-no-files-found: error
+          retention-days: 14

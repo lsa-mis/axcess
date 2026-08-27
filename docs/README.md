@@ -30,7 +30,11 @@ diff across rescans.
    companion handoff, retention model, and manual authentication review for an
    authorized 1FA/MFA target. This is not part of the normal LAN quick start.
 
-7. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
+7. **[Desktop application](./desktop-app.md)** — run Axcess as an Electron app,
+   build platform-specific installers, and understand the desktop security and
+   release boundary.
+
+8. **[Troubleshooting](./troubleshooting.md)** — what to do when a scan
    gets stuck, when a site blocks the crawler, when Ollama isn't
    answering, when scope creeps.
 

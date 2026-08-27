@@ -51,11 +51,11 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     >
   >({
     seed_url: "",
-    max_pages: 100,
+    max_pages: 50,
     max_depth: 10,
     rps: 1,
     whole_host: false,
-    scan_engine: "both",
+    scan_engine: "axe",
     axe_level: "AA",
     skip_keyboard: false,
     skip_responsive: false,
@@ -69,6 +69,11 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
   const alfaCapability = useQuery({
     queryKey: ["capabilities", "alfa", "local-login"],
     queryFn: api.getAlfaCapability,
+  });
+  const localAnalysisCapability = useQuery({
+    queryKey: ["capabilities", "local-analysis", "local-login"],
+    queryFn: api.getLocalAnalysisCapability,
+    retry: false,
   });
 
   useEffect(() => {
@@ -94,6 +99,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
       setForm((previous) => ({ ...previous, scan_engine: "axe" }));
     }
   }, [alfaCapability.data?.available, form.scan_engine]);
+
+  useEffect(() => {
+    if (localAnalysisCapability.data?.vision.available === false && !form.skip_vlm) {
+      setForm((previous) => ({ ...previous, skip_vlm: true }));
+    }
+  }, [form.skip_vlm, localAnalysisCapability.data?.vision.available]);
 
   const create = useMutation({
     mutationFn: (payload: LocalLoginScanPayload) =>
@@ -238,7 +249,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
             className="rounded-xs border border-umich-blue/25 bg-umich-blue/5 p-4"
           >
             <h2 id="login-profile-title" className="font-semibold text-fg">
-              Standard accessibility scan
+              Balanced accessibility scan
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
               WCAG 2.2 {form.axe_level} against the authenticated, rendered
@@ -442,22 +453,31 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     hint="Required for this explicitly authorized authenticated evaluation; normal scope and read-only request limits still apply."
                   />
                   <Checkbox
-                    checked={form.skip_ocr}
-                    onChange={(value) => {
-                      update("skip_ocr", value);
-                      if (value) update("skip_vlm", true);
+                    checked={!form.skip_ocr}
+                    onChange={(enabled) => {
+                      update("skip_ocr", !enabled);
+                      if (!enabled) update("skip_vlm", true);
                     }}
-                    label="Skip OCR"
-                    hint="Clear this option to retrieve protected images through the signed-in browser and store OCR results in the local report."
+                    disabled={localAnalysisCapability.data?.ocr.available === false}
+                    label="Detect text inside images with bundled OCR"
+                    hint="Tesseract runs locally with up to two workers. Protected images are retrieved through the signed-in browser; only redacted results are retained."
                   />
                   <Checkbox
-                    checked={form.skip_vlm}
-                    onChange={(value) => {
-                      update("skip_vlm", value);
-                      if (!value) update("skip_ocr", false);
-                    }}
-                    label="Skip VLM classification"
-                    hint="Clear this option to send image classification only to an Ollama endpoint verified as loopback on this computer. It remains an AI-assisted lead."
+                    checked={!form.skip_vlm}
+                    onChange={(enabled) => update("skip_vlm", !enabled)}
+                    disabled={
+                      form.skip_ocr ||
+                      localAnalysisCapability.data?.vision.available === false
+                    }
+                    label="Classify image text with a local vision model"
+                    hint={
+                      form.skip_ocr
+                        ? "Turn on OCR first."
+                        : localAnalysisCapability.data?.vision.available
+                          ? `${localAnalysisCapability.data.vision.model} is installed and will run only through loopback Ollama.`
+                          : localAnalysisCapability.data?.vision.reason ??
+                            "Checking whether the configured local vision model is ready…"
+                    }
                   />
                   <Checkbox
                     checked={form.skip_keyboard}

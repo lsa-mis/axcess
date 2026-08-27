@@ -280,3 +280,58 @@ def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection
 
     assert summary.pages_fetched == 1
     assert browser.calls == [seed]
+    # Protected/login scans disable image extraction by default. Browser
+    # analyzer coverage must not disappear with that unrelated option.
+    assert summary.axe_pages_scanned == 1
+    assert summary.keyboard_pages_probed == 1
+    assert summary.responsive_pages_probed == 1
+    row = tmp_db.execute(
+        "SELECT axe_pages_scanned, keyboard_pages_probed, responsive_pages_probed "
+        "FROM scans WHERE id = ?",
+        (summary.scan_id,),
+    ).fetchone()
+    assert row is not None
+    assert tuple(row) == (1, 1, 1)
+
+
+def test_rendered_analyzers_persist_when_image_extraction_is_disabled(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """The login-mode image default must not suppress DOM-rule evidence."""
+
+    with _serve() as base:
+        summary = asyncio.run(
+            run_crawl(
+                tmp_db,
+                CrawlConfig(
+                    seed_url=f"{base}/",
+                    max_pages=1,
+                    workers=1,
+                    rps=100.0,
+                    js_eager=True,
+                    image_extraction_enabled=False,
+                    ocr_enabled=False,
+                    vlm_enabled=False,
+                    semantic_enabled=False,
+                    alfa_enabled=False,
+                    capture_screenshots=False,
+                ),
+            )
+        )
+
+    assert summary.status == "completed"
+    assert summary.pages_fetched == 1
+    assert summary.axe_pages_scanned == 1
+    assert summary.keyboard_pages_probed == 1
+    assert summary.responsive_pages_probed == 1
+    row = tmp_db.execute(
+        "SELECT axe_pages_scanned, axe_violations_total, "
+        "keyboard_pages_probed, responsive_pages_probed "
+        "FROM scans WHERE id = ?",
+        (summary.scan_id,),
+    ).fetchone()
+    assert row is not None
+    assert row["axe_pages_scanned"] == 1
+    assert row["axe_violations_total"] == summary.axe_violations_total
+    assert row["keyboard_pages_probed"] == 1
+    assert row["responsive_pages_probed"] == 1

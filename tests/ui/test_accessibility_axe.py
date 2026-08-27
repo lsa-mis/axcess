@@ -169,7 +169,7 @@ async def test_simple_scan_path_hides_advanced_controls_until_requested(
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
             await playwright_async.expect(
-                page.get_by_role("heading", name="Standard accessibility scan")
+                page.get_by_role("heading", name="Balanced accessibility scan")
             ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_role("button", name="Start scan")
@@ -291,9 +291,24 @@ async def test_issue_table_keeps_exact_locations_in_a_bounded_scroller(
                 "el => ({client: el.clientWidth, scroll: el.scrollWidth})"
             )
             assert sizes["scroll"] > sizes["client"]
+            scrollbar = page.get_by_role("scrollbar", name="Scroll issue table columns")
+            await playwright_async.expect(scrollbar).to_be_visible()
+            await scrollbar.focus()
+            await scrollbar.press("End")
+            assert await region.evaluate("el => el.scrollLeft") > 0
+            await scrollbar.press("Home")
+            assert await region.evaluate("el => el.scrollLeft") == 0
             await playwright_async.expect(
                 region.get_by_role("link", name="Open stored page evidence").first
             ).to_be_attached()
+            # The protected-identity context refreshes every 15 seconds even
+            # on public report routes. That security check must not unmount a
+            # known-public table and reset the reader to the top.
+            await page.evaluate("window.scrollTo(0, 500)")
+            scroll_position = await page.evaluate("window.scrollY")
+            assert scroll_position > 0
+            await page.wait_for_timeout(16_000)
+            assert await page.evaluate("window.scrollY") == scroll_position
         finally:
             await browser.close()
 
@@ -584,6 +599,22 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
                     body='{"available":true,"reason":null}',
                 ),
             )
+            await page.route(
+                "**/api/capabilities/local-analysis",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=(
+                        '{"ocr":{"available":true,"engine":"Tesseract 5",'
+                        '"language":"eng","max_workers":2,"bundled_in_desktop":true},'
+                        '"ollama":{"reachable":true},'
+                        '"vision":{"available":true,"model":"qwen3-vl:2b-instruct",'
+                        '"installed_size_bytes":1900000000,"reason":null},'
+                        '"semantic":{"available":false,"models":[],"ready_models":[],'
+                        '"missing_models":[],"checks_per_page":0,"reason":"Not configured"}}'
+                    ),
+                ),
+            )
             await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
             login_link = page.get_by_role("link", name="2FA or login scan")
             await playwright_async.expect(login_link).to_be_visible()
@@ -602,20 +633,24 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             both_engines = page.get_by_role(
                 "radio", name=re.compile(r"^axe-core \+ Siteimprove Alfa")
             )
+            axe_only = page.get_by_role("radio", name=re.compile(r"^axe-core Runs directly"))
             alfa_only = page.get_by_role("radio", name=re.compile(r"^Siteimprove Alfa only"))
             await playwright_async.expect(both_engines).to_be_enabled()
+            await playwright_async.expect(axe_only).to_be_checked()
+            await both_engines.check()
             await playwright_async.expect(both_engines).to_be_checked()
             await alfa_only.check()
             await playwright_async.expect(alfa_only).to_be_checked()
             await playwright_async.expect(
                 page.get_by_text("Siteimprove Alfa ACT rules", exact=True)
             ).to_be_visible()
-            skip_ocr = page.get_by_role("checkbox", name=re.compile(r"^Skip OCR"))
-            skip_vlm = page.get_by_role("checkbox", name=re.compile(r"^Skip VLM classification"))
-            await playwright_async.expect(skip_ocr).to_be_enabled()
-            await playwright_async.expect(skip_vlm).to_be_enabled()
-            await playwright_async.expect(skip_ocr).to_be_checked()
-            await skip_ocr.uncheck()
+            use_ocr = page.get_by_role("checkbox", name=re.compile(r"^Detect text inside images"))
+            use_vlm = page.get_by_role("checkbox", name=re.compile(r"^Classify image text"))
+            await playwright_async.expect(use_ocr).to_be_enabled()
+            await playwright_async.expect(use_ocr).not_to_be_checked()
+            await playwright_async.expect(use_vlm).to_be_disabled()
+            await use_ocr.check()
+            await playwright_async.expect(use_vlm).to_be_enabled()
             await playwright_async.expect(
                 page.get_by_role(
                     "checkbox", name=re.compile(r"^Store protected image-analysis evidence")

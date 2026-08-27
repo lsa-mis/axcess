@@ -51,6 +51,50 @@ def test_health_returns_version(client: TestClient) -> None:
     assert "version" in body
 
 
+def test_local_analysis_capability_distinguishes_bundled_ocr_and_models(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.web import server
+
+    class _Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "models": [
+                    {"name": "qwen3-vl:2b-instruct", "size": 1_900_000_000},
+                    {"name": "gemma2:9b", "size": 5_000_000_000},
+                ]
+            }
+
+    class _Client:
+        async def __aenter__(self) -> _Client:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def get(self, _url: str) -> _Response:
+            return _Response()
+
+    monkeypatch.setattr(server.httpx, "AsyncClient", lambda **_kwargs: _Client())
+    response = client.get("/api/capabilities/local-analysis")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ocr"]["engine"] == "Tesseract 5"
+    assert body["vision"] == {
+        "available": True,
+        "model": "qwen3-vl:2b-instruct",
+        "installed_size_bytes": 1_900_000_000,
+        "reason": None,
+    }
+    assert body["semantic"]["available"] is False
+    assert body["semantic"]["ready_models"] == ["gemma2:9b"]
+    assert body["semantic"]["missing_models"] == ["qwen2.5:7b-instruct"]
+
+
 def test_favicon_svg_served(client: TestClient) -> None:
     """The brand favicon must serve from /favicon.svg with the SVG mime."""
     resp = client.get("/favicon.svg")
@@ -509,6 +553,80 @@ def test_api_create_scan_kicks_off_crawl(
     assert called.get("ran") is True
 
 
+def test_background_crawl_startup_failure_finishes_scan(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-queue exception must not leave a permanently running report."""
+    import asyncio
+
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+    # Directory-like seeds are normalized with a trailing slash by the
+    # crawler.  The up-front scan row and failure path must retain that same
+    # identity or the UI can stay attached to an orphaned running row.
+    seed_url = "https://startup-failure.example.test/section"
+    canonical_seed = f"{seed_url}/"
+    with connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', '{}')",
+            (canonical_seed,),
+        )
+
+    async def _fail_before_queue(_conn, _config):  # type: ignore[no-untyped-def]
+        raise RuntimeError("browser could not start")
+
+    monkeypatch.setattr(server, "run_crawl", _fail_before_queue)
+    asyncio.run(
+        server._run_background_crawl(
+            db_path,
+            server.CrawlConfig(seed_url=seed_url),
+        )
+    )
+
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT status, finished_at, failure_reason FROM scans WHERE seed_url = ?",
+            (canonical_seed,),
+        ).fetchone()
+    assert row is not None
+    assert row["status"] == "failed"
+    assert row["finished_at"] is not None
+    assert row["failure_reason"] == "browser could not start"
+
+
+def test_prepare_scan_row_uses_crawler_seed_identity(
+    seeded_db: tuple[Path, Path, int],
+) -> None:
+    """The progress row and crawler must not split at an auto-added slash."""
+
+    from audit.crawler.orchestrator import _ensure_scan
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+    config = server.CrawlConfig(seed_url="https://app.example.test/about")
+    prepared_id = server._prepare_scan_row(db_path, config)
+
+    with connect(db_path) as conn:
+        prepared = conn.execute(
+            "SELECT seed_url FROM scans WHERE id = ?", (prepared_id,)
+        ).fetchone()
+        crawler_id = _ensure_scan(
+            conn,
+            "https://app.example.test/about/",
+            config,
+        )
+        count = conn.execute(
+            "SELECT COUNT(*) AS n FROM scans WHERE seed_url LIKE 'https://app.example.test/about%'"
+        ).fetchone()
+
+    assert prepared is not None
+    assert prepared["seed_url"] == "https://app.example.test/about/"
+    assert crawler_id == prepared_id
+    assert count is not None
+    assert count["n"] == 1
+
+
 def test_api_create_scan_respects_whole_host(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -524,6 +642,9 @@ def test_api_create_scan_respects_whole_host(
         captured["seed_url"] = config.seed_url
         captured["axe_level"] = config.axe_level
         captured["browser_headless"] = config.browser_headless
+        captured["semantic_enabled"] = config.semantic_enabled
+        captured["focus_checks_enabled"] = config.focus_checks_enabled
+        captured["visual_checks_enabled"] = config.visual_checks_enabled
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -539,6 +660,9 @@ def test_api_create_scan_respects_whole_host(
             "axe_level": "AAA",
             "skip_ocr": True,
             "skip_vlm": True,
+            "skip_semantic": True,
+            "skip_focus": True,
+            "skip_visual": True,
         },
     )
     assert resp.status_code == 201
@@ -554,6 +678,9 @@ def test_api_create_scan_respects_whole_host(
     # The chosen conformance target reaches the crawl config.
     assert captured.get("axe_level") == "AAA"
     assert captured.get("browser_headless") is False
+    assert captured.get("semantic_enabled") is False
+    assert captured.get("focus_checks_enabled") is False
+    assert captured.get("visual_checks_enabled") is False
 
 
 def test_api_create_scan_selects_alfa_engine(

@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef, useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink } from "lucide-react";
@@ -149,10 +150,100 @@ export default function IssuesRoute() {
 }
 
 function IssueTable({ rows }: { rows: IssueRow[] }) {
+  const tableId = useId();
+  const scrollHelpId = useId();
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [scrollMaximum, setScrollMaximum] = useState(0);
+
+  useEffect(() => {
+    const scrollbar = topScrollRef.current;
+    if (!scrollbar) return;
+    const updateMaximum = () => {
+      setScrollMaximum(Math.max(0, scrollbar.scrollWidth - scrollbar.clientWidth));
+    };
+    updateMaximum();
+    const resizeObserver = new ResizeObserver(updateMaximum);
+    resizeObserver.observe(scrollbar);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const syncScroll = (
+    source: HTMLDivElement,
+    target: HTMLDivElement | null,
+  ) => {
+    if (target && target.scrollLeft !== source.scrollLeft) {
+      target.scrollLeft = source.scrollLeft;
+    }
+  };
+
+  const moveScroll = (requestedPosition: number) => {
+    const position = Math.max(0, Math.min(scrollMaximum, requestedPosition));
+    if (topScrollRef.current) topScrollRef.current.scrollLeft = position;
+    if (tableScrollRef.current) tableScrollRef.current.scrollLeft = position;
+    setScrollPosition(position);
+  };
+
   return (
     <Card className="min-w-0 max-w-full overflow-hidden">
-      <div className="w-full max-w-full overflow-x-auto" role="region" aria-label="Scrollable accessibility issue table">
-        <table className="min-w-[1180px] w-full border-collapse text-left text-sm">
+      <div className="border-b border-border bg-surface-subtle px-4 pb-2 pt-3">
+        <p id={scrollHelpId} className="mb-2 text-xs text-fg-muted">
+          More columns are available horizontally. Use the scrollbar below, or
+          focus it and press the Left and Right Arrow keys.
+        </p>
+        <div
+          ref={topScrollRef}
+          className="w-full overflow-x-auto overflow-y-hidden rounded-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-umich-blue"
+          role="scrollbar"
+          aria-label="Scroll issue table columns"
+          aria-controls={tableId}
+          aria-describedby={scrollHelpId}
+          aria-orientation="horizontal"
+          aria-valuemin={0}
+          aria-valuemax={scrollMaximum}
+          aria-valuenow={Math.round(scrollPosition)}
+          aria-valuetext={
+            scrollMaximum > 0
+              ? `${Math.round((scrollPosition / scrollMaximum) * 100)}% across the table`
+              : "All columns fit"
+          }
+          tabIndex={0}
+          onKeyDown={(event) => {
+            const page = Math.max(80, event.currentTarget.clientWidth * 0.8);
+            const nextPosition = {
+              ArrowLeft: scrollPosition - 48,
+              ArrowRight: scrollPosition + 48,
+              PageUp: scrollPosition - page,
+              PageDown: scrollPosition + page,
+              Home: 0,
+              End: scrollMaximum,
+            }[event.key];
+            if (nextPosition !== undefined) {
+              event.preventDefault();
+              moveScroll(nextPosition);
+            }
+          }}
+          onScroll={(event) => {
+            setScrollPosition(event.currentTarget.scrollLeft);
+            syncScroll(event.currentTarget, tableScrollRef.current);
+          }}
+        >
+          <div className="h-1 min-w-[1180px]" aria-hidden="true" />
+        </div>
+      </div>
+      <div
+        ref={tableScrollRef}
+        className="w-full max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-umich-blue"
+        role="region"
+        aria-label="Scrollable accessibility issue table"
+        aria-describedby={scrollHelpId}
+        onScroll={(event) => {
+          setScrollPosition(event.currentTarget.scrollLeft);
+          syncScroll(event.currentTarget, topScrollRef.current);
+        }}
+      >
+        <table id={tableId} className="min-w-[1180px] w-full border-collapse text-left text-sm">
           <caption className="sr-only">
             Accessibility issue groups with explanation, expected remediation, and exact location samples
           </caption>
