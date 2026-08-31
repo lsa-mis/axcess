@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Interaction probe fixture</title>
+</head>
+<body>
+  <header>
+    <nav aria-label="Main">
+      <a href="#main">Skip to content</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <h1>Guest registration</h1>
+
+    <!-- LOAD-STATE VIOLATION: axe `image-alt`. Visible without any
+         interaction, so it must be reported exactly once and must NOT be
+         re-reported by every state a click reveals. -->
+    <img src="banner.png">
+
+    <!-- REVEALED VIOLATION: the unlabelled input does not exist until this
+         button is pressed. This is the case a load-time-only scan cannot
+         see at all. -->
+    <button type="button" id="add-guest">Add another guest</button>
+    <form id="guests"></form>
+
+    <!-- MUST NEVER BE CLICKED: the probe's blocked-label guard. If it is
+         clicked the page records it, and the test fails loudly rather than
+         silently trusting the guard. -->
+    <button type="button" id="danger" onclick="document.body.dataset.signedOut='yes'">
+      Sign out
+    </button>
+
+    <!-- REPEAT CAP: ten controls of one structural shape. After digits are
+         normalised they share a signature, so only a few should be sampled
+         rather than all ten. -->
+    <div id="calendar">
+      <button type="button" id="day-1" onclick="bump()">Day 1</button>
+      <button type="button" id="day-2" onclick="bump()">Day 2</button>
+      <button type="button" id="day-3" onclick="bump()">Day 3</button>
+      <button type="button" id="day-4" onclick="bump()">Day 4</button>
+      <button type="button" id="day-5" onclick="bump()">Day 5</button>
+      <button type="button" id="day-6" onclick="bump()">Day 6</button>
+      <button type="button" id="day-7" onclick="bump()">Day 7</button>
+      <button type="button" id="day-8" onclick="bump()">Day 8</button>
+      <button type="button" id="day-9" onclick="bump()">Day 9</button>
+      <button type="button" id="day-10" onclick="bump()">Day 10</button>
+    </div>
+    <p>Days clicked: <span id="clicks">0</span></p>
+  </main>
+
+  <script>
+    document.getElementById('add-guest').addEventListener('click', function () {
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'guest-name';
+      document.getElementById('guests').appendChild(input);
+    });
+    function bump() {
+      var el = document.getElementById('clicks');
+      el.textContent = String(Number(el.textContent) + 1);
+    }
+  </script>
+</body>
+</html>

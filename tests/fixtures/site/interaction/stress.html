@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Interaction probe stress fixture</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; }
+  [hidden], .off { display: none; }
+  .cell { display:inline-block; padding:.4rem .6rem; border:1px solid #555; margin:2px; }
+  nav { background:#eee; padding:.5rem; }
+  #modal { border:2px solid #333; padding:1rem; }
+</style></head>
+<body>
+
+<nav>
+  <!-- GLOBAL: keyed without the URL, so it is operated once per crawl. -->
+  <button id="nav-menu" aria-expanded="false" onclick="t('nav-panel', this)">Menu</button>
+  <div id="nav-panel" class="off"><input type="text"></div>
+</nav>
+
+<h1>Interaction stress fixture</h1>
+
+<!-- 1. Disclosure -> reveals an input with no accessible name (axe: label). -->
+<button id="disclosure" aria-expanded="false" onclick="t('guest-panel', this)">Add another guest</button>
+<div id="guest-panel" class="off"><input type="text" id="guest-name"></div>
+
+<!-- 2. Tabs -> switching reveals an img with no alt (axe: image-alt). -->
+<div role="tablist">
+  <button role="tab" id="tab-a" aria-selected="true"  onclick="tab('a')">Details</button>
+  <button role="tab" id="tab-b" aria-selected="false" onclick="tab('b')">Photos</button>
+  <button role="tab" id="tab-c" aria-selected="false" onclick="tab('c')">Reviews</button>
+</div>
+<div id="panel-a">Plain text panel.</div>
+<div id="panel-b" class="off"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></div>
+<div id="panel-c" class="off"><input type="text" id="review-box"></div>
+
+<!-- 3. Modal -> dialog containing an unlabelled control. -->
+<button id="open-modal" aria-haspopup="dialog" onclick="t('modal', this)">Open booking dialog</button>
+<div id="modal" class="off" role="dialog" aria-label="Booking"><input type="text" id="modal-field"></div>
+
+<!-- 4/5. Inert controls: click lands, DOM is byte-identical, no axe run. -->
+<button id="inert-a" onclick="void 0">Refresh estimate</button>
+<button id="inert-b" onclick="console.log('noop')">Recalculate</button>
+
+<!-- 6. Twenty structurally identical cells: the repeat cap must bite. -->
+<div id="grid">
+  <script>
+    for (let i = 1; i <= 20; i++)
+      document.write('<button class="cell day" onclick="this.classList.toggle(\'on\')">Day ' + i + '</button>');
+  </script>
+</div>
+
+<!-- 7/8. Destructive labels: must never be operated. -->
+<button id="danger-1" onclick="document.body.innerHTML='<h1>WIPED</h1>'">Delete account</button>
+<button id="danger-2" onclick="document.body.innerHTML='<h1>WIPED</h1>'">Sign out of all devices</button>
+
+<!-- 9. Inside an anchor: the link crawler's job, not this probe's. -->
+<a href="/other.html"><button id="in-anchor">Buy now</button></a>
+
+<!-- 10. Not rendered: must not be collected. -->
+<button id="never-shown" style="display:none" onclick="t('guest-panel', this)">Invisible</button>
+
+<!-- 11. Navigates away: must be reverted, and the sweep must continue. -->
+<button id="navigates" onclick="location.href='/about.html'">Go to about</button>
+
+<script>
+  function t(id, btn) {
+    var el = document.getElementById(id);
+    el.classList.toggle('off');
+    if (btn && btn.hasAttribute('aria-expanded'))
+      btn.setAttribute('aria-expanded', el.classList.contains('off') ? 'false' : 'true');
+  }
+  function tab(which) {
+    ['a','b','c'].forEach(function (k) {
+      document.getElementById('panel-' + k).classList.toggle('off', k !== which);
+      document.getElementById('tab-' + k).setAttribute('aria-selected', String(k === which));
+    });
+  }
+</script>
+</body></html>

@@ -16,6 +16,7 @@ import httpx
 if TYPE_CHECKING:
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
+    from audit.analyzer.interaction import RevealedViolation
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
@@ -59,6 +60,11 @@ class FetchResult:
     # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())
+    # Violations reachable only by operating a control (opening a menu,
+    # expanding a form). Same population rules as the probes above;
+    # opt-in via ``--interaction``. Each carries the accessible name of
+    # the control that revealed it.
+    interaction_findings: tuple[RevealedViolation, ...] = field(default=())
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)

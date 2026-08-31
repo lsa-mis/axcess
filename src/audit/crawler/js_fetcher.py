@@ -25,6 +25,7 @@ from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.interaction import InteractionProbe, RevealedViolation
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
@@ -124,6 +125,7 @@ class JsFetcher:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -153,6 +155,13 @@ class JsFetcher:
         # SC 1.3.2 visual probe. Screenshots the page — must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
+        # Interaction probe. Runs after every read-only pass and after the
+        # probes that only move focus, but BEFORE the responsive probe:
+        # it clicks things, so the DOM it leaves behind is not the DOM the
+        # page loaded with, and a viewport-resize check must not inherit
+        # an opened menu. Off unless explicitly attached — it is the most
+        # expensive pass here (one axe run per revealed state).
+        self._interaction_probe = interaction_probe
         # When set, capture a circled screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
@@ -308,6 +317,20 @@ class JsFetcher:
             ):
                 visual_findings = await self._visual_probe.run(page)
 
+            # Interaction probe — clicks controls and re-runs axe on each
+            # state a click reveals. Given the load-state violations as a
+            # baseline so anything already reported is never reported
+            # again, however many revealed states it survives into.
+            interaction_findings: list[RevealedViolation] = []
+            if (
+                self._interaction_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                interaction_findings = await self._interaction_probe.run(
+                    page, baseline=axe_violations
+                )
+
             responsive_findings: list[ResponsiveFinding] = []
             if (
                 self._responsive_probe is not None
@@ -365,6 +388,7 @@ class JsFetcher:
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
                 visual_findings=tuple(visual_findings),
+                interaction_findings=tuple(interaction_findings),
                 screenshots=screenshots,
             )
         finally:

@@ -210,11 +210,17 @@ def test_a11y_history_migration_forward_and_rollback(tmp_path: Path) -> None:
     db_path = tmp_path / "pre-0019.db"
     conn = connect(db_path)
     try:
+        # Every migration EXCEPT 0019 — the one under test. Truncating at
+        # 18 instead would leave `page_a11y_findings` at an old shape while
+        # the seeding below goes through the current repo helper, so every
+        # future column added to that table would break this test for
+        # reasons that have nothing to do with finding history. 0020+ do
+        # not reference a11y_finding_history, so skipping only 0019 still
+        # produces exactly the pre-0019 state this test needs.
         for path in sorted(_MIGRATIONS.glob("*.sql")):
             if path.name.endswith(".rollback.sql"):
                 continue
-            number = int(path.name.split("_", 1)[0])
-            if number >= 19:
+            if int(path.name.split("_", 1)[0]) == 19:
                 continue
             conn.executescript(path.read_text(encoding="utf-8"))
 

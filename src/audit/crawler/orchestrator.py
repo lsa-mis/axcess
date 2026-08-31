@@ -34,6 +34,7 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.interaction import InteractionProbe, RevealedViolation
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -184,6 +185,20 @@ class CrawlConfig:
     # one. One VLM call per page, so it respects the same vlm_enabled gate.
     # Default on; disable with ``--skip-visual``.
     visual_checks_enabled: bool = True
+    # Interaction probe. Clicks the page's controls and re-runs axe on
+    # each state a click reveals, so defects inside closed menus,
+    # unopened dialogs, and unswitched tabs become visible. Findings
+    # persist as ordinary axe rows carrying ``revealed_by``, so the
+    # existing (page_id, rule_id, target_hash) uniqueness already stops
+    # an unchanged header being reported once per click.
+    #
+    # OFF by default, unlike every other probe here: it is the only pass
+    # that mutates the page, and it costs one axe run per revealed state
+    # rather than one per page. Enable with ``--interaction``.
+    interaction_checks_enabled: bool = False
+    interaction_max_clicks: int = 40
+    interaction_max_repeated: int = 3
+    interaction_max_depth: int = 2
     # Per-finding element screenshots. When on (default), the JS fetcher
     # captures a circled screenshot of each live-page finding's element
     # at scan time; the orchestrator stores it in the blob store and threads
@@ -223,6 +238,9 @@ class CrawlSummary:
     focus_findings_total: int = 0
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
+    interaction_pages_probed: int = 0
+    interaction_clicked_total: int = 0
+    interaction_findings_total: int = 0
     findings_written: int = 0
     findings_by_severity: dict[str, int] = field(
         default_factory=lambda: {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -348,6 +366,17 @@ async def run_crawl(
         if config.vlm_enabled:
             vision_provider = await _build_vision_provider(config, client)
         visual_probe = VisualProbe(provider=vision_provider)
+    # Interaction probe — opt-in. Shares the crawl's single AxeAnalyzer so
+    # axe is injected once per page whether or not this probe runs.
+    interaction_probe: InteractionProbe | None = None
+    if config.interaction_checks_enabled and axe_analyzer is not None:
+        interaction_probe = InteractionProbe(
+            axe=axe_analyzer,
+            level=axe_level,
+            max_clicks=config.interaction_max_clicks,
+            max_repeated=config.interaction_max_repeated,
+            max_depth=config.interaction_max_depth,
+        )
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
         js_holder = _LazyJs(
@@ -359,6 +388,7 @@ async def run_crawl(
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
             visual_probe=visual_probe,
+            interaction_probe=interaction_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
         )
@@ -516,6 +546,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,
+            "interaction_checks_enabled": config.interaction_checks_enabled,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older
             # reports omit this key and must be labeled "coverage not recorded"
@@ -601,6 +632,7 @@ class _LazyJs:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         headless: bool = True,
     ) -> None:
@@ -613,6 +645,7 @@ class _LazyJs:
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
         self._visual_probe = visual_probe
+        self._interaction_probe = interaction_probe
         self._capture_screenshots = capture_screenshots
         self._headless = headless
 
@@ -626,6 +659,7 @@ class _LazyJs:
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
                 visual_probe=self._visual_probe,
+                interaction_probe=self._interaction_probe,
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
             )
@@ -975,6 +1009,19 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 screenshots=result.screenshots,
             )
 
+        # Interaction probe. Unlike the probes above these are NOT tagged
+        # with their own pipeline: what the probe found is an axe
+        # violation, so it goes down the ordinary axe path and inherits
+        # its (page_id, rule_id, target_hash) dedupe. All that is added is
+        # ``revealed_by``.
+        if render_mode == "js" and ctx.config.interaction_checks_enabled:
+            _persist_interaction(
+                ctx,
+                page_id=page_id,
+                findings=result.interaction_findings,
+                screenshots=result.screenshots,
+            )
+
         # Phase 9+: per-criterion semantic analyzers. Works on both
         # static and JS-rendered fetches because the first wave is
         # selectolax-based (the HTML body is enough). Later phases
@@ -1148,6 +1195,69 @@ def _persist_axe(
     )
     ctx.summary.axe_pages_scanned += 1
     ctx.summary.axe_violations_total += len(violations)
+
+
+def _persist_interaction(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[RevealedViolation, ...],
+    screenshots: Mapping[str, bytes],
+) -> None:
+    """Write violations that only exist after a control was operated.
+
+    Deliberately the same ``upsert_axe_violation`` the load-state pass
+    uses, against the same ``page_id``. That is the entire dedupe story:
+    a violation already recorded at load has the same target_hash here,
+    hits ``ON CONFLICT``, and updates instead of inserting a second row.
+    The probe filters those out before they ever reach this function, so
+    the constraint is a backstop rather than the primary mechanism.
+    """
+    for revealed in findings:
+        v = revealed.violation
+        try:
+            repo.upsert_axe_violation(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                rule_id=v.rule_id,
+                wcag_sc=v.wcag_sc,
+                wcag_scs=v.wcag_scs,
+                wcag_level=v.wcag_level,
+                impact=v.impact,
+                help=v.help,
+                help_url=v.help_url,
+                target_selector=v.target_selector,
+                failure_summary=v.failure_summary,
+                html_snippet=v.html_snippet,
+                target_hash=v.target_hash,
+                screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
+                revealed_by=revealed.revealed_by,
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "interaction.persist_failed",
+                rule_id=v.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    # These ARE axe violations, so they belong in the scan's axe total —
+    # otherwise page_a11y_findings would hold more axe rows than the
+    # counter claims. pages_delta stays 0: the page was already counted as
+    # axe-scanned by the load-state pass, and counting it twice would make
+    # "pages scanned" exceed the number of pages.
+    repo.increment_scan_axe_counters(
+        ctx.conn,
+        scan_id=ctx.scan_id,
+        pages_delta=0,
+        violations_delta=len(findings),
+    )
+    # Mirrored into the in-memory summary so the CLI table and the DB
+    # cannot disagree, with the interaction-specific counters kept
+    # alongside so the report can still say how much clicking bought.
+    ctx.summary.axe_violations_total += len(findings)
+    ctx.summary.interaction_pages_probed += 1
+    ctx.summary.interaction_findings_total += len(findings)
 
 
 def _persist_alfa(

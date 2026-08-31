@@ -393,6 +393,7 @@ def upsert_axe_violation(
     html_snippet: str,
     target_hash: str,
     screenshot_hash: str | None = None,
+    revealed_by: str | None = None,
 ) -> int:
     """Idempotent upsert on ``(page_id, rule_id, target_hash)``.
 
@@ -407,9 +408,9 @@ def upsert_axe_violation(
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, screenshot_hash
+            html_snippet, target_hash, screenshot_hash, revealed_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -422,6 +423,10 @@ def upsert_axe_violation(
             failure_summary = excluded.failure_summary,
             html_snippet = excluded.html_snippet,
             screenshot_hash = excluded.screenshot_hash,
+            -- revealed_by is deliberately NOT updated. The load-state
+            -- pass runs first, so a finding visible without any
+            -- interaction keeps its NULL and is never relabelled as
+            -- click-only by a later state that merely still shows it.
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -439,6 +444,7 @@ def upsert_axe_violation(
             html_snippet,
             target_hash,
             screenshot_hash,
+            revealed_by,
         ),
     )
     row = conn.execute(
