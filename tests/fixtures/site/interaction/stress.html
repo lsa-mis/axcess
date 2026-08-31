@@ -36,6 +36,15 @@
 <button id="open-modal" aria-haspopup="dialog" onclick="t('modal', this)">Open booking dialog</button>
 <div id="modal" class="off" role="dialog" aria-label="Booking"><input type="text" id="modal-field"></div>
 
+<!-- 3b. A GENUINE two-level chain: this button reveals a button, which
+     reveals an unlabelled field. Only scoped recursion can reach the field:
+     "More options" must be operated at depth 1, not depth 0. -->
+<button id="menu-root" aria-expanded="false" onclick="t('submenu', this)">Account menu</button>
+<div id="submenu" class="off">
+  <button id="submenu-btn" aria-expanded="false" onclick="t('submenu-panel', this)">More options</button>
+  <div id="submenu-panel" class="off"><input type="text" id="deep-field"></div>
+</div>
+
 <!-- 4/5. Inert controls: click lands, DOM is byte-identical, no axe run. -->
 <button id="inert-a" onclick="void 0">Refresh estimate</button>
 <button id="inert-b" onclick="console.log('noop')">Recalculate</button>

@@ -17,6 +17,7 @@ The fixture is built so each guarantee fails loudly rather than silently:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -173,3 +174,93 @@ async def test_a_control_is_operated_only_once(page, axe) -> None:  # type: igno
 
     # ...and therefore the one unlabelled input is one finding, not three.
     assert len([r for r in revealed if r.violation.rule_id == "label"]) == 1
+
+
+async def test_nested_control_is_explored_at_depth_one(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A control revealed by a click must be reachable, and cost one level.
+
+    The stress fixture holds a genuine two-level chain: "Account menu"
+    reveals "More options", which reveals an unlabelled field. Reaching
+    that field is only possible if the nested sweep looks at what the
+    click revealed instead of re-reading the whole document — when it
+    re-read the document, the first control that changed anything dragged
+    every flat button on the page down to depth 1, and the depth budget
+    was gone before the chain could be walked.
+    """
+    await page.goto(_file_url("stress.html"))
+    baseline = await axe.run(page, "AA")
+
+    revealed = await InteractionProbe(axe=axe, max_clicks=40, max_depth=2).run(
+        page, baseline=baseline
+    )
+
+    deep = [r for r in revealed if r.violation.target_selector == "#deep-field"]
+    assert deep, (
+        "the field behind Account menu -> More options was not reached; "
+        "nested sweeps are not scoped to the revealed subtree"
+    )
+    assert deep[0].violation.rule_id == "label"
+    # Attributed to the control actually operated, not to the outer menu.
+    assert deep[0].revealed_by == "More options"
+
+
+async def test_flat_controls_do_not_consume_recursion_depth(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Depth must measure nesting, not "how many clicks changed something".
+
+    With ``max_depth=1`` no nested sweep may run at all. Every control that
+    was operable at load must still be operated, because none of them are
+    nested — they only looked nested when the sweep re-read the document.
+    """
+    await page.goto(_file_url("stress.html"))
+    baseline = await axe.run(page, "AA")
+
+    revealed = await InteractionProbe(axe=axe, max_clicks=40, max_depth=1).run(
+        page, baseline=baseline
+    )
+
+    # Reachable without descending: each is a top-level control.
+    for label in ("Add another guest", "Photos", "Open booking dialog"):
+        assert any(r.revealed_by == label for r in revealed), (
+            f'"{label}" is a load-state control and must be operated at depth 0'
+        )
+    # Not reachable: it only exists after another click.
+    assert not any(r.revealed_by == "More options" for r in revealed), (
+        "max_depth=1 forbids descending, so the nested control must be skipped"
+    )
+
+
+@pytest.mark.parametrize("max_depth", [1, 2, 3, 4, 5])
+async def test_depth_limit_counts_nesting_levels_exactly(page, axe, max_depth) -> None:  # type: ignore[no-untyped-def]
+    """``max_depth=N`` must reach exactly N levels of a nesting chain.
+
+    ``nested_depth.html`` is a five-level chain where each level reveals both
+    an uniquely-numbered unlabelled field and the button for the next level,
+    so the deepest field found is an exact readout of the recursion depth.
+
+    This pins down two failures that both let depth drift from nesting. The
+    sweep used to re-read the whole document on every pass, so a revealed
+    button was picked back up at depth 0 and clicked there: the chain walked
+    to level three under ``max_depth=1``. And the nested sweep used to see
+    the whole document rather than what the click revealed, which spent the
+    depth budget on flat controls before any chain could be walked.
+    """
+    await page.goto(_file_url("nested_depth.html"))
+    baseline = await axe.run(page, "AA")
+
+    revealed = await InteractionProbe(axe=axe, max_clicks=60, max_depth=max_depth).run(
+        page, baseline=baseline
+    )
+
+    # A set: one field can fail several rules (label *and* target-size), and
+    # what is being measured is which levels were reached, not how many
+    # violations each level happened to contain.
+    reached = sorted(
+        {
+            int(m.group(1))
+            for r in revealed
+            if (m := re.match(r"#field-(\d)$", r.violation.target_selector))
+        }
+    )
+    assert reached == list(range(1, max_depth + 1)), (
+        f"max_depth={max_depth} should reach levels 1..{max_depth}, reached {reached}"
+    )

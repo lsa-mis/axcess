@@ -64,14 +64,21 @@ DEFAULT_BLOCKED_LABELS: tuple[str, ...] = (
 # call until it times out. Anything inside an <a> is excluded because links
 # are the crawler's job — this probe must not trigger navigation it then has
 # to undo.
+_CANDIDATE_SELECTOR = (
+    'button, [role="button"], [role="tab"], [role="menuitem"], '
+    '[role="switch"], [role="checkbox"], [role="radio"], '
+    "details > summary, [aria-expanded], [aria-haspopup], [onclick]"
+)
+
+# `fresh` answers "did this control become operable since the last mark?".
+# It is the whole basis of scoped recursion: after a click, the only controls
+# worth descending into are the ones that were not there (or not operable)
+# before it. The mark is a JS property on the element, not an attribute, so
+# it never appears in innerHTML — invisible to both the DOM hash and axe.
 _COLLECT_JS = """
-() => {
+(sel) => {
   const out = [];
-  const candidates = document.querySelectorAll(
-    'button, [role="button"], [role="tab"], [role="menuitem"], ' +
-    '[role="switch"], [role="checkbox"], [role="radio"], ' +
-    'details > summary, [aria-expanded], [aria-haspopup], [onclick]'
-  );
+  const candidates = document.querySelectorAll(sel);
   const esc = (s) => (window.CSS && CSS.escape ? CSS.escape(s) : s);
   for (const el of candidates) {
     if (el.closest('a')) continue;
@@ -89,9 +96,24 @@ _COLLECT_JS = """
     const isGlobal = !!el.closest(
       'header, nav, footer, [role="banner"], [role="navigation"], [role="contentinfo"]'
     );
-    out.push({ selector: tag + (id || classes), tag: tag, label: label, isGlobal: isGlobal });
+    out.push({
+      selector: tag + (id || classes), tag: tag, label: label,
+      isGlobal: isGlobal, fresh: !el.__axcessSeen,
+    });
   }
   return out;
+}
+"""
+
+# Mark every currently-operable control as already-seen. Called immediately
+# before a click so that whatever the click reveals stands out as unmarked.
+_MARK_JS = """
+(sel) => {
+  let n = 0;
+  for (const el of document.querySelectorAll(sel)) {
+    if (el.offsetParent !== null) { el.__axcessSeen = true; n++; }
+  }
+  return n;
 }
 """
 
@@ -171,7 +193,7 @@ class InteractionProbe:
         )
         found: list[RevealedViolation] = []
         try:
-            await self._explore(page, budget, found, pinned=page.url, depth=0)
+            await self._explore(page, budget, found, pinned=page.url, depth=0, fresh_only=False)
         except Exception as exc:
             # A probe is evidence-gathering, not a gate. Whatever we managed
             # to reach before something went wrong is still valid evidence.
@@ -192,52 +214,66 @@ class InteractionProbe:
         *,
         pinned: str,
         depth: int,
+        fresh_only: bool,
     ) -> None:
+        """Sweep controls and operate the ones this probe has not touched.
+
+        ``fresh_only`` is what makes depth mean nesting rather than breadth.
+        A nested sweep runs with it set, so it considers only controls that
+        became operable as a result of the click that opened it — not the
+        whole document. Without it, the first control that changed anything
+        pulled every other control on the page down into its subtree: an
+        instrumented run of the stress fixture spent 11 of 12 clicks at
+        depth 1 on buttons that had been sitting in the markup all along,
+        which exhausted the depth budget before any genuine
+        menu -> submenu -> item chain could be reached.
+        """
         if depth >= self.max_depth or budget.remaining <= 0:
             return
 
-        # Clicking can reveal further controls, so re-read the DOM after each
-        # sweep and stop as soon as a sweep operates nothing new. The seen-key
-        # set and the repeat cap both shrink monotonically, which is what
-        # guarantees this terminates.
-        while budget.remaining > 0:
-            try:
-                controls: list[dict[str, Any]] = await page.evaluate(_COLLECT_JS)
-            except Exception:
-                return  # navigated or detached mid-sweep
-            progressed = 0
+        # Exactly one pass per level. Mark-and-diff makes a second pass not
+        # just redundant but wrong: every control operable at this level is
+        # already in `controls`, and anything that becomes operable later did
+        # so because a click revealed it — which makes it the nested sweep's
+        # business, one level down. Re-reading the document here would hand
+        # those revealed controls back to *this* level, and that is precisely
+        # how the depth limit came to mean nothing. A five-level chain was
+        # walked all the way to level three under ``max_depth=1``, because
+        # each extra pass picked up the next level's button and clicked it at
+        # depth 0. Termination no longer rests on a progress counter: the
+        # control list is finite and the recursion is bounded by max_depth.
+        try:
+            controls: list[dict[str, Any]] = await page.evaluate(_COLLECT_JS, _CANDIDATE_SELECTOR)
+        except Exception:
+            return  # navigated or detached mid-sweep
+        if fresh_only:
+            controls = [c for c in controls if c["fresh"]]
 
-            for control in controls:
-                if budget.remaining <= 0:
-                    break
-                if self._is_blocked(control["label"]):
-                    continue
+        for control in controls:
+            if budget.remaining <= 0:
+                break
+            if self._is_blocked(control["label"]):
+                continue
 
-                key = self._interaction_key(control, pinned)
-                if key in budget.seen_keys:
-                    continue
+            key = self._interaction_key(control, pinned)
+            if key in budget.seen_keys:
+                continue
 
-                signature = _signature(control["selector"])
-                shape = f"{'GLOBAL' if control['isGlobal'] else pinned}|{signature}"
-                if budget.signature_counts.get(shape, 0) >= self.max_repeated:
-                    continue
+            signature = _signature(control["selector"])
+            shape = f"{'GLOBAL' if control['isGlobal'] else pinned}|{signature}"
+            if budget.signature_counts.get(shape, 0) >= self.max_repeated:
+                continue
 
-                # Claim the control BEFORE operating it. _operate recurses
-                # into a nested sweep of whatever the click reveals, and
-                # that sweep re-reads the DOM — so if the claim landed
-                # afterwards the nested sweep would still see this control
-                # as untouched and click it again, once per level. An
-                # end-to-end run caught exactly that: one "Add another
-                # guest" button pressed three times, three inputs appended,
-                # one defect reported as three findings.
-                budget.seen_keys.add(key)
-                budget.signature_counts[shape] = budget.signature_counts.get(shape, 0) + 1
+            # Claim the control BEFORE operating it. _operate recurses into a
+            # nested sweep of whatever the click reveals; if the claim landed
+            # afterwards that sweep would still see this control as untouched
+            # and click it again. An end-to-end run caught exactly that: one
+            # "Add another guest" button pressed three times, three inputs
+            # appended, one defect reported as three findings.
+            budget.seen_keys.add(key)
+            budget.signature_counts[shape] = budget.signature_counts.get(shape, 0) + 1
 
-                if await self._operate(page, budget, found, control, pinned=pinned, depth=depth):
-                    progressed += 1
-
-            if progressed == 0:
-                return
+            await self._operate(page, budget, found, control, pinned=pinned, depth=depth)
 
     def _is_blocked(self, label: str) -> bool:
         lowered = label.lower()
@@ -285,6 +321,11 @@ class InteractionProbe:
             if not await locator.is_visible(timeout=1000):
                 return False
 
+            # Everything operable right now is "old". Whatever the click
+            # makes operable will be the only unmarked set afterwards, which
+            # is exactly what the nested sweep descends into.
+            await page.evaluate(_MARK_JS, _CANDIDATE_SELECTOR)
+
             before_hash = await page.evaluate(_DOM_HASH_JS)
             budget.remaining -= 1
             await locator.click(timeout=3000)
@@ -303,8 +344,11 @@ class InteractionProbe:
 
             await self._collect(page, budget, found, label)
 
-            # Whatever this click opened may itself contain controls.
-            await self._explore(page, budget, found, pinned=pinned, depth=depth + 1)
+            # Whatever this click opened may itself contain controls. Only
+            # those: fresh_only keeps the descent inside what appeared.
+            await self._explore(
+                page, budget, found, pinned=pinned, depth=depth + 1, fresh_only=True
+            )
 
             # Close the state we opened so the next sibling is reachable.
             await page.keyboard.press("Escape")

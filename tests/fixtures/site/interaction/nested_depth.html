@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Nested depth fixture</title>
+<style>body{font-family:system-ui;margin:2rem}.off{display:none}</style></head>
+<body>
+<main>
+<h1>Five-level nesting chain</h1>
+
+<!-- Each level reveals BOTH an unlabelled field (a violation axe will catch,
+     uniquely identifiable per level) AND the button for the next level down.
+     Nothing here is reachable except by walking the chain in order, so the
+     deepest level reached is an exact readout of the recursion depth. -->
+
+<button id="alpha-btn" onclick="open_('lvl1')">Level one</button>
+<div id="lvl1" class="off">
+  <input type="text" id="field-1">
+  <button id="beta-btn" onclick="open_('lvl2')">Level two</button>
+  <div id="lvl2" class="off">
+    <input type="text" id="field-2">
+    <button id="gamma-btn" onclick="open_('lvl3')">Level three</button>
+    <div id="lvl3" class="off">
+      <input type="text" id="field-3">
+      <button id="delta-btn" onclick="open_('lvl4')">Level four</button>
+      <div id="lvl4" class="off">
+        <input type="text" id="field-4">
+        <button id="epsilon-btn" onclick="open_('lvl5')">Level five</button>
+        <div id="lvl5" class="off">
+          <input type="text" id="field-5">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+<script>
+  function open_(id) { document.getElementById(id).classList.remove('off'); }
+</script>
+</body></html>
