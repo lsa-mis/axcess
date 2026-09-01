@@ -29,6 +29,7 @@ from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.interaction import InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
@@ -683,6 +684,11 @@ class ManualAuthenticationSession:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        # Operates the page's controls and re-runs axe on each state a click
+        # reveals. Omitting it was silent: a login scan ran with interaction
+        # enabled in its config, recorded every page as probed, and reached
+        # zero DOM states, because the fetcher had no probe to run.
+        interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         max_rendered_html_chars: int | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -705,6 +711,7 @@ class ManualAuthenticationSession:
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
             visual_probe=visual_probe,
+            interaction_probe=interaction_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,
             shared_pages=shared_pages,

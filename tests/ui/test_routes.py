@@ -1665,3 +1665,149 @@ def test_login_handoff_still_completes_when_real_pages_were_scanned() -> None:
 
     assert status == "completed"
     assert error is None
+
+
+async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A login scan must actually operate the application's controls.
+
+    Scan #15 is the symptom this pins: interaction_checks_enabled was true in
+    the scan's own config and 358 pages were recorded as probed, yet zero DOM
+    states were reached and the log held not one interaction.clicked line.
+    The handoff builds its own fetcher from the signed-in session rather than
+    using the orchestrator's, and never passed it a probe — so the flag was
+    on and there was nothing to run.
+    """
+    from audit.crawler.orchestrator import CrawlConfig, CrawlSummary
+    from audit.db.schema import connect
+    from audit.web import server as srv
+
+    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
+    db_path = tmp_path / "audit.db"
+    schema_conn = connect(db_path)
+    for sql in sorted(migrations.glob("*.sql")):
+        if not sql.name.endswith(".rollback.sql"):
+            schema_conn.executescript(sql.read_text())
+    schema_conn.close()
+
+    captured: dict[str, object] = {}
+
+    async def _fake_run_crawl(conn, config, **kwargs):  # type: ignore[no-untyped-def]
+        return CrawlSummary(scan_id=1, seed_url=config.seed_url)
+
+    class _FakeSession:
+        async def start(self):  # type: ignore[no-untyped-def]
+            return None
+
+        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(url="https://app.example.edu/dashboard")
+
+        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+            return tuple(SimpleNamespace() for _ in range(count))
+
+        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
+            return None
+
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
+            return True
+
+        def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs)
+            return SimpleNamespace()
+
+        async def close(self):  # type: ignore[no-untyped-def]
+            return None
+
+    monkeypatch.setattr(srv, "run_crawl", _fake_run_crawl)
+
+    config = CrawlConfig(
+        seed_url="https://app.example.edu/",
+        axe_enabled=True,
+        interaction_checks_enabled=True,
+        alfa_enabled=False,
+        image_extraction_enabled=False,
+        vlm_enabled=False,
+        semantic_enabled=False,
+        workers=1,
+    )
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
+    run.confirmation.set()
+
+    await srv._run_local_login_background(db_path, tmp_path, config, run)
+
+    assert captured.get("interaction_probe") is not None, (
+        "the login scan's fetcher has no interaction probe, so enabling interaction changes nothing"
+    )
+
+
+async def test_login_handoff_says_so_when_interaction_cannot_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Choosing Alfa only leaves interaction enabled but inert — say so.
+
+    The probe re-runs axe on each state a click reveals, so without an axe
+    analyzer there is nothing to re-run. Failing silently here would repeat
+    the defect this fix addresses: a scan reporting every page as probed
+    while reaching zero states, with nothing to explain why.
+    """
+    from audit.crawler.orchestrator import CrawlConfig, CrawlSummary
+    from audit.db.schema import connect
+    from audit.web import server as srv
+
+    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
+    db_path = tmp_path / "audit.db"
+    schema_conn = connect(db_path)
+    for sql in sorted(migrations.glob("*.sql")):
+        if not sql.name.endswith(".rollback.sql"):
+            schema_conn.executescript(sql.read_text())
+    schema_conn.close()
+
+    captured: dict[str, object] = {}
+
+    async def _fake_run_crawl(conn, config, **kwargs):  # type: ignore[no-untyped-def]
+        return CrawlSummary(scan_id=1, seed_url=config.seed_url)
+
+    class _FakeSession:
+        async def start(self):  # type: ignore[no-untyped-def]
+            return None
+
+        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(url="https://app.example.edu/dashboard")
+
+        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+            return tuple(SimpleNamespace() for _ in range(count))
+
+        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
+            return None
+
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
+            return True
+
+        def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs)
+            return SimpleNamespace()
+
+        async def close(self):  # type: ignore[no-untyped-def]
+            return None
+
+    monkeypatch.setattr(srv, "run_crawl", _fake_run_crawl)
+
+    config = CrawlConfig(
+        seed_url="https://app.example.edu/",
+        axe_enabled=False,  # "Siteimprove Alfa only"
+        interaction_checks_enabled=True,
+        alfa_enabled=False,
+        image_extraction_enabled=False,
+        vlm_enabled=False,
+        semantic_enabled=False,
+        workers=1,
+    )
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
+    run.confirmation.set()
+
+    await srv._run_local_login_background(db_path, tmp_path, config, run)
+
+    # No analyzer, so no probe — and the log carries the reason.
+    assert captured.get("interaction_probe") is None
+    assert captured.get("axe_analyzer") is None

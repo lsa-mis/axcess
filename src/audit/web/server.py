@@ -44,6 +44,7 @@ from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_pa
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
@@ -2632,10 +2633,38 @@ async def _run_local_login_background(
         # For an authenticated scan they must be attached before we inject the
         # already-signed-in fetcher, otherwise the injected context would crawl
         # successfully but silently skip its DOM and interaction checks.
+        # Built once and shared, exactly as the orchestrator does for an
+        # unauthenticated crawl. The probe re-runs axe on each state a click
+        # reveals, so it needs the same analyzer: without one there is
+        # nothing to re-run, and interaction would be enabled but inert. Say
+        # so rather than repeating that silence — a scan that reports every
+        # page as probed while reaching zero states explains nothing.
+        login_axe = (
+            AxeAnalyzer.from_bundled(suppress_diagnostics=True) if config.axe_enabled else None
+        )
+        login_interaction: InteractionProbe | None = None
+        if config.interaction_checks_enabled:
+            if login_axe is None:
+                get_logger(__name__).info(
+                    "interaction.unavailable",
+                    reason="axe_engine_not_selected",
+                    hint=(
+                        "Operating page controls re-runs axe on each revealed "
+                        "state. Choose an engine that includes axe-core to "
+                        "test states behind menus and dialogs."
+                    ),
+                )
+            else:
+                login_interaction = InteractionProbe(
+                    axe=login_axe,
+                    level=config.axe_level,  # type: ignore[arg-type]
+                    max_clicks=config.interaction_max_clicks,
+                    max_repeated=config.interaction_max_repeated,
+                    max_depth=config.interaction_max_depth,
+                    blocked_labels=DEFAULT_BLOCKED_LABELS + tuple(config.blocked_url_patterns),
+                )
         fetcher = run.session.create_shared_js_fetcher(
-            axe_analyzer=(
-                AxeAnalyzer.from_bundled(suppress_diagnostics=True) if config.axe_enabled else None
-            ),
+            axe_analyzer=login_axe,
             axe_level=config.axe_level,  # type: ignore[arg-type]
             keyboard_probe=(
                 KeyboardProbe(suppress_diagnostics=True) if config.keyboard_probe_enabled else None
@@ -2646,6 +2675,7 @@ async def _run_local_login_background(
                 else None
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
+            interaction_probe=login_interaction,
             capture_screenshots=False,
             shared_pages=scan_pages,
         )

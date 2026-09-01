@@ -633,3 +633,37 @@ async def test_discarding_sign_in_closes_every_tab_it_used() -> None:
 
     assert page.closed, "the original sign-in tab was left open"
     assert popup.closed, "the tab SSO opened was left open after sign-in"
+
+
+# ------------------------------------------- interaction on the login path
+
+
+@pytest.mark.asyncio
+async def test_the_shared_fetcher_carries_an_interaction_probe() -> None:
+    """The authenticated fetcher must be able to operate page controls.
+
+    The login handoff does not use the orchestrator's fetcher; it builds its
+    own from the signed-in session. That builder accepted an axe analyzer and
+    the keyboard, responsive, focus, and visual probes — and no interaction
+    probe — so a 358-page authenticated scan ran with interaction enabled in
+    its config, recorded 358 pages probed, and reached zero DOM states. The
+    probe was never there to run.
+    """
+    from audit.analyzer.axe import AxeAnalyzer
+    from audit.analyzer.interaction import InteractionProbe
+
+    session, _playwright, _chromium, _context, page = _session_with_fake_browser()
+    await session.start()
+    page.url = "https://app.example.edu/dashboard"
+    session.verify_authenticated_target()
+
+    axe = AxeAnalyzer(axe_source="/* stub */")
+    fetcher = session.create_shared_js_fetcher(
+        axe_analyzer=axe,
+        interaction_probe=InteractionProbe(axe=axe),
+    )
+
+    assert fetcher._interaction_probe is not None, (
+        "the authenticated fetcher cannot operate controls, so interaction "
+        "silently does nothing on every login scan"
+    )
