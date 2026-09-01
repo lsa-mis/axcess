@@ -726,18 +726,20 @@ def create_app(
     @app.get("/api/scans")
     def api_list_scans() -> JSONResponse:
         with get_conn() as conn:
+            # Written out per schema rather than assembled from fragments:
+            # the column list is fixed, so a literal query keeps this
+            # obviously free of interpolation. On a database predating
+            # migration 0024 the counter is simply not selected, and
+            # _scan_row_to_summary reports 0 for the missing key — the
+            # truthful answer for a scan that ran before it existed.
+            has_states = _scans_have_interaction_columns(conn)
             if _protected_scan_table_exists(conn):
                 rows = conn.execute(
-                    "SELECT id, seed_url, status, page_count, finding_count, "
-                    "started_at, finished_at FROM scans "
-                    "WHERE NOT EXISTS ("
-                    "SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id"
-                    ") ORDER BY id DESC"
+                    _SCANS_PUBLIC_WITH_STATES if has_states else _SCANS_PUBLIC_LEGACY
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT id, seed_url, status, page_count, finding_count, "
-                    "started_at, finished_at FROM scans ORDER BY id DESC"
+                    _SCANS_ALL_WITH_STATES if has_states else _SCANS_ALL_LEGACY
                 ).fetchall()
         return JSONResponse([_scan_row_to_summary(r) for r in rows])
 
@@ -2311,6 +2313,43 @@ def _protected_summary(record: Any) -> dict[str, Any]:
     }
 
 
+_SCANS_PUBLIC_WITH_STATES = (
+    "SELECT id, seed_url, status, page_count, finding_count, "
+    "interaction_states_total, started_at, finished_at FROM scans "
+    "WHERE NOT EXISTS (SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id) "
+    "ORDER BY id DESC"
+)
+_SCANS_PUBLIC_LEGACY = (
+    "SELECT id, seed_url, status, page_count, finding_count, "
+    "started_at, finished_at FROM scans "
+    "WHERE NOT EXISTS (SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id) "
+    "ORDER BY id DESC"
+)
+_SCANS_ALL_WITH_STATES = (
+    "SELECT id, seed_url, status, page_count, finding_count, "
+    "interaction_states_total, started_at, finished_at FROM scans ORDER BY id DESC"
+)
+_SCANS_ALL_LEGACY = (
+    "SELECT id, seed_url, status, page_count, finding_count, "
+    "started_at, finished_at FROM scans ORDER BY id DESC"
+)
+
+
+def _scans_have_interaction_columns(conn: sqlite3.Connection) -> bool:
+    """Return whether ``scans`` carries the interaction counters (0024+).
+
+    Same upgrade-window reasoning as :func:`_protected_scan_table_exists`:
+    new application code can briefly run against a database that has not had
+    the migration applied yet, and the scan list must degrade to omitting a
+    number rather than returning 500 for every report.
+    """
+    try:
+        columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(scans)")}
+    except sqlite3.Error:
+        return False
+    return "interaction_states_total" in columns
+
+
 def _protected_scan_table_exists(conn: sqlite3.Connection) -> bool:
     """Return whether the optional protected-scan schema has been installed.
 
@@ -2385,6 +2424,10 @@ def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
         "seed_url": str(row["seed_url"]),
         "status": str(row["status"]),
         "page_count": int(row.get("page_count") or 0),
+        # DOM states reached by operating controls: menus opened, dialogs
+        # shown, tabs switched. A page count alone understates an
+        # application whose content mostly does not exist until it is used.
+        "dom_state_count": int(row.get("interaction_states_total") or 0),
         "finding_count": int(row.get("finding_count") or 0),
         "started_at": _to_iso_string(row.get("started_at")),
         "finished_at": _to_iso_string(row.get("finished_at")),

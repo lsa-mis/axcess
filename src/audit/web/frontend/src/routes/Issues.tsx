@@ -342,6 +342,14 @@ function Location({ location }: { location: IssueLocation }) {
         <span className="sr-only"> opens the scanned page in a new tab</span>
       </a>
       {location.page_title && <p className="mt-0.5 break-all text-xs text-fg-muted">{location.page_url}</p>}
+      {/* A finding that only exists after a control is used cannot be
+          reproduced from the URL alone. Naming the control is the
+          difference between evidence and an assertion. */}
+      {location.revealed_by && (
+        <p className="mt-0.5 text-xs font-medium text-fg">
+          After clicking &ldquo;{location.revealed_by}&rdquo;
+        </p>
+      )}
       <code className="mt-1 block max-w-[28rem] overflow-x-auto rounded-xs bg-surface-muted px-2 py-1 text-xs text-fg">
         {location.target}
       </code>

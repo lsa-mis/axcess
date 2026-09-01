@@ -263,7 +263,7 @@ def findings_for_sc(
     sql = f"""
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.impact, a.help, a.help_url,
                a.target_selector, a.failure_summary, a.html_snippet,
-               a.status, a.wcag_sc, a.wcag_level,
+               a.status, a.wcag_sc, a.wcag_level, a.revealed_by,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
@@ -327,6 +327,7 @@ def grouped_by_rule(
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
                a.impact, a.help, a.help_url, a.target_selector,
                a.failure_summary, a.html_snippet, a.engine_evidence_json, a.status,
+               a.revealed_by,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
@@ -383,6 +384,9 @@ def grouped_by_rule(
                 "page_url": str(r["page_url"]),
                 "page_title": r["page_title"],
                 "target_selector": str(r["target_selector"] or ""),
+                # The control operated to reach this state; NULL when the
+                # finding was present at page load.
+                "revealed_by": (str(r["revealed_by"]) if r["revealed_by"] else None),
                 "failure_summary": r["failure_summary"],
                 "html_snippet": r["html_snippet"],
                 "engine_evidence_json": r["engine_evidence_json"],

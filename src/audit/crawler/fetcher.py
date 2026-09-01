@@ -65,6 +65,11 @@ class FetchResult:
     # opt-in via ``--interaction``. Each carries the accessible name of
     # the control that revealed it.
     interaction_findings: tuple[RevealedViolation, ...] = field(default=())
+    # DOM states the interaction probe reached on this page: clicks that
+    # actually changed the page. Counted whether or not the state held a
+    # defect, because it measures the coverage interaction added, not the
+    # findings it happened to produce.
+    interaction_states: int = 0
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)

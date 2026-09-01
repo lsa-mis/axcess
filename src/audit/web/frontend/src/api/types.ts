@@ -24,6 +24,10 @@ export interface ScanSummary {
   seed_url: string;
   status: ScanStatus;
   page_count: number;
+  /** DOM states reached by operating controls — menus opened, dialogs shown,
+   *  tabs switched. A page count alone understates an application whose
+   *  content mostly does not exist until something is used. */
+  dom_state_count: number;
   finding_count: number;
   started_at: string | null;
   finished_at: string | null;
@@ -686,6 +690,10 @@ export interface IssueLocation {
   target: string;
   context: string | null;
   evidence_url: string;
+  /** The control operated before this markup existed; null when the finding
+   *  was present at page load. Without it the URL alone does not show a
+   *  defect that only appears once a menu is opened. */
+  revealed_by: string | null;
 }
 
 export interface IssuePage {

@@ -157,6 +157,9 @@ export default function ScansRoute() {
                     <th scope="col" className="px-4 py-2 text-left font-semibold">Status</th>
                     <th scope="col" className="px-4 py-2 text-left font-semibold">Handling</th>
                     <th scope="col" className="px-4 py-2 text-right font-semibold">Pages</th>
+                    <th scope="col" className="px-4 py-2 text-right font-semibold">
+                      DOM states
+                    </th>
                     <th scope="col" className="px-4 py-2 text-right font-semibold">Issue leads</th>
                     <th scope="col" className="px-4 py-2 text-left font-semibold">Updated</th>
                     <th scope="col" className="px-4 py-2 text-right font-semibold">Open</th>
@@ -229,6 +232,11 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
         {scan.page_count.toLocaleString()}
+      </td>
+      {/* States reached by operating controls, alongside pages: a scan of an
+          application is not described by its URL count alone. */}
+      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
+        {(scan.dom_state_count ?? 0).toLocaleString()}
       </td>
       <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
         {scan.finding_count > 0 ? (

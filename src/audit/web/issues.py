@@ -175,6 +175,11 @@ class IssueLocation:
     target: str
     context: str | None
     evidence_url: str
+    # The control that had to be operated before this markup existed. None
+    # means it was present when the page loaded. Without it a reader cannot
+    # reproduce the finding: the URL alone does not show a defect that only
+    # appears once a menu is opened.
+    revealed_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1040,6 +1045,7 @@ def _a11y_location_samples(
                 target=target,
                 context=context or None,
                 evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+                revealed_by=(str(finding["revealed_by"]) if finding.get("revealed_by") else None),
             )
         )
         if len(samples) >= limit:

@@ -389,6 +389,11 @@ class JsFetcher:
                 focus_findings=tuple(focus_findings),
                 visual_findings=tuple(visual_findings),
                 interaction_findings=tuple(interaction_findings),
+                interaction_states=(
+                    self._interaction_probe.last_states_found
+                    if self._interaction_probe is not None
+                    else 0
+                ),
                 screenshots=screenshots,
             )
         finally:

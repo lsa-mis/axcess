@@ -150,6 +150,11 @@ class _Budget:
     signature_counts: dict[str, int] = field(default_factory=dict)
     seen_keys: set[str] = field(default_factory=set)
     seen_hashes: set[str] = field(default_factory=set)
+    # Clicks that actually changed the DOM. Each one is a state of the page
+    # that a load-time pass cannot reach, whether or not it contained a
+    # defect — which makes it the honest measure of what interaction added
+    # to a scan's coverage.
+    states_found: int = 0
 
 
 @dataclass
@@ -175,6 +180,10 @@ class InteractionProbe:
     # Time for a revealed state to settle (animations, async content).
     settle_ms: int = 400
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
+    # States reached by the most recent ``run``. The probe is constructed
+    # once per crawl and used page by page, so the caller reads this
+    # immediately after each call rather than accumulating it here.
+    last_states_found: int = 0
 
     async def run(
         self, page: Page, *, baseline: Sequence[AxeViolation] = ()
@@ -191,6 +200,7 @@ class InteractionProbe:
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
         )
+        self.last_states_found = 0
         found: list[RevealedViolation] = []
         try:
             await self._explore(page, budget, found, pinned=page.url, depth=0, fresh_only=False)
@@ -198,6 +208,7 @@ class InteractionProbe:
             # A probe is evidence-gathering, not a gate. Whatever we managed
             # to reach before something went wrong is still valid evidence.
             log.warning("interaction.aborted", error=str(exc)[:200])
+        self.last_states_found = budget.states_found
         if found:
             log.info(
                 "interaction.revealed",
@@ -362,6 +373,7 @@ class InteractionProbe:
                 )
                 return True  # inert control; spent, but nothing to scan
 
+            budget.states_found += 1
             before_found = len(found)
             await self._collect(page, budget, found, label)
             log.info(

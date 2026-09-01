@@ -767,6 +767,31 @@ def upsert_semantic_finding(
     return int(row["id"])
 
 
+def increment_scan_interaction_counters(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    pages_delta: int = 0,
+    states_delta: int = 0,
+) -> None:
+    """Bump the denormalized interaction counters on the ``scans`` row.
+
+    Mirrors :func:`increment_scan_axe_counters` so the scan list can report
+    how many DOM states a scan reached without joining every finding.
+    """
+    if pages_delta == 0 and states_delta == 0:
+        return
+    conn.execute(
+        """
+        UPDATE scans
+           SET interaction_pages_probed = interaction_pages_probed + ?,
+               interaction_states_total = interaction_states_total + ?
+         WHERE id = ?
+        """,
+        (pages_delta, states_delta, scan_id),
+    )
+
+
 def increment_scan_axe_counters(
     conn: sqlite3.Connection,
     *,

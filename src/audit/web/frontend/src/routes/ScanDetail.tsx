@@ -309,8 +309,16 @@ export default function ScanDetailRoute() {
             </dl>
           </Card>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             <StatCard label="Pages crawled" value={data.page_count} />
+            {/* Pages alone understate an application whose content mostly
+                does not exist until a control is used. This counts the
+                states reached by opening menus, dialogs, and tabs. */}
+            <StatCard
+              label="DOM states discovered"
+              value={(data.dom_state_count ?? 0).toLocaleString()}
+              hint="reached by operating controls"
+            />
             <StatCard
               label="Crawl errors"
               value={data.error_count}
