@@ -205,11 +205,17 @@ def test_pre_0019_a11y_status_route_fails_closed_without_partial_update(
     blob_dir.mkdir()
     conn = connect(db_path)
     try:
+        # Every migration EXCEPT 0019 — the one whose absence is under test.
+        # Truncating at 18 instead would freeze page_a11y_findings at an old
+        # shape while the seeding below goes through the current repo helper,
+        # so any future column on that table would break this test for
+        # reasons unrelated to finding history. 0020+ do not reference
+        # a11y_finding_history, so skipping only 0019 gives exactly the
+        # pre-0019 state this test needs.
         for path in sorted(_MIGRATIONS.glob("*.sql")):
             if path.name.endswith(".rollback.sql"):
                 continue
-            number = int(path.name.split("_", 1)[0])
-            if number >= 19:
+            if int(path.name.split("_", 1)[0]) == 19:
                 continue
             conn.executescript(path.read_text(encoding="utf-8"))
         scan = conn.execute(

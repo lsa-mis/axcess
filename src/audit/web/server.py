@@ -17,7 +17,7 @@ import re
 import secrets
 import shutil
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlencode, urlsplit
@@ -2555,7 +2555,17 @@ async def _run_local_login_background(
         run.status = "awaiting_authentication"
         await run.confirmation.wait()
         run.status = "verifying_authentication"
-        run.session.verify_authenticated_target()
+        # Sign-in almost always ends somewhere other than where it began: an
+        # SSO round trip, then a dashboard or landing page. Start the crawl
+        # from where the auditor actually is rather than from the pre-login
+        # URL, which for a login handoff is frequently the sign-in page
+        # itself — re-fetching it produced a scan of the login form. The
+        # verified URL has already passed the approved-target-origin check
+        # inside verify_authenticated_target, so an IdP or OAuth-callback URL
+        # can never become the entry point. Scope still derives from the
+        # configured seed; only the entry point moves (see CrawlConfig).
+        landed = run.session.verify_authenticated_target()
+        config = replace(config, start_url=landed.url)
         # Chromium on macOS restores a minimized window whenever a new page is
         # created. Allocate one reusable tab per worker before minimizing so
         # the authenticated crawl stays out of the auditor's way throughout.

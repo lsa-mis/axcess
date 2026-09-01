@@ -8,6 +8,7 @@ and the optional shared-token gate.
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import sqlite3
 from io import BytesIO, StringIO
@@ -1530,3 +1531,85 @@ def test_access_token_gate_blocks_and_admits(
     # Wrong token → 401.
     bad = TestClient(app)
     assert bad.get("/api/scans?token=nope").status_code == 401
+
+
+async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The verified landing URL must reach the crawl as ``start_url``.
+
+    ``verify_authenticated_target`` already validated where sign-in ended and
+    returned it; the handoff used to throw that value away and crawl the
+    pre-login seed, which for a login handoff is often the sign-in page
+    itself. This pins the wiring: the browser half is faked, because the real
+    path needs Chromium and a human at the keyboard, but the config handed to
+    ``run_crawl`` is the thing that was wrong.
+    """
+    from audit.crawler.orchestrator import CrawlConfig, CrawlSummary
+    from audit.db.schema import connect
+    from audit.web import server as srv
+
+    # The handoff writes the scan row itself once the crawl returns, so the
+    # database has to be real even though the browser is not. `tests` is not
+    # an importable package, so apply the forward migrations directly rather
+    # than reaching into conftest.
+    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
+    db_path = tmp_path / "audit.db"
+    schema_conn = connect(db_path)
+    for sql in sorted(migrations.glob("*.sql")):
+        if not sql.name.endswith(".rollback.sql"):
+            schema_conn.executescript(sql.read_text())
+    schema_conn.close()
+
+    seed = "https://app.example.edu/"
+    landed = "https://app.example.edu/dashboard/home"
+
+    captured: dict[str, CrawlConfig] = {}
+
+    async def _fake_run_crawl(conn, config, **kwargs):  # type: ignore[no-untyped-def]
+        captured["config"] = config
+        return CrawlSummary(scan_id=1, seed_url=config.seed_url)
+
+    class _FakeSession:
+        async def start(self):  # type: ignore[no-untyped-def]
+            return None
+
+        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(url=landed)
+
+        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+            return tuple(SimpleNamespace() for _ in range(count))
+
+        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
+            return None
+
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
+            return True
+
+        def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace()
+
+        async def close(self):  # type: ignore[no-untyped-def]
+            return None
+
+    monkeypatch.setattr(srv, "run_crawl", _fake_run_crawl)
+
+    config = CrawlConfig(
+        seed_url=seed,
+        alfa_enabled=False,
+        image_extraction_enabled=False,
+        vlm_enabled=False,
+        semantic_enabled=False,
+        workers=1,
+    )
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
+    run.confirmation.set()
+
+    await srv._run_local_login_background(db_path, tmp_path, config, run)
+
+    assert "config" in captured, "the handoff never reached run_crawl"
+    assert captured["config"].start_url == landed, (
+        "the verified landing URL was discarded; the crawl restarts at the pre-login seed"
+    )
+    # Scope must not have moved with it.
+    assert captured["config"].seed_url == seed

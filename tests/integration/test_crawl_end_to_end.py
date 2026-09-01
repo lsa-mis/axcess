@@ -335,3 +335,108 @@ def test_rendered_analyzers_persist_when_image_extraction_is_disabled(
     assert row["axe_violations_total"] == summary.axe_violations_total
     assert row["keyboard_pages_probed"] == 1
     assert row["responsive_pages_probed"] == 1
+
+
+def test_start_url_is_where_the_crawl_actually_begins(tmp_db: sqlite3.Connection) -> None:
+    """The crawl starts at the signed-in landing page, not the configured seed.
+
+    ``interaction/hidden_state.html`` is linked from nowhere in the fixture
+    site, so it is reachable only by being seeded directly. If ``start_url``
+    were ignored — the behaviour that made a login handoff re-fetch the
+    sign-in page — the crawl would begin at the seed and this page could
+    never appear, while ``about.html`` (one link from the seed) would.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            start_url=f"{base}/interaction/hidden_state.html",
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/interaction/hidden_state.html" in urls, (
+        "the crawl did not begin where sign-in landed"
+    )
+    assert f"{base}/about.html" not in urls, (
+        "the crawl began at the seed and followed its links, ignoring start_url"
+    )
+
+
+def test_start_url_does_not_narrow_the_configured_scope(tmp_db: sqlite3.Connection) -> None:
+    """Scope stays anchored to the seed even though the entry point moved.
+
+    ``subdir/deep.html`` links back to ``/``. Adopting the landing URL as the
+    seed would derive scope from its path — ``/subdir/`` — and that link
+    would fall out of scope, silently confining an authenticated scan to
+    whichever directory the identity provider happened to land on.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            start_url=f"{base}/subdir/deep.html",
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/subdir/deep.html" in urls
+    # Only reachable via "/" — in scope solely because scope came from the seed.
+    assert f"{base}/about.html" in urls, "start_url narrowed the scope to its own directory"
+    assert summary.seed_url.rstrip("/") == base.rstrip("/")
+
+
+def test_out_of_scope_start_url_falls_back_to_the_seed(tmp_db: sqlite3.Connection) -> None:
+    """An unusable entry point must not produce a zero-page scan.
+
+    Every job is scope-checked again when it is leased, so seeding a URL
+    outside the configured scope would leave the crawl rejecting its only
+    queued job and reporting nothing. Falling back to the seed keeps the scan
+    alive; the orchestrator logs why.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/subdir/",
+            start_url="http://127.0.0.1:9/elsewhere.html",
+            max_pages=20,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert urls, "an out-of-scope start URL emptied the crawl instead of falling back"
+    assert f"{base}/subdir/deep.html" in urls
+    assert not any("127.0.0.1:9" in u for u in urls)
+
+
+def test_default_start_url_is_unchanged_behaviour(tmp_db: sqlite3.Connection) -> None:
+    """Every unauthenticated crawl leaves start_url unset and is unaffected."""
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/subdir/",
+            max_pages=20,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        assert config.start_url is None
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/subdir/deep.html" in urls

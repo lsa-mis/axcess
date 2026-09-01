@@ -336,7 +336,7 @@ class ProtectedCompanionRunner:
                     await self._await_with_lease(_wait_for_terminal_confirmation(), heartbeat_task)
                 else:
                     await self._await_with_lease(wait_for_auditor(), heartbeat_task)
-                session.verify_authenticated_target()
+                landed = session.verify_authenticated_target()
                 # Keep the context (and its in-memory session) but close the
                 # visible tab that handled sign-in before crawling fresh pages.
                 # This terminates any pre-auth page activity once policy switches
@@ -361,7 +361,9 @@ class ProtectedCompanionRunner:
                 ),
                 heartbeat_task,
             )
-            crawler = _ProtectedBrowserCrawler(session=session, work=work, client=self._client)
+            crawler = _ProtectedBrowserCrawler(
+                session=session, work=work, client=self._client, entry_url=landed.url
+            )
             stats = await self._await_with_lease(crawler.crawl(), heartbeat_task)
             await self._await_with_lease(
                 self._client.event(
@@ -504,12 +506,25 @@ class _ProtectedBrowserCrawler:
         session: ManualAuthenticationSession,
         work: CompanionWork,
         client: ProtectedCompanionClient,
+        entry_url: str | None = None,
     ) -> None:
         self._session = session
         self._work = work
         self._client = client
         self._target_policy = ProtectedEgressPolicy(work.approved_target_origins)
         self._scope = url_policy.build_scope(url_policy.normalize_seed_url(work.seed_url))
+        # Where sign-in actually landed. Scope above stays anchored to the
+        # work spec's seed — the auditor's approved area does not move
+        # because an identity provider redirected somewhere deeper — but the
+        # crawl starts from the signed-in page rather than re-fetching a seed
+        # that is often the sign-in form itself. Out-of-scope landings fall
+        # back to the seed, since every URL is scope-checked again below and
+        # an out-of-scope entry would yield a zero-page scan.
+        self._entry_url = work.seed_url
+        if entry_url is not None:
+            candidate = url_policy.normalize(entry_url)
+            if url_policy.is_in_scope(candidate, self._scope, allow_subdomains=False):
+                self._entry_url = candidate
         self._max_pages = min(_config_int(work.config, "max_pages", 100), _MAX_PAGES)
         self._max_depth = min(_config_int(work.config, "max_depth", 10), _MAX_DEPTH)
         self._seconds_between_pages = 1.0 / _config_float(work.config, "rps", 1.0)
@@ -554,8 +569,8 @@ class _ProtectedBrowserCrawler:
             await self._build_alfa() if _config_bool(self._config, "alfa_enabled", False) else None
         )
         local_ai = await self._open_local_ai()
-        queue: deque[tuple[str, int]] = deque([(self._work.seed_url, 0)])
-        seen: set[str] = {self._work.seed_url}
+        queue: deque[tuple[str, int]] = deque([(self._entry_url, 0)])
+        seen: set[str] = {self._entry_url}
         stats = CompanionCrawlStats()
 
         try:

@@ -71,6 +71,21 @@ class AlfaPageAnalyzer(Protocol):
 @dataclass(frozen=True)
 class CrawlConfig:
     seed_url: str
+    # Where the crawl *begins*, when that differs from what defines its scope.
+    #
+    # ``seed_url`` does two jobs: it anchors the scope, and it is the first URL
+    # fetched. Manual sign-in splits those apart. An auditor points a scan at
+    # an application, signs in through an identity provider, and lands
+    # somewhere else entirely — a dashboard, a course page, a post-SSO
+    # redirect. The crawl should carry on from where they actually are, but
+    # the scope they asked for must not move under them: adopting the landing
+    # URL as the seed would re-derive scope from its path and silently narrow
+    # the scan (seed ``/courses/123`` + landing ``/courses/123/modules`` would
+    # confine the whole crawl to ``/modules/``).
+    #
+    # So scope always comes from ``seed_url``; only the entry point moves.
+    # ``None`` means "start at the seed", which is every unauthenticated crawl.
+    start_url: str | None = None
     max_pages: int = 500
     max_depth: int = 10
     allow_subdomains: bool = False
@@ -283,7 +298,29 @@ async def run_crawl(
         scope=scope,
         allow_subdomains=config.allow_subdomains,
     )
-    _seed_queue(conn, scan_id, normalized_seed)
+    # An out-of-scope landing page is not usable as an entry point: every job
+    # is scope-checked again at lease time, so seeding it would produce a scan
+    # that immediately rejects its only URL and reports zero pages. Falling
+    # back to the seed keeps that crawl alive, and the warning names the real
+    # problem — the configured scope does not cover where sign-in landed.
+    entry_url = normalized_seed
+    if config.start_url is not None:
+        candidate = url_policy.normalize(config.start_url)
+        if candidate == normalized_seed:
+            pass
+        elif url_policy.is_in_scope(candidate, scope, allow_subdomains=config.allow_subdomains):
+            entry_url = candidate
+            log.info("crawl.start_url_adopted", start=candidate)
+        else:
+            log.warning(
+                "crawl.start_url_out_of_scope",
+                hint=(
+                    "Sign-in finished outside the scan's scope; starting from the "
+                    "configured seed instead. Set the seed to the signed-in area "
+                    "to scan it."
+                ),
+            )
+    _seed_queue(conn, scan_id, entry_url)
 
     summary = CrawlSummary(scan_id=scan_id, seed_url=normalized_seed)
     limiter = HostLimiter(rps=config.rps, concurrency_per_host=config.concurrency_per_host)
