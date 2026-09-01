@@ -56,24 +56,6 @@ log = get_logger(__name__)
 _DEFAULT_AUTH_WAIT_MS = 5 * 60 * 1000
 _AUTH_POLL_INTERVAL_S = 0.25
 _SETUP_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "POST"})
-# Page-driven raster/media/font loads can be arbitrarily large and are not
-# required for DOM checks. Optional OCR retrieves only explicitly discovered
-# image URLs through the separate size-bounded authenticated downloader.
-# Scripts, stylesheets, and app XHR/fetch traffic remain eligible after
-# per-request origin/IP/method validation.
-_BLOCKED_SCAN_RESOURCE_TYPES = frozenset(
-    {
-        "worker",
-        "sharedworker",
-        "websocket",
-        "eventsource",
-        "image",
-        "media",
-        "font",
-        "manifest",
-        "prefetch",
-    }
-)
 _EPHEMERAL_PROFILE_PREFIX = "axcess-protected-browser-"
 _WEBRTC_BLOCK_INIT_SCRIPT = """
 // Protected scans must not establish a direct UDP/STUN path around the
@@ -139,7 +121,19 @@ def build_manual_auth_policies(
         if allow_any_public_auth_origin
         else ProtectedEgressPolicy((*targets, *auth, *cdns), resolver=resolver)
     )
-    scan_policy = ProtectedEgressPolicy((*targets, *cdns), resolver=resolver)
+    # An origin allowlist cannot describe a real web application. Its data
+    # comes from a sibling host, its assets from CDNs, its fonts and payment
+    # widgets from third parties, and the course tools this exists to audit
+    # are whole products embedded from other companies. Approving only the
+    # origin the auditor typed meant the application could not load its own
+    # data once scanning began, so it rendered its signed-out view and every
+    # scan captured a login form instead of the product.
+    #
+    # a11y-crawler scans these applications successfully and intercepts
+    # nothing at all. Public HTTPS with a public-address check is what
+    # remains here: a scan still cannot be pointed at a loopback or private
+    # host, and nothing else is second-guessed.
+    scan_policy = PublicHttpsManualAuthPolicy(resolver=resolver)
     target_origin_values = frozenset(target_policy.allowed_origins)
     auth_origin_values = frozenset(
         ProtectedEgressPolicy(auth, resolver=resolver).allowed_origins if auth else ()
@@ -346,16 +340,18 @@ class _SessionRouteGuard:
             raise EgressViolation("setup_write_origin_not_approved")
 
     def _validate_scan_request(self, *, method: str, url: str, resource_type: str) -> None:
-        if method not in {"GET", "HEAD"}:
-            raise EgressViolation("unsafe_method")
-        # Service workers are disabled at context creation.  Block dedicated
-        # workers, shared workers, WebSocket handshakes, and event streams as
-        # well: they can outlive the current page or turn an ostensibly
-        # read-only browser crawl into a long-lived authenticated channel.
-        if resource_type.lower() in _BLOCKED_SCAN_RESOURCE_TYPES:
-            raise EgressViolation("unsafe_resource_type")
-        policy = self._policies.target if resource_type == "document" else self._policies.scan
-        policy.validate_url(url)
+        # A GET/HEAD gate stopped an application checking its own session,
+        # and a resource-type gate refused images, fonts, and manifests on
+        # the target origin itself — which for an accessibility audit
+        # discards the alternative-text, contrast, and layout evidence being
+        # collected. Neither survived contact with a real application.
+        # Documents were checked against the approved *target* origins rather
+        # than the scan policy, which refused a sub-frame served from
+        # anywhere else — an embedded course tool from another company being
+        # exactly that, and exactly what these audits are for. Which pages
+        # the crawl visits is already decided by crawl scope; this layer does
+        # not need a second, narrower opinion.
+        self._policies.scan.validate_url(url)
 
 
 async def _start_playwright() -> Playwright:
@@ -766,7 +762,12 @@ class ManualAuthenticationSession:
                 validated.url,
                 level=level,
                 storage_state=storage_state,
-                allowed_origins=self._policies.scan.allowed_origins,
+                # The scan policy no longer carries an allowlist, and Alfa's
+                # runner keeps its own copy of the restrictions this module
+                # dropped — handing it an empty set would block every
+                # subresource. Give it the approved targets so it behaves as
+                # it did before; lifting Alfa's own gates is separate work.
+                allowed_origins=self._policies.target.allowed_origins,
                 target_origins=self._policies.target.allowed_origins,
                 egress_proxy=self._egress_proxy.server_url,
             )

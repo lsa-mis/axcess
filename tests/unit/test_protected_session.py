@@ -66,7 +66,21 @@ def _policies() -> ManualAuthPolicies:
     )
 
 
-def test_setup_policy_allows_explicit_identity_provider_and_cdn_only_during_setup() -> None:
+def test_a_scan_reaches_any_public_https_origin() -> None:
+    """The scan policy is no longer an origin allowlist.
+
+    It was, and it could not describe a real web application: data from a
+    sibling host, assets from CDNs, fonts and payment widgets from third
+    parties, and — for the course tools this exists to audit — entire
+    products embedded from other companies. Approving only the origin the
+    auditor typed meant the application could not load its own data once
+    scanning began, so it rendered its signed-out view and the scan captured
+    a login form instead of the product.
+
+    This test previously asserted the opposite, that scan mode tightened to
+    the approved target and refused everything else. That property was
+    removed deliberately, and this records what replaced it.
+    """
     policies = _policies()
 
     assert (
@@ -81,12 +95,42 @@ def test_setup_policy_allows_explicit_identity_provider_and_cdn_only_during_setu
     assert policies.scan.validate_url("https://cdn.example.edu/app.css").origin.value == (
         "https://cdn.example.edu"
     )
-    with pytest.raises(EgressViolation, match="origin_not_approved"):
-        policies.scan.validate_url("https://login.example.edu/authorize")
+    # An identity-provider origin is reachable during a scan now. It is a
+    # public HTTPS origin like any other, and the application decides what it
+    # loads, not an allowlist written before the page was ever seen.
+    assert policies.scan.validate_url("https://login.example.edu/authorize").origin.value == (
+        "https://login.example.edu"
+    )
 
 
-def test_local_manual_login_allows_dynamic_public_mfa_then_tightens_to_target() -> None:
-    """A Duo-style redirect works only before the human confirms sign-in."""
+def test_a_scan_still_refuses_a_private_or_plaintext_destination() -> None:
+    """What the scan policy does still enforce, now that origins are open.
+
+    Dropping the allowlist is not the same as dropping every boundary: a
+    scan cannot be pointed at a loopback or private address, and cannot be
+    downgraded to plaintext.
+    """
+    policies = _policies()
+
+    for unsafe in (
+        "http://app.example.edu/insecure",
+        "https://127.0.0.1:8000/admin",
+        "https://localhost/admin",
+        "https://192.168.1.10/admin",
+    ):
+        with pytest.raises(EgressViolation):
+            policies.scan.validate_url(unsafe)
+
+
+def test_local_manual_login_allows_a_dynamic_public_mfa_origin() -> None:
+    """A Duo-style redirect to an unpredictable host must work.
+
+    Previously this also asserted that the same origin became unreachable
+    once scanning began. That tightening is gone: the scan policy is no
+    longer an allowlist, because one cannot describe a real application.
+    What still gates the scan is verification — sign-in must return to an
+    approved target page, which is asserted below and unchanged.
+    """
 
     def resolver(host: str) -> tuple[str, ...]:
         assert host in {
@@ -109,12 +153,14 @@ def test_local_manual_login_allows_dynamic_public_mfa_then_tightens_to_target() 
         ).origin.value
         == "https://api-12345.duosecurity.com"
     )
-    with pytest.raises(EgressViolation, match="origin_not_approved"):
-        policies.scan.validate_url("https://api-12345.duosecurity.com/frame/v4/auth")
+    # Verification is the gate that matters, and it is unchanged: sign-in
+    # has to come back to an approved target page before scanning starts.
     assert (
         verify_authenticated_target_url("https://app.example.edu/dashboard", policies).origin.value
         == "https://app.example.edu"
     )
+    with pytest.raises(ManualAuthenticationError):
+        verify_authenticated_target_url("https://api-12345.duosecurity.com/frame/v4/auth", policies)
 
 
 def test_seed_and_authenticated_verification_require_target_not_identity_provider() -> None:
@@ -323,7 +369,7 @@ def _session_with_fake_browser() -> tuple[
 
 
 @pytest.mark.asyncio
-async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_verification() -> None:
+async def test_manual_session_is_headed_ephemeral_and_scans_after_verification() -> None:
     session, playwright, chromium, context, page = _session_with_fake_browser()
 
     started_page = await session.start()
@@ -419,12 +465,23 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
     ]
     assert context.cdp_session.detached
 
+    # A scan no longer refuses these. An identity-provider origin is a public
+    # HTTPS origin like any other; a POST is how a single-page application
+    # asks whether it is still signed in; a worker is part of how the page
+    # under audit runs. Refusing them did not make a scan safer — it made the
+    # application render its signed-out view, so the audit described a login
+    # form instead of the product.
     after_auth_idp = _FakeRoute(_FakeRequest("GET", "https://login.example.edu/authorize"))
-    unsafe_scan_post = _FakeRoute(_FakeRequest("POST", "https://app.example.edu/form", "fetch"))
-    unsafe_worker = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/worker.js", "worker"))
-    for route in (after_auth_idp, unsafe_scan_post, unsafe_worker):
+    app_session_post = _FakeRoute(_FakeRequest("POST", "https://app.example.edu/form", "fetch"))
+    app_worker = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/worker.js", "worker"))
+    for route in (after_auth_idp, app_session_post, app_worker):
         await session._route_guard.handle_route(route)  # type: ignore[arg-type]
-        assert route.actions == [("abort", "blockedbyclient")]
+        assert route.actions == [("continue", None)]
+
+    # A private or plaintext destination is still refused.
+    private = _FakeRoute(_FakeRequest("GET", "https://127.0.0.1:9000/admin"))
+    await session._route_guard.handle_route(private)  # type: ignore[arg-type]
+    assert private.actions == [("abort", "blockedbyclient")]
 
     safe_scan = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/dashboard"))
     # The protected route guard must never use Playwright's API-response
@@ -439,7 +496,9 @@ async def test_manual_session_is_headed_ephemeral_and_tightens_after_target_veri
         await session._route_guard.handle_route(route)  # type: ignore[arg-type]
     assert safe_scan.actions == [("continue", None)]
     assert safe_fetch.actions == [("continue", None)]
-    assert chunked_image.actions == [("abort", "blockedbyclient")]
+    # Images are fetched now. Refusing them removed the alternative-text
+    # and contrast evidence an accessibility audit exists to collect.
+    assert chunked_image.actions == [("continue", None)]
     assert session.consume_scan_egress_block() == "egress_policy_blocked"
 
     fetcher = session.create_shared_js_fetcher(shared_pages=scan_pages)
