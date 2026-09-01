@@ -24,21 +24,31 @@ def upsert_page(
     title: str | None,
     render_mode: str,
     html_hash: str | None,
+    final_url: str | None = None,
 ) -> int:
-    """Insert (or update) a page row. Returns its id."""
+    """Insert (or update) a page row. Returns its id.
+
+    ``final_url`` is where the request actually landed, and is set only when
+    a redirect moved it: ``url_normalized`` alone cannot distinguish a page
+    that was scanned from one that merely redirected somewhere else.
+    """
     cur = conn.execute(
         """
-        INSERT INTO pages (scan_id, url_normalized, status_code, title, render_mode, html_hash)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO pages (
+            scan_id, url_normalized, status_code, title, render_mode,
+            html_hash, final_url
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(scan_id, url_normalized) DO UPDATE SET
             status_code = excluded.status_code,
             title = excluded.title,
             render_mode = excluded.render_mode,
             html_hash = excluded.html_hash,
+            final_url = excluded.final_url,
             fetched_at = CURRENT_TIMESTAMP
         RETURNING id
         """,
-        (scan_id, url_normalized, status_code, title, render_mode, html_hash),
+        (scan_id, url_normalized, status_code, title, render_mode, html_hash, final_url),
     )
     row = cur.fetchone()
     return int(row["id"])

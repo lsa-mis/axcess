@@ -23,7 +23,6 @@ import hashlib
 import hmac
 import io
 import ipaddress
-import re
 import warnings
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterable
@@ -48,6 +47,7 @@ from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.crawler import url_policy
 from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.js_fetcher import RenderedPageTooLargeError
+from audit.crawler.render_detect import looks_like_authentication_page
 from audit.extractor.html_images import extract_image_refs
 from audit.extractor.svg_text import find_inline_svg_text
 from audit.protected.egress import EgressViolation, ProtectedEgressPolicy
@@ -79,14 +79,6 @@ _MAX_OCR_IMAGE_DIMENSION = 8_192
 _MAX_OCR_IMAGE_PIXELS = 24_000_000
 _MAX_OCR_STDOUT_BYTES = 1_000_000
 _MAX_OCR_STDERR_BYTES = 64 * 1024
-_AUTH_INPUT_MARKER = re.compile(
-    rb"<input\b[^>]*(?:"
-    rb"type\s*=\s*['\"]?password|"
-    rb"autocomplete\s*=\s*['\"]?(?:current-password|one-time-code|webauthn)|"
-    rb"name\s*=\s*['\"]?(?:otp|mfa|verification(?:_|-)?code)"
-    rb")",
-    re.IGNORECASE,
-)
 _HEARTBEAT_INTERVAL_S = 20.0
 _Awaited = TypeVar("_Awaited")
 
@@ -603,7 +595,7 @@ class _ProtectedBrowserCrawler:
                     except UnsafeProtectedNavigationError:
                         raise
 
-                    if result.status_code in {401, 403} or _looks_like_authentication_page(
+                    if result.status_code in {401, 403} or looks_like_authentication_page(
                         result.url, result.body
                     ):
                         # A same-origin login screen may return 200, so the
@@ -1237,25 +1229,6 @@ async def _stop_ocr_process(
     if readers:
         with contextlib.suppress(Exception):
             await asyncio.gather(*readers, return_exceptions=True)
-
-
-def _looks_like_authentication_page(url: str, body: bytes) -> bool:
-    """Recognize a returned login/re-verification page without retaining it.
-
-    A session timeout often lands on a same-origin login page and returns
-    HTTP 200, so host and status checks alone are not sufficient.  The test is
-    intentionally conservative and only looks for common password, OTP, and
-    WebAuthn form controls in memory.  It does not extract names, values,
-    labels, text, or HTML as evidence.
-    """
-    try:
-        path = urlsplit(url).path.lower()
-    except ValueError:
-        path = ""
-    auth_segments = ("/login", "/sign-in", "/signin", "/sso", "/mfa", "/verify")
-    if any(segment in path for segment in auth_segments):
-        return True
-    return _AUTH_INPUT_MARKER.search(body[:512_000]) is not None
 
 
 def _normalize_companion_server(value: str) -> str:

@@ -67,13 +67,13 @@ def test_companion_only_accepts_loopback_ollama_and_detects_login_forms() -> Non
     assert companion.is_loopback_ollama_url("http://[::1]:11434")
     assert not companion.is_loopback_ollama_url("http://localhost:11434")
     assert not companion.is_loopback_ollama_url("https://ollama.example.test")
-    assert companion._looks_like_authentication_page(
+    assert companion.looks_like_authentication_page(
         "https://app.example.test/dashboard", b'<input type="password" name="password">'
     )
-    assert companion._looks_like_authentication_page(
+    assert companion.looks_like_authentication_page(
         "https://app.example.test/sign-in", b"<main>signed out</main>"
     )
-    assert not companion._looks_like_authentication_page(
+    assert not companion.looks_like_authentication_page(
         "https://app.example.test/dashboard", b"<main>Account overview</main>"
     )
 

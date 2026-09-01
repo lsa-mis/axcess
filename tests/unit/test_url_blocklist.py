@@ -89,3 +89,42 @@ def test_excluded_ignores_a_trailing_slash_on_the_entry() -> None:
     """Both spellings of an entry must behave identically."""
     for entry in ("https://a.example/admin", "https://a.example/admin/"):
         assert is_excluded("https://a.example/admin/users", [entry])
+
+
+# --------------------------------------------------------------- auth walls
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://app.example.edu/login",
+        "https://app.example.edu/login/forgot_password",
+        "https://app.example.edu/sign-in",
+        "https://app.example.edu/sso/callback",
+        "https://app.example.edu/mfa",
+        "https://app.example.edu/verify",
+    ],
+)
+def test_authentication_paths_are_recognized(url: str) -> None:
+    from audit.crawler.render_detect import looks_like_authentication_page
+
+    assert looks_like_authentication_page(url, b"<html></html>")
+
+
+def test_an_application_url_serving_a_login_form_is_recognized() -> None:
+    """The case that mattered: the URL looks fine, the page does not.
+
+    A lapsed session lands on a same-origin login page returning HTTP 200,
+    so the path alone says nothing. Only the form gives it away.
+    """
+    from audit.crawler.render_detect import looks_like_authentication_page
+
+    body = b'<html><body><form><input type="password" name="pw"></form></body></html>'
+    assert looks_like_authentication_page("https://app.example.edu/course/dashboard", body)
+
+
+def test_an_ordinary_application_page_is_not_an_auth_wall() -> None:
+    from audit.crawler.render_detect import looks_like_authentication_page
+
+    body = b"<html><body><h1>Dashboard</h1><a href='/reports'>Reports</a></body></html>"
+    assert not looks_like_authentication_page("https://app.example.edu/course/dashboard", body)

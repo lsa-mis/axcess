@@ -48,7 +48,11 @@ from audit.crawler import url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
-from audit.crawler.render_detect import is_challenge_response, is_js_only
+from audit.crawler.render_detect import (
+    is_challenge_response,
+    is_js_only,
+    looks_like_authentication_page,
+)
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
@@ -244,6 +248,13 @@ class CrawlSummary:
     svg_text_hits: int = 0
     image_errors: int = 0
     pages_skipped_scope: int = 0
+    # Pages whose request was redirected somewhere else.
+    pages_redirected: int = 0
+    # Pages that turned out to be a sign-in or re-verification wall. Counted,
+    # not fatal: a public scan of a login page is legitimate evidence. The
+    # login handoff treats it as failure, because there it means the session
+    # never reached the crawl.
+    pages_auth_wall: int = 0
     # Times a link or queued job was refused by the blocklist. Counts
     # refusals, not distinct URLs: a sign-out control in a shared header is
     # refused once per page that carries it.
@@ -967,6 +978,11 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
+    if result.url and result.url != url:
+        ctx.summary.pages_redirected += 1
+    if result.is_html and looks_like_authentication_page(result.url or url, result.body):
+        ctx.summary.pages_auth_wall += 1
+        log.info("crawl.auth_wall", requested=url, landed=result.url or url)
 
     if (
         ctx.config.image_extraction_enabled
@@ -1123,9 +1139,17 @@ def _record_page(
 ) -> int | None:
     title = _extract_title(result.body) if result and result.is_html else None
     html_hash = hashlib.sha256(result.body).hexdigest() if result and result.body else None
+    # The requested URL stays the row's identity — dedupe, resume, and the
+    # job queue are all keyed on it. Where the request actually ended up is
+    # recorded alongside, and only when it moved: without it a redirected
+    # page is indistinguishable from one that was really scanned, which is
+    # how a login form came to be filed under an application URL.
+    landed = result.url if result is not None else None
+    final_url = landed if landed and landed != url else None
     return repo.upsert_page(
         ctx.conn,
         scan_id=ctx.scan_id,
+        final_url=final_url,
         url_normalized=url,
         status_code=status_code,
         title=title,

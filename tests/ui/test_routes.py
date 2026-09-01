@@ -1613,3 +1613,55 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
     )
     # Scope must not have moved with it.
     assert captured["config"].seed_url == seed
+
+
+def test_login_handoff_fails_when_every_page_was_a_sign_in_wall() -> None:
+    """A scan of a login form must not be reported as a completed audit.
+
+    This is the Peerceptiv failure. The crawl requested an application page,
+    the server redirected it to sign-in because the session had not carried,
+    the queue drained after the login page and the one link on it, and the
+    run was filed as "completed" with two pages. The report described a login
+    form while looking like evidence about the product.
+    """
+    from audit.crawler.orchestrator import CrawlSummary
+    from audit.web import server as srv
+
+    summary = CrawlSummary(
+        scan_id=1,
+        seed_url="https://app.example.edu/",
+        pages_fetched=2,
+        pages_auth_wall=2,
+        pages_redirected=1,
+        status="completed",
+    )
+
+    status, error = srv._local_login_completion(summary)
+
+    assert status == "failed"
+    assert error is not None
+    assert "sign-in page" in error
+    assert "redirected" in error
+
+
+def test_login_handoff_still_completes_when_real_pages_were_scanned() -> None:
+    """A sign-in page among application pages is normal, not a failure.
+
+    An application commonly links to its own login page, and that page has
+    accessibility problems worth reporting like any other.
+    """
+    from audit.crawler.orchestrator import CrawlSummary
+    from audit.web import server as srv
+
+    summary = CrawlSummary(
+        scan_id=1,
+        seed_url="https://app.example.edu/",
+        pages_fetched=12,
+        pages_auth_wall=1,
+        status="completed",
+    )
+
+    status, error = srv._local_login_completion(summary)
+
+    assert status == "completed"
+    assert error is None

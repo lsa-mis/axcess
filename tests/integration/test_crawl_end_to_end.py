@@ -516,3 +516,91 @@ def test_blocklist_can_be_emptied_for_an_unauthenticated_scan(tmp_db: sqlite3.Co
 
     urls = _page_urls(tmp_db, summary.scan_id)
     assert f"{base}/authed/logout.html" in urls
+
+
+class _RedirectingHandler(_QuietHandler):
+    """Serves the fixture site, but bounces one path to a login page.
+
+    Reproduces a lapsed session: the application URL is requested, the server
+    answers 302 to sign-in, and the crawler follows it without ever being
+    told the page it received is not the page it asked for.
+    """
+
+    def do_GET(self) -> None:
+        if self.path.startswith("/redirects/dashboard"):
+            self.send_response(302)
+            self.send_header("Location", "/redirects/login.html")
+            self.end_headers()
+            return
+        super().do_GET()
+
+
+@contextmanager
+def _serve_with_redirect() -> Iterator[str]:
+    handler = lambda *a, **kw: _RedirectingHandler(*a, directory=str(FIXTURE_ROOT), **kw)  # noqa: E731
+    with socketserver.TCPServer(("127.0.0.1", 0), handler) as httpd:
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{port}"
+        finally:
+            httpd.shutdown()
+            thread.join(timeout=5)
+
+
+def test_a_redirect_to_sign_in_is_recorded_and_counted(tmp_db: sqlite3.Connection) -> None:
+    """The landing page is recorded, and the sign-in wall is counted.
+
+    Previously the row was filed under the requested URL with the login
+    page's content, so two scans of two different application URLs produced
+    byte-identical HTML and nothing indicated why.
+    """
+    with _serve_with_redirect() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/redirects/",
+            start_url=f"{base}/redirects/dashboard",
+            max_pages=20,
+            rps=100.0,
+            workers=1,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    row = tmp_db.execute(
+        "SELECT url_normalized, final_url, title FROM pages "
+        "WHERE scan_id = ? AND url_normalized LIKE '%dashboard%'",
+        (summary.scan_id,),
+    ).fetchone()
+    assert row is not None, "the requested URL is still the row's identity"
+    assert row["final_url"] is not None, "the redirect was not recorded"
+    assert row["final_url"].endswith("/redirects/login.html")
+    assert summary.pages_redirected >= 1
+    # Both the login page and the reset page behind it are sign-in walls.
+    assert summary.pages_auth_wall >= 1
+
+
+def test_a_page_that_was_not_redirected_records_no_landing_url(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """final_url is a signal, so it must stay NULL in the ordinary case."""
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/subdir/",
+            max_pages=10,
+            rps=100.0,
+            workers=1,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    finals = [
+        r["final_url"]
+        for r in tmp_db.execute("SELECT final_url FROM pages WHERE scan_id = ?", (summary.scan_id,))
+    ]
+    assert finals and all(f is None for f in finals)
+    assert summary.pages_redirected == 0

@@ -15,6 +15,9 @@ spot them without false-positiving on real error pages.
 
 from __future__ import annotations
 
+import re
+from urllib.parse import urlsplit
+
 from selectolax.parser import HTMLParser
 
 MIN_BODY_NODE_COUNT = 15
@@ -97,3 +100,38 @@ def is_challenge_response(status_code: int, body: bytes) -> bool:
     # The markers are short and the bodies are small (< 50KB for most
     # challenge pages). Linear byte search is fine.
     return any(marker in body for marker in _CHALLENGE_MARKERS)
+
+
+# Password / OTP / WebAuthn form controls. A session that has lapsed usually
+# lands on a same-origin login page returning HTTP 200, so status and host
+# checks alone cannot tell an application page from a sign-in wall.
+_AUTH_INPUT_MARKER = re.compile(
+    rb"<input\b[^>]*(?:"
+    rb"type\s*=\s*['\"]?password|"
+    rb"autocomplete\s*=\s*['\"]?(?:current-password|one-time-code|webauthn)|"
+    rb"name\s*=\s*['\"]?(?:otp|mfa|verification(?:_|-)?code)"
+    rb")",
+    re.IGNORECASE,
+)
+
+_AUTH_PATH_SEGMENTS = ("/login", "/sign-in", "/signin", "/sso", "/mfa", "/verify")
+
+
+def looks_like_authentication_page(url: str, body: bytes) -> bool:
+    """Recognize a login / re-verification page without retaining any of it.
+
+    Deliberately conservative: a path segment that names authentication, or
+    the presence of a password, one-time-code, or WebAuthn control. It reads
+    no names, values, labels, or text as evidence.
+
+    Shared by the companion, which uses it to detect a lapsed session
+    mid-crawl, and by the local login handoff, which uses it to refuse to
+    call a scan of a sign-in form a completed audit.
+    """
+    try:
+        path = urlsplit(url).path.lower()
+    except ValueError:
+        path = ""
+    if any(segment in path for segment in _AUTH_PATH_SEGMENTS):
+        return True
+    return _AUTH_INPUT_MARKER.search(body[:512_000]) is not None

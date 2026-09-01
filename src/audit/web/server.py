@@ -2682,6 +2682,23 @@ def _local_login_completion(summary: CrawlSummary) -> tuple[str, str | None]:
             "Sign-in succeeded, but Axcess could not scan an application page. "
             "Start a new login scan; if it happens again, check the server log.",
         )
+    # Every page turned out to be a sign-in wall. The crawl drained its queue
+    # and would otherwise report "completed" — a scan of a login form filed as
+    # an audit of the application, which is worse than an error because the
+    # report looks legitimate. It means the session did not reach the crawl,
+    # so the pages tell us nothing about the signed-in product.
+    if summary.pages_auth_wall >= summary.pages_fetched:
+        redirected = (
+            " The request was redirected away from the page it asked for."
+            if summary.pages_redirected
+            else ""
+        )
+        return (
+            "failed",
+            f"Signed in, but every page Axcess scanned ({summary.pages_fetched}) was a "
+            f"sign-in page, so the session did not carry into the scan.{redirected} "
+            "The report would describe a login form, not the application.",
+        )
     if summary.status in {"completed", "failed", "interrupted"}:
         return summary.status, None
     return "failed", "The login scan ended before Axcess could finish the report."
