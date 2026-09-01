@@ -225,7 +225,14 @@ class CrawlConfig:
     # OFF by default, unlike every other probe here: it is the only pass
     # that mutates the page, and it costs one axe run per revealed state
     # rather than one per page. Enable with ``--interaction``.
-    interaction_checks_enabled: bool = False
+    # On by default. Most of a modern application does not exist until a
+    # control is used — menus closed, dialogs unopened, tabs unswitched — so
+    # a load-state-only audit reports on a fraction of what a user meets. It
+    # is the one pass that operates the page rather than observing it, and it
+    # costs an axe run per revealed state, so ``--skip-interaction`` turns it
+    # off when crawl time matters more. It never operates a control whose
+    # accessible name looks destructive.
+    interaction_checks_enabled: bool = True
     interaction_max_clicks: int = 40
     interaction_max_repeated: int = 3
     interaction_max_depth: int = 2
@@ -280,7 +287,8 @@ class CrawlSummary:
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
     interaction_pages_probed: int = 0
-    interaction_clicked_total: int = 0
+    # DOM states reached across the scan: clicks that changed the page.
+    interaction_states_total: int = 0
     interaction_findings_total: int = 0
     findings_written: int = 0
     findings_by_severity: dict[str, int] = field(
@@ -1148,6 +1156,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 ctx,
                 page_id=page_id,
                 findings=result.interaction_findings,
+                states=result.interaction_states,
                 screenshots=result.screenshots,
             )
 
@@ -1357,6 +1366,7 @@ def _persist_interaction(
     *,
     page_id: int,
     findings: tuple[RevealedViolation, ...],
+    states: int,
     screenshots: Mapping[str, bytes],
 ) -> None:
     """Write violations that only exist after a control was operated.
@@ -1413,6 +1423,12 @@ def _persist_interaction(
     ctx.summary.axe_violations_total += len(findings)
     ctx.summary.interaction_pages_probed += 1
     ctx.summary.interaction_findings_total += len(findings)
+    # States reached, not findings produced: a clean revealed state is still
+    # coverage this scan gained over a load-time-only pass.
+    ctx.summary.interaction_states_total += states
+    repo.increment_scan_interaction_counters(
+        ctx.conn, scan_id=ctx.scan_id, pages_delta=1, states_delta=states
+    )
 
 
 def _persist_alfa(

@@ -403,18 +403,17 @@ def crawl(
             ),
         ),
     ] = False,
-    interaction: Annotated[
+    skip_interaction: Annotated[
         bool,
         typer.Option(
-            "--interaction",
+            "--skip-interaction",
             help=(
-                "Operate each page's controls (menus, tabs, disclosure "
-                "buttons) and re-run axe on every state a click reveals. "
-                "Finds defects that do not exist until something is "
-                "clicked. Off by default: it is the only pass that "
-                "modifies the page, and it costs one axe run per revealed "
-                "state. Never clicks a control whose name looks "
-                "destructive (sign out, delete, remove)."
+                "Skip operating each page's controls (menus, tabs, "
+                "disclosure buttons). On by default: most of an application "
+                "does not exist until something is clicked, so a "
+                "load-state-only audit covers a fraction of what a user "
+                "meets. Skipping saves one axe run per revealed state at "
+                "the cost of every defect that is only reachable that way."
             ),
         ),
     ] = False,
@@ -512,7 +511,7 @@ def crawl(
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
             visual_checks_enabled=not skip_visual,
-            interaction_checks_enabled=interaction,
+            interaction_checks_enabled=not skip_interaction,
             capture_screenshots=not skip_screenshots,
         )
         if static_only:
