@@ -187,6 +187,12 @@ class _SessionRouteGuard:
         self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
         self._auxiliary = PlaywrightRoutePolicy(policies.scan)
         self._last_scan_block_code: str | None = None
+        self._on_auth_page: Callable[[Page], None] | None = None
+
+    def observe_auth_pages(self, callback: Callable[[Page], None]) -> None:
+        """Register the session's hook for a tab sign-in opened for itself."""
+
+        self._on_auth_page = callback
 
     @property
     def context_options(self) -> dict[str, bool | str]:
@@ -210,7 +216,38 @@ class _SessionRouteGuard:
     async def install_on_context(self, context: BrowserContext) -> None:
         await context.route("**/*", self.handle_route)
         await context.route_web_socket("**/*", self._auxiliary.handle_web_socket)
-        context.on("page", self._auxiliary.handle_context_page)
+        context.on("page", self.handle_context_page)
+
+    async def handle_context_page(self, page: Page) -> None:
+        """Close an auxiliary tab — unless sign-in is what opened it.
+
+        While scanning, a tab with an opener is never legitimate: the crawler
+        creates every page it uses, so anything else is uncontrolled
+        navigation that must not become evidence. That rule stays exactly as
+        it was once scan mode activates.
+
+        During manual sign-in it is wrong. Institutional SSO routinely hands
+        off through a new tab — an LTI launch from a VLE into the tool it
+        embeds is the ordinary case, not an edge case — and closing it on
+        arrival made those applications impossible to sign in to at all. The
+        auditor watched the tab they needed vanish.
+
+        Keeping the tab is a much smaller concession than it looks, because
+        it is not what constrains the popup. Every request the tab makes
+        still goes through ``handle_route`` under the setup policy, so it can
+        only reach approved target and auth origins whether or not the tab
+        itself survives. Closing it was defence in depth over that check, and
+        during sign-in that depth costs more than it buys.
+        """
+
+        if self._state is ManualAuthState.AUTHENTICATED:
+            await self._auxiliary.handle_context_page(page)
+            return
+        # Playwright exposes downloads per page, so the cancellation guard has
+        # to be attached to each tab individually.
+        page.on("download", self._auxiliary.handle_download)
+        if self._on_auth_page is not None:
+            self._on_auth_page(page)
 
     async def handle_route(self, route: Route) -> None:
         request = route.request
@@ -331,6 +368,11 @@ class ManualAuthenticationSession:
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
+        # Every tab open during sign-in, oldest first. SSO can hand off into
+        # a tab it opens for itself, and the auditor finishes there — so that
+        # tab, not the one we opened, is where verification must read the
+        # landing URL from, and all of them have to be closed afterwards.
+        self._auth_pages: list[Page] = []
         self._egress_proxy = LoopbackEgressProxy(self._policies.setup)
         self._profile_dir: str | None = None
 
@@ -398,8 +440,10 @@ class ManualAuthenticationSession:
             # before any document script runs; Chromium's launch policy above
             # remains the transport-level enforcement.
             await self._context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
+            self._route_guard.observe_auth_pages(self._adopt_auth_page)
             await self._route_guard.install_on_context(self._context)
             self._page = await self._context.new_page()
+            self._auth_pages.append(self._page)
             self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
             await self._page.goto(
                 self._seed_url,
@@ -412,6 +456,34 @@ class ManualAuthenticationSession:
             raise ManualAuthenticationError(
                 "Could not open the approved manual authentication browser."
             ) from exc
+
+    def _adopt_auth_page(self, page: Page) -> None:
+        """Make a tab that sign-in opened the one the session speaks for.
+
+        Verification reads ``self.page``. If SSO finished in a tab it opened,
+        that is where the approved landing URL is, and leaving ``_page`` on
+        the original tab would verify a stale sign-in URL — and then start
+        the crawl from it.
+        """
+
+        if page in self._auth_pages:
+            return
+        self._auth_pages.append(page)
+        self._page = page
+        page.on("close", self._forget_auth_page)
+
+    def _forget_auth_page(self, page: Page) -> None:
+        """Fall back to the newest surviving tab when one closes.
+
+        An OAuth handoff window often closes itself after returning control
+        to its opener, so the tab that is current a moment ago may be gone by
+        the time the auditor confirms.
+        """
+
+        if page in self._auth_pages:
+            self._auth_pages.remove(page)
+        if self._page is page:
+            self._page = self._auth_pages[-1] if self._auth_pages else None
 
     def verify_authenticated_target(self, url: str | None = None) -> ValidatedUrl:
         """Verify a manually confirmed return to an approved target page.
@@ -535,9 +607,13 @@ class ManualAuthenticationSession:
             raise ManualAuthenticationError(
                 "Complete and verify manual sign-in before discarding its browser page."
             )
-        page = self._page
+        pages = list(self._auth_pages)
+        self._auth_pages.clear()
         self._page = None
-        if page is not None:
+        # Every tab sign-in used, including any SSO opened for itself: each
+        # can hold a live callback or event stream that would otherwise keep
+        # running after route policy tightens.
+        for page in pages:
             with contextlib.suppress(Exception):
                 await page.close(run_before_unload=False)
 
@@ -677,6 +753,7 @@ class ManualAuthenticationSession:
         browser = self._browser
         playwright = self._playwright
         self._page = None
+        self._auth_pages.clear()
         self._context = None
         self._browser = None
         self._playwright = None

@@ -483,3 +483,94 @@ async def test_wait_times_out_at_identity_provider_without_claiming_authenticate
         await session.wait_for_authenticated_target(timeout_ms=5, poll_interval_s=0.001)
     assert session.state is ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
     await session.close()
+
+
+@dataclass
+class _FakePopup(_FakePage):
+    """A tab another page opened — what an SSO/LTI handoff produces."""
+
+    opener_page: object | None = None
+
+    async def opener(self) -> object | None:
+        return self.opener_page
+
+
+@pytest.mark.asyncio
+async def test_sign_in_tab_opened_by_sso_is_kept_and_becomes_the_session_page() -> None:
+    """An SSO handoff tab must survive, and be where verification looks.
+
+    Institutional SSO routinely hands off through a tab it opens — an LTI
+    launch from a VLE into the tool it embeds is the ordinary case. Closing
+    it on arrival, which is correct while scanning, made those applications
+    impossible to sign in to: the auditor watched the tab they needed vanish.
+    """
+    session, _playwright, _chromium, context, page = _session_with_fake_browser()
+    await session.start()
+
+    on_page = context.event_handlers["page"]
+    popup = _FakePopup(opener_page=page)
+    popup.url = "https://app.example.edu/dashboard"
+
+    await on_page(popup)  # type: ignore[operator]
+
+    assert not popup.closed, "the tab SSO opened was closed and sign-in could not continue"
+    # Verification reads session.page; leaving it on the original tab would
+    # verify a stale sign-in URL and then start the crawl from it.
+    assert session.page is popup
+    assert session.verify_authenticated_target().url == "https://app.example.edu/dashboard"
+
+
+@pytest.mark.asyncio
+async def test_auxiliary_tab_is_still_closed_once_scanning_starts() -> None:
+    """The control that motivated closing popups stays in force while scanning.
+
+    During the crawl every page is one Axcess deliberately created, so a tab
+    with an opener is uncontrolled navigation and must never become evidence.
+    """
+    session, _playwright, _chromium, context, page = _session_with_fake_browser()
+    await session.start()
+    page.url = "https://app.example.edu/dashboard"
+    session.verify_authenticated_target()  # activates scan mode
+
+    on_page = context.event_handlers["page"]
+    popup = _FakePopup(opener_page=page)
+
+    await on_page(popup)  # type: ignore[operator]
+
+    assert popup.closed, "an opener-created tab survived into scan mode"
+
+
+@pytest.mark.asyncio
+async def test_a_handoff_tab_that_closes_itself_falls_back_to_the_previous_tab() -> None:
+    """OAuth windows commonly close themselves after returning control."""
+    session, _playwright, _chromium, context, page = _session_with_fake_browser()
+    await session.start()
+
+    on_page = context.event_handlers["page"]
+    popup = _FakePopup(opener_page=page)
+    await on_page(popup)  # type: ignore[operator]
+    assert session.page is popup
+
+    # Playwright fires "close" on the page; the session registered for it.
+    close_handler = popup.event_handlers["close"]
+    close_handler(popup)  # type: ignore[operator]
+
+    assert session.page is page, "the session kept pointing at a closed tab"
+
+
+@pytest.mark.asyncio
+async def test_discarding_sign_in_closes_every_tab_it_used() -> None:
+    """A handoff tab can hold a live callback or event stream of its own."""
+    session, _playwright, _chromium, context, page = _session_with_fake_browser()
+    await session.start()
+
+    on_page = context.event_handlers["page"]
+    popup = _FakePopup(opener_page=page)
+    popup.url = "https://app.example.edu/dashboard"
+    await on_page(popup)  # type: ignore[operator]
+    session.verify_authenticated_target()
+
+    await session.discard_manual_auth_page()
+
+    assert page.closed, "the original sign-in tab was left open"
+    assert popup.closed, "the tab SSO opened was left open after sign-in"
