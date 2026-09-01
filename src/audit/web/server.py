@@ -61,7 +61,7 @@ from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.exports.xlsx_export import render_xlsx
-from audit.logging import get_logger
+from audit.logging import configure_logging, get_logger
 from audit.protected.crypto import DeterministicLocalKms, ProtectedVault
 from audit.protected.models import ProtectedScanStatus, normalize_exact_https_origin
 from audit.protected.repository import (
@@ -582,6 +582,18 @@ def create_app(
                     "protected.retention_purge_failed",
                     error_type=type(exc).__name__,
                 )
+
+    @app.on_event("startup")
+    async def _configure_scan_logging() -> None:
+        """Send scan logs to a file the auditor can actually reach.
+
+        A desktop scan runs inside Electron, where stderr goes nowhere the
+        user can see. Without this the only record of a failed scan was what
+        could be reconstructed from database rows afterwards.
+        """
+        log_path = configure_logging(log_dir=get_settings().log_dir)
+        if log_path is not None:
+            get_logger(__name__).info("logging.file_ready", path=str(log_path))
 
     @app.on_event("startup")
     async def _start_protected_retention_worker() -> None:

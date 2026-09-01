@@ -23,6 +23,7 @@ from enum import StrEnum
 from time import monotonic
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
+from urllib.parse import urlsplit
 
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
 from audit.analyzer.axe import AxeAnalyzer
@@ -34,6 +35,7 @@ from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
 from audit.crawler.js_fetcher import JsFetcher
 from audit.extractor.downloader import AuthenticatedImageDownloader
+from audit.logging import get_logger
 from audit.protected.egress import (
     EgressViolation,
     HostResolver,
@@ -49,6 +51,8 @@ if TYPE_CHECKING:
 
 _DEFAULT_USER_AGENT = "axcess/0.1 (+authorized protected accessibility audit)"
 _DEFAULT_NAV_TIMEOUT_MS = 30_000
+log = get_logger(__name__)
+
 _DEFAULT_AUTH_WAIT_MS = 5 * 60 * 1000
 _AUTH_POLL_INTERVAL_S = 0.25
 _SETUP_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "POST"})
@@ -163,6 +167,21 @@ def validate_protected_seed_url(seed_url: str, policies: ManualAuthPolicies) -> 
         ) from exc
 
 
+def _origin_only(url: str) -> str:
+    """Scheme and host of ``url``; never its path, query, or fragment.
+
+    A protected request path can carry identifiers or session material, so
+    diagnostics record only which origin was involved.
+    """
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "(unparseable)"
+    if not parts.scheme or not parts.hostname:
+        return "(opaque)"
+    return f"{parts.scheme}://{parts.hostname}"
+
+
 def verify_authenticated_target_url(url: str, policies: ManualAuthPolicies) -> ValidatedUrl:
     """Accept only a clean page at an approved *target* origin.
 
@@ -265,9 +284,24 @@ class _SessionRouteGuard:
                     url=request.url,
                     resource_type=request.resource_type,
                 )
-        except EgressViolation:
+        except EgressViolation as exc:
             if self._state is ManualAuthState.AUTHENTICATED:
                 self._last_scan_block_code = "egress_policy_blocked"
+            # Log the shape of what was refused, never the URL: a protected
+            # request path can carry session material. Method, resource type,
+            # and the policy's own reason code are enough to tell "the app
+            # could not check its session" apart from "the app tried to reach
+            # an origin nobody approved" — a distinction that previously left
+            # no trace at all, so a scan that captured a login form gave no
+            # indication why.
+            log.info(
+                "protected.request_blocked",
+                phase=self._state.value,
+                method=method,
+                resource_type=request.resource_type,
+                reason=str(exc.args[0]) if exc.args else "unknown",
+                origin=_origin_only(request.url),
+            )
             await route.abort("blockedbyclient")
             return
         if self._state is not ManualAuthState.AUTHENTICATED:

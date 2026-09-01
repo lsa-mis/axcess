@@ -253,6 +253,11 @@ class InteractionProbe:
             if budget.remaining <= 0:
                 break
             if self._is_blocked(control["label"]):
+                log.info(
+                    "interaction.refused",
+                    control=str(control["label"])[:60],
+                    reason="blocked_label",
+                )
                 continue
 
             key = self._interaction_key(control, pinned)
@@ -335,14 +340,38 @@ class InteractionProbe:
             # it landed on belongs to the crawl frontier, which owns scope,
             # robots, and rate limiting. Undo it and carry on where we were.
             if page.url != pinned:
+                log.info(
+                    "interaction.clicked",
+                    control=label[:60],
+                    selector=selector[:80],
+                    depth=depth,
+                    outcome="navigated",
+                    landed=page.url,
+                )
                 await self._restore(page, pinned)
                 return True
 
             after_hash = await page.evaluate(_DOM_HASH_JS)
             if before_hash == after_hash:
+                log.info(
+                    "interaction.clicked",
+                    control=label[:60],
+                    selector=selector[:80],
+                    depth=depth,
+                    outcome="no_dom_change",
+                )
                 return True  # inert control; spent, but nothing to scan
 
+            before_found = len(found)
             await self._collect(page, budget, found, label)
+            log.info(
+                "interaction.clicked",
+                control=label[:60],
+                selector=selector[:80],
+                depth=depth,
+                outcome="dom_changed",
+                new_violations=len(found) - before_found,
+            )
 
             # Whatever this click opened may itself contain controls. Only
             # those: fresh_only keeps the descent inside what appeared.

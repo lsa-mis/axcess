@@ -21,6 +21,7 @@ from typing import Any, Protocol
 from urllib.parse import urljoin
 
 import httpx
+import structlog
 from selectolax.parser import HTMLParser
 
 from audit.analyzer.alfa import (
@@ -346,6 +347,20 @@ async def run_crawl(
                 ),
             )
     _seed_queue(conn, scan_id, entry_url)
+
+    # Every log line from this crawl carries its scan id, so one run can be
+    # read on its own out of a file that holds several.
+    structlog.contextvars.bind_contextvars(scan_id=scan_id)
+    log.info(
+        "crawl.begin",
+        seed=normalized_seed,
+        entry=entry_url,
+        scope=f"{scope.seed_host}{scope.path_prefix}",
+        max_pages=config.max_pages,
+        max_depth=config.max_depth,
+        workers=config.workers,
+        interaction=config.interaction_checks_enabled,
+    )
 
     summary = CrawlSummary(scan_id=scan_id, seed_url=normalized_seed)
     limiter = HostLimiter(rps=config.rps, concurrency_per_host=config.concurrency_per_host)
@@ -929,6 +944,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # scope rules) shouldn't be fetched. Cheaper than the robots call below.
     if not url_policy.is_in_scope(url, ctx.scope, allow_subdomains=ctx.config.allow_subdomains):
         ctx.summary.pages_skipped_scope += 1
+        log.info("crawl.skipped", url=url, reason="out_of_scope")
         return
 
     # Re-checked here as well as at enqueue, for the same reason scope is:
@@ -938,11 +954,17 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         url, ctx.config.excluded_scopes
     ):
         ctx.summary.pages_skipped_blocked += 1
+        log.info("crawl.skipped", url=url, reason="blocklist")
         return
 
     if not ctx.config.ignore_robots and not await ctx.robots.allowed(url):
         ctx.summary.pages_skipped_robots += 1
+        log.info("crawl.skipped", url=url, reason="robots_txt")
         return
+
+    # Logged before the fetch, not after, so the order pages are *visited* is
+    # recoverable even when a later one fails or the process dies.
+    log.info("crawl.navigating", url=url, depth=depth)
 
     async with ctx.limiter.throttle(url):
         if ctx.config.browser_only:
@@ -978,11 +1000,28 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
-    if result.url and result.url != url:
+    redirected = bool(result.url and result.url != url)
+    if redirected:
         ctx.summary.pages_redirected += 1
-    if result.is_html and looks_like_authentication_page(result.url or url, result.body):
+    auth_wall = bool(
+        result.is_html and looks_like_authentication_page(result.url or url, result.body)
+    )
+    if auth_wall:
         ctx.summary.pages_auth_wall += 1
-        log.info("crawl.auth_wall", requested=url, landed=result.url or url)
+    # One line per page, always. Reconstructing a failed scan from database
+    # rows afterwards meant comparing HTML hashes to discover that three
+    # different application URLs had all returned the same login markup.
+    # This states it outright, at the moment it happens.
+    log.info(
+        "crawl.page",
+        requested=url,
+        landed=result.url if redirected else None,
+        status=result.status_code,
+        title=_extract_title(result.body) if result.is_html else None,
+        bytes=len(result.body or b""),
+        render=render_mode,
+        auth_wall=auth_wall,
+    )
 
     if (
         ctx.config.image_extraction_enabled
@@ -1197,6 +1236,7 @@ def _enqueue_children(
         if not url_policy.is_in_scope(
             normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
         ):
+            log.debug("crawl.link_refused", url=normalized, source=base_url, reason="out_of_scope")
             continue
         # a11y-crawler filters at link discovery and again at enqueue; those
         # are one step here, so the check sits at the single point where a
@@ -1209,6 +1249,7 @@ def _enqueue_children(
             # the header of every page), and a summary that reported zero
             # would tell the operator the blocklist had done nothing.
             ctx.summary.pages_skipped_blocked += 1
+            log.info("crawl.link_refused", url=normalized, source=base_url, reason="blocklist")
             continue
         queue.enqueue(
             ctx.conn,
@@ -1216,6 +1257,10 @@ def _enqueue_children(
             {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
             dedupe_key=_dedupe_key(ctx.scan_id, normalized),
         )
+        # Which page produced this link. A crawl that visits somewhere
+        # unexpected is only explainable if the page that offered the link
+        # is recorded alongside it.
+        log.info("crawl.enqueued", url=normalized, source=base_url, depth=depth)
 
 
 def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
