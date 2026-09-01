@@ -440,3 +440,79 @@ def test_default_start_url_is_unchanged_behaviour(tmp_db: sqlite3.Connection) ->
 
     urls = _page_urls(tmp_db, summary.scan_id)
     assert f"{base}/subdir/deep.html" in urls
+
+
+def test_a_sign_out_link_is_never_followed(tmp_db: sqlite3.Connection) -> None:
+    """An authenticated crawl must not end its own session.
+
+    This is the shape of a real failure: a scan of an app signed in as the
+    auditor followed the "Sign out" link in the header, and every page after
+    that rendered the login screen. The scan still reported as completed,
+    so the report looked like evidence about the application when it was
+    evidence about a login form.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/authed/",
+            start_url=f"{base}/authed/dashboard.html",
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/authed/logout.html" not in urls, "the crawl signed itself out"
+    # The rest of the app is still crawled — blocking is targeted, not a halt.
+    assert f"{base}/authed/dashboard.html" in urls
+    assert f"{base}/authed/reports.html" in urls
+    assert f"{base}/authed/settings.html" in urls
+    assert summary.pages_skipped_blocked >= 1
+
+
+def test_excluded_scopes_are_not_visited(tmp_db: sqlite3.Connection) -> None:
+    """The operator's explicit "never visit" list is honoured as a prefix."""
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/authed/",
+            start_url=f"{base}/authed/dashboard.html",
+            excluded_scopes=(f"{base}/authed/reports.html",),
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/authed/reports.html" not in urls
+    assert f"{base}/authed/settings.html" in urls
+
+
+def test_blocklist_can_be_emptied_for_an_unauthenticated_scan(tmp_db: sqlite3.Connection) -> None:
+    """Blocking is a default, not a rule: a public scan may want that page.
+
+    Nothing is at risk without a session to lose, and a sign-out page has
+    accessibility problems like any other.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=f"{base}/authed/",
+            start_url=f"{base}/authed/dashboard.html",
+            blocked_url_patterns=(),
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/authed/logout.html" in urls

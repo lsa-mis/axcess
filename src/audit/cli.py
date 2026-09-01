@@ -13,6 +13,7 @@ from rich.table import Table
 
 from audit.blob_store import BlobStore
 from audit.config import get_settings
+from audit.crawler import url_policy
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
 from audit.exports.collector import collect_scan
@@ -256,6 +257,33 @@ def crawl(
         bool,
         typer.Option("--ignore-robots", help="Skip robots.txt (authorized testing only)."),
     ] = False,
+    block: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--block",
+            help=(
+                "Extra URL substring never to visit, e.g. --block /admin. "
+                "Repeatable. Adds to the sign-out/delete defaults."
+            ),
+        ),
+    ] = None,
+    allow_session_ending_urls: Annotated[
+        bool,
+        typer.Option(
+            "--allow-session-ending-urls",
+            help=(
+                "Drop the built-in sign-out/delete blocklist. Safe for an "
+                "unauthenticated scan; an authenticated one may sign itself out."
+            ),
+        ),
+    ] = False,
+    exclude: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--exclude",
+            help="URL or path prefix never to visit. Repeatable.",
+        ),
+    ] = None,
     skip_ocr: Annotated[
         bool,
         typer.Option("--skip-ocr", help="Skip OCR (fetch + image download only)."),
@@ -455,6 +483,12 @@ def crawl(
             whole_host=whole_host,
             rps=rps,
             ignore_robots=ignore_robots,
+            blocked_url_patterns=(
+                ()
+                if allow_session_ending_urls
+                else url_policy.DEFAULT_BLOCKED_URL_PATTERNS + tuple(block or ())
+            ),
+            excluded_scopes=tuple(exclude or ()),
             user_agent=settings.user_agent,
             request_timeout_s=settings.request_timeout_s,
             ocr_enabled=not skip_ocr,

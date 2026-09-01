@@ -18,6 +18,7 @@ Subdomains are still opt-in via ``allow_subdomains``.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -27,6 +28,51 @@ _DEFAULT_PORTS = {"http": "80", "https": "443"}
 
 _extract = tldextract.TLDExtract(suffix_list_urls=())
 """Offline-only PSL extractor — uses the snapshot bundled with tldextract."""
+
+
+# Ported from a11y-crawler (lib/crawler/config.ts). A crawl that follows a
+# "Sign out" link destroys the session it was given and then reports every
+# remaining page as the login screen — the scan looks like it completed,
+# having tested nothing. The defaults are path fragments rather than whole
+# paths because applications spell the same action many ways
+# (``/logout``, ``/account/logout``, ``/auth/sign-out``).
+DEFAULT_BLOCKED_URL_PATTERNS: tuple[str, ...] = (
+    "/logout",
+    "/delete",
+    "/remove",
+    "/signout",
+    "/sign-out",
+    "/log-out",
+)
+
+
+def is_blocked(url: str, patterns: Iterable[str]) -> bool:
+    """True if ``url`` contains any pattern, case-insensitively.
+
+    Substring rather than path-segment matching, matching a11y-crawler's
+    ``isBlocked``. It is deliberately broad: over-blocking costs a page of
+    coverage, while under-blocking costs the whole authenticated scan.
+    """
+    lowered = url.lower()
+    return any(pattern and pattern.lower() in lowered for pattern in patterns)
+
+
+def is_excluded(url: str, scopes: Iterable[str]) -> bool:
+    """True if ``url`` is, or sits under, one of ``scopes``.
+
+    Mirrors a11y-crawler's ``isExcluded``: an entry matches the URL exactly,
+    or as a path prefix, or as a prefix followed by a query string. The
+    trailing slash on an entry is ignored so both spellings behave alike.
+    This is the operator's "never visit these" list, distinct from the
+    pattern blocklist above.
+    """
+    for scope in scopes:
+        if not scope:
+            continue
+        clean = scope.rstrip("/")
+        if url == clean or url.startswith(clean + "/") or url.startswith(clean + "?"):
+            return True
+    return False
 
 
 def normalize(url: str) -> str:

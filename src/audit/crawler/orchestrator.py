@@ -34,7 +34,7 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
-from audit.analyzer.interaction import InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe, RevealedViolation
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -91,6 +91,16 @@ class CrawlConfig:
     allow_subdomains: bool = False
     rps: float = 2.0
     ignore_robots: bool = False
+    # Never fetch a URL containing one of these, case-insensitively. Ported
+    # from a11y-crawler, defaults included: an authenticated crawl that
+    # follows a "Sign out" link ends its own session, and every page after
+    # that is the login screen. The scan still reports as completed, so the
+    # failure is silent — which is exactly how it presents in a report.
+    blocked_url_patterns: tuple[str, ...] = url_policy.DEFAULT_BLOCKED_URL_PATTERNS
+    # Operator-supplied "never visit these" URLs or subtrees. Distinct from
+    # the patterns above: entries match exactly, as a path prefix, or as a
+    # prefix plus query string.
+    excluded_scopes: tuple[str, ...] = ()
     concurrency_per_host: int = 2
     workers: int = 4
     user_agent: str = "axcess/0.1 (+local accessibility audit)"
@@ -234,6 +244,10 @@ class CrawlSummary:
     svg_text_hits: int = 0
     image_errors: int = 0
     pages_skipped_scope: int = 0
+    # Times a link or queued job was refused by the blocklist. Counts
+    # refusals, not distinct URLs: a sign-out control in a shared header is
+    # refused once per page that carries it.
+    pages_skipped_blocked: int = 0
     ocr_analyzed: int = 0
     ocr_text_candidates: int = 0
     vlm_classified: int = 0
@@ -413,6 +427,12 @@ async def run_crawl(
             max_clicks=config.interaction_max_clicks,
             max_repeated=config.interaction_max_repeated,
             max_depth=config.interaction_max_depth,
+            # a11y-crawler matches one list against both URLs and control
+            # labels, so an operator who blocks "Sign out" is protected from
+            # the link and the button alike. The probe's own label list stays
+            # in front: the URL defaults are path fragments ("/logout") and
+            # would never match a rendered label on their own.
+            blocked_labels=DEFAULT_BLOCKED_LABELS + tuple(config.blocked_url_patterns),
         )
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
@@ -561,6 +581,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "max_pages": config.max_pages,
             "max_depth": config.max_depth,
             "allow_subdomains": config.allow_subdomains,
+            # Where the crawl began, when sign-in moved it off the seed. A
+            # report that cannot say which page it started from cannot be
+            # reproduced from its own record.
+            "start_url": config.start_url,
+            # What the crawl refused to visit, so a coverage gap in the
+            # report is explainable rather than mysterious.
+            "blocked_url_patterns": list(config.blocked_url_patterns),
+            "excluded_scopes": list(config.excluded_scopes),
             "rps": config.rps,
             "workers": config.workers,
             "ignore_robots": config.ignore_robots,
@@ -892,6 +920,15 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx.summary.pages_skipped_scope += 1
         return
 
+    # Re-checked here as well as at enqueue, for the same reason scope is:
+    # a job may have been queued before the operator added a pattern, and a
+    # redirect can land on a blocked URL that no link ever pointed at.
+    if url_policy.is_blocked(url, ctx.config.blocked_url_patterns) or url_policy.is_excluded(
+        url, ctx.config.excluded_scopes
+    ):
+        ctx.summary.pages_skipped_blocked += 1
+        return
+
     if not ctx.config.ignore_robots and not await ctx.robots.allowed(url):
         ctx.summary.pages_skipped_robots += 1
         return
@@ -1136,6 +1173,18 @@ def _enqueue_children(
         if not url_policy.is_in_scope(
             normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
         ):
+            continue
+        # a11y-crawler filters at link discovery and again at enqueue; those
+        # are one step here, so the check sits at the single point where a
+        # discovered link becomes a queued job.
+        if url_policy.is_blocked(
+            normalized, ctx.config.blocked_url_patterns
+        ) or url_policy.is_excluded(normalized, ctx.config.excluded_scopes):
+            # Counted here, not only at lease time: a link refused before it
+            # is ever queued is the common case (a sign-out control sits in
+            # the header of every page), and a summary that reported zero
+            # would tell the operator the blocklist had done nothing.
+            ctx.summary.pages_skipped_blocked += 1
             continue
         queue.enqueue(
             ctx.conn,
