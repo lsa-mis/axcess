@@ -52,3 +52,20 @@ class RevealedViolation:
         """Delegate too, so the screenshot pass treats every finding type
         the same way without knowing which pipeline produced it."""
         return self.violation.target_selector
+
+
+@dataclass(frozen=True)
+class InteractionResult:
+    """What one page's interaction pass produced.
+
+    Returned rather than recorded on the probe. The probe is built once per
+    crawl and used by every worker, so a count kept on it is shared mutable
+    state: with two workers one page's pass reset the field before another
+    read it, and a scan whose log showed 2,637 state-changing clicks
+    recorded 2,585. A return value cannot be raced.
+    """
+
+    findings: tuple[RevealedViolation, ...] = ()
+    #: Clicks that actually changed the DOM — states a load-time pass cannot
+    #: reach, counted whether or not they held a defect.
+    states: int = 0

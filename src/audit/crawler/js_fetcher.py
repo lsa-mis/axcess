@@ -25,7 +25,10 @@ from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
-from audit.analyzer.interaction import InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import (
+    InteractionProbe,
+    InteractionResult,
+)
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
@@ -321,15 +324,15 @@ class JsFetcher:
             # state a click reveals. Given the load-state violations as a
             # baseline so anything already reported is never reported
             # again, however many revealed states it survives into.
-            interaction_findings: list[RevealedViolation] = []
+            # Held per fetch, not on the probe: the probe is shared by every
+            # concurrent worker, so a count stored on it is raced.
+            interaction = InteractionResult()
             if (
                 self._interaction_probe is not None
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                interaction_findings = await self._interaction_probe.run(
-                    page, baseline=axe_violations
-                )
+                interaction = await self._interaction_probe.run(page, baseline=axe_violations)
 
             responsive_findings: list[ResponsiveFinding] = []
             if (
@@ -388,12 +391,8 @@ class JsFetcher:
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
                 visual_findings=tuple(visual_findings),
-                interaction_findings=tuple(interaction_findings),
-                interaction_states=(
-                    self._interaction_probe.last_states_found
-                    if self._interaction_probe is not None
-                    else 0
-                ),
+                interaction_findings=interaction.findings,
+                interaction_states=interaction.states,
                 screenshots=screenshots,
             )
         finally:

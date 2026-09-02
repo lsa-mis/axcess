@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
-from audit.analyzer.interaction.base import RevealedViolation
+from audit.analyzer.interaction.base import InteractionResult, RevealedViolation
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
@@ -180,14 +180,8 @@ class InteractionProbe:
     # Time for a revealed state to settle (animations, async content).
     settle_ms: int = 400
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
-    # States reached by the most recent ``run``. The probe is constructed
-    # once per crawl and used page by page, so the caller reads this
-    # immediately after each call rather than accumulating it here.
-    last_states_found: int = 0
 
-    async def run(
-        self, page: Page, *, baseline: Sequence[AxeViolation] = ()
-    ) -> list[RevealedViolation]:
+    async def run(self, page: Page, *, baseline: Sequence[AxeViolation] = ()) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
         ``baseline`` is the load-state axe result for this page. Anything in
@@ -200,7 +194,6 @@ class InteractionProbe:
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
         )
-        self.last_states_found = 0
         found: list[RevealedViolation] = []
         try:
             await self._explore(page, budget, found, pinned=page.url, depth=0, fresh_only=False)
@@ -208,14 +201,13 @@ class InteractionProbe:
             # A probe is evidence-gathering, not a gate. Whatever we managed
             # to reach before something went wrong is still valid evidence.
             log.warning("interaction.aborted", error=str(exc)[:200])
-        self.last_states_found = budget.states_found
         if found:
             log.info(
                 "interaction.revealed",
                 violations=len(found),
                 clicks_used=self.max_clicks - budget.remaining,
             )
-        return found
+        return InteractionResult(findings=tuple(found), states=budget.states_found)
 
     async def _explore(
         self,

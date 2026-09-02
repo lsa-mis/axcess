@@ -17,6 +17,7 @@ The fixture is built so each guarantee fails loudly rather than silently:
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 
@@ -76,7 +77,7 @@ async def test_reveals_violation_that_only_exists_after_a_click(page, axe) -> No
     assert not any(v.rule_id == "label" for v in baseline)
 
     probe = InteractionProbe(axe=axe)
-    revealed = await probe.run(page, baseline=baseline)
+    revealed = (await probe.run(page, baseline=baseline)).findings
 
     label_findings = [r for r in revealed if r.violation.rule_id == "label"]
     assert label_findings, "probe did not find the input revealed by clicking"
@@ -97,7 +98,7 @@ async def test_load_state_violation_is_never_reported_again(page, axe) -> None: 
     baseline = await axe.run(page, "AA")
     assert any(v.rule_id == "image-alt" for v in baseline), "fixture regressed"
 
-    revealed = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+    revealed = (await InteractionProbe(axe=axe).run(page, baseline=baseline)).findings
 
     assert not any(r.violation.rule_id == "image-alt" for r in revealed)
     # Nothing is emitted twice, whatever the rule.
@@ -138,7 +139,7 @@ async def test_click_budget_is_respected(page, axe) -> None:  # type: ignore[no-
     await page.goto(_file_url("hidden_state.html"))
     baseline = await axe.run(page, "AA")
 
-    revealed = await InteractionProbe(axe=axe, max_clicks=2).run(page, baseline=baseline)
+    revealed = (await InteractionProbe(axe=axe, max_clicks=2).run(page, baseline=baseline)).findings
 
     # The budget counts CLICKS, not findings: one revealed state can carry
     # several violations at once (an unlabelled input fails `label` and
@@ -165,7 +166,7 @@ async def test_a_control_is_operated_only_once(page, axe) -> None:  # type: igno
     await page.goto(_file_url("hidden_state.html"))
     baseline = await axe.run(page, "AA")
 
-    revealed = await InteractionProbe(axe=axe, max_depth=2).run(page, baseline=baseline)
+    revealed = (await InteractionProbe(axe=axe, max_depth=2).run(page, baseline=baseline)).findings
 
     presses = await page.evaluate(
         "() => document.getElementById('guests').querySelectorAll('input').length"
@@ -190,9 +191,9 @@ async def test_nested_control_is_explored_at_depth_one(page, axe) -> None:  # ty
     await page.goto(_file_url("stress.html"))
     baseline = await axe.run(page, "AA")
 
-    revealed = await InteractionProbe(axe=axe, max_clicks=40, max_depth=2).run(
-        page, baseline=baseline
-    )
+    revealed = (
+        await InteractionProbe(axe=axe, max_clicks=40, max_depth=2).run(page, baseline=baseline)
+    ).findings
 
     deep = [r for r in revealed if r.violation.target_selector == "#deep-field"]
     assert deep, (
@@ -214,9 +215,9 @@ async def test_flat_controls_do_not_consume_recursion_depth(page, axe) -> None: 
     await page.goto(_file_url("stress.html"))
     baseline = await axe.run(page, "AA")
 
-    revealed = await InteractionProbe(axe=axe, max_clicks=40, max_depth=1).run(
-        page, baseline=baseline
-    )
+    revealed = (
+        await InteractionProbe(axe=axe, max_clicks=40, max_depth=1).run(page, baseline=baseline)
+    ).findings
 
     # Reachable without descending: each is a top-level control.
     for label in ("Add another guest", "Photos", "Open booking dialog"):
@@ -247,9 +248,11 @@ async def test_depth_limit_counts_nesting_levels_exactly(page, axe, max_depth) -
     await page.goto(_file_url("nested_depth.html"))
     baseline = await axe.run(page, "AA")
 
-    revealed = await InteractionProbe(axe=axe, max_clicks=60, max_depth=max_depth).run(
-        page, baseline=baseline
-    )
+    revealed = (
+        await InteractionProbe(axe=axe, max_clicks=60, max_depth=max_depth).run(
+            page, baseline=baseline
+        )
+    ).findings
 
     # A set: one field can fail several rules (label *and* target-size), and
     # what is being measured is which levels were reached, not how many
@@ -264,3 +267,35 @@ async def test_depth_limit_counts_nesting_levels_exactly(page, axe, max_depth) -
     assert reached == list(range(1, max_depth + 1)), (
         f"max_depth={max_depth} should reach levels 1..{max_depth}, reached {reached}"
     )
+
+
+async def test_concurrent_pages_each_get_their_own_state_count(browser, axe) -> None:  # type: ignore[no-untyped-def]
+    """One probe serves every worker, so its result must not be shared state.
+
+    The count was kept on the probe and read after the call. The probe is
+    built once per crawl and used by two workers concurrently, so one page's
+    pass reset the field before another read it: a scan whose log showed
+    2,637 state-changing clicks recorded 2,585. A returned value cannot be
+    raced, and this fails if the count ever moves back onto the instance.
+    """
+    probe = InteractionProbe(axe=axe, max_clicks=40)
+
+    async def _scan(name: str):  # type: ignore[no-untyped-def]
+        context = await browser.new_context(viewport={"width": 1440, "height": 900})
+        page = await context.new_page()
+        try:
+            await page.goto(_file_url(name))
+            baseline = await axe.run(page, "AA")
+            return await probe.run(page, baseline=baseline)
+        finally:
+            await context.close()
+
+    # The same probe instance, two pages in flight at once.
+    stress, hidden = await asyncio.gather(_scan("stress.html"), _scan("hidden_state.html"))
+
+    assert stress.states > 0, "the busier fixture reached no states"
+    assert hidden.states > 0, "the simpler fixture reached no states"
+    # Each result describes its own page: a shared field would have made one
+    # of these carry the other's total, or zero.
+    assert stress.states != hidden.states or len(stress.findings) != len(hidden.findings)
+    assert len(stress.findings) == len({f.violation.target_hash for f in stress.findings})
