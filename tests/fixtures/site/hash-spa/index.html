@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Home | Hash SPA</title>
+  </head>
+  <body>
+    <a href="#main-content">Skip to main content</a>
+    <nav aria-label="Primary">
+      <a href="#/about">About</a>
+      <a href="#/projects">Projects</a>
+    </nav>
+    <main id="main-content"><h1>Home</h1></main>
+    <script>
+      const route = window.location.hash.slice(1);
+      const names = { "/about": "About", "/projects": "Projects" };
+      const name = names[route] || "Home";
+      document.title = `${name} | Hash SPA`;
+      document.querySelector("h1").textContent = name;
+    </script>
+  </body>
+</html>

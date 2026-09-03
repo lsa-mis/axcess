@@ -58,6 +58,9 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     whole_host: false,
     scan_engine: "axe",
     axe_level: "AA",
+    // Operating controls changes the signed-in page, so require an explicit
+    // advanced-settings opt-in for DOM-state discovery.
+    skip_interaction: true,
     skip_keyboard: false,
     skip_responsive: false,
     skip_ocr: true,
@@ -273,6 +276,9 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 form.skip_responsive
                   ? "Responsive checks skipped"
                   : "Responsive and zoom checks",
+                form.skip_interaction || form.scan_engine === "alfa"
+                  ? "Load-state DOM only"
+                  : "Click-through DOM state discovery",
                 form.skip_ocr
                   ? "Image text analysis skipped"
                   : form.skip_vlm
@@ -411,7 +417,10 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     <EngineChoice
                       value="alfa"
                       selected={form.scan_engine}
-                      onChange={(engine) => update("scan_engine", engine)}
+                      onChange={(engine) => {
+                        update("scan_engine", engine);
+                        update("skip_interaction", true);
+                      }}
                       disabled={alfaCapability.data?.available === false}
                       label="Siteimprove Alfa only"
                       hint="Runs Alfa ACT rules using the temporary authenticated session."
@@ -449,6 +458,19 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     disabled
                     label="Fast crawl — skip browser rendering (static only)"
                     hint="Unavailable: the temporary signed-in browser is required for every protected page."
+                  />
+                  <Checkbox
+                    checked={!form.skip_interaction}
+                    onChange={(enabled) =>
+                      update("skip_interaction", !enabled)
+                    }
+                    disabled={form.scan_engine === "alfa"}
+                    label="Click through DOM states"
+                    hint={
+                      form.scan_engine === "alfa"
+                        ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
+                        : "Opens menus, dialogs, tabs, and disclosure controls in the signed-in site, then re-runs axe-core in each revealed state. This adds scan time and avoids controls with destructive names."
+                    }
                   />
                   <Checkbox
                     checked

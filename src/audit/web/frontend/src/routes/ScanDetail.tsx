@@ -71,6 +71,7 @@ export default function ScanDetailRoute() {
         static_only: false,
         show_browser: false,
         scan_engine: "axe",
+        skip_interaction: true,
         skip_keyboard: false,
         skip_responsive: false,
         skip_semantic: true,

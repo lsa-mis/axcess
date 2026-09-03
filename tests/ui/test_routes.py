@@ -396,6 +396,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
                 "whole_host": True,
                 "scan_engine": "both",
                 "axe_level": "AAA",
+                "skip_interaction": True,
                 "skip_keyboard": True,
                 "skip_responsive": True,
                 "skip_ocr": True,
@@ -417,6 +418,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.whole_host is True
     assert config.axe_level == "AAA"
     assert config.axe_enabled is True
+    assert config.interaction_checks_enabled is False
     assert config.keyboard_probe_enabled is False
     assert config.responsive_checks_enabled is False
     assert config.workers == 4
@@ -670,6 +672,7 @@ def test_api_create_scan_respects_whole_host(
         captured["semantic_enabled"] = config.semantic_enabled
         captured["focus_checks_enabled"] = config.focus_checks_enabled
         captured["visual_checks_enabled"] = config.visual_checks_enabled
+        captured["interaction_checks_enabled"] = config.interaction_checks_enabled
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -688,6 +691,7 @@ def test_api_create_scan_respects_whole_host(
             "skip_semantic": True,
             "skip_focus": True,
             "skip_visual": True,
+            "skip_interaction": True,
         },
     )
     assert resp.status_code == 201
@@ -706,6 +710,7 @@ def test_api_create_scan_respects_whole_host(
     assert captured.get("semantic_enabled") is False
     assert captured.get("focus_checks_enabled") is False
     assert captured.get("visual_checks_enabled") is False
+    assert captured.get("interaction_checks_enabled") is False
 
 
 def test_api_create_scan_selects_alfa_engine(

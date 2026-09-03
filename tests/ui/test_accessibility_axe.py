@@ -181,6 +181,12 @@ async def test_simple_scan_path_hides_advanced_controls_until_requested(
             await playwright_async.expect(
                 page.get_by_role("group", name="Scan engine")
             ).to_be_visible()
+            dom_discovery = page.get_by_role(
+                "checkbox", name=re.compile(r"^Click through DOM states")
+            )
+            await playwright_async.expect(dom_discovery).not_to_be_checked()
+            await dom_discovery.check()
+            await playwright_async.expect(dom_discovery).to_be_checked()
         finally:
             await browser.close()
 

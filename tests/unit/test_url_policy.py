@@ -16,6 +16,18 @@ def test_normalize_drops_fragment() -> None:
     assert normalize("https://example.com/page#section") == "https://example.com/page"
 
 
+def test_normalize_preserves_hash_router_path() -> None:
+    assert normalize("https://example.com/#/about") == "https://example.com/#/about"
+    assert normalize("https://example.com/#!/projects") == "https://example.com/#!/projects"
+
+
+def test_normalize_keeps_hash_routes_distinct_from_in_page_anchors() -> None:
+    assert normalize("https://example.com/#main-content") == "https://example.com/"
+    assert normalize("https://example.com/#/projects/42?tab=summary") == (
+        "https://example.com/#/projects/42?tab=summary"
+    )
+
+
 def test_normalize_sorts_query() -> None:
     assert normalize("https://example.com/p?b=2&a=1&c=3") == "https://example.com/p?a=1&b=2&c=3"
 
@@ -197,6 +209,12 @@ def test_compare_key_canonicalizes_loopback_aliases() -> None:
         assert compare_key(variant) == k, variant
 
 
+def test_compare_key_preserves_loopback_hash_router_path() -> None:
+    a = compare_key("http://localhost:8000/#/projects")
+    b = compare_key("http://127.0.0.1:9000/#/projects")
+    assert a == b == "http://127.0.0.1/#/projects"
+
+
 def test_compare_key_preserves_real_host_port() -> None:
     # Ports on real hosts are semantically significant — do not strip.
     assert compare_key("https://example.com:8443/x") == "https://example.com:8443/x"
@@ -213,6 +231,11 @@ def test_compare_key_handles_inline_svg_embedded_url() -> None:
     assert a == b
     assert a.endswith("#0")
     assert "127.0.0.1/page.html" in a
+
+
+def test_compare_key_handles_inline_svg_on_hash_router_page() -> None:
+    value = compare_key("inline-svg://http://localhost:8000/#/about#3")
+    assert value == "inline-svg://http://127.0.0.1/#/about#3"
 
 
 def test_compare_key_is_idempotent() -> None:

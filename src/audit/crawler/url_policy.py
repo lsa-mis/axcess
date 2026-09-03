@@ -82,7 +82,9 @@ def normalize(url: str) -> str:
       * lowercase scheme and host
       * strip default ports (``:80`` for http, ``:443`` for https)
       * sort query parameters alphabetically, preserving blank values
-      * drop URL fragment
+      * drop ordinary in-page fragments
+      * preserve hash-router paths (``#/route`` and ``#!/route``), because
+        they identify distinct rendered pages in single-page applications
       * empty path becomes ``/``
     """
     parts = urlsplit(url.strip())
@@ -103,7 +105,22 @@ def normalize(url: str) -> str:
     query_pairs = parse_qsl(parts.query, keep_blank_values=True)
     query = urlencode(sorted(query_pairs))
 
-    return urlunsplit((scheme, netloc, path, query, ""))
+    fragment = _spa_route_fragment(parts.fragment)
+
+    return urlunsplit((scheme, netloc, path, query, fragment))
+
+
+def _spa_route_fragment(fragment: str) -> str:
+    """Return a fragment only when it has the shape of a client-side route.
+
+    Ordinary fragments point within one document and must continue to dedupe
+    (``#main-content`` is not another page). Hash routers use a leading slash,
+    optionally behind the historical ``!`` marker, to represent a distinct
+    application route whose DOM must be rendered and audited separately.
+    """
+    if fragment.startswith("/") or fragment.startswith("!/"):
+        return fragment
+    return ""
 
 
 @dataclass(frozen=True)
@@ -215,7 +232,10 @@ def compare_key(url: str) -> str:
         inner = url[len(_INLINE_SVG_SCHEME) :]
         frag = ""
         if "#" in inner:
-            inner, frag = inner.split("#", 1)
+            # The embedded page URL may itself be a hash-router URL. The last
+            # fragment is the inline SVG position; everything before it is
+            # the page identity.
+            inner, frag = inner.rsplit("#", 1)
         return f"{_INLINE_SVG_SCHEME}{compare_key(inner)}" + (f"#{frag}" if frag else "")
 
     try:
@@ -230,7 +250,8 @@ def compare_key(url: str) -> str:
     path = parts.path or "/"
     query_pairs = parse_qsl(parts.query, keep_blank_values=True)
     query = urlencode(sorted(query_pairs))
-    return urlunsplit((scheme, _CANONICAL_LOOPBACK, path, query, ""))
+    fragment = _spa_route_fragment(parts.fragment)
+    return urlunsplit((scheme, _CANONICAL_LOOPBACK, path, query, fragment))
 
 
 def is_in_scope(url: str, scope: HostScope, *, allow_subdomains: bool = False) -> bool:

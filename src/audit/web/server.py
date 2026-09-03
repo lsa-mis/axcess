@@ -127,6 +127,7 @@ class LocalLoginScanRequest(BaseModel):
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
+    skip_interaction: bool = False
     skip_keyboard: bool = False
     skip_responsive: bool = False
     skip_ocr: bool = True
@@ -982,6 +983,9 @@ def create_app(
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
             alfa_enabled=body.scan_engine in {"alfa", "both"},
+            interaction_checks_enabled=(
+                not body.skip_interaction and body.scan_engine in {"axe", "both"}
+            ),
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
@@ -1155,6 +1159,7 @@ def create_app(
             "show_browser": bool(body.get("show_browser")),
             "skip_axe": bool(body.get("skip_axe")),
             "scan_engine": requested_engine,
+            "skip_interaction": bool(body.get("skip_interaction")),
             "skip_keyboard": bool(body.get("skip_keyboard")),
             "skip_responsive": bool(body.get("skip_responsive")),
             "skip_semantic": bool(body.get("skip_semantic")),
@@ -2493,6 +2498,14 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         axe_enabled=scan_engine in {"axe", "both"},
         axe_level=str(form.get("axe_level", "AA")).upper(),
         alfa_enabled=scan_engine in {"alfa", "both"},
+        # DOM-state discovery operates controls in Axcess' browser and
+        # re-runs axe-core after a control reveals new content. Keep the
+        # stored config honest when either prerequisite is unavailable.
+        interaction_checks_enabled=(
+            not bool(form.get("skip_interaction"))
+            and not bool(form.get("static_only"))
+            and scan_engine in {"axe", "both"}
+        ),
         # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
         # the wiring to the runner lands in Phase 9.1 — for now this
         # just plumbs the flag through so the web form has the same

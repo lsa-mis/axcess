@@ -264,6 +264,8 @@ export interface NewScanPayload {
   show_browser: boolean;
   /** DOM rule engine selection. `both` retains distinct evidence per engine. */
   scan_engine: "axe" | "alfa" | "both";
+  /** Skip clicking controls and re-running axe in newly revealed DOM states. */
+  skip_interaction: boolean;
   skip_keyboard: boolean;
   skip_responsive: boolean;
   /** Skip local-AI review of contextual criteria such as link purpose. */
@@ -322,6 +324,8 @@ export interface LocalLoginScanPayload {
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
   axe_level: "A" | "AA" | "AAA";
+  /** Skip clicking controls and re-running axe in newly revealed DOM states. */
+  skip_interaction: boolean;
   skip_keyboard: boolean;
   skip_responsive: boolean;
   skip_ocr: boolean;

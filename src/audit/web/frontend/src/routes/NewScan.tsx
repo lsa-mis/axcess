@@ -48,6 +48,9 @@ export default function NewScanRoute() {
     // explicit corroboration option because it starts a second browser pass
     // for every page and is therefore substantially slower.
     scan_engine: "axe",
+    // Operating page controls is slower and changes the live DOM, so keep
+    // DOM-state discovery as an explicit advanced opt-in.
+    skip_interaction: true,
     skip_keyboard: false,
     skip_responsive: false,
     skip_semantic: true,
@@ -343,6 +346,9 @@ export default function NewScanRoute() {
                       : form.skip_vlm
                         ? "Image text detection (OCR)"
                         : "Image text detection and local-AI review",
+                    form.skip_interaction || form.scan_engine === "alfa"
+                      ? "Load-state DOM only"
+                      : "Click-through DOM state discovery",
                     `Up to ${form.max_pages.toLocaleString()} pages`,
                   ].map((label) => (
                     <li key={label} className="flex items-start gap-2">
@@ -500,7 +506,10 @@ export default function NewScanRoute() {
                         <EngineChoice
                           value="alfa"
                           selected={form.scan_engine}
-                          onChange={(engine) => update("scan_engine", engine)}
+                          onChange={(engine) => {
+                            update("scan_engine", engine);
+                            update("skip_interaction", true);
+                          }}
                           disabled={alfaCapability.data?.available === false}
                           label="Siteimprove Alfa only"
                           hint="ACT means Accessibility Conformance Testing. Each standardized rule checks one specific condition; failures become evidence and “can’t tell” outcomes need an expert decision."
@@ -539,7 +548,10 @@ export default function NewScanRoute() {
                       <Checkbox
                         tone="warning"
                         checked={form.static_only}
-                        onChange={(v) => update("static_only", v)}
+                        onChange={(v) => {
+                          update("static_only", v);
+                          if (v) update("skip_interaction", true);
+                        }}
                         label="Fast crawl — skip browser rendering (static only)"
                         hint={
                           form.scan_engine === "alfa"
@@ -562,6 +574,23 @@ export default function NewScanRoute() {
                           form.static_only
                             ? "Unavailable in static-only mode because Axcess is not rendering pages."
                             : "Leave this off to render invisibly in the background while you use other apps. Turn it on only when you want to watch page navigation; closing it stops browser-based checks."
+                        }
+                      />
+                      <Checkbox
+                        checked={!form.skip_interaction}
+                        onChange={(enabled) =>
+                          update("skip_interaction", !enabled)
+                        }
+                        disabled={
+                          form.static_only || form.scan_engine === "alfa"
+                        }
+                        label="Click through DOM states"
+                        hint={
+                          form.static_only
+                            ? "Unavailable in static-only mode because DOM state discovery needs Axcess’ browser."
+                            : form.scan_engine === "alfa"
+                              ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
+                              : "Opens menus, dialogs, tabs, and disclosure controls, then re-runs axe-core in each revealed state. This adds scan time and avoids controls with destructive names."
                         }
                       />
                       <Checkbox

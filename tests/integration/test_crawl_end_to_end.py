@@ -84,6 +84,45 @@ def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
     assert missing["status_code"] == 404
 
 
+def test_crawl_discovers_hash_router_pages(tmp_db: sqlite3.Connection) -> None:
+    """SPA hash routes are distinct rendered pages; ordinary anchors are not."""
+    with _serve() as base:
+        seed = f"{base}/hash-spa/index.html"
+        config = CrawlConfig(
+            js_eager=True,
+            seed_url=seed,
+            max_pages=10,
+            rps=100.0,
+            workers=1,
+            image_extraction_enabled=False,
+            axe_enabled=False,
+            vlm_enabled=False,
+            semantic_enabled=False,
+            keyboard_probe_enabled=False,
+            responsive_checks_enabled=False,
+            focus_checks_enabled=False,
+            visual_checks_enabled=False,
+            interaction_checks_enabled=False,
+            capture_screenshots=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    assert summary.status == "completed"
+    rows = tmp_db.execute(
+        "SELECT url_normalized, final_url, title FROM pages WHERE scan_id = ?",
+        (summary.scan_id,),
+    ).fetchall()
+    by_url = {row["url_normalized"]: row for row in rows}
+    assert set(by_url) == {
+        seed,
+        f"{seed}#/about",
+        f"{seed}#/projects",
+    }
+    assert by_url[f"{seed}#/about"]["title"] == "About | Hash SPA"
+    assert by_url[f"{seed}#/projects"]["title"] == "Projects | Hash SPA"
+    assert all(row["final_url"] is None for row in rows)
+
+
 def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
         config = CrawlConfig(

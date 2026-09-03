@@ -274,7 +274,11 @@ class JsFetcher:
             html = await page.content()
             status = resp.status if resp is not None else 0
             headers = resp.headers if resp is not None else {}
-            final_url = resp.url if resp is not None else url
+            # ``Response.url`` omits the fragment because fragments are not
+            # sent over HTTP. ``Page.url`` retains React/Vue hash-router
+            # routes such as ``#/projects`` and also reflects client-side
+            # redirects, so it is the rendered document identity we need.
+            final_url = page.url
             # Run axe against the fully-rendered DOM. We do this *before*
             # closing the context so the page is still live; the analyzer
             # injects axe.min.js and calls `axe.run` over the document.
