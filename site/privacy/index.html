@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy and trust — Axcess</title>
+<meta name="description" content="What stays on your computer, what Axcess connects to, and how it scans sites behind a login without ever seeing your password.">
+<link rel="canonical" href="https://lsa-mis.github.io/axcess/privacy/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Axcess">
+<meta property="og:title" content="Privacy and trust — Axcess">
+<meta property="og:description" content="What stays on your computer, what Axcess connects to, and how it scans sites behind a login without ever seeing your password.">
+<meta property="og:url" content="https://lsa-mis.github.io/axcess/privacy/">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#00274C">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="../how-it-works/">How it works</a></li>
+        <li><a href="../coverage/">Coverage</a></li>
+        <li><a href="../who-its-for/">Who it&#x27;s for</a></li>
+        <li><a href="../privacy/" aria-current="page">Privacy</a></li>
+        <li><a href="../get-started/">Get started</a></li>
+        <li><a href="../faq/">FAQ</a></li>
+        <li class="cta"><a href="https://github.com/lsa-mis/axcess">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">Privacy and trust</span>
+    <h1>Your evidence <span class="hl">never leaves</span> your computer</h1>
+    <p class="lede">Local-first is not a slogan here. It is the reason Axcess exists: accessibility audits often involve private, sensitive, or login-protected pages, and those should not be uploaded to anyone's cloud.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The boundary</span>
+      <h2>What stays local and what connects out</h2>
+    </div>
+    <div class="boundary">
+      <span class="tag">Stays on your computer</span>
+      <div class="inner">
+        <div><strong>Scan evidence</strong><span>Pages, elements, snippets, screenshots, and image files, stored in a local database.</span></div>
+        <div><strong>Your decisions</strong><span>Every review outcome, rationale, and status change, with its history.</span></div>
+        <div><strong>Reports and exports</strong><span>Workbooks, reports, and ticket files are written to your disk and go only where you send them.</span></div>
+        <div><strong>The browser</strong><span>A bundled Chromium renders pages locally, including the visible window you sign in with.</span></div>
+        <div><strong>Text recognition</strong><span>Bundled OCR reads text inside images on your machine.</span></div>
+        <div><strong>Optional AI</strong><span>If you choose to install a local model through Ollama, it runs on this computer too.</span></div>
+      </div>
+    </div>
+    <div class="outside">
+      <div><strong>Connects to: the website you are scanning</strong><span>Axcess necessarily loads pages from the target site, at the rate you set, respecting robots.txt unless you say otherwise.</span></div>
+      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no update checks that carry data, no cloud AI. Any external integration would require an explicit administrator decision.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Protected sites</span>
+      <h2>Scanning behind a login without sharing your password</h2>
+      <p class="sub">Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in, it watches.</p>
+    </div>
+    <ol class="steps">
+      <li><h3>Choose "Login or 2FA website"</h3><p>Enter the application address you are authorized to test and, if needed, the sign-in addresses it uses.</p></li>
+      <li><h3>Axcess opens a visible browser window</h3><p>This is a normal Chromium window on your screen.</p></li>
+      <li><h3>You sign in directly with the website</h3><p>Password, passkey, push notification, one-time code, whatever the site requires. Nothing is typed into Axcess.</p></li>
+      <li><h3>Navigate to the approved page and confirm</h3><p>Select <em>I have signed in</em>. Axcess checks the page is inside the agreed scope.</p></li>
+      <li><h3>The scan uses that live session</h3><p>The session exists only in memory and ends with the scan. Login and identity-provider pages are not stored as evidence.</p></li>
+    </ol>
+    <div style="margin-top:1.5rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><p><strong>This is not a way around authentication.</strong> Axcess only continues where you have already signed in, with accounts and sites you are explicitly authorized to test.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Optional AI</span>
+      <h2>AI is opt-in, local, and labelled</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span><h3>You install it, or you don't</h3><p>AI-assisted checks need a separately installed local service called Ollama and models you download yourself. Axcess never installs or downloads them silently, and it works without them.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>Every AI result is marked</h3><p>Model output is shown as a lead that needs confirmation, with the model's rationale beside the original evidence. It cannot become a confirmed barrier without a person.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Where your data lives</span>
+      <h2>Plain folders you control</h2>
+      <p class="sub">The desktop app keeps evidence in the operating system's application-data folder, never inside the app itself. Delete the folder and the evidence is gone.</p>
+    </div>
+    <div class="table-wrap" tabindex="0">
+      <table>
+        <caption class="vis-hidden">Data locations by operating system</caption>
+        <thead><tr><th scope="col">Operating system</th><th scope="col">Data folder</th></tr></thead>
+        <tbody>
+          <tr><td><b>macOS</b></td><td><code>~/Library/Application Support/Axcess/data/</code></td></tr>
+          <tr><td><b>Windows</b></td><td><code>%APPDATA%/Axcess/data/</code></td></tr>
+          <tr><td><b>Linux</b></td><td><code>~/.config/Axcess/data/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small" style="margin-top:1rem">Inside: a single SQLite database that is the source of truth, an <code>blobs</code> folder of image evidence, and local logs. Exported files are snapshots, not the record.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Teams and institutions</span>
+      <h2>Sharing without giving up local-first</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><h3>Small team on a private network</h3><p>Axcess can run on an always-on machine for a trusted team, over a LAN or a private mesh such as Tailscale, behind a shared access token. It must never be exposed as an open public service; anyone with access can point a crawler at any site.</p></article>
+      <article class="card"><h3>Managed protected scans</h3><p>For sensitive institutional targets the project includes a stricter design: identity-aware access, a scan-bound companion, managed-key encryption, redaction, seven-day retention, and controlled exports. It requires institutional infrastructure and is disabled by default.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Accuracy</span>
+      <h2>What Axcess claims about its own accuracy</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><h3>A regression gate, not a marketing number</h3><p>A versioned, labelled test corpus requires fewer than 5% false discoveries and at least 80% recall for every detection layer before a change can ship. That stops a known detector from getting worse.</p></article>
+      <article class="card"><h3>What that does not mean</h3><p>It is not a claim that every real website will see the same rate. A public real-world accuracy figure would need a representative held-out set reviewed independently by at least two accessibility experts, and the project says so in writing.</p></article>
+    </div>
+    <div style="margin-top:1.5rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>What Axcess is not.</strong> Axcess produces accessibility evidence for a qualified person to review. Automated and AI-assisted results do not prove WCAG conformance, legal compliance, or the accessibility of an entire website, and they do not replace testing with people who use assistive technology.</p></div></div>
+  </div>
+</section>
+
+</main>
+
+<nav class="pager" aria-label="Read next">
+  <div class="wrap">
+    <a class="prev" href="../who-its-for/"><small>Previous</small><span>Who it&#x27;s for</span></a>
+    <a class="next" href="../get-started/"><small>Next</small><span>Get started with Axcess</span></a>
+  </div>
+</nav>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+        <p style="margin-top:1rem;max-width:34ch">Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of Michigan.</p>
+      </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="../how-it-works/">How it works</a></li>
+          <li><a href="../coverage/">What it checks</a></li>
+          <li><a href="../who-its-for/">Who it's for</a></li>
+          <li><a href="../faq/">Questions and glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Use</h2>
+        <ul>
+          <li><a href="../get-started/">Get started</a></li>
+          <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="../about/">About Axcess</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">White paper</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess">Source on GitHub</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fine">
+      <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
+      <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a> at U-M LSA</span>
+    </div>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

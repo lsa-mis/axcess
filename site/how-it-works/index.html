@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Axcess works — Axcess</title>
+<meta name="description" content="Six plain-language steps from a web address to a verified fix, and what each Axcess check actually looks at.">
+<link rel="canonical" href="https://lsa-mis.github.io/axcess/how-it-works/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Axcess">
+<meta property="og:title" content="How Axcess works — Axcess">
+<meta property="og:description" content="Six plain-language steps from a web address to a verified fix, and what each Axcess check actually looks at.">
+<meta property="og:url" content="https://lsa-mis.github.io/axcess/how-it-works/">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#00274C">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="../how-it-works/" aria-current="page">How it works</a></li>
+        <li><a href="../coverage/">Coverage</a></li>
+        <li><a href="../who-its-for/">Who it&#x27;s for</a></li>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="../get-started/">Get started</a></li>
+        <li><a href="../faq/">FAQ</a></li>
+        <li class="cta"><a href="https://github.com/lsa-mis/axcess">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">How it works</span>
+    <h1>From a web address to a <span class="hl">verified fix</span></h1>
+    <p class="lede">Axcess follows the way an accessibility expert already works. Here is each step in plain language, followed by what the checks actually look at and how sure each one is.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The workflow</span>
+      <h2>Six steps, one scan</h2>
+    </div>
+    <ol class="steps">
+      <li>
+        <h3>Choose the site</h3>
+        <p>Pick a public website, or choose <em>Login or 2FA website</em> for a site that needs a sign-in. For a protected site, Axcess opens a visible browser window and you sign in yourself, with your password, passkey, or one-time code. Axcess never asks for any of them.</p>
+        <p class="tip">Only scan sites you are authorized to test.</p>
+      </li>
+      <li>
+        <h3>Set the scope</h3>
+        <p>Decide which part of the site to cover: a single section such as <code>/admissions/</code> or the whole site. Set a page limit, how deep to follow links, and how gently to crawl. A live preview shows what the scope means before you start.</p>
+      </li>
+      <li>
+        <h3>Watch the scan</h3>
+        <p>You see the current page, how many pages were discovered, loaded, and tested, which checks ran and which were skipped, and an estimated finish time. Live updates never steal your keyboard focus or jump the page.</p>
+      </li>
+      <li>
+        <h3>Read the report</h3>
+        <p>One table lists every issue and answers four questions: <strong>What is the issue? Why does it matter? What is the expected fix? Where exactly is it?</strong> Repeated occurrences are grouped so a single cause is fixed once.</p>
+      </li>
+      <li>
+        <h3>Open the evidence</h3>
+        <p>Follow any issue to the page, the element, the snippet, the rule, or the screenshot that produced it. Everything is stored with the scan, so a claim can be checked months later.</p>
+      </li>
+      <li>
+        <h3>Export and verify</h3>
+        <p>Record your decisions, export the workbook or report, assign the work, and rescan when fixes land. The comparison shows what is new, resolved, and still open.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Under the hood, in plain words</span>
+      <h2>What each check looks at</h2>
+      <p class="sub">A scan runs several independent checks. Each result keeps the name of the check that produced it, so two methods are never blended into one unexplained verdict.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></span><h3>Rule engine</h3><p>The widely used axe-core engine inspects each rendered page for machine-testable problems: missing image descriptions, broken headings, form fields without names, low contrast, and more.</p><p><span class="chip chip-automated">Deterministic</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></span><h3>Second opinion</h3><p>Optionally, Siteimprove's independent Alfa engine takes its own look. Where the two engines agree or disagree is visible, which helps you judge how solid a result is.</p><p><span class="chip chip-automated">Deterministic</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></span><h3>Keyboard check</h3><p>Axcess presses Tab and Shift+Tab through each page looking for places where keyboard users get stuck. It is deliberately cautious: ordinary focus loops and dialogs are not reported as traps.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><h3>Zoom and reflow check</h3><p>Each page is squeezed to a phone-width view, zoomed to about 200%, and given wider text spacing to see whether anything is cut off or overlaps.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><h3>Focus check</h3><p>Finds keyboard focus hidden behind sticky headers or banners, and tab orders that were forced out of sequence.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 8 12 5-5 2-2 5z"/><path d="M4 4l2 2M4 10h2M10 4v2"/></svg></span><h3>Click through states</h3><p>Axcess can open menus, tabs, and dialogs and re-run the rule engine on what appears. It never clicks links, never presses anything named sign out, delete, or unsubscribe, and stops after a bounded number of clicks per page.</p><p><span class="chip chip-automated">Deterministic</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg></span><h3>Image text check</h3><p>Text hidden inside pictures is invisible to screen readers and cannot be resized. Built-in text recognition finds it; an optional local vision model judges whether the image is really just text.</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg></span><h3>Visual and motion check</h3><p>Measures video and audio that autoplay without controls, records scrolling text, and, with a local vision model, compares the visual reading order to the order a screen reader would hear.</p><p><span class="chip chip-partial">Mixed</span></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16M4 12h10M4 18h14"/></svg></span><h3>Meaning check</h3><p>With a local language model, asks judgement questions a rule engine cannot: does this link make sense out of context? Does this heading describe its section? Is this form field explained well enough?</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
+    </div>
+    <p class="small" style="margin-top:1.25rem">Every AI-assisted check is optional and runs on a local model you install yourself. Without one, the browser-only checks still run in full. <a href="../coverage/">See exactly which WCAG criteria each check covers.</a></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Evidence before verdicts</span>
+      <h2>How sure is each result?</h2>
+      <p class="sub">Not all findings are equally certain, and Axcess never pretends they are. Results travel in three separate lanes, and a lead can never silently become a confirmed barrier.</p>
+    </div>
+    <div class="lanes">
+      <div class="lane lane-automated">
+        <span class="chip chip-automated">Likely barrier</span>
+        <h3>Deterministic rule failures</h3>
+        <p>A rule engine measured something on the rendered page and it failed. High confidence, though a person still verifies the fix.</p>
+      </div>
+      <div class="lane lane-observed">
+        <span class="chip chip-partial">Review lead</span>
+        <h3>Browser-observed behaviour</h3>
+        <p>Axcess operated the page and saw something suspicious, such as focus that would not leave an element. The evidence is real; the interpretation needs an expert.</p>
+      </div>
+      <div class="lane lane-ai">
+        <span class="chip chip-ai">Needs confirmation</span>
+        <h3>AI-assisted suggestions</h3>
+        <p>A local model made a judgement call. These are strong leads, clearly labelled, and always confirmed or rejected by a person before they count.</p>
+      </div>
+    </div>
+    <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg><p><strong>Decisions are recorded, not just made.</strong> Each issue group can be accepted, rejected as a false positive, marked remediated, or kept open as an accepted risk, with a written rationale and a history of who decided what and when.</p></div></div>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Modern websites</span>
+      <h2>Works with apps, not just pages</h2>
+      <p class="sub">Many sites today are applications built with React, Vue, Angular, or similar frameworks. A traditional crawler sees an empty shell. Axcess renders every page in a real browser first.</p>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><h3>Routes are discovered by following real links</h3><p>Axcess follows links it can see on rendered pages, including app-style routes, and stays inside the scope you set. It does not guess private addresses or read application code.</p></article>
+      <article class="card"><h3>States are counted separately from pages</h3><p>When Axcess opens a menu or dialog and tests what appears, it reports that as a DOM state alongside the page count, not folded into it. A page count alone would undersell an app; counting states as pages would oversell the crawl.</p></article>
+      <article class="card"><h3>Interaction is bounded and safe</h3><p>Links are never clicked by the probe. Controls named sign out, delete, remove, unsubscribe, or deactivate are refused. Each page is capped at 40 clicks and two levels of newly revealed controls.</p></article>
+      <article class="card"><h3>Some things still need a person</h3><p>Hover-only content, gestures, operating-system menus, embedded third-party widgets, and states without a visible change on the page are outside what the probe can see. The report says so.</p></article>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Follow-up</span>
+      <h2>Rescan and compare</h2>
+      <p class="sub">A fix is only real when a later scan shows it. Run the same scope again and Axcess lines the two reports up.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card"><h3>New</h3><p>Barriers seen now that were not in the earlier scan.</p></article>
+      <article class="card"><h3>Resolved</h3><p>Barriers from the earlier scan that are no longer observed under the same scope and checks.</p></article>
+      <article class="card"><h3>Still open</h3><p>Barriers present in both scans, so the work is not finished yet.</p></article>
+    </div>
+    <p class="small" style="margin-top:1.25rem">"Not found this time" is not automatically "fixed". Axcess compares the same scope and methods, and a confirmed fix should still pass a retest or a human check.</p>
+  </div>
+</section>
+
+<section class="soft">
+  <div class="wrap">
+    <div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>What Axcess is not.</strong> Axcess produces accessibility evidence for a qualified person to review. Automated and AI-assisted results do not prove WCAG conformance, legal compliance, or the accessibility of an entire website, and they do not replace testing with people who use assistive technology.</p></div>
+  </div>
+</section>
+
+</main>
+
+<nav class="pager" aria-label="Read next">
+  <div class="wrap">
+    <a class="prev" href="../"><small>Previous</small><span>Home</span></a>
+    <a class="next" href="../coverage/"><small>Next</small><span>What Axcess checks</span></a>
+  </div>
+</nav>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+        <p style="margin-top:1rem;max-width:34ch">Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of Michigan.</p>
+      </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="../how-it-works/">How it works</a></li>
+          <li><a href="../coverage/">What it checks</a></li>
+          <li><a href="../who-its-for/">Who it's for</a></li>
+          <li><a href="../faq/">Questions and glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Use</h2>
+        <ul>
+          <li><a href="../get-started/">Get started</a></li>
+          <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="../about/">About Axcess</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">White paper</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess">Source on GitHub</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fine">
+      <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
+      <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a> at U-M LSA</span>
+    </div>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

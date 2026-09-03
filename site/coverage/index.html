@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Axcess checks — Axcess</title>
+<meta name="description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<link rel="canonical" href="https://lsa-mis.github.io/axcess/coverage/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Axcess">
+<meta property="og:title" content="What Axcess checks — Axcess">
+<meta property="og:description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<meta property="og:url" content="https://lsa-mis.github.io/axcess/coverage/">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#00274C">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="../how-it-works/">How it works</a></li>
+        <li><a href="../coverage/" aria-current="page">Coverage</a></li>
+        <li><a href="../who-its-for/">Who it&#x27;s for</a></li>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="../get-started/">Get started</a></li>
+        <li><a href="../faq/">FAQ</a></li>
+        <li class="cta"><a href="https://github.com/lsa-mis/axcess">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">Coverage</span>
+    <h1>What Axcess checks, and what it <span class="hl">honestly can't</span></h1>
+    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define 55 Level A and AA success criteria. Axcess contributes evidence to 29 of them today. Every one of the 55 is listed below, including the 26 a person must test by hand, with the steps to do it.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">At a glance</span>
+      <h2>29 of 55 criteria with Axcess evidence</h2>
+      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Tracking screen, and the documentation can never disagree.</p>
+    </div>
+    <div class="covbar" role="img" aria-label="Of 55 criteria: 5 automated, 18 partly automated, 6 AI-assisted, 26 manual only."><span class="automated" style="width:9.1%"></span><span class="partial" style="width:32.7%"></span><span class="ai-assisted" style="width:10.9%"></span><span class="manual" style="width:47.3%"></span></div>
+    <div class="legend" aria-hidden="true"><span><i style="background:var(--m-automated)"></i>Automated: 5</span><span><i style="background:var(--m-partial)"></i>Partly automated: 18</span><span><i style="background:var(--m-ai)"></i>AI-assisted lead: 6</span><span><i style="background:#c2cad6"></i>Manual only: 26</span></div>
+    <div class="lanes lanes-4"><article class="lane lane-automated" style=""><span class="chip chip-automated">Automated</span><h3>5 criteria</h3><p>Axcess checks this reliably on its own. A person confirms it applies and reviews any remaining states.</p></article><article class="lane lane-observed" style=""><span class="chip chip-partial">Partly automated</span><h3>18 criteria</h3><p>Axcess catches the mechanical failures. A person tests the parts that need judgement.</p></article><article class="lane lane-ai" style=""><span class="chip chip-ai-assisted">AI-assisted lead</span><h3>6 criteria</h3><p>A local AI model flags likely problems as leads. A person confirms each one before it counts.</p></article><article class="lane lane-observed" style="border-top-color:#c2cad6"><span class="chip chip-manual">Manual only</span><h3>26 criteria</h3><p>Axcess has no check for this yet. The report gives you the steps to test it yourself.</p></article></div>
+    <div class="table-wrap" style="margin-top:1.75rem" tabindex="0">
+      <table>
+        <caption class="vis-hidden">Coverage by WCAG conformance level</caption>
+        <thead><tr><th scope="col">Level</th><th scope="col">Criteria</th><th scope="col">Automated</th><th scope="col">Partly automated</th><th scope="col">AI-assisted</th><th scope="col">Manual only</th><th scope="col">With Axcess evidence</th></tr></thead>
+        <tbody><tr><td><b>Level A</b></td><td>31</td><td>2</td><td>11</td><td>4</td><td>14</td><td><b>17</b></td></tr><tr><td><b>Level AA</b></td><td>24</td><td>3</td><td>7</td><td>2</td><td>12</td><td><b>12</b></td></tr><tr><td><b>A + AA</b></td><td>55</td><td>5</td><td>18</td><td>6</td><td>26</td><td><b>29</b></td></tr></tbody>
+      </table>
+    </div>
+    <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>&quot;Contributes evidence&quot; is not &quot;proves conformance&quot;.</strong> Even a fully automated criterion leaves a residual human judgement, which is why every card below has a <em>What a person still checks</em> section.</p></div></div>
+  </div>
+</section>
+
+<section class="soft" id="explorer">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Explore</span>
+      <h2>All 55 success criteria</h2>
+      <p class="sub">Filter by how Axcess covers a criterion or by conformance level, or search by number, name, or keyword. Open any criterion to read what Axcess does and what a person still checks.</p>
+    </div>
+    <div class="explorer-controls">
+      <div class="filter-row" role="group" aria-label="Filter by coverage method">
+        <span class="label">Coverage</span>
+        <button class="pill" type="button" data-filter="method" data-value="all" aria-pressed="true">All</button>
+        <button class="pill" type="button" data-filter="method" data-value="automated" aria-pressed="false">Automated</button>
+        <button class="pill" type="button" data-filter="method" data-value="partial" aria-pressed="false">Partly automated</button>
+        <button class="pill" type="button" data-filter="method" data-value="ai-assisted" aria-pressed="false">AI-assisted</button>
+        <button class="pill" type="button" data-filter="method" data-value="manual" aria-pressed="false">Manual only</button>
+      </div>
+      <div class="filter-row" role="group" aria-label="Filter by conformance level">
+        <span class="label">Level</span>
+        <button class="pill" type="button" data-filter="level" data-value="all" aria-pressed="true">A and AA</button>
+        <button class="pill" type="button" data-filter="level" data-value="A" aria-pressed="false">Level A</button>
+        <button class="pill" type="button" data-filter="level" data-value="AA" aria-pressed="false">Level AA</button>
+      </div>
+      <div class="search">
+        <label for="crit-search">Search</label>
+        <input id="crit-search" type="search" placeholder="e.g. 2.4.4, captions, keyboard" autocomplete="off">
+      </div>
+      <div class="filter-row">
+        <p class="result-count" id="result-count" role="status" aria-live="polite" style="margin:0">Showing all 55 success criteria</p>
+        <span style="flex:1"></span>
+        <button class="pill" type="button" id="expand-all">Expand all</button>
+        <button class="pill" type="button" id="collapse-all">Collapse all</button>
+      </div>
+    </div>
+    <div class="principle" id="principle-1">
+      <h3>1. Perceivable <small><span data-visible>20</span> of 20 criteria</small></h3>
+      <p class="principle-blurb">Can everyone perceive the content? Text alternatives for images, captions, contrast, zoom, and layouts that reflow on small screens.</p>
+      <div class="crit-list">
+      <details class="crit" id="sc-1-1-1" data-method="partial" data-level="A" data-text="1.1.1 non-text content a partly automated axe flags missing alt on img / area / input[type=image] and unlabelled svgs; the image-of-text vlm separately flags pictures that are really text. whether the alt text that is present is a meaningful equivalent — and the decorative-vs-informative call — needs a human. rule engine (axe-core), image text check">
+        <summary>
+          <span class="sc">1.1.1</span>
+          <span class="name">Non-text Content</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags missing alt on img / area / input[type=image] and unlabelled SVGs; the image-of-text VLM separately flags pictures that are really text.</p></div>
+          <div><h4>What a person still checks</h4><p>Whether the alt text that IS present is a meaningful equivalent — and the decorative-vs-informative call — needs a human.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Image text check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-2-1" data-method="ai-assisted" data-level="A" data-text="1.2.1 audio-only and video-only (prerecorded) a ai-assisted lead for &lt;audio&gt; elements, the semantic llm checks whether a transcript or text alternative is reachable (nearby &quot;transcript&quot; link / surrounding text). confirm the transcript is accurate and equivalent. video-only (silent video) can&#x27;t be detected from the dom — still a manual check. meaning check (local ai)">
+        <summary>
+          <span class="sc">1.2.1</span>
+          <span class="name">Audio-only and Video-only (Prerecorded)</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>For &lt;audio&gt; elements, the semantic LLM checks whether a transcript or text alternative is reachable (nearby &quot;Transcript&quot; link / surrounding text).</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the transcript is accurate and equivalent. Video-only (silent video) can&#x27;t be detected from the DOM — still a manual check.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-2-2" data-method="manual" data-level="A" data-text="1.2.2 captions (prerecorded) a manual only  play each video and confirm synchronized, accurate captions. auto-caption diffing (whisper) is on the roadmap. ">
+        <summary>
+          <span class="sc">1.2.2</span>
+          <span class="name">Captions (Prerecorded)</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Play each video and confirm synchronized, accurate captions. Auto-caption diffing (Whisper) is on the roadmap.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-2-3" data-method="manual" data-level="A" data-text="1.2.3 audio description or media alternative (prerecorded) a manual only  confirm an audio description or full text alternative for prerecorded video. ">
+        <summary>
+          <span class="sc">1.2.3</span>
+          <span class="name">Audio Description or Media Alternative (Prerecorded)</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm an audio description or full text alternative for prerecorded video.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-2-4" data-method="manual" data-level="AA" data-text="1.2.4 captions (live) aa manual only  confirm live audio in synchronized media has real-time captions. ">
+        <summary>
+          <span class="sc">1.2.4</span>
+          <span class="name">Captions (Live)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm live audio in synchronized media has real-time captions.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-2-5" data-method="manual" data-level="AA" data-text="1.2.5 audio description (prerecorded) aa manual only  confirm prerecorded video has a synchronized audio description track. ">
+        <summary>
+          <span class="sc">1.2.5</span>
+          <span class="name">Audio Description (Prerecorded)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm prerecorded video has a synchronized audio description track.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-3-1" data-method="partial" data-level="A" data-text="1.3.1 info and relationships a partly automated axe checks list, table-header, definition-list, required-aria-children and heading-structure markup on the rendered dom. relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they&#x27;re also programmatic. rule engine (axe-core)">
+        <summary>
+          <span class="sc">1.3.1</span>
+          <span class="name">Info and Relationships</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks list, table-header, definition-list, required-ARIA-children and heading-structure markup on the rendered DOM.</p></div>
+          <div><h4>What a person still checks</h4><p>Relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they&#x27;re also programmatic.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-3-2" data-method="ai-assisted" data-level="A" data-text="1.3.2 meaningful sequence a ai-assisted lead the visual probe screenshots the page and asks a local vision model whether the visual reading order matches the dom/source order (css can reorder content so screen readers hear a different sequence). confirm the model&#x27;s call by tabbing/reading with a screen reader. subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available. visual and motion check">
+        <summary>
+          <span class="sc">1.3.2</span>
+          <span class="name">Meaningful Sequence</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The visual probe screenshots the page and asks a local vision model whether the visual reading order matches the DOM/source order (CSS can reorder content so screen readers hear a different sequence).</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the model&#x27;s call by tabbing/reading with a screen reader. Subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-3-3" data-method="manual" data-level="A" data-text="1.3.3 sensory characteristics a manual only  read instructions for reliance on shape/size/location/sound alone (&quot;click the round button to the right&quot;) — judgement only a human can make. ">
+        <summary>
+          <span class="sc">1.3.3</span>
+          <span class="name">Sensory Characteristics</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Read instructions for reliance on shape/size/location/sound alone (&quot;click the round button to the right&quot;) — judgement only a human can make.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-3-4" data-method="manual" data-level="AA" data-text="1.3.4 orientation aa manual only  confirm content isn&#x27;t locked to portrait or landscape (rotate the device / check for orientation-locking css). ">
+        <summary>
+          <span class="sc">1.3.4</span>
+          <span class="name">Orientation</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm content isn&#x27;t locked to portrait or landscape (rotate the device / check for orientation-locking CSS).</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-3-5" data-method="partial" data-level="AA" data-text="1.3.5 identify input purpose aa partly automated axe validates that any autocomplete tokens used are valid. confirm autocomplete is present on fields collecting the user&#x27;s own info (name, email, address) — missing autocomplete isn&#x27;t auto-detected. rule engine (axe-core)">
+        <summary>
+          <span class="sc">1.3.5</span>
+          <span class="name">Identify Input Purpose</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe validates that any autocomplete tokens used are valid.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm autocomplete IS present on fields collecting the user&#x27;s own info (name, email, address) — missing autocomplete isn&#x27;t auto-detected.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-1" data-method="partial" data-level="A" data-text="1.4.1 use of color a partly automated axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). most colour-only meaning — form errors, chart series, required-field markers, status — needs a human to confirm a non-colour cue exists. rule engine (axe-core)">
+        <summary>
+          <span class="sc">1.4.1</span>
+          <span class="name">Use of Color</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags links distinguished from surrounding text by colour alone (a narrow heuristic).</p></div>
+          <div><h4>What a person still checks</h4><p>Most colour-only meaning — form errors, chart series, required-field markers, status — needs a human to confirm a non-colour cue exists.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-2" data-method="partial" data-level="A" data-text="1.4.2 audio control a partly automated the visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. autoplay markup alone is not flagged. confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy. visual and motion check">
+        <summary>
+          <span class="sc">1.4.2</span>
+          <span class="name">Audio Control</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. Autoplay markup alone is not flagged.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-3" data-method="partial" data-level="AA" data-text="1.4.3 contrast (minimum) aa partly automated axe measures text/background contrast on the rendered dom against the 4.5:1 (3:1 large-text) thresholds. text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check. rule engine (axe-core)">
+        <summary>
+          <span class="sc">1.4.3</span>
+          <span class="name">Contrast (Minimum)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe measures text/background contrast on the rendered DOM against the 4.5:1 (3:1 large-text) thresholds.</p></div>
+          <div><h4>What a person still checks</h4><p>Text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-4" data-method="automated" data-level="AA" data-text="1.4.4 resize text aa automated the responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container. confirm no loss of content or function across the full zoom range in your target browsers. zoom and reflow check">
+        <summary>
+          <span class="sc">1.4.4</span>
+          <span class="name">Resize Text</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-automated">Automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm no loss of content or function across the full zoom range in your target browsers.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-5" data-method="ai-assisted" data-level="AA" data-text="1.4.5 images of text aa ai-assisted lead ocr + a local vision model judge whether each image is really rendered text rather than a photo/diagram. confirm flagged images aren&#x27;t the allowed exceptions (logos, or text that&#x27;s essential to a particular presentation). image text check">
+        <summary>
+          <span class="sc">1.4.5</span>
+          <span class="name">Images of Text</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>OCR + a local vision model judge whether each image is really rendered text rather than a photo/diagram.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm flagged images aren&#x27;t the allowed exceptions (logos, or text that&#x27;s essential to a particular presentation).</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Image text check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-10" data-method="automated" data-level="AA" data-text="1.4.10 reflow aa automated the responsive probe loads each page at 320 css px and flags horizontal scrolling / overflow. confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use). zoom and reflow check">
+        <summary>
+          <span class="sc">1.4.10</span>
+          <span class="name">Reflow</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-automated">Automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The responsive probe loads each page at 320 CSS px and flags horizontal scrolling / overflow.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use).</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-11" data-method="manual" data-level="AA" data-text="1.4.11 non-text contrast aa manual only  check that ui component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. no reliable automated rule exists yet. ">
+        <summary>
+          <span class="sc">1.4.11</span>
+          <span class="name">Non-text Contrast</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Check that UI component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. No reliable automated rule exists yet.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-12" data-method="automated" data-level="AA" data-text="1.4.12 text spacing aa automated the responsive probe injects the wcag text-spacing override css (line-height 1.5, etc.) and flags clipping/overlap. confirm no text is cut off or overlapping with the spacing applied. zoom and reflow check">
+        <summary>
+          <span class="sc">1.4.12</span>
+          <span class="name">Text Spacing</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-automated">Automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm no text is cut off or overlapping with the spacing applied.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-1-4-13" data-method="manual" data-level="AA" data-text="1.4.13 content on hover or focus aa manual only  for tooltips/popovers triggered by hover/focus, confirm they&#x27;re dismissable, hoverable, and persistent. ">
+        <summary>
+          <span class="sc">1.4.13</span>
+          <span class="name">Content on Hover or Focus</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>For tooltips/popovers triggered by hover/focus, confirm they&#x27;re dismissable, hoverable, and persistent.</p></div>
+          
+        </div>
+      </details>
+      </div>
+    </div>
+    <div class="principle" id="principle-2">
+      <h3>2. Operable <small><span data-visible>20</span> of 20 criteria</small></h3>
+      <p class="principle-blurb">Can everyone operate the site? Keyboard access, enough time, nothing that flashes, and clear ways to navigate and find things.</p>
+      <div class="crit-list">
+      <details class="crit" id="sc-2-1-1" data-method="partial" data-level="A" data-text="2.1.1 keyboard a partly automated axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page. confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard — the deepest part of this sc is manual. rule engine (axe-core), keyboard check">
+        <summary>
+          <span class="sc">2.1.1</span>
+          <span class="name">Keyboard</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard — the deepest part of this SC is manual.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Keyboard check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-1-2" data-method="partial" data-level="A" data-text="2.1.2 no keyboard trap a partly automated the keyboard probe emits a review lead only when the same observable element resists repeated tab and shift+tab exit attempts. it suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus. reproduce every lead and test components that appear after interaction. confirm whether arrow keys, escape, a close control, or a documented non-standard command lets the user leave before recording a failure. keyboard check">
+        <summary>
+          <span class="sc">2.1.2</span>
+          <span class="name">No Keyboard Trap</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The keyboard probe emits a review lead only when the same observable element resists repeated Tab and Shift+Tab exit attempts. It suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus.</p></div>
+          <div><h4>What a person still checks</h4><p>Reproduce every lead and test components that appear after interaction. Confirm whether arrow keys, Escape, a close control, or a documented non-standard command lets the user leave before recording a failure.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Keyboard check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-1-4" data-method="manual" data-level="A" data-text="2.1.4 character key shortcuts a manual only  if single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. ">
+        <summary>
+          <span class="sc">2.1.4</span>
+          <span class="name">Character Key Shortcuts</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>If single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-2-1" data-method="manual" data-level="A" data-text="2.2.1 timing adjustable a manual only  for any time limit, confirm it can be turned off, adjusted, or extended. ">
+        <summary>
+          <span class="sc">2.2.1</span>
+          <span class="name">Timing Adjustable</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>For any time limit, confirm it can be turned off, adjusted, or extended.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-2-2" data-method="partial" data-level="A" data-text="2.2.2 pause, stop, hide a partly automated the visual probe measures actual playback advancement for visible video longer than five seconds without a detected control. it also records &lt;marquee&gt; as an expert-review lead. css animations, auto-advancing carousels, and auto-updating regions aren&#x27;t auto-detected — confirm any content that moves &gt;5s can be paused, stopped, or hidden. visual and motion check">
+        <summary>
+          <span class="sc">2.2.2</span>
+          <span class="name">Pause, Stop, Hide</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The visual probe measures actual playback advancement for visible video longer than five seconds without a detected control. It also records &lt;marquee&gt; as an expert-review lead.</p></div>
+          <div><h4>What a person still checks</h4><p>CSS animations, auto-advancing carousels, and auto-updating regions aren&#x27;t auto-detected — confirm any content that moves &gt;5s can be paused, stopped, or hidden.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-3-1" data-method="manual" data-level="A" data-text="2.3.1 three flashes or below threshold a manual only  confirm nothing flashes more than three times per second. flash analysis is not implemented. ">
+        <summary>
+          <span class="sc">2.3.1</span>
+          <span class="name">Three Flashes or Below Threshold</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm nothing flashes more than three times per second. Flash analysis is not implemented.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-1" data-method="partial" data-level="A" data-text="2.4.1 bypass blocks a partly automated axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. confirm the skip link actually moves focus and works with the keyboard. rule engine (axe-core)">
+        <summary>
+          <span class="sc">2.4.1</span>
+          <span class="name">Bypass Blocks</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the skip link actually moves focus and works with the keyboard.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-2" data-method="automated" data-level="A" data-text="2.4.2 page titled a automated axe checks that every page has a non-empty &lt;title&gt;. confirm the title is descriptive and distinguishes the page (a light human check). rule engine (axe-core)">
+        <summary>
+          <span class="sc">2.4.2</span>
+          <span class="name">Page Titled</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-automated">Automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks that every page has a non-empty &lt;title&gt;.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the title is descriptive and distinguishes the page (a light human check).</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: high</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-3" data-method="partial" data-level="A" data-text="2.4.3 focus order a partly automated the focus probe flags positive tabindex (wcag failure f44) — a manual tab order that overrides the natural dom order and usually breaks the sequence. tab through the whole page and confirm the focus order preserves meaning and operability — the order can break without a positive tabindex (e.g. css-reordered columns), which still needs a human. focus check">
+        <summary>
+          <span class="sc">2.4.3</span>
+          <span class="name">Focus Order</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The focus probe flags positive tabindex (WCAG failure F44) — a manual tab order that overrides the natural DOM order and usually breaks the sequence.</p></div>
+          <div><h4>What a person still checks</h4><p>Tab through the whole page and confirm the focus order preserves meaning and operability — the order can break without a positive tabindex (e.g. CSS-reordered columns), which still needs a human.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Focus check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-4" data-method="ai-assisted" data-level="A" data-text="2.4.4 link purpose (in context) a ai-assisted lead axe flags empty/unnamed links; the semantic llm judges whether the link text plus its context conveys where it goes. confirm the llm&#x27;s borderline calls (&quot;read more&quot;, icon links) — it flags strong leads, not verdicts. rule engine (axe-core), meaning check (local ai)">
+        <summary>
+          <span class="sc">2.4.4</span>
+          <span class="name">Link Purpose (In Context)</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s borderline calls (&quot;read more&quot;, icon links) — it flags strong leads, not verdicts.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-5" data-method="manual" data-level="AA" data-text="2.4.5 multiple ways aa manual only  confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. ">
+        <summary>
+          <span class="sc">2.4.5</span>
+          <span class="name">Multiple Ways</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-6" data-method="ai-assisted" data-level="AA" data-text="2.4.6 headings and labels aa ai-assisted lead axe flags empty headings / unlabelled controls; the semantic llm judges whether each heading actually describes the content it introduces. confirm the llm&#x27;s borderline heading calls, and check that form-control labels are descriptive — label descriptiveness is not yet ai-assisted. rule engine (axe-core), meaning check (local ai)">
+        <summary>
+          <span class="sc">2.4.6</span>
+          <span class="name">Headings and Labels</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags empty headings / unlabelled controls; the semantic LLM judges whether each heading actually describes the content it introduces.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s borderline heading calls, and check that form-control LABELS are descriptive — label descriptiveness is not yet AI-assisted.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-7" data-method="partial" data-level="AA" data-text="2.4.7 focus visible aa partly automated axe has limited checks for suppressed focus indicators. tab the whole page and confirm a clearly visible focus indicator on every interactive element — largely manual. rule engine (axe-core)">
+        <summary>
+          <span class="sc">2.4.7</span>
+          <span class="name">Focus Visible</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe has limited checks for suppressed focus indicators.</p></div>
+          <div><h4>What a person still checks</h4><p>Tab the whole page and confirm a clearly visible focus indicator on every interactive element — largely manual.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-4-11" data-method="partial" data-level="AA" data-text="2.4.11 focus not obscured (minimum) aa partly automated the live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic &quot;focus hidden behind the sticky header&quot; failure). confirm partial-overlap cases the centre-point check can miss, and tab through interactively — overlays that appear only after a click still need a human. focus check">
+        <summary>
+          <span class="sc">2.4.11</span>
+          <span class="name">Focus Not Obscured (Minimum)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>The live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic &quot;focus hidden behind the sticky header&quot; failure).</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm partial-overlap cases the centre-point check can miss, and tab through interactively — overlays that appear only after a click still need a human.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Focus check</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-1" data-method="manual" data-level="A" data-text="2.5.1 pointer gestures a manual only  for any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. ">
+        <summary>
+          <span class="sc">2.5.1</span>
+          <span class="name">Pointer Gestures</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>For any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-2" data-method="manual" data-level="A" data-text="2.5.2 pointer cancellation a manual only  confirm actions fire on the up-event and can be aborted (no critical action on down-press). ">
+        <summary>
+          <span class="sc">2.5.2</span>
+          <span class="name">Pointer Cancellation</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm actions fire on the up-event and can be aborted (no critical action on down-press).</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-3" data-method="partial" data-level="A" data-text="2.5.3 label in name a partly automated axe flags controls whose accessible name doesn&#x27;t contain the visible label text (label-content-name-mismatch). confirm the visible text is fully contained in the accessible name for voice-control users. rule engine (axe-core)">
+        <summary>
+          <span class="sc">2.5.3</span>
+          <span class="name">Label in Name</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe flags controls whose accessible name doesn&#x27;t contain the visible label text (label-content-name-mismatch).</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the visible text is fully contained in the accessible name for voice-control users.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-4" data-method="manual" data-level="A" data-text="2.5.4 motion actuation a manual only  if a function is triggered by device motion (shake/tilt), confirm a ui alternative and a way to disable motion actuation. ">
+        <summary>
+          <span class="sc">2.5.4</span>
+          <span class="name">Motion Actuation</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>If a function is triggered by device motion (shake/tilt), confirm a UI alternative and a way to disable motion actuation.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-7" data-method="manual" data-level="AA" data-text="2.5.7 dragging movements aa manual only  for any drag operation (sliders, reorder, kanban), confirm a single-pointer alternative (tap/click) exists. ">
+        <summary>
+          <span class="sc">2.5.7</span>
+          <span class="name">Dragging Movements</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>For any drag operation (sliders, reorder, kanban), confirm a single-pointer alternative (tap/click) exists.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-2-5-8" data-method="partial" data-level="AA" data-text="2.5.8 target size (minimum) aa partly automated axe checks interactive targets are at least 24x24 css px (with spacing). confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. rule engine (axe-core)">
+        <summary>
+          <span class="sc">2.5.8</span>
+          <span class="name">Target Size (Minimum)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks interactive targets are at least 24x24 CSS px (with spacing).</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      </div>
+    </div>
+    <div class="principle" id="principle-3">
+      <h3>3. Understandable <small><span data-visible>13</span> of 13 criteria</small></h3>
+      <p class="principle-blurb">Can everyone understand it? Readable language, predictable behaviour, and forms that help people avoid and fix mistakes.</p>
+      <div class="crit-list">
+      <details class="crit" id="sc-3-1-1" data-method="automated" data-level="A" data-text="3.1.1 language of page a automated axe checks &lt;html&gt; has a present and valid lang attribute. confirm the declared language actually matches the page&#x27;s main content. rule engine (axe-core)">
+        <summary>
+          <span class="sc">3.1.1</span>
+          <span class="name">Language of Page</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-automated">Automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks &lt;html&gt; has a present and valid lang attribute.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the declared language actually matches the page&#x27;s main content.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: high</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-3-1-2" data-method="partial" data-level="AA" data-text="3.1.2 language of parts aa partly automated axe validates lang attributes that are present on parts of the page. detecting foreign-language passages that are *missing* a lang attribute needs a human reader. rule engine (axe-core)">
+        <summary>
+          <span class="sc">3.1.2</span>
+          <span class="name">Language of Parts</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe validates lang attributes that are present on parts of the page.</p></div>
+          <div><h4>What a person still checks</h4><p>Detecting foreign-language passages that are *missing* a lang attribute needs a human reader.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-3-2-1" data-method="manual" data-level="A" data-text="3.2.1 on focus a manual only  confirm moving focus to a control doesn&#x27;t trigger an unexpected context change (auto-submit, new window). ">
+        <summary>
+          <span class="sc">3.2.1</span>
+          <span class="name">On Focus</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm moving focus to a control doesn&#x27;t trigger an unexpected context change (auto-submit, new window).</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-2-2" data-method="manual" data-level="A" data-text="3.2.2 on input a manual only  confirm changing a setting (select, checkbox) doesn&#x27;t auto-trigger a context change without warning. ">
+        <summary>
+          <span class="sc">3.2.2</span>
+          <span class="name">On Input</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm changing a setting (select, checkbox) doesn&#x27;t auto-trigger a context change without warning.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-2-3" data-method="manual" data-level="AA" data-text="3.2.3 consistent navigation aa manual only  confirm navigation repeated across pages stays in the same relative order. a cross-page embedding analyzer is on the roadmap. ">
+        <summary>
+          <span class="sc">3.2.3</span>
+          <span class="name">Consistent Navigation</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm navigation repeated across pages stays in the same relative order. A cross-page embedding analyzer is on the roadmap.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-2-4" data-method="manual" data-level="AA" data-text="3.2.4 consistent identification aa manual only  confirm components with the same function are labelled consistently across pages. a cross-page analyzer is on the roadmap. ">
+        <summary>
+          <span class="sc">3.2.4</span>
+          <span class="name">Consistent Identification</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm components with the same function are labelled consistently across pages. A cross-page analyzer is on the roadmap.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-2-6" data-method="manual" data-level="A" data-text="3.2.6 consistent help a manual only  confirm help mechanisms (contact, self-help) appear in the same relative order on every page that has them. ">
+        <summary>
+          <span class="sc">3.2.6</span>
+          <span class="name">Consistent Help</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm help mechanisms (contact, self-help) appear in the same relative order on every page that has them.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-1" data-method="manual" data-level="A" data-text="3.3.1 error identification a manual only  submit forms with invalid data and confirm errors are identified in text. requires interaction the crawler doesn&#x27;t perform. ">
+        <summary>
+          <span class="sc">3.3.1</span>
+          <span class="name">Error Identification</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Submit forms with invalid data and confirm errors are identified in text. Requires interaction the crawler doesn&#x27;t perform.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-2" data-method="ai-assisted" data-level="A" data-text="3.3.2 labels or instructions a ai-assisted lead axe checks a programmatic label exists; the semantic llm judges whether each control&#x27;s label/instructions are sufficient to know what to enter. confirm the llm&#x27;s sufficiency calls, and test real form submissions — error-time instructions (sc 3.3.x) still need a human. rule engine (axe-core), meaning check (local ai)">
+        <summary>
+          <span class="sc">3.3.2</span>
+          <span class="name">Labels or Instructions</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-ai-assisted">AI-assisted lead</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks a programmatic label exists; the semantic LLM judges whether each control&#x27;s label/instructions are sufficient to know what to enter.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s sufficiency calls, and test real form submissions — error-time instructions (SC 3.3.x) still need a human.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-3" data-method="manual" data-level="AA" data-text="3.3.3 error suggestion aa manual only  trigger validation errors and confirm the page suggests how to fix them. ">
+        <summary>
+          <span class="sc">3.3.3</span>
+          <span class="name">Error Suggestion</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Trigger validation errors and confirm the page suggests how to fix them.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-4" data-method="manual" data-level="AA" data-text="3.3.4 error prevention (legal, financial, data) aa manual only  for legal/financial/data submissions, confirm reversal, checking, or confirmation is available. ">
+        <summary>
+          <span class="sc">3.3.4</span>
+          <span class="name">Error Prevention (Legal, Financial, Data)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>For legal/financial/data submissions, confirm reversal, checking, or confirmation is available.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-7" data-method="manual" data-level="A" data-text="3.3.7 redundant entry a manual only  in multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. ">
+        <summary>
+          <span class="sc">3.3.7</span>
+          <span class="name">Redundant Entry</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed.</p></div>
+          
+        </div>
+      </details>
+      <details class="crit" id="sc-3-3-8" data-method="manual" data-level="AA" data-text="3.3.8 accessible authentication (minimum) aa manual only  manually test each in-scope sign-in and mfa step. confirm it does not require a cognitive function test (for example, solving a puzzle or memorizing/transcribing information) without an accessible alternative. a successful post-mfa crawl only proves that an auditor established a temporary browser session; it does not automatically evaluate or pass the authentication experience. do not record passwords, otps, passkeys, recovery codes, cookies, or session details in this report. ">
+        <summary>
+          <span class="sc">3.3.8</span>
+          <span class="name">Accessible Authentication (Minimum)</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-manual">Manual only</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>No automated check yet. The report includes this criterion in the manual testing list with the steps below.</p></div>
+          <div><h4>What a person still checks</h4><p>Manually test each in-scope sign-in and MFA step. Confirm it does not require a cognitive function test (for example, solving a puzzle or memorizing/transcribing information) without an accessible alternative. A successful post-MFA crawl only proves that an auditor established a temporary browser session; it does not automatically evaluate or pass the authentication experience. Do not record passwords, OTPs, passkeys, recovery codes, cookies, or session details in this report.</p></div>
+          
+        </div>
+      </details>
+      </div>
+    </div>
+    <div class="principle" id="principle-4">
+      <h3>4. Robust <small><span data-visible>2</span> of 2 criteria</small></h3>
+      <p class="principle-blurb">Does it work with assistive technology? Names, roles, and status messages that screen readers can rely on.</p>
+      <div class="crit-list">
+      <details class="crit" id="sc-4-1-2" data-method="partial" data-level="A" data-text="4.1.2 name, role, value a partly automated axe checks names/roles/values for standard controls and aria widgets (button-name, link-name, aria-* validity, roles). custom widgets&#x27; state changes (expanded, selected, checked) need a screen reader to confirm they&#x27;re announced. rule engine (axe-core)">
+        <summary>
+          <span class="sc">4.1.2</span>
+          <span class="name">Name, Role, Value</span>
+          <span class="tags"><span class="chip chip-level">Level A</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles).</p></div>
+          <div><h4>What a person still checks</h4><p>Custom widgets&#x27; state changes (expanded, selected, checked) need a screen reader to confirm they&#x27;re announced.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+        </div>
+      </details>
+      <details class="crit" id="sc-4-1-3" data-method="partial" data-level="AA" data-text="4.1.3 status messages aa partly automated axe checks for some live-region / role=status markup. confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing. rule engine (axe-core)">
+        <summary>
+          <span class="sc">4.1.3</span>
+          <span class="name">Status Messages</span>
+          <span class="tags"><span class="chip chip-level">Level AA</span><span class="chip chip-partial">Partly automated</span></span>
+          <svg class="caret" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <div class="crit-body">
+          <div><h4>What Axcess does</h4><p>axe checks for some live-region / role=status markup.</p></div>
+          <div><h4>What a person still checks</h4><p>Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced — needs screen-reader testing.</p></div>
+          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+        </div>
+      </details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Roadmap</span>
+      <h2>Next on the list</h2>
+      <p class="sub">Criteria the project has designed a check for but not yet shipped. They stay labelled manual until the code exists and has been validated.</p>
+    </div>
+    <div class="grid grid-3"><article class="card"><h3><span class="sc">3.2.3</span> Consistent Navigation</h3><p>Embed each page&#x27;s nav, cluster; outliers = nav diverges.</p></article><article class="card"><h3><span class="sc">1.2.4</span> Captions (prerecorded video)</h3><p>Transcribe the audio track, diff vs the published &lt;track&gt;; flag missing / garbage / desynced captions.</p></article><article class="card"><h3><span class="sc">3.2.4</span> Consistent Identification</h3><p>Find visually similar components across pages; verify their accessible names match.</p></article><article class="card"><h3><span class="sc">3.2.6</span> Consistent Help</h3><p>Locate help affordances across the crawl; flag pages where help moves to a non-standard location.</p></article></div>
+    <p class="small" style="margin-top:1.25rem">Roadmap and coverage are reconciled against the code in <a href="https://github.com/lsa-mis/axcess/blob/main/docs/coverage-tracker.md">the coverage tracker</a>.</p>
+  </div>
+</section>
+
+</main>
+
+<nav class="pager" aria-label="Read next">
+  <div class="wrap">
+    <a class="prev" href="../how-it-works/"><small>Previous</small><span>How it works</span></a>
+    <a class="next" href="../who-its-for/"><small>Next</small><span>Who Axcess is for</span></a>
+  </div>
+</nav>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+        <p style="margin-top:1rem;max-width:34ch">Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of Michigan.</p>
+      </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="../how-it-works/">How it works</a></li>
+          <li><a href="../coverage/">What it checks</a></li>
+          <li><a href="../who-its-for/">Who it's for</a></li>
+          <li><a href="../faq/">Questions and glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Use</h2>
+        <ul>
+          <li><a href="../get-started/">Get started</a></li>
+          <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="../about/">About Axcess</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">White paper</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess">Source on GitHub</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fine">
+      <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
+      <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a> at U-M LSA</span>
+    </div>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

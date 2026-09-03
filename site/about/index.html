@@ -1,150 +1,175 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>About Axcess — accessibility evidence you can inspect</title>
-  <meta name="description" content="Learn how Axcess combines scoped crawling, SPA route discovery, DOM state exploration, browser probes, and local-first evidence for expert accessibility review.">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2300274C'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23FFCB05' font-family='Arial' font-size='18' font-weight='800'%3EAx%3C/text%3E%3C/svg%3E">
-  <style>
-    :root {
-      --blue: #00274c;
-      --blue-light: #0b4f82;
-      --maize: #ffcb05;
-      --ink: #14181f;
-      --muted: #4a5568;
-      --line: #dce3eb;
-      --soft: #f4f7fa;
-      --white: #fff;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--white);
-      font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: #003f75; }
-    a:focus-visible, .button:focus-visible { outline: 3px solid var(--maize); outline-offset: 3px; }
-    .skip { position: absolute; left: -999px; top: 0; padding: .65rem 1rem; color: #fff; background: var(--blue); z-index: 100; }
-    .skip:focus { left: .5rem; top: .5rem; }
-    .wrap { width: min(1040px, calc(100% - 2.5rem)); margin: 0 auto; }
-    header { border-bottom: 1px solid var(--line); background: rgba(255,255,255,.95); }
-    header .wrap { min-height: 68px; display: flex; align-items: center; gap: 1rem; }
-    .brand { display: inline-flex; align-items: center; gap: .65rem; color: var(--ink); font-weight: 800; text-decoration: none; font-size: 1.12rem; }
-    .mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 8px; color: var(--blue); background: var(--maize); font-weight: 900; }
-    nav { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; }
-    nav a { font-size: .95rem; font-weight: 650; text-decoration: none; }
-    .button { display: inline-block; padding: .62rem 1rem; border-radius: 8px; color: #fff; background: var(--blue); font-weight: 750; text-decoration: none; }
-    .hero { color: #fff; background: var(--blue); padding: 5rem 0 4.5rem; }
-    .eyebrow { display: block; color: var(--maize); font-size: .8rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    h1 { max-width: 14ch; margin: .8rem 0 1rem; font-size: clamp(2.5rem, 6vw, 4.6rem); line-height: 1.02; letter-spacing: -.04em; }
-    .lede { max-width: 62ch; margin: 0; color: #d8e5f1; font-size: 1.2rem; }
-    main section { padding: 4rem 0; border-bottom: 1px solid var(--line); }
-    main section.soft { background: var(--soft); }
-    h2 { margin: 0 0 .65rem; color: var(--blue); font-size: clamp(1.7rem, 4vw, 2.35rem); line-height: 1.15; letter-spacing: -.025em; }
-    h3 { margin: 0 0 .35rem; color: var(--blue); font-size: 1.12rem; }
-    .intro { max-width: 70ch; margin: 0; color: var(--muted); font-size: 1.08rem; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.15rem; margin-top: 2rem; }
-    .card { padding: 1.35rem; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
-    .card p { margin: 0; color: var(--muted); }
-    .steps { list-style: none; padding: 0; margin: 2rem 0 0; counter-reset: step; display: grid; gap: 1rem; }
-    .steps li { position: relative; padding: 1.2rem 1.25rem 1.2rem 4.35rem; border-left: 4px solid var(--maize); background: var(--soft); }
-    .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 1.25rem; top: 1.1rem; width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--blue); font-weight: 800; }
-    .steps strong { display: block; color: var(--blue); }
-    .callout { margin-top: 2rem; padding: 1.4rem; border-radius: 12px; color: #fff; background: var(--blue); }
-    .callout strong { color: var(--maize); }
-    .cta { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.75rem; }
-    .cta .secondary { font-weight: 700; }
-    footer { padding: 2.5rem 0; color: var(--muted); font-size: .92rem; }
-    @media (max-width: 700px) {
-      header .wrap { align-items: flex-start; flex-direction: column; padding-top: .75rem; padding-bottom: .75rem; }
-      nav { width: 100%; margin-left: 0; gap: .85rem; overflow-x: auto; }
-      nav a { white-space: nowrap; }
-      .grid { grid-template-columns: 1fr; }
-      .hero { padding: 3.6rem 0; }
-    }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About Axcess — Axcess</title>
+<meta name="description" content="Why Axcess exists, how it grew from a single problem into an evidence workbench, and where it is heading.">
+<link rel="canonical" href="https://lsa-mis.github.io/axcess/about/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Axcess">
+<meta property="og:title" content="About Axcess — Axcess">
+<meta property="og:description" content="Why Axcess exists, how it grew from a single problem into an evidence workbench, and where it is heading.">
+<meta property="og:url" content="https://lsa-mis.github.io/axcess/about/">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#00274C">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-  <header>
-    <div class="wrap">
-      <a class="brand" href="../"><span class="mark" aria-hidden="true">Ax</span> Axcess</a>
-      <nav aria-label="Primary">
-        <a aria-current="page" href="./">About</a>
-        <a href="../#pipelines">What it checks</a>
-        <a href="../#start">Get started</a>
-        <a class="button" href="https://github.com/lsa-mis/axcess">GitHub</a>
-      </nav>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="../how-it-works/">How it works</a></li>
+        <li><a href="../coverage/">Coverage</a></li>
+        <li><a href="../who-its-for/">Who it&#x27;s for</a></li>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="../get-started/">Get started</a></li>
+        <li><a href="../faq/">FAQ</a></li>
+        <li class="cta"><a href="https://github.com/lsa-mis/axcess">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">About Axcess</span>
+    <h1>Evidence <span class="hl">before</span> verdicts</h1>
+    <p class="lede">Axcess started with one hard problem and grew into a way of working. This is the story, the idea that guides it, and where it is heading.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap narrow">
+    <div class="section-head">
+      <span class="eyebrow">The beginning</span>
+      <h2>One problem nobody's scanner could solve</h2>
     </div>
-  </header>
+    <p>An accessibility lead at the University of Michigan needed to find every image that was really just a picture of text, across an entire website, before the next reporting cycle. Text inside an image cannot be resized, restyled, or read aloud, and existing tools could not find it reliably at scale. Checking every page and image by hand was slow, repetitive, and easy to get wrong.</p>
+    <p>The first version of Axcess did exactly that job. It crawled a site without sending anything to the cloud, found the images, read the text inside them, compared it with the alternative text on the page, and ranked the likely problems for a person to review. Then it could scan again to confirm the fixes.</p>
+    <p>The intent was never to remove the expert. It was to take away the repetitive discovery work and hand the expert better evidence.</p>
+  </div>
+</section>
 
-  <main id="main">
-    <section class="hero">
-      <div class="wrap">
-        <span class="eyebrow">About Axcess</span>
-        <h1>Accessibility evidence you can inspect.</h1>
-        <p class="lede">Axcess is a local-first accessibility auditor that explores a scoped web property, records what its detection layers observe, and helps a human decide what to fix. It is built for investigation—not certification.</p>
+<section class="soft">
+  <div class="wrap narrow">
+    <div class="section-head">
+      <span class="eyebrow">How it grew</span>
+      <h2>Finding a problem is only the first question</h2>
+    </div>
+    <p>A raw result does not answer what people actually ask. What happened? Who is affected? Which pages? How certain is it? What should change? How will we know it is fixed?</p>
+    <p>So Axcess became an evidence workbench. New checks were added for page structure, names and roles, keyboard behaviour, focus, small screens, media, and meaning. A manual evaluation workflow was added because many accessibility questions cannot honestly be answered by software. And the product became explicit about uncertainty: a rule failure, an observed behaviour, and an AI suggestion are never treated as equally certain, and each keeps the name of the method that produced it.</p>
+    <p>The guiding idea is simple: <strong>preserve the evidence before presenting a verdict.</strong></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Principles</span>
+      <h2>What the project holds itself to</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>Honest coverage</h3><p>Axcess contributes evidence to 29 of 55 WCAG 2.2 A/AA criteria, and says so. Every public number comes from the same file the product reads, so a claim can never drift from the code.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h3>Private by default</h3><p>Evidence stays on the auditor's computer. No telemetry, no cloud AI, no account. Sensitive and login-protected pages deserve nothing less.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Universal design first</h3><p>The tool's own interface is held to WCAG 2.2 AAA and designed around an accessibility professional who may use a screen reader, magnification, or keyboard only. When efficiency and universal design pull apart, universal design wins.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg></span><h3>Human decisions, recorded</h3><p>Automated results are input, not output. People confirm, reject, and remediate, with reasons and history, and the report says what was and was not evaluated.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Direction</span>
+      <h2>Where Axcess is heading</h2>
+      <p class="sub">The project's white paper lays out its long-term direction: an offline, evidence-first accessibility quality system, grounded in the W3C's evaluation methodology and ACT rule format.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card"><h3>Truthful, inspectable coverage</h3><p>Record exactly what happened for every page, state, and method. "Found nothing", "skipped", and "unavailable" must never look the same.</p></article>
+      <article class="card"><h3>Test experiences, not just URLs</h3><p>Safe, user-authorised journey recipes so the states after a click, a form error, or a sign-in are tested too.</p></article>
+      <article class="card"><h3>Issues as durable work</h3><p>Separate what was observed, what people decided, what was remediated, and what a comparison showed.</p></article>
+      <article class="card"><h3>The report as the product</h3><p>A self-contained, accessible HTML report that works without Axcess running and answers what was evaluated, what was not, and what to fix first.</p></article>
+      <article class="card"><h3>"Fully offline", defined</h3><p>A private live scan that touches only the target, and an air-gapped replay mode that touches nothing.</p></article>
+      <article class="card"><h3>Validation before promotion</h3><p>Every new detector measured against expert-reviewed real-world examples before it is trusted.</p></article>
+    </div>
+    <p style="margin-top:1.5rem"><a class="btn btn-maize" href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">Read the white paper</a></p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Open source</span>
+      <h2>Built in the open at the University of Michigan</h2>
+      <p class="sub">Axcess is MIT licensed and developed by the LSA Technology Services team at the University of Michigan's College of Literature, Science, and the Arts. The crawler, evidence store, interface, and exports are all public.</p>
+    </div>
+    <div style="display:flex;gap:.8rem;flex-wrap:wrap">
+      <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess">Source on GitHub</a>
+      <a class="btn btn-ghost" href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a>
+      <a class="btn btn-ghost" href="../get-started/">Get started</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="pager" aria-label="Read next">
+  <div class="wrap">
+    <a class="prev" href="../faq/"><small>Previous</small><span>FAQ</span></a>
+  </div>
+</nav>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+        <p style="margin-top:1rem;max-width:34ch">Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of Michigan.</p>
       </div>
-    </section>
-
-    <section>
-      <div class="wrap">
-        <h2>Why Axcess exists</h2>
-        <p class="intro">A single score hides the details that make accessibility work actionable. Axcess keeps the page, selector, browser observation, rule, screenshot, and confidence level connected so reviewers can verify each claim and hand developers a concrete remediation target.</p>
-        <div class="grid">
-          <article class="card">
-            <h3>Local by default</h3>
-            <p>Scan evidence lives in local SQLite storage and content-addressed image blobs. Optional model-assisted checks can use a deliberately configured local Ollama service.</p>
-          </article>
-          <article class="card">
-            <h3>Multiple independent signals</h3>
-            <p>DOM rules, keyboard behavior, responsive layout, focus, image analysis, and semantic review remain visibly attributed to the pipeline that produced them.</p>
-          </article>
-          <article class="card">
-            <h3>Built for modern applications</h3>
-            <p>Rendered crawling discovers client-side SPA routes, while controlled click-through exploration records meaningful DOM states that a simple page load would never expose.</p>
-          </article>
-          <article class="card">
-            <h3>Human review stays central</h3>
-            <p>Deterministic failures and judgment-based leads are kept distinct. Axcess reports evidence and limitations; it does not claim legal compliance or complete conformance.</p>
-          </article>
-        </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="../how-it-works/">How it works</a></li>
+          <li><a href="../coverage/">What it checks</a></li>
+          <li><a href="../who-its-for/">Who it's for</a></li>
+          <li><a href="../faq/">Questions and glossary</a></li>
+        </ul>
       </div>
-    </section>
-
-    <section class="soft" id="process">
-      <div class="wrap">
-        <h2>From site to evidence</h2>
-        <p class="intro">Every report is scoped to one scan and keeps coverage transparent.</p>
-        <ol class="steps">
-          <li><strong>Define the scope.</strong> Choose a public or authorized login-protected target, path boundary, crawl depth, and page limit.</li>
-          <li><strong>Explore routes and states.</strong> Render pages in Chromium, follow allowed links and SPA routes, then conservatively operate eligible controls to reveal additional DOM states.</li>
-          <li><strong>Run detection layers.</strong> Apply axe-core and independent browser probes, with optional local AI-assisted analysis for contextual questions.</li>
-          <li><strong>Review and verify.</strong> Group repeated occurrences into issues, inspect the stored evidence, assign remediation work, and rescan to compare changes.</li>
-        </ol>
-        <div class="callout"><strong>Important:</strong> automated and AI-assisted results are evidence for expert review. They do not prove the accessibility of an entire website, WCAG conformance, or legal compliance.</div>
+      <div>
+        <h2>Use</h2>
+        <ul>
+          <li><a href="../get-started/">Get started</a></li>
+          <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
+        </ul>
       </div>
-    </section>
-
-    <section>
-      <div class="wrap">
-        <h2>Open source and locally operated</h2>
-        <p class="intro">Axcess is MIT licensed. The crawler, evidence store, FastAPI service, React review interface, and export pipeline are developed in the open.</p>
-        <div class="cta">
-          <a class="button" href="https://github.com/lsa-mis/axcess">View the source on GitHub</a>
-          <a class="secondary" href="../">Explore the product overview</a>
-        </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="../about/">About Axcess</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">White paper</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess">Source on GitHub</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/LICENSE">MIT license</a></li>
+        </ul>
       </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="wrap">Axcess · Local-first accessibility evidence · MIT licensed</div>
-  </footer>
+    </div>
+    <div class="fine">
+      <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
+      <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a> at U-M LSA</span>
+    </div>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
 </body>
 </html>

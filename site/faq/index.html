@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questions and glossary — Axcess</title>
+<meta name="description" content="Straight answers to common questions about Axcess, plus a plain-language glossary of the words you&#x27;ll see in a report.">
+<link rel="canonical" href="https://lsa-mis.github.io/axcess/faq/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Axcess">
+<meta property="og:title" content="Questions and glossary — Axcess">
+<meta property="og:description" content="Straight answers to common questions about Axcess, plus a plain-language glossary of the words you&#x27;ll see in a report.">
+<meta property="og:url" content="https://lsa-mis.github.io/axcess/faq/">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#00274C">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <ul>
+        <li><a href="../how-it-works/">How it works</a></li>
+        <li><a href="../coverage/">Coverage</a></li>
+        <li><a href="../who-its-for/">Who it&#x27;s for</a></li>
+        <li><a href="../privacy/">Privacy</a></li>
+        <li><a href="../get-started/">Get started</a></li>
+        <li><a href="../faq/" aria-current="page">FAQ</a></li>
+        <li class="cta"><a href="https://github.com/lsa-mis/axcess">GitHub</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">Questions and glossary</span>
+    <h1>Straight answers, <span class="hl">plain words</span></h1>
+    <p class="lede">The questions people ask before they trust a tool, and the vocabulary you will meet in an Axcess report.</p>
+  </div>
+</section>
+
+<section id="questions">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">FAQ</span>
+      <h2>Common questions</h2>
+    </div>
+    <div class="faq"><details><summary>Does Axcess certify that my website is accessible?</summary><div class="a"><p>No. Axcess produces evidence for a qualified person to review. It does not certify WCAG conformance, prove legal compliance, or replace testing with people who use assistive technology. A qualified person can use Axcess evidence to complete a conformance report; Axcess will not generate one automatically.</p></div></details><details><summary>Do I need AI to use it?</summary><div class="a"><p>No. The rule engines and the keyboard, zoom, focus, and interaction checks run with just the bundled browser. AI-assisted checks are optional, run on a local model you install yourself, and are clearly labelled as leads that need confirmation.</p></div></details><details><summary>Does any of my data go to the cloud?</summary><div class="a"><p>No. There is no account, no telemetry, and no upload. Evidence is stored in a local database on your computer. The only outbound connection is to the website you are scanning, plus an optional local AI service on the same machine. <a href="../privacy/">Read the privacy page.</a></p></div></details><details><summary>Can it scan pages behind a login or two-factor sign-in?</summary><div class="a"><p>Yes. Axcess opens a visible browser window, you sign in directly with the website, and the scan continues using that live session. Axcess never asks for your password or code, and login pages are not stored as evidence. Use only accounts and sites you are authorized to test.</p></div></details><details><summary>What does "29 of 55 criteria" mean?</summary><div class="a"><p>WCAG 2.2 has 55 Level A and AA success criteria. Axcess has at least one check that contributes evidence for 29 of them. That does not mean those 29 are decided without a person, and it does not mean a site that passes them conforms. The remaining 26 are listed as manual, with the steps to test each one. <a href="../coverage/">See all 55.</a></p></div></details><details><summary>What is the difference between an issue group and an occurrence?</summary><div class="a"><p>An occurrence is one problem on one page, for example a missing image description on the home page. An issue group collects occurrences that share a cause and probably share a fix, for example the same broken template across 40 pages. The report shows both numbers so a large raw count never stands alone.</p></div></details><details><summary>How accurate is it?</summary><div class="a"><p>A labelled test corpus requires fewer than 5% false discoveries and at least 80% recall for every detection layer before a change ships. That is a regression gate, not a real-world guarantee; the project states plainly that a public accuracy claim would need an independently reviewed corpus. Every finding also carries a confidence and a method, and you can reject any of them as a false positive with a recorded reason.</p></div></details><details><summary>How long does a scan take?</summary><div class="a"><p>It depends on the number of pages and which checks you enable. Rendering each page in a real browser and running several checks takes a few seconds per page. A 25-page first scan usually finishes in a few minutes. Advanced settings let you skip individual checks and say exactly what coverage you lose.</p></div></details><details><summary>Will it break anything on the site?</summary><div class="a"><p>Axcess only reads pages and, if you enable it, operates visible controls such as menus and tabs. It never clicks links during that probe, refuses anything named sign out, delete, remove, unsubscribe, or deactivate, reverses navigations, and caps clicks per page. Crawl speed is conservative by default and robots.txt is respected unless you choose otherwise.</p></div></details><details><summary>Does it work on single-page apps built with React, Vue, or Angular?</summary><div class="a"><p>Yes. Pages are rendered in a real browser before testing, app-style routes are followed as separate pages, and the click-through probe can test menus and dialogs that only appear after interaction. Routes must be reachable by real links inside your scope; Axcess does not read application code to guess private addresses.</p></div></details><details><summary>Can several people use one Axcess?</summary><div class="a"><p>A small trusted team can share one instance on an always-on machine over a private network with a shared access token. It runs one scan at a time and must not be exposed to the public internet. Larger, stricter institutional deployments are described in the documentation.</p></div></details><details><summary>What does it cost, and who maintains it?</summary><div class="a"><p>Axcess is free and open source under the MIT license. It was built at the University of Michigan's College of Literature, Science, and the Arts. The source, documentation, and white paper are on GitHub.</p></div></details><details><summary>Which platforms are supported?</summary><div class="a"><p>The desktop preview is for Apple Silicon Macs. From source, Axcess runs on macOS, Linux, and Windows with WSL. Windows and Linux desktop installers are part of the build system but are not yet released as previews.</p></div></details></div>
+  </div>
+</section>
+
+<section class="soft" id="glossary">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Glossary</span>
+      <h2>Words you'll see in a report</h2>
+    </div>
+    <dl class="glossary"><div><dt>WCAG</dt><dd>The Web Content Accessibility Guidelines, the international standard for accessible websites. Version 2.2 is current. Levels A and AA are the usual legal and policy target.</dd></div><div><dt>Success criterion</dt><dd>One testable requirement in WCAG, numbered like 1.4.3. There are 55 at Levels A and AA.</dd></div><div><dt>Evidence</dt><dd>What a check actually observed: the page, the element, a snippet, a screenshot, the rule, and the method. Axcess keeps evidence attached to every result.</dd></div><div><dt>Issue group</dt><dd>Occurrences that share a cause and probably share a fix, presented as one row in the issue table.</dd></div><div><dt>Occurrence</dt><dd>One instance of a problem on one page, or in one DOM state.</dd></div><div><dt>Review lead</dt><dd>A result that needs a person to confirm it before it counts, such as a keyboard-trap observation or an AI suggestion.</dd></div><div><dt>False positive</dt><dd>A result the reviewer has judged not to be a real barrier. Marking one records the reason and keeps the history.</dd></div><div><dt>Rule engine</dt><dd>Software that checks a page against a fixed list of machine-testable rules. Axcess uses axe-core and, optionally, Siteimprove Alfa.</dd></div><div><dt>axe-core</dt><dd>The most widely used open-source accessibility rule engine, made by Deque. It runs inside the rendered page.</dd></div><div><dt>Alfa</dt><dd>Siteimprove&#x27;s open-source rule engine, based on the W3C&#x27;s ACT rule format. An independent second opinion.</dd></div><div><dt>ACT rule</dt><dd>A W3C-standardised, precisely written accessibility test that different tools can implement the same way.</dd></div><div><dt>Rendered page</dt><dd>A page after the browser has run its scripts and drawn it, which is what visitors actually see. Axcess tests rendered pages.</dd></div><div><dt>DOM state</dt><dd>What the page looks like after a control is operated, for example after a menu opens. Axcess can test these states and counts them separately from pages.</dd></div><div><dt>Scope</dt><dd>The part of a site a scan is allowed to visit, defined by the host and a path such as /admissions/, plus page and depth limits.</dd></div><div><dt>OCR</dt><dd>Optical character recognition: software that reads text inside images. Axcess bundles Tesseract for this.</dd></div><div><dt>Local AI model</dt><dd>A language or vision model that runs on your own computer through a service called Ollama. Optional, and never installed silently.</dd></div><div><dt>Ollama</dt><dd>A free program for running AI models locally. Axcess talks to it only on the same machine.</dd></div><div><dt>Images of text</dt><dd>WCAG 1.4.5. Text baked into a picture cannot be resized, restyled, or read by a screen reader. Finding these at scale was the original reason Axcess was built.</dd></div><div><dt>Keyboard trap</dt><dd>WCAG 2.1.2. A place where keyboard focus enters a component and cannot leave, stranding people who do not use a mouse.</dd></div><div><dt>Reflow</dt><dd>WCAG 1.4.10. Content should rearrange to fit a narrow screen without sideways scrolling.</dd></div><div><dt>Rescan comparison</dt><dd>Running the same scope again and lining up the two reports: new, resolved, and still open.</dd></div><div><dt>Local-first</dt><dd>The design principle that your data lives on your computer by default and only leaves it when you deliberately send it somewhere.</dd></div></dl>
+  </div>
+</section>
+
+</main>
+
+<nav class="pager" aria-label="Read next">
+  <div class="wrap">
+    <a class="prev" href="../get-started/"><small>Previous</small><span>Get started</span></a>
+    <a class="next" href="../about/"><small>Next</small><span>About Axcess</span></a>
+  </div>
+</nav>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="../"><svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg><span>Axcess<small>Accessibility evidence workbench</small></span></a>
+        <p style="margin-top:1rem;max-width:34ch">Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of Michigan.</p>
+      </div>
+      <div>
+        <h2>Learn</h2>
+        <ul>
+          <li><a href="../how-it-works/">How it works</a></li>
+          <li><a href="../coverage/">What it checks</a></li>
+          <li><a href="../who-its-for/">Who it's for</a></li>
+          <li><a href="../faq/">Questions and glossary</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Use</h2>
+        <ul>
+          <li><a href="../get-started/">Get started</a></li>
+          <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="../about/">About Axcess</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/whitepaper/AXCESS-WHITE-PAPER.md">White paper</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess">Source on GitHub</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/LICENSE">MIT license</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fine">
+      <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
+      <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a> at U-M LSA</span>
+    </div>
+  </div>
+</footer>
+<script src="../assets/site.js" defer></script>
+</body>
+</html>
