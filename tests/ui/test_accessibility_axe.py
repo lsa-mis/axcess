@@ -169,14 +169,22 @@ async def test_simple_scan_path_hides_advanced_controls_until_requested(
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
             await playwright_async.expect(
-                page.get_by_role("heading", name="Balanced accessibility scan")
+                page.get_by_role("textbox", name="Site URL")
             ).to_be_visible()
+            # The default profile and the advanced controls both start
+            # collapsed, so the first screen is URL -> Start scan.
+            await playwright_async.expect(
+                page.get_by_role("button", name="Default scan settings", exact=True)
+            ).to_have_attribute("aria-expanded", "false")
             await playwright_async.expect(
                 page.get_by_role("button", name="Start scan")
             ).to_be_visible()
             await playwright_async.expect(page.get_by_label("Max pages")).to_be_hidden()
 
             await page.get_by_text("Advanced settings", exact=True).click()
+            await playwright_async.expect(
+                page.get_by_role("button", name="Advanced settings", exact=True)
+            ).to_have_attribute("aria-expanded", "true")
             await playwright_async.expect(page.get_by_label("Max pages")).to_be_visible()
             await playwright_async.expect(
                 page.get_by_role("group", name="Scan engine")
@@ -588,6 +596,153 @@ async def test_every_spa_route_has_an_accurate_document_title(
 
 
 @pytest.mark.asyncio
+async def test_header_uses_one_mode_neutral_new_scan_action(
+    live_server: tuple[str, int],
+) -> None:
+    """The global CTA defers the public/login choice to the new-scan page."""
+    base, _scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/app/", wait_until="networkidle")
+
+            action = page.get_by_role("banner").get_by_role(
+                "link", name="Create New Scan", exact=True
+            )
+            await playwright_async.expect(action).to_have_count(1)
+            href = await action.get_attribute("href")
+            assert href is not None
+            assert href.endswith("/app/scans/new")
+            assert "mode=" not in href
+
+            await action.click()
+            assert page.url.endswith("/app/scans/new")
+            await playwright_async.expect(
+                page.get_by_role("radiogroup", name="Choose the type of site you want to scan")
+            ).to_be_visible()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_header_offers_one_external_feedback_link(
+    live_server: tuple[str, int],
+) -> None:
+    """Feedback is reachable from every screen and clearly leaves the app."""
+    base, _scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/app/", wait_until="networkidle")
+
+            feedback = page.get_by_role("banner").get_by_role(
+                "link", name="Send feedback (opens in a new tab)", exact=True
+            )
+            await playwright_async.expect(feedback).to_have_count(1)
+            assert await feedback.get_attribute("href") == (
+                "https://form.asana.com/?k=nRyyF2UKBYMXEj3v8CKCCA&d=939514425027676"
+            )
+            # A new tab is a change of context, and the opened page must not
+            # be able to reach back into this one.
+            assert await feedback.get_attribute("target") == "_blank"
+            rel = await feedback.get_attribute("rel") or ""
+            assert "noopener" in rel and "noreferrer" in rel
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_scan_mode_choice_is_a_radio_group_that_keeps_other_params(
+    live_server: tuple[str, int],
+) -> None:
+    """Switching scan type must not lose a pre-filled rescan URL."""
+    base, _scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(
+                f"{base}/app/scans/new?url=https%3A%2F%2Fexample.com%2F",
+                wait_until="networkidle",
+            )
+            public = page.get_by_role("radio", name="Public website", exact=True)
+            login = page.get_by_role("radio", name="Login or 2FA website", exact=True)
+            await playwright_async.expect(public).to_be_checked()
+            # Exactly one card is marked selected at a time.
+            await playwright_async.expect(page.get_by_text("Selected", exact=True)).to_have_count(1)
+
+            await login.click()
+            await playwright_async.expect(login).to_be_checked()
+            assert "mode=login" in page.url
+            assert "url=https%3A%2F%2Fexample.com%2F" in page.url
+
+            await public.click()
+            await playwright_async.expect(public).to_be_checked()
+            assert "mode=" not in page.url
+            assert "url=https%3A%2F%2Fexample.com%2F" in page.url
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_tracking_coverage_table_filters_and_sorts(
+    live_server: tuple[str, int],
+) -> None:
+    """The coverage matrix can be narrowed and reordered, and says so."""
+    base, _scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/app/tracking", wait_until="networkidle")
+
+            manual = page.get_by_role("group", name="Filter coverage by method").get_by_role(
+                "button", name=re.compile(r"^Manual only")
+            )
+            await manual.click()
+            await playwright_async.expect(manual).to_have_attribute("aria-pressed", "true")
+            assert "method=manual" in page.url
+            matrix = page.get_by_role(
+                "table",
+                name="Every WCAG 2.2 A/AA success criterion and how Axcess covers it",
+            )
+            coverage_cells = matrix.locator("tbody tr td:nth-child(4)")
+            labels = set(await coverage_cells.all_inner_texts())
+            assert labels == {"Manual only"}, labels
+
+            reset = page.get_by_role("group", name="Filter coverage by method").get_by_role(
+                "button", name=re.compile(r"^All")
+            )
+            await reset.click()
+            await playwright_async.expect(matrix.locator("tbody tr th[scope='row']")).to_have_count(
+                55
+            )
+
+            # Success criteria sort as numbers: 1.4.4 before 1.4.10.
+            sc_header = matrix.get_by_role("columnheader", name="SC")
+            await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "ascending")
+            shown = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+            assert shown == sorted(shown, key=lambda sc: tuple(int(part) for part in sc.split(".")))
+
+            await sc_header.get_by_role("button").click()
+            await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "descending")
+            assert await matrix.locator("tbody tr th[scope='row']").first.inner_text() == "4.1.3"
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_tracking_page_stays_clean_while_filtered(
+    live_server: tuple[str, int],
+) -> None:
+    """The new filter and sort controls must hold the AAA bar too."""
+    base, _scan_id = live_server
+    await _axe_clean(base, "/app/tracking?method=ai-assisted&sort=method&dir=desc")
+
+
+@pytest.mark.asyncio
 async def test_login_scan_is_visible_and_explains_login_before_crawl(
     live_server: tuple[str, int],
 ) -> None:
@@ -622,19 +777,30 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
                 ),
             )
             await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-            login_link = page.get_by_role("link", name="2FA or login scan")
-            await playwright_async.expect(login_link).to_be_visible()
-            await login_link.click()
+            login_choice = page.get_by_role("radio", name="Login or 2FA website", exact=True)
+            await playwright_async.expect(login_choice).to_be_visible()
+            await login_choice.click()
+            await playwright_async.expect(login_choice).to_be_checked()
             assert "mode=login" in page.url
             await playwright_async.expect(
                 page.get_by_role("heading", name="New scan", exact=True)
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("heading", name="Open browser, sign in, then scan")
+                page.get_by_text(re.compile(r"^Enter the page to scan\."))
             ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_role("textbox", name="Page to scan after login")
             ).to_be_visible()
+            # Authorization and the sign-in explanation now sit with the URL.
+            await playwright_async.expect(
+                page.get_by_role("checkbox", name=re.compile(r"^I have authorization"))
+            ).to_be_visible()
+            await playwright_async.expect(
+                page.get_by_role("note", name="What happens during sign-in")
+            ).to_be_visible()
+            # The included-tests summary is a collapsed disclosure now; the
+            # assertions below read from it, so open it once here.
+            await page.get_by_role("button", name="Default scan settings", exact=True).click()
             await page.get_by_text("Advanced settings", exact=True).click()
             workers = page.get_by_role("spinbutton", name="Workers")
             await playwright_async.expect(workers).to_be_enabled()
@@ -680,7 +846,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
                 page.get_by_role("button", name="Open sign-in browser")
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("textbox", name="Seed URL")
+                page.get_by_role("textbox", name="Site URL")
             ).to_have_count(0)
             assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         finally:

@@ -819,11 +819,11 @@ function BlockedScanNotice({
         />
         <div className="text-sm">
           <strong className="text-sev-critical">
-            Seed URL returned HTTP {blocked.status_code}
+            Site URL returned HTTP {blocked.status_code}
           </strong>
           {blocked.title && <> — &ldquo;{blocked.title}&rdquo;</>}. The crawler
           could not read past the entry page. Try a{" "}
-          <Link to="/scans/new">new public scan</Link>, or use an authorized
+          <Link to="/scans/new">new scan</Link>, or use an authorized
           sign-in scan when the site requires authentication.
           <span className="sr-only"> Report {scanId} is incomplete.</span>
         </div>

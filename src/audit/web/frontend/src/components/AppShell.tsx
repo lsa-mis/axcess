@@ -2,15 +2,16 @@ import { Link, useLocation } from "react-router";
 import {
   LayoutDashboard,
   ListChecks,
-  LockKeyhole,
   Menu,
+  MessageSquarePlus,
   Plus,
   Radar,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
-import { LinkButton } from "./ui";
+import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
+import { ExternalLinkButton, LinkButton } from "./ui";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -207,12 +208,8 @@ function TopBar({
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
 }) {
-  const { pathname, search } = useLocation();
-  const loginMode = new URLSearchParams(search).get("mode") === "login";
-  const onNewScanForm = pathname === "/scans/new" && !loginMode;
-  const onProtectedScanForm =
-    (pathname === "/scans/new" && loginMode) ||
-    pathname === "/scans/protected/new";
+  const { pathname } = useLocation();
+  const onNewScanForm = pathname === "/scans/new";
   return (
     <header
       className="flex h-[72px] items-center justify-between border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
@@ -250,26 +247,27 @@ function TopBar({
         </p>
         <p className="truncate text-sm font-semibold text-fg">{routeLabel}</p>
       </div>
-      {/* Public and authenticated scans are different security workflows, so
-          keep both choices visible at the app level. At narrow widths the
-          icons retain explicit accessible names and titles without forcing
-          the header wider than the viewport. */}
+      {/* Scan type is chosen on the new-scan page. Keep one global action in
+          the shell so the header does not make users choose a workflow before
+          they have seen the explanation for each option.
+
+          "Send feedback" sits beside it because feedback is worth asking for
+          from every screen, and a single fixed home is easier to find than a
+          per-page control. It carries no scan context: Asana forms have no
+          documented URL-prefill contract, so there is no supported way to
+          attach the current page — and guessing at one could put a scanned
+          URL into a third-party form. */}
       <div className="ml-auto flex items-center gap-2">
-        <LinkButton
-          to="/scans/new?mode=login"
-          variant={onProtectedScanForm ? "ghost" : "secondary"}
+        <ExternalLinkButton
+          href={FEEDBACK_FORM_URL}
+          variant="secondary"
           size="md"
-          className={cn(
-            onProtectedScanForm && "pointer-events-none opacity-50",
-          )}
-          aria-disabled={onProtectedScanForm || undefined}
-          tabIndex={onProtectedScanForm ? -1 : undefined}
-          aria-label="2FA or login scan"
-          title="Scan a site that requires login or 2FA"
+          aria-label="Send feedback (opens in a new tab)"
+          title="Send feedback (opens in a new tab)"
         >
-          <LockKeyhole className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">2FA / login scan</span>
-        </LinkButton>
+          <MessageSquarePlus className="h-5 w-5" aria-hidden />
+          <span className="hidden sm:inline">Send feedback</span>
+        </ExternalLinkButton>
         <LinkButton
           to="/scans/new"
           variant={onNewScanForm ? "ghost" : "primary"}
@@ -277,11 +275,11 @@ function TopBar({
           className={cn(onNewScanForm && "pointer-events-none opacity-50")}
           aria-disabled={onNewScanForm || undefined}
           tabIndex={onNewScanForm ? -1 : undefined}
-          aria-label="New public scan"
-          title="Scan a public site"
+          aria-label="Create New Scan"
+          title="Create a new accessibility scan"
         >
           <Plus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Public scan</span>
+          <span className="hidden sm:inline">Create New Scan</span>
         </LinkButton>
       </div>
     </header>
@@ -327,7 +325,7 @@ function routeTitle(pathname: string): string {
     [/^\/$/, "Dashboard"],
     [/^\/scans\/?$/, "Reports"],
     [/^\/scans\/new\/?$/, "New scan"],
-    [/^\/scans\/protected\/new\/?$/, "2FA / login scan"],
+    [/^\/scans\/protected\/new\/?$/, "New scan"],
     [/^\/scans\/\d+\/protected\/manual-checks\/?$/, "Protected manual checks"],
     [/^\/scans\/\d+\/protected\/issues\/?$/, "Protected issue index"],
     [/^\/scans\/\d+\/protected\/?$/, "Protected companion"],

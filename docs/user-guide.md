@@ -43,9 +43,9 @@ and (on rescans) the diff counters.
 uv run audit serve         # → http://127.0.0.1:8765
 ```
 
-Open **http://127.0.0.1:8765/scans/new** and:
+Open **http://127.0.0.1:8765/app/scans/new** and:
 
-1. Paste the seed URL. As you type, the **Scope** preview shows what
+1. Paste the site URL. As you type, the **Scope** preview shows what
    the crawler will actually do:
    - `https://example.com/docs` → `example.com/docs/` (auto-added slash)
    - `https://example.com/` → whole host

@@ -1075,7 +1075,7 @@ def privacy() -> str:
     </div>
     <div class="outside">
       <div><strong>Connects to: the website you are scanning</strong><span>Axcess necessarily loads pages from the target site, at the rate you set, respecting robots.txt unless you say otherwise.</span></div>
-      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no update checks that carry data, no cloud AI. Any external integration would require an explicit administrator decision.</span></div>
+      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no update checks that carry data, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
     </div>
   </div>
 </section>
@@ -1216,9 +1216,9 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will have a report in a few minutes and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Open Axcess and choose "Public scan"</h3><p>The dashboard has two buttons at the top: <em>Public scan</em> and <em>2FA / login scan</em>. Choose the public one for now.</p></li>
-      <li><h3>Paste the address of one section</h3><p>Something like <code>https://www.example.edu/admissions/</code>. The scope preview will show that only pages under <em>/admissions/</em> will be visited. Leave <em>Crawl the entire host</em> unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>The other defaults are conservative and fine. Under <em>Included tests</em>, leave everything on; the browser-based checks do not need any AI.</p>
+      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Under <em>Choose the type of site you want to scan</em>, pick <em>Public website</em>.</p></li>
+      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, something like <code>https://www.example.edu/admissions/</code>. The scope preview will show that only pages under <em>/admissions/</em> will be visited. Leave <em>Crawl the entire host</em>, under Advanced settings, unchecked.</p></li>
+      <li><h3>Set "Max pages" to about 25</h3><p>Open <em>Advanced settings</em> to find it. The other defaults are conservative and fine, and the browser-based checks need no AI. Expand <em>Default scan settings</em> if you want to see exactly which tests will run.</p>
         <p class="tip">Want to see it work? Turn on "Show the scanning browser window" in advanced settings.</p></li>
       <li><h3>Start the scan and watch</h3><p>You will see the current page, counts of pages discovered and tested, which checks ran, and an estimated finish time. You can stop at any point.</p></li>
     </ol>

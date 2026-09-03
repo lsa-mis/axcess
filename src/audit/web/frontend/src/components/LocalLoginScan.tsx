@@ -15,9 +15,10 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../api/client";
 import type { LocalLoginScanPayload, LocalLoginScanStatus } from "../api/types";
 import EngineChoice from "../routes/EngineChoice";
-import { Button, Card, Checkbox } from "./ui";
+import { Button, Card, Checkbox, Disclosure } from "./ui";
 import ProtectedScanSteps from "./ProtectedScanSteps";
 import { formatScanEta } from "../lib/scanProgress";
+import { WHOLE_HOST_HINT_LOGIN } from "../lib/scanCopy";
 
 const TERMINAL = new Set<LocalLoginScanStatus>([
   "completed",
@@ -168,19 +169,10 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     <>
       {showSteps && <ProtectedScanSteps current="scope" className="mb-5" />}
       <Card className="max-w-3xl p-5">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">
-            Direct local login
-          </p>
-          <h2 className="mt-1 text-xl font-semibold text-fg">
-            Open browser, sign in, then scan
-          </h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Choose the scan settings first. Axcess will then open visible
-            Chromium so you can complete the password, passkey, or 2FA flow
-            yourself.
-          </p>
-        </div>
+        <p className="mb-5 text-sm text-fg-muted">
+          Enter the page to scan. Axcess opens a browser window where you sign
+          in yourself, then scans from that page.
+        </p>
 
         {error && (
           <div
@@ -248,14 +240,44 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
             )}
           </label>
 
-          <section
-            aria-labelledby="login-profile-title"
-            className="rounded-xs border border-umich-blue/25 bg-umich-blue/5 p-4"
+          {/* Authorization and the sign-in explanation sit with the URL,
+          not above the submit button: they are preconditions for entering
+          this flow at all, and a reader should meet them before spending
+          time on settings. The checkbox is described by the note below it. */}
+          <Checkbox
+            checked={authorized}
+            onChange={setAuthorized}
+            label="I have authorization from the site owner and will use a least-privilege test account."
+            describedBy="login-signin-note"
+          />
+
+          <div
+            id="login-signin-note"
+            role="note"
+            aria-labelledby="login-signin-note-title"
+            className="rounded-md border border-border bg-surface-subtle p-4 text-sm text-fg-muted"
           >
-            <h2 id="login-profile-title" className="font-semibold text-fg">
-              Balanced accessibility scan
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
+            <p id="login-signin-note-title" className="font-semibold text-fg">
+              What happens during sign-in
+            </p>
+            <p className="mt-1">
+              During sign-in, the visible browser may follow public HTTPS
+              redirects to U-M Shibboleth, Duo, or another identity provider.
+              Once you confirm the application page, Axcess locks the crawler to
+              that website and read-only page requests. The login session stays
+              in memory and is destroyed when the scan ends. Report evidence is
+              stored in your local Axcess database.
+            </p>
+          </div>
+
+          <Disclosure
+            id="login-profile"
+            title="Default scan settings"
+            icon={
+              <Check className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+            }
+          >
+            <p className="text-sm text-fg-muted">
               WCAG 2.2 {form.axe_level} against the authenticated, rendered
               site. The temporary browser session stays in memory and is
               destroyed after the scan.
@@ -296,14 +318,19 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 </li>
               ))}
             </ul>
-          </section>
+          </Disclosure>
 
-          <details className="rounded-xs border border-border bg-surface">
-            <summary className="flex min-h-target cursor-pointer items-center gap-2 px-4 py-3 font-semibold text-fg">
-              <Settings2 className="h-4 w-4 text-umich-blue" aria-hidden />
-              Advanced settings
-            </summary>
-            <div className="space-y-4 border-t border-border p-4">
+          <Disclosure
+            id="login-advanced"
+            title="Advanced settings"
+            icon={
+              <Settings2
+                className="h-4 w-4 shrink-0 text-umich-blue"
+                aria-hidden
+              />
+            }
+          >
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <LoginNumberField
                   label="Max pages"
@@ -341,8 +368,10 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 the safety maximum for login and 2FA scans.
               </p>
 
-              <fieldset className="rounded-xs border border-border p-3">
-                <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+              {/* One left edge for every option: the nested boxes made
+              siblings look ranked. Fieldsets stay for grouping, minus chrome. */}
+              <fieldset className="min-w-0 border-0 p-0">
+                <legend className="px-0 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
                   Options
                 </legend>
                 <div className="mb-3 mt-1">
@@ -382,8 +411,8 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                   </select>
                 </div>
 
-                <fieldset className="mb-3 rounded-xs border border-border p-3">
-                  <legend className="px-1 text-sm font-medium text-fg">
+                <fieldset className="mb-3 border-0 p-0">
+                  <legend className="px-0 text-sm font-medium text-fg">
                     Scan engine
                   </legend>
                   <p
@@ -438,12 +467,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                   )}
                 </fieldset>
 
-                <div className="mt-1 space-y-1">
+                <div className="-mx-2 mt-1 space-y-1">
                   <Checkbox
                     checked={form.whole_host}
                     onChange={(value) => update("whole_host", value)}
                     label="Crawl the entire approved host"
-                    hint="Ignores the URL path scope, but never leaves the exact signed-in website origin."
+                    hint={WHOLE_HOST_HINT_LOGIN}
                   />
                   <Checkbox
                     checked={false}
@@ -541,7 +570,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 </div>
               </fieldset>
             </div>
-          </details>
+          </Disclosure>
 
           {!form.skip_ocr && (
             <div className="rounded-xs border border-sev-major/50 bg-sev-major-bg/30 p-3">
@@ -560,28 +589,6 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
               />
             </div>
           )}
-
-          <label className="flex min-h-11 items-start gap-3 text-sm text-fg">
-            <input
-              type="checkbox"
-              checked={authorized}
-              onChange={(event) => setAuthorized(event.target.checked)}
-              className="mt-1 size-5 rounded border-border text-umich-blue focus:ring-2 focus:ring-umich-blue/40"
-            />
-            <span>
-              I have authorization from the site owner and will use a
-              least-privilege test account.
-            </span>
-          </label>
-
-          <div className="rounded-md border border-border bg-surface-subtle p-4 text-sm text-fg-muted">
-            During sign-in, the visible browser may follow public HTTPS
-            redirects to U-M Shibboleth, Duo, or another identity provider. Once
-            you confirm the application page, Axcess locks the crawler to that
-            website and read-only page requests. The login session stays in
-            memory and is destroyed when the scan ends. Report evidence is
-            stored in your local Axcess database.
-          </div>
 
           <div className="flex flex-wrap gap-3">
             <Button

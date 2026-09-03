@@ -67,16 +67,9 @@ export default function ScansRoute() {
           title="No scans yet"
           message="Point the crawler at a URL to start auditing."
           action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <LinkButton to="/scans/new" variant="primary">
-                <PlusCircle className="h-4 w-4" aria-hidden /> New public scan
-              </LinkButton>
-              {protectedIdentity.isReady && (
-                <LinkButton to="/scans/new?mode=login" variant="secondary">
-                  <PlusCircle className="h-4 w-4" aria-hidden /> 2FA / login scan
-                </LinkButton>
-              )}
-            </div>
+            <LinkButton to="/scans/new" variant="primary">
+              <PlusCircle className="h-4 w-4" aria-hidden /> Create New Scan
+            </LinkButton>
           }
         />
       ) : (
@@ -89,7 +82,7 @@ export default function ScansRoute() {
                   #
                 </th>
                 <th scope="col" className="px-4 py-2 text-left font-semibold">
-                  Seed URL
+                  Site URL
                 </th>
                 <th scope="col" className="px-4 py-2 text-left font-semibold">
                   Status
@@ -135,7 +128,7 @@ export default function ScansRoute() {
               </p>
             </div>
             <LinkButton to="/scans/new?mode=login" variant="secondary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> 2FA / login scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> New login scan
             </LinkButton>
           </div>
           {protectedReports.isFetching ? (

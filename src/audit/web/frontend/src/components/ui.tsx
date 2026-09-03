@@ -1,4 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { createElement, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
@@ -317,6 +319,125 @@ export function DownloadLink({
   );
 }
 
+/**
+ * Button-styled <a> to a genuinely external destination.
+ *
+ * Distinct from :func:`DownloadLink` (same-origin server paths) and
+ * :func:`LinkButton` (SPA routes): this one always opens a new tab and
+ * always carries ``rel="noopener noreferrer"``, so the destination can
+ * never reach back into this window. In the packaged desktop app the
+ * Electron shell intercepts these and hands the URL to the system
+ * browser, which is why the href must be http(s).
+ *
+ * Pass ``aria-label`` whenever the visible text is hidden at small
+ * widths, and say "opens in a new tab" in it — the new window is a
+ * change of context the user should hear about before they activate it
+ * (WCAG 3.2.5).
+ */
+type ExternalLinkButtonProps = ComponentPropsWithoutRef<"a"> & {
+  variant?: Variant;
+  size?: Size;
+};
+export function ExternalLinkButton({
+  variant = "secondary",
+  size = "md",
+  className,
+  children,
+  ...rest
+}: ExternalLinkButtonProps) {
+  return (
+    <a
+      className={cn(
+        BUTTON_BASE,
+        SIZE_CLASSES[size],
+        VARIANT_CLASSES[variant],
+        className,
+      )}
+      target="_blank"
+      rel="noopener noreferrer"
+      {...rest}
+    >
+      {children}
+    </a>
+  );
+}
+
+/**
+ * Collapsible section with a caret, a heading-level toggle, and an
+ * expanded-state background.
+ *
+ * We use a controlled ``useState`` toggle rather than the browser-native
+ * ``<details>`` element for the same reason ``GroupedFindings`` does:
+ * the surrounding components are already React, and mixing imperative
+ * DOM state with React state is a footgun. Native ``<details>`` also
+ * gives no way to style the open state of the summary row or to swap the
+ * marker for our own caret, which is exactly the affordance users told
+ * us was missing — nothing on the row said "this can be clicked" or
+ * "this is now open".
+ *
+ * **The panel is always mounted and hidden with the ``hidden``
+ * attribute, never conditionally rendered.** ``aria-controls`` must point
+ * at an element that exists, or axe fails ``aria-valid-attr-value`` on
+ * every page that ships a closed disclosure.
+ */
+export function Disclosure({
+  id,
+  title,
+  headingLevel = 2,
+  defaultOpen = false,
+  icon,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  headingLevel?: 2 | 3;
+  defaultOpen?: boolean;
+  icon?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const buttonId = `${id}-button`;
+  const panelId = `${id}-panel`;
+  const Caret = open ? ChevronDown : ChevronRight;
+
+  return (
+    <div className={cn("rounded-xs border border-border bg-surface", className)}>
+      {createElement(
+        `h${headingLevel}`,
+        { className: "m-0" },
+        <button
+          type="button"
+          id={buttonId}
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((v) => !v)}
+          className={cn(
+            "flex min-h-target w-full items-center gap-2 rounded-xs px-4 py-3 text-left text-sm font-semibold text-fg",
+            open ? "bg-surface-muted" : "hover:bg-surface-muted/60",
+          )}
+        >
+          <Caret className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+          {icon}
+          {/* The title must be this button's only text node: the UI tests
+              address it both by exact text and by accessible name. */}
+          <span>{title}</span>
+        </button>,
+      )}
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={buttonId}
+        hidden={!open}
+        className="border-t border-border p-4"
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** Alt-attribute pill (missing / empty / authored) — Siteimprove-style tag. */
 export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
@@ -402,6 +523,7 @@ export function Checkbox({
   id,
   name,
   disabled = false,
+  describedBy,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -411,6 +533,14 @@ export function Checkbox({
   id?: string;
   name?: string;
   disabled?: boolean;
+  /**
+   * Id of an element that explains the consequence of ticking this box —
+   * for the authorization checkbox, the note describing what the visible
+   * browser does during sign-in. The `hint` prop is part of the label
+   * (and so of the accessible name); this is a description instead,
+   * which is the right relationship for a longer standing explanation.
+   */
+  describedBy?: string;
 }) {
   const showWarning = tone === "warning" && checked;
   return (
@@ -431,6 +561,7 @@ export function Checkbox({
         id={id}
         name={name}
         disabled={disabled}
+        aria-describedby={describedBy}
         // 22×22 visual control. Padding on the parent label provides the
         // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
         // surface for the unchecked state — SC 1.4.11.

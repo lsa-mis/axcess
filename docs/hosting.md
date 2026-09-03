@@ -121,6 +121,17 @@ It stops a network-reachable instance from being wide open. It does
 *not* give people separate accounts, separate data, or audit logs —
 that's Path B/C.
 
+### Outbound links
+
+The app makes no outbound request of its own beyond the site being
+scanned and, when enabled, a loopback Ollama service. The one outbound
+*link* is **Send feedback** in the top bar, which opens a hosted Asana
+form in a new tab. It carries no scan data — the form receives only
+what the person types into it — and nothing happens until someone
+clicks it. In the packaged desktop app the Electron shell hands
+http(s) links to the system browser rather than opening a window
+inside the app; see [`desktop-app.md`](./desktop-app.md).
+
 ## Protected authenticated scans are a separate deployment
 
 The LAN/Tailscale and shared-token setup above is for **public scans only**.

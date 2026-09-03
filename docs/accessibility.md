@@ -129,7 +129,7 @@ take a `size` prop. The choice is rule-driven, not stylistic:
 |---|---:|---|
 | `sm` | (does **not** clear 44 — opt-in only) | Reserved for non-interactive presentation chips (`SeverityChip`, `StatusChip`). **Do not use on actual buttons.** |
 | `md` *(default)* | 44 px | Every secondary action — Cancel, filter Apply, table-row Delete/Findings, pagination Prev/Next. |
-| `lg` | 52 px | The page's *one* primary action — "Start crawl" on `/scans/new`, "Save" on the finding triage row, "Findings (N)" on a completed scan, the topbar "Start a new scan", "Stop crawl" while running. There should be at most one `lg` per route. |
+| `lg` | 52 px | The page's *one* primary action — "Start crawl" on `/scans/new`, "Save" on the finding triage row, "Findings (N)" on a completed scan, the topbar "Create New Scan", "Stop crawl" while running. There should be at most one `lg` per route. |
 
 The same rule applies to inputs and selects: every editable control
 gets `min-h-target` plus `text-base` (16 px). The `text-base` is not

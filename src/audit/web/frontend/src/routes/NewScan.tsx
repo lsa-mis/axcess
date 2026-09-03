@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertOctagon,
@@ -13,18 +13,43 @@ import {
   Button,
   Card,
   Checkbox,
-  LinkButton,
+  Disclosure,
   PageHeader,
 } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
 import type { NewScanPayload } from "../api/types";
+import { SITE_URL_LABEL, WHOLE_HOST_HINT } from "../lib/scanCopy";
 import EngineChoice from "./EngineChoice";
+import ScanModeChoice, { type ScanMode } from "./ScanModeChoice";
 
 /** Start a scan: URL input + scope preview + advanced toggles. */
 export default function NewScanRoute() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const loginSelected = searchParams.get("mode") === "login";
+
+  /**
+   * Switching scan type is a navigation, so the choice stays bookmarkable
+   * and the Back button undoes it. Every other param rides along — in
+   * particular ``url``, which ScanDetail uses to pre-fill a rescan —
+   * except ``scan``, a handoff id that only means something in the login
+   * flow it was issued for.
+   */
+  const selectMode = (mode: ScanMode) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("scan");
+    if (mode === "login") next.set("mode", "login");
+    else next.delete("mode");
+    setSearchParams(next);
+  };
+
+  const loginModeHref = (() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("scan");
+    next.set("mode", "login");
+    return `/scans/new?${next.toString()}`;
+  })();
+
   const [form, setForm] = useState<NewScanPayload>({
     url: searchParams.get("url") ?? "",
     max_pages: 2500,
@@ -86,6 +111,10 @@ export default function NewScanRoute() {
     queryFn: api.getProtectedScanCapability,
     retry: false,
   });
+  const protectedReady = Boolean(
+    protectedCapability.data?.available ||
+      protectedCapability.data?.local_available,
+  );
   useEffect(() => {
     if (
       alfaCapability.data?.available === false &&
@@ -133,108 +162,72 @@ export default function NewScanRoute() {
       <PageHeader
         crumbs={[{ label: "Scans", to: "/scans" }, { label: "New scan" }]}
         title="New scan"
-        subtitle="Choose a public website or sign in yourself before Axcess scans a protected website."
       />
 
-      <section className="mb-6 max-w-4xl" aria-labelledby="scan-type-title">
-        <p
+      <fieldset className="mb-6 max-w-4xl">
+        <legend
           id="scan-type-title"
           className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-subtle"
         >
-          Choose how the site opens
-        </p>
-        <div className="grid gap-3 md:grid-cols-2">
-          <Card
-            className={
-              loginSelected
-                ? "p-5"
-                : "border-2 border-umich-blue bg-umich-blue/5 p-5"
-            }
-            aria-current={loginSelected ? undefined : "true"}
-          >
-            <div className="flex items-start gap-3">
+          Choose the type of site you want to scan
+        </legend>
+        <div
+          role="radiogroup"
+          aria-labelledby="scan-type-title"
+          className="grid items-stretch gap-3 md:grid-cols-2"
+        >
+          <ScanModeChoice
+            value="public"
+            selected={loginSelected ? "login" : "public"}
+            onSelect={selectMode}
+            title="Public website"
+            help="Scan any publicly-viewable website."
+            icon={
               <Globe2
                 className="mt-0.5 h-6 w-6 shrink-0 text-umich-blue"
                 aria-hidden
               />
-              <div>
-                <h2 className="font-semibold text-fg">Public website</h2>
-                <p className="mt-1 text-sm text-fg-muted">
-                  Start immediately. No account, password, or 2FA is required.
-                </p>
-                {loginSelected ? (
-                  <LinkButton
-                    to="/scans/new"
-                    variant="secondary"
-                    className="mt-3"
-                  >
-                    Select public website
-                  </LinkButton>
-                ) : (
-                  <span className="mt-3 inline-flex rounded-full bg-umich-blue px-2.5 py-1 text-xs font-semibold text-white">
-                    Selected
-                  </span>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          <Card
-            className={
-              loginSelected
-                ? "border-2 border-umich-blue bg-umich-blue/5 p-5"
-                : "p-5"
             }
-            aria-current={loginSelected ? "true" : undefined}
-          >
-            <div className="flex items-start gap-3">
+          />
+
+          <ScanModeChoice
+            value="login"
+            selected={loginSelected ? "login" : "public"}
+            onSelect={selectMode}
+            title="Login or 2FA website"
+            help="Scan a Login or 2FA-protected site using your credentials in a browser on your local machine."
+            disabled={
+              !loginSelected &&
+              !protectedCapability.isLoading &&
+              !protectedReady
+            }
+            icon={
               <LockKeyhole
                 className="mt-0.5 h-6 w-6 shrink-0 text-umich-blue"
                 aria-hidden
               />
-              <div className="min-w-0">
-                <h2 className="font-semibold text-fg">Login or 2FA website</h2>
-                <p className="mt-1 text-sm text-fg-muted">
-                  Open a visible protected browser, sign in yourself, and scan
-                  only after the approved application page is confirmed.
-                </p>
-                {loginSelected ? (
-                  <span className="mt-3 inline-flex rounded-full bg-umich-blue px-2.5 py-1 text-xs font-semibold text-white">
-                    Selected
-                  </span>
-                ) : protectedCapability.isLoading ? (
-                  <p className="mt-3 text-sm text-fg-muted" role="status">
-                    Checking availability…
+            }
+            footer={
+              loginSelected ? null : protectedCapability.isLoading ? (
+                <p role="status">Checking availability…</p>
+              ) : protectedReady ? null : (
+                <div role="status">
+                  <p>
+                    {protectedCapability.data?.reason ??
+                      "Protected sign-in scanning is unavailable on this server."}
                   </p>
-                ) : protectedCapability.data?.available ||
-                  protectedCapability.data?.local_available ? (
-                  <LinkButton
-                    to="/scans/new?mode=login"
-                    variant="secondary"
-                    className="mt-3"
+                  <Link
+                    to={loginModeHref}
+                    className="mt-2 inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
                   >
-                    Select login / 2FA website
-                  </LinkButton>
-                ) : (
-                  <div className="mt-3 text-sm text-fg-muted" role="status">
-                    <p>
-                      {protectedCapability.data?.reason ??
-                        "Protected sign-in scanning is unavailable on this server."}
-                    </p>
-                    <LinkButton
-                      to="/scans/new?mode=login"
-                      variant="secondary"
-                      className="mt-3"
-                    >
-                      View setup and workflow
-                    </LinkButton>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
+                    View setup and workflow
+                  </Link>
+                </div>
+              )
+            }
+          />
         </div>
-      </section>
+      </fieldset>
 
       {loginSelected ? (
         <LocalLoginScan showSteps={false} />
@@ -258,7 +251,7 @@ export default function NewScanRoute() {
               first." */}
               <label className="flex flex-col gap-1.5">
                 <span className="text-base font-semibold text-fg">
-                  Seed URL
+                  {SITE_URL_LABEL}
                 </span>
                 <input
                   type="url"
@@ -315,20 +308,17 @@ export default function NewScanRoute() {
                 )}
               </label>
 
-              <section
-                aria-labelledby="standard-profile-title"
-                className="rounded-xs border border-umich-blue/25 bg-umich-blue/5 p-4"
+              <Disclosure
+                id="default-profile"
+                title="Default scan settings"
+                icon={
+                  <Check className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+                }
               >
-                <h2
-                  id="standard-profile-title"
-                  className="font-semibold text-fg"
-                >
-                  Balanced accessibility scan
-                </h2>
-                <p className="mt-1 text-sm text-fg-muted">
+                <p className="text-sm text-fg-muted">
                   WCAG 2.2 AA against the rendered site, with fast deterministic
-                  checks first. Slower corroboration and local-AI review remain
-                  available under Advanced settings.
+                  checks first. Slower corroboration and local-AI review can be
+                  turned on under Advanced settings below.
                 </p>
                 <ul
                   className="mt-3 grid gap-2 text-sm sm:grid-cols-2"
@@ -371,14 +361,19 @@ export default function NewScanRoute() {
                     axe-core: {alfaCapability.data.reason}
                   </p>
                 )}
-              </section>
+              </Disclosure>
 
-              <details className="rounded-xs border border-border bg-surface">
-                <summary className="flex min-h-target cursor-pointer items-center gap-2 px-4 py-3 font-semibold text-fg">
-                  <Settings2 className="h-4 w-4 text-umich-blue" aria-hidden />
-                  Advanced settings
-                </summary>
-                <div className="space-y-4 border-t border-border p-4">
+              <Disclosure
+                id="advanced"
+                title="Advanced settings"
+                icon={
+                  <Settings2
+                    className="h-4 w-4 shrink-0 text-umich-blue"
+                    aria-hidden
+                  />
+                }
+              >
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <NumberField
                       label="Max pages"
@@ -418,8 +413,12 @@ export default function NewScanRoute() {
                     additional load.
                   </p>
 
-                  <fieldset className="rounded-xs border border-border p-3">
-                    <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                  {/* Every control below sits at one left edge: the
+                  nested boxes that used to wrap these groups made options
+                  look ranked when they are all siblings. The fieldsets stay
+                  for their legends and grouping semantics, minus the chrome. */}
+                  <fieldset className="min-w-0 border-0 p-0">
+                    <legend className="px-0 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
                       Options
                     </legend>
 
@@ -464,8 +463,8 @@ export default function NewScanRoute() {
                       </select>
                     </div>
 
-                    <fieldset className="mb-3 rounded-xs border border-border p-3">
-                      <legend className="px-1 text-sm font-medium text-fg">
+                    <fieldset className="mb-3 border-0 p-0">
+                      <legend className="px-0 text-sm font-medium text-fg">
                         Scan engine
                       </legend>
                       <p
@@ -529,12 +528,12 @@ export default function NewScanRoute() {
                 shared <Checkbox> primitive. Hints explain the consequence
                 of the option in plain language (UD #4 Perceptible Information,
                 Nielsen #2 Match between system & real world). */}
-                    <div className="mt-1 space-y-1">
+                    <div className="-mx-2 mt-1 space-y-1">
                       <Checkbox
                         checked={form.whole_host}
                         onChange={(v) => update("whole_host", v)}
                         label="Crawl the entire host"
-                        hint="Ignores the URL path scope — every page on the host is in scope."
+                        hint={WHOLE_HOST_HINT}
                       />
                       <Checkbox
                         checked={form.include_subdomain}
@@ -696,7 +695,7 @@ export default function NewScanRoute() {
                     </div>
                   </fieldset>
                 </div>
-              </details>
+              </Disclosure>
 
               {/* Submit + Cancel. The submit is the page's primary CTA
               (`size="lg"`); Cancel stays at the default `md` to make the

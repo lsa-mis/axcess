@@ -215,7 +215,7 @@ an incomplete export is unmistakably labeled **DRAFT**.
 
 The desktop and loopback web app support a practical local login flow:
 
-1. Select **Login or 2FA website**.
+1. Select **Create New Scan**, then choose **Login or 2FA website**.
 2. Enter the authorized HTTPS application URL and any required sign-in origins.
 3. Axcess opens a visible Chromium window.
 4. Sign in directly with the website using password, passkey, push, OTP, or

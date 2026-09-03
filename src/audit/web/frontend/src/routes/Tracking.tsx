@@ -1,6 +1,10 @@
+import { useMemo } from "react";
+import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
-import { Card, PageHeader } from "../components/ui";
+import { cn } from "../lib/cn";
+import { Card, EmptyState, PageHeader } from "../components/ui";
 import type {
   CoverageCriterion,
   CoverageData,
@@ -22,11 +26,14 @@ export default function TrackingRoute() {
   });
 
   const counts = data?.counts;
+  const deterministicCount =
+    data?.shipped.filter((p) => !p.needs_ai).length ?? 0;
+  const aiCount = (data?.shipped.length ?? 0) - deterministicCount;
 
   return (
     <>
       <PageHeader
-        title="Coverage & feature tracker"
+        title="Coverage & Feature Tracker"
         subtitle="What the tool detects today versus what's planned. Status is reconciled against the actual code."
       />
 
@@ -38,28 +45,66 @@ export default function TrackingRoute() {
         </Card>
       )}
 
-      {counts && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          <StatusBadge status="shipped">{counts.shipped} shipped</StatusBadge>
-          <StatusBadge status="in_progress">
-            {counts.in_progress} in progress
-          </StatusBadge>
-          <StatusBadge status="planned">{counts.planned} planned</StatusBadge>
-          <span className="self-center text-xs text-fg-subtle">
-            (AI roadmap items)
-          </span>
-        </div>
-      )}
-
       {data?.coverage && <CoverageSection coverage={data.coverage} />}
+
+      <section aria-labelledby="roadmap-h" className="mb-8">
+        <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
+          AI Roadmap
+        </h2>
+        <p className="mb-3 text-sm text-fg-muted">
+          The queue to close the AI coverage gap. A criterion listed in the
+          orchestrator&apos;s default criteria but with no analyzer class is
+          skipped at runtime — those read “planned,” not “shipped.”
+        </p>
+        {counts && (
+          <ul className="mb-3 flex flex-wrap gap-2" aria-label="Roadmap items by status">
+            <li>
+              <StatusBadge status="shipped">{counts.shipped} shipped</StatusBadge>
+            </li>
+            <li>
+              <StatusBadge status="in_progress">
+                {counts.in_progress} in progress
+              </StatusBadge>
+            </li>
+            <li>
+              <StatusBadge status="planned">{counts.planned} planned</StatusBadge>
+            </li>
+          </ul>
+        )}
+        <Card className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="sr-only">
+              Planned AI analyzers by WCAG criterion
+            </caption>
+            <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+              <tr>
+                <Th>SC</Th>
+                <Th>Criterion</Th>
+                <Th>Status</Th>
+                <Th>Model class</Th>
+                <Th>What the AI step does</Th>
+                <Th>Reuses</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border align-top">
+              {data?.roadmap.map((r) => (
+                <RoadmapRow key={r.wcag} item={r} />
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </section>
 
       <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
-          Shipped pipelines — what runs today
+          Shipped Pipelines — What Runs Today
         </h2>
+        {/* Counted from the data, not written down: the previous sentence
+        said "three deterministic, two AI" and had been wrong since two
+        pipelines shipped. */}
         <p className="mb-3 text-sm text-fg-muted">
-          The three deterministic pipelines need only chromium (no Ollama);
-          the two AI pipelines need a local Ollama daemon.
+          The {deterministicCount} deterministic pipelines need only chromium
+          (no Ollama); the {aiCount} AI pipelines need a local Ollama daemon.
         </p>
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -115,39 +160,6 @@ export default function TrackingRoute() {
         </Card>
       </section>
 
-      <section aria-labelledby="roadmap-h">
-        <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
-          AI roadmap — semantic / VLM / cross-page analyzers
-        </h2>
-        <p className="mb-3 text-sm text-fg-muted">
-          The queue to close the AI coverage gap. A criterion listed in the
-          orchestrator&apos;s default criteria but with no analyzer class is
-          skipped at runtime — those read “planned,” not “shipped.”
-        </p>
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <caption className="sr-only">
-              Planned AI analyzers by WCAG criterion
-            </caption>
-            <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
-              <tr>
-                <Th>WCAG</Th>
-                <Th>Issue</Th>
-                <Th>Model class</Th>
-                <Th>What the AI step does</Th>
-                <Th>Reuses</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border align-top">
-              {data?.roadmap.map((r) => (
-                <RoadmapRow key={r.wcag} item={r} />
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      </section>
-
       <p className="mt-4 text-xs text-fg-subtle">
         Long-form version with the verification map:{" "}
         <code>docs/coverage-tracker.md</code>.
@@ -156,6 +168,13 @@ export default function TrackingRoute() {
   );
 }
 
+/** Human labels for the roadmap status enum (never the raw key). */
+const STATUS_LABEL: Record<TrackingStatus, string> = {
+  shipped: "Shipped",
+  in_progress: "In progress",
+  planned: "Planned",
+};
+
 function RoadmapRow({ item }: { item: RoadmapItem }) {
   return (
     <tr className="hover:bg-surface-muted/60">
@@ -163,6 +182,11 @@ function RoadmapRow({ item }: { item: RoadmapItem }) {
         {item.wcag}
       </th>
       <td className="px-4 py-3 text-fg">{item.issue}</td>
+      <td className="px-4 py-3">
+        <StatusBadge status={item.status}>
+          {STATUS_LABEL[item.status]}
+        </StatusBadge>
+      </td>
       <td className="px-4 py-3 text-xs text-fg-muted">{item.model_class}</td>
       <td className="px-4 py-3 text-fg-muted">
         {item.what}
@@ -171,12 +195,106 @@ function RoadmapRow({ item }: { item: RoadmapItem }) {
         )}
       </td>
       <td className="px-4 py-3 text-xs text-fg-subtle">{item.reuse}</td>
-      <td className="px-4 py-3">
-        <StatusBadge status={item.status}>
-          {item.status.replace("_", " ")}
-        </StatusBadge>
-      </td>
     </tr>
+  );
+}
+
+const SORT_KEYS = ["sc", "name", "level", "method"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+type SortDir = "asc" | "desc";
+
+/**
+ * Compare success-criterion numbers as numbers, not strings: sorted as
+ * text, "1.4.10" lands before "1.4.4", which is the order the matrix
+ * itself is careful to avoid.
+ */
+function compareSc(a: string, b: string): number {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** A column header that sorts, carrying its state in `aria-sort`. */
+function SortableTh({
+  sortKey,
+  label,
+  sort,
+  dir,
+  onSort,
+}: {
+  sortKey: SortKey;
+  label: string;
+  sort: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort === sortKey;
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowDownUp;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
+      className="px-4 py-2 text-left font-semibold"
+    >
+      {/* The uppercase treatment stays on the label span, per the house
+      rule that interactive controls reset the header's text styling. */}
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex min-h-target items-center gap-1 font-semibold normal-case tracking-normal text-fg-subtle hover:text-fg"
+      >
+        <span className="uppercase tracking-wide">{label}</span>
+        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      </button>
+    </th>
+  );
+}
+
+/** A count tile that also filters the table below it. */
+function FilterTile({
+  active,
+  onClick,
+  count,
+  blurb,
+  label,
+  badge,
+}: {
+  active: boolean;
+  onClick: () => void;
+  count: number;
+  blurb: string;
+  label?: string;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "min-h-target rounded-xs border p-3 text-left",
+        active
+          ? "border-umich-blue bg-umich-blue text-fg-inverse"
+          : "border-border bg-surface text-fg hover:bg-surface-muted",
+      )}
+    >
+      <span className="flex items-baseline justify-between gap-2">
+        {badge ?? <span className="text-2xs font-bold uppercase">{label}</span>}
+        <span className="text-lg font-bold tabular-nums">{count}</span>
+      </span>
+      <span
+        className={cn(
+          "mt-1.5 block text-2xs leading-snug",
+          active ? "text-fg-inverse" : "text-fg-subtle",
+        )}
+      >
+        {blurb}
+      </span>
+    </button>
   );
 }
 
@@ -244,33 +362,92 @@ function CoverageMethodBadge({
  */
 function CoverageSection({ coverage }: { coverage: CoverageData }) {
   const label = (m: CoverageMethod) => coverage.method_labels[m];
+  const [params, setParams] = useSearchParams();
+
+  // Filter and sort live in the URL, matching the Issues and Findings
+  // pages, so a filtered view can be bookmarked or pasted into a ticket.
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  };
+
+  const rawMethod = params.get("method") ?? "";
+  const method = (
+    coverage.methods.includes(rawMethod as CoverageMethod) ? rawMethod : ""
+  ) as CoverageMethod | "";
+  const rawSort = params.get("sort") ?? "";
+  const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey)
+    ? (rawSort as SortKey)
+    : "sc";
+  const dir: SortDir = params.get("dir") === "desc" ? "desc" : "asc";
+
+  const onSort = (key: SortKey) => {
+    const next = new URLSearchParams(params);
+    next.set("sort", key);
+    // Re-clicking the active column reverses it; a new column starts
+    // ascending, which is what "first click" means everywhere else.
+    next.set("dir", key === sort && dir === "asc" ? "desc" : "asc");
+    setParams(next, { replace: true });
+  };
+
+  const rows = useMemo(() => {
+    const filtered = method
+      ? coverage.criteria.filter((c) => c.method === method)
+      : [...coverage.criteria];
+    const rank = (m: CoverageMethod) => coverage.methods.indexOf(m);
+    filtered.sort((a, b) => {
+      const by =
+        sort === "sc"
+          ? compareSc(a.sc, b.sc)
+          : sort === "name"
+            ? a.name.localeCompare(b.name)
+            : sort === "level"
+              ? a.level.localeCompare(b.level) || compareSc(a.sc, b.sc)
+              : rank(a.method) - rank(b.method) || compareSc(a.sc, b.sc);
+      return dir === "asc" ? by : -by;
+    });
+    return filtered;
+  }, [coverage.criteria, coverage.methods, method, sort, dir]);
+
   return (
     <section aria-labelledby="cov-h" className="mb-8">
-      <h2 id="cov-h" className="mb-1 text-base font-semibold text-fg">
-        WCAG 2.2 A/AA coverage — automated vs. manual
+      <h2 id="cov-h" className="mb-3 text-base font-semibold text-fg">
+        Current Coverage
       </h2>
-      <p className="mb-3 text-sm text-fg-muted">
-        Across all {coverage.total} Level A/AA success criteria, exactly what
-        Axcess can determine for you — and what still needs a human.{" "}
-        {coverage.covered} have automated or AI-assisted coverage;{" "}
-        {coverage.manual_only} are manual-only.
-      </p>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {/* The method tiles double as the table's filter. They already
+      carried the counts, so making them the control removes a separate
+      filter row and keeps the number and the thing it filters together. */}
+      <div
+        role="group"
+        aria-label="Filter coverage by method"
+        className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5"
+      >
+        <FilterTile
+          active={!method}
+          onClick={() => setParam("method", "")}
+          count={coverage.total}
+          blurb="Every Level A/AA success criterion."
+          label="All"
+        />
         {coverage.methods.map((m) => (
-          <Card key={m} className="p-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <CoverageMethodBadge method={m} label={label(m)} />
-              <span className="text-lg font-bold tabular-nums text-fg">
-                {coverage.by_method[m] ?? 0}
-              </span>
-            </div>
-            <p className="mt-1.5 text-2xs leading-snug text-fg-subtle">
-              {coverage.method_blurb[m]}
-            </p>
-          </Card>
+          <FilterTile
+            key={m}
+            active={method === m}
+            onClick={() => setParam("method", method === m ? "" : m)}
+            count={coverage.by_method[m] ?? 0}
+            blurb={coverage.method_blurb[m]}
+            badge={<CoverageMethodBadge method={m} label={label(m)} />}
+          />
         ))}
       </div>
+
+      <p role="status" className="mb-2 text-xs text-fg-muted">
+        Showing {rows.length} of {coverage.total} criteria
+        {method ? ` · ${label(method)}` : ""}
+      </p>
 
       <Card className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -279,16 +456,28 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
           </caption>
           <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
             <tr>
-              <Th>SC</Th>
-              <Th>Criterion</Th>
-              <Th>Lvl</Th>
-              <Th>Coverage</Th>
+              <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
+              <SortableTh
+                sortKey="name"
+                label="Criterion"
+                sort={sort}
+                dir={dir}
+                onSort={onSort}
+              />
+              <SortableTh sortKey="level" label="Lvl" sort={sort} dir={dir} onSort={onSort} />
+              <SortableTh
+                sortKey="method"
+                label="Coverage"
+                sort={sort}
+                dir={dir}
+                onSort={onSort}
+              />
               <Th>What Axcess does</Th>
               <Th>What you must still test</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border align-top">
-            {coverage.criteria.map((c: CoverageCriterion) => (
+            {rows.map((c: CoverageCriterion) => (
               <tr key={c.sc} className="hover:bg-surface-muted/60">
                 <th
                   scope="row"
@@ -312,6 +501,12 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
           </tbody>
         </table>
       </Card>
+      {rows.length === 0 && (
+        <EmptyState
+          title="No criteria match"
+          message="Clear the method filter to see the whole matrix again."
+        />
+      )}
     </section>
   );
 }
