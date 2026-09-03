@@ -278,7 +278,7 @@ def shell(page: Page, body: str) -> str:
     </div>
     <div class="fine">
       <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
-      <span>A project by <a href="{PORTFOLIO}">Regan Maharjan</a> at U-M LSA</span>
+      <span>A project by LSA and ITS at U of M</span>
     </div>
   </div>
 </footer>
