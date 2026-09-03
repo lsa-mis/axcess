@@ -100,6 +100,12 @@ PAGES: tuple[Page, ...] = (
         "Straight answers to common questions about Axcess, plus a plain-language glossary of the words you'll see in a report.",
     ),
     Page(
+        "volume",
+        "Coverage by volume",
+        "Coverage by volume",
+        "What completed Axcess scans actually produced, in aggregate: detected occurrences by WCAG criterion, coverage method, and check. A development sample, kept for reference and not linked from the site.",
+    ),
+    Page(
         "about",
         "About",
         "About Axcess",
@@ -173,9 +179,10 @@ def shell(page: Page, body: str) -> str:
         for s in NAV_ORDER
         for current in [' aria-current="page"' if s == page.slug else ""]
     )
-    idx = JOURNEY.index(page.slug)
-    prev_slug = JOURNEY[idx - 1] if idx > 0 else None
-    next_slug = JOURNEY[idx + 1] if idx < len(JOURNEY) - 1 else None
+    on_journey = page.slug in JOURNEY
+    idx = JOURNEY.index(page.slug) if on_journey else -1
+    prev_slug = JOURNEY[idx - 1] if on_journey and idx > 0 else None
+    next_slug = JOURNEY[idx + 1] if on_journey and idx < len(JOURNEY) - 1 else None
     pager = ""
     if prev_slug is not None or next_slug is not None:
         parts = []
@@ -217,6 +224,7 @@ def shell(page: Page, body: str) -> str:
 <meta property="og:image" content="{BASE_URL}assets/axcess-dashboard-redacted.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
+{'<meta name="robots" content="noindex">' if page.slug not in JOURNEY else ""}
 <link rel="icon" type="image/svg+xml" href="{rel}assets/favicon.svg">
 <link rel="stylesheet" href="{rel}assets/site.css">
 <script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
@@ -757,7 +765,6 @@ def volume_section(vol: dict | None) -> str:
 
 
 def coverage(crit, summ, cov) -> str:
-    volume = volume_section(load_volume())
     total = summ.total
     bm = summ.by_method
     by_level = summ.by_level
@@ -877,8 +884,7 @@ def coverage(crit, summ, cov) -> str:
   </div>
 </section>
 
-{volume}
-<section id="explorer">
+<section class="soft" id="explorer">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Explore</span>
@@ -1433,6 +1439,23 @@ def faq() -> str:
 """
 
 
+def volume_page() -> str:
+    section = volume_section(load_volume())
+    if not section:
+        section = """
+<section><div class="wrap"><p class="sub">No volume snapshot is available in this build. Run <code>uv run python site/volume.py</code> on a machine with scan data, then rebuild.</p></div></section>"""
+    return f"""
+<section class="hero hero-compact">
+  <div class="wrap">
+    <span class="eyebrow">Reference</span>
+    <h1>Coverage by <span class="hl">volume</span></h1>
+    <p class="lede">Counting criteria says what Axcess can look for. Counting what it found says where the work is. This page aggregates the completed scans on the development machine, with no page addresses or site names. It is a reference view and is not linked from the main site.</p>
+  </div>
+</section>
+{section}
+"""
+
+
 def about(summ) -> str:
     return f"""
 <section class="hero hero-compact">
@@ -1536,6 +1559,7 @@ def render_all() -> dict[str, str]:
         "get-started": get_started(),
         "faq": faq(),
         "about": about(summ),
+        "volume": volume_page(),
     }
     return {slug: shell(BY_SLUG[slug], body) for slug, body in bodies.items()}
 

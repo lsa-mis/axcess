@@ -38,6 +38,7 @@ def test_every_page_renders(pages: dict[str, str]) -> None:
         "get-started",
         "faq",
         "about",
+        "volume",
     }
     assert set(pages) == expected
 
@@ -48,7 +49,7 @@ def test_page_skeleton(pages: dict[str, str]) -> None:
         assert '<html lang="en"' in doc, slug
         assert len(re.findall(r"<h1[ >]", doc)) == 1, f"{slug}: exactly one h1"
         assert "<title>" in doc and '<main id="main"' in doc, slug
-        assert 'aria-current="page"' in doc or slug in {"", "about"}, slug
+        assert 'aria-current="page"' in doc or slug in {"", "about", "volume"}, slug
         rel = "" if slug == "" else "../"
         assert f'href="{rel}assets/site.css"' in doc, slug
         assert f'src="{rel}assets/site.js"' in doc, slug
@@ -67,6 +68,12 @@ def test_coverage_numbers_come_from_the_matrix(pages: dict[str, str]) -> None:
         assert f'data-method="{c.method}"' in cov
     home = pages[""]
     assert f"<b>{summ.covered}<small> of {summ.total}</small></b>" in home
+
+
+def test_volume_is_unlisted(pages: dict[str, str]) -> None:
+    assert 'id="volume"' not in pages["coverage"]
+    assert 'href="volume/"' not in pages[""] and 'href="../volume/"' not in pages["coverage"]
+    assert '<meta name="robots" content="noindex">' in pages["volume"]
 
 
 def test_honesty_statement_is_present(pages: dict[str, str]) -> None:

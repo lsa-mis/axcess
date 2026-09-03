@@ -14,6 +14,7 @@
 <meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
+
 <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <script>document.documentElement.className = document.documentElement.className.replace('no-js', 'js');</script>
@@ -70,50 +71,7 @@
   </div>
 </section>
 
-
-<section class="soft" id="volume">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Coverage by volume</span>
-      <h2>What a scan actually produces</h2>
-      <p class="sub">Counting criteria says what Axcess can look for. Counting what it found says where the work is. These figures are aggregated from the completed scans on the development machine, with no page addresses or site names, and are refreshed with the site.</p>
-    </div>
-    <div class="stats" role="list">
-      <div class="stat" role="listitem"><b>37,551</b><span>detected occurrences across all completed scans</span></div>
-      <div class="stat" role="listitem"><b>4,592</b><span>pages tested in 13 scans of 4 websites</span></div>
-      <div class="stat" role="listitem"><b>8.2</b><span>occurrences per page on average, before grouping by cause</span></div>
-      <div class="stat" role="listitem"><b>9</b><span>success criteria with at least one detected occurrence</span></div>
-    </div>
-
-    <h3 style="margin-top:2.25rem">Where the volume comes from</h3>
-    <p class="sub" style="margin-bottom:1rem">Occurrences by success criterion. The last column shows how many of the tested pages had at least one occurrence, which is often the more useful number: a problem on half the pages usually has one cause.</p>
-    <div class="table-wrap" tabindex="0">
-      <table class="bars">
-        <caption class="vis-hidden">Detected occurrences by WCAG success criterion, with share of all occurrences and share of tested pages affected</caption>
-        <thead><tr><th scope="col">Criterion</th><th scope="col"><span class="vis-hidden">Bar</span></th><th scope="col" class="n">Occurrences</th><th scope="col" class="n">Share</th><th scope="col" class="n">Pages affected</th></tr></thead>
-        <tbody><tr><th scope="row" class="label"><span class="sc">1.4.3</span> Contrast (Minimum)<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:100.0%"></span></td><td class="n">11,441</td><td class="n">30%</td><td class="n"><span class="pct">18% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">2.5.8</span> Target Size (Minimum)<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:52.5%"></span></td><td class="n">6,012</td><td class="n">16%</td><td class="n"><span class="pct">56% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">1.4.10</span> Reflow<span class="chip chip-automated">Automated</span></th><td class="barcell"><span class="bar" style="width:40.5%"></span></td><td class="n">4,628</td><td class="n">12%</td><td class="n"><span class="pct">29% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">1.4.4</span> Resize Text<span class="chip chip-automated">Automated</span></th><td class="barcell"><span class="bar" style="width:36.7%"></span></td><td class="n">4,199</td><td class="n">11%</td><td class="n"><span class="pct">57% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">1.4.12</span> Text Spacing<span class="chip chip-automated">Automated</span></th><td class="barcell"><span class="bar" style="width:36.1%"></span></td><td class="n">4,134</td><td class="n">11%</td><td class="n"><span class="pct">57% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">1.3.1</span> Info and Relationships<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:29.7%"></span></td><td class="n">3,402</td><td class="n">9%</td><td class="n"><span class="pct">56% of pages</span></td></tr><tr><th scope="row" class="label">Best-practice rules (no single criterion)<span class="chip chip-plain">Best practice</span></th><td class="barcell"><span class="bar bp" style="width:25.5%"></span></td><td class="n">2,923</td><td class="n">8%</td><td class="n"><span class="pct">57% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">4.1.2</span> Name, Role, Value<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:7.0%"></span></td><td class="n">803</td><td class="n">2%</td><td class="n"><span class="pct">17% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">1.4.1</span> Use of Color<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:0.6%"></span></td><td class="n">6</td><td class="n">0%</td><td class="n"><span class="pct">0% of pages</span></td></tr><tr><th scope="row" class="label"><span class="sc">2.4.11</span> Focus Not Obscured (Minimum)<span class="chip chip-partial">Partly automated</span></th><td class="barcell"><span class="bar" style="width:0.6%"></span></td><td class="n">3</td><td class="n">0%</td><td class="n"><span class="pct">0% of pages</span></td></tr></tbody>
-      </table>
-    </div>
-
-    <h3 style="margin-top:2.25rem">Share of volume by coverage method</h3>
-    <p class="sub" style="margin-bottom:.5rem">By criteria count, most of WCAG needs a person. By volume of what a scan detects, almost everything so far came from the deterministic checks, which is exactly what they are for: the mechanical, repeated failures that nobody should find by hand.</p>
-    <div class="volbar" role="img" aria-label="Of 37,551 occurrences: Automated 35%; Partly automated 58%; Best practice 8%."><span class="automated" style="width:34.5%"></span><span class="partial" style="width:57.7%"></span><span class="best-practice" style="width:7.8%"></span></div>
-    <div class="legend" aria-hidden="true"><span><i style="background:var(--m-automated)"></i>Automated: 12,961 (35%)</span><span><i style="background:var(--m-partial)"></i>Partly automated: 21,667 (58%)</span><span><i style="background:#7b8794"></i>Best practice: 2,923 (8%)</span></div>
-
-    <h3 style="margin-top:2.25rem">The checks that fired most</h3>
-    <div class="table-wrap" tabindex="0">
-      <table>
-        <caption class="vis-hidden">Individual checks ranked by detected occurrences</caption>
-        <thead><tr><th scope="col">Check</th><th scope="col" class="n" style="text-align:right">Occurrences</th><th scope="col" class="n" style="text-align:right">Pages</th></tr></thead>
-        <tbody><tr><th scope="row">Contrast (Minimum)<br><span class="small">Rule engine (axe-core) · 1.4.3</span></th><td class="n">11,441</td><td class="n">823</td></tr><tr><th scope="row">Target Size (Minimum)<br><span class="small">Rule engine (axe-core) · 2.5.8</span></th><td class="n">5,965</td><td class="n">2,571</td></tr><tr><th scope="row">Reflow<br><span class="small">Zoom and reflow check · 1.4.10</span></th><td class="n">4,628</td><td class="n">1,316</td></tr><tr><th scope="row">Resize Text<br><span class="small">Zoom and reflow check · 1.4.4</span></th><td class="n">4,199</td><td class="n">2,619</td></tr><tr><th scope="row">Text Spacing<br><span class="small">Zoom and reflow check · 1.4.12</span></th><td class="n">4,134</td><td class="n">2,619</td></tr><tr><th scope="row">Content outside landmark regions<br><span class="small">Rule engine (axe-core)</span></th><td class="n">2,583</td><td class="n">2,560</td></tr><tr><th scope="row">Info and Relationships<br><span class="small">Rule engine (axe-core) · 1.3.1</span></th><td class="n">2,571</td><td class="n">2,571</td></tr><tr><th scope="row">Focusable content hidden from assistive technology<br><span class="small">Rule engine (axe-core) · 4.1.2</span></th><td class="n">799</td><td class="n">799</td></tr></tbody>
-      </table>
-    </div>
-
-    <p class="vol-note"><strong>Read this carefully.</strong> This is a small development sample of 4 websites, not a picture of the web, and none of these occurrences has been through expert review yet, so they are <em>detected</em>, not <em>confirmed</em>. The local-AI checks (meaning, visual, and vision-model image judgement) were switched off for every one of these scans, so their volume is zero by configuration, not by ability; the OCR-only image check produced 6 findings, kept separately. Snapshot generated 2026-09-03.</p>
-  </div>
-</section>
-
-<section id="explorer">
+<section class="soft" id="explorer">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Explore</span>
