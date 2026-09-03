@@ -7,7 +7,7 @@
 Scan a public or login-protected website, watch each test run, inspect a clear
 issue table, and export a defensible report with source-level evidence.
 
-[Desktop builds](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop) ·
+[Desktop builds](https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop) ·
 [Documentation](./docs/README.md) ·
 [Coverage](./docs/coverage-tracker.md) ·
 [Desktop guide](./docs/desktop-app.md) ·
@@ -29,7 +29,7 @@ Playwright Chromium, Siteimprove Alfa runner, Tesseract executable, and English
 OCR language data into one macOS app. It does not require separate Python,
 Node.js, Chromium, or Tesseract installations.
 
-**[Open the latest Electron branch build](https://github.com/rayraycodes/Axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
+**[Open the latest Electron branch build](https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
 then download `axcess-macos-apple-silicon` for the DMG. GitHub requires sign-in
 to download workflow artifacts, and each build is retained for 14 days.
 
@@ -108,7 +108,46 @@ Alfa is not an axe-core wrapper. It is a separate Siteimprove engine using ACT
 rules and a separate capture. Choose **axe**, **Alfa**, or **both** when starting
 a scan. Running both is slower but makes corroboration and disagreement visible.
 
+### Single-page applications and DOM states
 
+Axcess supports client-rendered applications built with React, Vue, Angular,
+Svelte, and similar frameworks. Playwright loads each page, waits for the
+application to render, and then extracts links from the resulting DOM. Normal
+history routes such as `/about` and hash-router routes such as `#/about` and
+`#!/about` are queued as distinct pages. Ordinary in-page anchors such as
+`#main-content` still deduplicate to the current page.
+
+Route discovery is link-driven and remains inside the configured host and path
+scope. Axcess does not inspect application bundles or guess private routes. A
+route must appear as a rendered `<a href>` link, be linked from another
+discovered page, or be supplied as the scan's starting URL. Page and depth
+limits still apply, so a completed bounded scan does not necessarily represent
+every route implemented by an application.
+
+**Click through DOM states** extends that coverage beyond page loads. Enable it
+under **Advanced settings** in the New Scan form; CLI scans enable it unless
+`--skip-interaction` is supplied. The probe operates visible buttons, tabs,
+menus, dialogs, disclosure controls, and similar elements, then re-runs
+axe-core whenever the DOM changes. Findings retain the control that revealed
+them, allowing Page Evidence to say, for example, **After clicking “Open
+profile menu.”** The report also keeps DOM-state counts separate from page
+counts.
+
+Interaction is deliberately bounded and conservative:
+
+- links remain the crawler's responsibility and are not clicked by the probe;
+- controls with names such as sign out, delete, remove, unsubscribe, or
+  deactivate are refused;
+- navigations are reversed rather than followed outside the scoped crawl
+  queue;
+- each page is capped at 40 clicks, three samples of a repeated control shape,
+  and two levels of newly revealed controls;
+- dropdowns rendered by the operating system, hover-only behavior, gestures,
+  closed shadow DOM, embedded cross-origin interfaces, and states without an
+  observable DOM change can still require manual testing.
+
+DOM-state results are browser-observed evidence, not proof that every possible
+application state or assistive-technology interaction was tested.
 
 ### Honest WCAG coverage
 
@@ -235,7 +274,7 @@ two accessibility experts. The validation protocol is documented in
 ### Setup
 
 ```bash
-git clone https://github.com/rayraycodes/Axcess.git
+git clone https://github.com/lsa-mis/axcess.git
 cd Axcess
 
 make setup             # Python dependencies + Playwright Chromium
@@ -260,8 +299,9 @@ uv run audit status
 uv run audit serve
 ```
 
-Scans operate page controls by default. Turn that off, or adjust what a crawl
-refuses to visit:
+CLI scans operate page controls by default; the New Scan form presents this as
+an unchecked Advanced Settings option. Turn the CLI probe off, or adjust what a
+crawl refuses to visit:
 
 ```bash
 # Load-state only: faster, and blind to anything behind a menu or dialog.
