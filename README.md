@@ -22,6 +22,8 @@ issue table, and export a defensible report with source-level evidence.
 > AI-assisted results do not prove WCAG conformance, legal compliance, or the
 > accessibility of an entire website.
 
+![Axcess accessibility workbench dashboard with recent scan details blurred](./docs/images/axcess-dashboard-redacted.png)
+
 ## Desktop preview
 
 The current desktop build packages the React workbench, FastAPI service,
