@@ -100,7 +100,7 @@ engines into a single unexplained verdict.
 | **Responsive probe** | 320 CSS-pixel reflow, resize behavior, clipping, and text-spacing overrides | Browser-observed evidence for 1.4.4, 1.4.10, and 1.4.12 | Chromium |
 | **Focus probe** | Obscured focus and positive `tabindex` behavior | Browser-observed focus evidence | Chromium |
 | **Image-of-text** | OCR plus vision-model assessment of meaningful text embedded in images | AI-assisted evidence for 1.4.5 | Tesseract; Ollama for VLM classification |
-| **Interaction probe** | Operates a page's menus, dialogs, tabs, and disclosure controls, then re-runs axe on every state a click reveals | Deterministic rule evidence from states a load-time pass cannot reach | Chromium |
+| **DOM State Discovery** | Operates a page's menus, dialogs, tabs, and disclosure controls, then re-runs axe on every DOM state a click reveals | Deterministic rule evidence from states a load-time pass cannot reach. `--skip-interaction` turns it off when crawl time matters more. | Chromium |
 | **Semantic analyzer** | Whether contextual content such as a link purpose or heading is understandable | Local-LLM lead requiring expert confirmation | Ollama |
 | **Visual probe** | Screenshot reading-order leads plus measured autoplay, audio, and moving-content behavior | Mixed AI-assisted and browser-observed evidence | Chromium; Ollama for visual judgment |
 
@@ -108,25 +108,7 @@ Alfa is not an axe-core wrapper. It is a separate Siteimprove engine using ACT
 rules and a separate capture. Choose **axe**, **Alfa**, or **both** when starting
 a scan. Running both is slower but makes corroboration and disagreement visible.
 
-Most of an application does not exist when a page finishes loading. Menus are
-closed, dialogs unopened, tabs unswitched. The interaction probe operates those
-controls and tests each state a click reveals, so a report covers what a person
-meets rather than what the first paint shows. It is the one layer that operates
-the page instead of observing it, so it is bounded and cautious: it never
-operates a control whose accessible name reads as destructive (sign out, log
-out, delete, remove, unsubscribe, deactivate, close account, cancel
-subscription), it reverts any click that navigates rather than following it,
-and it stops at 40 clicks per page, three samples of any repeated control, and
-two levels of nesting.
 
-Each revealed finding records the control that reached it, so the issue table
-and the page evidence both state which control to operate before the markup
-exists. A defect that only appears after a click cannot be reproduced from a
-URL and a selector alone.
-
-The cost is an axe pass for every state that actually changed, on top of the
-clicks themselves — a scan of a real application reached roughly seven states
-per page. `--skip-interaction` turns it off when crawl time matters more.
 
 ### Honest WCAG coverage
 
