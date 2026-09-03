@@ -278,7 +278,7 @@ def shell(page: Page, body: str) -> str:
     </div>
     <div class="fine">
       <span>Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.</span>
-      <span>A project by LSA and ITS at U of M</span>
+      <span>Led by the College of Literature, Science, and the Arts Technology Services and Information and Technology Services groups at the University of Michigan</span>
     </div>
   </div>
 </footer>
@@ -641,7 +641,123 @@ def how_it_works(summ) -> str:
 """
 
 
+VOLUME_FILE = SITE / "data" / "volume.json"
+METHOD_VOL_LABEL = {
+    "automated": "Automated",
+    "partial": "Partly automated",
+    "ai-assisted": "AI-assisted lead",
+    "manual": "Manual only",
+    "best-practice": "Best practice",
+}
+
+
+def load_volume() -> dict | None:
+    if not VOLUME_FILE.exists():
+        return None
+    import json
+
+    return json.loads(VOLUME_FILE.read_text(encoding="utf-8"))
+
+
+def volume_section(vol: dict | None) -> str:
+    """Coverage by volume: what completed scans actually produced, in aggregate."""
+    if not vol or not vol.get("occurrences"):
+        return ""
+    total = vol["occurrences"]
+    pages = vol["pages"]
+    rows = [r for r in vol["by_criterion"] if r["occurrences"] > 0]
+    top = max(r["occurrences"] for r in rows)
+
+    def row(r: dict) -> str:
+        share = r["occurrences"] / total * 100
+        page_pct = r["pages"] / pages * 100 if pages else 0
+        width = max(r["occurrences"] / top * 100, 0.6)
+        method = r["method"]
+        chip_cls = "chip-plain" if method == "best-practice" else f"chip-{method}"
+        sc = f'<span class="sc">{e(r["sc"])}</span> ' if r["sc"] else ""
+        return (
+            f'<tr><th scope="row" class="label">{sc}{e(r["name"])}'
+            f'<span class="chip {chip_cls}">{e(METHOD_VOL_LABEL.get(method, method))}</span></th>'
+            f'<td class="barcell"><span class="bar{" bp" if method == "best-practice" else ""}" style="width:{width:.1f}%"></span></td>'
+            f'<td class="n">{r["occurrences"]:,}</td>'
+            f'<td class="n">{share:.0f}%</td>'
+            f'<td class="n"><span class="pct">{page_pct:.0f}% of pages</span></td></tr>'
+        )
+
+    table = "".join(row(r) for r in rows)
+
+    order = ("automated", "partial", "ai-assisted", "best-practice")
+    bm = vol["by_method"]
+    segs = "".join(
+        f'<span class="{m}" style="width:{bm[m] / total * 100:.1f}%"></span>'
+        for m in order
+        if bm.get(m)
+    )
+    legend = "".join(
+        f'<span><i style="background:{ {"automated": "var(--m-automated)", "partial": "var(--m-partial)", "ai-assisted": "var(--m-ai)", "best-practice": "#7b8794"}[m] }"></i>'
+        f"{e(METHOD_VOL_LABEL[m])}: {bm[m]:,} ({bm[m] / total * 100:.0f}%)</span>"
+        for m in order
+        if bm.get(m)
+    )
+    label = "; ".join(
+        f"{METHOD_VOL_LABEL[m]} {bm[m] / total * 100:.0f}%" for m in order if bm.get(m)
+    )
+
+    rules = "".join(
+        f'<tr><th scope="row">{e(r["name"])}<br><span class="small">{e(PIPE_NAMES.get(r["pipeline"], r["pipeline"]))}'
+        f"{' · ' + e(r['sc']) if r['sc'] else ''}</span></th>"
+        f'<td class="n">{r["occurrences"]:,}</td><td class="n">{r["pages"]:,}</td></tr>'
+        for r in vol["by_rule"][:8]
+    )
+    per_page = total / pages if pages else 0
+
+    return f"""
+<section class="soft" id="volume">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Coverage by volume</span>
+      <h2>What a scan actually produces</h2>
+      <p class="sub">Counting criteria says what Axcess can look for. Counting what it found says where the work is. These figures are aggregated from the completed scans on the development machine, with no page addresses or site names, and are refreshed with the site.</p>
+    </div>
+    <div class="stats" role="list">
+      <div class="stat" role="listitem"><b>{total:,}</b><span>detected occurrences across all completed scans</span></div>
+      <div class="stat" role="listitem"><b>{pages:,}</b><span>pages tested in {vol["scans"]} scans of {vol["hosts"]} websites</span></div>
+      <div class="stat" role="listitem"><b>{per_page:.1f}</b><span>occurrences per page on average, before grouping by cause</span></div>
+      <div class="stat" role="listitem"><b>{len(rows) - (1 if any(not r["sc"] for r in rows) else 0)}</b><span>success criteria with at least one detected occurrence</span></div>
+    </div>
+
+    <h3 style="margin-top:2.25rem">Where the volume comes from</h3>
+    <p class="sub" style="margin-bottom:1rem">Occurrences by success criterion. The last column shows how many of the tested pages had at least one occurrence, which is often the more useful number: a problem on half the pages usually has one cause.</p>
+    <div class="table-wrap" tabindex="0">
+      <table class="bars">
+        <caption class="vis-hidden">Detected occurrences by WCAG success criterion, with share of all occurrences and share of tested pages affected</caption>
+        <thead><tr><th scope="col">Criterion</th><th scope="col"><span class="vis-hidden">Bar</span></th><th scope="col" class="n">Occurrences</th><th scope="col" class="n">Share</th><th scope="col" class="n">Pages affected</th></tr></thead>
+        <tbody>{table}</tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top:2.25rem">Share of volume by coverage method</h3>
+    <p class="sub" style="margin-bottom:.5rem">By criteria count, most of WCAG needs a person. By volume of what a scan detects, almost everything so far came from the deterministic checks, which is exactly what they are for: the mechanical, repeated failures that nobody should find by hand.</p>
+    <div class="volbar" role="img" aria-label="Of {total:,} occurrences: {label}.">{segs}</div>
+    <div class="legend" aria-hidden="true">{legend}</div>
+
+    <h3 style="margin-top:2.25rem">The checks that fired most</h3>
+    <div class="table-wrap" tabindex="0">
+      <table>
+        <caption class="vis-hidden">Individual checks ranked by detected occurrences</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col" class="n" style="text-align:right">Occurrences</th><th scope="col" class="n" style="text-align:right">Pages</th></tr></thead>
+        <tbody>{rules}</tbody>
+      </table>
+    </div>
+
+    <p class="vol-note"><strong>Read this carefully.</strong> This is a small development sample of {vol["hosts"]} websites, not a picture of the web, and none of these occurrences has been through expert review yet, so they are <em>detected</em>, not <em>confirmed</em>. The local-AI checks (meaning, visual, and vision-model image judgement) were switched off for every one of these scans, so their volume is zero by configuration, not by ability; the OCR-only image check produced {vol["image_findings"]} findings, kept separately. Snapshot generated {e(vol["generated"])}.</p>
+  </div>
+</section>
+"""
+
+
 def coverage(crit, summ, cov) -> str:
+    volume = volume_section(load_volume())
     total = summ.total
     bm = summ.by_method
     by_level = summ.by_level
@@ -761,7 +877,8 @@ def coverage(crit, summ, cov) -> str:
   </div>
 </section>
 
-<section class="soft" id="explorer">
+{volume}
+<section id="explorer">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Explore</span>

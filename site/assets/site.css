@@ -264,7 +264,8 @@ section.band .btn-maize { color: var(--navy); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
 table { width: 100%; border-collapse: collapse; font-size: .97rem; }
 th, td { text-align: left; padding: .8rem .95rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--soft); }
+thead th { font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--soft); }
+tbody th { font-weight: 700; color: var(--navy); background: transparent; }
 tbody tr:last-child td { border-bottom: 0; }
 td b { color: var(--navy); }
 
@@ -278,6 +279,26 @@ td b { color: var(--navy); }
 .legend { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; font-size: .93rem; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: .45rem; }
 .legend i { width: .8rem; height: .8rem; border-radius: 3px; display: inline-block; }
+
+/* ---------- Coverage by volume ---------- */
+.bars td, .bars th { padding: .65rem .8rem; }
+.bars .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+.bars th.n { text-align: right; }
+.bars .label { min-width: 16rem; }
+.bars .label .chip { margin-left: .4rem; vertical-align: middle; }
+.bars .barcell { width: 38%; min-width: 9rem; }
+@media (max-width: 700px) { .bars .barcell { display: none; } }
+.bars .bar { display: block; height: 12px; border-radius: 0 4px 4px 0; background: var(--navy); }
+.bars .bar.bp { background: #7b8794; }
+.bars .pct { color: var(--muted); font-size: .9rem; }
+.volbar { display: flex; height: 22px; border-radius: 999px; overflow: hidden; border: 1px solid var(--line-strong); margin: 1rem 0 .8rem; gap: 2px; background: var(--line-strong); }
+.volbar span { display: block; height: 100%; }
+.volbar .automated { background: var(--m-automated); }
+.volbar .partial { background: var(--m-partial); }
+.volbar .ai-assisted { background: var(--m-ai); }
+.volbar .best-practice { background: #7b8794; }
+.vol-note { font-size: .92rem; color: var(--muted); margin-top: 1rem; max-width: 74ch; }
+.site-footer .fine > span:last-child { max-width: 46ch; }
 
 /* ---------- Coverage explorer ---------- */
 .explorer-controls { display: grid; gap: 1rem; margin-bottom: 1.5rem; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.2rem 1.3rem; }
