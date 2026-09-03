@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Axcess — local-first, AI-augmented accessibility auditor</title>
-<meta name="description" content="Axcess crawls a site, renders every page, and runs 7 detection pipelines — a rule engine, behavioural probes, and local AI models — covering 28 of 55 WCAG 2.2 A/AA criteria. Runs entirely on your machine.">
+<meta name="description" content="Axcess crawls a site, renders every page, and runs 7 detection pipelines — a rule engine, behavioural probes, and local AI models — covering 29 of 55 WCAG 2.2 A/AA criteria. Runs entirely on your machine.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2300274C'/%3E%3Ctext x='16' y='22' text-anchor='middle' fill='%23FFCB05' font-family='Arial' font-size='18' font-weight='800'%3EAx%3C/text%3E%3C/svg%3E">
 <style>
   :root {
@@ -46,6 +46,9 @@
   .hero .cta .btn-ghost { border-color: #6f8aa6; color: #fff; }
   .hero .meta { margin-top: 1.5rem; color: #aebfd2; font-size: .9rem; }
   .hero .meta strong { color: #fff; }
+
+  .product-shot { display: block; width: 100%; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 48px rgba(0,39,76,.14); }
+  .caption { color: var(--muted); font-size: .9rem; margin: .75rem 0 0; }
 
   section { padding: 3.75rem 0; border-bottom: 1px solid var(--line); }
   section.soft { background: var(--bg-soft); }
@@ -101,6 +104,11 @@
 
   footer { padding: 2.5rem 0; color: var(--muted); font-size: .92rem; }
   footer .wrap { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center; }
+  @media (max-width: 760px) {
+    header.site .wrap { height: auto; min-height: 64px; flex-wrap: wrap; padding-top: .65rem; padding-bottom: .65rem; }
+    header nav { width: 100%; margin-left: 0; gap: .85rem; overflow-x: auto; padding-bottom: .2rem; }
+    header nav a { white-space: nowrap; }
+  }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 </style>
 </head>
@@ -109,12 +117,13 @@
 
 <header class="site">
   <div class="wrap">
-    <a class="brand" href="#top"><svg viewBox="0 0 32 32" width="36" height="36" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg> Axcess</a>
+    <a class="brand" href="./"><svg viewBox="0 0 32 32" width="36" height="36" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg> Axcess</a>
     <nav aria-label="Primary">
+      <a href="about/">About</a>
       <a href="#pipelines">What it checks</a>
       <a href="#compare">Compare</a>
       <a href="#start">How it works</a>
-      <a class="btn btn-primary" href="https://reganmaharjan.com.np/">← Portfolio</a>
+      <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess">GitHub</a>
     </nav>
   </div>
 </header>
@@ -122,18 +131,31 @@
 <main id="main">
 <section class="hero" id="top" style="border:0">
   <div class="wrap">
-    <span class="tag">Local-first · WCAG 2.2 AAA · MIT</span>
+    <span class="tag">Local-first · WCAG 2.2 A/AA evidence · MIT</span>
     <h1>Find the accessibility failures rule engines <span class="hl">miss</span>.</h1>
     <p class="lede">Axcess crawls your site, renders every page in a real browser, and runs
       <strong>7 detection pipelines</strong> — a rule engine, behavioural probes,
-      and local AI models — covering <strong>28 of 55</strong> WCAG 2.2 A/AA
+      and local AI models — covering <strong>29 of 55</strong> WCAG 2.2 A/AA
       success criteria. It all runs on your machine. No cloud, no telemetry.</p>
     <div class="cta">
       <a class="btn btn-primary" href="#pipelines">See what it checks ↓</a>
-      <a class="btn btn-ghost" href="https://reganmaharjan.com.np/">← Back to portfolio</a>
+      <a class="btn btn-ghost" href="about/">About Axcess</a>
     </div>
     <p class="meta">Runs with <strong>zero AI</strong> on just a browser, or add a local
       <strong>Ollama</strong> model for the judgment calls — your content never leaves the machine.</p>
+  </div>
+</section>
+
+<section id="workbench">
+  <div class="wrap">
+    <h2>An evidence workbench, not a scorecard</h2>
+    <p class="sub">Review grouped issues, follow every claim back to a page and selector,
+      and keep route coverage and click-discovered DOM states visible instead of hiding them
+      behind a single score.</p>
+    <img class="product-shot" src="assets/axcess-dashboard-redacted.png"
+      alt="Axcess dashboard showing scan totals, issue groups, and workflow guidance. Recent scan details are blurred."
+      width="1487" height="1058">
+    <p class="caption">Recent scan targets are intentionally blurred in this product preview.</p>
   </div>
 </section>
 
@@ -160,8 +182,8 @@
             <h3>Keyboard-trap probe</h3>
             <span class="badge badge-rule">rule</span>
           </div>
-          <p class="engine">Deterministic Playwright (Tab-walk, Esc, iframe checks)</p>
-          <p class="scs"><strong>Covers:</strong> 2.1.2 No Keyboard Trap</p>
+          <p class="engine">Deterministic Playwright (bidirectional Tab/Shift+Tab exit attempts)</p>
+          <p class="scs"><strong>Covers:</strong> 2.1.2 No Keyboard Trap — conservative review leads</p>
         </li>
         <li class="card">
           <div class="card-top">
@@ -196,8 +218,8 @@
             <h3>Visual probe</h3>
             <span class="badge badge-ai">AI</span>
           </div>
-          <p class="engine">Live-page screenshot + vision model (1.3.2); deterministic DOM (2.2.2)</p>
-          <p class="scs"><strong>Covers:</strong> 1.3.2 Meaningful Sequence, 2.2.2 Pause/Stop/Hide</p>
+          <p class="engine">Live-page screenshot + vision model (1.3.2); runtime media playback measurement (1.4.2, 2.2.2)</p>
+          <p class="scs"><strong>Covers:</strong> 1.3.2 Meaningful Sequence, 1.4.2 Audio Control, 2.2.2 Pause/Stop/Hide</p>
         </li>
         <li class="card">
           <div class="card-top">
@@ -206,7 +228,7 @@
             <span class="badge badge-ai">AI</span>
           </div>
           <p class="engine">Per-SC Text-LLM via Ollama</p>
-          <p class="scs"><strong>Covers:</strong> 2.4.4 Link Purpose (In Context)</p>
+          <p class="scs"><strong>Covers:</strong> 1.2.1 Audio-only transcript cues, 2.4.4 Link Purpose, 2.4.6 Headings and Labels, 3.3.2 Labels or Instructions</p>
         </li>
     </ul>
     <div class="legend">
@@ -224,31 +246,32 @@
       which still need a human — and tells you what to test for each. These numbers come straight
       from the code, so this page, the in-app Tracking view, and the docs can't drift apart.</p>
     <div class="stats">
-      <div class="stat"><b>28/55</b><span>A/AA criteria with<br>automated or AI coverage</span></div>
-      <div class="stat"><b>27</b><span>criteria flagged for<br>manual testing (with guidance)</span></div>
+      <div class="stat"><b>29/55</b><span>A/AA criteria with<br>automated or AI coverage</span></div>
+      <div class="stat"><b>26</b><span>criteria flagged for<br>manual testing (with guidance)</span></div>
       <div class="stat"><b>7</b><span>detection pipelines<br>(4 browser · 3 AI)</span></div>
       <div class="stat"><b>AAA</b><span>the tool audits itself at<br>WCAG 2.2 AAA</span></div>
     </div>
     <h3 class="cov-title">What Axcess checks for you</h3>
-    <p class="sub">The 28 criteria with automated or AI coverage today, grouped by how
+    <p class="sub">The 29 criteria with automated or AI coverage today, grouped by how
       Axcess detects them. Generated straight from the code.</p>
-      <h3 class="cov-h"><span class="dot automated"></span>Automated <span class="cov-n">6</span></h3>
+      <h3 class="cov-h"><span class="dot automated"></span>Automated <span class="cov-n">5</span></h3>
       <ul class="chips">
           <li><span class="wcag">1.4.4</span> Resize Text</li>
           <li><span class="wcag">1.4.10</span> Reflow</li>
           <li><span class="wcag">1.4.12</span> Text Spacing</li>
-          <li><span class="wcag">2.1.2</span> No Keyboard Trap</li>
           <li><span class="wcag">2.4.2</span> Page Titled</li>
           <li><span class="wcag">3.1.1</span> Language of Page</li>
       </ul>
-      <h3 class="cov-h"><span class="dot partial"></span>Partly automated <span class="cov-n">16</span></h3>
+      <h3 class="cov-h"><span class="dot partial"></span>Partly automated <span class="cov-n">18</span></h3>
       <ul class="chips">
           <li><span class="wcag">1.1.1</span> Non-text Content</li>
           <li><span class="wcag">1.3.1</span> Info and Relationships</li>
           <li><span class="wcag">1.3.5</span> Identify Input Purpose</li>
           <li><span class="wcag">1.4.1</span> Use of Color</li>
+          <li><span class="wcag">1.4.2</span> Audio Control</li>
           <li><span class="wcag">1.4.3</span> Contrast (Minimum)</li>
           <li><span class="wcag">2.1.1</span> Keyboard</li>
+          <li><span class="wcag">2.1.2</span> No Keyboard Trap</li>
           <li><span class="wcag">2.2.2</span> Pause, Stop, Hide</li>
           <li><span class="wcag">2.4.1</span> Bypass Blocks</li>
           <li><span class="wcag">2.4.3</span> Focus Order</li>
@@ -297,16 +320,16 @@
         <tr><td>axe-core</td><td>DOM rule engine</td><td><b>21</b> <span class="dim">/ 55</span><sup>1</sup></td><td>No</td></tr>
         <tr><td>Alfa <span class="dim">(Siteimprove OSS)</span></td><td>ACT-rules engine</td><td><span class="dim">not published</span><sup>2</sup></td><td>No</td></tr>
         <tr><td>Siteimprove</td><td>ACT-rules engine</td><td><span class="dim">not published</span><sup>3</sup></td><td>No</td></tr>
-        <tr class="me"><td><b>Axcess</b></td><td>Rule engine + 3 behavioural probes + 3 local-AI analyzers</td><td><b>28</b> <span class="dim">/ 55</span></td><td><b>Yes</b></td></tr>
+        <tr class="me"><td><b>Axcess</b></td><td>Rule engine + 3 behavioural probes + 3 local-AI analyzers</td><td><b>29</b> <span class="dim">/ 55</span></td><td><b>Yes</b></td></tr>
       </tbody>
     </table>
-    <p class="sub small">Axcess's 28 break down as <strong>6 deterministic</strong> ·
-      <strong>16 partly automated</strong> · <strong>6 AI-assisted</strong> (leads a human
+    <p class="sub small">Axcess's 29 break down as <strong>5 deterministic</strong> ·
+      <strong>18 partly automated</strong> · <strong>6 AI-assisted</strong> (leads a human
       confirms). It runs axe-core as its rule engine, so it covers that deterministic baseline and then
       reaches criteria no pure rule engine can — <em>“is this image really text?”</em> (1.4.5),
       <em>“does this link make sense out of context?”</em> (2.4.4), <em>“does the reading order match the
       layout?”</em> (1.3.2). The trade-off is stated plainly: AI-assisted findings are strong leads, not
-      certainties, so every finding carries a confidence label and 27 criteria are flagged
+      certainties, so every finding carries a confidence label and 26 criteria are flagged
       manual-only with guidance.</p>
     <p class="src">Sources, June 2026: <a href="https://github.com/dequelabs/axe-core/blob/develop/doc/rule-descriptions.md">axe-core 4.12 rule map</a>
       (21 distinct A/AA criteria, counted from source) ·
@@ -356,7 +379,7 @@ make frontend-build &amp;&amp; uv run audit serve   <span class="c"># → /app/<
 <footer>
   <div class="wrap">
     <span><svg viewBox="0 0 32 32" width="36" height="36" role="img" aria-label="Axcess logo" focusable="false"><rect width="32" height="32" rx="7" fill="#00274C"/><text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg> <strong>Axcess</strong> · MIT licensed · built at the University of Michigan 〽️</span>
-    <span>A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a></span>
+    <span><a href="about/">About</a> · <a href="https://github.com/lsa-mis/axcess">Source on GitHub</a> · A project by <a href="https://reganmaharjan.com.np/">Regan Maharjan</a></span>
   </div>
 </footer>
 </body>

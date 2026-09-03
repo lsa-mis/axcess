@@ -25,10 +25,9 @@ OUT = ROOT / "site" / "index.html"
 # the audit package, both in the dev env).
 sys.path.insert(0, str(ROOT / "src"))
 
-# Axcess is a private repo, so the public landing page links out to the
-# portfolio (which hosts it) and to on-page sections — never to private
-# GitHub URLs that would 404 for visitors.
+# Public destinations used by the generated landing page.
 PORTFOLIO_URL = "https://reganmaharjan.com.np/"
+REPOSITORY_URL = "https://github.com/lsa-mis/axcess"
 
 
 def e(s: str) -> str:
@@ -101,6 +100,7 @@ def render() -> str:
         axcess_partial=matrix.by_method.get("partial", 0),
         axcess_ai=matrix.by_method.get("ai-assisted", 0),
         portfolio=PORTFOLIO_URL,
+        repository=REPOSITORY_URL,
     )
 
 
@@ -166,6 +166,9 @@ TEMPLATE = (
   .hero .meta {{ margin-top: 1.5rem; color: #aebfd2; font-size: .9rem; }}
   .hero .meta strong {{ color: #fff; }}
 
+  .product-shot {{ display: block; width: 100%; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 48px rgba(0,39,76,.14); }}
+  .caption {{ color: var(--muted); font-size: .9rem; margin: .75rem 0 0; }}
+
   section {{ padding: 3.75rem 0; border-bottom: 1px solid var(--line); }}
   section.soft {{ background: var(--bg-soft); }}
   h2 {{ font-size: 1.9rem; letter-spacing: -.02em; margin: 0 0 .4rem; }}
@@ -220,6 +223,11 @@ TEMPLATE = (
 
   footer {{ padding: 2.5rem 0; color: var(--muted); font-size: .92rem; }}
   footer .wrap {{ display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center; }}
+  @media (max-width: 760px) {{
+    header.site .wrap {{ height: auto; min-height: 64px; flex-wrap: wrap; padding-top: .65rem; padding-bottom: .65rem; }}
+    header nav {{ width: 100%; margin-left: 0; gap: .85rem; overflow-x: auto; padding-bottom: .2rem; }}
+    header nav a {{ white-space: nowrap; }}
+  }}
   @media (prefers-reduced-motion: reduce) {{ html {{ scroll-behavior: auto; }} }}
 </style>
 </head>
@@ -228,14 +236,15 @@ TEMPLATE = (
 
 <header class="site">
   <div class="wrap">
-    <a class="brand" href="#top">"""
+    <a class="brand" href="./">"""
     + MARK
     + """ Axcess</a>
     <nav aria-label="Primary">
+      <a href="about/">About</a>
       <a href="#pipelines">What it checks</a>
       <a href="#compare">Compare</a>
       <a href="#start">How it works</a>
-      <a class="btn btn-primary" href="{portfolio}">← Portfolio</a>
+      <a class="btn btn-primary" href="{repository}">GitHub</a>
     </nav>
   </div>
 </header>
@@ -243,7 +252,7 @@ TEMPLATE = (
 <main id="main">
 <section class="hero" id="top" style="border:0">
   <div class="wrap">
-    <span class="tag">Local-first · WCAG 2.2 AAA · MIT</span>
+    <span class="tag">Local-first · WCAG 2.2 A/AA evidence · MIT</span>
     <h1>Find the accessibility failures rule engines <span class="hl">miss</span>.</h1>
     <p class="lede">Axcess crawls your site, renders every page in a real browser, and runs
       <strong>{shipped_pipelines} detection pipelines</strong> — a rule engine, behavioural probes,
@@ -251,10 +260,23 @@ TEMPLATE = (
       success criteria. It all runs on your machine. No cloud, no telemetry.</p>
     <div class="cta">
       <a class="btn btn-primary" href="#pipelines">See what it checks ↓</a>
-      <a class="btn btn-ghost" href="{portfolio}">← Back to portfolio</a>
+      <a class="btn btn-ghost" href="about/">About Axcess</a>
     </div>
     <p class="meta">Runs with <strong>zero AI</strong> on just a browser, or add a local
       <strong>Ollama</strong> model for the judgment calls — your content never leaves the machine.</p>
+  </div>
+</section>
+
+<section id="workbench">
+  <div class="wrap">
+    <h2>An evidence workbench, not a scorecard</h2>
+    <p class="sub">Review grouped issues, follow every claim back to a page and selector,
+      and keep route coverage and click-discovered DOM states visible instead of hiding them
+      behind a single score.</p>
+    <img class="product-shot" src="assets/axcess-dashboard-redacted.png"
+      alt="Axcess dashboard showing scan totals, issue groups, and workflow guidance. Recent scan details are blurred."
+      width="1487" height="1058">
+    <p class="caption">Recent scan targets are intentionally blurred in this product preview.</p>
   </div>
 </section>
 
@@ -378,7 +400,7 @@ make frontend-build &amp;&amp; uv run audit serve   <span class="c"># → /app/<
     <span>"""
     + MARK
     + """ <strong>Axcess</strong> · MIT licensed · built at the University of Michigan 〽️</span>
-    <span>A project by <a href="{portfolio}">Regan Maharjan</a></span>
+    <span><a href="about/">About</a> · <a href="{repository}">Source on GitHub</a> · A project by <a href="{portfolio}">Regan Maharjan</a></span>
   </div>
 </footer>
 </body>
