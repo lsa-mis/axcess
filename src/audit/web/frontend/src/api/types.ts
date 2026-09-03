@@ -952,6 +952,9 @@ export interface PageEvidence {
     screenshot_hash: string | null;
     engine_outcome: "failed" | "cant_tell";
     engine_evidence_json: string | null;
+    /** The control operated before this markup existed; null when the
+     *  finding was present at page load. */
+    revealed_by: string | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;

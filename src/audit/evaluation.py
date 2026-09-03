@@ -458,7 +458,12 @@ def get_page_evidence(
             """
             SELECT id, pipeline, rule_id, criterion_sc, wcag_sc, wcag_level,
                    impact, help, target_selector, failure_summary, html_snippet,
-                   status, screenshot_hash, engine_outcome, engine_evidence_json
+                   status, screenshot_hash, engine_outcome, engine_evidence_json,
+                   -- The control operated before this markup existed. Without
+                   -- it the evidence page lists a dialog that does not exist
+                   -- until something is clicked, alongside findings that are
+                   -- present on load, with nothing to tell them apart.
+                   revealed_by
               FROM page_a11y_findings
              WHERE page_id = ? AND scan_id = ?
              ORDER BY CASE impact WHEN 'critical' THEN 0 WHEN 'serious' THEN 1
