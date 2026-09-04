@@ -7,6 +7,10 @@ function requirePath(candidate, label) {
   if (!fs.existsSync(candidate)) throw new Error(`${label} is missing: ${candidate}`);
 }
 
+for (const extension of ["svg", "png", "ico", "icns"]) {
+  requirePath(path.join(desktopRoot, "assets", `axcess.${extension}`), "Axcess app icon");
+}
+
 const backendName = process.platform === "win32" ? "axcess-server.exe" : "axcess-server";
 const backendRoot = path.join(desktopRoot, "backend-dist", "axcess-server");
 requirePath(path.join(backendRoot, backendName), "Frozen Python backend");

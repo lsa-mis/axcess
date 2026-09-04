@@ -13,6 +13,7 @@
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f8fa; color: #172033; }
       main { width: min(32rem, calc(100vw - 3rem)); padding: 2rem; border: 1px solid #d8dee8; border-radius: .75rem; background: #fff; box-shadow: 0 12px 36px rgb(23 32 51 / 8%); }
       h1 { margin: 0 0 .75rem; font-size: 1.5rem; }
+      .app-icon { display: block; margin-bottom: 1rem; }
       p { margin: 0; line-height: 1.55; color: #4a566d; }
       .bar { height: .25rem; margin-top: 1.5rem; overflow: hidden; border-radius: 99px; background: #e6eaf0; }
       .bar::after { content: ""; display: block; width: 42%; height: 100%; border-radius: inherit; background: #1d5fa7; animation: move 1.2s ease-in-out infinite alternate; }
@@ -22,6 +23,7 @@
   </head>
   <body>
     <main role="status" aria-live="polite">
+      <img class="app-icon" src="../assets/axcess.svg" width="80" height="80" alt="" />
       <h1>Starting Axcess</h1>
       <p>Preparing your local accessibility workbench and report database.</p>
       <div class="bar" aria-hidden="true"></div>

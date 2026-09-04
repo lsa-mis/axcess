@@ -81,6 +81,8 @@ module.exports = {
     appBundleId: "edu.umich.axcess",
     appCategoryType: "public.app-category.developer-tools",
     executableName: "Axcess",
+    // Packager selects .icns or .ico for the target platform.
+    icon: path.join(__dirname, "assets", "axcess"),
     extraResource: resources,
     ignore: [
       /\/backend-dist(?:\/|$)/,
@@ -101,16 +103,20 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     { name: "@electron-forge/maker-zip", platforms: ["darwin"] },
-    { name: "@electron-forge/maker-squirrel", platforms: ["win32"] },
+    {
+      name: "@electron-forge/maker-squirrel",
+      platforms: ["win32"],
+      config: { setupIcon: path.join(__dirname, "assets", "axcess.ico") },
+    },
     {
       name: "@electron-forge/maker-deb",
       platforms: ["linux"],
-      config: { options: { bin: "Axcess" } },
+      config: { options: { bin: "Axcess", icon: path.join(__dirname, "assets", "axcess.png") } },
     },
     {
       name: "@electron-forge/maker-rpm",
       platforms: ["linux"],
-      config: { options: { bin: "Axcess" } },
+      config: { options: { bin: "Axcess", icon: path.join(__dirname, "assets", "axcess.png") } },
     },
   ],
   plugins: [

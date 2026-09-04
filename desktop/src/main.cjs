@@ -9,6 +9,7 @@ const { desktopEnvironment, isAxcessUrl, isSafeExternalUrl } = require("./runtim
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
 const repoRoot = path.resolve(__dirname, "../..");
+const appIcon = path.join(__dirname, "../assets/axcess.png");
 let mainWindow = null;
 let backendProcess = null;
 let backendOrigin = null;
@@ -157,6 +158,7 @@ function createWindow() {
     show: false,
     backgroundColor: "#f7f8fa",
     title: "Axcess",
+    icon: appIcon,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -209,7 +211,11 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(() => launch().catch(() => showStartupFailure()));
+  app.whenReady().then(() => {
+    // Packaged macOS apps use the bundle's ICNS; brand the development Dock too.
+    if (process.platform === "darwin" && !app.isPackaged) app.dock.setIcon(appIcon);
+    return launch().catch(() => showStartupFailure());
+  });
   app.on("activate", () => {
     if (!mainWindow) void launch().catch(() => showStartupFailure());
   });

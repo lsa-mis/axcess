@@ -78,6 +78,29 @@ macOS `ditto` so Electron framework symlinks remain relative, then mounts the
 finished DMG and rejects it if any app link is absolute/broken or its nested
 code-signature integrity fails.
 
+## Desktop branding
+
+Desktop builds use the existing navy-and-maize **Ax** identity, adapted as a
+rounded, padded app icon with outlined letters (no installed font required).
+The canonical desktop artwork is `desktop/assets/axcess.svg`.
+
+Committed native assets cover the macOS application/Dock (`axcess.icns`),
+Windows executable and Setup installer (`axcess.ico`), and Linux window and
+DEB/RPM launcher (`axcess.png`). The same mark appears on startup and error
+screens, and in the macOS development Dock. Packaging verifies all assets
+are present; ordinary builds do not require an icon-generation toolchain.
+
+After editing the SVG, regenerate the assets from the repository root using
+the project's installed Playwright Chromium and Pillow:
+
+```bash
+uv run python desktop/scripts/generate-icons.py
+```
+
+Review the generated PNG and run `make desktop-test` before committing all
+four assets together. Regeneration runs locally without fetching any images
+or fonts.
+
 ## Security boundary
 
 The main window has Node integration disabled, context isolation and the
@@ -96,7 +119,6 @@ from its integrity-checked ASAR archive.
 
 The build produces local, unsigned installers. Before institutional rollout:
 
-- create final `.icns`, `.ico`, and Linux icon assets;
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
 - bundle and verify an equivalent OCR runtime before enabling a Linux release

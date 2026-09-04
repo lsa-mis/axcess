@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Axcess">
+  <!-- Desktop adaptation of the navy-and-maize Ax favicon. Outlined letters
+       keep the mark identical on every platform, without font dependencies. -->
+  <rect x="64" y="64" width="896" height="896" rx="192" fill="#00274C"/>
+  <path fill="#FFCB05" fill-rule="evenodd" d="M208 680 332 344H424L548 680H455L431 606H324L299 680ZM347 530H408L378 431Z"/>
+  <path fill="#FFCB05" d="M512 432H613L662 508 712 432H812L713 553 817 680H714L662 600 610 680H508L612 553Z"/>
+</svg>
