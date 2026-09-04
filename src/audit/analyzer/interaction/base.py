@@ -69,3 +69,36 @@ class InteractionResult:
     #: Clicks that actually changed the DOM — states a load-time pass cannot
     #: reach, counted whether or not they held a defect.
     states: int = 0
+    urls: tuple[str, ...] = ()
+    #: False when exploration could not start with its required safety guard.
+    evaluated: bool = True
+    #: Distinct controls this page exposed, counting the ones a click
+    #: revealed. Discovery is not coverage: a control can be found and then
+    #: refused, capped, or never reached, so it is reported separately from
+    #: ``clicks_succeeded`` rather than folded into one "controls" number.
+    controls_discovered: int = 0
+    #: Controls the probe chose to operate, whether or not the click landed.
+    clicks_attempted: int = 0
+    #: Clicks Playwright actually dispatched. An attempt that timed out or
+    #: hit a detached node is not an interaction the report may claim. This
+    #: counts replays too, so it can exceed ``controls_operated``.
+    clicks_succeeded: int = 0
+    #: Distinct controls whose click was dispatched at least once. This, not
+    #: the click count, is the numerator of "operated N of M controls":
+    #: reopening a menu to reach its next sibling is a second click on the
+    #: same control, not a second control.
+    controls_operated: int = 0
+    #: Distinct controls refused because their label matched a blocked action.
+    blocked_controls: int = 0
+    #: Which bounds stopped exploration: any of ``clicks``, ``time``,
+    #: ``depth``, ``repeated_controls``, ``dialog_not_dismissed``. Empty
+    #: means the page was swept to exhaustion within every configured bound.
+    limits: tuple[str, ...] = ()
+    #: Dialogs a click opened, and how many would not close again. A stuck
+    #: dialog ends the page: its overlay covers every remaining control, so
+    #: clicking on regardless would record coverage that never happened.
+    dialogs_opened: int = 0
+    dialogs_stuck: int = 0
+    #: Bounded, reproducible note about the first stuck dialog: which dialog,
+    #: which control opened it, and what dismissal was tried.
+    detail: str = ""

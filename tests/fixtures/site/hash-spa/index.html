@@ -12,11 +12,21 @@
     </nav>
     <main id="main-content"><h1>Home</h1></main>
     <script>
-      const route = window.location.hash.slice(1);
-      const names = { "/about": "About", "/projects": "Projects" };
-      const name = names[route] || "Home";
-      document.title = `${name} | Hash SPA`;
-      document.querySelector("h1").textContent = name;
+      function render() {
+        const route = window.location.hash.slice(1);
+        const names = { "/about": "About", "/projects": "Projects", "/details": "Details" };
+        const name = names[route] || "Home";
+        document.title = `${name} | Hash SPA`;
+        document.querySelector("main").innerHTML = `<h1>${name}</h1>` +
+          (route === "/projects" ? '<a href="#/details">Project details</a>' : '') +
+          '<button id="expand" aria-expanded="false">Show options</button><div id="options"></div>';
+        document.querySelector('#expand').onclick = () => {
+          document.querySelector('#expand').setAttribute('aria-expanded', 'true');
+          document.querySelector('#options').innerHTML = '<input id="unlabelled">';
+        };
+      }
+      window.addEventListener("hashchange", () => setTimeout(render, 75));
+      setTimeout(render, 75);
     </script>
   </body>
 </html>

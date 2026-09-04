@@ -25,7 +25,6 @@ from urllib.parse import urlencode, urlsplit
 import httpx
 from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     FileResponse,
@@ -36,7 +35,14 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation
@@ -52,7 +58,8 @@ from audit.analyzer.semantic.registry import supported_criteria
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import url_policy
-from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
+from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
+from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.db import repo
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
@@ -133,6 +140,7 @@ class LocalLoginScanRequest(BaseModel):
     skip_ocr: bool = True
     skip_vlm: bool = True
     image_analysis_acknowledged: bool = False
+    search: SearchConfig | None = None
 
     @field_validator("approved_auth_origins")
     @classmethod
@@ -164,6 +172,18 @@ class LocalLoginScanRequest(BaseModel):
             raise ValueError("VLM classification requires OCR image analysis")
         if (not self.skip_ocr or not self.skip_vlm) and not self.image_analysis_acknowledged:
             raise ValueError("local protected-image storage acknowledgement is required")
+        if self.search:
+            # Name the single setting at fault. The combined message could
+            # not distinguish an unusable engine from a page URL outside the
+            # scan scope, and both were reported the same way.
+            refusal = _search_setup_refusal(
+                self.search,
+                seed_url=self.seed_url,
+                whole_host=self.whole_host,
+                engine=self.scan_engine,
+            )
+            if refusal:
+                raise ValueError(refusal)
         return self
 
     @property
@@ -412,6 +432,111 @@ def _protected_scan_capability(
     return True, None
 
 
+# Plain-language names for the request fields the scan forms expose. A
+# dotted path is accurate but "search.fields.0.value" is not what the form
+# calls the box the auditor typed into, and naming the wrong thing is how a
+# search term ended up in the "Search page URL" field in the first place.
+_REQUEST_FIELD_LABELS: dict[str, str] = {
+    "url": "Starting URL",
+    "seed_url": "Starting URL",
+    "scan_engine": "Engine",
+    "search": "Search-driven pages",
+    "search.confirmed": "Search authorization checkbox",
+    "search.page_url": "Search page URL",
+    "search.fields": "Search fields",
+    "search.fields.by": "Search field match type",
+    "search.fields.target": "Search field label or selector",
+    "search.fields.value": "Search field value",
+    "search.fields.kind": "Search field type",
+    "search.submit.target": "Search button label or selector",
+    "search.next_button.target": "Next results button label or selector",
+    "search.results_selector": "Search result CSS selector",
+    "search.max_results": "Maximum results",
+    "search.max_result_pages": "Maximum result pages",
+    "search.timeout_ms": "Search timeout",
+}
+
+
+def _search_setup_refusal(
+    search: SearchConfig,
+    *,
+    seed_url: str,
+    whole_host: bool,
+    engine: str,
+    static_only: bool = False,
+) -> str:
+    """Return the one setting that makes a configured search unusable.
+
+    Each cause has its own fix, and they are not interchangeable: an
+    out-of-scope page URL is corrected in a different box from an engine
+    choice. Returns an empty string when the setup is usable.
+    """
+
+    if static_only:
+        return (
+            "Search-driven pages: unavailable in static-only mode, "
+            "because searching needs Axcess' browser."
+        )
+    if engine == "alfa":
+        return (
+            "Search-driven pages: needs axe-core. "
+            "Choose axe-core or both engines, or turn the search off."
+        )
+    if not search_url_allowed(search, seed_url, whole_host=whole_host):
+        return (
+            "Search page URL: must be a full http:// or https:// address inside this "
+            "scan's scope, or blank to search the starting page. Search words belong "
+            "in a search field value, not here."
+        )
+    return ""
+
+
+def _validation_error_body(
+    exc: RequestValidationError | ValidationError, *, prefix: str = ""
+) -> dict[str, Any]:
+    """Name the setting that failed without echoing what was submitted.
+
+    FastAPI's default 422 embeds the rejected ``input``. For these forms that
+    input is the whole scan request, and the browser client then truncates
+    the body to a couple of hundred characters — which is exactly long enough
+    to lose the field name and keep the payload. Pydantic's ``msg`` is
+    generated from the schema, never from the value, so it is safe to return;
+    ``input`` and ``ctx`` are dropped.
+    """
+
+    messages: list[str] = []
+    fields: list[str] = []
+    for error in exc.errors()[:3]:
+        location = [
+            str(item)
+            for item in error.get("loc", ())
+            if item not in {"body", "query", "path", "header", "cookie"}
+        ]
+        # ``prefix`` names the sub-model when a nested config is validated on
+        # its own, so its errors still read as "Search page URL" rather than
+        # the bare "page_url" the sub-model reports.
+        location = [*prefix.split("."), *location] if prefix else location
+        path = ".".join(item for item in location if not item.isdigit())
+        index = next((int(item) for item in location if item.isdigit()), None)
+        label = _REQUEST_FIELD_LABELS.get(path, path or "Request")
+        if index is not None:
+            label = f"{label} #{index + 1}"
+        detail = str(error.get("msg") or "is not valid").removeprefix("Value error, ")
+        if error.get("type") == "extra_forbidden":
+            # The reported case: a browser tab newer than the server process,
+            # which had started before the setting existed and does not reload.
+            detail += " — this Axcess server does not know this setting; restart it."
+        messages.append(f"{label}: {detail}"[:200])
+        if path:
+            fields.append(path)
+    if not messages:
+        messages.append("Request: the submitted settings are not valid.")
+    remaining = len(exc.errors()) - len(messages)
+    if remaining > 0:
+        messages.append(f"({remaining} more problem{'' if remaining == 1 else 's'})")
+    return {"error": " ".join(messages), "fields": fields}
+
+
 def create_app(
     db_path: Path | None = None,
     blob_dir: Path | None = None,
@@ -450,7 +575,7 @@ def create_app(
                     "X-Content-Type-Options": "nosniff",
                 },
             )
-        return await request_validation_exception_handler(request, exc)
+        return JSONResponse(_validation_error_body(exc), status_code=422)
 
     # Optional shared-token gate. No-op when ``AUDIT_ACCESS_TOKEN`` is
     # unset (the default) so local dev + the test suite are untouched.
@@ -951,12 +1076,13 @@ def create_app(
 
         config = CrawlConfig(
             seed_url=body.seed_url,
+            search=body.search,
             max_pages=body.max_pages,
             max_depth=body.max_depth,
             rps=body.rps,
             whole_host=body.whole_host,
-            # Login scans reuse one authenticated BrowserContext, but each
-            # crawler worker opens and closes its own tab. Keep the cap small
+            # Login scans reuse an authenticated BrowserContext and a fixed
+            # tab pool (one tab for sessionStorage-backed sign-in). Keep the cap small
             # so concurrent pages cannot overwhelm the shared session or the
             # target application while still using modern laptop capacity.
             concurrency_per_host=body.workers,
@@ -1133,6 +1259,25 @@ def create_app(
         static_only = bool(
             body.get("static_only") or (body.get("js_eager") is False and "js_eager" in body)
         )
+        # One refusal per cause. The combined message could not tell an
+        # auditor which of five settings it meant, and the reported failure
+        # was a search term typed into the page-URL box — a mistake the
+        # message has to name to be worth reading.
+        search: SearchConfig | None = None
+        if body.get("search"):
+            try:
+                search = SearchConfig.model_validate(body["search"])
+            except ValidationError as exc:
+                return JSONResponse(_validation_error_body(exc, prefix="search"), status_code=422)
+            refusal = _search_setup_refusal(
+                search,
+                seed_url=url,
+                whole_host=bool(body.get("whole_host")),
+                engine=requested_engine,
+                static_only=static_only,
+            )
+            if refusal:
+                return JSONResponse({"error": refusal, "fields": ["search"]}, status_code=422)
         if static_only and requested_engine in {"axe", "both"}:
             return JSONResponse(
                 {
@@ -1144,6 +1289,7 @@ def create_app(
 
         form = {
             "url": url,
+            "search": search,
             "max_pages": int(body.get("max_pages") or 2500),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
@@ -2471,6 +2617,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         scan_engine = "axe"
     return CrawlConfig(
         seed_url=str(form["url"]).strip(),
+        search=form.get("search"),
         max_pages=int(form["max_pages"]),
         max_depth=int(form["max_depth"]),
         rps=float(form["rps"]),
@@ -2636,7 +2783,7 @@ async def _run_local_login_background(
         landed = run.session.verify_authenticated_target()
         config = replace(config, start_url=landed.url)
         # Chromium on macOS restores a minimized window whenever a new page is
-        # created. Allocate one reusable tab per worker before minimizing so
+        # created. Prepare reusable scan tabs before minimizing so
         # the authenticated crawl stays out of the auditor's way throughout.
         scan_pages = await run.session.prepare_background_scan_pages(config.workers)
         await run.session.discard_manual_auth_page()
@@ -2691,6 +2838,7 @@ async def _run_local_login_background(
             interaction_probe=login_interaction,
             capture_screenshots=False,
             shared_pages=scan_pages,
+            search_explorer=build_search_explorer(config, login_axe),
         )
         run.status = "scanning"
         authenticated_alfa: _AuthenticatedAlfaRunner | None = None
@@ -3142,6 +3290,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         cfg = {}
     axe_ran_counters = int(scan.get("axe_pages_scanned") or 0) > 0
     alfa_ran_counters = int(scan.get("alfa_pages_scanned") or 0) > 0
+    interaction_pages = int(scan.get("interaction_pages_probed") or 0)
+    interaction_states = int(scan.get("interaction_states_total") or 0)
     coverage_version = int(cfg.get("method_coverage_version") or 0)
     scan_status = str(scan.get("status") or "")
     page_count = int(scan.get("page_count") or 0)
@@ -3152,6 +3302,25 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
 
     rendered = flag("js_eager")
     method_specs = [
+        {
+            "key": "search",
+            "label": "Configured search",
+            "enabled": bool(cfg.get("search")),
+            "checked_count": coverage.get("search_states", 0),
+            "total_count": 0,
+            "unit": "state",
+            "verb": "checked",
+            "description": (
+                "Fills the configured search fields and checks result states, "
+                "then queues discovered pages within this scan's scope."
+            ),
+            "caveat": (
+                "Coverage depends on the supplied values and result/pagination limits. "
+                "Other searches may expose different pages. The operator authorized "
+                "these inputs and result clicks: unlike automatic clicking, a "
+                "configured search is not run behind the HTTP write guard."
+            ),
+        },
         {
             "key": "rendered",
             "label": "Browser rendering",
@@ -3259,12 +3428,87 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             ),
             "caveat": "An expert must confirm whether observed clipping is a barrier.",
         },
+        {
+            "key": "interaction",
+            "label": "Click Through DOM States",
+            "enabled": flag("interaction_checks_enabled", default=False) or interaction_pages > 0,
+            "checked_count": interaction_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            # Migrated older reports have zero-filled counters. Positive
+            # counters prove work; a version marker makes a new zero honest.
+            "coverage_known": interaction_pages > 0
+            or int(cfg.get("interaction_coverage_version") or 0) >= 1,
+            "description": (
+                "Opens menus, dialogs, tabs, and expandable controls in the rendered "
+                "page, then runs axe-core on the DOM states those clicks reveal. A "
+                "dialog is closed and verified closed before the next control is used."
+            ),
+            "caveat": (
+                "Requires axe-core. Bounded exploration skips payment, subscription and "
+                "other blocked actions, and blocks HTTP writes during automatic clicks; "
+                "a blocked request can leave a revealed state rendered incompletely. "
+                "Controls counted as found were not necessarily operated. A dialog "
+                "that would not close ends that page's exploration and is worth a "
+                "manual look. GET side effects, existing sockets, custom controls "
+                "and undiscovered states still need manual review."
+                if int(cfg.get("interaction_safety_version") or 0) >= 1
+                else "Requires axe-core. Exploration is bounded and skips blocked actions; "
+                "custom controls and undiscovered states still need manual review."
+            ),
+        },
     ]
 
     for method in method_specs:
         method.setdefault("coverage_known", True)
         method.update(_method_result(method, scan_status=scan_status))
+        if method["key"] == "interaction" and interaction_pages > 0:
+            method["result"] = "; ".join(
+                [str(method["result"]), *_interaction_clauses(interaction_states, coverage)]
+            )
+        elif method["key"] == "interaction" and method["state"] == "not_run":
+            method["result"] = "Selected, but no page checks were recorded"
+        elif (
+            method["key"] == "search" and method["enabled"] and coverage.get("search_attention", 0)
+        ):
+            method["state"] = "partial" if coverage.get("search_states", 0) else "not_run"
+            method["result"] = (
+                f"{coverage.get('search_states', 0)} result states checked; "
+                "search stopped early or found no results. Check the search settings and limits."
+            )
     return method_specs
+
+
+def _interaction_clauses(states: int, coverage: dict[str, int]) -> list[str]:
+    """Say what the control sweep reached, and what it did not.
+
+    "2 pages checked" is true of a page whose every control was refused and
+    of one swept to exhaustion. These clauses are what separates them, so
+    each is emitted only from a recorded count: an older scan with no
+    ledger rows simply says less rather than claiming a zero.
+    """
+
+    def plural(count: int, unit: str) -> str:
+        return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
+
+    clauses = [f"{plural(states, 'DOM state')} reached"]
+    controls = coverage.get("interaction_controls", 0)
+    if controls:
+        operated = coverage.get("interaction_operated", 0)
+        clauses.append(f"{operated} of {plural(controls, 'control')} operated")
+    blocked = coverage.get("interaction_blocked", 0)
+    if blocked:
+        clauses.append(f"{plural(blocked, 'control')} skipped as unsafe")
+    stuck = coverage.get("interaction_dialogs_stuck", 0)
+    if stuck:
+        # Named separately from the other bounds because it is the only one
+        # that is also a defect worth chasing rather than a budget we chose.
+        clauses.append(f"{plural(stuck, 'dialog')} would not close, stopping those pages early")
+    limited = coverage.get("interaction_limited_pages", 0)
+    if limited:
+        clauses.append(f"exploration limits reached on {plural(limited, 'page')}")
+    return clauses
 
 
 def _method_result(method: dict[str, Any], *, scan_status: str) -> dict[str, str]:
@@ -3323,7 +3567,51 @@ def _scan_method_coverage(conn: sqlite3.Connection, scan_id: int) -> dict[str, i
         "WHERE p.scan_id = ?",
         (scan_id,),
     ).fetchone()
+    search_states = 0
+    search_attention = 0
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='scan_search_runs'"
+    ).fetchone():
+        search_row = conn.execute(
+            "SELECT SUM(states), SUM(CASE WHEN status != 'completed' THEN 1 ELSE 0 END) "
+            "FROM scan_search_runs WHERE scan_id = ?",
+            (scan_id,),
+        ).fetchone()
+        search_states, search_attention = int(search_row[0] or 0), int(search_row[1] or 0)
+    # Interaction ledger. Absent for scans written before the table existed;
+    # the caller distinguishes "no controls found" from "not recorded" using
+    # the config's coverage version rather than reading zero as a fact.
+    interaction = {
+        "controls": 0,
+        "operated": 0,
+        "blocked": 0,
+        "limited_pages": 0,
+        "dialogs_stuck": 0,
+    }
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='scan_interaction_runs'"
+    ).fetchone():
+        row = conn.execute(
+            "SELECT SUM(controls_found), SUM(controls_operated), SUM(blocked_controls), "
+            "SUM(CASE WHEN limits != '' THEN 1 ELSE 0 END), SUM(dialogs_stuck) "
+            "FROM scan_interaction_runs WHERE scan_id = ?",
+            (scan_id,),
+        ).fetchone()
+        interaction = {
+            "controls": int(row[0] or 0),
+            "operated": int(row[1] or 0),
+            "blocked": int(row[2] or 0),
+            "limited_pages": int(row[3] or 0),
+            "dialogs_stuck": int(row[4] or 0),
+        }
     return {
+        "search_states": search_states,
+        "search_attention": search_attention,
+        "interaction_controls": interaction["controls"],
+        "interaction_operated": interaction["operated"],
+        "interaction_blocked": interaction["blocked"],
+        "interaction_limited_pages": interaction["limited_pages"],
+        "interaction_dialogs_stuck": interaction["dialogs_stuck"],
         "pages": int(pages["pages"] or 0),
         "rendered_pages": int(pages["rendered"] or 0),
         "discovered_images": int(images["discovered"] or 0),

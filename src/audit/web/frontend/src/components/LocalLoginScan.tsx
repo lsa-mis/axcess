@@ -15,6 +15,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../api/client";
 import type { LocalLoginScanPayload, LocalLoginScanStatus } from "../api/types";
 import EngineChoice from "../routes/EngineChoice";
+import SearchSettings from "./SearchSettings";
 import { Button, Card, Checkbox, Disclosure } from "./ui";
 import ProtectedScanSteps from "./ProtectedScanSteps";
 import { formatScanEta } from "../lib/scanProgress";
@@ -59,9 +60,8 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     whole_host: false,
     scan_engine: "axe",
     axe_level: "AA",
-    // Operating controls changes the signed-in page, so require an explicit
-    // advanced-settings opt-in for DOM-state discovery.
-    skip_interaction: true,
+    // Explore revealed DOM states and routes within the signed-in session.
+    skip_interaction: false,
     skip_keyboard: false,
     skip_responsive: false,
     skip_ocr: true,
@@ -494,11 +494,11 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                       update("skip_interaction", !enabled)
                     }
                     disabled={form.scan_engine === "alfa"}
-                    label="Click through DOM states"
+                    label="Click Through DOM States"
                     hint={
                       form.scan_engine === "alfa"
                         ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
-                        : "Opens menus, dialogs, tabs, and disclosure controls in the signed-in site, then re-runs axe-core in each revealed state. This adds scan time and avoids controls with destructive names."
+                        : "Opens menus, dialogs, tabs, and disclosure controls in the signed-in site, checks revealed states, and discovers additional routes to scan. Exploration is bounded and adds scan time. Skips payment, subscription, submission, and other blocked actions; blocks HTTP writes during automatic clicks."
                     }
                   />
                   <Checkbox
@@ -509,6 +509,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     label="Ignore robots.txt"
                     hint="Required for this explicitly authorized authenticated evaluation; normal scope and read-only request limits still apply."
                   />
+                  <SearchSettings value={form.search} onChange={search => update("search", search)} disabled={form.scan_engine === "alfa"} />
                   <Checkbox
                     checked={!form.skip_ocr}
                     onChange={(enabled) => {

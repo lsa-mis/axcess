@@ -39,6 +39,34 @@ import type {
 } from "./types";
 
 /**
+ * Turn an error response into something a person can act on.
+ *
+ * The API reports a refusal as `{ error }` naming the setting at fault.
+ * Showing that alone beats the raw body: the previous format prefixed the
+ * method and URL and then truncated at 200 characters, which for a
+ * validation failure cut the message off before the field name and left the
+ * reader looking at a slice of their own request.
+ */
+export function apiErrorMessage(status: number, body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object") {
+      const value = (parsed as { error?: unknown; detail?: unknown });
+      const message =
+        typeof value.error === "string"
+          ? value.error
+          : typeof value.detail === "string"
+            ? value.detail
+            : "";
+      if (message.trim()) return message.slice(0, 400);
+    }
+  } catch {
+    // Not JSON (a proxy error page, an empty body). Fall through.
+  }
+  return `${status}: ${body.slice(0, 200)}`;
+}
+
+/**
  * Thin fetch wrapper for the /api/* surface. Throws on non-2xx with the
  * response body text attached so React Query surfaces useful errors.
  */
@@ -53,9 +81,7 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(
-      `${init?.method ?? "GET"} ${input} → ${res.status}: ${body.slice(0, 200)}`,
-    );
+    throw new Error(apiErrorMessage(res.status, body));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -80,7 +106,7 @@ async function downloadProtectedRedactedExport(scanId: number): Promise<void> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`POST ${input} → ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(apiErrorMessage(res.status, body));
   }
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);

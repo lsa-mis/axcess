@@ -126,7 +126,9 @@ export interface ScanMethodCoverage {
     | "image"
     | "semantic"
     | "keyboard"
-    | "responsive";
+    | "responsive"
+    | "interaction"
+    | "search";
   label: string;
   /** Kept for compatibility: means selected/configured, not completed. */
   enabled: boolean;
@@ -134,7 +136,7 @@ export interface ScanMethodCoverage {
   result: string;
   checked_count: number;
   total_count: number;
-  unit: "page" | "image";
+  unit: "page" | "image" | "state";
   verb: "rendered" | "checked" | "analyzed" | "reviewed";
   coverage_known: boolean;
   description: string;
@@ -242,7 +244,22 @@ export interface LocalAnalysisCapability {
   };
 }
 
+export interface SearchTarget { by: "label" | "selector"; target: string; }
+export interface SearchField extends SearchTarget { value: string; kind: "text" | "select"; }
+export interface SearchConfig {
+  confirmed: boolean;
+  page_url: string;
+  fields: SearchField[];
+  submit: SearchTarget | null;
+  results_selector: string;
+  next_button: SearchTarget | null;
+  max_result_pages: number;
+  max_results: number;
+  timeout_ms: number;
+}
+
 export interface NewScanPayload {
+  search?: SearchConfig | null;
   url: string;
   max_pages: number;
   max_depth: number;
@@ -311,6 +328,7 @@ export interface ProtectedScanCapability {
 }
 
 export interface LocalLoginScanPayload {
+  search?: SearchConfig | null;
   seed_url: string;
   /** Exact HTTPS origins used only while the auditor completes sign-in. */
   approved_auth_origins: string[];

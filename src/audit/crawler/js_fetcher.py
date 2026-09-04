@@ -33,6 +33,8 @@ from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler.fetcher import FetchError, FetchResult
+from audit.crawler.search import SearchExplorer
+from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
@@ -135,6 +137,7 @@ class JsFetcher:
         private_context: bool = False,
         max_rendered_html_chars: int | None = None,
         headless: bool = True,
+        search_explorer: SearchExplorer | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -191,6 +194,7 @@ class JsFetcher:
         # watch page navigation. Protected scans inject their already-headed
         # shared context and ignore this launch preference.
         self._headless = headless
+        self._search_explorer = search_explorer
         if max_rendered_html_chars is not None and max_rendered_html_chars <= 0:
             raise ValueError("max_rendered_html_chars must be positive when configured")
         self._max_rendered_html_chars = max_rendered_html_chars
@@ -236,6 +240,8 @@ class JsFetcher:
             ctx = await browser.new_context(
                 user_agent=self._user_agent,
                 viewport=self._viewport,
+                service_workers="block",
+                accept_downloads=False,
             )
             owns_context = True
         page: Page | None = None
@@ -248,6 +254,16 @@ class JsFetcher:
                 page = await ctx.new_page()
             try:
                 resp = await page.goto(url, timeout=self._nav_timeout_ms, wait_until="load")
+                if resp is None:
+                    # A pooled login tab can navigate within one SPA document
+                    # (e.g. #/about -> #/projects). Playwright returns None for
+                    # that navigation, not an HTTP failure. Reload the selected
+                    # route so it gets the same load/settle lifecycle as a
+                    # public scan, retaining this tab's authenticated storage.
+                    # Never invent a 200: preserve the real response status.
+                    resp = await page.reload(timeout=self._nav_timeout_ms, wait_until="load")
+                if resp is None:
+                    raise FetchError("Browser navigation returned no document response.")
             except Exception as exc:
                 if self._private_context:
                     raise FetchError("Protected browser navigation failed.") from exc
@@ -272,8 +288,8 @@ class JsFetcher:
                         "Rendered page exceeded the configured extraction limit."
                     )
             html = await page.content()
-            status = resp.status if resp is not None else 0
-            headers = resp.headers if resp is not None else {}
+            status = resp.status
+            headers = resp.headers
             # ``Response.url`` omits the fragment because fragments are not
             # sent over HTTP. ``Page.url`` retains React/Vue hash-router
             # routes such as ``#/projects`` and also reflects client-side
@@ -331,12 +347,15 @@ class JsFetcher:
             # Held per fetch, not on the probe: the probe is shared by every
             # concurrent worker, so a count stored on it is raced.
             interaction = InteractionResult()
+            interaction_evaluated = False
+            search_result = None
             if (
                 self._interaction_probe is not None
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 interaction = await self._interaction_probe.run(page, baseline=axe_violations)
+                interaction_evaluated = interaction.evaluated
 
             responsive_findings: list[ResponsiveFinding] = []
             if (
@@ -384,6 +403,16 @@ class JsFetcher:
                     else:
                         log.warning("screenshot.capture_failed", url=final_url, error=str(exc))
 
+            if (
+                self._search_explorer is not None
+                and self._search_explorer.entry_url in {normalize(url), normalize(final_url)}
+                and 200 <= status < 300
+            ):
+                search_result = await self._search_explorer.run(
+                    page,
+                    baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
+                )
+
             return FetchResult(
                 url=final_url,
                 status_code=status,
@@ -397,6 +426,20 @@ class JsFetcher:
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
+                interaction_evaluated=interaction_evaluated,
+                interaction_controls=interaction.controls_discovered,
+                interaction_clicks_attempted=interaction.clicks_attempted,
+                interaction_clicks_succeeded=interaction.clicks_succeeded,
+                interaction_controls_operated=interaction.controls_operated,
+                interaction_blocked_controls=interaction.blocked_controls,
+                interaction_limits=interaction.limits,
+                interaction_dialogs_opened=interaction.dialogs_opened,
+                interaction_dialogs_stuck=interaction.dialogs_stuck,
+                interaction_detail=interaction.detail,
+                discovered_urls=tuple(
+                    sorted(set(interaction.urls) | set(search_result.urls if search_result else ()))
+                ),
+                search_result=search_result,
                 screenshots=screenshots,
             )
         finally:
