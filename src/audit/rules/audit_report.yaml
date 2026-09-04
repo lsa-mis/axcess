@@ -60,6 +60,24 @@ axe_rules:
       - >-
         Update the CMS field or the template so the alt attribute is
         always present, even when empty.
+    fix_options:
+      - label: "Describe the image's meaning in its alt attribute"
+        approach: >-
+          Decide what each image conveys where it sits, and write that meaning into
+          alt. Describe the purpose, not the appearance: "Acme logo", not "blue
+          square with letters".
+        watch_out: >-
+          The same file can need different alt text on different pages. A logo that
+          is also a link to the home page describes the destination, not the
+          picture.
+      - label: "Mark it decorative and carry the meaning in nearby text"
+        approach: >-
+          If the image only repeats adjacent text or is purely ornamental, set
+          alt="" so screen readers skip it cleanly, and make sure the surrounding
+          text carries the information.
+        watch_out: >-
+          alt="" on the only source of some information hides it completely, and an
+          image with alt="" inside a link leaves that link with no name at all.
     verify_manual: >-
       With a screen reader running (VoiceOver: Cmd+F5 on macOS; NVDA:
       Ctrl+Alt+N on Windows), tab to each affected image. It should
@@ -98,6 +116,29 @@ axe_rules:
         Update the CSS custom property or design-system token — most
         contrast failures cascade from one token, so one change
         often fixes many findings at once.
+    fix_options:
+      - label: "Adjust the foreground colour"
+        approach: >-
+          Darken or lighten the text until it reaches 4.5:1 against its actual
+          background, or 3:1 for large text.
+        watch_out: >-
+          Check every state, including hover, focus, visited and disabled, and
+          measure against the real backdrop: an image or gradient behind the text,
+          not the declared background colour.
+      - label: "Put the text on its own surface"
+        approach: >-
+          Change the background, or place the text on a solid panel or scrim, so
+          contrast stops depending on whatever sits behind it.
+        watch_out: >-
+          A semi-transparent scrim has to be measured at the lightest point of the
+          image beneath it, not an average.
+      - label: "Qualify as large text"
+        approach: >-
+          Text at 18.66px bold or 24px regular only needs 3:1, so increasing size or
+          weight can resolve a near miss without a palette change.
+        watch_out: >-
+          This is a lower bar, not an exemption. It does nothing for small UI
+          labels, and larger type can push layout in ways that need their own check.
     verify_manual: >-
       Open DevTools → Accessibility tab → Contrast ratio reading.
       Confirm ≥ 4.5:1 for body text, ≥ 3:1 for large text.
@@ -133,6 +174,29 @@ axe_rules:
       - >-
         Avoid "click here" and "read more" — write text that describes
         the destination so users scanning a link list can decide.
+    fix_options:
+      - label: "Give the link visible text"
+        approach: >-
+          Replace icon-only or empty links with text, or put text beside the icon so
+          every user sees the same name assistive tech hears.
+        watch_out: >-
+          A name is not yet a purpose: "Read more" repeated twenty times passes this
+          rule and still fails SC 2.4.4 in context.
+      - label: "Name it for assistive technology only"
+        approach: >-
+          Add an aria-label, or a visually hidden span inside the link using the
+          framework's screen-reader-only class.
+        watch_out: >-
+          aria-label replaces the visible text entirely, which breaks voice control
+          when the spoken name no longer matches what is on screen. Where visible
+          text exists, extend it with a hidden span instead.
+      - label: "Point at text that is already on the page"
+        approach: >-
+          When the link's purpose is written next to it, such as a card title,
+          reference that element with aria-labelledby.
+        watch_out: >-
+          The referenced id must exist and be unique. A duplicated id silently names
+          the link after the wrong element.
     verify_manual: >-
       Tab through the affected page; the focus ring should land on each
       link with a descriptive announcement. Use a screen reader's link
@@ -172,6 +236,29 @@ axe_rules:
       - >-
         Avoid <code>placeholder</code> as a label substitute — it
         disappears on focus and fails most contrast thresholds.
+    fix_options:
+      - label: "Associate a visible label element"
+        approach: >-
+          Give the control a <label for="..."> matching its id, or wrap the control
+          in the label.
+        watch_out: >-
+          The for value must match the input's id exactly, and placeholder text is
+          not a label: it disappears as soon as the user types.
+      - label: "Name the control for assistive technology only"
+        approach: >-
+          Use aria-label where a visible label would genuinely be redundant, such as
+          a search field sitting immediately beside a Search button.
+        watch_out: >-
+          A control with no visible label is harder for everyone, not just screen-
+          reader users. Keep this for the few cases where surrounding context is
+          unambiguous.
+      - label: "Reference an existing visible string"
+        approach: >-
+          Use aria-labelledby to name the control from text already displayed, such
+          as a table row or section heading.
+        watch_out: >-
+          Ids must be unique, and when several are referenced the reading order
+          follows the order listed, not the order on screen.
     verify_manual: >-
       Tab into each form field. The screen reader should announce the
       field's purpose immediately. Click the visible label; the focus
@@ -206,6 +293,23 @@ axe_rules:
       - >-
         If parts of the page are in a different language, wrap those
         sections in an element with its own <code>lang</code> attribute.
+    fix_options:
+      - label: "Set lang on the root html element"
+        approach: >-
+          Add lang to the served document template so it is correct before any
+          JavaScript runs.
+        watch_out: >-
+          Single-page frameworks render the shell once. Setting this only in JS
+          leaves the pre-hydration document unlabelled, and a site with per-page
+          languages has to update it on route change.
+      - label: "Derive the language from the content locale"
+        approach: >-
+          Where a CMS or i18n layer already knows the locale, emit it into the
+          document rather than hard-coding one language.
+        watch_out: >-
+          The value must be valid BCP 47: pt-BR, not pt_br. Passages in another
+          language still need their own lang attribute on the element that contains
+          them.
     verify_manual: >-
       View page source / DevTools → confirm <code>&lt;html lang="…"&gt;</code>
       is present and accurate.
@@ -241,6 +345,22 @@ axe_rules:
         If the focus order is wrong without forced tabindex, the DOM
         order itself is wrong — reorder the HTML rather than papering
         over it with tabindex.
+    fix_options:
+      - label: "Remove the positive tabindex values"
+        approach: >-
+          Delete tabindex="1" and higher, and let DOM order drive focus. Where the
+          sequence is genuinely wrong, reorder the markup.
+        watch_out: >-
+          A single positive value jumps ahead of the entire page, so removing one
+          changes the order of everything around it. Retest the whole flow, not just
+          the element you edited.
+      - label: "Use an element that is focusable by nature"
+        approach: >-
+          Replace a div carrying tabindex with a real button or link, which brings
+          focus, activation and role for free.
+        watch_out: >-
+          Changing the tag changes default styling, and a button inside a form needs
+          type="button" so it does not submit.
     verify_manual: >-
       Tab from the top of the page; focus should follow the visible
       reading order without surprises.
@@ -273,6 +393,23 @@ axe_rules:
         For icon-only buttons, give the wrapping <code>&lt;button&gt;</code>
         or <code>&lt;a&gt;</code> the size, not the icon itself — the
         hit target is the element, not its visual contents.
+    fix_options:
+      - label: "Enlarge the control's hit area"
+        approach: >-
+          Grow the clickable box to at least 24 by 24 CSS pixels with padding,
+          rather than only scaling the icon inside it.
+        watch_out: >-
+          Padding on an inline element may not grow the clickable box at all. Check
+          the rendered box, and that the larger target does not overlap its
+          neighbours.
+      - label: "Space the targets further apart"
+        approach: >-
+          SC 2.5.8 is also met when a 24px circle centred on the target does not
+          overlap another target's circle, so extra spacing can resolve it where the
+          design cannot grow.
+        watch_out: >-
+          The exception is measured between targets, so it lapses the moment a
+          denser row or an extra control is added nearby.
     verify_manual: >-
       Inspect each affected control; the rendered box should be at
       least 24×24 CSS pixels. Tap on a phone — it should activate
@@ -310,6 +447,22 @@ axe_rules:
         different non-color signal — bold weight, a small icon, or a
         bottom-border — combined with at least 3:1 contrast against
         the surrounding text.
+    fix_options:
+      - label: "Add a cue that does not rely on colour"
+        approach: >-
+          Underline links inside body copy, or give them another visual distinction
+          that is present at rest.
+        watch_out: >-
+          An underline that appears only on hover does not satisfy this: the cue has
+          to be there before the user interacts.
+      - label: "Raise the contrast between link and surrounding text"
+        approach: >-
+          Choose a link colour with at least 3:1 against the body text as well as
+          4.5:1 against the background.
+        watch_out: >-
+          This holds only while both colours stay fixed. A theme switch or a dark-
+          mode palette can break the relationship without touching the link's own
+          styles.
     verify_manual: >-
       Open the page in macOS's Color Filters (Settings → Accessibility
       → Display → Color Filters → Grayscale). Body links should still
@@ -345,6 +498,22 @@ axe_rules:
         Wrap the nav in <code>&lt;nav&gt;</code>, the page header in
         <code>&lt;header&gt;</code>, and the footer in
         <code>&lt;footer&gt;</code>. These are HTML5 landmarks by default.
+    fix_options:
+      - label: "Wrap the content in landmark elements"
+        approach: >-
+          Put the page's regions inside header, nav, main, aside and footer so every
+          meaningful block sits in a landmark.
+        watch_out: >-
+          The rule flags content that falls between landmarks, so partial adoption
+          still fails: anything meaningful has to end up inside one.
+      - label: "Apply ARIA landmark roles where the tag cannot change"
+        approach: >-
+          Add role="main", role="navigation" and similar to existing containers when
+          the element itself is fixed by a component library.
+        watch_out: >-
+          Prefer the native elements. A role on the wrong container, such as one
+          that wraps both the nav and the content, is more misleading than no role
+          at all.
     verify_manual: >-
       Run a screen reader's landmark navigation. The main content
       should be reachable in one keystroke (VoiceOver: VO+U then
@@ -375,6 +544,22 @@ axe_rules:
         Ensure exactly one <code>&lt;main&gt;</code> element exists
         per page, wrapping the primary content (not nav, header, or
         footer).
+    fix_options:
+      - label: "Keep exactly one main region"
+        approach: >-
+          Identify the primary content area, mark it main, and demote the others to
+          section or div.
+        watch_out: >-
+          In single-page layouts a per-route main inside a shell main produces two
+          at runtime even though each template looks correct on its own.
+      - label: "Hide the inactive regions from the accessibility tree"
+        approach: >-
+          Where several views live in the DOM at once, mark the inactive ones hidden
+          or inert so only one main is exposed.
+        watch_out: >-
+          display:none removes a region, but visibility and offscreen positioning
+          may not. Confirm in the accessibility tree rather than by looking at the
+          page.
     verify_manual: >-
       View source / DevTools — count the <main> elements. Should be
       exactly 1.
@@ -382,6 +567,76 @@ axe_rules:
     acceptance: >-
       Every page has exactly one <main> element wrapping its primary content.
     confidence_default: high
+
+  page-has-heading-one:
+    title: "The page has no top-level heading"
+    # Deliberately no wcag_sc: this is an axe best-practice rule, not a
+    # criterion. A page can lack an h1 and still satisfy 1.3.1. Claiming a
+    # Level A failure here would put an unsupported conformance verdict in
+    # the report; the missing structure is real, its WCAG status is a
+    # judgment the auditor makes after looking.
+    abilities_affected: [vision, cognition]
+    what_happening: >-
+      No level-one heading was found in the rendered page. Headings that are
+      present may be hidden with <code>display: none</code>, or the text that
+      looks like a heading may be a div, span, or button carrying a
+      typography class that only changes font size. Styling text to look
+      large does not make it a heading, and nothing hidden with
+      <code>display: none</code> reaches the accessibility tree.
+    why_matters: >-
+      Screen reader users navigate by heading. Without an outline they cannot
+      jump to a section, cannot get a sense of what the page contains, and
+      cannot confirm which page they are on — they are left reading the page
+      line by line. Sighted users with cognitive disabilities lose the same
+      structural cue.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the accessibility tree (or the heading list in a screen reader)
+        and compare it with what the page looks like. Every block of content
+        that reads as a section should appear as a heading.
+      - >-
+        Give the page exactly one <code>h1</code> naming what the page is,
+        then mark the section labels below it as <code>h2</code> and
+        <code>h3</code> so the levels descend without gaps.
+      - >-
+        Remove headings hidden with <code>display: none</code>. If a heading
+        must be invisible, use a screen-reader-only utility class, which
+        keeps it in the accessibility tree.
+    fix_options:
+      - label: "Promote the visible text into real headings via the component's tag prop"
+        approach: >-
+          Delete the headings hidden with display:none and let the components
+          that already look like headings render as real ones. Component
+          libraries usually expose this directly, such as a tag prop on a
+          title component.
+        watch_out: >-
+          Where the thing that looks like a section label is an interactive
+          control, keep the control and put a real heading above it rather
+          than turning a button into a heading.
+      - label: "Use standard heading tags, with a screen-reader-only class where needed"
+        approach: >-
+          Replace the typography wrappers with h1 to h3. Where a heading
+          genuinely should not be seen, use the framework's visually-hidden
+          class rather than display:none, which hides it from assistive
+          technology as well as from the screen.
+        watch_out: >-
+          Native heading tags bring their own margins and can override
+          component-library spacing, so check the layout after the swap.
+    verify_manual: >-
+      Open the page and list its headings, using the browser's accessibility
+      tree or a screen reader's heading list. Confirm one h1 that names the
+      page, levels that descend without skipping, and that everything which
+      looks like a heading either is one or has one associated with it.
+    verify_automated: >-
+      Re-run the crawl. The same page should no longer report
+      <code>page-has-heading-one</code> or <code>heading-order</code>.
+    acceptance: >-
+      The page exposes a logical heading structure with exactly one h1 and a
+      clear h1 to h6 outline with no skipped levels, and no heading is hidden
+      with display:none, visibility:hidden, or zero dimensions.
+    confidence_default: medium
 
   heading-order:
     title: "Heading levels skip a step"
@@ -408,6 +663,31 @@ axe_rules:
         If you used a heading level for visual styling, replace it
         with a CSS class on the correct heading level — styling is
         not the same as structure.
+    fix_options:
+      - label: "Promote the visible text into real headings via the component's tag prop"
+        approach: >-
+          Delete headings that are hidden with display:none, and let the components
+          that already look like headings render as h1 to h6. Component libraries
+          usually expose this directly, such as a tag prop on a title component.
+        watch_out: >-
+          Where the thing that looks like a section label is an interactive control,
+          keep the control and put a real heading above it rather than turning a
+          button into a heading.
+      - label: "Use standard heading tags, with a screen-reader-only class where needed"
+        approach: >-
+          Replace typography wrappers with h1 to h3. When a heading genuinely should
+          not be seen, use the framework's visually-hidden class rather than
+          display:none, which hides it from assistive technology too.
+        watch_out: >-
+          Native heading tags bring their own margins and can override component-
+          library spacing, so check the layout after the swap.
+      - label: "Correct only the level sequence"
+        approach: >-
+          Where the headings already exist but skip levels, renumber them so they
+          descend without gaps.
+        watch_out: >-
+          Levels express nesting, not size. Pick the level the structure calls for
+          and restyle with CSS, rather than choosing a level for its font size.
     verify_manual: >-
       Run a screen reader's heading list (VoiceOver: VO+U → Headings;
       NVDA: H key). The outline should read as a sensible table of
