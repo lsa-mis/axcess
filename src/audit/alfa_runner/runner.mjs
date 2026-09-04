@@ -9,7 +9,7 @@
  * follow-up URLs or contacts an external service.
  */
 
-import { Audit, Outcome } from "@siteimprove/alfa-act";
+import { Audit } from "@siteimprove/alfa-act";
 import { Playwright as AlfaPlaywright } from "@siteimprove/alfa-playwright";
 import rules from "@siteimprove/alfa-rules";
 import { Criterion, Conformance } from "@siteimprove/alfa-wcag";
@@ -21,9 +21,7 @@ import { isIP } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const MAX_FINDINGS = 200;
-const MAX_EVIDENCE_CHARS = 4_000;
-const MAX_MESSAGE_CHARS = 2_000;
+import { collectOutcomes } from "./evidence.mjs";
 const PROFILE_ROOT = join(tmpdir(), "axcess-protected-alfa");
 const PROFILE_PREFIX = "run-";
 const STALE_PROFILE_MAX_AGE_MS = 6 * 60 * 60 * 1_000;
@@ -181,31 +179,14 @@ try {
       : selectedRules;
     const outcomes = await Audit.of(alfaPage, auditRules).evaluate();
     verificationProgress("rule evaluation complete");
-    const counts = emptyCounts();
-    const findings = [];
-    for (const outcome of outcomes) {
-      if (Outcome.isFailed(outcome)) {
-        counts.failed += 1;
-      } else if (Outcome.isCantTell(outcome)) {
-        counts.cantTell += 1;
-      } else if (Outcome.isPassed(outcome)) {
-        counts.passed += 1;
-      } else {
-        counts.inapplicable += 1;
-      }
-      if ((Outcome.isFailed(outcome) || Outcome.isCantTell(outcome)) && findings.length < MAX_FINDINGS) {
-        findings.push(toFinding(outcome));
-      }
-    }
+    const projected = collectOutcomes(outcomes);
     emit({
       protocol_version: 1,
       engine: "alfa",
       url: page.url(),
       status,
       content_type: contentType,
-      outcome_counts: counts,
-      findings,
-      findings_truncated: counts.failed + counts.cantTell > findings.length,
+      ...projected,
     });
   }
 } catch (error) {
@@ -231,100 +212,8 @@ function verificationProgress(stage) {
   }
 }
 
-function toFinding(outcome) {
-  const rule = outcome.rule;
-  const ruleJson = rule.toJSON();
-  const requirements = Array.isArray(ruleJson.requirements) ? ruleJson.requirements : [];
-  const criteria = requirements.filter((requirement) => requirement?.type === "criterion");
-  const ruleCriteria = rule.requirements.filter(Criterion.isCriterion);
-  const wcagScs = criteria
-    .map((criterion) => String(criterion.chapter || ""))
-    .filter(Boolean);
-  const primary = criteria[0] || null;
-  const outcomeJson = outcome.toJSON();
-  const sarif = outcome.toSARIF();
-  const message = truncate(
-    sarif?.message?.text || outcomeJson?.diagnostic?.message || "Alfa requires expert review.",
-    MAX_MESSAGE_CHARS,
-  );
-  const targetEvidence = compactJson(summarizeTarget(outcomeJson?.target));
-  return {
-    rule_id: rule.uri.split("/").filter(Boolean).pop() || rule.uri,
-    rule_uri: rule.uri,
-    outcome: Outcome.isFailed(outcome) ? "failed" : "cantTell",
-    mode: outcome.mode,
-    wcag_sc: primary?.chapter || null,
-    wcag_scs: wcagScs,
-    wcag_level: ruleCriteria[0] ? criterionLevel(ruleCriteria[0]) : null,
-    help: primary
-      ? `WCAG ${primary.chapter}: ${primary.title || "Alfa ACT rule"}`
-      : "Alfa ACT rule requires expert review",
-    failure_summary: message,
-    target_hint: targetEvidence || "Alfa target unavailable; see the rule evidence.",
-    evidence: compactJson({
-      diagnostic: outcomeJson?.diagnostic,
-      expectations: outcomeJson?.expectations,
-      mode: outcome.mode,
-      outcome: outcome.outcome,
-      rule: { uri: rule.uri, requirements: criteria },
-      target: summarizeTarget(outcomeJson?.target),
-    }),
-  };
-}
-
-function summarizeTarget(target) {
-  if (Array.isArray(target)) return target.slice(0, 3).map(summarizeTarget);
-  if (!target || typeof target !== "object") return target ?? null;
-  const type = String(target.type || "");
-  if (type === "document") return { type: "document" };
-  if (type === "text") {
-    return { type, data: truncate(String(target.data || "").replace(/\s+/g, " ").trim(), 160) };
-  }
-  if (type === "attribute") {
-    return { type, name: target.name || null, value: truncate(String(target.value || ""), 160) };
-  }
-  if (type === "element") {
-    const attributes = Array.isArray(target.attributes)
-      ? target.attributes.slice(0, 12).map((attribute) => ({
-          type: "attribute",
-          name: attribute?.name || null,
-          value: truncate(String(attribute?.value || ""), 160),
-        }))
-      : [];
-    const text = Array.isArray(target.children)
-      ? target.children
-          .filter((child) => child?.type === "text")
-          .map((child) => String(child.data || ""))
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim()
-      : "";
-    return { type, name: target.name || null, attributes, text: truncate(text, 240) };
-  }
-  return { type: type || "node" };
-}
-
-function criterionLevel(requirement) {
-  // Alfa's Criterion keeps versioned levels. The 2.2 branch is the report
-  // target; a rule may be Level A even in an AA scan.
-  let found = null;
-  requirement.level?.some((value, versions) => {
-    if ([...versions].includes("2.2")) found = value;
-  });
-  return found;
-}
-
 function emptyCounts() {
   return { failed: 0, cantTell: 0, passed: 0, inapplicable: 0 };
-}
-
-function compactJson(value) {
-  if (value === undefined || value === null) return "";
-  try {
-    return truncate(JSON.stringify(value), MAX_EVIDENCE_CHARS);
-  } catch {
-    return "";
-  }
 }
 
 function truncate(value, max) {

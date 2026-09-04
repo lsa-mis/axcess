@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from audit.analyzer.alfa_evidence import bounded_evidence_json, normalize_finding
 from audit.logging import get_logger
 
 log = get_logger(__name__)
@@ -71,11 +72,12 @@ class AlfaFinding:
     failure_summary: str
     target_hint: str
     evidence_json: str
+    target_identity: str = ""
 
     @property
     def target_hash(self) -> str:
         h = hashlib.sha256()
-        for value in (self.rule_id, self.outcome, self.target_hint):
+        for value in (self.rule_id, self.outcome, self.target_identity or self.target_hint):
             h.update(value.encode("utf-8", errors="replace"))
             h.update(b"\x00")
         return h.hexdigest()
@@ -366,14 +368,18 @@ def _parse_result(raw: bytes) -> AlfaResult:
     findings_raw = payload.get("findings")
     if not isinstance(findings_raw, list):
         raise AlfaError("Alfa response omitted findings.")
-    findings = tuple(_parse_finding(item) for item in findings_raw[:200])
+    actionable = sorted(
+        findings_raw,
+        key=lambda item: 0 if isinstance(item, dict) and item.get("outcome") == "failed" else 1,
+    )
+    findings = tuple(_parse_finding(item) for item in actionable[:200])
     return AlfaResult(
         url=_bounded_text(payload.get("url"), 4096),
         status=_as_int(payload.get("status")),
         findings=findings,
         failed_total=_as_int(counts.get("failed")),
         cant_tell_total=_as_int(counts.get("cantTell")),
-        truncated=bool(payload.get("findings_truncated")),
+        truncated=bool(payload.get("findings_truncated")) or len(findings_raw) > 200,
         authentication_required=payload.get("authentication_required") is True,
     )
 
@@ -397,6 +403,14 @@ def _parse_finding(value: Any) -> AlfaFinding:
         for sc in (scs_raw if isinstance(scs_raw, list) else [])
         if _bounded_text(sc, 32)
     ]
+    normalized = normalize_finding(
+        {
+            "pipeline": "alfa",
+            "engine_outcome": outcome,
+            "engine_evidence_json": value.get("evidence"),
+            "failure_summary": value.get("failure_summary"),
+        }
+    )
     return AlfaFinding(
         rule_id=rule_id,
         rule_uri=_bounded_text(value.get("rule_uri"), 4096),
@@ -406,10 +420,11 @@ def _parse_finding(value: Any) -> AlfaFinding:
         wcag_scs=",".join(dict.fromkeys(scs)) or None,
         wcag_level=_bounded_text(value.get("wcag_level"), 8) or None,
         help=_bounded_text(value.get("help"), 2000) or f"Alfa ACT rule {rule_id}",
-        failure_summary=_bounded_text(value.get("failure_summary"), 8000),
+        failure_summary=_bounded_text(normalized.get("failure_summary"), 8000),
         target_hint=_bounded_text(value.get("target_hint"), 4000)
         or "Alfa target unavailable; see the stored evidence.",
-        evidence_json=_bounded_text(value.get("evidence"), 12000),
+        evidence_json=bounded_evidence_json(value.get("evidence")),
+        target_identity=_bounded_text(value.get("target_identity"), 128),
     )
 
 

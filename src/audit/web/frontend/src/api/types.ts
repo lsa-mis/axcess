@@ -759,7 +759,13 @@ export interface IssuesResponse {
 // Served by /api/scans/{id}/a11y/by-rule.
 // ---------------------------------------------------------------
 
-export interface A11yRuleGroupFinding {
+export interface AlfaEvidenceDisplay {
+  target_display?: string;
+  engine_evidence_status?: "complete" | "truncated" | "recovered" | "unavailable";
+  manual_review_hint?: string | null;
+}
+
+export interface A11yRuleGroupFinding extends AlfaEvidenceDisplay {
   id: number;
   pipeline: DetectionPipeline;
   engine_outcome: "failed" | "cant_tell" | null;
@@ -801,7 +807,7 @@ export interface A11yByRuleResponse {
   groups: A11yRuleGroup[];
 }
 
-export interface A11yDrillFinding {
+export interface A11yDrillFinding extends AlfaEvidenceDisplay {
   id: number;
   pipeline: DetectionPipeline;
   engine_outcome: "failed" | "cant_tell" | null;
@@ -974,6 +980,9 @@ export interface PageEvidence {
     screenshot_hash: string | null;
     engine_outcome: "failed" | "cant_tell";
     engine_evidence_json: string | null;
+    target_display?: string;
+    engine_evidence_status?: "complete" | "truncated" | "recovered" | "unavailable";
+    manual_review_hint?: string | null;
     /** The control operated before this markup existed; null when the
      *  finding was present at page load. */
     revealed_by: string | null;
@@ -991,4 +1000,42 @@ export interface PageEvidence {
     vlm_classification: Classification | null;
     vlm_rationale: string | null;
   }>;
+}
+
+
+export type ComparisonCategory = "new" | "still_detected" | "changed" | "no_longer_detected" | "cannot_compare";
+export interface ComparisonLink { label: string; url: string }
+export interface ComparisonSnapshot {
+  occurrences: number;
+  pages: number;
+  statuses: Record<string, number>;
+  outcomes: Record<string, number>;
+  issues: ComparisonLink[];
+  evidence: ComparisonLink[];
+}
+export interface ComparisonRow {
+  key: string;
+  pipeline: string;
+  title: string;
+  category: ComparisonCategory;
+  before: ComparisonSnapshot | null;
+  after: ComparisonSnapshot | null;
+  limitations: string[];
+}
+export interface ComparisonCoverageState {
+  state: "complete" | "incomplete" | "unknown" | "disabled";
+  checked: number | null;
+  total: number;
+}
+export interface ComparisonReport {
+  coverage: Array<{ pipeline: string; before: ComparisonCoverageState; after: ComparisonCoverageState }>;
+  current: { id: number; seed_url: string; started_at: string };
+  baseline: { id: number; seed_url: string; started_at: string } | null;
+  counts: Record<ComparisonCategory, number>;
+  pipeline_counts: Record<string, number>;
+  limitations: string[];
+  rows: ComparisonRow[];
+  total: number;
+  page: number;
+  page_size: number;
 }

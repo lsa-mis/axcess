@@ -32,7 +32,6 @@ What this module deliberately does NOT do:
 
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -41,6 +40,7 @@ from typing import Any, Literal
 
 import yaml
 
+from audit.analyzer.alfa_evidence import humanize_target
 from audit.web import a11y_queries, image_findings_queries
 
 # Conformance label shown in the table's badge column.
@@ -861,10 +861,17 @@ def _axe_issue_rows(
                     "verdict. Confirm that the rule applies and reproduce the barrier before "
                     "presenting the row as a confirmed accessibility issue."
                 )
+            review_hint = next(
+                (f.get("manual_review_hint") for f in finding_rows if f.get("manual_review_hint")),
+                None,
+            )
             alfa_fix_steps = (
                 "Open the linked page evidence and review the Alfa target and diagnostic.",
-                "Manually test the applicable WCAG success criterion with the "
-                "relevant assistive technology.",
+                review_hint
+                or (
+                    "Manually test the applicable WCAG success criterion with the "
+                    "relevant assistive technology."
+                ),
                 (
                     "Apply the correction, then rescan the same scope to verify the "
                     "ACT outcome is resolved."
@@ -1032,7 +1039,7 @@ def _a11y_location_samples(
     for finding in findings:
         page_id = int(finding["page_id"])
         target = _humanize_location_target(finding.get("target_selector"))
-        identity = (page_id, target)
+        identity = (page_id, str(finding.get("target_selector") or target))
         if identity in seen:
             continue
         seen.add(identity)
@@ -1044,7 +1051,7 @@ def _a11y_location_samples(
                 page_title=finding.get("page_title"),
                 target=target,
                 context=context or None,
-                evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+                evidence_url=f"/scans/{scan_id}/pages/{page_id}#finding-{finding['id']}",
                 revealed_by=(str(finding["revealed_by"]) if finding.get("revealed_by") else None),
             )
         )
@@ -1056,40 +1063,7 @@ def _a11y_location_samples(
 def _humanize_location_target(raw_target: Any) -> str:
     """Turn Alfa's structured target hint into a compact element locator."""
 
-    target = " ".join(str(raw_target or "").split())
-    if not target:
-        return "Page-level result"
-    try:
-        parsed = json.loads(target)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return target[:240]
-    if not isinstance(parsed, dict):
-        return target[:240]
-    target_type = str(parsed.get("type") or "")
-    if target_type == "document":
-        return "Document root"
-    if target_type == "attribute":
-        name = str(parsed.get("name") or "attribute")
-        value = str(parsed.get("value") or "")
-        return f'[{name}="{value[:120]}"]'
-    if target_type == "element":
-        name = str(parsed.get("name") or "element")
-        attributes = parsed.get("attributes")
-        selectors: list[str] = []
-        if isinstance(attributes, list):
-            preferred = {"id", "class", "name", "role", "type", "href", "src"}
-            for attribute in attributes:
-                if not isinstance(attribute, dict):
-                    continue
-                attr_name = str(attribute.get("name") or "")
-                if attr_name not in preferred:
-                    continue
-                value = str(attribute.get("value") or "")[:100]
-                selectors.append(f'[{attr_name}="{value}"]')
-                if len(selectors) >= 2:
-                    break
-        return f"{name}{''.join(selectors)}"[:240]
-    return target[:240]
+    return humanize_target(raw_target)
 
 
 def _image_location_samples(

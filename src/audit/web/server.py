@@ -82,6 +82,14 @@ from audit.protected.repository import (
 from audit.protected.session import ManualAuthenticationError, ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
 from audit.synthesizer.diff import compute_diff
+from audit.web.comparison import (
+    Category,
+    ComparisonError,
+    ComparisonResponse,
+    Pipeline,
+    compare_reports,
+    previous_scan_id,
+)
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
 from audit.web.export_readiness import (
     IncompleteEvaluationExportError,
@@ -876,11 +884,7 @@ def create_app(
             scan = _load_scan_or_404(conn, scan_id)
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
-            prev = conn.execute(
-                "SELECT id FROM scans WHERE seed_url = ? AND id <> ? "
-                "AND status = 'completed' ORDER BY id DESC LIMIT 1",
-                (scan["seed_url"], scan_id),
-            ).fetchone()
+            prev = previous_scan_id(conn, scan)
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
@@ -888,7 +892,7 @@ def create_app(
             **_scan_row_to_summary(scan),
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
-            "previous_scan_id": int(prev["id"]) if prev is not None else None,
+            "previous_scan_id": prev,
             "blocked": blocked,
             "progress": progress,
             # Axe counters denormalized on scans for cheap reads. The SPA
@@ -1977,6 +1981,29 @@ def create_app(
                     detail="Database migrations are incomplete. Run `make migrate` and retry.",
                 ) from exc
         return JSONResponse({"status": status, "updated": updated})
+
+    @app.get("/api/scans/{scan_id:int}/comparison", response_model=ComparisonResponse)
+    def api_scan_comparison(
+        scan_id: int,
+        compare_to: int | None = Query(default=None, ge=1),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=50, ge=1, le=50),
+        category: Category | None = None,
+        pipeline: Pipeline | None = None,
+    ) -> ComparisonResponse:
+        with get_conn() as conn:
+            try:
+                return compare_reports(
+                    conn,
+                    scan_id,
+                    compare_to=compare_to,
+                    page=page,
+                    page_size=page_size,
+                    category=category,
+                    pipeline=pipeline,
+                )
+            except ComparisonError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     @app.get("/api/scans/{scan_id:int}/diff")
     def api_scan_diff(scan_id: int, compare_to: int = Query(...)) -> JSONResponse:

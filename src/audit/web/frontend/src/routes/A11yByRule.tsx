@@ -1,3 +1,4 @@
+import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -328,9 +329,9 @@ function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId
       </td>
       <td className="px-3 py-2">
         <code className="block break-all font-mono text-2xs text-fg">
-          {finding.target_selector.length > 90
-            ? `${finding.target_selector.slice(0, 90)}…`
-            : finding.target_selector}
+          {(finding.target_display || finding.target_selector).length > 90
+            ? `${(finding.target_display || finding.target_selector).slice(0, 90)}…`
+            : (finding.target_display || finding.target_selector)}
         </code>
         {finding.html_snippet && (
           <details className="mt-1">
@@ -342,6 +343,8 @@ function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId
             </pre>
           </details>
         )}
+        <AlfaEvidenceNote evidence={finding} />
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${finding.page_id}#finding-${finding.id}`}>Open stored finding evidence</Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}

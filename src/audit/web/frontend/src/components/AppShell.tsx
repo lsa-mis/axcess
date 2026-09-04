@@ -136,6 +136,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
           />
           {mobileNavOpen && <MobileNav pathname={pathname} />}
+          <div className="border-b border-border bg-surface px-2 py-1 md:hidden"><ReportCrumb /></div>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>

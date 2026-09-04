@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router";
 import { cn } from "../lib/cn";
 
 /**
- * Report navigation: overview, the issue table, and optional comparison.
+ * Report navigation: overview, the issue table, and change verification.
  *
  * These are three *views of the same report*, not three steps of a task, so
  * they render as underline tabs. The earlier numbered-pill treatment read as
@@ -30,13 +30,11 @@ export default function ReportWorkspaceNav({
       active: pathname.includes("/issues"),
     },
   ];
-  if (previousScanId != null) {
-    items.push({
-      label: "Verify changes",
-      to: `/scans/${scanId}/diff?compare_to=${previousScanId}`,
-      active: pathname.includes("/diff"),
-    });
-  }
+  items.push({
+    label: "Verify changes",
+    to: `/scans/${scanId}/diff${previousScanId != null ? `?compare_to=${previousScanId}` : ""}`,
+    active: pathname.includes("/diff"),
+  });
 
   return (
     <nav

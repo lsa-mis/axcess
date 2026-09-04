@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from audit.analyzer.alfa_evidence import evidence_notice
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 
 TOP_N = 20
@@ -205,11 +206,14 @@ def _format_axe_block(af: ExportA11yFinding) -> list[str]:
     if af.help:
         lines.append(f"- **Rule:** {af.help}")
     lines.append(f"- **Page:** {af.page_url}")
-    lines.append(f"- **Target:** `{_short(af.target_selector, 100)}`")
+    lines.append(f"- **Target:** `{_short(af.target_display or af.target_selector, 100)}`")
     if af.failure_summary:
         # Failure summaries can be multi-line; collapse to one for the bullet.
         one_line = " ".join(af.failure_summary.split())
-        lines.append(f"- **Why it failed:** {_short(one_line, 240)}")
+        label = "Diagnostic" if af.pipeline == "alfa" else "Why it failed"
+        lines.append(f"- **{label}:** {_short(one_line, 240)}")
+    if af.pipeline == "alfa" and evidence_notice(af.engine_evidence_status):
+        lines.append(f"- **Evidence:** {evidence_notice(af.engine_evidence_status)}")
     if af.help_url:
         lines.append(f"- **Docs:** {af.help_url}")
     lines.append(f"- **Status:** {af.status}")

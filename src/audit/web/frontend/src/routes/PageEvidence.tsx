@@ -1,6 +1,8 @@
+import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import { api, blobUrl } from "../api/client";
 import ReportHeader from "../components/ReportHeader";
 import { Card, StatusChip } from "../components/ui";
@@ -13,7 +15,18 @@ type PageEvidenceFinding = PageEvidence["a11y_findings"][number];
 /** One finding's evidence card. Extracted unchanged so the flat list and the
  *  grouped-by-state list render identically. */
 function FindingCard({ finding }: { finding: PageEvidenceFinding }) {
-  return <Card className="p-4"><div className="flex flex-wrap justify-between gap-2"><div><strong>{finding.help}</strong><p className="mt-1 text-sm text-fg-muted">{finding.wcag_sc ? `WCAG ${finding.wcag_sc}` : "Best practice"} · {finding.pipeline}{finding.pipeline === "alfa" && ` · ${finding.engine_outcome === "cant_tell" ? "Needs expert review (cannot tell)" : "Standardized ACT test failed"}`}</p></div><StatusChip value={finding.status} /></div>{finding.failure_summary && <p className="mt-2 text-sm">{finding.failure_summary}</p>}<code className="mt-2 block overflow-x-auto rounded-xs bg-surface-muted p-2 text-xs">{finding.target_selector}</code>{finding.screenshot_hash && <figure className="mt-3"><img className="max-h-72 rounded-xs border border-border" src={blobUrl(finding.screenshot_hash)} alt="Circled issue evidence. The circular marker identifies the detected location." loading="lazy" /><figcaption className="mt-1 text-xs text-fg-muted">The circle marks the detected location.</figcaption></figure>}</Card>;
+  return <Card id={`finding-${finding.id}`} tabIndex={-1} className="scroll-mt-24 p-4" aria-label={`Finding ${finding.id}: ${finding.help}`}>
+    <div className="flex flex-wrap justify-between gap-2">
+      <div><h3 className="font-semibold">{finding.help}</h3>
+        <p className="mt-1 text-sm text-fg-muted">{finding.wcag_sc ? `WCAG ${finding.wcag_sc}` : "Best practice"} · {finding.pipeline}{finding.pipeline === "alfa" && ` · ${finding.engine_outcome === "cant_tell" ? "Needs manual review (cannot tell)" : "Standardized ACT test failed"}`}</p>
+      </div><StatusChip value={finding.status} />
+    </div>
+    {finding.failure_summary && <p className="mt-2 text-sm">{finding.failure_summary}</p>}
+    <AlfaEvidenceNote evidence={finding} />
+    <p className="mt-3 text-xs font-semibold">Location</p>
+    <code className="mt-1 block overflow-x-auto rounded-xs bg-surface-muted p-2 text-xs">{finding.target_display || finding.target_selector}</code>
+    {finding.screenshot_hash && <figure className="mt-3"><img className="max-h-72 rounded-xs border border-border" src={blobUrl(finding.screenshot_hash)} alt="Circled issue evidence. The circular marker identifies the detected location." loading="lazy" /><figcaption className="mt-1 text-xs text-fg-muted">The circle marks the detected location.</figcaption></figure>}
+  </Card>;
 }
 
 /** Findings split by the control that revealed them.
@@ -48,10 +61,20 @@ function groupByRevealingControl(findings: PageEvidenceFinding[]) {
 
 export default function PageEvidenceRoute() {
   const { scanId, pageId } = useParams<{ scanId: string; pageId: string }>();
+  const { hash } = useLocation();
   const scan = Number(scanId);
   const page = Number(pageId);
   const { data: scanData } = useQuery({ queryKey: ["scan", scan], queryFn: () => api.getScan(scan), enabled: Number.isFinite(scan) });
   const { data, error } = useQuery({ queryKey: ["page-evidence", scan, page], queryFn: () => api.getPageEvidence(scan, page), enabled: Number.isFinite(scan) && Number.isFinite(page) });
+  useEffect(() => {
+    if (!data || !scanData || !/^#finding-\d+$/.test(hash)) return;
+    const frame = window.requestAnimationFrame(() => {
+      const finding = document.getElementById(hash.slice(1));
+      finding?.scrollIntoView({ block: "center" });
+      finding?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [hash, data, scanData]);
   if (error) return <Card className="p-4 text-sm text-sev-critical" role="alert">This page is not part of the requested report.</Card>;
   if (!scanData || !data) return <div className="text-fg-muted">Loading…</div>;
   // Only group when a click actually revealed something: on a page where

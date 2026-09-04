@@ -1,6 +1,6 @@
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ExternalLink, Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card } from "../components/ui";
@@ -41,6 +41,7 @@ export default function IssuesRoute() {
   const issuesQuery = useQuery({
     queryKey: ["issues", id, conformance, q, sort],
     queryFn: () => api.listIssues(id, { conformance, q, sort }),
+    placeholderData: (previous, query) => query?.queryKey[1] === id ? keepPreviousData(previous) : undefined,
     enabled: Number.isFinite(id),
   });
 
@@ -55,7 +56,9 @@ export default function IssuesRoute() {
 
   const rows = useMemo(() => issuesQuery.data?.rows ?? [], [issuesQuery.data]);
   const selected =
-    rows.find((row) => row.issue_key === selectedKey) ?? rows[0] ?? null;
+    rows.find((row) => row.issue_key === selectedKey) ??
+    rows.find((row) => row.review_lane === "likely_barrier") ??
+    rows.find((row) => row.review_lane === "expert_review") ?? rows[0] ?? null;
 
   useEffect(() => {
     // Keep ?issue= honest without ever inventing it: the pane falls back to the
@@ -187,14 +190,7 @@ function IssueListPane({
             className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
             aria-hidden
           />
-          <input
-            type="search"
-            aria-label="Search issues"
-            value={q}
-            placeholder="Search issue name or WCAG criterion"
-            onChange={(event) => onParam("q", event.target.value)}
-            className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2 pl-10 pr-3 text-sm text-fg focus:border-umich-blue focus:outline-none"
-          />
+          <IssueSearch value={q} onChange={(value) => onParam("q", value)} />
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           <FilterSelect
@@ -242,13 +238,30 @@ function IssueListPane({
         </p>
       ) : (
         <ul aria-label="Accessibility issue groups" className="divide-y divide-border">
-          {rows.map((row) => (
-            <IssueListRow
-              key={row.issue_key}
-              row={row}
-              selected={row.issue_key === selectedKey}
-            />
-          ))}
+          {([
+            ["likely_barrier", "Likely barriers"],
+            ["expert_review", "Needs manual review"],
+            ["informational", "Informational"],
+          ] as const).map(([lane, label]) => {
+            const laneRows = rows.filter((row) => row.review_lane === lane);
+            if (laneRows.length === 0) return null;
+            const hasBarriers = rows.some((row) => row.review_lane === "likely_barrier");
+            const isOnlyLane = laneRows.length === rows.length;
+            return (
+              <li key={`${lane}:${hasBarriers}:${isOnlyLane}`}>
+                <details open={lane === "likely_barrier" || isOnlyLane}>
+                  <summary className="min-h-target cursor-pointer focus-visible:outline-none focus-visible:shadow-focus bg-surface-subtle px-3.5 py-3 text-sm font-semibold text-fg">
+                    {label} <span className="font-normal tabular-nums">({laneRows.length})</span>
+                  </summary>
+                  <ul aria-label={`${label} issue groups`} className="divide-y divide-border">
+                    {laneRows.map((row) => (
+                      <IssueListRow key={row.issue_key} row={row} selected={row.issue_key === selectedKey} />
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>
@@ -282,6 +295,7 @@ function IssueListRow({
       */}
       <a
         href={`${row.detail_url}`}
+        data-issue-selection="true"
         aria-current={selected ? "true" : undefined}
         onClick={(event) => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -338,10 +352,11 @@ function IssuePane({ row }: { row: IssueRow }) {
       firstRender.current = false;
       return;
     }
-    headingRef.current?.focus({ preventScroll: true });
+    if (document.activeElement?.getAttribute("data-issue-selection") === "true") {
+      headingRef.current?.focus({ preventScroll: true });
+    }
   }, [row.issue_key]);
 
-  const remaining = Math.max(0, row.occurrence_count - row.locations.length);
 
   return (
     <Card aria-labelledby={headingId} className="p-5" role="region">
@@ -374,7 +389,7 @@ function IssuePane({ row }: { row: IssueRow }) {
             Why it matters
           </h3>
           <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-fg">
-            {row.why_matters || row.description || row.evidence_summary}
+            {row.pipeline === "alfa" ? row.evidence_summary : row.why_matters || row.description || row.evidence_summary}
           </p>
           {row.abilities_affected.length > 0 && (
             <p className="mt-2.5 text-xs text-fg-muted">
@@ -430,9 +445,7 @@ function IssuePane({ row }: { row: IssueRow }) {
           to={row.detail_url}
           className="inline-flex min-h-target items-center text-sm font-semibold text-umich-blue underline underline-offset-2"
         >
-          {remaining > 0
-            ? `Open full evidence — ${remaining} more occurrence${remaining === 1 ? "" : "s"}`
-            : "Open full evidence"}
+          Open all occurrences
         </Link>
       </p>
     </Card>
@@ -556,4 +569,37 @@ function FilterSelect({
       </select>
     </label>
   );
+}
+
+
+/** Keep keystrokes synchronous while URL navigation is scheduled by the router. */
+function IssueSearch({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const published = useRef<string | null>(null);
+  const latestChange = useRef(onChange);
+  useEffect(() => { latestChange.current = onChange; }, [onChange]);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (value !== published.current) {
+      clearTimeout(timer.current);
+      setDraft(value);
+    }
+  }, [value]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return <input
+    type="search"
+    aria-label="Search issues"
+    value={draft}
+    placeholder="Search issue name or WCAG criterion"
+    onChange={(event) => {
+      const next = event.target.value;
+      setDraft(next);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        published.current = next;
+        latestChange.current(next);
+      }, 200);
+    }}
+    className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2 pl-10 pr-3 text-base text-fg focus:border-umich-blue focus:outline-none focus-visible:shadow-focus"
+  />;
 }

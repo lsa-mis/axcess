@@ -13,6 +13,7 @@ from collections import defaultdict
 from typing import Any
 
 from audit import coverage_matrix
+from audit.analyzer.alfa_evidence import normalize_finding
 
 OUTCOMES = frozenset({"not_started", "pass", "fail", "not_tested", "needs_follow_up"})
 EVALUATION_STATUSES = frozenset({"draft", "in_progress", "completed"})
@@ -453,7 +454,7 @@ def get_page_evidence(
     if page is None:
         return None
     findings = [
-        dict(row)
+        normalize_finding(dict(row))
         for row in conn.execute(
             """
             SELECT id, pipeline, rule_id, criterion_sc, wcag_sc, wcag_level,

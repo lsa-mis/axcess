@@ -62,6 +62,16 @@
 }
 
 @layer components {
+  a.report-link {
+    @apply rounded-xs text-umich-blue underline decoration-1 underline-offset-4;
+  }
+  a.report-link:hover {
+    @apply bg-surface-muted decoration-2;
+  }
+  a.report-link:focus-visible {
+    @apply bg-umich-maize/20 outline-none shadow-focus;
+  }
+
   /* Shared form control: visible border, large hit area, and no colour-only state. */
   .field {
     @apply min-h-target w-full rounded-xs border border-border-strong bg-surface px-3 py-2 text-sm text-fg shadow-sm transition-colors;

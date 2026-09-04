@@ -1,3 +1,4 @@
+import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronRight, ExternalLink, Info } from "lucide-react";
@@ -436,9 +437,9 @@ function DrillDownView({
                   </td>
                   <td className="px-3 py-2">
                     <code className="block break-all font-mono text-2xs text-fg">
-                      {f.target_selector.length > 90
-                        ? `${f.target_selector.slice(0, 90)}…`
-                        : f.target_selector}
+                      {(f.target_display || f.target_selector).length > 90
+                        ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
+                        : (f.target_display || f.target_selector)}
                     </code>
                     {f.html_snippet && (
                       <details className="mt-1">
@@ -450,6 +451,8 @@ function DrillDownView({
                         </pre>
                       </details>
                     )}
+                    <AlfaEvidenceNote evidence={f} />
+                    <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${f.page_id}#finding-${f.id}`}>Open stored finding evidence</Link>
                     {f.failure_summary && (
                       <div className="mt-1 text-2xs text-fg-muted">
                         {f.failure_summary}

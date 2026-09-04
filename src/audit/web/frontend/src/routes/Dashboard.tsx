@@ -9,6 +9,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { api } from "../api/client";
+import { siteLabel } from "../components/ReportCrumb";
 import {
   Card,
   EmptyState,
@@ -80,9 +81,12 @@ export default function DashboardRoute() {
       {!error && latest && latestIssues && (
         <Card className="mb-6 overflow-hidden border-umich-blue bg-[linear-gradient(118deg,#001E3C_0%,#002F5D_58%,#00417B_100%)] shadow-raised">
           <div className="grid gap-5 p-6 sm:p-7 md:grid-cols-[1fr_auto] md:items-center">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-surface-inverse-fg-subtle">
-                Latest completed report · #{latest.id}
+                Latest completed report ·{" "}
+                <span className="break-all normal-case tracking-normal">
+                  {siteLabel(latest.seed_url)}
+                </span>
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
                 {latestIssues.total_unfiltered > 0
@@ -157,10 +161,10 @@ export default function DashboardRoute() {
                     <li key={s.id}>
                       <Link
                         to={`/scans/${s.id}`}
-                        className="-mx-2 flex items-center justify-between gap-4 rounded-xs px-2 py-3 no-underline transition-colors hover:bg-surface-muted"
+                        className="report-link -mx-2 flex min-h-target items-center justify-between gap-4 rounded-xs px-2 py-3 transition-colors"
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-fg">
+                          <div className="truncate text-sm font-semibold text-umich-blue">
                             #{s.id} · {s.seed_url}
                           </div>
                           <div className="text-xs text-fg-subtle">

@@ -135,3 +135,33 @@ def test_partial_protected_migration_still_lists_public_reports(tmp_path: Path) 
 
         public_detail = client.get(f"/api/scans/{public_id}")
         assert public_detail.status_code == 200
+
+
+def test_legacy_populated_alfa_report_still_exports_without_revealed_by(tmp_path: Path) -> None:
+    """Missing later metadata must not prevent exporting existing evidence."""
+    from audit.exports.collector import collect_scan
+    from audit.exports.markdown_report import render_markdown
+
+    db_path, _, scan_id, _ = _legacy_database(tmp_path)
+    with connect(db_path) as conn:
+        page_id = int(
+            conn.execute(
+                "INSERT INTO pages(scan_id,url_normalized,status_code,render_mode) VALUES (?, 'https://legacy.example/first',200,'js')",
+                (scan_id,),
+            ).lastrowid
+        )
+        conn.execute(
+            "INSERT INTO page_a11y_findings(page_id,scan_id,rule_id,pipeline,target_selector,"
+            "target_hash,engine_outcome,engine_evidence_json,help) "
+            "VALUES (?,?,'sia-r69','alfa','p','legacy-hash','cant_tell',?, 'Contrast')",
+            (page_id, scan_id, '{"diagnostic":{"message":"Could not resolve colors"}}'),
+        )
+        columns_before = [r[1] for r in conn.execute("PRAGMA table_info(page_a11y_findings)")]
+        assert "revealed_by" not in columns_before
+        report = collect_scan(conn, scan_id)
+        assert report.a11y_findings[0].revealed_by is None
+        assert report.a11y_findings[0].failure_summary == "Could not resolve colors"
+        assert "**Diagnostic:** Could not resolve colors" in render_markdown(report)
+        assert [
+            r[1] for r in conn.execute("PRAGMA table_info(page_a11y_findings)")
+        ] == columns_before

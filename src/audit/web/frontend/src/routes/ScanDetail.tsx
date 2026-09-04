@@ -173,6 +173,7 @@ export default function ScanDetailRoute() {
           title="Overview"
           meta={
             <ReportMeta
+              note=""
               counts={
                 <>
                   {data.finished_at ? `Completed ${formatCompleted(data.finished_at)} · ` : ""}

@@ -57,7 +57,7 @@ export default function ReportCrumb() {
 
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
-      <ol className="flex min-w-0 items-center gap-1.5">
+      <ol className="flex min-w-0 flex-wrap items-center gap-1">
         <Crumb to="/scans">Reports</Crumb>
         <Separator />
         {/* The site is the middle crumb and links to the report's own
@@ -95,7 +95,7 @@ function Crumb({
     <li className="min-w-0">
       <Link
         to={to}
-        className={`block whitespace-nowrap font-medium text-fg-muted no-underline hover:text-fg hover:underline hover:underline-offset-2 ${className ?? ""}`}
+        className={`report-link block min-h-target content-center whitespace-nowrap px-2 py-2 font-semibold ${className ?? ""}`}
       >
         {children}
       </Link>

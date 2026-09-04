@@ -59,10 +59,10 @@ export function ReportMeta({
   return (
     <>
       <span className="font-semibold tabular-nums text-fg">{counts}</span>
-      <span aria-hidden className="px-1.5 text-border-strong">
-        |
-      </span>
-      <span className="text-fg-subtle">{note}</span>
+      {note && (<>
+        <span aria-hidden className="px-1.5 text-border-strong">|</span>
+        <span className="text-fg-subtle">{note}</span>
+      </>)}
     </>
   );
 }

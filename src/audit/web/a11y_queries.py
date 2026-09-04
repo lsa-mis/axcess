@@ -23,6 +23,8 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
+from audit.analyzer.alfa_evidence import normalize_finding
+
 # Impact ordering, for sorting "worst first" — axe doesn't always set
 # impact (best-practice rules and a few WCAG rules leave it None), so
 # None ranks last.
@@ -262,7 +264,7 @@ def findings_for_sc(
     # `limit`, `offset`) all flow through parameter binding.
     sql = f"""
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.impact, a.help, a.help_url,
-               a.target_selector, a.failure_summary, a.html_snippet,
+               a.target_selector, a.failure_summary, a.html_snippet, a.engine_evidence_json,
                a.status, a.wcag_sc, a.wcag_level, a.revealed_by,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
@@ -281,7 +283,7 @@ def findings_for_sc(
          LIMIT ? OFFSET ?
         """  # noqa: S608
     rows = conn.execute(sql, tuple(params)).fetchall()
-    return [dict(r) for r in rows]
+    return [normalize_finding(dict(r)) for r in rows]
 
 
 def grouped_by_rule(
@@ -376,22 +378,24 @@ def grouped_by_rule(
         if outcome in entry["engine_outcomes"]:
             entry["engine_outcomes"][outcome] += 1
         entry["findings"].append(
-            {
-                "id": int(r["id"]),
-                "pipeline": pipeline,
-                "engine_outcome": r["engine_outcome"],
-                "page_id": int(r["page_id"]),
-                "page_url": str(r["page_url"]),
-                "page_title": r["page_title"],
-                "target_selector": str(r["target_selector"] or ""),
-                # The control operated to reach this state; NULL when the
-                # finding was present at page load.
-                "revealed_by": (str(r["revealed_by"]) if r["revealed_by"] else None),
-                "failure_summary": r["failure_summary"],
-                "html_snippet": r["html_snippet"],
-                "engine_evidence_json": r["engine_evidence_json"],
-                "status": str(r["status"]),
-            }
+            normalize_finding(
+                {
+                    "id": int(r["id"]),
+                    "pipeline": pipeline,
+                    "engine_outcome": r["engine_outcome"],
+                    "page_id": int(r["page_id"]),
+                    "page_url": str(r["page_url"]),
+                    "page_title": r["page_title"],
+                    "target_selector": str(r["target_selector"] or ""),
+                    # The control operated to reach this state; NULL when the
+                    # finding was present at page load.
+                    "revealed_by": (str(r["revealed_by"]) if r["revealed_by"] else None),
+                    "failure_summary": r["failure_summary"],
+                    "html_snippet": r["html_snippet"],
+                    "engine_evidence_json": r["engine_evidence_json"],
+                    "status": str(r["status"]),
+                }
+            )
         )
 
     out: list[dict[str, Any]] = []

@@ -5,6 +5,8 @@ import type {
   AbilityLabel,
   AlfaCapability,
   ConformanceLabel,
+  ComparisonCategory,
+  ComparisonReport,
   IssueDetail,
   EvaluationRecord,
   ManualChecksResponse,
@@ -297,6 +299,18 @@ export const api = {
     request<DiffReport>(
       `/api/scans/${currentId}/diff?compare_to=${compareToId}`,
     ),
+  getComparison: (scanId: number, filter: {
+    compare_to?: number;
+    category?: ComparisonCategory | "";
+    pipeline?: string;
+    page?: number;
+  } = {}) => {
+    const params = new URLSearchParams({ page: String(filter.page ?? 1), page_size: "50" });
+    if (filter.compare_to !== undefined) params.set("compare_to", String(filter.compare_to));
+    if (filter.category) params.set("category", filter.category);
+    if (filter.pipeline) params.set("pipeline", filter.pipeline);
+    return request<ComparisonReport>(`/api/scans/${scanId}/comparison?${params}`);
+  },
   /**
    * Per-scan WCAG DOM-engine roll-up: source-attributed coverage + counts
    * by SC, level, and impact. Empty arrays are valid when no selected engine

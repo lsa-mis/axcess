@@ -45,6 +45,11 @@ from typing import Any
 import yaml
 
 from audit import coverage_matrix, evaluation
+from audit.analyzer.alfa_evidence import (
+    STRUCTURED_TARGET_LABEL,
+    bounded_summary,
+    normalize_finding,
+)
 from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
@@ -1424,27 +1429,38 @@ def _locations_for_row(
         db_rows = conn.execute(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
-                   a.target_selector AS selector, a.html_snippet AS html_snippet,
-                   a.failure_summary AS detail, a.revealed_by AS revealed_by
+                   a.target_selector, a.html_snippet, a.failure_summary, a.revealed_by,
+                   a.pipeline, a.engine_outcome, a.engine_evidence_json
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.id IN ({placeholders})
             """,  # noqa: S608 — placeholders are int-only
             tuple(sample),
         ).fetchall()
-        for r in db_rows:
-            detail = r["detail"] or ""
+        for raw in db_rows:
+            r = normalize_finding(dict(raw))
+            detail = r["failure_summary"] or ""
+            target = str(r.get("target_display") or r["target_selector"] or "")
             locations.append(
                 IssueLocation(
                     page_url=str(r["page_url"] or ""),
                     page_title=r["page_title"],
-                    description=_describe_dom_location(
-                        str(r["selector"] or ""),
-                        str(r["html_snippet"] or ""),
+                    description=(
+                        target
+                        if r["pipeline"] == "alfa"
+                        else _describe_dom_location(target, str(r["html_snippet"] or ""))
                     ),
-                    selector=str(r["selector"] or "") or None,
+                    selector=(
+                        str(r["target_selector"]) if target == STRUCTURED_TARGET_LABEL else target
+                    )
+                    or None,
                     image_url=None,
-                    detail=_short(" ".join(detail.split()), 120) or None,
+                    detail=(
+                        bounded_summary(detail, r.get("engine_evidence_status"), maximum=240)
+                        if r["pipeline"] == "alfa"
+                        else _short(" ".join(detail.split()), 120)
+                    )
+                    or None,
                     revealed_by=str(r["revealed_by"] or "") or None,
                 )
             )

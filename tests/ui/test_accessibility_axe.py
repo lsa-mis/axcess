@@ -284,6 +284,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
             await _mock_repeated_review_leads(page, base=base, scan_id=scan_id, copies=3)
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
+            await issues.locator("summary").filter(has_text="Needs manual review").click()
             rows = issues.get_by_role("link")
 
             # The first issue is selected on load, so the shape of an issue is
@@ -328,6 +329,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
             page = await browser.new_page(viewport={"width": 320, "height": 800})
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
+            await issues.locator("summary").filter(has_text="Needs manual review").click()
             await playwright_async.expect(issues).to_be_visible()
 
             widths = await page.evaluate(
@@ -372,9 +374,21 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
+            page_errors: list[str] = []
+            failed_responses: list[str] = []
+            page.on("pageerror", lambda error: page_errors.append(str(error)))
+            page.on(
+                "response",
+                lambda response: (
+                    failed_responses.append(f"{response.status}: {response.url}")
+                    if response.status >= 400
+                    else None
+                ),
+            )
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+            await page.locator("summary").filter(has_text="Informational (1)").click()
             row_link = page.get_by_role("link", name="Logo image — adequate alt")
-            informational_row = page.locator("li").filter(has=row_link)
+            informational_row = row_link.locator("xpath=ancestor::li[1]")
             await playwright_async.expect(
                 informational_row.get_by_text("Informational", exact=True)
             ).to_be_visible()
@@ -395,13 +409,22 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             assert await page.get_by_role("link", name="Audit report").count() == 0
             assert await page.get_by_role("heading", name="Fix (do this)").count() == 0
 
-            await page.goto(
+            response = await page.goto(
                 f"{base}/app/scans/{scan_id}/issues",
                 wait_until="networkidle",
             )
-            await playwright_async.expect(
-                page.get_by_role("heading", name="Issues", exact=True, level=1)
-            ).to_be_visible()
+            assert response is not None and response.ok
+            try:
+                await playwright_async.expect(
+                    page.get_by_role("heading", name="Issues", exact=True, level=1)
+                ).to_be_visible()
+            except AssertionError as error:
+                body = await page.locator("body").inner_text()
+                pytest.fail(
+                    f"{error}\nURL: {page.url}\nBrowser errors: {page_errors}\n"
+                    f"Failed responses: {failed_responses}\nRendered page: {body}"
+                )
+            assert not page_errors, page_errors
             assert await page.get_by_role("link", name="Audit report").count() == 0
         finally:
             await browser.close()
@@ -442,13 +465,13 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
                 page.get_by_text("Click Through DOM States", exact=True)
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("heading", name="Automated evidence is ready")
+                page.get_by_role("heading", name="Overview", exact=True, level=1)
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("link", name="Open issue table")
+                page.get_by_role("link", name=re.compile(r"^Open the \d+ issues?$"))
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_text("issue groups /", exact=False)
+                page.get_by_text("Likely barriers", exact=True)
             ).to_be_visible()
             # Overview, Issues and Verify changes are three views of one
             # report, so the tab bar is visible on all of them.

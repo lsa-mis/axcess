@@ -140,9 +140,10 @@ def _a11y_description(af: ExportA11yFinding) -> str:
     # assignee looks at the page, sees nothing, and closes the ticket as
     # "cannot reproduce" — so it sits directly above the selector.
     lines.append(f"**To reproduce:** {reproduction_step(af.revealed_by)}")
-    lines.append(f"**Target selector:** `{af.target_selector}`")
+    lines.append(f"**Target selector:** `{af.target_display or af.target_selector}`")
     if af.failure_summary:
-        lines.append(f"**Why it failed:** {af.failure_summary}")
+        label = "Diagnostic" if af.pipeline == "alfa" else "Why it failed"
+        lines.append(f"**{label}:** {af.failure_summary}")
     if af.html_snippet:
         # Triple-backtick fence so Jira's wiki renderer treats it as
         # a code block instead of trying to parse the HTML.
