@@ -57,6 +57,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from audit import coverage_matrix, evaluation
 from audit.blob_store import BlobStore
+from audit.exports import interaction_coverage
 from audit.exports.audit_report import (
     _IMPACT_SEVERITY,
     _PIPELINE_LABEL,
@@ -1037,6 +1038,75 @@ def _build_hotspots_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
             ws.cell(row=row_number, column=1).style = "Hyperlink"
 
 
+def _build_dom_states_sheet(
+    ws: Worksheet,
+    conn: sqlite3.Connection,
+    scan: ExportScan,
+) -> None:
+    """Per-page ledger for the click-through probe.
+
+    The operational question this answers is not "how many states" but "where
+    was the sweep incomplete, and why" — so ``Controls operated`` sits next to
+    ``Controls found`` rather than being reported as a bare total, and the
+    bound that stopped a page is spelled out in words. Pages that stopped early
+    sort first: they are the ones that still need a human.
+    """
+    coverage = interaction_coverage.load(conn, scan.id)
+    if not coverage.enabled:
+        _styled_table(
+            ws,
+            title="DOM states — content behind a click",
+            subtitle=(
+                "Click-through DOM state discovery was turned off for this scan. "
+                "Content that appears only after operating a menu, tab, or dialog "
+                "was not tested and needs manual review."
+            ),
+            headers=("Page", "Controls found", "Controls operated", "States", "Why it stopped"),
+            rows=[],
+            widths=(58.0, 16.0, 18.0, 12.0, 44.0),
+            center_cols=(2, 3, 4),
+            empty_note="Probe disabled for this scan.",
+        )
+        return
+
+    # Incomplete pages first, then the busiest — a reader scanning the top of
+    # this sheet should be looking at the gaps, not at page one of the crawl.
+    ordered = sorted(
+        coverage.pages,
+        key=lambda page: (not page.was_limited, -page.controls_found, page.page_url),
+    )
+    rows: list[tuple[Any, ...]] = [
+        (
+            page.page_url,
+            page.controls_found,
+            page.controls_operated,
+            page.states,
+            page.limit_text or "Swept completely",
+        )
+        for page in ordered
+    ]
+    subtitle = coverage.status_line
+    if coverage.caveats:
+        subtitle += "  " + "  ".join(coverage.caveats)
+    _styled_table(
+        ws,
+        title="DOM states — content behind a click",
+        subtitle=subtitle,
+        headers=("Page", "Controls found", "Controls operated", "States", "Why it stopped"),
+        rows=rows,
+        widths=(58.0, 16.0, 18.0, 12.0, 44.0),
+        center_cols=(2, 3, 4),
+        empty_note=(
+            "No per-page control ledger was recorded for this scan. "
+            "Treat per-page click coverage as unknown rather than zero."
+        ),
+    )
+    for row_number, page in enumerate(ordered, start=5):
+        if page.page_url.startswith(("https://", "http://")):
+            ws.cell(row=row_number, column=1).hyperlink = page.page_url
+            ws.cell(row=row_number, column=1).style = "Hyperlink"
+
+
 def _build_page_references_sheet(
     ws: Worksheet,
     scan: ExportScan,
@@ -1362,6 +1432,7 @@ def render_xlsx(
         _build_pooled_instances_sheet(wb.create_sheet(_POOLED_SHEET), pooled)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
     _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
+    _build_dom_states_sheet(wb.create_sheet("DOM States"), conn, scan)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
     _build_coverage_sheet(wb.create_sheet("Coverage & Method"))
     manual_checks = evaluation.list_manual_checks(conn, scan.id)

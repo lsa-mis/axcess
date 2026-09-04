@@ -56,9 +56,18 @@ This audit used multiple detection methods. Each sees different things; together
 | **Bidirectional keyboard-exit probe** | ✅ found issues | WCAG 2.1.2 review leads — both directions must remain blocked. Normal wrapping, two-control cycles, modal containment, and opaque embedded contexts are not counted as traps. | Medium — repeatable browser-observed evidence with exact attempt counts. Manually check for documented or state-specific exit commands before recording a failure. |
 | **Responsive & zoom probe** | — | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | Medium — deterministic geometry is useful evidence, but designed truncation and state-specific clipping need an expert decision. |
 | **Live-page focus probe** | — | SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays. | Medium — catches elements whose centre is covered; partial-overlap and post-click overlays still need a human. |
+| **Click-through DOM states** | — | Barriers that a page load never shows because the content only exists after a control is operated. Links are never clicked, and controls labelled sign out, delete, remove, or unsubscribe are refused. | Same deterministic rule evidence as a load-state pass, on states a load-state pass cannot reach. Coverage is bounded per page, so absence of a finding is not evidence that a state is clean. |
 | **Visual (VLM) probe** | — | SC 1.3.2 — content visually reordered by CSS so screen readers get a different, confusing sequence. | Medium — a vision-model judgement; treat as a lead and confirm. Only runs when a local vision model is available. |
 
 _A “—” means this method produced no findings on this scan — it may have been disabled for the run, or it ran and found nothing. axe-core and Alfa record definitive ran-clean signals when selected._
+
+### States behind a click
+
+Click-through DOM state discovery reached 0 state(s) across 0 page(s). Per-page control coverage was not recorded for this scan, so the share of controls operated is unknown.
+
+- Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what this probe can reach and still require manual testing.
+- Click-revealed findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly — absence is not proof of repair.
+
 
 _The next section breaks this down to every WCAG 2.2 A/AA success criterion — what was automated, what was AI-assisted, and the full list of what still needs manual testing._
 

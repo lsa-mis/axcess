@@ -848,8 +848,8 @@ function ProtectedCompanionHeader({ scanId }: { scanId?: number }) {
   return (
     <PageHeader
       crumbs={[
-        { label: "Scans", to: "/scans" },
-        ...(scanId ? [{ label: `Scan #${scanId}`, to: `/scans/${scanId}` }] : []),
+        { label: "Reports", to: "/scans" },
+        ...(scanId ? [{ label: `Report #${scanId}`, to: `/scans/${scanId}` }] : []),
         { label: "Protected companion" },
       ]}
       title="Protected companion"

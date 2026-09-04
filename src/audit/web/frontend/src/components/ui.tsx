@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { createElement, useState } from "react";
+import { createElement, forwardRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
@@ -89,15 +89,19 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-7">
+    <header className="mb-5">
       {crumbs && (
+        // The trail is the page's orientation line, so it stays quiet until
+        // you reach for it: ancestors are muted and only underline on hover,
+        // and the current page is the one weighted item. Underlining every
+        // crumb by default made the row compete with the <h1> beneath it.
         <nav
           aria-label="Breadcrumb"
-          className="mb-2 text-xs font-medium text-fg-subtle"
+          className="mb-2.5 text-xs font-medium text-fg-subtle"
         >
-          <ol className="flex flex-wrap items-center gap-1">
+          <ol className="flex flex-wrap items-center gap-1.5">
             {crumbs.map((c, i) => (
-              <li key={i} className="flex items-center gap-1">
+              <li key={i} className="flex items-center gap-1.5">
                 {c.to ? (
                   // Must be a Router <Link>, not a raw <a href>: the SPA is
                   // mounted under basename="/app", and a raw anchor would
@@ -105,17 +109,25 @@ export function PageHeader({
                   // SPA's ``/app/scans`` route. Same goes for any internal
                   // breadcrumb target — always Link, never <a>.
                   <Link
-                    className="text-fg-muted underline underline-offset-2"
+                    className="rounded-2xs text-fg-muted no-underline hover:text-fg hover:underline hover:underline-offset-2"
                     to={c.to}
                   >
                     {c.label}
                   </Link>
                 ) : (
-                  <span aria-current="page" className="text-fg">
+                  <span
+                    aria-current="page"
+                    className="font-semibold text-fg"
+                  >
                     {c.label}
                   </span>
                 )}
-                {i < crumbs.length - 1 && <span aria-hidden>›</span>}
+                {i < crumbs.length - 1 && (
+                  <ChevronRight
+                    className="h-3.5 w-3.5 shrink-0 text-border-strong"
+                    aria-hidden
+                  />
+                )}
               </li>
             ))}
           </ol>
@@ -218,24 +230,25 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
 };
-export function Button({
-  variant = "secondary",
-  size = "md",
-  className,
-  ...rest
-}: ButtonProps) {
-  return (
-    <button
-      className={cn(
-        BUTTON_BASE,
-        SIZE_CLASSES[size],
-        VARIANT_CLASSES[variant],
-        className,
-      )}
-      {...rest}
-    />
-  );
-}
+// forwardRef so callers that must move focus back to the trigger — a
+// disclosure closing on Escape, for one — can hold the element itself
+// instead of re-querying the DOM for it.
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  function Button({ variant = "secondary", size = "md", className, ...rest }, ref) {
+    return (
+      <button
+        ref={ref}
+        className={cn(
+          BUTTON_BASE,
+          SIZE_CLASSES[size],
+          VARIANT_CLASSES[variant],
+          className,
+        )}
+        {...rest}
+      />
+    );
+  },
+);
 
 /**
  * Internal styled link that LOOKS like a button. Always renders a Router

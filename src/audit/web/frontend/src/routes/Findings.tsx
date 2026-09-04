@@ -73,11 +73,6 @@ export default function FindingsRoute() {
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${id}`, to: `/scans/${id}` },
-          { label: "Findings" },
-        ]}
         title="Findings"
         subtitle={
           data
@@ -100,7 +95,7 @@ export default function FindingsRoute() {
             </LinkButton>
             <LinkButton to={`/scans/${id}`} variant="secondary">
               <ArrowLeft className="h-4 w-4" aria-hidden />
-              Back to Scan #{id}
+              Back to Report #{id}
             </LinkButton>
           </>
         }

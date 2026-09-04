@@ -51,6 +51,11 @@ CSV_COLUMNS = (
     "target_selector",
     "failure_summary",
     "help_url",
+    # Empty for a finding the page load showed. Otherwise the control that
+    # had to be operated first — without it a click-revealed row cannot be
+    # reproduced from this file alone. Appended last so existing column
+    # positions stay stable for saved spreadsheet templates.
+    "revealed_by",
 )
 
 
@@ -113,7 +118,9 @@ def _image_row(
         "" if finding.ocr_confidence is None else f"{finding.ocr_confidence:.2f}",
         _one_line(finding.vlm_rationale),
         _one_line(finding.remediation_hint),
-        # WCAG axe columns left blank
+        # WCAG axe columns left blank (incl. revealed_by — an image finding
+        # is discovered by the load-state extractor, never by a click).
+        "",
         "",
         "",
         "",
@@ -152,6 +159,7 @@ def _axe_row(af: ExportA11yFinding) -> list[str]:
         af.target_selector,
         _one_line(af.failure_summary),
         af.help_url,
+        af.revealed_by or "",
     ]
 
 

@@ -85,11 +85,6 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${scan.id}`, to: `/scans/${scan.id}` },
-          { label: "Findings (grouped)" },
-        ]}
         title="Image-of-text findings — grouped by issue"
         subtitle={scan.seed_url}
         actions={

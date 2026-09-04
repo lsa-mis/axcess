@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
 import { ExternalLinkButton, LinkButton } from "./ui";
+import ReportCrumb from "./ReportCrumb";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -96,12 +97,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
     document.title = `${routeLabel} · Axcess`;
     setMobileNavOpen(false);
     if (previousPath.current !== pathname) {
+      // `preventScroll` is the whole point: <main> starts below the topbar,
+      // so a plain focus() scrolled it flush to the top of the viewport and
+      // took the sidebar brand and the topbar with it. Every navigation
+      // nudged the page down by the height of the chrome. Focus still moves
+      // for screen-reader and keyboard users; the viewport just stays put.
       window.requestAnimationFrame(() =>
-        document.getElementById("main")?.focus(),
+        document.getElementById("main")?.focus({ preventScroll: true }),
       );
       previousPath.current = pathname;
     }
   }, [pathname, routeLabel]);
+
+  useEffect(() => {
+    // Every route starts at the top. React Router keeps the previous page's
+    // offset by default, so opening a short page from a long one landed the
+    // reader partway down it. Deliberately not inside the focus effect above:
+    // that one runs in a requestAnimationFrame, which never fires while the
+    // tab is in the background, and where the page starts should not depend
+    // on whether anyone was watching it load.
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-surface-subtle">
@@ -112,11 +128,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         Skip to main content
       </a>
 
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen items-start">
         <Sidebar />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
-            routeLabel={routeLabel}
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
           />
@@ -141,7 +156,7 @@ function Sidebar() {
   const { pathname } = useLocation();
   return (
     <aside
-      className="hidden w-64 shrink-0 flex-col bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] md:flex"
+      className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] md:flex"
       aria-label="Primary"
     >
       <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
@@ -199,12 +214,18 @@ function Sidebar() {
   );
 }
 
+/**
+ * A pure action bar. It used to also print "Accessibility audit /
+ * <route name>", which restated the <h1> sitting a few pixels below it —
+ * two orientation lines saying the same thing, neither of which said
+ * *which report* you were in. The breadcrumb above each page title is now
+ * the single answer to "where am I", and this bar carries only the two
+ * actions that belong on every screen.
+ */
 function TopBar({
-  routeLabel,
   mobileNavOpen,
   onToggleMobileNav,
 }: {
-  routeLabel: string;
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
 }) {
@@ -212,7 +233,7 @@ function TopBar({
   const onNewScanForm = pathname === "/scans/new";
   return (
     <header
-      className="flex h-[72px] items-center justify-between border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
+      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
       {/* Mobile brand — the sidebar (which carries the brand on desktop)
@@ -241,12 +262,6 @@ function TopBar({
           Axcess
         </span>
       </div>
-      <div className="hidden min-w-0 md:block">
-        <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-fg-subtle">
-          Accessibility audit
-        </p>
-        <p className="truncate text-sm font-semibold text-fg">{routeLabel}</p>
-      </div>
       {/* Scan type is chosen on the new-scan page. Keep one global action in
           the shell so the header does not make users choose a workflow before
           they have seen the explanation for each option.
@@ -257,16 +272,19 @@ function TopBar({
           documented URL-prefill contract, so there is no supported way to
           attach the current page — and guessing at one could put a scanned
           URL into a third-party form. */}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="hidden min-w-0 md:block">
+        <ReportCrumb />
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <ExternalLinkButton
           href={FEEDBACK_FORM_URL}
-          variant="secondary"
+          variant="ghost"
           size="md"
+          className="w-11 px-0"
           aria-label="Send feedback (opens in a new tab)"
           title="Send feedback (opens in a new tab)"
         >
           <MessageSquarePlus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Send feedback</span>
         </ExternalLinkButton>
         <LinkButton
           to="/scans/new"

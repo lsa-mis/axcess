@@ -160,7 +160,7 @@ export default function NewScanRoute() {
   return (
     <>
       <PageHeader
-        crumbs={[{ label: "Scans", to: "/scans" }, { label: "New scan" }]}
+        crumbs={[{ label: "Reports", to: "/scans" }, { label: "New scan" }]}
         title="New scan"
       />
 

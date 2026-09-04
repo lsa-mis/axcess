@@ -214,7 +214,7 @@ def test_json_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> N
     assert payload["scan"]["by_severity"]["critical"] + payload["scan"]["by_severity"]["major"] >= 1
     # v2 schema additions — the a11y section is present but empty on a
     # legacy fixture scan (no axe pages run).
-    assert payload["schema_version"] == 3
+    assert payload["schema_version"] == 4
     assert payload["a11y_findings"] == []
     assert payload["scan"]["axe_pages_scanned"] == 0
     assert payload["scan"]["axe_violations_total"] == 0

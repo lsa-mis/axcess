@@ -11,7 +11,13 @@ from audit.exports.collector import ExportScan
 # outcomes alongside the existing axe-core evidence. Earlier consumers still
 # parse the additive fields, while the explicit version lets downstream users
 # opt in to source-aware reporting.
-SCHEMA_VERSION = 3
+#
+# Version 4 adds ``revealed_by`` on each a11y finding: the control that had to
+# be operated before the finding existed, or null when the page load showed it.
+# A consumer that treats every finding as reachable on load will report
+# click-revealed barriers as unreproducible, so the field is additive but
+# meaningful — hence a version bump rather than a silent column.
+SCHEMA_VERSION = 4
 
 
 def render_json(scan: ExportScan, *, indent: int | None = 2) -> str:

@@ -3,12 +3,11 @@ import { useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
+import ReportHeader from "../components/ReportHeader";
 import {
   Card,
   EmptyState,
   LinkButton,
-  PageHeader,
   PageLink,
   StatCard,
 } from "../components/ui";
@@ -106,20 +105,16 @@ export default function IssueDetailRoute() {
 
   return (
     <>
-      <PageHeader
-        crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${scan.id}`, to: `/scans/${scan.id}` },
-          { label: "Issues", to: `/scans/${scan.id}/issues` },
-          { label: row.title },
-        ]}
+      <ReportHeader
+        scanId={scan.id}
+        previousScanId={scan.previous_scan_id}
         title={
           <span className="flex flex-wrap items-center gap-2">
             {!isInformational && <ConformanceBadge level={row.conformance} />}
             <span>{row.title}</span>
           </span>
         }
-        subtitle={
+        meta={
           row.wcag_sc
             ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}`
             : isInformational
@@ -139,8 +134,6 @@ export default function IssueDetailRoute() {
           </LinkButton>
         ) : undefined}
       />
-
-      <ReportWorkspaceNav scanId={scan.id} previousScanId={scan.previous_scan_id} />
 
       <Card className={`mb-4 p-4 ${laneClass}`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">

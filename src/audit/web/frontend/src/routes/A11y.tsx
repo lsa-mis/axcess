@@ -91,11 +91,6 @@ export default function A11yRoute() {
     return <div className="text-fg-muted">Loading…</div>;
   }
 
-  const crumbs = [
-    { label: "Scans", to: "/scans" },
-    { label: `Scan #${scan.id}`, to: `/scans/${scan.id}` },
-    { label: wcagSc ? `SC ${wcagSc}` : "WCAG findings" },
-  ];
   const coverage = rollup.coverage;
   const noDomPagesScanned =
     coverage.axe_pages_scanned === 0 && coverage.alfa_pages_scanned === 0;
@@ -103,7 +98,6 @@ export default function A11yRoute() {
   return (
     <>
       <PageHeader
-        crumbs={crumbs}
         title="WCAG DOM-engine findings"
         subtitle={scan.seed_url}
         actions={

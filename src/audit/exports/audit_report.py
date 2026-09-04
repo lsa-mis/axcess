@@ -45,7 +45,9 @@ from typing import Any
 import yaml
 
 from audit import coverage_matrix, evaluation
+from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
+from audit.exports.interaction_coverage import InteractionCoverage
 from audit.web import issues as issues_mod
 
 # The framework caps the executive summary at 8 sentences. The renderer
@@ -122,6 +124,10 @@ _PIPELINE_LABEL = {
 # Static description of each detection pipeline for the coverage section.
 # Editorial, not derived — what each method can and can't see. The
 # "ran" flag is filled in dynamically from the issues actually present.
+# Pages listed individually before the report defers to the workbook. A
+# stakeholder document should name the gaps, not reproduce a full ledger.
+_MAX_LIMITED_PAGES = 15
+
 _PIPELINE_COVERAGE = [
     {
         "key": "axe",
@@ -192,6 +198,18 @@ _PIPELINE_COVERAGE = [
         "checks": "SC 2.4.11 — focus hidden behind sticky headers / cookie banners / overlays.",
         "confidence": "Medium — catches elements whose centre is covered; "
         "partial-overlap and post-click overlays still need a human.",
+    },
+    {
+        "key": "interaction",
+        "name": "Click-through DOM states",
+        "method": "Operates the page's own menus, tabs, dialogs, and disclosure "
+        "controls, then re-runs the rule engine on each state a click reveals.",
+        "checks": "Barriers that a page load never shows because the content only "
+        "exists after a control is operated. Links are never clicked, and controls "
+        "labelled sign out, delete, remove, or unsubscribe are refused.",
+        "confidence": "Same deterministic rule evidence as a load-state pass, on states "
+        "a load-state pass cannot reach. Coverage is bounded per page, so absence of a "
+        "finding is not evidence that a state is clean.",
     },
     {
         "key": "visual",
@@ -508,7 +526,7 @@ def render_audit_report(
     lines.append("")
     lines.extend(_abilities_rollup(cards))
     lines.append("")
-    lines.extend(_coverage_and_method(rows, scan))
+    lines.extend(_coverage_and_method(rows, scan, interaction_coverage.load(conn, scan.id)))
     lines.append("")
     lines.extend(_wcag_coverage_matrix())
     lines.append("")
@@ -844,7 +862,9 @@ def _abilities_rollup(cards: list[AuditCard]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
+def _coverage_and_method(
+    rows: list[Any], scan: ExportScan, interaction: InteractionCoverage
+) -> list[str]:
     """What each detection pipeline checks + the honest "not checked" list."""
     lines = ["## Coverage and method", ""]
     pipelines_present = {r.pipeline for r in rows}
@@ -874,6 +894,15 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
                 if "alfa" in pipelines_present
                 else ("ran, clean" if alfa_ran else "—")
             )
+        elif p["key"] == "interaction":
+            if not interaction.enabled:
+                ran = "turned off"
+            elif interaction.findings_revealed:
+                ran = "✅ found issues"
+            elif interaction.states_total:
+                ran = "ran, clean"
+            else:
+                ran = "—"
         else:
             ran = "✅ found issues" if p["key"] in pipelines_present else "—"
         lines.append(f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |")
@@ -899,11 +928,69 @@ def _coverage_and_method(rows: list[Any], scan: ExportScan) -> list[str]:
         )
         lines.append("")
     lines.append("")
+    lines.extend(_dom_state_coverage(interaction))
+    lines.append("")
     lines.append(
         "_The next section breaks this down to every WCAG 2.2 A/AA success "
         "criterion — what was automated, what was AI-assisted, and the full "
         "list of what still needs manual testing._"
     )
+    return lines
+
+
+def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
+    """What the click-through probe reached, and what it could not.
+
+    A page count alone understates an application whose content appears after
+    a click, so states are reported beside pages rather than folded into them.
+    The pages where a bound stopped the sweep are named individually: "we
+    tested less here" is the half of a coverage claim a reader cannot infer
+    from a total, and it is the half that decides where manual testing goes.
+    """
+    lines = ["### States behind a click", ""]
+    lines.append(interaction.status_line)
+    lines.append("")
+    if not interaction.enabled:
+        return lines
+
+    if interaction.ledger_recorded and interaction.controls_found:
+        ratio = interaction.coverage_ratio
+        pct = f"{ratio * 100:.0f}%" if ratio is not None else "n/a"
+        lines.append("| Measure | Value |")
+        lines.append("|---|---|")
+        lines.append(f"| Pages probed | {interaction.pages_probed} |")
+        lines.append(f"| Controls found | {interaction.controls_found} |")
+        lines.append(f"| Controls operated | {interaction.controls_operated} ({pct}) |")
+        lines.append(f"| Additional DOM states reached | {interaction.states_total} |")
+        lines.append(f"| Findings visible only after a click | {interaction.findings_revealed} |")
+        lines.append(f"| Controls refused as destructive | {interaction.blocked_controls} |")
+        lines.append("")
+
+    for caveat in interaction.caveats:
+        lines.append(f"- {caveat}")
+    lines.append("")
+
+    limited = interaction.limited_pages
+    if limited:
+        lines.append("**Pages where the sweep stopped early**")
+        lines.append("")
+        lines.append("| Page | Controls operated | States | Why it stopped |")
+        lines.append("|---|---|---|---|")
+        for page in limited[:_MAX_LIMITED_PAGES]:
+            lines.append(
+                f"| {page.page_url} | {page.controls_operated} of {page.controls_found} "
+                f"| {page.states} | {page.limit_text} |"
+            )
+        if len(limited) > _MAX_LIMITED_PAGES:
+            lines.append(
+                f"| _…and {len(limited) - _MAX_LIMITED_PAGES} more page(s)_ | | | "
+                "_see the workbook's DOM States sheet_ |"
+            )
+        lines.append("")
+        lines.append(
+            "_These pages were tested, but not exhaustively: content behind the "
+            "controls that were not reached has neither passed nor failed._"
+        )
     return lines
 
 
@@ -1476,7 +1563,14 @@ def _format_location(loc: IssueLocation) -> str:
     else:
         target = ""
     detail = f" **Observed evidence:** {loc.detail}" if loc.detail else ""
-    return f"- **Page:** {page}. **Location on page:** {loc.description}.{target}{detail}"
+    # Without this, a click-revealed instance reads as if it were on the page
+    # at load, and whoever checks it reports "not reproducible".
+    seen = (
+        f' **Seen after:** activating "{_md_escape(loc.revealed_by)}" on this page.'
+        if loc.revealed_by
+        else ""
+    )
+    return f"- **Page:** {page}. **Location on page:** {loc.description}.{target}{seen}{detail}"
 
 
 def _describe_dom_location(selector: str, html_snippet: str) -> str:

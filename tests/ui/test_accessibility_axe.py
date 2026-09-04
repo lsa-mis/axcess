@@ -267,10 +267,15 @@ async def test_expert_workspace_reflows_without_document_overflow(
 
 
 @pytest.mark.asyncio
-async def test_issue_table_has_the_four_expert_columns(
+async def test_issue_card_answers_what_why_fix_and_where(
     live_server: tuple[str, int],
 ) -> None:
-    """The primary report answers what, why, fix, and location in one table."""
+    """The report still answers what, why, fix, and location — one issue at a time.
+
+    The four answers used to be four columns shown for every issue at once.
+    They are now the four sections of whichever issue is open, which is the
+    only structural claim this test cares about.
+    """
     base, scan_id = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
@@ -278,42 +283,72 @@ async def test_issue_table_has_the_four_expert_columns(
             page = await browser.new_page(viewport={"width": 1280, "height": 900})
             await _mock_repeated_review_leads(page, base=base, scan_id=scan_id, copies=3)
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            table = page.get_by_role("table")
-            for heading in ("Issue", "Why it is an issue", "Expected fix", "Where exactly"):
+            issues = page.get_by_role("list", name="Accessibility issue groups")
+            rows = issues.get_by_role("link")
+
+            # The first issue is selected on load, so the shape of an issue is
+            # visible without a click.
+            pane = page.get_by_role("region").filter(
+                has=page.get_by_role("heading", name="Why it matters")
+            )
+            for heading in ("Why it matters", "Expected fix", "Where exactly"):
                 await playwright_async.expect(
-                    table.get_by_role("columnheader", name=heading, exact=True)
+                    pane.get_by_role("heading", name=heading)
                 ).to_be_visible()
-                assert await table.get_by_role("row").count() == 6
+
+            # Selecting another issue swaps the pane and keeps the list in
+            # place — that is the whole point of the two-pane layout.
+            row_count = await rows.count()
+            second_title = (await rows.nth(1).inner_text()).splitlines()[0]
+            await rows.nth(1).click()
+            await playwright_async.expect(
+                pane.get_by_role("heading", level=2, name=second_title)
+            ).to_be_visible()
+            # The list is still there, whole: not navigating away from it is
+            # the entire reason for the two-pane layout.
+            assert await issues.get_by_role("link").count() == row_count
         finally:
             await browser.close()
 
 
 @pytest.mark.asyncio
-async def test_issue_table_keeps_exact_locations_in_a_bounded_scroller(
+async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     live_server: tuple[str, int],
 ) -> None:
-    """At 320px the table scrolls locally and exact evidence links remain reachable."""
+    """At 320px the exact evidence is reachable by scrolling down only.
+
+    The four-column table this replaced could only fit by scrolling sideways
+    inside its own container, behind a custom scrollbar widget. A one-column
+    list of disclosures needs neither.
+    """
     base, scan_id = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page(viewport={"width": 320, "height": 800})
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            region = page.get_by_role("region", name="Scrollable accessibility issue table")
-            await playwright_async.expect(region).to_be_visible()
-            sizes = await region.evaluate(
-                "el => ({client: el.clientWidth, scroll: el.scrollWidth})"
+            issues = page.get_by_role("list", name="Accessibility issue groups")
+            await playwright_async.expect(issues).to_be_visible()
+
+            widths = await page.evaluate(
+                """() => ({
+                    client: document.documentElement.clientWidth,
+                    body: document.body.scrollWidth
+                })"""
             )
-            assert sizes["scroll"] > sizes["client"]
-            scrollbar = page.get_by_role("scrollbar", name="Scroll issue table columns")
-            await playwright_async.expect(scrollbar).to_be_visible()
-            await scrollbar.focus()
-            await scrollbar.press("End")
-            assert await region.evaluate("el => el.scrollLeft") > 0
-            await scrollbar.press("Home")
-            assert await region.evaluate("el => el.scrollLeft") == 0
+            assert widths["body"] <= widths["client"], widths
+            assert await page.get_by_role("scrollbar").count() == 0
+
+            # There is no room for the evidence pane at this width, so the list
+            # is the whole page and each row carries the reader to that issue's
+            # own evidence route instead.
+            first_row = issues.get_by_role("link").first
+            href = await first_row.get_attribute("href")
+            assert href is not None and "/issues/" in href
+            await first_row.click()
+            await page.wait_for_url("**/issues/**")
             await playwright_async.expect(
-                region.get_by_role("link", name="Open stored page evidence").first
+                page.get_by_role("link", name="view evidence").first
             ).to_be_attached()
             # The protected-identity context refreshes every 15 seconds even
             # on public report routes. That security check must not unmount a
@@ -338,12 +373,13 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         try:
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            informational_row = page.get_by_role("link", name="Logo image — adequate alt").locator(
-                "xpath=ancestor::tr"
-            )
+            row_link = page.get_by_role("link", name="Logo image — adequate alt")
+            informational_row = page.locator("li").filter(has=row_link)
             await playwright_async.expect(
                 informational_row.get_by_text("Informational", exact=True)
             ).to_be_visible()
+            # Informational evidence never inherits triage or remediation
+            # controls: the row is a link to its evidence and nothing else.
             assert await informational_row.get_by_role("button").count() == 0
 
             await page.goto(
@@ -364,7 +400,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
                 wait_until="networkidle",
             )
             await playwright_async.expect(
-                page.get_by_role("heading", name="Accessibility issues", level=1)
+                page.get_by_role("heading", name="Issues", exact=True, level=1)
             ).to_be_visible()
             assert await page.get_by_role("link", name="Audit report").count() == 0
         finally:
@@ -382,7 +418,6 @@ async def test_spa_navigation_sets_title_and_focuses_main(
         try:
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-            await page.get_by_text("Expert tools and scan details", exact=True).click()
             workspace = page.get_by_role("navigation", name="Report workspace")
             await workspace.get_by_role("link", name="Issues").click()
             await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
@@ -415,9 +450,11 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
             await playwright_async.expect(
                 page.get_by_text("issue groups /", exact=False)
             ).to_be_visible()
+            # Overview, Issues and Verify changes are three views of one
+            # report, so the tab bar is visible on all of them.
             await playwright_async.expect(
                 page.get_by_role("navigation", name="Report workspace")
-            ).to_be_hidden()
+            ).to_be_visible()
         finally:
             await browser.close()
 

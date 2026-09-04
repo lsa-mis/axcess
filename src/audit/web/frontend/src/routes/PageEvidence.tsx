@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { useParams } from "react-router";
 import { api, blobUrl } from "../api/client";
-import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
-import { Card, PageHeader, StatusChip } from "../components/ui";
+import ReportHeader from "../components/ReportHeader";
+import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import type { PageEvidence } from "../api/types";
 
@@ -61,8 +61,12 @@ export default function PageEvidenceRoute() {
     : null;
   return (
     <>
-      <PageHeader crumbs={[{ label: "Reports", to: "/scans" }, { label: `Report #${scan}`, to: `/scans/${scan}` }, { label: "Page evidence" }]} title={data.page.title || "Page evidence"} subtitle={data.page.url_normalized} />
-      <ReportWorkspaceNav scanId={scan} previousScanId={scanData.previous_scan_id} />
+      <ReportHeader
+        scanId={scan}
+        previousScanId={scanData.previous_scan_id}
+        title={data.page.title || "Page evidence"}
+        meta={data.page.url_normalized}
+      />
       <Card className="mb-4 p-4 text-sm"><dl className="grid gap-3 sm:grid-cols-3"><div><dt className="font-semibold text-fg-muted">Page load result</dt><dd>{httpStatusLabel(data.page.status_code)}</dd></div><div><dt className="font-semibold text-fg-muted">How Axcess loaded it</dt><dd>{renderModeLabel(data.page.render_mode)}</dd></div><div><dt className="font-semibold text-fg-muted">Fetched</dt><dd>{data.page.fetched_at ?? "—"}</dd></div></dl></Card>
       <section className="mb-6"><h2 className="mb-2 text-base font-semibold">Observed accessibility findings</h2>{a11yGroups === null ? (<div className="space-y-3">{data.a11y_findings.map((finding) => <FindingCard key={finding.id} finding={finding} />)}</div>) : (<div className="space-y-6">{a11yGroups.map((group) => (<section key={group.key}><h3 className="mb-2 text-sm font-semibold text-fg">{group.label} <span className="font-normal text-fg-muted">({group.findings.length} {group.findings.length === 1 ? "finding" : "findings"})</span></h3><div className="space-y-3">{group.findings.map((finding) => <FindingCard key={finding.id} finding={finding} />)}</div></section>))}</div>)}</section>
       <section><h2 className="mb-2 text-base font-semibold">Image evidence</h2><div className="grid gap-3 lg:grid-cols-2">{data.image_occurrences.map((image) => <Card key={image.occurrence_id} className="p-4"><a href={image.src_url_canonical} target="_blank" rel="noreferrer" className="font-semibold">Source image <ExternalLink className="inline h-4 w-4" aria-hidden /></a><p className="mt-2 text-sm"><strong>Alt:</strong> {image.alt_text === null ? "Missing" : image.alt_text || "Decorative"}</p>{image.ocr_text && <p className="mt-2 text-sm"><strong>OCR:</strong> {image.ocr_text}</p>}{image.vlm_rationale && <p className="mt-2 text-sm text-fg-muted"><strong>AI rationale:</strong> {image.vlm_rationale}</p>}</Card>)}</div></section>
