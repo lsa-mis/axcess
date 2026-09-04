@@ -190,11 +190,11 @@ async def test_simple_scan_path_hides_advanced_controls_until_requested(
                 page.get_by_role("group", name="Scan engine")
             ).to_be_visible()
             dom_discovery = page.get_by_role(
-                "checkbox", name=re.compile(r"^Click through DOM states")
+                "checkbox", name=re.compile(r"^Click Through DOM States")
             )
-            await playwright_async.expect(dom_discovery).not_to_be_checked()
-            await dom_discovery.check()
             await playwright_async.expect(dom_discovery).to_be_checked()
+            await dom_discovery.uncheck()
+            await playwright_async.expect(dom_discovery).not_to_be_checked()
         finally:
             await browser.close()
 
@@ -403,6 +403,9 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         try:
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+            await playwright_async.expect(
+                page.get_by_text("Click Through DOM States", exact=True)
+            ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_role("heading", name="Automated evidence is ready")
             ).to_be_visible()
@@ -802,6 +805,10 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             # assertions below read from it, so open it once here.
             await page.get_by_role("button", name="Default scan settings", exact=True).click()
             await page.get_by_text("Advanced settings", exact=True).click()
+            dom_discovery = page.get_by_role(
+                "checkbox", name=re.compile(r"^Click Through DOM States")
+            )
+            await playwright_async.expect(dom_discovery).to_be_checked()
             workers = page.get_by_role("spinbutton", name="Workers")
             await playwright_async.expect(workers).to_be_enabled()
             await playwright_async.expect(workers).to_have_value("2")
@@ -820,6 +827,8 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             await playwright_async.expect(both_engines).to_be_checked()
             await alfa_only.check()
             await playwright_async.expect(alfa_only).to_be_checked()
+            await playwright_async.expect(dom_discovery).not_to_be_checked()
+            await playwright_async.expect(dom_discovery).to_be_disabled()
             await playwright_async.expect(
                 page.get_by_text("Siteimprove Alfa ACT rules", exact=True)
             ).to_be_visible()
@@ -867,5 +876,44 @@ async def test_skip_link_reachable_by_tab(live_server: tuple[str, int]) -> None:
                 "() => document.activeElement && document.activeElement.getAttribute('href')"
             )
             assert href == "#main"
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("login", [False, True])
+async def test_search_settings_keyboard_and_axe(live_server: tuple[str, int], login: bool) -> None:
+    base, _ = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+            if login:
+                await page.get_by_role("radio", name="Login or 2FA website", exact=True).focus()
+                await page.keyboard.press("Space")
+            await page.get_by_role("button", name="Advanced settings", exact=True).click()
+            toggle = page.get_by_role(
+                "checkbox", name=re.compile("^Search to discover result pages")
+            )
+            await toggle.focus()
+            await page.keyboard.press("Space")
+            await page.get_by_label("Field 1 label", exact=True).fill("Search reports")
+            value = page.get_by_label("Field 1 value", exact=True)
+            await value.focus()
+            await page.keyboard.type("sample")
+            await playwright_async.expect(value).to_have_value("sample")
+            for label in ("Press a search button", "Follow result pagination"):
+                await page.get_by_role("checkbox", name=re.compile("^" + label)).focus()
+                await page.keyboard.press("Space")
+            await page.get_by_role("button", name="Add search field", exact=True).click()
+            await page.get_by_label("Field 2 label", exact=True).fill("Category")
+            await page.get_by_role("combobox", name="Field 2 type", exact=True).select_option(
+                "select"
+            )
+            await page.get_by_label("Field 2 value", exact=True).fill("All reports")
+            await page.get_by_role("checkbox", name=re.compile("^I authorize these search")).check()
+            violations = await _run_axe(page)
+            assert not violations, _render_violations(violations)
         finally:
             await browser.close()

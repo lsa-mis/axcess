@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
+    from audit.crawler.search import SearchResult
 
 _HTML_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 
@@ -73,6 +74,22 @@ class FetchResult:
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)
+    # True only when an attached interaction probe actually ran. Selection
+    # alone cannot establish coverage (e.g. axe or the probe is unavailable).
+    interaction_evaluated: bool = False
+    # Per-page interaction ledger, carried separately from the findings so a
+    # page whose clicks revealed no defect still reports what was operated.
+    interaction_controls: int = 0
+    interaction_clicks_attempted: int = 0
+    interaction_clicks_succeeded: int = 0
+    interaction_controls_operated: int = 0
+    interaction_blocked_controls: int = 0
+    interaction_limits: tuple[str, ...] = ()
+    interaction_dialogs_opened: int = 0
+    interaction_dialogs_stuck: int = 0
+    interaction_detail: str = ""
+    discovered_urls: tuple[str, ...] = ()
+    search_result: SearchResult | None = None
 
     @property
     def is_html(self) -> bool:

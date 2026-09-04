@@ -8,11 +8,98 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Literal
 
+from audit.crawler.search import SearchOutcome
 from audit.protected.redaction import redact_text
+
+
+def record_search_run(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    outcome: SearchOutcome,
+) -> None:
+    if (
+        conn.execute(
+            "SELECT 1 FROM pages WHERE id = ? AND scan_id = ?", (page_id, scan_id)
+        ).fetchone()
+        is None
+    ):
+        raise ValueError("Search page does not belong to scan")
+    with _status_transaction(conn):
+        conn.execute(
+            "INSERT INTO scan_search_runs (scan_id, page_id, status, states, discovered, detail) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(scan_id, page_id) DO UPDATE SET "
+            "status=excluded.status, states=excluded.states, "
+            "discovered=excluded.discovered, detail=excluded.detail",
+            (scan_id, page_id, outcome.status, outcome.states, outcome.discovered, outcome.detail),
+        )
+
+
+def record_interaction_run(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    controls_found: int,
+    clicks_attempted: int,
+    clicks_succeeded: int,
+    controls_operated: int,
+    states: int,
+    blocked_controls: int,
+    limits: Sequence[str] = (),
+    dialogs_opened: int = 0,
+    dialogs_stuck: int = 0,
+    detail: str = "",
+) -> None:
+    """Record what one page's control sweep actually reached.
+
+    Written per page rather than accumulated on the scan row so a report can
+    say which pages were explored to exhaustion and which hit a bound. The
+    scan-belongs check mirrors ``record_search_run``: an interaction ledger
+    for a page from another scan would silently mix two reports' coverage.
+    """
+    if (
+        conn.execute(
+            "SELECT 1 FROM pages WHERE id = ? AND scan_id = ?", (page_id, scan_id)
+        ).fetchone()
+        is None
+    ):
+        raise ValueError("Interaction page does not belong to scan")
+    with _status_transaction(conn):
+        conn.execute(
+            "INSERT INTO scan_interaction_runs (scan_id, page_id, controls_found, "
+            "clicks_attempted, clicks_succeeded, controls_operated, states, "
+            "blocked_controls, dialogs_opened, dialogs_stuck, limits, detail) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(scan_id, page_id) DO UPDATE SET "
+            "controls_found=excluded.controls_found, "
+            "clicks_attempted=excluded.clicks_attempted, "
+            "clicks_succeeded=excluded.clicks_succeeded, "
+            "controls_operated=excluded.controls_operated, states=excluded.states, "
+            "blocked_controls=excluded.blocked_controls, "
+            "dialogs_opened=excluded.dialogs_opened, "
+            "dialogs_stuck=excluded.dialogs_stuck, "
+            "limits=excluded.limits, detail=excluded.detail",
+            (
+                scan_id,
+                page_id,
+                controls_found,
+                clicks_attempted,
+                clicks_succeeded,
+                controls_operated,
+                states,
+                blocked_controls,
+                dialogs_opened,
+                dialogs_stuck,
+                ",".join(sorted({item for item in limits if item}))[:200],
+                detail[:200],
+            ),
+        )
 
 
 def upsert_page(

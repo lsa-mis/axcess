@@ -89,3 +89,55 @@ def test_key_cannot_depend_on_recursion_depth() -> None:
     """
     params = list(inspect.signature(InteractionProbe._interaction_key).parameters)
     assert params == ["self", "control", "pinned"]
+
+
+def test_equal_names_at_different_dom_locations_are_distinct() -> None:
+    probe = InteractionProbe(axe=None)  # type: ignore[arg-type]
+    first = {"tag": "button", "label": "Details", "isGlobal": False, "selector": "#first"}
+    second = {**first, "selector": "#second"}
+    assert probe._interaction_key(first, "https://example.test/") != probe._interaction_key(
+        second, "https://example.test/"
+    )
+
+
+def test_sensitive_actions_are_blocked() -> None:
+    probe = InteractionProbe(axe=None)  # type: ignore[arg-type]
+    for label in (
+        "Subscribe now",
+        "PAYMENT",
+        "save_changes",
+        "Send invitation",
+        "Upload file",
+        "Confirm transfer",
+        "Start trial",
+        "Grant access",
+    ):
+        assert probe._is_blocked(label), label
+
+
+def test_discovered_urls_exclude_sensitive_actions_and_nonweb_schemes() -> None:
+    from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS
+    from audit.analyzer.interaction.safety import safe_url
+
+    for url in (
+        "https://example.test/%64elete",
+        "https://example.test/action?do=payment",
+        "https://user:password@example.test/",
+        "javascript:alert(1)",
+        "mailto:someone@example.test",
+        "https://example.test/sign-out",
+    ):
+        assert not safe_url(url, DEFAULT_BLOCKED_LABELS), url
+    assert safe_url("https://example.test/results?q=trees", DEFAULT_BLOCKED_LABELS)
+
+
+async def test_unguarded_service_worker_context_is_not_reported_as_checked() -> None:
+    from types import SimpleNamespace
+
+    page = SimpleNamespace(
+        url="https://example.test/", context=SimpleNamespace(service_workers=[object()])
+    )
+    result = await InteractionProbe(axe=None).run(page)  # type: ignore[arg-type]
+    assert not result.evaluated
+    assert result.states == 0
+    assert result.findings == ()

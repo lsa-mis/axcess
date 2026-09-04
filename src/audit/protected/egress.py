@@ -19,7 +19,7 @@ import ipaddress
 import re
 import socket
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, cast
 from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
@@ -208,6 +208,17 @@ class ProtectedEgressPolicy:
             origin=parsed.origin,
             resolved_addresses=addresses,
         )
+
+    def validate_page_url(self, url: str) -> ValidatedUrl:
+        """Validate a browser route without admitting OAuth fragment payloads.
+
+        HTTP requests have no fragment, but React/Vue hash routes do. Keep
+        their identity for evidence and discovery while applying the normal
+        origin, address and secret checks to the underlying document URL.
+        """
+        document_url, fragment = split_safe_page_url(url)
+        verified = self.validate_url(document_url)
+        return replace(verified, url=verified.url + (f"#{fragment}" if fragment else ""))
 
     def validate_redirect(self, source_url: str, redirect_url: str) -> ValidatedUrl:
         """Validate both ends of a redirect before following it."""
@@ -585,6 +596,21 @@ def _parse_approved_origin(value: str) -> ApprovedOrigin:
         raise EgressViolation("invalid_approved_origin") from exc
     parsed = _parse_url(normalized, allow_fragment=False)
     return parsed.origin
+
+
+def split_safe_page_url(value: str) -> tuple[str, str]:
+    """Separate a hash-router path only after checking its query for secrets."""
+    if value != value.strip() or _contains_control_characters(value):
+        raise EgressViolation("invalid_url")
+    document, separator, fragment = value.partition("#")
+    if not separator:
+        return value, ""
+    route = fragment[1:] if fragment.startswith("!/") else fragment
+    if not route.startswith("/") or route.startswith("//") or "#" in route:
+        raise EgressViolation("fragment_not_allowed")
+    _reject_decoded_control_characters(route, "")
+    _reject_unsafe_query(route.partition("?")[2])
+    return document, fragment
 
 
 def _parse_request_url(value: str, *, allow_sensitive_query: bool = False) -> _ParsedUrl:

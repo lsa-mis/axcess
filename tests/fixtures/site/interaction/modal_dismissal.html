@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Modal dismissal fixture</title>
+<style>
+  body{font-family:system-ui;margin:2rem}
+  .panel{display:none}
+  .panel[data-open]{display:block;position:fixed;inset:20% 25%;background:#fff;
+    border:2px solid #333;padding:1rem;z-index:10}
+  /* The overlay is the whole point: while a modal is up it covers the page,
+     so any click aimed at a control underneath lands on the overlay instead. */
+  #m-plain[data-open]{position:static;inset:auto}
+  #veil{display:none}
+  #veil[data-open]{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5}
+</style></head>
+<body>
+<main>
+<h1>Modal dismissal</h1>
+
+<!-- Each button below is a sibling of the others at depth 0. If a modal is
+     left open, the veil swallows the clicks meant for the remaining
+     siblings, and their counters stay at zero. -->
+
+<button id="escapable" onclick="show('m-escape')">Open escapable dialog</button>
+<button id="button-only" onclick="show('m-button')">Open dialog with close button</button>
+<button id="stuck" onclick="show('m-stuck')">Open undismissable dialog</button>
+<button id="after" onclick="bump('after')">Plain control after the dialogs</button>
+
+<p>after clicks: <span id="after-count">0</span></p>
+
+<div id="veil"></div>
+
+<!-- Closes on Escape. -->
+<div id="m-escape" class="panel" role="dialog" aria-modal="true" aria-label="Escapable dialog">
+  <p>Press Escape to close.</p>
+  <input type="text" id="escape-field">
+</div>
+
+<!-- Ignores Escape; only its own Close control dismisses it. -->
+<div id="m-button" class="panel" role="dialog" aria-modal="true" aria-label="Button dialog">
+  <p>Escape does nothing here.</p>
+  <input type="text" id="button-field">
+  <button id="button-close" onclick="hide('m-button')">Close</button>
+</div>
+
+<!-- Declares no modality and has no overlay, so it blocks nothing even
+     though it never closes. Halting the page on this would be a bug. -->
+<button id="nonmodal" onclick="showPlain('m-plain')">Open non-modal panel</button>
+<div id="m-plain" class="panel" role="dialog" aria-label="Plain panel">
+  <p>Not modal. Nothing underneath is covered.</p>
+</div>
+
+<!-- Dismisses by nothing the probe is willing to press. "Delete everything"
+     is a blocked label, so a probe that closed this modal by clicking
+     whatever was inside it would be doing the unacceptable thing. -->
+<div id="m-stuck" class="panel" role="dialog" aria-modal="true" aria-label="Stuck dialog">
+  <p>This dialog has no safe way out.</p>
+  <input type="text" id="stuck-field">
+  <button id="stuck-destroy" onclick="hide('m-stuck')">Delete everything</button>
+</div>
+</main>
+<script>
+  function showPlain(id) {
+    // Deliberately no veil: a non-modal dialog covers nothing.
+    document.getElementById(id).setAttribute('data-open', '');
+  }
+  function show(id) {
+    document.getElementById(id).setAttribute('data-open', '');
+    document.getElementById('veil').setAttribute('data-open', '');
+  }
+  function hide(id) {
+    document.getElementById(id).removeAttribute('data-open');
+    document.getElementById('veil').removeAttribute('data-open');
+  }
+  function bump(name) {
+    const el = document.getElementById(name + '-count');
+    el.textContent = String(Number(el.textContent) + 1);
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    // Only the escapable dialog honours Escape.
+    if (document.getElementById('m-escape').hasAttribute('data-open')) hide('m-escape');
+  });
+</script>
+</body></html>

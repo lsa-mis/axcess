@@ -18,7 +18,7 @@ import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 import structlog
@@ -55,6 +55,7 @@ from audit.crawler.render_detect import (
     looks_like_authentication_page,
 )
 from audit.crawler.robots import RobotsChecker
+from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
@@ -222,9 +223,6 @@ class CrawlConfig:
     # existing (page_id, rule_id, target_hash) uniqueness already stops
     # an unchanged header being reported once per click.
     #
-    # OFF by default, unlike every other probe here: it is the only pass
-    # that mutates the page, and it costs one axe run per revealed state
-    # rather than one per page. Enable with ``--interaction``.
     # On by default. Most of a modern application does not exist until a
     # control is used — menus closed, dialogs unopened, tabs unswitched — so
     # a load-state-only audit reports on a fraction of what a user meets. It
@@ -233,9 +231,9 @@ class CrawlConfig:
     # off when crawl time matters more. It never operates a control whose
     # accessible name looks destructive.
     interaction_checks_enabled: bool = True
-    interaction_max_clicks: int = 40
-    interaction_max_repeated: int = 3
-    interaction_max_depth: int = 2
+    interaction_max_clicks: int = 100
+    interaction_max_repeated: int = 20
+    interaction_max_depth: int = 5
     # Per-finding element screenshots. When on (default), the JS fetcher
     # captures a circled screenshot of each live-page finding's element
     # at scan time; the orchestrator stores it in the blob store and threads
@@ -243,6 +241,7 @@ class CrawlConfig:
     # each issue. Bounded per page (see ``js_fetcher.MAX_SHOTS_PER_PAGE``);
     # disable with ``--skip-screenshots`` when crawl speed matters more.
     capture_screenshots: bool = True
+    search: SearchConfig | None = None
 
 
 @dataclass
@@ -355,6 +354,10 @@ async def run_crawl(
                 ),
             )
     _seed_queue(conn, scan_id, entry_url)
+    if config.search and config.search.page_url:
+        if not search_url_allowed(config.search, config.seed_url, whole_host=config.whole_host):
+            raise ValueError("Search page must be inside the scan scope.")
+        _seed_queue(conn, scan_id, url_policy.normalize(config.search.page_url))
 
     # Every log line from this crawl carries its scan id, so one run can be
     # read on its own out of a file that holds several.
@@ -482,6 +485,7 @@ async def run_crawl(
             interaction_probe=interaction_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
+            search_explorer=build_search_explorer(config, axe_analyzer),
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -646,6 +650,15 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,
             "interaction_checks_enabled": config.interaction_checks_enabled,
+            # 1: scan-level probed/states counters are persisted.
+            # 2: adds the per-page scan_interaction_runs ledger, so a
+            # report may state controls operated and the bounds hit.
+            "interaction_coverage_version": 2,
+            "interaction_safety_version": 1,
+            "interaction_max_clicks": config.interaction_max_clicks,
+            "interaction_max_repeated": config.interaction_max_repeated,
+            "interaction_max_depth": config.interaction_max_depth,
+            "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older
             # reports omit this key and must be labeled "coverage not recorded"
@@ -734,6 +747,7 @@ class _LazyJs:
         interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         headless: bool = True,
+        search_explorer: SearchExplorer | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -747,6 +761,7 @@ class _LazyJs:
         self._interaction_probe = interaction_probe
         self._capture_screenshots = capture_screenshots
         self._headless = headless
+        self._search_explorer = search_explorer
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -761,6 +776,7 @@ class _LazyJs:
                 interaction_probe=self._interaction_probe,
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
+                search_explorer=self._search_explorer,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -770,6 +786,38 @@ class _LazyJs:
         if self._owned and self._fetcher is not None:
             await self._fetcher.__aexit__(None, None, None)
             self._fetcher = None
+
+
+def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> SearchExplorer | None:
+    if config.search is None:
+        return None
+    if axe is None or not config.js_enabled or not config.js_eager:
+        raise ValueError("Configured searches require browser rendering and axe-core.")
+    if not search_url_allowed(config.search, config.seed_url, whole_host=config.whole_host):
+        raise ValueError("Search page must be inside the scan scope.")
+    scope = url_policy.build_scope(config.seed_url, whole_host=config.whole_host)
+
+    def can_visit(url: str) -> bool:
+        try:
+            parts = urlsplit(url)
+            if parts.username or parts.password:
+                return False
+            candidate = url_policy.normalize(url)
+            return (
+                url_policy.is_in_scope(candidate, scope, allow_subdomains=config.allow_subdomains)
+                and not url_policy.is_blocked(candidate, config.blocked_url_patterns)
+                and not url_policy.is_excluded(candidate, config.excluded_scopes)
+            )
+        except ValueError:
+            return False
+
+    return SearchExplorer(
+        config.search,
+        entry_url=config.start_url or url_policy.normalize_seed_url(config.seed_url),
+        can_visit=can_visit,
+        axe=axe,
+        level=config.axe_level,  # type: ignore[arg-type]
+    )
 
 
 @dataclass
@@ -1008,6 +1056,18 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
+    if result.search_result is not None and page_id is not None:
+        repo.record_search_run(
+            ctx.conn, scan_id=ctx.scan_id, page_id=page_id, outcome=result.search_result.outcome
+        )
+        _persist_interaction(
+            ctx,
+            page_id=page_id,
+            findings=result.search_result.findings,
+            states=0,
+            screenshots={},
+            count_page=False,
+        )
     redirected = bool(result.url and result.url != url)
     if redirected:
         ctx.summary.pages_redirected += 1
@@ -1151,7 +1211,11 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # violation, so it goes down the ordinary axe path and inherits
         # its (page_id, rule_id, target_hash) dedupe. All that is added is
         # ``revealed_by``.
-        if render_mode == "js" and ctx.config.interaction_checks_enabled:
+        if (
+            render_mode == "js"
+            and ctx.config.interaction_checks_enabled
+            and result.interaction_evaluated
+        ):
             _persist_interaction(
                 ctx,
                 page_id=page_id,
@@ -1159,6 +1223,32 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 states=result.interaction_states,
                 screenshots=result.screenshots,
             )
+            # The per-page ledger is written even when the sweep produced no
+            # findings: "37 of 52 controls operated, stopped by the click
+            # budget" is the part of an exploratory pass a reader has to be
+            # able to check, and a clean page would otherwise record nothing.
+            try:
+                repo.record_interaction_run(
+                    ctx.conn,
+                    scan_id=ctx.scan_id,
+                    page_id=page_id,
+                    controls_found=result.interaction_controls,
+                    clicks_attempted=result.interaction_clicks_attempted,
+                    clicks_succeeded=result.interaction_clicks_succeeded,
+                    controls_operated=result.interaction_controls_operated,
+                    states=result.interaction_states,
+                    blocked_controls=result.interaction_blocked_controls,
+                    limits=result.interaction_limits,
+                    dialogs_opened=result.interaction_dialogs_opened,
+                    dialogs_stuck=result.interaction_dialogs_stuck,
+                    detail=result.interaction_detail,
+                )
+            except (sqlite3.Error, ValueError) as exc:
+                log.warning(
+                    "interaction.coverage_persist_failed",
+                    page_id=page_id,
+                    error=str(exc),
+                )
 
         # Phase 9+: per-criterion semantic analyzers. Works on both
         # static and JS-rendered fetches because the first wave is
@@ -1174,7 +1264,13 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         return
     if _page_limit_reached(ctx):
         return
-    _enqueue_children(ctx, base_url=result.url, body=result.body, depth=depth + 1)
+    _enqueue_children(
+        ctx,
+        base_url=result.url,
+        body=result.body,
+        depth=depth + 1,
+        extra_urls=result.discovered_urls,
+    )
 
 
 def _record_page(
@@ -1224,21 +1320,22 @@ def _enqueue_children(
     base_url: str,
     body: bytes,
     depth: int,
+    extra_urls: tuple[str, ...] = (),
 ) -> None:
     try:
         tree = HTMLParser(body)
     except Exception:
         return
     seen: set[str] = set()
-    for anchor in tree.css("a[href]"):
-        href = anchor.attributes.get("href")
+    hrefs = [anchor.attributes.get("href") for anchor in tree.css("a[href]")]
+    for href in [*hrefs, *extra_urls[:1000]]:
         if not href:
             continue
         try:
             absolute = urljoin(base_url, href)
+            normalized = url_policy.normalize(absolute)
         except ValueError:
             continue
-        normalized = url_policy.normalize(absolute)
         if normalized in seen:
             continue
         seen.add(normalized)
@@ -1368,6 +1465,7 @@ def _persist_interaction(
     findings: tuple[RevealedViolation, ...],
     states: int,
     screenshots: Mapping[str, bytes],
+    count_page: bool = True,
 ) -> None:
     """Write violations that only exist after a control was operated.
 
@@ -1421,13 +1519,13 @@ def _persist_interaction(
     # cannot disagree, with the interaction-specific counters kept
     # alongside so the report can still say how much clicking bought.
     ctx.summary.axe_violations_total += len(findings)
-    ctx.summary.interaction_pages_probed += 1
+    ctx.summary.interaction_pages_probed += int(count_page)
     ctx.summary.interaction_findings_total += len(findings)
     # States reached, not findings produced: a clean revealed state is still
     # coverage this scan gained over a load-time-only pass.
     ctx.summary.interaction_states_total += states
     repo.increment_scan_interaction_counters(
-        ctx.conn, scan_id=ctx.scan_id, pages_delta=1, states_delta=states
+        ctx.conn, scan_id=ctx.scan_id, pages_delta=int(count_page), states_delta=states
     )
 
 

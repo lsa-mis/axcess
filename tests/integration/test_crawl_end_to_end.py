@@ -84,32 +84,61 @@ def test_crawl_discovers_all_in_scope_pages(tmp_db: sqlite3.Connection) -> None:
     assert missing["status_code"] == 404
 
 
-def test_crawl_discovers_hash_router_pages(tmp_db: sqlite3.Connection) -> None:
+@pytest.mark.parametrize("browser_only", [False, True])
+def test_crawl_discovers_hash_router_pages(tmp_db: sqlite3.Connection, browser_only: bool) -> None:
     """SPA hash routes are distinct rendered pages; ordinary anchors are not."""
     with _serve() as base:
         seed = f"{base}/hash-spa/index.html"
         config = CrawlConfig(
             js_eager=True,
+            browser_only=browser_only,
             seed_url=seed,
             max_pages=10,
             rps=100.0,
             workers=1,
             image_extraction_enabled=False,
-            axe_enabled=False,
+            axe_enabled=True,
             vlm_enabled=False,
             semantic_enabled=False,
             keyboard_probe_enabled=False,
             responsive_checks_enabled=False,
             focus_checks_enabled=False,
             visual_checks_enabled=False,
-            interaction_checks_enabled=False,
+            interaction_checks_enabled=True,
             capture_screenshots=False,
         )
-        summary = asyncio.run(run_crawl(tmp_db, config))
+
+        async def crawl() -> CrawlSummary:
+            if not browser_only:
+                return await run_crawl(tmp_db, config)
+            from playwright.async_api import async_playwright
+
+            from audit.analyzer.axe import AxeAnalyzer
+            from audit.analyzer.interaction import InteractionProbe
+            from audit.crawler.js_fetcher import JsFetcher
+
+            async with async_playwright() as pw:
+                browser = await pw.chromium.launch()
+                context = await browser.new_context()
+                page = await context.new_page()
+                axe = AxeAnalyzer.from_bundled()
+                fetcher = JsFetcher(
+                    user_agent="test",
+                    shared_context=context,
+                    shared_pages=(page,),
+                    axe_analyzer=axe,
+                    interaction_probe=InteractionProbe(axe=axe),
+                )
+                try:
+                    return await run_crawl(tmp_db, config, js_fetcher=fetcher)
+                finally:
+                    await browser.close()
+
+        summary = asyncio.run(crawl())
 
     assert summary.status == "completed"
     rows = tmp_db.execute(
-        "SELECT url_normalized, final_url, title FROM pages WHERE scan_id = ?",
+        "SELECT url_normalized, final_url, title, status_code FROM pages WHERE scan_id = ?",
         (summary.scan_id,),
     ).fetchall()
     by_url = {row["url_normalized"]: row for row in rows}
@@ -117,10 +146,29 @@ def test_crawl_discovers_hash_router_pages(tmp_db: sqlite3.Connection) -> None:
         seed,
         f"{seed}#/about",
         f"{seed}#/projects",
+        f"{seed}#/details",
     }
     assert by_url[f"{seed}#/about"]["title"] == "About | Hash SPA"
     assert by_url[f"{seed}#/projects"]["title"] == "Projects | Hash SPA"
+    assert by_url[f"{seed}#/details"]["title"] == "Details | Hash SPA"
+    assert all(row["status_code"] == 200 for row in rows)
+    assert summary.axe_pages_scanned == 4
+    assert summary.interaction_pages_probed == 4
+    assert summary.interaction_states_total == 4
     assert all(row["final_url"] is None for row in rows)
+
+    # The per-page ledger is what lets a report say how much of each page was
+    # actually operated, so it must exist for every probed page — including
+    # ones whose clicks revealed nothing.
+    ledger = tmp_db.execute(
+        "SELECT COUNT(*) AS pages, SUM(controls_found) AS found, "
+        "SUM(controls_operated) AS clicked, SUM(states) AS states "
+        "FROM scan_interaction_runs WHERE scan_id = ?",
+        (summary.scan_id,),
+    ).fetchone()
+    assert ledger["pages"] == 4
+    assert ledger["states"] == summary.interaction_states_total
+    assert 0 < ledger["clicked"] <= ledger["found"]
 
 
 def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
@@ -324,13 +372,17 @@ def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection
     assert summary.axe_pages_scanned == 1
     assert summary.keyboard_pages_probed == 1
     assert summary.responsive_pages_probed == 1
+    # This injected browser has no interaction probe. Configuration alone
+    # must not claim that it clicked through any DOM states.
+    assert summary.interaction_pages_probed == 0
     row = tmp_db.execute(
-        "SELECT axe_pages_scanned, keyboard_pages_probed, responsive_pages_probed "
+        "SELECT axe_pages_scanned, keyboard_pages_probed, responsive_pages_probed, "
+        "interaction_pages_probed "
         "FROM scans WHERE id = ?",
         (summary.scan_id,),
     ).fetchone()
     assert row is not None
-    assert tuple(row) == (1, 1, 1)
+    assert tuple(row) == (1, 1, 1, 0)
 
 
 def test_rendered_analyzers_persist_when_image_extraction_is_disabled(

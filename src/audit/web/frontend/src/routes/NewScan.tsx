@@ -17,6 +17,7 @@ import {
   PageHeader,
 } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
+import SearchSettings from "../components/SearchSettings";
 import type { NewScanPayload } from "../api/types";
 import { SITE_URL_LABEL, WHOLE_HOST_HINT } from "../lib/scanCopy";
 import EngineChoice from "./EngineChoice";
@@ -73,9 +74,8 @@ export default function NewScanRoute() {
     // explicit corroboration option because it starts a second browser pass
     // for every page and is therefore substantially slower.
     scan_engine: "axe",
-    // Operating page controls is slower and changes the live DOM, so keep
-    // DOM-state discovery as an explicit advanced opt-in.
-    skip_interaction: true,
+    // Explore revealed DOM states and routes as part of the default scan.
+    skip_interaction: false,
     skip_keyboard: false,
     skip_responsive: false,
     skip_semantic: true,
@@ -583,13 +583,13 @@ export default function NewScanRoute() {
                         disabled={
                           form.static_only || form.scan_engine === "alfa"
                         }
-                        label="Click through DOM states"
+                        label="Click Through DOM States"
                         hint={
                           form.static_only
                             ? "Unavailable in static-only mode because DOM state discovery needs Axcess’ browser."
                             : form.scan_engine === "alfa"
                               ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
-                              : "Opens menus, dialogs, tabs, and disclosure controls, then re-runs axe-core in each revealed state. This adds scan time and avoids controls with destructive names."
+                              : "Opens menus, dialogs, tabs, and disclosure controls, checks revealed states, and discovers additional routes to scan. Exploration is bounded and adds scan time. Skips payment, subscription, submission, and other blocked actions; blocks HTTP writes during automatic clicks."
                         }
                       />
                       <Checkbox
@@ -599,6 +599,7 @@ export default function NewScanRoute() {
                         label="Ignore robots.txt"
                         hint="Authorized testing only. The scan will be flagged in its config and audit log."
                       />
+                      <SearchSettings value={form.search} onChange={search => update("search", search)} disabled={form.static_only || form.scan_engine === "alfa"} />
                       <Checkbox
                         checked={!form.skip_ocr}
                         onChange={(enabled) => {

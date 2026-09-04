@@ -180,6 +180,8 @@ def test_api_scan_detail_reports_actual_method_coverage(
             "semantic_enabled": True,
             "keyboard_probe_enabled": True,
             "responsive_checks_enabled": True,
+            "interaction_checks_enabled": True,
+            "interaction_coverage_version": 1,
             "method_coverage_version": 1,
         }
     )
@@ -188,8 +190,9 @@ def test_api_scan_detail_reports_actual_method_coverage(
         cur = conn.execute(
             "INSERT INTO scans (seed_url, status, page_count, config_json, "
             "axe_pages_scanned, alfa_pages_scanned, semantic_pages_analyzed, "
-            "keyboard_pages_probed, responsive_pages_probed) "
-            "VALUES ('https://coverage.example/', 'completed', 2, ?, 2, 1, 2, 2, 1)",
+            "keyboard_pages_probed, responsive_pages_probed, "
+            "interaction_pages_probed, interaction_states_total) "
+            "VALUES ('https://coverage.example/', 'completed', 2, ?, 2, 1, 2, 2, 1, 2, 5)",
             (config,),
         )
         scan_id = int(cur.lastrowid or 0)
@@ -218,6 +221,9 @@ def test_api_scan_detail_reports_actual_method_coverage(
     assert methods["keyboard"]["state"] == "checked"
     assert methods["responsive"]["state"] == "partial"
     assert methods["image"]["result"] == "No images found to analyze"
+    assert methods["interaction"]["label"] == "Click Through DOM States"
+    assert methods["interaction"]["state"] == "checked"
+    assert methods["interaction"]["result"] == "2 pages checked; 5 DOM states reached"
 
 
 def test_api_scan_detail_404(client: TestClient) -> None:

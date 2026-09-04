@@ -227,6 +227,29 @@ class IssueLocation:
     selector: str | None
     image_url: str | None
     detail: str | None
+    # The control that had to be operated before this markup existed. None
+    # means it was on the page at load. This is the difference between an
+    # instance a reader can reproduce and one they cannot: "open the Account
+    # menu, then look at the field" versus "load the page".
+    revealed_by: str | None = None
+
+
+@dataclass(frozen=True)
+class FixOption:
+    """One authored way to fix an issue, with the trade-off it carries.
+
+    Deliberately not derived from scan data. Which approaches exist, and
+    what each one costs, is editorial judgment about a codebase — a scan
+    records that a heading is missing, never that promoting a component's
+    ``tag`` prop is preferable to hand-written HTML. So options live in
+    ``rules/audit_report.yaml`` and are simply absent for rules nobody has
+    written them for; an export renders what exists rather than inventing a
+    second option to fill out a table.
+    """
+
+    label: str
+    approach: str
+    watch_out: str = ""
 
 
 @dataclass(frozen=True)
@@ -1315,7 +1338,7 @@ def _locations_for_row(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
                    a.target_selector AS selector, a.html_snippet AS html_snippet,
-                   a.failure_summary AS detail
+                   a.failure_summary AS detail, a.revealed_by AS revealed_by
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.id IN ({placeholders})
@@ -1335,6 +1358,7 @@ def _locations_for_row(
                     selector=str(r["selector"] or "") or None,
                     image_url=None,
                     detail=_short(" ".join(detail.split()), 120) or None,
+                    revealed_by=str(r["revealed_by"] or "") or None,
                 )
             )
     else:  # image pipeline
@@ -1647,6 +1671,33 @@ def _conformance_estimate(cards: list[AuditCard]) -> str | None:
     return " · ".join(parts) if parts else None
 
 
+def _fix_options(meta: dict[str, Any]) -> tuple[FixOption, ...]:
+    """Read authored fix approaches, skipping anything malformed.
+
+    A half-written option is worse than none: an export that prints an
+    empty "Watch out for" cell reads as "nothing to watch out for".
+    """
+    raw = meta.get("fix_options")
+    if not isinstance(raw, list):
+        return ()
+    options: list[FixOption] = []
+    for item in raw[:6]:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        approach = str(item.get("approach") or "").strip()
+        if not label or not approach:
+            continue
+        options.append(
+            FixOption(
+                label=label,
+                approach=approach,
+                watch_out=str(item.get("watch_out") or "").strip(),
+            )
+        )
+    return tuple(options)
+
+
 def _meta_for_row(row: Any, rules: dict[str, Any]) -> dict[str, Any]:
     """Re-resolve the YAML card for a row (for verify/confidence fields).
 
@@ -1693,6 +1744,21 @@ def _short(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+def fix_options_for(row: Any, rules: dict[str, Any]) -> tuple[FixOption, ...]:
+    """Authored fix approaches for one issue row; empty when none are written.
+
+    Shares ``_meta_for_row``'s key scheme so every export resolves an
+    issue to the same YAML entry. ``rules`` is passed in rather than loaded
+    here: a caller rendering hundreds of issues reads the file once.
+    """
+    return _fix_options(_meta_for_row(row, rules))
+
+
+def load_report_rules() -> dict[str, Any]:
+    """Read the authored rule copy once, for callers outside this module."""
+    return _load_rules()
+
+
 def _load_rules() -> dict[str, Any]:
     """Read ``rules/audit_report.yaml`` once. Returns ``{}`` on parse error."""
     try:
@@ -1706,7 +1772,10 @@ def _load_rules() -> dict[str, Any]:
 __all__ = [
     "AuditCard",
     "DroppedFinding",
+    "FixOption",
     "IssueLocation",
+    "fix_options_for",
+    "load_report_rules",
     "render_audit_report",
 ]
 

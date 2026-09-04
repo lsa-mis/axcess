@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Focusable category menu regression</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    [role=listbox] { position: fixed; top: 5rem; left: 2rem; background: white; padding: 1rem; }
+    .item { cursor: pointer; padding: .5rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Reports</h1>
+    <button id="categories" aria-haspopup="listbox" aria-expanded="false">Categories</button>
+    <div id="content">My Favorites</div>
+    <p tabindex="0" id="ordinary-focus-target">Focusable explanatory text, not an action.</p>
+  </main>
+  <script>
+    window.selected = [];
+    window.openings = 0;
+    window.focusTargetClicks = 0;
+    document.querySelector('#ordinary-focus-target').addEventListener('click', () => {
+      window.focusTargetClicks++;
+    });
+    const categories = ['My Favorites', 'LSA-TS', 'User Access', 'History', 'Subscribe', 'Delete report'];
+    document.querySelector('#categories').addEventListener('click', () => {
+      document.querySelector('.category-menu')?.remove();
+      window.openings++;
+      const menu = document.createElement('div');
+      menu.id = 'portal-' + window.openings; menu.className = 'category-menu';
+      menu.setAttribute('role', 'listbox'); menu.tabIndex = 0;
+      categories.forEach((name, index) => {
+        const item = document.createElement('div');
+        item.className = 'item'; item.tabIndex = index === 0 ? 0 : -1;
+        item.innerHTML = '<span>' + name + '</span>';
+        // Vue-style event listener, with no role or onclick attribute.
+        item.addEventListener('click', () => {
+          window.selected.push(name);
+          document.querySelector('#content').innerHTML = '<input id="category-' + index + '">';
+          menu.remove();
+          document.querySelector('#categories').setAttribute('aria-expanded', 'false');
+        });
+        menu.append(item);
+      });
+      document.body.append(menu);
+      document.querySelector('#categories').setAttribute('aria-expanded', 'true');
+    });
+  </script>
+</body>
+</html>

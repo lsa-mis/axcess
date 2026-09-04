@@ -1214,6 +1214,11 @@ def _protected_public_config_json(config: CrawlConfig, opaque_alias: str) -> str
     public_config.pop("user_agent", None)
     public_config.pop("vlm_base_url", None)
     public_config.pop("vlm_model", None)
+    # A configured search carries a target URL and the values that were typed
+    # into the site's own form. The method ledger only needs to know that a
+    # search ran, so keep the flag and drop everything identifying.
+    if public_config.get("search") is not None:
+        public_config["search"] = True
     public_config["protected_work_spec"] = "encrypted"
     public_config["seed_url"] = opaque_alias
     return json.dumps(public_config, sort_keys=True, separators=(",", ":"))
@@ -1233,6 +1238,9 @@ def _protected_work_config(config: CrawlConfig, *, allow_local_ai: bool) -> dict
     # endpoint into the agent payload by accident.
     work_config.pop("seed_url", None)
     work_config.pop("user_agent", None)
+    # A search page URL is a seed by another name. Protected scans do not
+    # configure one today; removing it explicitly keeps that true if they do.
+    work_config.pop("search", None)
     if allow_local_ai:
         work_config["vlm_base_url"] = config.vlm_base_url
         work_config["vlm_model"] = config.vlm_model

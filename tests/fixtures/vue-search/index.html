@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><title>Vue search route fixture</title>
+<script src="/vendor/vue.global.prod.js"></script><script src="/vendor/vue-router.global.prod.js"></script>
+<style>body{font:18px system-ui;margin:2rem;color:#172b4d;background:#fff}button,input,select{font:inherit;margin:.5rem;padding:.5rem}nav{margin-bottom:2rem}li{margin:.5rem}button{cursor:pointer}</style>
+</head><body><div id="app"></div><script>
+const {createApp, ref, watch} = Vue;
+const {createRouter,createWebHistory,createWebHashHistory,useRoute,useRouter} = VueRouter;
+const authMode = new URLSearchParams(location.search).get('auth');
+const hashMode = new URLSearchParams(location.search).get('router') === 'hash';
+const store = (key,value) => sessionStorage.setItem(key,value);
+if(authMode) store('requireAuth',authMode);
+const authenticated = () => !sessionStorage.getItem('requireAuth') || sessionStorage.getItem('signedIn') === 'yes';
+const reports = Array.from({length:24},(_,i)=>({id:i+1,name:`Sample report ${String(i+1).padStart(2,'0')}`}));
+window.fixture = {searches:0, opened:[], forbidden:0};
+const Home = {
+ setup(){
+  const router=useRouter(), q=ref(''), category=ref('all'), page=ref(0), visible=ref([]), menu=ref(false);
+  let timer;
+  const search=()=>{clearTimeout(timer); visible.value=[]; timer=setTimeout(()=>{
+    window.fixture.searches++;
+    visible.value=q.value.toLowerCase().includes('sample') ? reports.slice(page.value*8,page.value*8+8):[];
+  },250)};
+  watch(q,()=>{page.value=0;search()});
+  const next=()=>{page.value++;search()};
+  const open=id=>{window.fixture.opened.push(id);router.push('/reports/'+id)};
+  return {q,category,page,visible,menu,search,next,open};
+ },
+ template:`<main><h1>Vue report finder</h1><p>Twenty-four result routes and twenty-four nested routes exist only after a search.</p>
+  <button id="menu" @click="menu=!menu">Browse help</button><nav v-if="menu"><router-link to="/help">Help</router-link><router-link to="/about">About</router-link></nav>
+  <form @submit.prevent="search"><label>Search reports<input v-model="q" type="search"></label>
+  <label>Category<select v-model="category"><option value="all">All reports</option><option>Other</option></select></label>
+  <button>Search</button></form>
+  <ul role="listbox" aria-label="Results"><li v-for="report in visible" :key="report.id" role="option" aria-selected="false" tabindex="0" @click="open(report.id)" @keydown.enter="open(report.id)">{{report.name}}</li></ul>
+  <button v-if="visible.length" :disabled="page>=2" @click="next">Next results</button>
+  <p v-if="q && !visible.length">Waiting for results or no matching reports.</p></main>`
+};
+const Report={setup(){const route=useRoute();return{route}},template:`<main><h1>Report {{route.params.id}}</h1><router-link :to="'/reports/'+route.params.id+'/details'">Details</router-link><button @click="show=true">Show information</button><p v-if="show">Read-only report information</p></main>`,data:()=>({show:false})};
+const Details={setup(){return {route:useRoute()}},template:`<main><h1>Details {{route.params.id}}</h1><router-link to="/">Search again</router-link></main>`};
+const router=createRouter({history:hashMode?createWebHashHistory():createWebHistory(),routes:[
+ {path:'/',component:Home},{path:'/reports/:id',component:Report},{path:'/reports/:id/details',component:Details},
+ {path:'/help',component:{template:'<main><h1>Help</h1><router-link to="/">Home</router-link></main>'}},
+ {path:'/about',component:{template:'<main><h1>About</h1></main>'}},
+]});
+createApp({setup(){const ready=ref(authenticated());const signIn=()=>{store('signedIn','yes');ready.value=true};return{ready,signIn}},
+template:`<div><template v-if="ready"><router-view /></template><main v-else><h1>Fixture sign-in</h1><button @click="signIn">Complete test sign-in</button></main></div>`}).use(router).mount('#app');
+</script></body></html>

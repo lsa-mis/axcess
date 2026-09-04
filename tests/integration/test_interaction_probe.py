@@ -299,3 +299,367 @@ async def test_concurrent_pages_each_get_their_own_state_count(browser, axe) -> 
     # of these carry the other's total, or zero.
     assert stress.states != hidden.states or len(stress.findings) != len(hidden.findings)
     assert len(stress.findings) == len({f.violation.target_hash for f in stress.findings})
+
+
+class _NoopAxe:
+    async def run(self, *_args):  # type: ignore[no-untyped-def]
+        return []
+
+
+async def test_distinct_equal_named_controls_and_fixed_controls_are_clicked(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content("""
+        <main id="cards"></main><aside style="position:fixed;right:0;top:0">
+        <button id="fixed" onclick="window.clicked.push('fixed')">Open help</button></aside>
+        <label><input type="checkbox" onclick="window.clicked.push('checkbox')">Show details</label>
+        <a href="#" role="button"
+          onclick="event.preventDefault();window.clicked.push('anchor')">Expand</a>
+        <script>
+          window.clicked = [];
+          for (let i=0; i<8; i++) {
+            const button = document.createElement('button');
+            button.className = 'card'; button.textContent = 'Details';
+            button.onclick = () => window.clicked.push(i);
+            document.getElementById('cards').append(button);
+          }
+        </script>
+    """)
+    await InteractionProbe(axe=_NoopAxe(), settle_ms=0).run(page)  # type: ignore[arg-type]
+    clicked = await page.evaluate("window.clicked")
+    assert clicked == [*range(8), "fixed", "checkbox", "anchor"]
+
+
+async def test_nested_siblings_survive_escape_handling(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content("""
+        <button id="menu" onclick="panel.hidden=false">Menu</button>
+        <div id="panel" hidden>
+          <button id="first"
+          onclick="window.clicked.push('first');this.dataset.used='1'">First</button>
+          <button id="second"
+          onclick="window.clicked.push('second');this.dataset.used='1'">Second</button>
+        </div>
+        <script>
+          window.clicked=[];
+          document.addEventListener('keydown', e => {if (e.key==='Escape') panel.hidden=true});
+        </script>
+    """)
+    await InteractionProbe(axe=_NoopAxe(), settle_ms=0).run(page)  # type: ignore[arg-type]
+    assert await page.evaluate("window.clicked") == ["first", "second"]
+
+
+async def test_disabled_and_unsafe_actions_are_not_clicked(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content("""
+        <script>window.clicked=[]</script>
+        <button onclick="window.clicked.push('subscription')">Subscribe now</button>
+        <span id="pay-label">Make payment</span>
+        <button aria-labelledby="pay-label"
+          onclick="window.clicked.push('payment')">Continue</button>
+        <button onclick="window.clicked.push('save')">Save changes</button>
+        <button onclick="window.clicked.push('send')">Send invitation</button>
+        <button disabled onclick="window.clicked.push('disabled')">More</button>
+        <button aria-disabled="true" onclick="window.clicked.push('aria-disabled')">More</button>
+        <form onsubmit="window.clicked.push('form');return false">
+          <button>Continue</button><input type="submit" value="Continue">
+        </form>
+        <button
+          onclick="if(confirm('Proceed?'))window.clicked.push('confirmed')">Show preview</button>
+        <button onclick="window.clicked.push('safe')">Open details</button>
+    """)
+    await InteractionProbe(axe=_NoopAxe(), settle_ms=0).run(page)  # type: ignore[arg-type]
+    assert await page.evaluate("window.clicked") == ["safe"]
+
+
+async def test_network_writes_and_popups_are_blocked_without_affecting_other_tabs(browser) -> None:  # type: ignore[no-untyped-def]
+    context = await browser.new_context(service_workers="block")
+    requests: list[tuple[str, str]] = []
+    html = """
+        <button id="preview"
+          onclick="fetch('/api/update', {method:'POST'}).catch(()=>{})">Preview</button>
+        <button id="reset" onclick="fetch('/api/delete?id=1').catch(()=>{})">More details</button>
+        <button id="popup" onclick="window.open('/payment')">View account</button>
+        <button id="external"
+          onclick="fetch('https://elsewhere.test/read').catch(()=>{})">Open resource</button>
+        <button id="nav" onclick="location.href='/results'">Results</button>
+        <button id="read"
+          onclick="fetch('/api/content').then(()=>this.dataset.loaded='1')">Help</button>
+    """
+
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        requests.append((route.request.method, route.request.url))
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    await context.route("**/*", fixture)
+    page = await context.new_page()
+    other = await context.new_page()
+    try:
+        await page.goto("https://fixture.test/")
+        await other.goto("https://fixture.test/other")
+        requests.clear()
+        probe = InteractionProbe(axe=_NoopAxe(), settle_ms=10)  # type: ignore[arg-type]
+        task = asyncio.create_task(probe.run(page))
+        await asyncio.sleep(0.1)
+        await other.evaluate("fetch('/unrelated', {method:'POST'})")
+        result = await task
+        assert ("POST", "https://fixture.test/unrelated") in requests
+        assert ("GET", "https://fixture.test/api/content") in requests
+        assert all(
+            "/api/update" not in url
+            and "/api/delete" not in url
+            and "/payment" not in url
+            and "/results" not in url
+            and "elsewhere.test" not in url
+            for _, url in requests
+        )
+        assert "https://fixture.test/results" in result.urls
+        assert not any("/payment" in url for url in result.urls)
+        # The temporary guard must not leak into later page work.
+        await page.evaluate("fetch('/after', {method:'POST'})")
+        assert ("POST", "https://fixture.test/after") in requests
+    finally:
+        await context.close()
+
+
+async def test_time_budget_retains_earlier_evidence_and_removes_guard(page) -> None:  # type: ignore[no-untyped-def]
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        await route.fulfill(status=200, content_type="text/html", body="<main>Fixture</main>")
+
+    await page.context.route("**/*", fixture)
+    await page.goto("https://fixture.test/")
+    await page.set_content("<button onclick=\"this.textContent='Opened'\">Open</button>")
+
+    class SlowAxe:
+        async def run(self, *_args):  # type: ignore[no-untyped-def]
+            await asyncio.sleep(10)
+            return []
+
+    result = await InteractionProbe(axe=SlowAxe(), timeout_s=0.3, settle_ms=0).run(page)  # type: ignore[arg-type]
+    assert result.states == 1
+    assert result.evaluated
+    assert await page.evaluate("fetch('/after', {method:'POST'}).then(r => r.status)") == 200
+
+
+async def test_focusable_categories_reopen_after_every_selection(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Missing ARIA roles must not prevent auditing a real custom menu."""
+    await page.goto(_file_url("focusable_categories.html"))
+    baseline = await axe.run(page, "AA")
+    result = await InteractionProbe(axe=axe, settle_ms=10).run(page, baseline=baseline)
+    assert await page.evaluate("window.selected") == [
+        "My Favorites",
+        "LSA-TS",
+        "User Access",
+        "History",
+    ]
+    assert await page.evaluate("window.openings") == 4
+    assert await page.evaluate("window.focusTargetClicks") == 0
+    assert {
+        item.violation.target_selector
+        for item in result.findings
+        if item.violation.rule_id == "label"
+    } == {"#category-0", "#category-1", "#category-2", "#category-3"}
+
+
+async def test_reopening_categories_consumes_the_click_budget(page) -> None:  # type: ignore[no-untyped-def]
+    await page.goto(_file_url("focusable_categories.html"))
+    await InteractionProbe(axe=_NoopAxe(), max_clicks=4, settle_ms=10).run(page)  # type: ignore[arg-type]
+    assert await page.evaluate("window.selected") == ["My Favorites", "LSA-TS"]
+    assert await page.evaluate("window.openings") == 2
+
+
+async def test_reopens_the_full_path_when_a_nested_menu_closes_all_ancestors(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content("""
+        <button id="root">Categories</button>
+        <main id="content"></main>
+        <script>
+          window.selected=[]; window.rootOpenings=0; window.subOpenings=0;
+          root.onclick = () => {
+            window.rootOpenings++;
+            const parent=document.createElement('div');
+            parent.id='parent-'+window.rootOpenings;
+            const opener=document.createElement('button');
+            opener.textContent='Departments';
+            opener.onclick=() => {
+              window.subOpenings++;
+              const sub=document.createElement('div');
+              sub.id='sub-'+window.subOpenings;
+              ['First', 'Second'].forEach(name => {
+                const item=document.createElement('button'); item.textContent=name;
+                item.onclick=() => {
+                  window.selected.push(name); content.textContent=name;
+                  sub.remove(); parent.remove();
+                };
+                sub.append(item);
+              });
+              document.body.append(sub);
+            };
+            parent.append(opener); document.body.append(parent);
+          };
+        </script>
+    """)
+    await InteractionProbe(axe=_NoopAxe(), settle_ms=10).run(page)  # type: ignore[arg-type]
+    assert await page.evaluate("window.selected") == ["First", "Second"]
+    assert await page.evaluate("[window.rootOpenings, window.subOpenings]") == [2, 2]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_coverage_counts_operated_controls_and_names_the_bound(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A capped sweep must report what it left alone, not just what it did.
+
+    ``hidden_state.html`` holds ten same-shaped calendar buttons plus a
+    blocked "Sign out". With the repeat cap at three, most of those controls
+    are discovered and never operated — which is exactly the case a coverage
+    number must not round up to "checked".
+    """
+    await page.goto(_file_url("hidden_state.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe, max_repeated=3).run(page, baseline=baseline)
+
+    assert result.evaluated
+    assert result.controls_operated < result.controls_discovered
+    assert result.controls_operated <= result.clicks_succeeded <= result.clicks_attempted
+    assert result.blocked_controls >= 1
+    assert "repeated_controls" in result.limits
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_controls_revealed_by_a_click_are_counted_as_discovered(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Depth-limited exploration still records the controls it uncovered."""
+    await page.goto(_file_url("nested_depth.html"))
+    baseline = await axe.run(page, "AA")
+
+    shallow = await InteractionProbe(axe=axe, max_depth=1).run(page, baseline=baseline)
+    await page.reload()
+    deep = await InteractionProbe(axe=axe, max_depth=4).run(page, baseline=baseline)
+
+    # The depth-1 sweep opens the first level and sees what it exposed
+    # without being allowed to press it, so discovery exceeds clicks and the
+    # bound that stopped it is named.
+    assert shallow.controls_discovered > shallow.controls_operated
+    assert "depth" in shallow.limits
+    assert deep.controls_operated > shallow.controls_operated
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_dialog_is_closed_before_the_next_control_is_used(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Escape-closable and button-closable dialogs must both be cleared.
+
+    The fixture's veil covers the page whenever a dialog is up, so the plain
+    control at the end can only be clicked if both dialogs were actually
+    dismissed first. Its counter is the assertion.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+
+    # Without the undismissable one in play, the sweep must run to the end.
+    await page.evaluate("() => document.getElementById('stuck').remove()")
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.dialogs_opened == 2, "both dialogs should have been opened"
+    assert result.dialogs_stuck == 0
+    assert "dialog_not_dismissed" not in result.limits
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 1, (
+        "the control after the dialogs was never reached: a dialog was left open"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_dialog_that_will_not_close_stops_the_page_and_is_reported(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """The stuck dialog must end the sweep rather than click through an overlay.
+
+    Its only exit is labelled "Delete everything", so the probe has no safe
+    way out and must say so instead of pressing it.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    # Put the undismussable dialog first so there is still page left to lose.
+    await page.evaluate(
+        "() => { const s = document.getElementById('stuck');"
+        " s.parentElement.insertBefore(s, document.getElementById('escapable')); }"
+    )
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.dialogs_stuck == 1
+    assert "dialog_not_dismissed" in result.limits
+    assert "did not close" in result.detail
+    assert "Open undismissable dialog" in result.detail
+    # The destructive control inside it was never used to tidy up.
+    assert await page.evaluate("() => document.getElementById('m-stuck').hasAttribute('data-open')")
+    # And the sweep stopped instead of clicking the overlay.
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 0, "clicking continued past an open modal"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_controls_inside_a_dialog_are_still_explored_before_it_closes(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Closing the dialog must not cost the coverage inside it.
+
+    Each dialog holds an unlabelled input, which axe only sees while the
+    dialog is open.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    revealed = {finding.violation.rule_id for finding in result.findings}
+    assert "label" in revealed, "the dialog's unlabelled input was never scanned"
+    assert result.states >= 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_dialog_ignoring_escape_is_closed_by_its_own_close_control(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Escape is not the only exit, so a dialog that ignores it still closes.
+
+    ``max_depth=1`` stops the nested sweep from entering the dialog, so the
+    dialog's own Close button cannot be pressed as ordinary exploration.
+    Anything that closes it here is the dismissal path.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate(
+        "() => { for (const id of ['escapable', 'stuck']) document.getElementById(id).remove(); }"
+    )
+
+    result = await InteractionProbe(axe=axe, max_depth=1).run(page, baseline=baseline)
+
+    assert result.dialogs_opened == 1
+    assert result.dialogs_stuck == 0
+    assert not await page.evaluate(
+        "() => document.getElementById('m-button').hasAttribute('data-open')"
+    )
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 1, "the control after the dialog was never reached"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """role="dialog" alone is not modal, and must not cost the rest of the page.
+
+    Regression: treating every visible dialog as blocking halted a sweep on
+    an ordinary inline panel that covered nothing, losing every control after
+    it. Only aria-modal and a native showModal() dialog block.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate(
+        "() => { for (const id of ['escapable', 'button-only', 'stuck'])"
+        " document.getElementById(id).remove(); }"
+    )
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.dialogs_opened == 0, "a non-modal dialog was treated as blocking"
+    assert result.dialogs_stuck == 0
+    assert "dialog_not_dismissed" not in result.limits
+    # It stayed open, and the sweep carried on regardless.
+    assert await page.evaluate("() => document.getElementById('m-plain').hasAttribute('data-open')")
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 1

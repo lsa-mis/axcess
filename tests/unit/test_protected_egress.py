@@ -97,6 +97,45 @@ def test_transient_manual_auth_urls_allow_oauth_query_parameters_but_not_fragmen
         policy.validate_transient_auth_url("https://app.example.edu/#access_token=secret")
 
 
+@pytest.mark.parametrize("fragment", ["/projects", "!/projects", "/projects?sort=name"])
+def test_browser_routes_preserve_hash_identity(fragment: str) -> None:
+    policy = ProtectedEgressPolicy(["https://app.example.edu"], resolver=_public_resolver)
+    url = f"https://app.example.edu/#{fragment}"
+    assert policy.validate_page_url(url).url == url
+    with pytest.raises(EgressViolation, match="fragment_not_allowed"):
+        policy.validate_url(url)
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "#access_token=secret",
+        "#/callback?access_token=secret",
+        "#!/callback?code=secret",
+        "#/callback?access%255Ftoken=secret",
+        "#/path%00",
+        "#/path#access_token=secret",
+        "#//other.example/path",
+        "?token=secret#/projects",
+    ],
+)
+def test_browser_routes_do_not_relax_secret_checks(suffix: str) -> None:
+    policy = ProtectedEgressPolicy(["https://app.example.edu"], resolver=_public_resolver)
+    with pytest.raises(EgressViolation):
+        policy.validate_page_url(f"https://app.example.edu/{suffix}")
+
+
+def test_browser_routes_still_require_approved_origin_and_public_dns() -> None:
+    policy = ProtectedEgressPolicy(["https://app.example.edu"], resolver=_public_resolver)
+    with pytest.raises(EgressViolation, match="origin_not_approved"):
+        policy.validate_page_url("https://other.example.edu/#/projects")
+    private = ProtectedEgressPolicy(
+        ["https://app.example.edu"], resolver=lambda _host: ("127.0.0.1",)
+    )
+    with pytest.raises(EgressViolation, match="non_public_address"):
+        private.validate_page_url("https://app.example.edu/#/projects")
+
+
 @pytest.mark.parametrize(
     "addresses",
     [
