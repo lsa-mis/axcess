@@ -93,6 +93,11 @@ class ExportA11yFinding:
     pipeline: str = "axe"
     engine_outcome: str = "failed"
     engine_evidence_json: str | None = None
+    # Label of the control that had to be operated before this finding was
+    # visible. ``None`` means the load-state pass saw it. Exports turn this
+    # into a reproduction step: a developer who cannot reach the barrier
+    # closes the ticket as invalid.
+    revealed_by: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -215,7 +220,7 @@ def _collect_a11y_findings(
                a.rule_id, a.wcag_sc, a.wcag_scs,
                a.wcag_level, a.impact, a.help, a.help_url,
                a.target_selector, a.failure_summary, a.html_snippet,
-               a.status,
+               a.status, a.revealed_by,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
@@ -263,6 +268,7 @@ def _collect_a11y_findings(
                 pipeline=str(r["pipeline"] or "axe"),
                 engine_outcome=str(r["engine_outcome"] or "failed"),
                 engine_evidence_json=r["engine_evidence_json"],
+                revealed_by=(str(r["revealed_by"]) if r["revealed_by"] else None),
             )
         )
     return out

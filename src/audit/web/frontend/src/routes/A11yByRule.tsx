@@ -88,12 +88,6 @@ export default function A11yByRuleRoute() {
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${scan.id}`, to: `/scans/${scan.id}` },
-          { label: "WCAG findings", to: `/scans/${scan.id}/a11y` },
-          { label: "by rule" },
-        ]}
         title="WCAG DOM-engine findings — grouped by rule"
         subtitle={scan.seed_url}
         actions={

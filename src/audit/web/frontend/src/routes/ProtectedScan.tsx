@@ -722,7 +722,7 @@ function ProtectedScanHeader() {
   return (
     <PageHeader
       crumbs={[
-        { label: "Scans", to: "/scans" },
+        { label: "Reports", to: "/scans" },
         { label: "2FA / login scan" },
       ]}
       title="2FA / login scan"

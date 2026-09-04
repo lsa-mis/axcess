@@ -1,14 +1,8 @@
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
 import { api } from "../api/client";
-import {
-  Card,
-  LinkButton,
-  PageHeader,
-  SeverityChip,
-  StatCard,
-} from "../components/ui";
+import { Card, SeverityChip, StatCard } from "../components/ui";
+import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import type { DiffEntry } from "../api/types";
 
 export default function DiffRoute() {
@@ -17,6 +11,11 @@ export default function DiffRoute() {
   const [params] = useSearchParams();
   const compareTo = Number(params.get("compare_to") ?? NaN);
 
+  const scanQuery = useQuery({
+    queryKey: ["scan", id],
+    queryFn: () => api.getScan(id),
+    enabled: Number.isFinite(id),
+  });
   const { data, error, isLoading } = useQuery({
     queryKey: ["diff", id, compareTo],
     queryFn: () => api.getDiff(id, compareTo),
@@ -41,18 +40,19 @@ export default function DiffRoute() {
 
   return (
     <>
-      <PageHeader
-        crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${id}`, to: `/scans/${id}` },
-          { label: "Diff" },
-        ]}
-        title={<>Diff — #{id} vs #{compareTo}</>}
-        actions={
-          <LinkButton to={`/scans/${id}`} variant="secondary">
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to Scan #{id}
-          </LinkButton>
+      {/* "Verify changes" everywhere — the tab, the trail and the heading all
+          said something different before ("Diff", "Verify changes", "Diff —
+          #46 vs #45"), which read as three separate destinations. The
+          comparison itself belongs in the meta line, not the title. */}
+      <ReportHeader
+        scanId={id}
+        previousScanId={scanQuery.data?.previous_scan_id ?? compareTo}
+        title="Verify changes"
+        meta={
+          <ReportMeta
+            counts={`Report #${id} compared with #${compareTo}`}
+            note="What changed since the earlier scan of this site."
+          />
         }
       />
 

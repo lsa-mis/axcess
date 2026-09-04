@@ -44,15 +44,18 @@ def test_xlsx_is_a_valid_workbook_with_all_report_sheets(tmp_db: sqlite3.Connect
     assert names[1] == "Issues Overview"
     # Per-issue tabs sit between the index and the rollups, so the rollup
     # sheets are located by name rather than by a fixed position.
-    assert names[-6:] == [
+    assert names[-7:] == [
         "Page Hotspots",
         "Page References",
+        # Between the page inventory and the audience roll-up: what was
+        # clicked on those pages, and where the sweep stopped short.
+        "DOM States",
         "Who's Affected",
         "Coverage & Method",
         "Test Tracking",
         "Manual Review Evidence",
     ]
-    issue_tabs = names[2:-6]
+    issue_tabs = names[2:-7]
     assert issue_tabs, "every issue should get its own tab"
     assert all(re.fullmatch(r"I\d{2}( .*)?", name) for name in issue_tabs)
     # Excel rejects longer names outright, so this is a hard limit.

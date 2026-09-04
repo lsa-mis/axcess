@@ -4,11 +4,9 @@ import { useState } from "react";
 import {
   Accessibility,
   AlertOctagon,
-  CheckCircle2,
   Clock3,
   FileOutput,
-  GitCompare,
-  ListFilter,
+  ArrowRight,
   Loader2,
   Pause,
   Play,
@@ -24,7 +22,9 @@ import type {
   ScanMethodState,
   ScanProgress,
 } from "../api/types";
-import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
+import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import ExportMenu from "../components/ExportMenu";
+import MethodCoverageLedger from "../components/MethodCoverageLedger";
 import {
   Button,
   Card,
@@ -113,14 +113,7 @@ export default function ScanDetailRoute() {
   if (data.status === "running") {
     return (
       <>
-        <PageHeader
-          crumbs={[
-            { label: "Scans", to: "/scans" },
-            { label: `Scan #${data.id}` },
-          ]}
-          title="Scan in progress"
-          subtitle={data.seed_url}
-        />
+        <PageHeader title="Scan in progress" subtitle={data.seed_url} />
         <ScanProgressPanel
           scan={data}
           progress={data.progress}
@@ -165,37 +158,47 @@ export default function ScanDetailRoute() {
 
   return (
     <>
-      <PageHeader
-        crumbs={[
-          { label: "Reports", to: "/scans" },
-          { label: `Report #${data.id}` },
-        ]}
-        title={isComplete ? `Report #${data.id}` : `Scan #${data.id}`}
-        subtitle={data.seed_url}
-        actions={
-          isComplete ? (
+      {/* A completed scan is a report, so it wears the report chrome: same
+          title/meta/actions/tabs as Issues and Verify changes. A scan that
+          never produced one keeps the plainer page header — there are no
+          other views of it to tab between. The "Compare" button is gone
+          because "Verify changes" is now a tab a few pixels below it. */}
+      {isComplete ? (
+        <ReportHeader
+          scanId={data.id}
+          previousScanId={data.previous_scan_id}
+          // "Overview" and not "Report #46": the topbar trail already names the
+          // report and the site, so repeating the number here spent the page's
+          // one loudest line on something the reader had just read.
+          title="Overview"
+          meta={
+            <ReportMeta
+              counts={
+                <>
+                  {data.finished_at ? `Completed ${formatCompleted(data.finished_at)} · ` : ""}
+                  {data.page_count.toLocaleString()} page
+                  {data.page_count === 1 ? "" : "s"} crawled,{" "}
+                  {data.error_count.toLocaleString()} error
+                  {data.error_count === 1 ? "" : "s"}
+                </>
+              }
+            />
+          }
+          actions={
             <>
-              <LinkButton
-                to={`/scans/${data.id}/issues`}
-                variant="primary"
-                size="lg"
-              >
-                <ListFilter className="h-5 w-5" aria-hidden />
-                Open issue table
+              <ExportMenu scanId={data.id} />
+              <LinkButton to={`/scans/${data.id}/issues`} variant="primary">
+                {issueSummary
+                  ? `Open the ${issueGroups.toLocaleString()} issue${issueGroups === 1 ? "" : "s"}`
+                  : "Open issue table"}
+                <ArrowRight className="h-4 w-4" aria-hidden />
               </LinkButton>
-              {data.previous_scan_id != null && (
-                <LinkButton
-                  to={`/scans/${data.id}/diff?compare_to=${data.previous_scan_id}`}
-                  variant="secondary"
-                >
-                  <GitCompare className="h-4 w-4" aria-hidden />
-                  Compare
-                </LinkButton>
-              )}
             </>
-          ) : undefined
-        }
-      />
+          }
+        />
+      ) : (
+        <PageHeader title={`Scan #${data.id}`} subtitle={data.seed_url} />
+      )}
 
       {deleteScan.error && (
         <Card
@@ -262,123 +265,54 @@ export default function ScanDetailRoute() {
         </Card>
       ) : (
         <>
-          <Card className="mb-5 overflow-hidden border-umich-blue/30">
-            <div className="flex flex-col gap-4 bg-umich-blue/5 p-5 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex gap-3">
-                <CheckCircle2
-                  className="mt-0.5 h-6 w-6 shrink-0 text-umich-blue"
-                  aria-hidden
-                />
-                <div>
-                  <h2 className="text-lg font-semibold text-fg">
-                    Automated evidence is ready
-                  </h2>
-                  <p className="mt-1 text-sm text-fg-muted">
-                    {issueSummary
-                      ? `${issueGroups.toLocaleString()} issue groups / ${issueOccurrences.toLocaleString()} detected occurrences.`
-                      : "Organizing issue groups and report evidence…"}
-                  </p>
-                  <p className="mt-1 text-xs text-fg-muted">
-                    This is evidence for expert review, not an automated
-                    conformance verdict.
-                  </p>
-                </div>
-              </div>
-              <LinkButton to={`/scans/${data.id}/issues`} variant="primary">
-                <ListFilter className="h-4 w-4" aria-hidden />
-                View all issues
-              </LinkButton>
-            </div>
-            <dl className="grid gap-px bg-border sm:grid-cols-3">
-              <ReportMetric
-                label="Likely barriers"
-                value={
-                  issueSummary ? likelyBarrierGroups.toLocaleString() : "—"
-                }
-                note="High-confidence issue groups"
-              />
-              <ReportMetric
-                label="Review leads"
-                value={issueSummary ? expertReviewGroups.toLocaleString() : "—"}
-                note="Expert decision required"
-              />
-              <ReportMetric
-                label="Pages tested"
-                value={data.page_count.toLocaleString()}
-                note={`${data.error_count.toLocaleString()} crawl errors`}
-              />
-            </dl>
-          </Card>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <StatCard label="Pages crawled" value={data.page_count} />
-            {/* Pages alone understate an application whose content mostly
-                does not exist until a control is used. This counts the
-                states reached by opening menus, dialogs, and tabs. */}
-            <StatCard
-              label="DOM states discovered"
-              value={(data.dom_state_count ?? 0).toLocaleString()}
-              hint="reached by operating controls"
-            />
-            <StatCard
-              label="Crawl errors"
-              value={data.error_count}
-              tone={data.error_count ? "major" : "default"}
-            />
+          {/* One row of numbers, one ledger of methods. The page used to lead
+              with a banner restating the counts, then print Likely barriers,
+              Review leads, Pages crawled and Occurrences a second time in a
+              different tile style, then repeat "open the issues" at the
+              bottom under a button already in the header. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <StatCard
               label="Likely barriers"
-              value={likelyBarrierGroups}
-              hint="issue groups"
+              value={issueSummary ? likelyBarrierGroups.toLocaleString() : "—"}
+              hint="High-confidence issue groups"
             />
             <StatCard
               label="Review leads"
-              value={expertReviewGroups}
-              hint="expert decision needed"
+              value={issueSummary ? expertReviewGroups.toLocaleString() : "—"}
+              hint="Expert decision required"
             />
             <StatCard
               label="Occurrences"
               value={issueSummary ? issueOccurrences.toLocaleString() : "—"}
-              hint="not a conformance score"
+              hint="Not a conformance score"
+            />
+            <StatCard
+              label="Pages tested"
+              value={data.page_count.toLocaleString()}
+              hint={`${data.error_count.toLocaleString()} crawl errors`}
+              tone={data.error_count ? "major" : "default"}
+            />
+            {/* Pages alone understate an application whose content mostly does
+                not exist until a control is used. */}
+            <StatCard
+              label="DOM states"
+              value={(data.dom_state_count ?? 0).toLocaleString()}
+              hint="Reached by operating controls"
             />
           </div>
 
-          <Card className="mt-5 p-5">
-            <h2 className="flex items-center gap-2 font-semibold text-fg">
-              <ShieldCheck className="h-5 w-5 text-umich-blue" aria-hidden />
-              What Axcess checked
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-fg-muted">
-              “Selected” only means a method was requested. The status and count
-              below show whether it actually completed work for this report.
-            </p>
-            <MethodCoverageList methods={data.methods_used} className="mt-4" />
-          </Card>
-
-          <Card className="mt-5 p-5">
-            <h2 className="flex items-center gap-2 font-semibold text-fg">
-              <ListFilter className="h-5 w-5 text-umich-blue" aria-hidden />
-              Issue table
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              See what the issue is, why it matters, the expected fix, and exact
-              page locations in one table.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <LinkButton to={`/scans/${data.id}/issues`} variant="primary">
-                Open accessibility issue table
-              </LinkButton>
-            </div>
-          </Card>
+          <MethodCoverageLedger
+            scanId={data.id}
+            methods={data.methods_used}
+            rows={issueSummary?.rows}
+            className="mt-6"
+          />
 
           <details className="mt-5 rounded-xs border border-border bg-surface p-4 shadow-card">
             <summary className="min-h-target cursor-pointer py-2 font-semibold text-fg">
               Expert tools and scan details
             </summary>
             <div className="border-t border-border pt-4">
-              <ReportWorkspaceNav
-                scanId={data.id}
-                previousScanId={data.previous_scan_id}
-              />
               <div className="flex flex-wrap gap-2">
                 <LinkButton to={`/scans/${data.id}/a11y`} variant="secondary">
                   <Accessibility className="h-4 w-4" aria-hidden /> DOM engines
@@ -780,29 +714,6 @@ function ProgressStage({
     </div>
   );
 }
-
-function ReportMetric({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="bg-surface p-4">
-      <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
-        {label}
-      </dt>
-      <dd className="mt-1 text-2xl font-semibold tabular-nums text-umich-blue">
-        {value}
-      </dd>
-      <dd className="text-xs text-fg-muted">{note}</dd>
-    </div>
-  );
-}
-
 function BlockedScanNotice({
   scanId,
   blocked,
@@ -830,4 +741,17 @@ function BlockedScanNotice({
       </div>
     </Card>
   );
+}
+
+/** "4 Sep 2026, 15:16" — a scan's own finish time, in the reader's locale. */
+function formatCompleted(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

@@ -117,8 +117,8 @@ export default function FindingDetailRoute() {
     <>
       <PageHeader
         crumbs={[
-          { label: "Scans", to: "/scans" },
-          { label: `Scan #${data.scan_id}`, to: `/scans/${data.scan_id}` },
+          { label: "Reports", to: "/scans" },
+          { label: `Report #${data.scan_id}`, to: `/scans/${data.scan_id}` },
           { label: "Findings", to: `/scans/${data.scan_id}/findings` },
           { label: `Finding #${data.id}` },
         ]}

@@ -29,7 +29,7 @@ async def test_removed_workflow_routes_redirect_to_the_issue_table(
             )
             await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
             await playwright_async.expect(
-                page.get_by_role("heading", name="Accessibility issues")
+                page.get_by_role("heading", name="Issues", exact=True, level=1)
             ).to_be_visible()
             assert await page.get_by_role("listbox").count() == 0
             assert await page.get_by_role("button", name="Apply decision").count() == 0
@@ -39,21 +39,57 @@ async def test_removed_workflow_routes_redirect_to_the_issue_table(
 
 
 @pytest.mark.asyncio
-async def test_issue_table_keeps_downloads_and_draft_label_in_urls(
+async def test_export_menu_offers_every_format_with_the_draft_label_in_urls(
     live_server: tuple[str, int],
 ) -> None:
-    """Workbook and report downloads remain available without a handoff page."""
+    """One control carries all four downloads, each acknowledging draft state."""
     base, scan_id = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            workbook = page.get_by_role("link", name="Download workbook")
-            report = page.get_by_role("link", name="Download report")
-            for link in (workbook, report):
+            trigger = page.get_by_role("button", name="Export")
+            await playwright_async.expect(trigger).to_have_attribute("aria-expanded", "false")
+            await trigger.click()
+            await playwright_async.expect(trigger).to_have_attribute("aria-expanded", "true")
+            for name, fmt in (
+                ("Remediation workbook", "xlsx"),
+                ("Audit report", "audit"),
+                ("Issue table", "csv"),
+                ("Raw findings", "json"),
+            ):
+                link = page.get_by_role("link", name=name)
+                await playwright_async.expect(link).to_be_visible()
                 href = await link.get_attribute("href")
-                assert href is not None and "draft=acknowledged" in href
+                assert href is not None
+                assert f"/export/{fmt}" in href
+                assert "draft=acknowledged" in href
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_export_menu_closes_on_escape_and_returns_focus(
+    live_server: tuple[str, int],
+) -> None:
+    """Dismissing the disclosure never drops focus to the top of the document."""
+    base, scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page()
+            await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+            trigger = page.get_by_role("button", name="Export")
+            await trigger.click()
+            await playwright_async.expect(
+                page.get_by_role("link", name="Remediation workbook")
+            ).to_be_visible()
+            await page.keyboard.press("Escape")
+            await playwright_async.expect(
+                page.get_by_role("link", name="Remediation workbook")
+            ).to_be_hidden()
+            await playwright_async.expect(trigger).to_be_focused()
         finally:
             await browser.close()
 
@@ -73,7 +109,9 @@ async def test_issue_table_filters_are_keyboard_operable(
             await search.focus()
             await search.fill("logo")
             await page.wait_for_url("**?q=logo")
-            await playwright_async.expect(page.get_by_role("table")).to_be_visible()
+            await playwright_async.expect(
+                page.get_by_role("link", name="Logo image — adequate alt")
+            ).to_be_visible()
             await search.press("Tab")
             await playwright_async.expect(
                 page.get_by_label("WCAG level", exact=True)

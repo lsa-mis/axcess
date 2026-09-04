@@ -16,6 +16,7 @@ import csv
 import io
 
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
+from audit.exports.interaction_coverage import reproduction_step
 
 JIRA_COLUMNS = (
     "Summary",
@@ -135,6 +136,10 @@ def _a11y_description(af: ExportA11yFinding) -> str:
     if af.help:
         lines.append(f"**Description:** {af.help}")
     lines.append(f"**Page:** {af.page_url}")
+    # A click-revealed barrier is invisible on load. Without this step the
+    # assignee looks at the page, sees nothing, and closes the ticket as
+    # "cannot reproduce" — so it sits directly above the selector.
+    lines.append(f"**To reproduce:** {reproduction_step(af.revealed_by)}")
     lines.append(f"**Target selector:** `{af.target_selector}`")
     if af.failure_summary:
         lines.append(f"**Why it failed:** {af.failure_summary}")
