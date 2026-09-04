@@ -227,6 +227,11 @@ class _FakePage:
     goto_calls: list[tuple[str, int, str]] = field(default_factory=list)
     event_handlers: dict[str, object] = field(default_factory=dict)
     closed: bool = False
+    has_session_storage: bool = False
+
+    async def evaluate(self, script: str) -> bool:
+        assert script == "() => sessionStorage.length > 0"
+        return self.has_session_storage
 
     async def goto(self, url: str, *, timeout: int, wait_until: str) -> object:
         self.url = url
@@ -366,6 +371,22 @@ def _session_with_fake_browser() -> tuple[
         playwright_start=start_playwright,  # type: ignore[arg-type]
     )
     return session, playwright, chromium, context, page
+
+
+@pytest.mark.asyncio
+async def test_tab_scoped_session_survives_login_handoff() -> None:
+    session, _, _, context, page = _session_with_fake_browser()
+    await session.start()
+    page.url = "https://app.example.edu/#/dashboard"
+    page.has_session_storage = True
+    assert session.verify_authenticated_target().url == page.url
+    scan_pages = await session.prepare_background_scan_pages(4)
+    await session.discard_manual_auth_page()
+    assert scan_pages == (page,)
+    assert not page.closed
+    assert not context.additional_pages
+    await session.close()
+    assert context.closed
 
 
 @pytest.mark.asyncio

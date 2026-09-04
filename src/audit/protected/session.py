@@ -35,6 +35,7 @@ from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
 from audit.crawler.js_fetcher import JsFetcher
+from audit.crawler.search import SearchExplorer
 from audit.extractor.downloader import AuthenticatedImageDownloader
 from audit.logging import get_logger
 from audit.protected.egress import (
@@ -155,7 +156,7 @@ def build_manual_auth_policies(
 def validate_protected_seed_url(seed_url: str, policies: ManualAuthPolicies) -> ValidatedUrl:
     """Require the manual-auth entry URL to be an approved application origin."""
     try:
-        return policies.target.validate_url(seed_url)
+        return policies.target.validate_page_url(seed_url)
     except EgressViolation as exc:
         raise ManualAuthenticationError(
             "The protected scan seed is not an approved target URL."
@@ -186,7 +187,7 @@ def verify_authenticated_target_url(url: str, policies: ManualAuthPolicies) -> V
     credential-bearing query or fragment suitable for stored evidence.
     """
     try:
-        return policies.target.validate_url(url)
+        return policies.target.validate_page_url(url)
     except EgressViolation as exc:
         raise ManualAuthenticationError(
             "Manual sign-in has not returned to an approved target page."
@@ -533,13 +534,15 @@ class ManualAuthenticationSession:
         return verified
 
     async def prepare_background_scan_pages(self, count: int) -> tuple[Page, ...]:
-        """Create the fixed authenticated tab pool before hiding Chromium.
+        """Prepare up to ``count`` authenticated tabs before hiding Chromium.
 
         macOS restores a minimized Chromium window whenever Playwright creates
         a new top-level page. Preparing every worker tab first lets the crawl
         reuse those pages without repeatedly bringing the browser to the
         foreground. The pages and their shared authenticated context remain
         memory-only and are destroyed together at session close.
+        If sign-in uses sessionStorage, the pool retains its single tab;
+        workers serialize access to preserve that tab-scoped session.
         """
 
         if self._state is not ManualAuthState.AUTHENTICATED:
@@ -548,6 +551,15 @@ class ManualAuthenticationSession:
             )
         if count <= 0:
             raise ValueError("Background scan page count must be positive.")
+        # sessionStorage belongs to a tab, not its BrowserContext. Opening
+        # fresh worker tabs and closing sign-in silently signs out SPAs that
+        # keep their session there. Retain that tab and serialize the pool
+        # instead of exporting or copying any authentication material.
+        auth_page = self.page
+        if await auth_page.evaluate("() => sessionStorage.length > 0"):
+            self._auth_pages.remove(auth_page)
+            self._page = None
+            return (auth_page,)
         pages: list[Page] = []
         try:
             for _ in range(count):
@@ -625,7 +637,7 @@ class ManualAuthenticationSession:
                     await cdp_session.detach()
 
     async def discard_manual_auth_page(self) -> None:
-        """Close the original headed tab once its session has been verified.
+        """Close sign-in tabs that have not been retained for scanning.
 
         The authenticated browser context remains in memory for the crawl,
         but the tab used for sign-in no longer has a reason to stay alive.
@@ -692,6 +704,7 @@ class ManualAuthenticationSession:
         capture_screenshots: bool = False,
         max_rendered_html_chars: int | None = None,
         shared_pages: tuple[Page, ...] = (),
+        search_explorer: SearchExplorer | None = None,
     ) -> JsFetcher:
         """Return a fetcher that reuses this in-memory authenticated context.
 
@@ -717,6 +730,7 @@ class ManualAuthenticationSession:
             shared_pages=shared_pages,
             private_context=True,
             max_rendered_html_chars=max_rendered_html_chars,
+            search_explorer=search_explorer,
         )
 
     def create_authenticated_image_downloader(

@@ -698,7 +698,8 @@ class _ProtectedBrowserCrawler:
 
     def _validate_page_result(self, *, requested_url: str, result: FetchResult) -> None:
         try:
-            self._target_policy.validate_final_url(requested_url, result.url)
+            self._target_policy.validate_page_url(requested_url)
+            self._target_policy.validate_page_url(result.url)
         except EgressViolation as exc:
             raise UnsafeProtectedNavigationError(
                 "The protected browser attempted to leave the approved target scope."
@@ -757,7 +758,7 @@ class _ProtectedBrowserCrawler:
             if not href:
                 continue
             try:
-                candidate = self._target_policy.validate_url(urljoin(base_url, href)).url
+                candidate = self._target_policy.validate_page_url(urljoin(base_url, href)).url
             except (EgressViolation, ValueError):
                 continue
             if url_policy.is_in_scope(candidate, self._scope, allow_subdomains=False):
@@ -842,7 +843,7 @@ class _ProtectedBrowserCrawler:
         """
         try:
             current = self._target_policy.validate_url(url).url
-            source_page = self._target_policy.validate_url(page_url).url
+            source_page = self._target_policy.validate_page_url(page_url).url
         except EgressViolation as exc:
             raise CompanionError(
                 "Protected image URL is outside the approved target scope."
