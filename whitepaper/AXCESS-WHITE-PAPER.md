@@ -1,249 +1,226 @@
 # Axcess: Evidence Before Verdicts
 
-**A local-first accessibility evidence workbench for expert web audits**<br>
-Project white paper · Version 1.0 · 27 August 2026<br>
-Software baseline: Axcess `0.1.0`
+**A short product white paper**
 
-> **Important:** Axcess collects and organizes accessibility evidence for
-> expert review. It does not certify WCAG conformance, prove legal compliance,
-> or establish that an entire website is accessible.
+**Updated:** August 31, 2026
 
-## Abstract
+> **Important:** Axcess helps people find, understand, and review accessibility barriers. It does not certify that a website conforms to WCAG, prove legal compliance, or replace testing by people with disabilities.
 
-Accessibility evaluation is not a single automated test. Rule engines can
-identify machine-testable failures, browsers can expose interaction and layout
-behavior, local models can surface contextual review leads, and people must
-still decide what the evidence means. In practice, these layers are often
-split across tools, stripped of page context, or collapsed into a misleading
-pass/fail score.
+## Executive summary
 
-Axcess is being built to close that operational gap. It is a local-first
-desktop and loopback web application that scopes one website, preserves the
-evidence from each detection method, groups repeated occurrences into issues,
-and gives an accessibility professional a traceable path from impact to page,
-element, evidence, remediation, and verification. Its core proposition is
-simple: **preserve evidence before producing a verdict**.
+Axcess is a local-first accessibility auditing workbench. It scans one authorized website at a time, collects evidence from several testing methods, groups repeated results into understandable issues, and helps an accessibility professional decide what should be fixed first.
 
-## 1. The problem we are solving
+“Local-first” means that reports, screenshots, and other scan evidence stay on the auditor’s computer by default. This is especially valuable when reviewing private, sensitive, or login-protected websites.
 
-An accessibility professional needs more than a count of violations. They
-need to know:
+Axcess began with a narrow goal: find images of text across large websites more reliably. That first problem revealed a larger need. Accessibility professionals did not simply need another scanner. They needed a trustworthy way to connect automated results, browser behavior, human judgment, remediation work, and follow-up scans without losing the evidence behind each decision.
 
-1. what created the result and how reliable that method is;
-2. who may be affected and what task may be blocked;
-3. which pages and elements contain the problem;
-4. what evidence supports the conclusion;
-5. what change is expected and how it will be verified; and
-6. whether the result is new, unresolved, remediated, or a false positive.
+The project’s guiding idea is therefore simple: **preserve the evidence before presenting a verdict.**
 
-Traditional scanner output often makes this work harder. Thousands of repeated
-occurrences can obscure a small number of root problems. Deterministic findings
-and uncertain machine judgments may appear equivalent. Screenshots, selectors,
-page titles, and method limitations can become detached from the report. When
-authenticated applications are involved, sending raw page content to a hosted
-service can also create an unacceptable privacy boundary.
+## 1. What is Axcess?
 
-Axcess treats these as evidence-management problems, not merely detection
-problems.
+Axcess is a desktop and local web application for expert accessibility review. It is designed to support the full path from discovery to verification:
 
-## 2. Product thesis
+1. An auditor chooses an authorized website and defines the scan boundaries.
+2. Axcess visits pages and renders them in a real browser.
+3. Several independent methods test the page and record what they observe.
+4. Axcess groups related results into issues and explains their likely user impact.
+5. A human reviews the evidence, records a decision, and shares remediation guidance.
+6. A later scan shows which issues are new, still present, or resolved.
 
-Axcess is organized around five commitments:
+The completed scan is the source of truth. Every page, issue, screenshot, selector, and decision is tied to a specific report. Results from different scans are not silently mixed.
 
-- **Local by default.** Scan data, screenshots, and content-addressed image
-  blobs remain on the auditor's machine unless the operator explicitly chooses
-  another controlled deployment.
-- **One report, one scope.** Every page, finding, issue, decision, and evidence
-  reference belongs to an exact `scan_id`. Results from separate scans are not
-  mixed implicitly.
-- **Methods remain attributable.** axe-core, Siteimprove Alfa, browser probes,
-  OCR, and model-assisted analysis retain their own source and confidence.
-- **Uncertainty remains visible.** AI-assisted results, `cantTell` outcomes,
-  and behavioral leads are presented for confirmation rather than promoted to
-  facts.
-- **The expert controls the conclusion.** Automation proposes and organizes;
-  a human accepts, rejects, remediates, documents, and verifies.
+Axcess is not a generic web scraper, a public scanning service, or an automatic compliance judge. It is an evidence workbench built to help a qualified person make better, faster, and more defensible decisions.
 
-## 3. The Axcess evidence loop
+## 2. The initial why
 
-![Axcess evidence loop: a scoped target is rendered locally, evaluated by attributed detection layers, stored as scan evidence, grouped into issues, reviewed by an expert, and returned to the site through remediation and rescanning.](./axcess-evidence-loop.svg)
+The original motivation was a concrete gap in existing accessibility tools.
 
-**Text equivalent:** An authorized target enters a local trust boundary. Axcess
-applies URL scope, renders pages in Chromium, and runs independent detection
-layers. Raw results and screenshots are stored in scan-scoped SQLite records
-and content-addressed blobs. Axcess groups repeated evidence into issues. An
-expert reviews user impact, page references, remediation, and limitations,
-then exports or assigns the work. A rescan compares new, remaining, and
-resolved evidence and begins the loop again.
+An accessibility lead needed to find possible failures of WCAG 1.4.5, Images of Text, across an entire website. Existing tools did not provide strong enough coverage at that scale. Checking every page and image by hand was slow, repetitive, and easy to miss.
 
-The completed scan—not a generated workbook, Markdown file, or rendered UI—is
-the source of truth. Axcess stores the report in `data/audit.db` with supporting
-files in `data/blobs/`. Exports are reproducible views of that evidence.
+The first version of Axcess was designed to:
 
-## 4. How the system works
+- crawl a website without sending its contents to a cloud service;
+- find images and text embedded inside them;
+- use optical character recognition, or OCR, to detect text;
+- use an optional local vision model to understand the image’s purpose;
+- compare visible image text with alternative text;
+- prioritize likely barriers for human review; and
+- support rescanning so an auditor could verify fixes.
 
-### 4.1 Scope and capture
+The intent was never to remove the expert from the process. It was to reduce repetitive discovery work and give the expert better evidence.
 
-The operator supplies an authorized seed URL and chooses a path or host scope,
-page limit, crawl depth, rate, browser visibility, and test methods. URL policy,
-redirect checks, robots handling, and a resumable queue constrain discovery.
-Playwright Chromium renders JavaScript applications and supports a visible,
-manual sign-in flow for login or 2FA sites. Credentials and second factors are
-entered into the target site—not into Axcess.
+## 3. How and why the vision evolved
 
-### 4.2 Independent evidence layers
+As Axcess developed, the team learned that finding a possible problem is only one part of an accessibility audit.
 
-| Layer | Evidence produced | Interpretation |
-| --- | --- | --- |
-| axe-core | Rendered-DOM rule violations with rule, target, and context | High-confidence deterministic evidence for the tested condition; remediation still requires verification |
-| Siteimprove Alfa | Independent ACT-rule `passed`, `failed`, and `cantTell` outcomes | A second attributed engine, not an axe wrapper; uncertainty remains explicit |
-| Keyboard, responsive, focus, and media probes | Observed focus movement, geometry, reflow, text-spacing, and playback behavior | Repeatable browser evidence and conservative expert-review leads |
-| Image analysis | Tesseract OCR plus optional local vision-model classification and alt comparison | Evidence for images of text; model judgments require confirmation |
-| Semantic and visual analysis | Bounded page context or screenshots evaluated by optional local models | Contextual leads, never autonomous conformance decisions |
-| Manual evaluation | Expert outcome, rationale, page reference, and supporting evidence | The human decision layer for criteria and contexts automation cannot decide |
+A raw result does not answer the questions people actually ask: What happened? Who is affected? Which pages contain it? How certain is the result? What should change? How will the fix be verified?
 
-Axcess currently maintains an authoritative matrix for all **55 WCAG 2.2 Level
-A and AA success criteria**. It contributes some evidence to **29** of them:
-5 categorized as automated, 18 partly automated, and 6 AI-assisted. The other
-26 remain manual-only. “Contributes evidence” does not mean that Axcess can
-fully decide those 29 criteria without a person.
+The project therefore expanded from an image-text scanner into a broader accessibility evidence workbench. New testing layers were added for page structure, names and roles, keyboard behavior, focus, responsive layouts, media behavior, and contextual meaning. Manual evaluation was added because many accessibility questions cannot be answered honestly by automation.
 
-### 4.3 Durable, scan-scoped evidence
+The product also became more explicit about uncertainty. A deterministic browser rule, an observed interaction, and an AI-assisted suggestion are not treated as equally certain. Each result keeps the name of the method that produced it, its limitations, and whether a person must confirm it.
 
-Raw evidence is retained before synthesis. Page records, selectors, snippets,
-engine outcomes, OCR text, screenshots, and image hashes remain associated with
-the scan and page that produced them. Content-addressed blobs deduplicate image
-data without weakening ownership checks. The normal SQLite model is deliberately
-single-host with one active writer; Axcess does not imply multi-user tenancy.
+Finally, the project grew from a developer-run local service into a desktop application. This made the local-first model easier to use while preserving its privacy boundary.
 
-### 4.4 Issue synthesis and review
+The evolved purpose of Axcess is not “automate accessibility.” It is to create a clear and inspectable chain from evidence to human decision to verified improvement.
 
-The review surface groups repeated occurrences by a stable issue identity while
-showing both numbers—for example, issue groups and total occurrences. Each
-actionable issue is intended to answer:
+## 4. Existing features
 
-- **What is the issue?** Rule, criterion, level, source layer, and status.
-- **What is the user impact?** The affected user and practical barrier.
-- **Where is it?** Linked page references, URLs, titles, selectors, and bounded
-  context.
-- **What should change?** Remediation steps and acceptance criteria.
-- **How will we know?** Verification guidance and access to stored evidence.
+Axcess currently includes:
 
-AI-assisted evidence and Alfa `cantTell` outcomes stay in a review-needed lane.
-Informational evidence cannot silently become a confirmed barrier.
+- **Scoped website scanning.** The auditor can limit a scan by path, host, page count, depth, and rate.
+- **Public and login-protected site support.** A visible browser allows the auditor to sign in directly without giving credentials to Axcess.
+- **Real browser rendering.** Playwright Chromium loads JavaScript-driven pages before testing them.
+- **Multiple testing methods.** Axcess uses axe-core, Siteimprove Alfa, OCR, optional local AI analysis, and browser probes for keyboard, focus, responsive, visual, and media behavior.
+- **Honest WCAG capability tracking.** The project maps its testing methods across all 55 WCAG 2.2 Level A and AA success criteria. Its current methods can contribute evidence to 29 criteria; this does not mean that every enabled method completed successfully in every scan, or that those criteria were proven to conform.
+- **Issue grouping.** Repeated occurrences are grouped into actionable issues while preserving exact page and element references.
+- **Evidence review.** Reports include the testing source, confidence, user impact, affected pages, selectors, snippets, screenshots, remediation guidance, and verification steps where available.
+- **Human decision records.** Auditors can review findings, record outcomes, and keep manual evidence separate from machine-generated evidence.
+- **Exports.** Reports can be shared as Excel workbooks, Markdown, CSV, JSON, and Jira-oriented files.
+- **Initial rescan comparison.** Image findings can be compared across scans. Extending trustworthy comparison to every testing pipeline is an important next step.
+- **Local storage and private operation.** Scan data remains in local SQLite and evidence files by default. Axcess has no telemetry and does not silently send reports to an external model.
+- **Accessible product interface.** The Axcess interface is designed and tested for keyboard use, screen readers, zoom, reflow, visible focus, and strong color contrast.
 
-### 4.5 Handoff and rescan
+## 5. Long-term goals and recommended direction
 
-The operational Excel workbook contains Summary, Issues Overview, Page Hotspots,
-Page References, Who's Affected, Coverage & Method, Test Tracking, and Manual
-Review Evidence. The Issues Overview sheet uses **User Impact**, and its page
-references link to the corresponding workbook evidence. Separate Owner Worklist
-and Decision History sheets are intentionally omitted; ownership and decisions
-stay attached to the relevant issue or evidence workflow instead of becoming
-disconnected ledgers.
+Axcess’s strongest direction is to become an **offline, evidence-first accessibility quality system**. It should not compete by collecting the largest number of scanner engines. Its advantage should be the most trustworthy path from coverage planning to reproducible evidence, human judgment, remediation, and verified improvement.
 
-Axcess can also produce stakeholder Markdown, evidence inventory, CSV, JSON,
-and Jira CSV exports. A later scan of the same normalized scope can identify
-new, still-present, and resolved evidence. This makes verification part of the
-workflow rather than an afterthought.
+This direction is grounded in [WCAG-EM 2.0](https://www.w3.org/TR/WCAG-EM/), W3C’s methodology for evaluating websites, and the [ACT Rules Format 1.1](https://www.w3.org/TR/act-rules-format/), which provides a useful vocabulary for automated, semi-automated, and manual tests. Both reinforce an important product principle: automated results are evidence, not proof that a site conforms.
 
-## 5. Desktop delivery
+### First: make coverage truthful and inspectable
 
-The Electron application packages the existing React workbench and FastAPI
-service rather than creating a separate product. It starts a private backend on
-an available loopback port and opens the same interface in a sandboxed window.
-The package includes Python, Node.js for Alfa, Playwright Chromium, Tesseract,
-and English OCR data. Optional Ollama models remain separate and are never
-downloaded silently.
+Before adding more detectors, Axcess should record exactly what happened for every page, state, and testing method. A method may have completed and found nothing, failed, been skipped, been unavailable, or produced a result that still needs human review. Those outcomes must never look the same in the report.
 
-Automated CI currently produces preview artifacts for **Windows x64** and
-**Apple silicon macOS**. These builds are operating-system specific and
-unsigned; Windows SmartScreen or macOS Gatekeeper may warn during installation.
-Production distribution still requires platform signing, Apple notarization,
-managed update and rollback procedures, and organizational security review.
+Coverage should be shown across several separate dimensions:
 
-Desktop evidence is stored in the operating system's application-data folder,
-not inside the installed application. Closing Axcess stops the private backend,
-and a second launch reuses the existing single-writer application instance.
+- which pages and representative templates were evaluated;
+- which interactive states and essential user journeys were tested;
+- which browsers, viewports, preferences, and assistive-technology baselines were included;
+- which automated, behavioral, AI-assisted, and manual methods completed; and
+- which questions remain untested or require human judgment.
 
-## 6. Privacy and security boundary
+This is more useful and more honest than one accessibility score. W3C warns that combined scores can be misleading because WCAG has no single reliable rating system.
 
-Local-first operation is a product boundary, not a marketing label:
+### Second: test experiences, not only URLs
 
-- the desktop backend binds only to loopback;
-- the Electron renderer has Node integration disabled, context isolation and
-  sandboxing enabled, and navigation restricted to the exact local origin;
-- scan evidence does not leave the host merely because a model-assisted method
-  exists;
-- local Ollama is optional and must be intentionally configured; and
-- scanned content is treated as untrusted evidence, not as instructions.
+The largest coverage gap is not another static scanner. It is everything that happens after a person interacts with a page: opening a menu, revealing a dialog, selecting a tab, encountering a form error, signing in, or completing a multi-step task.
 
-Axcess also documents a stricter design for institutionally managed protected
-scans, including identity-aware access, a scan-bound companion, encryption,
-redaction, limited retention, and fail-closed egress. That mode requires
-external infrastructure and is disabled by default. A shared access token is
-an ingress gate, not user identity, tenancy, or an audit log.
+Axcess should add safe, user-authorized journey recipes. An auditor could record the steps of an essential process and allow Axcess to retest each meaningful state. Every state should retain its action path, rendered page evidence, screenshot, browser settings, rule versions, and any incomplete network activity. Axcess should never blindly submit a purchase, delete data, or perform another consequential action.
 
-## 7. Accuracy without overclaiming
+The best coverage model would combine:
 
-False positives cost expert time and weaken trust, so Axcess separates evidence
-lanes and tests detector behavior against a versioned adversarial corpus. The
-current quality gate targets a false-discovery rate below 5% on that labeled
-corpus. This is a regression guard—not a claim that every production website
-will achieve the same rate.
+- axe-core as the stable deterministic baseline;
+- Alfa as an independent second engine, retained only where measured results add confirmed value;
+- browser probes for keyboard, focus, reflow, text spacing, pointer interaction, motion, hover content, and form behavior;
+- guided manual checks for meaning, exceptions, and assistive-technology behavior; and
+- optional local AI for narrow questions where it can show evidence, express uncertainty, and abstain.
 
-A defensible public accuracy claim requires a representative held-out corpus
-and independent review by multiple accessibility experts. Until then, Axcess
-reports method, confidence, limitations, and review status with the result.
+### Third: make issues durable work objects
 
-## 8. What Axcess is—and is not
+Raw observations, grouped issues, and remediation work should be separate concepts.
 
-Axcess **is** a local evidence workbench for an accessibility professional, a
-repeatable way to combine multiple detection layers, and a traceable bridge
-from discovery to remediation verification.
+An observation is an immutable record of what a method saw. An occurrence is that result at one target and state. An issue groups occurrences that probably share a fix. The workflow then records what people decided and did about the issue.
 
-Axcess **is not**:
+Axcess should separately track:
 
-- a legal-compliance or WCAG-certification service;
-- an unrestricted public crawler;
-- a replacement for assistive-technology and manual testing;
-- a multi-tenant hosted audit platform; or
-- an autonomous agent allowed to change findings, start scans, or contact
-  external services without a separate confirmed action.
+- the review decision: unreviewed, confirmed, rejected, or inconclusive;
+- the remediation state: open, planned, in progress, ready for verification, verified, deferred, or accepted risk; and
+- the comparison result: new, unchanged, changed, no longer observed under equivalent coverage, or not comparable.
 
-## 9. Intended direction and measures of success
+“Not found in the next scan” should not automatically mean “fixed.” The same page, state, method, and rule version must be comparable, and a confirmed fix should still pass a relevant retest or human verification.
 
-The near-term direction is to make the evidence loop dependable across desktop
-platforms, deepen the expert-review workflow, expand coverage only where a
-method can retain honest end-to-end evidence, and validate accuracy with a
-stronger independently reviewed corpus. A planned report-scoped conversation
-layer may help experts ask which issues matter first or which pages are
-affected, but it must remain optional, read-only by default, explicitly
-provider-configured, and bound to one completed scan.
+Axcess should also suggest shared root causes across templates and design-system components. One navigation component fixed once may remove hundreds of page-level occurrences. Suggested groups should remain inspectable and editable by a person.
 
-Progress should be measured by outcomes that matter to an audit team:
+### Fourth: make the report a product, not an export afterthought
 
-- time from completed scan to a prioritized, review-ready issue set;
-- percentage of claims with a working page and evidence reference;
-- expert agreement with deterministic and assisted findings by method;
-- false-discovery rate on versioned and held-out corpora;
-- successful verification of remediated issues on rescan; and
-- absence of cross-scan evidence leakage or silent external data transfer.
+The primary human-facing deliverable should be a self-contained, keyboard- and screen-reader-accessible HTML report that works without Axcess running and loads no remote assets. The local database and evidence files should remain the source of truth. The report should answer, in order:
+
+1. What was evaluated?
+2. What was not evaluated, skipped, or incomplete?
+3. What should be fixed first, and why?
+4. Which pages, states, components, and user journeys are affected?
+5. What evidence supports each claim?
+6. What needs manual review?
+7. What changed since a comparable report?
+8. Which tools, rules, models, browsers, settings, and versions produced the evidence?
+
+The report should use transparent reasons for priority—user impact, essential-task risk, prevalence, confidence, regression status, and fix leverage—rather than hiding them inside one score.
+
+Axcess should produce different views from the same local evidence:
+
+- a short leadership summary;
+- a design and engineering work queue;
+- a WCAG-EM-style evaluator report;
+- a versioned Axcess JSON file as a portable machine-readable export;
+- an optional EARL JSON-LD export for accessibility-tool interchange; and
+- an optional SARIF export for developer and CI systems.
+
+Excel, CSV, Markdown, and printable output remain useful secondary formats. A VPAT or Accessibility Conformance Report should never be generated automatically from a scan; at most, Axcess could prepare an evidence worksheet for a qualified person to complete.
+
+### Fifth: define “fully offline” precisely
+
+Scanning a live website still requires a connection to that authorized target. For Axcess, fully offline should mean that no evidence, prompts, telemetry, or results are sent to a third party.
+
+Two modes would make that promise clear:
+
+- **Private live scan:** the browser may contact the approved target and required site resources, while analysis stays local and all other outbound traffic is blocked or reported.
+- **Air-gapped replay:** an approved capture is imported and analyzed without any live network access.
+
+Both modes should bundle the required rules, help text, fonts, browser runtime, schemas, and optional local model packs. Completed scans must record exact versions and must never be silently reinterpreted after an update. Shareable reports should offer a redacted profile, hashed evidence manifest, and clear retention and deletion controls.
+
+### A practical order of work
+
+1. Build a per-page, per-state method ledger and correct the report language.
+2. Make scan evidence immutable and reproducible, including explicit scan-to-analysis bindings.
+3. Separate observations, issue groups, review decisions, remediation states, and verification.
+4. Restore a complete keyboard-first flow from coverage review to manual checks and final report.
+5. Add accessible offline HTML and coverage-aware comparison across all pipelines.
+6. Add recorded journeys and representative cross-browser testing.
+7. Expand high-value deterministic probes and guided manual testing.
+8. Validate every detector against expert-reviewed real-world examples before promoting it.
+9. Add report conversation only after provenance, privacy, and issue management are dependable.
+
+## 6. Interesting directions and open questions
+
+The following questions could guide future research and product decisions.
+
+### Better evidence
+
+- Could Axcess show when two independent methods agree, disagree, or observe different parts of the same barrier?
+- How should evidence age over time as pages, standards, browsers, and testing engines change?
+- Can the product explain uncertainty in language that is useful to both experts and content owners?
+- What minimum evidence should be required before an issue can be called “verified fixed”?
+
+### Better outcomes
+
+- Can Axcess measure whether fixes improved a real user task, not only whether a rule stopped firing?
+- Could recurring root causes reveal where a design system, content template, or development process should change?
+- What is the best way to turn repeated findings into prevention guidance for designers, developers, and editors?
+- How should accepted-risk decisions expire so that old exceptions do not hide new regressions?
+
+### Human participation
+
+- How can people with disabilities contribute lived-experience evidence directly to a report?
+- Which decisions should always require manual or assistive-technology testing?
+- Could Axcess help teams plan a manual test without making the process feel like a checklist exercise?
+- Which browser and assistive-technology combinations should define each organization’s accessibility-support baseline?
+
+### Privacy and trust
+
+- What is the smallest amount of report evidence a model needs to answer a useful question?
+- How can sensitive content be redacted while keeping enough context for a valid accessibility decision?
+- What proof should Axcess provide that report data stayed on the local device?
+- How should offline rule and model packs be signed, updated, rolled back, and connected to historical results?
+
+### Product direction
+
+- Should Axcess remain primarily a single-expert desktop tool, or should it eventually support controlled team workflows?
+- Could a shared, anonymized test corpus improve detector quality without exposing scanned content?
+- What would responsible integration with issue trackers, design systems, and continuous delivery look like while preserving explicit human approval?
+- Should issue work live inside one historical report, or in durable remediation cases linked across explicit report comparisons?
+- Which essential journeys may Axcess safely replay, and which actions must always require confirmation?
 
 ## Conclusion
 
-Axcess is trying to make accessibility auditing more inspectable, private, and
-operationally useful. Its differentiator is not a promise that automation can
-decide accessibility. It is the opposite: every useful machine result should
-arrive with enough provenance, context, and limitation for a person to make a
-better decision—and enough durable evidence to verify that decision later.
+Axcess started by solving one difficult accessibility problem: finding images of text across a website. It evolved into a broader response to an even more important challenge—the loss of context, confidence, and accountability between a scanner result and a real fix.
 
-## Repository references
-
-- [Product overview](../README.md)
-- [System architecture](../docs/architecture.md)
-- [Coverage and feature tracker](../docs/coverage-tracker.md)
-- [Desktop application](../docs/desktop-app.md)
-- [Protected scan design](../docs/protected-scans.md)
-- [Accessibility contract for the Axcess UI](../docs/accessibility.md)
-- [Detector quality protocol](../tests/quality/README.md)
+Its promise is deliberately modest but meaningful. Axcess does not declare a website accessible. It helps people understand how thoroughly it was evaluated, collect better evidence, make clearer decisions, communicate what needs to change, and verify that the change actually happened.
