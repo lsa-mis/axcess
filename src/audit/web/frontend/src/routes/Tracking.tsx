@@ -14,7 +14,7 @@ import type {
 } from "../api/types";
 
 /**
- * Coverage & feature tracker — what the tool detects today versus what's
+ * Coverage & feature tracker, what the tool detects today versus what's
  * planned, across every pipeline. Reads from /api/tracking, which is
  * backed by the same source of truth as docs/coverage-tracker.md
  * (coverage_status.py) so the page can't claim coverage the code lacks.
@@ -80,7 +80,7 @@ export default function TrackingRoute() {
         <p className="mb-3 text-sm text-fg-muted">
           The queue to close the AI coverage gap. A criterion listed in the
           orchestrator&apos;s default criteria but with no analyzer class is
-          skipped at runtime — those read “planned,” not “shipped.”
+          skipped at runtime, those read “planned,” not “shipped.”
         </p>
         {counts && (
           <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filter roadmap by status">
@@ -119,7 +119,7 @@ export default function TrackingRoute() {
 
       {view === "pipelines" && <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
-          Shipped Pipelines — What Runs Today
+          Shipped Pipelines, What Runs Today
         </h2>
         {/* Counted from the data, not written down: the previous sentence
         said "three deterministic, two AI" and had been wrong since two
@@ -378,7 +378,7 @@ function CoverageMethodBadge({
 }
 
 /**
- * The honest WCAG 2.2 A/AA coverage breakdown — what Axcess checks
+ * The honest WCAG 2.2 A/AA coverage breakdown, what Axcess checks
  * automatically, what it AI-assists, and (the long tail) what still needs
  * manual testing. Rendered straight from the coverage matrix so it can't
  * over-claim. The "What you must still test" column is the whole point.
@@ -528,7 +528,7 @@ function CoverageSection({ coverage: fullCoverage, notCovered = false }: { cover
                   <CoverageMethodBadge method={c.method} label={notCovered ? "Not covered yet" : label(c.method)} />
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-muted">
-                  {c.automated_check || <span className="text-fg-subtle">—</span>}
+                  {c.automated_check || <span className="text-fg-subtle">n/a</span>}
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-muted">
                   {c.manual_check}

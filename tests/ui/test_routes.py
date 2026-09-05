@@ -680,6 +680,7 @@ def test_api_create_scan_respects_whole_host(
         captured["focus_checks_enabled"] = config.focus_checks_enabled
         captured["visual_checks_enabled"] = config.visual_checks_enabled
         captured["interaction_checks_enabled"] = config.interaction_checks_enabled
+        captured["store_rendered_html"] = config.store_rendered_html
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -699,6 +700,7 @@ def test_api_create_scan_respects_whole_host(
             "skip_focus": True,
             "skip_visual": True,
             "skip_interaction": True,
+            "skip_rendered_storage": True,
         },
     )
     assert resp.status_code == 201
@@ -718,6 +720,8 @@ def test_api_create_scan_respects_whole_host(
     assert captured.get("focus_checks_enabled") is False
     assert captured.get("visual_checks_enabled") is False
     assert captured.get("interaction_checks_enabled") is False
+    # The "don't store rendered pages" opt-out reaches the crawl config.
+    assert captured.get("store_rendered_html") is False
 
 
 def test_api_create_scan_selects_alfa_engine(
@@ -1343,7 +1347,7 @@ def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, obje
     resp = client.get(f"/api/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
     assert "text/markdown" in resp.headers["content-type"]
-    assert resp.text.startswith(f"# Accessibility evidence inventory — Scan #{scan_id}")
+    assert resp.text.startswith(f"# Accessibility evidence inventory, Scan #{scan_id}")
 
 
 def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
@@ -1389,18 +1393,18 @@ def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
     assert f"scan_{scan_id}_DRAFT." in response.headers["content-disposition"]
     assert response.headers["x-axcess-export-state"] == "draft"
     if fmt in {"markdown", "audit"}:
-        assert response.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+        assert response.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
         assert "do not treat it as a conformance determination" in response.text
     elif fmt == "json":
         notice = response.json()["export_notice"]
         assert notice["draft"] is True
         assert notice["evaluation_status"] == "draft"
-        assert notice["label"] == "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+        assert notice["label"] == "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
     elif fmt == "xlsx":
         workbook = load_workbook(BytesIO(response.content))
         assert workbook.sheetnames[0] == "DRAFT NOTICE"
         assert workbook["DRAFT NOTICE"]["A1"].value == (
-            "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+            "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
         )
         assert workbook["DRAFT NOTICE"]["B3"].value == "draft"
     elif fmt == "csv":
@@ -1481,7 +1485,7 @@ def test_unreviewed_actionable_findings_block_final_but_allow_acknowledged_draft
     )
     assert draft.status_code == 200
     assert f"scan_{scan_id}_DRAFT.md" in draft.headers["content-disposition"]
-    assert draft.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+    assert draft.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
 
 
 @pytest.mark.parametrize(

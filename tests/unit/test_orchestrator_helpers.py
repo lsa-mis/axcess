@@ -7,9 +7,18 @@ previous scan from the auto-diff.
 
 from __future__ import annotations
 
+import gzip
+import json
 import sqlite3
 
-from audit.crawler.orchestrator import _previous_completed_scan, _purge_out_of_scope_jobs
+from audit.crawler.orchestrator import (
+    _MAX_STORED_HTML_BYTES,
+    CrawlConfig,
+    _compress_html,
+    _previous_completed_scan,
+    _purge_out_of_scope_jobs,
+    config_json_for_scan,
+)
 from audit.crawler.url_policy import build_scope
 
 
@@ -136,3 +145,28 @@ def test_purge_is_noop_when_all_in_scope(tmp_db: sqlite3.Connection) -> None:
     assert (
         _purge_out_of_scope_jobs(tmp_db, scan_id=scan_id, scope=scope, allow_subdomains=False) == 0
     )
+
+
+def test_compress_html_is_deterministic_and_reversible() -> None:
+    body = ("<p>repeat</p>" * 100).encode()
+    first = _compress_html(body)
+    second = _compress_html(body)
+    assert first is not None and second is not None
+    assert first == second  # mtime=0 → identical bytes for identical input
+    assert gzip.decompress(first) == body
+
+
+def test_compress_html_rejects_empty_and_oversized() -> None:
+    assert _compress_html(b"") is None
+    assert _compress_html(b"x" * (_MAX_STORED_HTML_BYTES + 1)) is None
+
+
+def test_config_json_includes_rendered_storage_flag() -> None:
+    default = json.loads(config_json_for_scan(CrawlConfig(seed_url="https://example.com/")))
+    assert default["store_rendered_html"] is True
+    opt_out = json.loads(
+        config_json_for_scan(
+            CrawlConfig(seed_url="https://example.com/", store_rendered_html=False)
+        )
+    )
+    assert opt_out["store_rendered_html"] is False

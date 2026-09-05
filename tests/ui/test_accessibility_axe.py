@@ -387,7 +387,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             )
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             await page.locator("summary").filter(has_text="Informational (1)").click()
-            row_link = page.get_by_role("link", name="Logo image — adequate alt")
+            row_link = page.get_by_role("link", name="Logo image, adequate alt")
             informational_row = row_link.locator("xpath=ancestor::li[1]")
             await playwright_async.expect(
                 informational_row.get_by_text("Informational", exact=True)
@@ -471,7 +471,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
                 page.get_by_role("link", name=re.compile(r"^Open the \d+ issues?$"))
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_text("Likely barriers", exact=True)
+                page.get_by_text("Barriers", exact=True)
             ).to_be_visible()
             # Overview, Issues and Verify changes are three views of one
             # report, so the tab bar is visible on all of them.
@@ -701,7 +701,7 @@ async def test_header_offers_one_external_feedback_link(
             await page.goto(f"{base}/app/", wait_until="networkidle")
 
             feedback = page.get_by_role("banner").get_by_role(
-                "link", name="Send feedback (opens in a new tab)", exact=True
+                "link", name="Give feedback (opens in a new tab)", exact=True
             )
             await playwright_async.expect(feedback).to_have_count(1)
             assert await feedback.get_attribute("href") == (
@@ -930,7 +930,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             await playwright_async.expect(use_vlm).to_be_enabled()
             await use_vlm.check()
             await playwright_async.expect(
-                page.get_by_text("Local AI—no automatic model downloads", exact=True)
+                page.get_by_text("Local AI: no automatic model downloads", exact=True)
             ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_text(re.compile(r"No model download will start with this scan"))

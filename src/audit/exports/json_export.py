@@ -1,4 +1,4 @@
-"""JSON export — nested per-finding with an ``occurrences`` array."""
+"""JSON export, nested per-finding with an ``occurrences`` array."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from audit.exports.collector import ExportScan
 # be operated before the finding existed, or null when the page load showed it.
 # A consumer that treats every finding as reachable on load will report
 # click-revealed barriers as unreproducible, so the field is additive but
-# meaningful — hence a version bump rather than a silent column.
+# meaningful, hence a version bump rather than a silent column.
 SCHEMA_VERSION = 4
 
 
@@ -54,7 +54,7 @@ def to_payload(scan: ExportScan) -> dict[str, Any]:
             "alfa_cant_tell_total": scan.alfa_cant_tell_total,
             "by_wcag_level": dict(scan.by_wcag_level),
         },
-        # Image-of-text findings (WCAG 1.4.5 pipeline) — unchanged shape.
+        # Image-of-text findings (WCAG 1.4.5 pipeline), unchanged shape.
         "findings": [finding.to_dict() for finding in scan.findings],
         # WCAG axe-core findings (DOM pipeline). Sibling array so v1
         # consumers reading only `findings` keep working; v2-aware

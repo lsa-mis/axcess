@@ -12,6 +12,7 @@ import type {
   ManualChecksResponse,
   ManualOutcome,
   PageEvidence,
+  PageInspection,
   DiffReport,
   FindingDetail,
   FindingsFilter,
@@ -172,6 +173,17 @@ export const api = {
     }),
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /**
+   * Rendered page + DOM for the Page/DOM inspector. Serves the rendered
+   * document persisted at scan time when present; otherwise re-renders the
+   * one recorded page live (a fresh fetch, so it must not be cached).
+   * Refuses running/failed/interrupted scans, protected reports, and targets
+   * outside the scan's scope. Nothing is stored by this call.
+   */
+  getPageInspection: (scanId: number, pageId: number) =>
+    request<PageInspection>(`/api/scans/${scanId}/pages/${pageId}/inspect`, {
+      cache: "no-store",
+    }),
   scopePreview: (url: string, wholeHost: boolean) => {
     const params = new URLSearchParams({ url });
     if (wholeHost) params.set("whole_host", "1");
@@ -184,7 +196,7 @@ export const api = {
     }),
   /**
    * Create an authorized protected-scan draft. This request contains scope
-   * and acknowledgement metadata only — never browser/session credentials.
+   * and acknowledgement metadata only, never browser/session credentials.
    * The auditor completes 1FA/MFA later in the paired local companion.
    */
   createProtectedScan: (payload: ProtectedScanPayload) =>
@@ -259,7 +271,7 @@ export const api = {
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
   /**
    * Permanently delete a scan and its findings/pages/jobs. Backend refuses
-   * (409) if the scan is currently running — caller must `cancelScan` first.
+   * (409) if the scan is currently running, caller must `cancelScan` first.
    * Idempotent at the UI layer because we invalidate ["scans"] after.
    */
   deleteScan: (id: number) =>
@@ -268,7 +280,7 @@ export const api = {
     }),
   /**
    * Image-of-text findings grouped by `(classification, alt_adequacy)`.
-   * Each group's findings share one remediation hint — same key the
+   * Each group's findings share one remediation hint, same key the
    * `rules/remediation.yaml` rule book uses. Optional `status` filter
    * narrows to a single triage state.
    */
@@ -319,7 +331,7 @@ export const api = {
   getA11yRollup: (scanId: number) =>
     request<A11yRollup>(`/api/scans/${scanId}/a11y`),
   /**
-   * Per-rule rollup — the actionable cut. Where `getA11yRollup`
+   * Per-rule rollup, the actionable cut. Where `getA11yRollup`
    * groups by WCAG SC (the reporting axis), this groups by engine and
    * `rule_id` (the fixing axis): one CSS class fails contrast on
    * 800 pages → one group of 800, ready for one bulk-status decision.
@@ -333,7 +345,7 @@ export const api = {
   },
   /**
    * Drill-down list of individual axe violations for one WCAG SC.
-   * Pass `null` (or omit) to get findings with no SC mapping —
+   * Pass `null` (or omit) to get findings with no SC mapping,
    * axe's best-practice rules land there. The server treats an
    * empty-string query param as "SC IS NULL," so we have to
    * distinguish: undefined → no filter, null → best-practice only.
@@ -369,7 +381,7 @@ export const api = {
    * Bulk-update a set of image-of-text findings to the same status.
    * The natural call site is the grouped-by-issue view: every finding
    * in a group shares one fix, so one POST replaces N per-row calls.
-   * Returns `{status, updated}` — the count is how many DB rows
+   * Returns `{status, updated}`, the count is how many DB rows
    * changed (≤ length of finding_ids; ids that don't exist are dropped
    * silently in SQL).
    */
@@ -390,7 +402,7 @@ export const api = {
       },
     ),
   /**
-   * Per-issue detail — Siteimprove-style "page 2".
+   * Per-issue detail, Siteimprove-style "page 2".
    * Includes the IssueRow header data + every page that contributes
    * findings to this issue + the YAML-sourced description / fix /
    * verify content. The pages list is server-sorted; pass `sort` to
@@ -408,7 +420,7 @@ export const api = {
     );
   },
   /**
-   * Unified Issues table — one row per issue across both pipelines.
+   * Unified Issues table, one row per issue across both pipelines.
    * Filter args are flat strings (comma-separated for the multi-value
    * ones if we ever need that; today the backend takes single values).
    */
@@ -433,7 +445,7 @@ export const api = {
     );
   },
   /**
-   * Coverage & feature tracker data — what's shipped vs. planned across
+   * Coverage & feature tracker data, what's shipped vs. planned across
    * every detection pipeline. Served from the same source of truth as
    * docs/coverage-tracker.md (coverage_status.py), so the page can't
    * drift from the code.
@@ -441,7 +453,7 @@ export const api = {
   getTracking: () => request<TrackingData>("/api/tracking"),
 };
 
-/** Direct URL (bypass fetch) for image blobs — used in <img src=…>. */
+/** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
 

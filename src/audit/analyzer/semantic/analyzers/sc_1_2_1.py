@@ -1,6 +1,6 @@
-"""SC 1.2.1 — Audio-only (Prerecorded): transcript presence analyzer.
+"""SC 1.2.1, Audio-only (Prerecorded): transcript presence analyzer.
 
-Scoped to ``<audio>`` elements — the unambiguous "audio-only prerecorded"
+Scoped to ``<audio>`` elements, the unambiguous "audio-only prerecorded"
 case that requires a text transcript. ``<video>`` is intentionally left to a
 human (a video with sound falls under 1.2.2/1.2.3/1.2.5, and the DOM can't
 tell us whether a video is silent). The analyzer judges whether a transcript
@@ -55,7 +55,7 @@ class AudioTranscriptAnalyzer:
         self.prompt_version = prompt_content_version(self._prompt_template)
 
     async def analyze(self, ctx: AnalysisContext) -> list[SemanticFinding]:
-        # Only audio elements — see module docstring for why video is excluded.
+        # Only audio elements, see module docstring for why video is excluded.
         audio = [m for m in extract_media(ctx.body) if m.kind == "audio"]
         if not audio:
             return []

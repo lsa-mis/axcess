@@ -1,6 +1,6 @@
 """Detect inline ``<svg>`` elements that contain visible ``<text>``.
 
-Inline SVG text is rendered as a raster image by the browser — it's an
+Inline SVG text is rendered as a raster image by the browser, it's an
 "image of text" even though there's no image file to download. Per the spec
 we flag these as findings immediately and skip OCR.
 
@@ -28,7 +28,7 @@ class InlineSvgTextHit:
 def find_inline_svg_text(body: bytes) -> list[InlineSvgTextHit]:
     """Return one hit per top-level inline ``<svg>`` with non-empty ``<text>`` content.
 
-    Nested ``<svg>`` elements are ignored — we only report the outermost one
+    Nested ``<svg>`` elements are ignored, we only report the outermost one
     so a single composition doesn't generate multiple findings.
     """
     tree = HTMLParser(body)

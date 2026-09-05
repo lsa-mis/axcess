@@ -85,7 +85,7 @@ export default function HandoffRoute() {
         <div className={`flex items-start gap-3 p-4 ${ready ? "bg-umich-blue/5" : "bg-sev-major-bg"}`}>
           {ready ? <Check className="mt-0.5 h-5 w-5 text-umich-blue" aria-hidden /> : <AlertTriangle className="mt-0.5 h-5 w-5 text-sev-major" aria-hidden />}
           <div>
-            <h2 className="font-semibold">{ready ? "Report is ready for handoff" : "Draft report — finish the expert record before sharing"}</h2>
+            <h2 className="font-semibold">{ready ? "Report is ready for handoff" : "Draft report, finish the expert record before sharing"}</h2>
             <p className="mt-1 text-sm text-fg-muted">Exports describe evidence and recommendations; they do not certify conformance.</p>
           </div>
         </div>

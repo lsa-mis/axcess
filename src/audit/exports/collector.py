@@ -1,7 +1,7 @@
 """Shared data collector for every export format.
 
 One DB query pass produces a list of :class:`ExportFinding` rows with every
-piece of context an export needs — severity, classification, OCR + VLM
+piece of context an export needs, severity, classification, OCR + VLM
 text, remediation hint, all occurrences on the scanned site, and a deep
 link back into the local review UI.
 
@@ -69,7 +69,7 @@ class ExportA11yFinding:
     """One DOM-engine finding, flattened for export.
 
     Parallels :class:`ExportFinding` but for the page-scoped axe pipeline.
-    Each row is a distinct DOM target — duplicates of the same rule
+    Each row is a distinct DOM target, duplicates of the same rule
     across many pages collapse into many rows here (one per page+target),
     matching how axe reports them.
     """

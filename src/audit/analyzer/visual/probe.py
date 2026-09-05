@@ -1,8 +1,8 @@
-"""SC 1.3.2 — Meaningful Sequence probe (VLM).
+"""SC 1.3.2, Meaningful Sequence probe (VLM).
 
 Screenshots the rendered page and lists its text content in DOM/source
 order (the order a screen reader reads). A local vision model judges whether
-the *visual* reading order in the screenshot matches that source order — CSS
+the *visual* reading order in the screenshot matches that source order, CSS
 (flex/grid ``order``, floats, absolute positioning) can make them diverge so
 a screen-reader user hears a different, confusing sequence than a sighted
 user sees.
@@ -128,7 +128,7 @@ async () => {
 _PROMPT = """You are a WCAG 2.2 specialist evaluating SC 1.3.2 Meaningful Sequence (Level A).
 
 The attached screenshot shows a rendered web page. Below is that page's text content listed in
-DOM / source order — the order a screen reader reads it.
+DOM / source order, the order a screen reader reads it.
 
 Question: does the VISUAL reading order in the screenshot (top-to-bottom, then
 left-to-right) match this source order? A FAILURE is when CSS (flex/grid `order`,
@@ -155,7 +155,7 @@ class VisualProbe:
     """Runs the visual-pipeline checks on a live page.
 
     - SC 1.4.2 / 2.2.2 (runtime): playing audio or moving video without controls.
-      Always runs — no model needed.
+      Always runs, no model needed.
     - SC 1.3.2 (VLM): visual reading order vs DOM order. Only runs when a
       vision ``provider`` is supplied; no-ops otherwise.
     """
@@ -164,7 +164,7 @@ class VisualProbe:
     max_blocks: int = _MAX_BLOCKS
 
     async def run(self, page: Page) -> list[VisualFinding]:
-        """Run both checks. Never raises — each is isolated."""
+        """Run both checks. Never raises, each is isolated."""
         findings: list[VisualFinding] = []
         try:
             findings.extend(await self._check_motion(page))
@@ -177,7 +177,7 @@ class VisualProbe:
         return findings
 
     async def _check_motion(self, page: Page) -> list[VisualFinding]:
-        """SC 1.4.2 / 2.2.2 — measured autoplay media and marquee leads."""
+        """SC 1.4.2 / 2.2.2, measured autoplay media and marquee leads."""
         raw: Any = await page.evaluate(_MOTION_JS)
         findings: list[VisualFinding] = []
         seen: set[str] = set()
@@ -226,7 +226,7 @@ class VisualProbe:
         return findings
 
     async def _check_meaningful_sequence(self, page: Page) -> list[VisualFinding]:
-        """SC 1.3.2 — visual reading order vs DOM order (VLM)."""
+        """SC 1.3.2, visual reading order vs DOM order (VLM)."""
         if self.provider is None:
             return []
         blocks: Any = await page.evaluate(_DOM_ORDER_JS, self.max_blocks)

@@ -31,7 +31,7 @@ const STATUS_OPTIONS: FindingStatus[] = [
 /**
  * Per-scan WCAG DOM-engine view, segregated by success criterion.
  *
- * This is the second product surface — distinct from the original
+ * This is the second product surface, distinct from the original
  * `Findings` route which only covers WCAG 1.4.5 (Images of Text).
  * Different lifecycle (DOM-time, not image-time), different audience
  * (a developer fixing CSS / templates), different dedupe key
@@ -199,7 +199,7 @@ function ScopeBanner() {
           <strong> ACT (Accessibility Conformance Testing) rules</strong> on its
           own local browser capture. Each standardized ACT rule checks one
           specific condition and can return pass, fail, or <code>cantTell</code>.
-          A failed rule is evidence about that condition—not proof that the whole
+          A failed rule is evidence about that condition, not proof that the whole
           page or site fails WCAG. A <code>cantTell</code> result needs an expert
           decision.
         </p>
@@ -223,7 +223,7 @@ function RollupView({ scanId, groups }: { scanId: number; groups: A11ySCGroup[] 
 
 function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) {
   const linkParams = new URLSearchParams();
-  // For best-practice (wcag_sc=null), pass an empty string — the server
+  // For best-practice (wcag_sc=null), pass an empty string, the server
   // treats "" as "no SC mapping" and `undefined` as "no filter."
   linkParams.set("wcag_sc", group.wcag_sc ?? "");
   return (
@@ -330,7 +330,7 @@ function DrillDownView({
         </Link>
       </div>
 
-      {/* Status filter — auto-applies on change, URL-persistent. The
+      {/* Status filter, auto-applies on change, URL-persistent. The
           option labels carry the count so the triager can see at a
           glance how many findings sit in each bucket before clicking. */}
       <Card className="mb-3 p-3">
@@ -424,7 +424,7 @@ function DrillDownView({
                   </td>
                   <td className="px-3 py-2">
                     {f.impact ? <ImpactChip value={f.impact} /> : (
-                      <span className="text-fg-subtle">—</span>
+                      <span className="text-fg-subtle">n/a</span>
                     )}
                   </td>
                   <td className="max-w-xs px-3 py-2">
@@ -433,6 +433,11 @@ function DrillDownView({
                       scanId={scanId}
                       pageUrl={f.page_url}
                       pageTitle={f.page_title}
+                      selector={f.target_selector}
+                      snippet={f.html_snippet}
+                      origin="DOM-engine findings"
+                      context={f.rule_id}
+                      backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -484,7 +489,7 @@ function DrillDownView({
  * (the row now shows its new status) and the rollup (the status-filter
  * counts in the header need to refresh).
  *
- * Auto-submits on change — no Save button, no extra keystrokes. The
+ * Auto-submits on change, no Save button, no extra keystrokes. The
  * triager can fly through dozens of findings with Tab + arrow keys.
  */
 function StatusCell({
@@ -547,7 +552,7 @@ function StatusCell({
 /**
  * Pill rendering an axe impact value. We map axe's four-level scale to
  * the existing severity tokens so this view inherits the color system
- * the rest of the SPA uses — no new colors to audit. critical → critical,
+ * the rest of the SPA uses, no new colors to audit. critical → critical,
  * serious → major, moderate → minor, minor → info.
  */
 function ImpactChip({ value }: { value: AxeImpact }) {

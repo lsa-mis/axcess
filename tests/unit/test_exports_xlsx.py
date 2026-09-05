@@ -317,7 +317,7 @@ def test_page_references_summarizes_large_structured_engine_targets(
     row = alfa_rows[0]
     assert "structured target evidence" in str(references.cell(row=row, column=5).value)
     assert references.cell(row=row, column=6).value == (
-        "Structured engine target recorded — open the issue evidence in Axcess."
+        "Structured engine target recorded, open the issue evidence in Axcess."
     )
 
 

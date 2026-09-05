@@ -82,7 +82,7 @@ export default function FindingsRoute() {
         actions={
           <>
             {/* Promote the grouped view as the *primary* action from
-                this flat-table page — most of the time the user wants
+                this flat-table page, most of the time the user wants
                 to act on issue *kinds*, not on individual rows. The
                 flat table stays the dwell page for one-off lookups
                 and bulk power-user work. */}
@@ -163,7 +163,7 @@ export default function FindingsRoute() {
           className="mt-4 flex flex-wrap items-center gap-3 text-sm"
           aria-label="Pagination"
         >
-          {/* Pagination arrows are interactive — they need to clear the
+          {/* Pagination arrows are interactive, they need to clear the
               44×44 SC 2.5.5 floor like every other control. Using the
               shared <Button> at default `md` size pulls them up to
               44px tall and inherits the AAA focus ring. */}
@@ -216,7 +216,7 @@ function FilterSelect({
       {label}
       {/* min-h-target + text-base so each filter clears the 44×44
           SC 2.5.5 floor and the option list is comfortable to read.
-          The label uppercase/tracking class is text-only — the
+          The label uppercase/tracking class is text-only, the
           `font-normal normal-case tracking-normal` resets it on the
           interactive control so the value renders as natural sentence
           case, not THE LIKE. */}
@@ -238,7 +238,7 @@ function FilterSelect({
 
 /**
  * Virtualized findings table. Only the visible rows are rendered to the
- * DOM — a 1000-finding scan still scrolls at 60fps. Thumbnails are a
+ * DOM, a 1000-finding scan still scrolls at 60fps. Thumbnails are a
  * fixed 72×48 and never expand; clicking a row opens the detail page.
  */
 function FindingsTable({
@@ -256,7 +256,7 @@ function FindingsTable({
     overscan: 8,
   });
 
-  // Call directly each render — react-virtual's hook subscribes to scroll +
+  // Call directly each render, react-virtual's hook subscribes to scroll +
   // resize internally and triggers re-renders, so this stays in sync. A
   // useMemo([rowVirtualizer]) would *cache* the first (empty) result
   // forever because the virtualizer reference is stable across renders.
@@ -324,7 +324,7 @@ function FindingsTable({
                       />
                     ) : (
                       <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
-                        —
+                        n/a
                       </span>
                     )}
                   </div>
@@ -337,14 +337,14 @@ function FindingsTable({
                         {f.ocr_text}
                       </span>
                     ) : (
-                      <span className="text-xs text-fg-subtle">—</span>
+                      <span className="text-xs text-fg-subtle">n/a</span>
                     )}
                   </div>
                   <div role="cell" className="min-w-0">
                     <AltTag value={f.sample_alt} />
                   </div>
                   <div role="cell" className="text-xs text-fg-muted">
-                    {f.vlm_classification ?? "—"}
+                    {f.vlm_classification ?? "n/a"}
                   </div>
                   <div role="cell" className="min-w-0">
                     {f.sample_page ? (
@@ -366,7 +366,7 @@ function FindingsTable({
                         <span className="sr-only">opens in a new tab</span>
                       </a>
                     ) : (
-                      <span className="text-xs text-fg-subtle">—</span>
+                      <span className="text-xs text-fg-subtle">n/a</span>
                     )}
                   </div>
                   <div role="cell">

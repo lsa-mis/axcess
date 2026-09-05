@@ -21,14 +21,14 @@ class AnalysisContext:
     """Inputs every per-criterion analyzer receives.
 
     Most static SCs (link purpose, heading descriptiveness, label-in-name)
-    only need the rendered HTML body — selectolax parses it; no
+    only need the rendered HTML body, selectolax parses it; no
     Playwright required. A few SCs (1.4.3 contrast, 2.4.7 focus visible)
     need a live Playwright Page so the analyzer can call
     ``page.evaluate()`` for computed styles. The context carries both;
     analyzers pick what they need.
 
     ``page`` is intentionally typed ``Any`` here so this module doesn't
-    import Playwright at module load — keeping the contract narrow
+    import Playwright at module load, keeping the contract narrow
     means analyzers that don't need a Page never indirectly drag in
     the dependency.
     """
@@ -46,10 +46,10 @@ class SemanticFinding:
     same persistence sink, same UI surface, same triage workflow. The
     differences:
 
-    * ``criterion_sc`` is mandatory — the per-criterion analyzer always
+    * ``criterion_sc`` is mandatory, the per-criterion analyzer always
       knows which WCAG SC it's about, where axe rules sometimes
       aren't SC-mapped at all (best-practice rules).
-    * No ``rule_id`` — there's no axe rule. The DB-side helper
+    * No ``rule_id``, there's no axe rule. The DB-side helper
       composes a synthetic ``rule_id = f"semantic:{criterion_sc}"`` so
       the existing UNIQUE constraint on
       ``(page_id, rule_id, target_hash)`` still applies.
@@ -66,7 +66,7 @@ class SemanticFinding:
     target_selector: str  # CSS selector for the failing element
     failure_summary: str  # why-it-failed prose from the model
     html_snippet: str  # the failing element's outerHTML (truncated)
-    target_hash: str  # dedupe key — (criterion, selector, snippet)
+    target_hash: str  # dedupe key, (criterion, selector, snippet)
     help_url: str | None = None  # WCAG docs link, optional
     wcag_scs: str | None = None  # multi-mapped SCs, comma-separated
 

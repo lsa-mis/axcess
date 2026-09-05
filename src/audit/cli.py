@@ -38,7 +38,7 @@ from audit.synthesizer.findings import synthesize_findings
 
 app = typer.Typer(
     help=(
-        "Axcess — local, offline web accessibility auditor "
+        "Axcess, local, offline web accessibility auditor "
         "(images-of-text detection, keyboard-trap probing, and more)."
     ),
     no_args_is_help=True,
@@ -388,7 +388,7 @@ def crawl(
         typer.Option(
             "--skip-focus",
             help=(
-                "Skip the focus-obscured probe (SC 2.4.11 — focusable elements "
+                "Skip the focus-obscured probe (SC 2.4.11, focusable elements "
                 "hidden behind sticky/fixed overlays)."
             ),
         ),
@@ -428,6 +428,18 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_rendered_storage: Annotated[
+        bool,
+        typer.Option(
+            "--no-store-rendered",
+            help=(
+                "Do not keep a stored copy of each page's rendered HTML. "
+                "Keeps the report database smaller; the Page/DOM inspector "
+                "then re-renders the live page on demand instead of opening "
+                "the stored capture. Finding evidence is unaffected."
+            ),
+        ),
+    ] = False,
     use_js: Annotated[
         bool,
         typer.Option(
@@ -446,7 +458,7 @@ def crawl(
                 "Fast link-inventory crawl: fetch pages with plain HTTP and "
                 "skip browser rendering except for SPA/WAF pages. WARNING: "
                 "disables axe, keyboard, and responsive checks on every "
-                "statically-fetched page — image-of-text + semantic "
+                "statically-fetched page, image-of-text + semantic "
                 "pipelines still run."
             ),
         ),
@@ -513,6 +525,7 @@ def crawl(
             visual_checks_enabled=not skip_visual,
             interaction_checks_enabled=not skip_interaction,
             capture_screenshots=not skip_screenshots,
+            store_rendered_html=not skip_rendered_storage,
         )
         if static_only:
             console.print(
@@ -523,7 +536,7 @@ def crawl(
             )
         # Override the default semantic-criteria tuple when the user
         # passed `--semantic-criteria 2.4.4,1.3.1`. Dataclass is frozen,
-        # so we rebuild it via `replace()` — the orchestrator validates
+        # so we rebuild it via `replace()`, the orchestrator validates
         # SC formatting and logs + drops any malformed entry.
         if semantic_criteria:
             from dataclasses import replace as _dc_replace

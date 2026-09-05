@@ -2,21 +2,21 @@
 
 Three checks, all impossible from static HTML and absent from axe-core:
 
-1. **Reflow at 320 px (SC 1.4.10)** — resize the viewport to 320x900 and
+1. **Reflow at 320 px (SC 1.4.10)**, resize the viewport to 320x900 and
    check whether the document needs a horizontal scrollbar. WCAG's
    reflow criterion says content must be usable at 320 CSS px without
    two-dimensional scrolling. The probe also walks the DOM for the
    widest offending elements so the finding names the culprit, not just
    the symptom.
 
-2. **Text clipping at ~200% zoom (SC 1.4.4)** — 640x450 viewport is the
+2. **Text clipping at ~200% zoom (SC 1.4.4)**, 640x450 viewport is the
    standard automation proxy for 200% zoom at a 1280 desktop width.
    Leaf elements with ``overflow: hidden`` whose ``scrollWidth`` exceeds
    their ``clientWidth`` are losing characters. ``text-overflow:
-   ellipsis`` elements are skipped — designed truncation is a judgment
+   ellipsis`` elements are skipped, designed truncation is a judgment
    call for a human, and flagging it would bury real failures in noise.
 
-3. **Text-spacing override (SC 1.4.12)** — inject the canonical WCAG
+3. **Text-spacing override (SC 1.4.12)**, inject the canonical WCAG
    spacing CSS (line-height 1.5, letter-spacing 0.12 em, word-spacing
    0.16 em, paragraph spacing 2 em) and re-run the clipping detector.
    Sites that hard-code container heights clip when users apply their
@@ -24,8 +24,8 @@ Three checks, all impossible from static HTML and absent from axe-core:
    UI gate (tests/ui/test_accessibility_text_spacing.py) uses.
 
 Ordering contract: the probe MUTATES the page (viewport size, injected
-CSS). It must run LAST in ``JsFetcher.fetch`` — after the HTML capture,
-after axe, after the keyboard probe — and it restores the original
+CSS). It must run LAST in ``JsFetcher.fetch``, after the HTML capture,
+after axe, after the keyboard probe, and it restores the original
 viewport before returning so any later consumer isn't surprised.
 
 Safety: same posture as the keyboard probe. Every check is wrapped, a
@@ -67,7 +67,7 @@ _ZOOM_VIEWPORT = {"width": 640, "height": 450}
 # reflow failures.
 _OVERFLOW_TOLERANCE_PX = 8
 
-# Walk caps — bound the per-check JS work on pathological pages.
+# Walk caps, bound the per-check JS work on pathological pages.
 _MAX_ELEMENTS_SCANNED = 2000
 _MAX_OFFENDERS_PER_CHECK = 5
 
@@ -86,7 +86,7 @@ p {
 
 # Shared JS: find leaf elements whose text is clipped by overflow:hidden.
 # Returns up to `max` {selector, html, detail} records. Ellipsis elements
-# are skipped (designed truncation — human judgment, not an auto-fail).
+# are skipped (designed truncation, human judgment, not an auto-fail).
 _CLIPPED_TEXT_JS = """
 (maxOffenders) => {
   const out = [];
@@ -212,14 +212,14 @@ class ResponsiveProbe:
             log.warning("responsive.%s_failed: %s", check, exc)
 
     # -----------------------------------------------------------------
-    # Check 1 — reflow at 320 px (SC 1.4.10).
+    # Check 1, reflow at 320 px (SC 1.4.10).
     # -----------------------------------------------------------------
 
     async def _check_reflow(self, page: Page) -> list[ResponsiveFinding]:
         await page.set_viewport_size(_REFLOW_VIEWPORT)  # type: ignore[arg-type]
         # Give responsive CSS a beat to settle (media queries, JS resize
         # handlers). 150ms is enough for CSS; deliberately not waiting
-        # for JS frameworks — a page that needs seconds to reflow has
+        # for JS frameworks, a page that needs seconds to reflow has
         # bigger problems and we'd rather under- than over-wait.
         await page.wait_for_timeout(150)
         result: dict[str, Any] | None = await page.evaluate(_REFLOW_JS)
@@ -256,7 +256,7 @@ class ResponsiveProbe:
         ]
 
     # -----------------------------------------------------------------
-    # Check 2 — text clipping at the 200% zoom proxy (SC 1.4.4).
+    # Check 2, text clipping at the 200% zoom proxy (SC 1.4.4).
     # -----------------------------------------------------------------
 
     async def _check_zoom_clipping(self, page: Page) -> list[ResponsiveFinding]:
@@ -282,11 +282,11 @@ class ResponsiveProbe:
         ]
 
     # -----------------------------------------------------------------
-    # Check 3 — WCAG text-spacing override (SC 1.4.12).
+    # Check 3, WCAG text-spacing override (SC 1.4.12).
     # -----------------------------------------------------------------
 
     async def _check_text_spacing(self, page: Page) -> list[ResponsiveFinding]:
-        # Run at the crawl's standard viewport — spacing failures are
+        # Run at the crawl's standard viewport, spacing failures are
         # about hard-coded boxes, not narrow screens, and running at
         # 320px would double-report what the reflow check already saw.
         await page.set_viewport_size(

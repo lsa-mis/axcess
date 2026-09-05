@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import hashlib
 import json
 import sqlite3
@@ -82,7 +83,7 @@ class CrawlConfig:
     # ``seed_url`` does two jobs: it anchors the scope, and it is the first URL
     # fetched. Manual sign-in splits those apart. An auditor points a scan at
     # an application, signs in through an identity provider, and lands
-    # somewhere else entirely — a dashboard, a course page, a post-SSO
+    # somewhere else entirely, a dashboard, a course page, a post-SSO
     # redirect. The crawl should carry on from where they actually are, but
     # the scope they asked for must not move under them: adopting the landing
     # URL as the seed would re-derive scope from its path and silently narrow
@@ -101,7 +102,7 @@ class CrawlConfig:
     # from a11y-crawler, defaults included: an authenticated crawl that
     # follows a "Sign out" link ends its own session, and every page after
     # that is the login screen. The scan still reports as completed, so the
-    # failure is silent — which is exactly how it presents in a report.
+    # failure is silent, which is exactly how it presents in a report.
     blocked_url_patterns: tuple[str, ...] = url_policy.DEFAULT_BLOCKED_URL_PATTERNS
     # Operator-supplied "never visit these" URLs or subtrees. Distinct from
     # the patterns above: entries match exactly, as a path prefix, or as a
@@ -111,19 +112,19 @@ class CrawlConfig:
     workers: int = 4
     user_agent: str = "axcess/0.1 (+local accessibility audit)"
     request_timeout_s: float = 30.0
-    # OCR — disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
+    # OCR, disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
     ocr_enabled: bool = True
     ocr_language: str = "eng"
     ocr_max_workers: int = 2
     ocr_min_confidence: float = 60.0
     ocr_min_word_count: int = 3
-    # VLM — disabled unless Ollama is reachable and the model is loaded.
+    # VLM, disabled unless Ollama is reachable and the model is loaded.
     vlm_enabled: bool = True
     vlm_model: str = "qwen3-vl:2b-instruct"
     vlm_base_url: str = "http://localhost:11434"
     vlm_prompt_name: str = "classify_v1.txt"
     vlm_concurrency: int = 1
-    # Synthesis — toggle off with ``--skip-synthesize`` if the caller wants
+    # Synthesis, toggle off with ``--skip-synthesize`` if the caller wants
     # to run ``audit synthesize`` manually against the same scan later.
     synthesize_enabled: bool = True
     # Explicit override for the diff's ``compare_to`` scan id. ``None`` means
@@ -136,7 +137,7 @@ class CrawlConfig:
     # defaults to True: this is an accessibility auditor, and three of the
     # four detection pipelines (axe, keyboard probe, responsive probe) can
     # only see a rendered DOM. The pre-flip default (False) silently
-    # produced near-zero axe coverage on static sites — an audit tool must
+    # produced near-zero axe coverage on static sites, an audit tool must
     # not have a fast path that quietly guts its own audit. Set
     # ``js_eager=False`` (CLI ``--static-only``) for a fast link-inventory
     # crawl when rendered-DOM checks aren't needed.
@@ -157,9 +158,9 @@ class CrawlConfig:
     # Set ``whole_host`` to follow every link on the seed host.
     whole_host: bool = False
     # WCAG 2.x AA scan via axe-core. Runs against the rendered DOM, so it
-    # requires Playwright — pages fetched statically are skipped (only
+    # requires Playwright, pages fetched statically are skipped (only
     # relevant under ``--static-only``). ``axe_level`` is the WCAG level
-    # the rule set is filtered to: "A" (Level A only), "AA" (default — A+AA),
+    # the rule set is filtered to: "A" (Level A only), "AA" (default, A+AA),
     # or "AAA" (all). Best-practice rules are always included.
     axe_enabled: bool = True
     axe_level: str = "AA"
@@ -203,14 +204,14 @@ class CrawlConfig:
     # on the live page: 320px reflow (SC 1.4.10), ~200% zoom text
     # clipping (SC 1.4.4), and the WCAG text-spacing override
     # (SC 1.4.12). The zoom-lock viewport-meta check is deliberately NOT
-    # here — axe's `meta-viewport` rule already covers it. ~1-2s per
+    # here, axe's `meta-viewport` rule already covers it. ~1-2s per
     # page; disable with ``--skip-responsive``.
     responsive_checks_enabled: bool = True
-    # SC 2.4.11 Focus Not Obscured — live-page focus probe. Deterministic
+    # SC 2.4.11 Focus Not Obscured, live-page focus probe. Deterministic
     # (focuses each element, checks for a sticky/fixed overlay over its
     # centre); no model. Default on; disable with ``--skip-focus``.
     focus_checks_enabled: bool = True
-    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. Screenshots the page
+    # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. Screenshots the page
     # and asks a local vision model whether the visual reading order matches
     # the DOM order. Needs Ollama + a vision model; no-ops cleanly without
     # one. One VLM call per page, so it respects the same vlm_enabled gate.
@@ -224,7 +225,7 @@ class CrawlConfig:
     # an unchanged header being reported once per click.
     #
     # On by default. Most of a modern application does not exist until a
-    # control is used — menus closed, dialogs unopened, tabs unswitched — so
+    # control is used, menus closed, dialogs unopened, tabs unswitched, so
     # a load-state-only audit reports on a fraction of what a user meets. It
     # is the one pass that operates the page rather than observing it, and it
     # costs an axe run per revealed state, so ``--skip-interaction`` turns it
@@ -241,6 +242,12 @@ class CrawlConfig:
     # each issue. Bounded per page (see ``js_fetcher.MAX_SHOTS_PER_PAGE``);
     # disable with ``--skip-screenshots`` when crawl speed matters more.
     capture_screenshots: bool = True
+    # Persist each page's rendered document (gzip) in ``pages.rendered_html``
+    # so the Page/DOM inspector opens it instantly instead of re-rendering
+    # the live site. Disable to keep the report database smaller; the
+    # inspector then always re-renders on demand. Finding evidence,
+    # screenshots, and image blobs are unaffected.
+    store_rendered_html: bool = True
     search: SearchConfig | None = None
 
 
@@ -335,7 +342,7 @@ async def run_crawl(
     # is scope-checked again at lease time, so seeding it would produce a scan
     # that immediately rejects its only URL and reports zero pages. Falling
     # back to the seed keeps that crawl alive, and the warning names the real
-    # problem — the configured scope does not cover where sign-in landed.
+    # problem, the configured scope does not cover where sign-in landed.
     entry_url = normalized_seed
     if config.start_url is not None:
         candidate = url_policy.normalize(config.start_url)
@@ -396,7 +403,7 @@ async def run_crawl(
     # Build the axe analyzer once for the whole crawl. Reads the bundled
     # axe.min.js off disk; reuses the same JS source across every page so
     # we pay the 553 KB I/O cost once. A missing bundle is loud, not
-    # silent — the crawl fails fast rather than silently producing
+    # silent, the crawl fails fast rather than silently producing
     # zero axe findings.
     axe_analyzer: AxeAnalyzer | None = None
     axe_level: AxeLevel = "AA"
@@ -429,7 +436,7 @@ async def run_crawl(
             )
     else:
         alfa_analyzer = None
-    # SC 2.1.2 keyboard probe — default on. Constructed once per crawl
+    # SC 2.1.2 keyboard probe, default on. Constructed once per crawl
     # and reused across all pages; cheap to allocate, no state.
     keyboard_probe: KeyboardProbe | None = None
     if config.keyboard_probe_enabled:
@@ -441,7 +448,7 @@ async def run_crawl(
     responsive_probe: ResponsiveProbe | None = None
     if config.responsive_checks_enabled:
         responsive_probe = ResponsiveProbe()
-    # SC 2.4.11 focus-obscured probe — default on. Deterministic, stateless.
+    # SC 2.4.11 focus-obscured probe, default on. Deterministic, stateless.
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
@@ -454,7 +461,7 @@ async def run_crawl(
         if config.vlm_enabled:
             vision_provider = await _build_vision_provider(config, client)
         visual_probe = VisualProbe(provider=vision_provider)
-    # Interaction probe — opt-in. Shares the crawl's single AxeAnalyzer so
+    # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
     interaction_probe: InteractionProbe | None = None
     if config.interaction_checks_enabled and axe_analyzer is not None:
@@ -608,7 +615,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
 def config_json_for_scan(config: CrawlConfig) -> str:
     """Serialize the scan-relevant config for the ``scans.config_json`` column.
 
-    Single source of truth — the web layer's ``_prepare_scan_row`` uses
+    Single source of truth, the web layer's ``_prepare_scan_row`` uses
     this too, so both writers produce the same shape. The pipeline flags
     matter beyond reproducibility: the UI's "methods used on this scan"
     row derives from them, so an operator can tell a full audit from a
@@ -632,7 +639,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "ignore_robots": config.ignore_robots,
             "concurrency_per_host": config.concurrency_per_host,
             "user_agent": config.user_agent,
-            # Pipeline switches — drives the "methods used" UI row.
+            # Pipeline switches, drives the "methods used" UI row.
             "js_eager": config.js_eager,
             "browser_headless": config.browser_headless,
             "browser_only": config.browser_only,
@@ -658,6 +665,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
             "interaction_max_depth": config.interaction_max_depth,
+            "store_rendered_html": config.store_rendered_html,
             "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older
@@ -683,7 +691,7 @@ def _purge_out_of_scope_jobs(
     """Delete pending ``fetch`` jobs for ``scan_id`` whose URL is out of scope.
 
     Returns the number of rows dropped. Safe to call on scans that don't
-    have any stale jobs — no-op if every pending job still matches scope.
+    have any stale jobs, no-op if every pending job still matches scope.
     """
     rows = conn.execute(
         "SELECT id, payload_json FROM jobs "
@@ -704,7 +712,7 @@ def _purge_out_of_scope_jobs(
     if stale:
         placeholders = ",".join("?" * len(stale))
         conn.execute(
-            f"DELETE FROM jobs WHERE id IN ({placeholders})",  # noqa: S608 — ids only
+            f"DELETE FROM jobs WHERE id IN ({placeholders})",  # noqa: S608, ids only
             stale,
         )
         log.info("crawl.purge_out_of_scope", scan_id=scan_id, dropped=len(stale))
@@ -912,7 +920,7 @@ async def _build_semantic_analyzers(
     The semantic pass is opt-out: if Ollama isn't reachable, or no
     requested criterion has a registered analyzer yet, we log and
     return an empty list. The crawl continues without semantic
-    findings — same graceful-skip semantics as the VLM and axe
+    findings, same graceful-skip semantics as the VLM and axe
     pipelines.
     """
     if not config.semantic_enabled:
@@ -921,7 +929,7 @@ async def _build_semantic_analyzers(
         return None, []
 
     # Imports inside the function so the orchestrator module doesn't
-    # depend on the semantic package at import time — the analyzer
+    # depend on the semantic package at import time, the analyzer
     # is a Phase 9+ addition; importing eagerly would couple existing
     # crawl flow to a brand-new module.
     # Default model: pick from the model registry's text-default. The
@@ -1123,7 +1131,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # Persist axe-core violations attached by JsFetcher. Static fetches
         # never carry violations (axe needs a browser); we count an axe-page
         # only when violations is a real attached tuple, even an empty one
-        # — that distinguishes "we scanned and found nothing" from "we
+        #, that distinguishes "we scanned and found nothing" from "we
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
@@ -1273,6 +1281,27 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     )
 
 
+# Upper bound on the rendered HTML retained per page (uncompressed bytes).
+# Pages above this are dropped (``rendered_html`` = NULL) and the inspector
+# falls back to an on-demand render. Bounds storage without changing crawl
+# behavior or the reproduction of findings.
+_MAX_STORED_HTML_BYTES = 2_000_000
+
+
+def _compress_html(body: bytes) -> bytes | None:
+    """Gzip the rendered document for storage, or None if too large to keep.
+
+    ``compresslevel=1`` is deliberate: HTML is highly redundant, so level 1
+    already captures most of the ratio (typically within ~10-15% of level 9)
+    at a fraction of the CPU cost, this runs once per page on a crawl that
+    may visit thousands of pages. ``mtime=0`` keeps the bytes deterministic
+    so identical documents always compress identically.
+    """
+    if not body or len(body) > _MAX_STORED_HTML_BYTES:
+        return None
+    return gzip.compress(body, compresslevel=1, mtime=0)
+
+
 def _record_page(
     ctx: _WorkerContext,
     url: str,
@@ -1283,7 +1312,17 @@ def _record_page(
 ) -> int | None:
     title = _extract_title(result.body) if result and result.is_html else None
     html_hash = hashlib.sha256(result.body).hexdigest() if result and result.body else None
-    # The requested URL stays the row's identity — dedupe, resume, and the
+    # Persist the rendered document so the inspector can open instantly instead
+    # of re-launching a browser. Only HTML bodies are kept; non-HTML (a PDF) or
+    # over-bound pages leave the column NULL and fall back to on-demand render.
+    # A scan configured with ``store_rendered_html=False`` never compresses or
+    # writes the document at all.
+    rendered_html = (
+        _compress_html(result.body)
+        if result and result.is_html and ctx.config.store_rendered_html
+        else None
+    )
+    # The requested URL stays the row's identity, dedupe, resume, and the
     # job queue are all keyed on it. Where the request actually ended up is
     # recorded alongside, and only when it moved: without it a redirected
     # page is indistinguishable from one that was really scanned, which is
@@ -1299,6 +1338,7 @@ def _record_page(
         title=title,
         render_mode=render_mode,
         html_hash=html_hash,
+        rendered_html=rendered_html,
     )
 
 
@@ -1373,7 +1413,7 @@ def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
     """Decide whether a static fetch result warrants a re-fetch via Playwright.
 
     Three triggers, any of which is enough:
-      * ``js_eager`` is on — the caller asked for JS on every page.
+      * ``js_eager`` is on, the caller asked for JS on every page.
       * the static HTML clearly needs client rendering (SPA bootstrap).
       * the response looks like a WAF / bot-check interstitial.
 
@@ -1598,7 +1638,7 @@ def _persist_keyboard(
 
     Mirrors :func:`_persist_axe`'s row-by-row insert pattern. Counts
     every probed page (even ones that returned zero findings), because
-    the operator cares about coverage — "we probed 47 of 50 pages and
+    the operator cares about coverage, "we probed 47 of 50 pages and
     found 2 traps" is more useful than "we found 2 traps somewhere."
     """
     for t in traps:
@@ -1635,7 +1675,7 @@ def _persist_responsive(
 ) -> None:
     """Write responsive-probe findings + bump the responsive counters.
 
-    Mirrors :func:`_persist_keyboard` — pages are counted even when the
+    Mirrors :func:`_persist_keyboard`, pages are counted even when the
     probe found nothing, because the coverage signal ("we probed 47 of
     50 pages") matters as much as the findings.
     """
@@ -1756,11 +1796,11 @@ def _persist_semantic(
 ) -> None:
     """Upsert semantic findings into ``page_a11y_findings``.
 
-    Same row-by-row insert pattern as ``_persist_axe`` — SQLite at our
+    Same row-by-row insert pattern as ``_persist_axe``, SQLite at our
     scale handles 100k inserts cleanly. A per-row sqlite3 error logs
     + drops; the rest of the page's findings still land.
 
-    Note: semantic findings carry no element screenshot — the semantic
+    Note: semantic findings carry no element screenshot, the semantic
     pass runs against the static HTML body with no live Playwright page,
     so there's no rendered element to capture (out of scope for the
     scan-time screenshot feature).

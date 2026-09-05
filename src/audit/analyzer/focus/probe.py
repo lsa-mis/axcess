@@ -1,9 +1,9 @@
-"""SC 2.4.11 — Focus Not Obscured (Minimum) probe.
+"""SC 2.4.11, Focus Not Obscured (Minimum) probe.
 
 Deterministic, no model. In one ``page.evaluate`` it focuses each focusable
 element and checks whether the element's centre is covered by a
 ``position:fixed`` / ``sticky`` overlay (the classic "focus disappears
-behind the sticky header" failure). Conservative on purpose — it samples
+behind the sticky header" failure). Conservative on purpose, it samples
 the centre point, so it flags elements that are substantially obscured, not
 ones merely clipped at an edge. Edge cases (transforms, partial overlap)
 still need a human; the coverage matrix marks this ``partial``.
@@ -25,7 +25,7 @@ from audit.logging import get_logger
 
 log = get_logger(__name__)
 
-# Cap how many focusable elements we test per page — bounds the worst case
+# Cap how many focusable elements we test per page, bounds the worst case
 # on a 500-link page. Most pages have far fewer interactive elements.
 MAX_FOCUSABLE = 150
 
@@ -82,7 +82,7 @@ _OBSCURED_JS = """
 
 
 # SC 2.4.3 (WCAG F44): positive tabindex forces a manual tab order that
-# overrides DOM order. Deterministic + high-confidence — return every
+# overrides DOM order. Deterministic + high-confidence, return every
 # element whose tabindex attribute parses to a value > 0.
 _POSITIVE_TABINDEX_JS = """
 (cap) => {
@@ -121,7 +121,7 @@ class FocusProbe:
     suppress_diagnostics: bool = False
 
     async def run(self, page: Page) -> list[FocusFinding]:
-        """Run both focus checks. Never raises — each check is isolated so
+        """Run both focus checks. Never raises, each check is isolated so
         one failing doesn't lose the other's findings."""
         findings: list[FocusFinding] = []
         try:
@@ -141,7 +141,7 @@ class FocusProbe:
             log.warning(f"focus.{check}_failed", error=str(exc))
 
     async def _check_obscured(self, page: Page) -> list[FocusFinding]:
-        """SC 2.4.11 — elements hidden behind a sticky/fixed overlay."""
+        """SC 2.4.11, elements hidden behind a sticky/fixed overlay."""
         raw: Any = await page.evaluate(_OBSCURED_JS, self.max_focusable)
         findings: list[FocusFinding] = []
         seen: set[str] = set()
@@ -164,7 +164,7 @@ class FocusProbe:
                     ),
                     html_snippet=str(item.get("html") or ""),
                     help=(
-                        "Keep focused elements visible — add scroll-margin / "
+                        "Keep focused elements visible, add scroll-margin / "
                         "scroll-padding so they aren't hidden behind sticky headers, "
                         "or reduce the sticky element's height."
                     ),
@@ -173,7 +173,7 @@ class FocusProbe:
         return findings
 
     async def _check_positive_tabindex(self, page: Page) -> list[FocusFinding]:
-        """SC 2.4.3 (WCAG F44) — positive tabindex forces a manual tab order."""
+        """SC 2.4.3 (WCAG F44), positive tabindex forces a manual tab order."""
         raw: Any = await page.evaluate(_POSITIVE_TABINDEX_JS, self.max_focusable)
         findings: list[FocusFinding] = []
         seen: set[str] = set()

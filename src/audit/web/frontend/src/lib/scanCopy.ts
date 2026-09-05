@@ -4,7 +4,7 @@
  * The URL field label appears on the public form, is negated in the login
  * form's test ("there is no site-URL field here"), and is quoted inside the
  * whole-host hint. Keeping the noun in one constant means renaming the field
- * — e.g. to "Root URL" — is a one-line change that can't leave a hint behind
+ *, e.g. to "Root URL", is a one-line change that can't leave a hint behind
  * saying something different from the label above it.
  */
 export const SITE_URL_LABEL = "Site URL";
@@ -12,7 +12,7 @@ export const SITE_URL_LABEL = "Site URL";
 /** The same thing in running prose, for hints and helper text. */
 export const SITE_URL_NOUN = "site URL";
 
-export const WHOLE_HOST_HINT = `Ignores the ${SITE_URL_NOUN}’s path — every page on the host is in scope.`;
+export const WHOLE_HOST_HINT = `Ignores the ${SITE_URL_NOUN}’s path, every page on the host is in scope.`;
 
 export const WHOLE_HOST_HINT_LOGIN = `Ignores the ${SITE_URL_NOUN}’s path, but never leaves the exact signed-in website origin.`;
 

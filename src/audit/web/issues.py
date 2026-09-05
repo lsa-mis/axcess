@@ -1,15 +1,15 @@
-"""Unified Issues view — one row per "issue", across both pipelines.
+"""Unified Issues view, one row per "issue", across both pipelines.
 
 This is the entry point that mirrors Siteimprove's Issues table. Until
 this module landed, image-of-text findings and axe-core WCAG findings
 lived in their own grouped views (``/findings/grouped`` and
 ``/a11y/by-rule``). The right operator workflow is *one* sortable,
 filterable table that says "here is every issue your site has, in
-priority order" — not two parallel tables in two URL prefixes.
+priority order", not two parallel tables in two URL prefixes.
 
 The unifying abstraction is :class:`IssueRow`. An issue is a *kind* of
 problem (one axe ``rule_id``, or one ``(classification, alt_adequacy)``
-pair) — many findings collapse into one row. Each row carries the data
+pair), many findings collapse into one row. Each row carries the data
 the table needs to render: title, conformance level, success criterion,
 responsibility (owner), abilities affected, occurrence count, page
 count, priority score, status summary, and the deep-link to the
@@ -18,7 +18,7 @@ unified view is a façade over the existing URLs).
 
 What this module deliberately does NOT do:
 
-* It does not compute findings — both ``image_findings_queries`` and
+* It does not compute findings, both ``image_findings_queries`` and
   ``a11y_queries`` already do. We compose them.
 * It does not invent a "Points you can gain" score. We surface the
   raw priority/severity weight we already compute and label it
@@ -53,7 +53,7 @@ ConformanceLabel = str  # one of: "A" | "AA" | "AAA" | "BP"
 # Owner / responsibility taxonomy (unchanged from audit_report.yaml).
 ResponsibilityLabel = str
 
-# Abilities — what user populations this issue blocks.
+# Abilities, what user populations this issue blocks.
 AbilityLabel = str  # vision | cognition | motor | hearing
 
 # A result is not automatically an "issue" just because a detector emitted
@@ -93,7 +93,7 @@ def _alfa_diagnostics(findings: list[dict[str, Any]], *, limit: int = 2) -> list
 
 # Severity to priority weight. Used for sorting and for the "Priority"
 # column. Multiplied by log(1 + page_count) to give multi-page issues
-# more weight — one fix on 800 pages beats one fix on 1 page even if
+# more weight, one fix on 800 pages beats one fix on 1 page even if
 # the per-page severity is identical.
 _SEVERITY_WEIGHT = {
     "critical": 4.0,
@@ -180,6 +180,14 @@ class IssueLocation:
     # reproduce the finding: the URL alone does not show a defect that only
     # appears once a menu is opened.
     revealed_by: str | None = None
+    # Blob hash of the scan-time screenshot with the detected location
+    # circled, when one was captured. Lets the Issues view expand the visual
+    # evidence inline instead of deep-linking to the page-evidence route.
+    screenshot_hash: str | None = None
+    # The captured outerHTML of the flagged element, the "exact element
+    # location" an inspector shows. Rendered as escaped source, never
+    # executed, so it is evidence of what the markup was at scan time.
+    html_snippet: str | None = None
 
 
 @dataclass(frozen=True)
@@ -194,7 +202,7 @@ class IssueRow:
 
     The trailing four fields (description, why_matters, fix_steps,
     acceptance) ride along with each row so the Issues list can
-    surface the *what/why/how* inline — the operator triages without
+    surface the *what/why/how* inline, the operator triages without
     round-tripping through the detail page. They're optional because
     rules not in ``rules/audit_report.yaml`` produce rows with empty
     longform content; the row still renders.
@@ -250,20 +258,20 @@ def list_issues(
     """Build the unified issues list with optional filters.
 
     Filter semantics:
-      * ``conformance`` — list like ``["A", "AA"]``. Empty/None = all.
-      * ``responsibility`` — list of owner labels. Empty/None = all.
-      * ``abilities`` — list of ability labels. An issue passes if it
+      * ``conformance``, list like ``["A", "AA"]``. Empty/None = all.
+      * ``responsibility``, list of owner labels. Empty/None = all.
+      * ``abilities``, list of ability labels. An issue passes if it
         affects ANY of the requested abilities (OR semantics, matching
         the operator intent of "show me everything affecting Vision").
-      * ``status`` — single status string; an issue is included if at
+      * ``status``, single status string; an issue is included if at
         least one of its findings is in that status. Empty/None = all.
-      * ``search`` — case-insensitive substring match against title or
+      * ``search``, case-insensitive substring match against title or
         WCAG SC.
 
     Sort options:
-      * ``priority_desc`` (default) — highest impact x spread first
+      * ``priority_desc`` (default), highest impact x spread first
       * ``priority_asc``
-      * ``conformance`` — A first, then AA, then AAA, then BP
+      * ``conformance``, A first, then AA, then AAA, then BP
       * ``occurrences_desc`` / ``pages_desc``
 
     Filters applied AFTER the query (the underlying grouping queries
@@ -306,18 +314,18 @@ def get_issue_detail(
     """Load the single-issue detail view for ``issue_key``.
 
     ``issue_key`` shape:
-      * ``axe:<rule_id>``  — e.g. ``axe:color-contrast``
-      * ``alfa:<rule_id>:<outcome>`` — explicit ``failed`` / ``cant_tell`` subgroup
-      * ``image:<classification>_<adequacy>`` — e.g. ``image:essential_missing``
+      * ``axe:<rule_id>`` , e.g. ``axe:color-contrast``
+      * ``alfa:<rule_id>:<outcome>``, explicit ``failed`` / ``cant_tell`` subgroup
+      * ``image:<classification>_<adequacy>``, e.g. ``image:essential_missing``
 
     Returns ``None`` if no matching IssueRow exists for this scan
     (e.g. stale URL after a rescan). Callers should 404 in that case.
 
     ``sort`` controls the pages-with-issue table order:
-      * ``occurrences_desc`` (default) — biggest contributors first
+      * ``occurrences_desc`` (default), biggest contributors first
       * ``occurrences_asc``
-      * ``url``                       — alphabetical by URL
-      * ``status``                    — pages with un-triaged findings first
+      * ``url``                      , alphabetical by URL
+      * ``status``                   , pages with un-triaged findings first
     """
     rows = list_issues(conn, scan_id)
     row = next((r for r in rows if r.issue_key == issue_key), None)
@@ -347,7 +355,7 @@ def get_issue_detail(
     meta = _rule_meta_for(row, rules)
 
     # Help URL preference: YAML card → the row itself (the list builder
-    # already resolved the per-finding URL — dequeuniversity for axe,
+    # already resolved the per-finding URL, dequeuniversity for axe,
     # the WCAG Understanding pages for the dynamic probes) → for axe,
     # one last look at the grouped data.
     help_url: str | None = meta.get("help_url") or row.help_url
@@ -388,7 +396,7 @@ def get_issue_detail(
 
 def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
     """Pick the right YAML block for this issue's pipeline + key."""
-    # The yaml-loaded dicts are typed as `Any` at this depth — coerce
+    # The yaml-loaded dicts are typed as `Any` at this depth, coerce
     # via `dict(...)` so mypy sees a concrete dict[str, Any] return.
     if row.pipeline == "axe":
         rule_id = row.issue_key.removeprefix("axe:")
@@ -402,7 +410,7 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         return dict(meta) if isinstance(meta, dict) else {}
     if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
-        # several rule_ids — e.g. all three keyboard-trap shapes).
+        # several rule_ids, e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
         # SCs live), then axe_rules for any author who keyed there.
         sc = row.wcag_sc or ""
@@ -457,7 +465,7 @@ def _pages_for_issue(
         # ("color-contrast") and the dynamic probes
         # ("keyboard-trap-stuck", "responsive-reflow-overflow"),
         # ``semantic:<sc>`` for semantic. Our UI issue_key prefixes
-        # axe/keyboard/responsive with "<pipeline>:" — strip that to
+        # axe/keyboard/responsive with "<pipeline>:", strip that to
         # recover the DB value; semantic's issue_key already matches
         # the DB column exactly.
         if row.pipeline == "semantic":
@@ -509,7 +517,7 @@ def _pages_for_issue(
         # `page_image` row pointing at an image that has a finding
         # matching the (classification, adequacy) we're after. The
         # `IssueRow.finding_ids` we already collected does the matching
-        # for us — query against those ids directly.
+        # for us, query against those ids directly.
         if not row.finding_ids:
             return []
         placeholders = ",".join("?" for _ in row.finding_ids)
@@ -527,7 +535,7 @@ def _pages_for_issue(
              WHERE f.id IN ({placeholders})
                AND p.scan_id = ?
              GROUP BY p.id, p.url_normalized, p.title
-            """,  # noqa: S608 — placeholders are int-only
+            """,  # noqa: S608, placeholders are int-only
             (*row.finding_ids, scan_id),
         ).fetchall()
 
@@ -583,7 +591,7 @@ def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:
 
 
 def conformance_breakdown(rows: list[IssueRow]) -> dict[str, int]:
-    """Counts by conformance label — for the page-header stat tiles."""
+    """Counts by conformance label, for the page-header stat tiles."""
     out = {"A": 0, "AA": 0, "AAA": 0, "BP": 0}
     for r in rows:
         out[r.conformance] = out.get(r.conformance, 0) + 1
@@ -591,7 +599,7 @@ def conformance_breakdown(rows: list[IssueRow]) -> dict[str, int]:
 
 
 def responsibility_breakdown(rows: list[IssueRow]) -> dict[str, int]:
-    """Counts by owner — used to render filter chips with totals."""
+    """Counts by owner, used to render filter chips with totals."""
     out: dict[str, int] = {}
     for r in rows:
         out[r.responsibility] = out.get(r.responsibility, 0) + 1
@@ -731,7 +739,7 @@ def _axe_issue_rows(
         elif pipeline == "keyboard":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_keyboard_observation:
-                default_title = "Legacy keyboard observation — not a confirmed trap"
+                default_title = "Legacy keyboard observation, not a confirmed trap"
                 review_lane = "informational"
                 evidence_confidence = "low"
                 evidence_summary = (
@@ -773,7 +781,7 @@ def _axe_issue_rows(
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_visual_motion_observation:
-                default_title = "Legacy autoplay markup observation — playback not verified"
+                default_title = "Legacy autoplay markup observation, playback not verified"
                 review_lane = "informational"
                 evidence_confidence = "low"
                 evidence_summary = (
@@ -820,7 +828,7 @@ def _axe_issue_rows(
             diagnostic_text = "; ".join(diagnostics)
             if outcome_group == "cant_tell":
                 default_title = (
-                    f"{criterion_name or 'Alfa ACT result'} — expert decision needed "
+                    f"{criterion_name or 'Alfa ACT result'}, expert decision needed "
                     f"(Alfa {raw_rule_id})"
                 )
                 evidence_summary = (
@@ -830,7 +838,7 @@ def _axe_issue_rows(
             else:
                 diagnostic_title = diagnostics[0] if diagnostics else "rule requirements failed"
                 default_title = (
-                    f"{criterion_name or 'Alfa ACT rule'} — {diagnostic_title} (Alfa {raw_rule_id})"
+                    f"{criterion_name or 'Alfa ACT rule'}, {diagnostic_title} (Alfa {raw_rule_id})"
                 )
                 review_lane = "likely_barrier"
                 evidence_confidence = "high"
@@ -911,7 +919,7 @@ def _axe_issue_rows(
                 impact=impact,
                 status_summary=dict(g.get("status_breakdown") or {}),
                 # Deep-link to the dedicated Issue Detail view (the
-                # Siteimprove "page 2" shape — stat tiles, description,
+                # Siteimprove "page 2" shape, stat tiles, description,
                 # pages-with-issue table). The older grouped views
                 # (/a11y/by-rule, /findings/grouped) remain reachable
                 # for operators who want to scroll multiple issues at
@@ -1053,6 +1061,16 @@ def _a11y_location_samples(
                 context=context or None,
                 evidence_url=f"/scans/{scan_id}/pages/{page_id}#finding-{finding['id']}",
                 revealed_by=(str(finding["revealed_by"]) if finding.get("revealed_by") else None),
+                screenshot_hash=(
+                    str(finding["screenshot_hash"])
+                    if finding.get("screenshot_hash")
+                    else None
+                ),
+                html_snippet=(
+                    " ".join(str(finding["html_snippet"]).split())[:2000]
+                    if finding.get("html_snippet")
+                    else None
+                ),
             )
         )
         if len(samples) >= limit:
@@ -1140,7 +1158,7 @@ def _humanize_image_title(classification: str, adequacy: str) -> str:
         "partial": "partial alt",
         "adequate": "adequate alt",
     }.get(adequacy, adequacy)
-    return f"{cls_human} — {adequacy_human}"
+    return f"{cls_human}, {adequacy_human}"
 
 
 def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:
@@ -1162,7 +1180,7 @@ def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:
 def _load_rules() -> dict[str, Any]:
     """Load audit_report.yaml. Returns ``{}`` on parse error.
 
-    The Issues view degrades cleanly without metadata — every row
+    The Issues view degrades cleanly without metadata, every row
     still gets a sensible default title and 'dev' as the owner.
     """
     try:
@@ -1189,6 +1207,6 @@ __all__ = [
 
 
 # Field is unused by callers but referenced internally to ensure the
-# dataclass stays "frozen" — silences a linter complaint about an
+# dataclass stays "frozen", silences a linter complaint about an
 # unused `field` import on platforms where annotations strip it.
 _ = field

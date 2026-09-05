@@ -362,7 +362,7 @@ def format_report(corpus: BenchmarkCorpus, report: BenchmarkReport) -> str:
         lines.append("FAIL")
         lines.extend(f"- {failure}" for failure in failures)
     else:
-        lines.append("PASS — all labeled-corpus quality gates met.")
+        lines.append("PASS, all labeled-corpus quality gates met.")
     return "\n".join(lines)
 
 

@@ -11,7 +11,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
-# Rule ids — grep-able + prefixed so issues.py routes the pipeline the same
+# Rule ids, grep-able + prefixed so issues.py routes the pipeline the same
 # way it does for keyboard-trap-* / responsive-*.
 RULE_FOCUS_OBSCURED = "focus-not-obscured"  # SC 2.4.11
 RULE_POSITIVE_TABINDEX = "focus-order-positive-tabindex"  # SC 2.4.3 (WCAG F44)
@@ -46,7 +46,7 @@ class FocusFinding:
 
     @property
     def target_hash(self) -> str:
-        """Dedupe key — stable across rescans of the same page+element."""
+        """Dedupe key, stable across rescans of the same page+element."""
         h = hashlib.sha256()
         h.update(self.rule_id.encode("utf-8", errors="replace"))
         h.update(b"\x00")
@@ -56,7 +56,7 @@ class FocusFinding:
         return h.hexdigest()
 
     def to_repo_kwargs(self) -> dict[str, Any]:
-        """Kwargs for ``repo.upsert_focus_finding`` — same row format as the
+        """Kwargs for ``repo.upsert_focus_finding``, same row format as the
         axe / semantic / keyboard / responsive pipelines."""
         return {
             "rule_id": self.rule_id,

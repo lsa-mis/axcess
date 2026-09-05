@@ -866,5 +866,5 @@ function NumberField({
 }
 
 // Exported for lightweight unit tests without mounting React. It is not a
-// security boundary — the server repeats and extends these checks.
+// security boundary, the server repeats and extends these checks.
 export { exactOrigins, protectedPayload };

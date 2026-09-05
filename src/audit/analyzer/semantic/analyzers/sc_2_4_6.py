@@ -1,4 +1,4 @@
-"""SC 2.4.6 — Headings and Labels (descriptiveness) analyzer.
+"""SC 2.4.6, Headings and Labels (descriptiveness) analyzer.
 
 Scope: HEADINGS. Judges whether each heading describes the content it
 introduces (the core 2.4.6 question that no rule engine can answer —
@@ -154,7 +154,7 @@ def _format_headings(headings: list[HeadingRecord]) -> str:
         if h.following_text:
             lines.append(f"  introduces_content: {h.following_text!r}")
         else:
-            lines.append("  introduces_content: (none captured — do not flag)")
+            lines.append("  introduces_content: (none captured, do not flag)")
     return "\n".join(lines)
 
 

@@ -8,7 +8,7 @@ static and JS fetches uniformly.
 When constructed with an :class:`audit.analyzer.axe.AxeAnalyzer`, each
 fetch *also* runs a full WCAG axe-core pass against the rendered DOM and
 attaches the violations to :attr:`FetchResult.axe_violations`. This is
-the integration point for the broader WCAG 2.x AA scan — axe needs a
+the integration point for the broader WCAG 2.x AA scan, axe needs a
 fully-loaded, fully-rendered DOM, and that's exactly what we have here
 between ``page.goto`` and ``ctx.close``.
 """
@@ -113,7 +113,7 @@ class JsFetcher:
     Pass ``axe_analyzer`` to run a WCAG axe-core scan on every fetched
     page; the violations show up on the returned :class:`FetchResult`'s
     ``axe_violations`` attribute. Pass ``None`` (the default) to skip
-    the axe pass — crawl is materially faster (~50-150 ms per page saved)
+    the axe pass, crawl is materially faster (~50-150 ms per page saved)
     so we make it explicit, not implicit.
     """
 
@@ -151,21 +151,21 @@ class JsFetcher:
         # so axe must come first.
         self._keyboard_probe = keyboard_probe
         # Responsive/zoom probe. Runs LAST of all: it resizes the
-        # viewport and injects CSS — the most page-mutating step —
+        # viewport and injects CSS, the most page-mutating step —
         # and restores the viewport when done.
         self._responsive_probe = responsive_probe
         # SC 2.4.11 focus probe. Runs before the responsive probe (it reads
         # geometry at the normal viewport) but after axe/keyboard. It only
-        # focuses elements + reads layout — no lasting DOM mutation.
+        # focuses elements + reads layout, no lasting DOM mutation.
         self._focus_probe = focus_probe
-        # SC 1.3.2 visual probe. Screenshots the page — must run before the
+        # SC 1.3.2 visual probe. Screenshots the page, must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
         # Interaction probe. Runs after every read-only pass and after the
         # probes that only move focus, but BEFORE the responsive probe:
         # it clicks things, so the DOM it leaves behind is not the DOM the
         # page loaded with, and a viewport-resize check must not inherit
-        # an opened menu. Off unless explicitly attached — it is the most
+        # an opened menu. Off unless explicitly attached, it is the most
         # expensive pass here (one axe run per revealed state).
         self._interaction_probe = interaction_probe
         # When set, capture a circled screenshot of each live-page
@@ -308,7 +308,7 @@ class JsFetcher:
             ):
                 axe_violations = await self._axe_analyzer.run(page, level=self._axe_level)
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
-            # presses keys and alters focus — axe needs a quiet DOM.
+            # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe
             # itself never raises (it catches internally).
             keyboard_traps: list[KeyboardTrap] = []
@@ -318,7 +318,7 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 keyboard_traps = await self._keyboard_probe.run(page)
-            # Responsive probe LAST — it resizes the viewport and
+            # Responsive probe LAST, it resizes the viewport and
             # injects CSS, so every read-only/quiet-DOM consumer must
             # already be done. Probe never raises; restores viewport.
             # Focus probe runs before the viewport-mutating responsive probe.
@@ -330,7 +330,7 @@ class JsFetcher:
             ):
                 focus_findings = await self._focus_probe.run(page)
 
-            # Visual (VLM) probe — screenshots, so also before the responsive
+            # Visual (VLM) probe, screenshots, so also before the responsive
             # probe mutates the viewport.
             visual_findings: list[VisualFinding] = []
             if (
@@ -340,7 +340,7 @@ class JsFetcher:
             ):
                 visual_findings = await self._visual_probe.run(page)
 
-            # Interaction probe — clicks controls and re-runs axe on each
+            # Interaction probe, clicks controls and re-runs axe on each
             # state a click reveals. Given the load-state violations as a
             # baseline so anything already reported is never reported
             # again, however many revealed states it survives into.
@@ -365,7 +365,7 @@ class JsFetcher:
             ):
                 responsive_findings = await self._responsive_probe.run(page)
 
-            # Per-finding element screenshots — captured LAST, after every
+            # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes
             # (the page is still live). One bad selector or a screenshot
             # failure must never break the crawl, so the whole loop is
@@ -461,7 +461,7 @@ class JsFetcher:
         Returns contextual PNG bytes with a circle centered on the detected
         location, or ``None`` if the element is
         missing, off-screen, too small, or anything goes wrong. The whole
-        body is defensive — an invalid CSS selector, a detached node, or a
+        body is defensive, an invalid CSS selector, a detached node, or a
         screenshot timeout returns ``None`` rather than raising, so one bad
         finding never breaks the page's capture pass.
         """

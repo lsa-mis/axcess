@@ -1,4 +1,4 @@
-"""SC 2.4.4 — Link Purpose (In Context) analyzer.
+"""SC 2.4.4, Link Purpose (In Context) analyzer.
 
 The Phase 9.1 pilot. Per the plan: extract every navigable link plus
 its 5-level ancestor context, send a focused prompt to a local Ollama
@@ -37,7 +37,7 @@ PROMPT_NAME = "sc_2_4_4_link_purpose_in_context.txt"
 
 # Hard cap so a 1000-link page can't blow the prompt budget. Picked at
 # 50 because that's where qwen2.5:7b's accuracy on similar bounded
-# tasks plateaus in informal testing — bigger batches dilute attention.
+# tasks plateaus in informal testing, bigger batches dilute attention.
 MAX_LINKS_PER_CALL = 50
 
 
@@ -128,7 +128,7 @@ class LinkPurposeInContextAnalyzer:
           * Non-string field values where strings expected.
 
         For each defect we log + skip the offending row rather than
-        raising — the goal is to surface as many real findings as we
+        raising, the goal is to surface as many real findings as we
         can without one bad row killing the page's output.
         """
         if not isinstance(raw, dict):
@@ -164,7 +164,7 @@ class LinkPurposeInContextAnalyzer:
                 )
                 continue
             if idx in seen_indices:
-                # Same link flagged twice — keep the first, drop dupes
+                # Same link flagged twice, keep the first, drop dupes
                 # so the bulk-status UI doesn't show duplicates.
                 continue
             seen_indices.add(idx)
@@ -201,7 +201,7 @@ class LinkPurposeInContextAnalyzer:
                 snippet=link.snippet,
             )
             # Map model confidence to a coarse impact. A low-confidence
-            # finding is "moderate" rather than "serious" — keeps the
+            # finding is "moderate" rather than "serious", keeps the
             # priority scoring honest about probabilistic detection.
             impact = {"high": "serious", "medium": "moderate", "low": "minor"}.get(
                 confidence, "moderate"

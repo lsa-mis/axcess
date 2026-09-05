@@ -112,7 +112,7 @@ def synthesize_findings(
 def _images_with_text(conn: sqlite3.Connection, scan_id: int) -> list[sqlite3.Row]:
     """Images in this scan that are SVG-text or have an OCR text candidate.
 
-    Picks the most-recent analysis row per image — prefer a row that has a
+    Picks the most-recent analysis row per image, prefer a row that has a
     VLM classification over an OCR-only one.
     """
     rows = conn.execute(

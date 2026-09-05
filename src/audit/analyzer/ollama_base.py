@@ -1,10 +1,10 @@
-"""Shared Ollama HTTP plumbing — the bit both VLM and text analyzers need.
+"""Shared Ollama HTTP plumbing, the bit both VLM and text analyzers need.
 
 Two analyzers talk to the same local Ollama daemon:
 
-* :class:`~audit.analyzer.vlm.ollama.OllamaProvider` — the image-of-text
+* :class:`~audit.analyzer.vlm.ollama.OllamaProvider`, the image-of-text
   classifier (VLM, the 1.4.5 pipeline). Already in production.
-* :class:`~audit.analyzer.semantic.ollama_text.OllamaTextProvider` — the
+* :class:`~audit.analyzer.semantic.ollama_text.OllamaTextProvider`, the
   per-criterion text analyzer added in Phase 9. Generic
   ``generate(prompt) -> str``; the caller owns the prompt template.
 
@@ -93,7 +93,7 @@ class OllamaBase:
     async def healthy(self, model: str | None = None) -> bool:
         """Return True if the Ollama daemon is reachable and knows the model.
 
-        ``model`` overrides the instance default — useful when one
+        ``model`` overrides the instance default, useful when one
         provider switches between models per call (the semantic runner
         may use ``qwen2.5:7b-instruct`` for most criteria but swap to
         the 14B for SC 2.5.3).

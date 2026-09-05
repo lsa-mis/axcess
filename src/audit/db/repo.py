@@ -112,30 +112,45 @@ def upsert_page(
     render_mode: str,
     html_hash: str | None,
     final_url: str | None = None,
+    rendered_html: bytes | None = None,
 ) -> int:
     """Insert (or update) a page row. Returns its id.
 
     ``final_url`` is where the request actually landed, and is set only when
     a redirect moved it: ``url_normalized`` alone cannot distinguish a page
     that was scanned from one that merely redirected somewhere else.
+
+    ``rendered_html`` is the gzip-compressed rendered document captured during
+    the crawl (NULL when unavailable or too large). The inspector loads it
+    straight from storage instead of re-rendering the live page.
     """
     cur = conn.execute(
         """
         INSERT INTO pages (
             scan_id, url_normalized, status_code, title, render_mode,
-            html_hash, final_url
+            html_hash, final_url, rendered_html
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(scan_id, url_normalized) DO UPDATE SET
             status_code = excluded.status_code,
             title = excluded.title,
             render_mode = excluded.render_mode,
             html_hash = excluded.html_hash,
             final_url = excluded.final_url,
+            rendered_html = excluded.rendered_html,
             fetched_at = CURRENT_TIMESTAMP
         RETURNING id
         """,
-        (scan_id, url_normalized, status_code, title, render_mode, html_hash, final_url),
+        (
+            scan_id,
+            url_normalized,
+            status_code,
+            title,
+            render_mode,
+            html_hash,
+            final_url,
+            rendered_html,
+        ),
     )
     row = cur.fetchone()
     return int(row["id"])
@@ -362,7 +377,7 @@ def bulk_set_findings_status(
     can't write garbage into the DB.
 
     Each affected row also gets a ``finding_history`` row written with
-    ``change_type='status_change'`` and the recorded actor — that's the
+    ``change_type='status_change'`` and the recorded actor, that's the
     durable audit trail. We capture the *previous* status per row so a
     later diff or rollback can reason about transitions correctly even
     when many rows had different starting states.
@@ -375,7 +390,7 @@ def bulk_set_findings_status(
     # (the bulk UPDATE later loses the prior value).
     placeholders = ",".join("?" for _ in finding_ids)
     select_sql = (
-        "SELECT id, scan_id, status FROM findings "  # noqa: S608 — placeholders only
+        "SELECT id, scan_id, status FROM findings "  # noqa: S608, placeholders only
         f"WHERE id IN ({placeholders}) AND status <> ?"
     )
     with _status_transaction(conn):
@@ -408,7 +423,7 @@ def bulk_set_findings_status(
             UPDATE findings
                SET status = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id IN ({changed_placeholders})
-            """,  # noqa: S608 — fixed-shape IN list
+            """,  # noqa: S608, fixed-shape IN list
             (status, *changed_ids),
         )
         return int(cur.rowcount or 0)
@@ -434,7 +449,7 @@ def bulk_set_a11y_findings_status(
         return 0
     placeholders = ",".join("?" for _ in finding_ids)
     select_sql = (
-        "SELECT id, scan_id, status FROM page_a11y_findings "  # noqa: S608 — placeholders only
+        "SELECT id, scan_id, status FROM page_a11y_findings "  # noqa: S608, placeholders only
         f"WHERE id IN ({placeholders}) AND status <> ?"
     )
     with _status_transaction(conn):
@@ -467,7 +482,7 @@ def bulk_set_a11y_findings_status(
             UPDATE page_a11y_findings
                SET status = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id IN ({changed_placeholders})
-            """,  # noqa: S608 — fixed-shape IN list
+            """,  # noqa: S608, fixed-shape IN list
             (status, *changed_ids),
         )
         return int(cur.rowcount or 0)
@@ -496,7 +511,7 @@ def upsert_axe_violation(
 
     Re-running a crawl against the same site updates rule metadata and
     snippet text (axe may have refined its wording between runs) but
-    preserves the human-set ``status`` workflow column — so a triager
+    preserves the human-set ``status`` workflow column, so a triager
     who marked something ``accepted_risk`` doesn't get bumped back to
     ``new`` on the next scan.
     """
@@ -573,8 +588,8 @@ def upsert_keyboard_finding(
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
-    Same shape as :func:`upsert_axe_violation` — the row format is
-    identical — but the natural key carries the ``pipeline='keyboard'``
+    Same shape as :func:`upsert_axe_violation`, the row format is
+    identical, but the natural key carries the ``pipeline='keyboard'``
     discriminator so the UI's Issues view can tag the row's source.
     Mirrors :func:`upsert_semantic_finding`'s design pattern; we use a
     dedicated function (rather than overloading the axe helper) so
@@ -654,7 +669,7 @@ def upsert_responsive_finding(
 ) -> int:
     """Idempotent upsert for a responsive/zoom probe finding.
 
-    The row format is identical to the keyboard probe's — both are
+    The row format is identical to the keyboard probe's, both are
     dynamic Playwright probes writing into ``page_a11y_findings`` —
     so this delegates to :func:`upsert_keyboard_finding`, which is
     pipeline-parameterized. A dedicated entry point keeps the
@@ -704,7 +719,7 @@ def upsert_focus_finding(
 ) -> int:
     """Idempotent upsert for a live-page focus probe finding (SC 2.4.11).
 
-    Same row format as the keyboard/responsive probes — delegates to the
+    Same row format as the keyboard/responsive probes, delegates to the
     pipeline-parameterized :func:`upsert_keyboard_finding`.
     """
     return upsert_keyboard_finding(
@@ -750,7 +765,7 @@ def upsert_visual_finding(
 ) -> int:
     """Idempotent upsert for a visual (VLM) probe finding (SC 1.3.2).
 
-    Same row format as the other dynamic-probe pipelines — delegates to the
+    Same row format as the other dynamic-probe pipelines, delegates to the
     pipeline-parameterized :func:`upsert_keyboard_finding`.
     """
     return upsert_keyboard_finding(
@@ -793,9 +808,9 @@ def upsert_semantic_finding(
     """Idempotent upsert for a per-criterion semantic finding.
 
     Writes to ``page_a11y_findings`` with ``pipeline='semantic'``.
-    Mirrors :func:`upsert_axe_violation` deliberately — same table,
+    Mirrors :func:`upsert_axe_violation` deliberately, same table,
     same dedupe shape, same preservation-of-human-state-on-conflict
-    semantics — but the natural key here is
+    semantics, but the natural key here is
     ``(page_id, criterion_sc, target_hash)`` instead of
     ``(page_id, rule_id, target_hash)`` because semantic analyzers
     don't have an axe-style ``rule_id``; they have a WCAG SC and a

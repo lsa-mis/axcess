@@ -19,14 +19,14 @@ import {
 import type { ProtectedScanSummary, ScanSummary } from "../api/types";
 
 /**
- * Scans list — the SPA's home page. Each row tells the operator three
+ * Scans list, the SPA's home page. Each row tells the operator three
  * things at a glance: where the crawl is pointed, what state it's in
  * (color-coded badge), and how recently it ran. Per-row actions live at
  * the right edge so the row body stays scannable.
  *
  * Running scans get a tinted background so they're impossible to miss
  * (and a pulsing badge from ScanStatusBadge as the secondary signal).
- * The Delete affordance is disabled for running scans — the backend
+ * The Delete affordance is disabled for running scans, the backend
  * would 409 anyway, but disabling client-side avoids the round-trip.
  */
 const REPORTS_PER_PAGE = 10;
@@ -70,7 +70,7 @@ export default function ScansRoute() {
 
   return (
     <>
-      {/* No header "New scan" action — the topbar carries the single
+      {/* No header "New scan" action, the topbar carries the single
           global CTA. The empty state below keeps its contextual one. */}
       <PageHeader
         title="Reports"
@@ -279,7 +279,7 @@ function ProtectedReportRow({ report }: { report: ProtectedScanSummary }) {
 
 /**
  * One scans-table row. Pulled out so the delete mutation's loading state
- * is local to the row that owns it — clicking delete on row 7 doesn't
+ * is local to the row that owns it, clicking delete on row 7 doesn't
  * grey out the buttons in row 8.
  */
 function ScanRow({ scan }: { scan: ScanSummary }) {
@@ -325,7 +325,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
       </td>
       <td
         className="whitespace-nowrap px-4 py-2 text-xs text-fg-subtle"
-        // Full ISO on hover gives precision when "2h ago" isn't enough —
+        // Full ISO on hover gives precision when "2h ago" isn't enough,
         // e.g. comparing two scans that both say "yesterday".
         title={scan.started_at ?? undefined}
       >
@@ -334,7 +334,7 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
       <td className="whitespace-nowrap px-4 py-2">
         {/* Per-row actions kept at default `md` size (44px tall). The
             earlier compressed `px-2 py-1 text-xs` style was the exact
-            SC 2.5.5 fail flagged by the discovery audit — destructive
+            SC 2.5.5 fail flagged by the discovery audit, destructive
             controls in particular must be a real target. The action
             cluster gets `gap-2` so the two controls don't visually
             merge into one wide button. */}
@@ -357,12 +357,12 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
 
 /**
  * Delete button with a window.confirm gate. We use the native confirm()
- * intentionally — it's keyboard-accessible by default, screen-reader
+ * intentionally, it's keyboard-accessible by default, screen-reader
  * friendly, and adds zero UI surface. The cost is a slightly utilitarian
  * dialog, which is appropriate for an internal a11y tool and avoids the
  * trap of building a custom modal that itself fails axe.
  *
- * Running scans show a disabled button with a tooltip explaining why —
+ * Running scans show a disabled button with a tooltip explaining why,
  * the user shouldn't have to discover the constraint by clicking.
  */
 function DeleteScanButton({ scan }: { scan: ScanSummary }) {
@@ -388,7 +388,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         disabled
         title="Cancel the running scan before deleting it."
         className="text-fg-subtle"
-        aria-label={`Delete scan ${scan.id} (disabled — scan is running)`}
+        aria-label={`Delete scan ${scan.id} (disabled, scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
         Delete
@@ -421,7 +421,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       </Button>
       {error && (
         // role="alert" + text-xs (12px). Bumped from text-2xs (10px)
-        // because errors are critical to read on first glance — AAA
+        // because errors are critical to read on first glance, AAA
         // reading-comfort doesn't mandate a font size, but tiny error
         // text fights the user.
         <span className="ml-2 text-xs text-sev-critical" role="alert">

@@ -17,8 +17,8 @@ import {
  * The workbench landing screen, written for the person who has to make the
  * decisions rather than for someone being sold the tool.
  *
- * It used to open with four counts about the software — completed scans, pages
- * crawled, "image evidence · raw image records", most recent scan id — under a
+ * It used to open with four counts about the software, completed scans, pages
+ * crawled, "image evidence · raw image records", most recent scan id, under a
  * dark marketing panel and a permanent three-bullet "How Axcess works"
  * explainer. None of that answers the only question an accessibility expert
  * arrives with: *what is waiting for my judgement?* So the page leads with the
@@ -37,7 +37,7 @@ export default function DashboardRoute() {
   const latest = completed[0];
 
   // Lane counts are per report, so this is deliberately the newest report only
-  // — and the copy says so. Summing them across every scan would invent a
+  //, and the copy says so. Summing them across every scan would invent a
   // site-wide backlog the data does not support.
   const { data: latestIssues } = useQuery({
     queryKey: ["issues", latest?.id, "dashboard"],
@@ -78,7 +78,7 @@ export default function DashboardRoute() {
               is crawling {siteLabel(running.seed_url)}
             </span>
           </div>
-          {/* Plain inline Link is correct here — this is a body text link, not
+          {/* Plain inline Link is correct here, this is a body text link, not
               a button-shaped affordance. The variant API on LinkButton is for
               chrome elements (page-header CTAs, table action cells, etc). */}
           <Link
@@ -132,13 +132,13 @@ export default function DashboardRoute() {
         // evidence · raw image records" measured the crawler, not the audit.
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
-            label="Likely barriers"
-            value={latestIssues ? likelyBarriers : "—"}
+            label="Barriers"
+            value={latestIssues ? likelyBarriers : "n/a"}
             hint="Newest report · act without confirmation"
           />
           <StatCard
             label="Review leads"
-            value={latestIssues ? reviewLeads : "—"}
+            value={latestIssues ? reviewLeads : "n/a"}
             hint="Newest report · expert decision required"
           />
           <StatCard
@@ -146,13 +146,13 @@ export default function DashboardRoute() {
             value={
               latestIssues
                 ? latestIssues.occurrence_counts.all_evidence.toLocaleString()
-                : "—"
+                : "n/a"
             }
             hint="Newest report · not a conformance score"
           />
           <StatCard
             label="Completed reports"
-            value={isLoading ? "—" : completed.length}
+            value={isLoading ? "n/a" : completed.length}
             hint="All time"
           />
         </div>
@@ -211,14 +211,14 @@ export default function DashboardRoute() {
         </Card>
       )}
 
-      {/* The scope caveat stays — it is what keeps a report from being read as
-          a certificate — but as one line of standing context rather than the
+      {/* The scope caveat stays, it is what keeps a report from being read as
+          a certificate, but as one line of standing context rather than the
           three-bullet product tour that used to hold a third of this page. */}
       {!error && scans.length > 0 && (
         <p className="mt-4 max-w-3xl text-xs leading-relaxed text-fg-subtle">
           Axcess reports what its checks observed and where. Automated results
           are evidence for expert review, never a conformance decision, and a
-          method that did not run is not a passing result — each report&rsquo;s
+          method that did not run is not a passing result, each report&rsquo;s
           overview lists exactly what was and was not checked.
         </p>
       )}

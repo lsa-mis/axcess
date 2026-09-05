@@ -7,14 +7,14 @@ duplicating the SQL between them would invite drift.
 
 Three aggregation axes the UI cares about:
 
-* **By WCAG SC** — "you're failing SC 1.4.3 on 47 pages." This is what
+* **By WCAG SC**, "you're failing SC 1.4.3 on 47 pages." This is what
   the accessibility lead reports to stakeholders.
-* **By rule** — "color-contrast accounts for 47 of those 50 failures
+* **By rule**, "color-contrast accounts for 47 of those 50 failures
   on SC 1.4.3." This is what the developer fixing the bug needs.
-* **By impact** — axe's own severity scale, useful for ordering effort.
+* **By impact**, axe's own severity scale, useful for ordering effort.
 
 The functions here all take a connection and a scan id, return plain
-dicts, and never raise on an empty scan — the empty-state case is part
+dicts, and never raise on an empty scan, the empty-state case is part
 of the contract.
 """
 
@@ -25,7 +25,7 @@ from typing import Any
 
 from audit.analyzer.alfa_evidence import normalize_finding
 
-# Impact ordering, for sorting "worst first" — axe doesn't always set
+# Impact ordering, for sorting "worst first", axe doesn't always set
 # impact (best-practice rules and a few WCAG rules leave it None), so
 # None ranks last.
 _IMPACT_RANK = {"critical": 0, "serious": 1, "moderate": 2, "minor": 3, None: 4}
@@ -66,7 +66,7 @@ def by_level(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     """Violation counts grouped by WCAG conformance level.
 
     Best-practice findings (axe-coined rules with no SC mapping) land
-    under the ``"best_practice"`` key — they're worth surfacing but
+    under the ``"best_practice"`` key, they're worth surfacing but
     they're not a WCAG fail in the strict sense.
     """
     out = {"A": 0, "AA": 0, "AAA": 0, "best_practice": 0}
@@ -161,7 +161,7 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
             },
         )
         entry["violation_count"] += int(r["violation_count"])
-        # We can't sum page_count across rules — same page may fail two
+        # We can't sum page_count across rules, same page may fail two
         # rules under the same SC. Re-query for the SC's unique page count.
         impact = r["impact"]
         rank = _IMPACT_RANK.get(impact, _IMPACT_RANK[None])
@@ -239,7 +239,7 @@ def findings_for_sc(
     Used by the detail view when the operator clicks into an SC heading.
     Joined to ``pages`` so each row carries the page URL.
 
-    ``status`` filters by triage state — pass e.g. ``"new"`` to hide
+    ``status`` filters by triage state, pass e.g. ``"new"`` to hide
     already-handled findings. ``None`` (the default) returns every
     status. An unrecognized status string is ignored rather than
     raising, so a stale URL with a bad ``status`` param still loads.
@@ -259,7 +259,7 @@ def findings_for_sc(
     where = " AND ".join(clauses)
     params.extend([limit, offset])
     # The f-string only interpolates `where`, which is itself built from
-    # a fixed set of string literals defined above — never from caller
+    # a fixed set of string literals defined above, never from caller
     # input. Caller-supplied values (`scan_id`, `wcag_sc`, `status`,
     # `limit`, `offset`) all flow through parameter binding.
     sql = f"""
@@ -292,7 +292,7 @@ def grouped_by_rule(
     *,
     status: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Per-rule rollup — the actionable WCAG cut.
+    """Per-rule rollup, the actionable WCAG cut.
 
     The :func:`by_sc` view groups by WCAG success criterion, which is
     the *reporting* axis ("we're failing 1.4.3 on 47 pages"). This view
@@ -312,7 +312,7 @@ def grouped_by_rule(
       ``wcag_scs`` (every SC the rule maps to), ``wcag_level``
     * ``violation_count``, ``page_count``
     * ``status_breakdown`` (one bucket per triage status)
-    * ``findings`` — every individual violation row, page-joined,
+    * ``findings``, every individual violation row, page-joined,
       ready for bulk-status
 
     Ordered worst-impact-first, then largest page_count (most spread →
@@ -329,14 +329,14 @@ def grouped_by_rule(
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
                a.impact, a.help, a.help_url, a.target_selector,
                a.failure_summary, a.html_snippet, a.engine_evidence_json, a.status,
-               a.revealed_by,
+               a.revealed_by, a.screenshot_hash,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
           JOIN pages p ON p.id = a.page_id
          WHERE a.scan_id = ?{extra_clause}
          ORDER BY a.pipeline, a.rule_id, p.url_normalized
-        """,  # noqa: S608 — extra_clause is one of two fixed strings
+        """,  # noqa: S608, extra_clause is one of two fixed strings
         tuple(params),
     ).fetchall()
 
@@ -394,6 +394,12 @@ def grouped_by_rule(
                     "html_snippet": r["html_snippet"],
                     "engine_evidence_json": r["engine_evidence_json"],
                     "status": str(r["status"]),
+                    # Blob hash of the scan-time screenshot with the detected
+                    # location circled, the inline evidence the Issues view
+                    # expands, so the reviewer never has to leave the list.
+                    "screenshot_hash": (
+                        str(r["screenshot_hash"]) if r["screenshot_hash"] else None
+                    ),
                 }
             )
         )
@@ -415,7 +421,7 @@ def grouped_by_rule(
 
 
 def by_status(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
-    """Violation counts grouped by triage status — for the filter bar."""
+    """Violation counts grouped by triage status, for the filter bar."""
     out: dict[str, int] = dict.fromkeys(_STATUSES, 0)
     rows = conn.execute(
         """

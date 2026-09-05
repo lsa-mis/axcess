@@ -3,8 +3,8 @@
  *
  * Two shapes reach the UI. Browser-based probes (axe, keyboard, focus,
  * responsive) store a CSS selector. Alfa stores a JSON descriptor of the node
- * it judged — most often a text node, e.g.
- * ``{"type":"text","data":"Free and open source"}`` — because ACT rules are
+ * it judged, most often a text node, e.g.
+ * ``{"type":"text","data":"Free and open source"}``, because ACT rules are
  * evaluated against a serialized page, not a live DOM.
  *
  * The JSON shape is unreadable in a UI and, worse, un-followable: a reader
@@ -13,7 +13,7 @@
  * (``#:~:text=…``), which Chrome, Edge and Safari resolve by scrolling the
  * live page to that exact text and highlighting it. That is the closest thing
  * to "point at it" available for findings that have no screenshot, which is
- * every Alfa finding — Alfa evaluates in its own browser subprocess, so the
+ * every Alfa finding, Alfa evaluates in its own browser subprocess, so the
  * crawler never has its element on screen to photograph.
  */
 export interface FindingLocation {
@@ -71,7 +71,7 @@ export function textFragmentUrl(pageUrl: string, text: string): string | null {
   if (normalized.length < 4) return null;
   try {
     const url = new URL(pageUrl);
-    // Strip any existing fragment — a directive must be the whole hash.
+    // Strip any existing fragment, a directive must be the whole hash.
     url.hash = "";
     return `${url.toString()}#:~:text=${encodeURIComponent(normalized)}`;
   } catch {

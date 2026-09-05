@@ -78,6 +78,7 @@ export default function ScanDetailRoute() {
         skip_focus: false,
         skip_visual: true,
         axe_level: "AA",
+        skip_rendered_storage: false,
       }),
     onSuccess: async ({ scan_id }) => {
       setLiveUpdates(true);
@@ -160,7 +161,7 @@ export default function ScanDetailRoute() {
     <>
       {/* A completed scan is a report, so it wears the report chrome: same
           title/meta/actions/tabs as Issues and Verify changes. A scan that
-          never produced one keeps the plainer page header — there are no
+          never produced one keeps the plainer page header, there are no
           other views of it to tab between. The "Compare" button is gone
           because "Verify changes" is now a tab a few pixels below it. */}
       {isComplete ? (
@@ -273,18 +274,18 @@ export default function ScanDetailRoute() {
               bottom under a button already in the header. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             <StatCard
-              label="Likely barriers"
-              value={issueSummary ? likelyBarrierGroups.toLocaleString() : "—"}
+              label="Barriers"
+              value={issueSummary ? likelyBarrierGroups.toLocaleString() : "n/a"}
               hint="High-confidence issue groups"
             />
             <StatCard
               label="Review leads"
-              value={issueSummary ? expertReviewGroups.toLocaleString() : "—"}
+              value={issueSummary ? expertReviewGroups.toLocaleString() : "n/a"}
               hint="Expert decision required"
             />
             <StatCard
               label="Occurrences"
-              value={issueSummary ? issueOccurrences.toLocaleString() : "—"}
+              value={issueSummary ? issueOccurrences.toLocaleString() : "n/a"}
               hint="Not a conformance score"
             />
             <StatCard
@@ -408,7 +409,7 @@ function ScanProgressPanel({
           </p>
           <p className="mt-1 text-xs text-fg-muted">
             The site can reveal more links during the crawl, so the ETA is a
-            range—not a fixed deadline.
+            range, not a fixed deadline.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -600,7 +601,7 @@ function ScanProgressPanel({
             Selected checks
           </h3>
           <p className="mt-1 text-xs text-fg-muted">
-            Each row explains the method and reports completed work—not merely
+            Each row explains the method and reports completed work, not merely
             configuration.
           </p>
           <MethodCoverageList
@@ -733,7 +734,7 @@ function BlockedScanNotice({
           <strong className="text-sev-critical">
             Site URL returned HTTP {blocked.status_code}
           </strong>
-          {blocked.title && <> — &ldquo;{blocked.title}&rdquo;</>}. The crawler
+          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. The crawler
           could not read past the entry page. Try a{" "}
           <Link to="/scans/new">new scan</Link>, or use an authorized
           sign-in scan when the site requires authentication.
@@ -744,7 +745,7 @@ function BlockedScanNotice({
   );
 }
 
-/** "4 Sep 2026, 15:16" — a scan's own finish time, in the reader's locale. */
+/** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
 function formatCompleted(iso: string): string {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return iso;

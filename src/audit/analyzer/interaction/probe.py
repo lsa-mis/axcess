@@ -16,7 +16,7 @@ afternoon.
 **Only new markup is reported.** The caller passes the load-state
 violations as ``baseline``; every hash seen is remembered as exploration
 proceeds. A violation on the site header is found once, at load, and never
-again — not once per click, and not once per revealed state. That filtering
+again, not once per click, and not once per revealed state. That filtering
 happens here rather than being left to the database's unique constraint so
 the crawl does not pay for hundreds of redundant upserts per page.
 """
@@ -197,7 +197,7 @@ _RESET_MARKS_JS = (
 #
 # Modality is read from the two declarations that define it: aria-modal, and
 # a native <dialog> opened with showModal(). A role="dialog" without either
-# is NOT modal — it sits in the page like any other panel and blocks nothing,
+# is NOT modal, it sits in the page like any other panel and blocks nothing,
 # so halting on one would throw away the rest of a page for no reason. (A
 # dialog that behaves modally without declaring it is its own defect, and one
 # this check will not see.) Identity is a JS expando rather than an
@@ -324,7 +324,7 @@ class _Budget:
     seen_hashes: set[str] = field(default_factory=set)
     # Clicks that actually changed the DOM. Each one is a state of the page
     # that a load-time pass cannot reach, whether or not it contained a
-    # defect — which makes it the honest measure of what interaction added
+    # defect, which makes it the honest measure of what interaction added
     # to a scan's coverage.
     states_found: int = 0
     clicks_succeeded: int = 0
@@ -458,7 +458,7 @@ class InteractionProbe:
 
         ``fresh_only`` is what makes depth mean nesting rather than breadth.
         A nested sweep runs with it set, so it considers only controls that
-        became operable as a result of the click that opened it — not the
+        became operable as a result of the click that opened it, not the
         whole document. Without it, the first control that changed anything
         pulled every other control on the page down into its subtree: an
         instrumented run of the stress fixture spent 11 of 12 clicks at
@@ -472,7 +472,7 @@ class InteractionProbe:
         # Exactly one pass per level. Mark-and-diff makes a second pass not
         # just redundant but wrong: every control operable at this level is
         # already in `controls`, and anything that becomes operable later did
-        # so because a click revealed it — which makes it the nested sweep's
+        # so because a click revealed it, which makes it the nested sweep's
         # business, one level down. Re-reading the document here would hand
         # those revealed controls back to *this* level, and that is precisely
         # how the depth limit came to mean nothing. A five-level chain was

@@ -1,28 +1,25 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams, Link, useNavigate } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ExternalLink, Info, Search } from "lucide-react";
+import { Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card } from "../components/ui";
 import ExportMenu from "../components/ExportMenu";
+import IssueEvidence from "../components/IssueEvidence";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { cn } from "../lib/cn";
-import type { ConformanceLabel, IssueLocation, IssueRow } from "../api/types";
+import type { ConformanceLabel, IssueRow } from "../api/types";
 
 /**
- * The primary report: an issue list beside the evidence for the selected one.
+ * The primary report: the issue list beside the selected issue's evidence.
  *
- * The four-column table this replaces put what, why, fix and where on screen
- * for every issue at once — six issues carrying roughly fifteen facts each, in
- * columns so wide they needed their own horizontal scrollbar. Reviewers work
- * one issue at a time, so the list stays permanently visible for scanning and
- * comparing while the pane beside it answers the four questions for whichever
- * issue is selected.
- *
- * **Below `lg` the two panes cannot coexist**, so the list becomes the whole
- * page and picking an issue navigates to ``/scans/:id/issues/:key`` — the
- * detail route that already exists. That is the same content at a URL of its
- * own, not a second implementation of it.
+ * On wide screens the full issue evidence, description, why it matters, the
+ * fix, verification, and every affected page with its occurrences and instance
+ * screenshots, sits in the right pane next to the list, so the reviewer can
+ * scan the list and read the selected issue in the same view. Below ``lg`` the
+ * two cannot coexist, so the list is the whole page and picking an issue
+ * navigates to ``/scans/:id/issues/:key`` (the same content at a URL of its
+ * own). The per-issue route still exists for deep links and bookmarks.
  */
 export default function IssuesRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -49,8 +46,6 @@ export default function IssuesRoute() {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
-    // Changing a filter can strip the selected issue out of the results;
-    // the selection effect below re-picks rather than leaving a stale pane.
     setParams(next, { replace: true });
   };
 
@@ -63,7 +58,7 @@ export default function IssuesRoute() {
   useEffect(() => {
     // Keep ?issue= honest without ever inventing it: the pane falls back to the
     // first row on its own, so an untouched /issues URL stays clean. Only a
-    // param that no longer names a visible row gets dropped — which is what
+    // param that no longer names a visible row gets dropped, which is what
     // happens when a filter removes the issue that was selected.
     if (!selectedKey || rows.length === 0) return;
     if (rows.some((row) => row.issue_key === selectedKey)) return;
@@ -128,7 +123,7 @@ export default function IssuesRoute() {
           <p className="mt-2 max-w-3xl pl-6 leading-relaxed">
             ACT means Accessibility Conformance Testing. Each standardized rule
             checks one specific accessibility condition and returns pass, fail,
-            or cannot tell. A failed rule is evidence about that condition—not
+            or cannot tell. A failed rule is evidence about that condition, not
             proof that the whole page or site fails WCAG. “Cannot tell” needs an
             expert decision.
           </p>
@@ -148,11 +143,17 @@ export default function IssuesRoute() {
           onParam={setParam}
           onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
         />
-        {/* The pane is the desktop half of the pattern. On small screens the
-            list rows are links to the detail route instead, so nothing here
-            needs a second, stacked rendering of the same evidence. */}
+        {/* The evidence pane is the desktop half of the pattern. On small
+            screens the list rows navigate to the detail route instead, so
+            nothing here needs a second, stacked rendering of the same data. */}
         <div className="hidden lg:block">
-          {selected ? <IssuePane row={selected} /> : null}
+          {selected ? (
+            <IssueEvidence
+              key={selected.issue_key}
+              scanId={scan.id}
+              issueKey={selected.issue_key}
+            />
+          ) : null}
         </div>
       </div>
     </>
@@ -239,23 +240,25 @@ function IssueListPane({
       ) : (
         <ul aria-label="Accessibility issue groups" className="divide-y divide-border">
           {([
-            ["likely_barrier", "Likely barriers"],
+            ["likely_barrier", "Barriers"],
             ["expert_review", "Needs manual review"],
             ["informational", "Informational"],
           ] as const).map(([lane, label]) => {
             const laneRows = rows.filter((row) => row.review_lane === lane);
             if (laneRows.length === 0) return null;
-            const hasBarriers = rows.some((row) => row.review_lane === "likely_barrier");
-            const isOnlyLane = laneRows.length === rows.length;
             return (
-              <li key={`${lane}:${hasBarriers}:${isOnlyLane}`}>
-                <details open={lane === "likely_barrier" || isOnlyLane}>
+              <li key={lane}>
+                <details open={true}>
                   <summary className="min-h-target cursor-pointer focus-visible:outline-none focus-visible:shadow-focus bg-surface-subtle px-3.5 py-3 text-sm font-semibold text-fg">
                     {label} <span className="font-normal tabular-nums">({laneRows.length})</span>
                   </summary>
                   <ul aria-label={`${label} issue groups`} className="divide-y divide-border">
                     {laneRows.map((row) => (
-                      <IssueListRow key={row.issue_key} row={row} selected={row.issue_key === selectedKey} />
+                      <IssueListRow
+                        key={row.issue_key}
+                        row={row}
+                        selected={row.issue_key === selectedKey}
+                      />
                     ))}
                   </ul>
                 </details>
@@ -268,18 +271,13 @@ function IssueListPane({
   );
 }
 
-function IssueListRow({
-  row,
-  selected,
-}: {
-  row: IssueRow;
-  selected: boolean;
-}) {
+function IssueListRow({ row, selected }: { row: IssueRow; selected: boolean }) {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const lane = laneLabel(row.review_lane);
 
   const select = () => {
+    // Selection lives in ?issue= so it is shareable and survives a refresh.
     const next = new URLSearchParams(params);
     next.set("issue", row.issue_key);
     setParams(next, { replace: true });
@@ -290,11 +288,11 @@ function IssueListRow({
       {/*
         One control, two behaviors by width. It is a real <a> so it can be
         opened in a new tab and read as a link, and at lg and up the click is
-        intercepted to select the pane instead of navigating — which is the
-        same destination's content without losing the list.
+        intercepted to select the issue in the pane instead of navigating,
+        which is the same destination's content without losing the list.
       */}
       <a
-        href={`${row.detail_url}`}
+        href={row.detail_url}
         data-issue-selection="true"
         aria-current={selected ? "true" : undefined}
         onClick={(event) => {
@@ -304,22 +302,26 @@ function IssueListRow({
           else navigate(row.detail_url);
         }}
         className={cn(
-          // `hover:no-underline` is load-bearing: the base layer's `a:hover`
-          // rule out-specifies a plain `no-underline`, so without it the whole
-          // row — title, chips and count — underlines on hover.
           "block px-3.5 py-3 no-underline transition-colors hover:no-underline",
           selected
-            ? "bg-surface-muted shadow-[inset_3px_0_0_theme(colors.umich.blue)]"
+            ? "bg-umich-blue/[0.06] shadow-[inset_4px_0_0_theme(colors.umich.blue)]"
             : "hover:bg-surface-muted/60",
         )}
       >
-        <span
-          className={cn(
-            "block text-sm leading-snug",
-            selected ? "font-semibold text-umich-blue" : "font-semibold text-fg",
+        <span className="flex items-start justify-between gap-2">
+          <span
+            className={cn(
+              "block text-sm leading-snug",
+              selected ? "font-semibold text-umich-blue" : "font-semibold text-fg",
+            )}
+          >
+            {row.title}
+          </span>
+          {selected && (
+            <span className="mt-0.5 shrink-0 rounded-full bg-umich-blue px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-white">
+              Current
+            </span>
           )}
-        >
-          {row.title}
         </span>
         <span className="mt-1.5 flex flex-wrap gap-1.5">
           <Tag tone={row.review_lane === "informational" ? "neutral" : "flag"}>{lane}</Tag>
@@ -328,166 +330,7 @@ function IssueListRow({
         <span className="mt-1.5 block text-xs tabular-nums text-fg-muted">
           {occurrenceSummary(row)}
         </span>
-        {/* Small screens leave this list for the detail route, so say so. */}
-        <span className="sr-only lg:hidden"> — opens the full issue evidence</span>
       </a>
-    </li>
-  );
-}
-
-/**
- * The evidence pane: what, why, the fix, and exactly where.
- *
- * It is a labelled region rather than a live region — the selection is a
- * deliberate act by the reader, so announcing the whole pane on every arrow
- * press would talk over them. Focus is moved to the heading instead.
- */
-function IssuePane({ row }: { row: IssueRow }) {
-  const headingId = useId();
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const firstRender = useRef(true);
-
-  useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
-    if (document.activeElement?.getAttribute("data-issue-selection") === "true") {
-      headingRef.current?.focus({ preventScroll: true });
-    }
-  }, [row.issue_key]);
-
-
-  return (
-    <Card aria-labelledby={headingId} className="p-5" role="region">
-      <h2
-        id={headingId}
-        ref={headingRef}
-        tabIndex={-1}
-        className="text-lg font-semibold leading-snug tracking-[-0.01em] text-fg"
-      >
-        {row.title}
-      </h2>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Tag tone={row.review_lane === "informational" ? "neutral" : "flag"}>
-          {laneLabel(row.review_lane)}
-        </Tag>
-        {row.wcag_sc && <Tag>WCAG {row.wcag_sc} {row.conformance}</Tag>}
-        <Tag>{sourceLabel(row.pipeline)}</Tag>
-        {/* Evidence that only exists after a control is used was reached by the
-            click-through pass, not by loading the URL. Saying so here is what
-            connects the overview's "26 DOM states reached" to a real issue. */}
-        {row.locations.some((location) => location.revealed_by) && (
-          <Tag>Found in a clicked-open state</Tag>
-        )}
-        <span className="text-xs tabular-nums text-fg-muted">{occurrenceSummary(row)}</span>
-      </div>
-
-      <div className="mt-5 grid gap-x-9 gap-y-5 xl:grid-cols-2">
-        <div>
-          <h3 className="text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-            Why it matters
-          </h3>
-          <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-fg">
-            {row.pipeline === "alfa" ? row.evidence_summary : row.why_matters || row.description || row.evidence_summary}
-          </p>
-          {row.abilities_affected.length > 0 && (
-            <p className="mt-2.5 text-xs text-fg-muted">
-              <strong className="font-semibold">Affects</strong> · {row.abilities_affected.join(", ")}
-            </p>
-          )}
-        </div>
-        <div>
-          <h3 className="text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-            Expected fix
-          </h3>
-          {row.fix_steps.length > 0 ? (
-            <ol className="mt-1.5 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-fg">
-              {row.fix_steps.map((step, index) => (
-                <li key={index} dangerouslySetInnerHTML={{ __html: step }} />
-              ))}
-            </ol>
-          ) : (
-            <p className="mt-1.5 text-sm leading-relaxed text-fg">
-              Confirm the stored evidence in page context, then correct the component or content that produced the result.
-            </p>
-          )}
-          {row.acceptance && (
-            <p className="mt-2.5 max-w-[58ch] text-xs text-fg-muted">
-              <strong className="font-semibold">Done when</strong> · {row.acceptance}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <h3 className="mt-6 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
-        Where exactly
-        {row.locations.length > 0 && (
-          <span className="ml-1.5 font-medium normal-case tracking-normal text-fg-muted">
-            · {row.locations.length} of {row.occurrence_count} shown
-          </span>
-        )}
-      </h3>
-      {row.locations.length > 0 ? (
-        <ul className="mt-2 grid gap-2.5 xl:grid-cols-2">
-          {row.locations.map((location) => (
-            <Location key={`${location.page_id}:${location.target}`} location={location} />
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm text-fg-muted">
-          No bounded location sample is available for this historical evidence.
-        </p>
-      )}
-
-      <p className="mt-4">
-        <Link
-          to={row.detail_url}
-          className="inline-flex min-h-target items-center text-sm font-semibold text-umich-blue underline underline-offset-2"
-        >
-          Open all occurrences
-        </Link>
-      </p>
-    </Card>
-  );
-}
-
-function Location({ location }: { location: IssueLocation }) {
-  return (
-    <li className="rounded-xs border border-border bg-surface-subtle px-3.5 py-3">
-      <a
-        href={location.page_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-umich-blue underline underline-offset-2"
-      >
-        {location.page_title || location.page_url}
-        <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-        <span className="sr-only"> opens the scanned page in a new tab</span>
-      </a>
-      {location.page_title && (
-        <p className="mt-0.5 break-all text-xs text-fg-subtle">{location.page_url}</p>
-      )}
-      {/* A finding that only exists after a control is used cannot be
-          reproduced from the URL alone. Naming the control is the
-          difference between evidence and an assertion. */}
-      {location.revealed_by && (
-        <p className="mt-1 text-xs font-medium text-fg">
-          After clicking &ldquo;{location.revealed_by}&rdquo;
-        </p>
-      )}
-      <code className="mt-2 block overflow-x-auto rounded-2xs border border-border bg-surface-muted px-2 py-1 text-xs text-fg">
-        {location.target}
-      </code>
-      {location.context && (
-        <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-fg-muted">{location.context}</p>
-      )}
-      <Link
-        to={location.evidence_url}
-        className="mt-2 inline-block text-xs font-semibold text-umich-blue underline underline-offset-2"
-      >
-        Open stored page evidence
-      </Link>
     </li>
   );
 }
@@ -522,26 +365,12 @@ function occurrenceSummary(row: IssueRow): string {
   );
 }
 
-function sourceLabel(pipeline: IssueRow["pipeline"]): string {
-  return {
-    axe: "axe-core",
-    alfa: "ACT rule · Siteimprove Alfa",
-    semantic: "Local AI",
-    keyboard: "Keyboard probe",
-    responsive: "Responsive probe",
-    focus: "Focus probe",
-    visual: "Visual probe",
-    image: "OCR + vision",
-    protected_image: "Protected image",
-  }[pipeline] ?? pipeline;
-}
-
 /**
  * A filter control that shows one short word and announces a fuller one.
  *
  * The visible caption is a substring of the accessible name (SC 2.5.3), so
  * speech-input users can say either "Level" or "WCAG level" and hit the same
- * control — while the toolbar stays compact enough for the list column.
+ * control, while the toolbar stays compact enough for the list column.
  */
 function FilterSelect({
   caption,
@@ -570,7 +399,6 @@ function FilterSelect({
     </label>
   );
 }
-
 
 /** Keep keystrokes synchronous while URL navigation is scheduled by the router. */
 function IssueSearch({ value, onChange }: { value: string; onChange: (value: string) => void }) {

@@ -10,12 +10,12 @@ import type {
 } from "../api/types";
 
 /**
- * What this scan actually checked — a ledger, one row per method.
+ * What this scan actually checked, a ledger, one row per method.
  *
  * The previous treatment printed every method's label, description, result and
  * caveat as a permanent two-column grid of cards: nine paragraphs of hedging
  * on a page whose job is to say what happened. The caveats matter, so they are
- * kept in full — they just sit behind the row they qualify, where a reader
+ * kept in full, they just sit behind the row they qualify, where a reader
  * goes when they want to know what a method does and does not prove.
  */
 const METHOD_STATE_LABEL: Record<ScanMethodState, string> = {
@@ -31,8 +31,8 @@ const METHOD_STATE_LABEL: Record<ScanMethodState, string> = {
 /**
  * Which detector's findings belong to which method, so a row can answer "and
  * what did it find?" rather than only "did it run?". ``rendered`` and
- * ``interaction`` are not detectors — they are how a page is reached, and
- * whatever they expose is then checked by axe and Alfa — so they are counted
+ * ``interaction`` are not detectors, they are how a page is reached, and
+ * whatever they expose is then checked by axe and Alfa, so they are counted
  * differently below.
  */
 const METHOD_PIPELINE: Partial<Record<ScanMethodCoverage["key"], IssueRow["pipeline"][]>> = {
@@ -101,7 +101,7 @@ function MethodRow({
           open && "bg-surface-subtle",
         )}
       >
-        {/* The icon is a second, non-color signal for whether a method ran —
+        {/* The icon is a second, non-color signal for whether a method ran,
             the chip alone would leave the state to a colour difference. */}
         {ran ? (
           <Check className="h-[18px] w-[18px] shrink-0 text-fg" aria-hidden />
@@ -112,7 +112,7 @@ function MethodRow({
           {method.label}
         </span>
         <span className="hidden shrink-0 text-sm tabular-nums text-fg-muted sm:block">
-          {ran ? method.result : "—"}
+          {ran ? method.result : "n/a"}
         </span>
         <StateChip state={method.state} />
         <ChevronRight
@@ -161,7 +161,7 @@ function MethodRow({
  * exception worth spelling out: clicking through DOM states does not detect
  * anything itself, it just reaches markup that would otherwise be invisible to
  * the scan, so what it "found" is the evidence that only exists after a
- * control was used. Saying "none" there is a real result, not a gap — it means
+ * control was used. Saying "none" there is a real result, not a gap, it means
  * nothing in this report is hiding behind a menu.
  */
 function findingsFor(

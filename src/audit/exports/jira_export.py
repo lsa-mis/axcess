@@ -38,7 +38,7 @@ _SEVERITY_TO_PRIORITY = {
 
 # Axe's impact scale to the same Jira priority axis. The mapping is
 # the same shape as the SPA's impact-to-severity chip mapping, so a
-# triager who sees `serious` in the UI sees `High` in Jira — no
+# triager who sees `serious` in the UI sees `High` in Jira, no
 # off-by-one surprise.
 _IMPACT_TO_PRIORITY = {
     "critical": "Highest",
@@ -63,14 +63,14 @@ _SOURCE_LABELS = {
 
 # Statuses that mean "we're not opening a ticket for this." Jira import
 # would silently create issues for accepted_risk / false_positive rows
-# otherwise — Sam would have to delete them manually. Filter out here.
+# otherwise, Sam would have to delete them manually. Filter out here.
 _TRIAGE_SKIP = frozenset({"remediated", "accepted_risk", "false_positive"})
 
 
 def render_jira_csv(scan: ExportScan) -> str:
     """One Jira issue per finding. Multi-page findings list every page.
 
-    DOM-engine findings join image findings in the same CSV — each row carries
+    DOM-engine findings join image findings in the same CSV, each row carries
     the same column shape, just different ``Labels`` and ``Description``
     content. Findings already triaged as remediated / accepted_risk /
     false_positive are skipped so re-running an export against a
@@ -109,7 +109,7 @@ def render_jira_csv(scan: ExportScan) -> str:
 
 
 def _a11y_summary(af: ExportA11yFinding) -> str:
-    sc = f" — SC {af.wcag_sc}" if af.wcag_sc else " — best-practice"
+    sc = f", SC {af.wcag_sc}" if af.wcag_sc else ", best-practice"
     return f"WCAG {af.rule_id}{sc}: {af.page_url}"
 
 
@@ -132,13 +132,13 @@ def _a11y_description(af: ExportA11yFinding) -> str:
             f"**WCAG SC:** {af.wcag_sc}" + (f" (Level {af.wcag_level})" if af.wcag_level else "")
         )
     else:
-        lines.append("**WCAG SC:** _best-practice — no SC mapping_")
+        lines.append("**WCAG SC:** _best-practice, no SC mapping_")
     if af.help:
         lines.append(f"**Description:** {af.help}")
     lines.append(f"**Page:** {af.page_url}")
     # A click-revealed barrier is invisible on load. Without this step the
     # assignee looks at the page, sees nothing, and closes the ticket as
-    # "cannot reproduce" — so it sits directly above the selector.
+    # "cannot reproduce", so it sits directly above the selector.
     lines.append(f"**To reproduce:** {reproduction_step(af.revealed_by)}")
     lines.append(f"**Target selector:** `{af.target_display or af.target_selector}`")
     if af.failure_summary:
@@ -184,10 +184,10 @@ def _summary(finding: ExportFinding) -> str:
         hint = " ".join(hint.split())
         if len(hint) > 60:
             hint = hint[:57].rstrip() + "..."
-        return f"WCAG 1.4.5: image of text — {hint}"
+        return f"WCAG 1.4.5: image of text, {hint}"
     if finding.has_svg_text:
         return f"WCAG 1.4.5: inline SVG with visible text ({finding.severity})"
-    return f"WCAG 1.4.5: text in image — {finding.severity} ({finding.image_url})"
+    return f"WCAG 1.4.5: text in image, {finding.severity} ({finding.image_url})"
 
 
 def _description(finding: ExportFinding) -> str:
@@ -217,7 +217,7 @@ def _description(finding: ExportFinding) -> str:
     for occ in finding.occurrences:
         alt = "(missing)" if occ.alt_text is None else occ.alt_text or "(empty)"
         fold = " (above fold)" if occ.above_fold else ""
-        lines.append(f"  - {occ.page_url} — alt={alt!r}{fold}")
+        lines.append(f"  - {occ.page_url}, alt={alt!r}{fold}")
 
     lines.append("")
     lines.append(f"Review locally: {finding.ui_url}")

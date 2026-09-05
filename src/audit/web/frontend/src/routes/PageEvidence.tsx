@@ -16,8 +16,8 @@ type PageEvidenceFinding = PageEvidence["a11y_findings"][number];
 /**
  * Everything one scanned page produced.
  *
- * The page used to open with three facts about the fetch — load result, render
- * mode, timestamp — and only then reach "Observed accessibility findings".
+ * The page used to open with three facts about the fetch, load result, render
+ * mode, timestamp, and only then reach "Observed accessibility findings".
  * That is backwards: how the page was retrieved is provenance, and provenance
  * is what you check *after* you know what was found. So the answer comes
  * first, in counts and then in cards, and the fetch details sit at the bottom
@@ -98,7 +98,7 @@ export default function PageEvidenceRoute() {
             {needsDecision > 0 && (
               <li>
                 <strong className="font-semibold tabular-nums text-fg">{needsDecision}</strong>{" "}
-                the engine could not decide — a person has to judge {needsDecision === 1 ? "it" : "them"}
+                the engine could not decide, a person has to judge {needsDecision === 1 ? "it" : "them"}
               </li>
             )}
             {withoutAlt > 0 && (
@@ -117,7 +117,7 @@ export default function PageEvidenceRoute() {
         </h2>
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
-            No check reported a problem on this page. That is not the same as a pass — the
+            No check reported a problem on this page. That is not the same as a pass, the
             report overview lists which methods ran and which did not.
           </Card>
         ) : groups === null ? (
@@ -200,7 +200,7 @@ export default function PageEvidenceRoute() {
       )}
 
       {/* Provenance, not findings. It answers "can I trust the above" and
-          belongs after it — this was the first thing on the page before. */}
+          belongs after it, this was the first thing on the page before. */}
       <details className="rounded-xs border border-border bg-surface p-4 shadow-card">
         <summary className="min-h-target cursor-pointer content-center text-sm font-semibold text-fg">
           How Axcess loaded this page
@@ -216,7 +216,7 @@ export default function PageEvidenceRoute() {
           </div>
           <div>
             <dt className="font-semibold text-fg-muted">Fetched</dt>
-            <dd className="text-fg">{data.page.fetched_at ?? "—"}</dd>
+            <dd className="text-fg">{data.page.fetched_at ?? "n/a"}</dd>
           </div>
         </dl>
       </details>
@@ -266,7 +266,7 @@ function FindingCard({
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {/* A text fragment scrolls the live page to this exact wording and
-            highlights it — the only "show me" available for findings that
+            highlights it, the only "show me" available for findings that
             have no screenshot, which is every Alfa result. */}
         {location.deepLink && (
           <a
@@ -277,7 +277,7 @@ function FindingCard({
           >
             <Crosshair className="h-4 w-4" aria-hidden />
             Show me on the live page
-            <span className="sr-only"> — opens in a new tab and scrolls to this text</span>
+            <span className="sr-only">, opens in a new tab and scrolls to this text</span>
           </a>
         )}
         <details className="text-xs">
@@ -347,7 +347,7 @@ function sourceLabel(pipeline: string): string {
 /** Findings split by the control that revealed them.
  *
  *  A finding that only exists after a click cannot be told apart from one
- *  present at load when both sit in a flat list — an auditor reading this
+ *  present at load when both sit in a flat list, an auditor reading this
  *  page was being sent to look for a dialog that is not there until
  *  something is operated. Load-state findings come first, then each control
  *  in the order the probe reached it, which is also the order an auditor

@@ -1,9 +1,9 @@
 # Remediation hints keyed on (vlm_classification, alt_adequacy).
-# Matched in order — first match wins; the fallback entry at the bottom
+# Matched in order, first match wins; the fallback entry at the bottom
 # handles any combo not named above.
 
 rules:
-  # Essential — image IS text and the text is load-bearing.
+  # Essential, image IS text and the text is load-bearing.
   - classification: essential
     adequacy: missing
     hint: >-
@@ -31,7 +31,7 @@ rules:
       Alt matches the visible text, but essential text should be real HTML so
       users can zoom, translate, and select it. Consider replacing the image.
 
-  # Informational — image has text that enriches surrounding content.
+  # Informational, image has text that enriches surrounding content.
   - classification: informational
     adequacy: missing
     hint: >-
@@ -56,7 +56,7 @@ rules:
       Alt summarizes the visible text. For longer content, consider a linked
       long description (aria-describedby) and real HTML for labels.
 
-  # Logo — brand mark or wordmark.
+  # Logo, brand mark or wordmark.
   - classification: logo
     adequacy: missing
     hint: >-
@@ -78,9 +78,9 @@ rules:
   - classification: logo
     adequacy: adequate
     hint: >-
-      Good — logo alt names the brand. No action required.
+      Good, logo alt names the brand. No action required.
 
-  # Decorative — text in image is stylistic; same info is in page text.
+  # Decorative, text in image is stylistic; same info is in page text.
   - classification: decorative
     adequacy: missing
     hint: >-
@@ -106,7 +106,7 @@ rules:
       Alt matches the decorative text. If the same info is already in the
       page, switch to alt="" to avoid duplicate announcements.
 
-  # No meaningful text — likely OCR false positive.
+  # No meaningful text, likely OCR false positive.
   - classification: no_meaningful_text
     adequacy: missing
     hint: >-
@@ -116,7 +116,7 @@ rules:
   - classification: no_meaningful_text
     adequacy: inadequate
     hint: >-
-      Likely OCR false positive — no meaningful text in the image. Confirm
+      Likely OCR false positive, no meaningful text in the image. Confirm
       and, if truly decorative, keep alt="".
 
   - classification: no_meaningful_text
@@ -130,7 +130,7 @@ rules:
     hint: >-
       Likely OCR false positive. No action required.
 
-  # Fallback — used when the VLM wasn't run (SVG text, etc.)
+  # Fallback, used when the VLM wasn't run (SVG text, etc.)
   - classification: "*"
     adequacy: missing
     hint: >-

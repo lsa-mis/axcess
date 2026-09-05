@@ -44,6 +44,9 @@ desktop/out/
 .env
 .env.local
 
+# Runtime caches
+.tldextract-cache/
+
 # Frontend (src/audit/web/frontend)
 # Vite build output is already ignored by the global "dist/" rule above.
 node_modules/

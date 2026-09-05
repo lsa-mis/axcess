@@ -234,7 +234,7 @@ class _SessionRouteGuard:
         context.on("page", self.handle_context_page)
 
     async def handle_context_page(self, page: Page) -> None:
-        """Close an auxiliary tab — unless sign-in is what opened it.
+        """Close an auxiliary tab, unless sign-in is what opened it.
 
         While scanning, a tab with an opener is never legitimate: the crawler
         creates every page it uses, so anything else is uncontrolled
@@ -242,8 +242,8 @@ class _SessionRouteGuard:
         it was once scan mode activates.
 
         During manual sign-in it is wrong. Institutional SSO routinely hands
-        off through a new tab — an LTI launch from a VLE into the tool it
-        embeds is the ordinary case, not an edge case — and closing it on
+        off through a new tab, an LTI launch from a VLE into the tool it
+        embeds is the ordinary case, not an edge case, and closing it on
         arrival made those applications impossible to sign in to at all. The
         auditor watched the tab they needed vanish.
 
@@ -287,7 +287,7 @@ class _SessionRouteGuard:
             # request path can carry session material. Method, resource type,
             # and the policy's own reason code are enough to tell "the app
             # could not check its session" apart from "the app tried to reach
-            # an origin nobody approved" — a distinction that previously left
+            # an origin nobody approved", a distinction that previously left
             # no trace at all, so a scan that captured a login form gave no
             # indication why.
             log.info(
@@ -344,12 +344,12 @@ class _SessionRouteGuard:
     def _validate_scan_request(self, *, method: str, url: str, resource_type: str) -> None:
         # A GET/HEAD gate stopped an application checking its own session,
         # and a resource-type gate refused images, fonts, and manifests on
-        # the target origin itself — which for an accessibility audit
+        # the target origin itself, which for an accessibility audit
         # discards the alternative-text, contrast, and layout evidence being
         # collected. Neither survived contact with a real application.
         # Documents were checked against the approved *target* origins rather
         # than the scan policy, which refused a sub-frame served from
-        # anywhere else — an embedded course tool from another company being
+        # anywhere else, an embedded course tool from another company being
         # exactly that, and exactly what these audits are for. Which pages
         # the crawl visits is already decided by crawl scope; this layer does
         # not need a second, narrower opinion.
@@ -401,7 +401,7 @@ class ManualAuthenticationSession:
         self._context: BrowserContext | None = None
         self._page: Page | None = None
         # Every tab open during sign-in, oldest first. SSO can hand off into
-        # a tab it opens for itself, and the auditor finishes there — so that
+        # a tab it opens for itself, and the auditor finishes there, so that
         # tab, not the one we opened, is where verification must read the
         # landing URL from, and all of them have to be closed afterwards.
         self._auth_pages: list[Page] = []
@@ -494,7 +494,7 @@ class ManualAuthenticationSession:
 
         Verification reads ``self.page``. If SSO finished in a tab it opened,
         that is where the approved landing URL is, and leaving ``_page`` on
-        the original tab would verify a stale sign-in URL — and then start
+        the original tab would verify a stale sign-in URL, and then start
         the crawl from it.
         """
 
@@ -785,7 +785,7 @@ class ManualAuthenticationSession:
                 storage_state=storage_state,
                 # The scan policy no longer carries an allowlist, and Alfa's
                 # runner keeps its own copy of the restrictions this module
-                # dropped — handing it an empty set would block every
+                # dropped, handing it an empty set would block every
                 # subresource. Give it the approved targets so it behaves as
                 # it did before; lifting Alfa's own gates is separate work.
                 allowed_origins=self._policies.target.allowed_origins,

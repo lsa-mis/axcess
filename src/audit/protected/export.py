@@ -104,7 +104,7 @@ def render_redacted_protected_report(
 
     created = (generated_at or datetime.now(UTC)).astimezone(UTC).isoformat()
     lines = [
-        "# Axcess protected report — redacted operational summary",
+        "# Axcess protected report, redacted operational summary",
         "",
         "**Handling:** Protected. This download is intentionally redacted and must be "
         "handled according to the report's approved data classification.",
@@ -151,7 +151,7 @@ def render_redacted_protected_report(
         for check in manual_checks:
             lines.append(_manual_check_row(check))
     else:  # pragma: no cover - the validated WCAG matrix is always populated
-        lines.append("| — | No WCAG manual-check matrix available | — | — |")
+        lines.append("| n/a | No WCAG manual-check matrix available | n/a |, |")
 
     lines.extend(
         [
@@ -171,7 +171,7 @@ def render_redacted_protected_report(
         for row in rows:
             lines.append(_issue_row(row))
     else:
-        lines.append("| No retained issue index rows | — | — | — | — | — | 0 | 0 |")
+        lines.append("| No retained issue index rows | n/a |, | n/a |, | n/a | 0 | 0 |")
     if len(rows) == _MAX_ISSUE_GROUPS:
         lines.extend(
             [
@@ -204,13 +204,13 @@ def _issue_row(row: sqlite3.Row) -> str:
     rule_id = str(row["rule_id"] or "")
     safe_rule = rule_id if _RULE_ID.fullmatch(rule_id) else "unavailable"
     wcag_sc = str(row["wcag_sc"] or "")
-    safe_sc = wcag_sc if _WCAG_SC.fullmatch(wcag_sc) else "—"
+    safe_sc = wcag_sc if _WCAG_SC.fullmatch(wcag_sc) else "n/a"
     level = str(row["wcag_level"] or "")
-    safe_level = level if level in {"A", "AA", "AAA"} else "—"
+    safe_level = level if level in {"A", "AA", "AAA"} else "n/a"
     outcome = str(row["engine_outcome"] or "")
-    safe_outcome = outcome if outcome in _OUTCOMES else "—"
+    safe_outcome = outcome if outcome in _OUTCOMES else "n/a"
     impact = str(row["impact"] or "")
-    safe_impact = impact if impact in _IMPACTS else "—"
+    safe_impact = impact if impact in _IMPACTS else "n/a"
     return (
         f"| {source} | `{safe_rule}` | {safe_sc} | {safe_level} | {safe_outcome} | "
         f"{safe_impact} | {_safe_count(row['occurrence_count'])} | "
@@ -231,9 +231,9 @@ def _manual_check_row(check: Mapping[str, Any]) -> str:
     raw_sc = raw_criterion.get("sc") if isinstance(raw_criterion, Mapping) else ""
     sc = str(raw_sc or "")
     criterion = coverage_matrix.by_sc(sc) if _WCAG_SC.fullmatch(sc) else None
-    outcome = _MANUAL_OUTCOME_LABELS.get(str(check.get("outcome") or ""), "—")
+    outcome = _MANUAL_OUTCOME_LABELS.get(str(check.get("outcome") or ""), "n/a")
     if criterion is None:
-        return f"| — | Unavailable | — | {outcome} |"
+        return f"| n/a | Unavailable | n/a | {outcome} |"
     return f"| {criterion.sc} | {criterion.name} | {criterion.level} | {outcome} |"
 
 

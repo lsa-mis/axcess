@@ -1,10 +1,10 @@
-"""WCAG 2.2 A/AA coverage matrix — loader + summary.
+"""WCAG 2.2 A/AA coverage matrix, loader + summary.
 
 The data lives in ``rules/wcag_coverage.yaml`` (the authoritative, honest
 source of truth for which success criteria Axcess checks automatically,
 AI-assists, or leaves to manual testing). This module loads + validates it
 and exposes a small typed surface that the audit report, the ``/api/tracking``
-endpoint, and the landing-page generator all read from — so the
+endpoint, and the landing-page generator all read from, so the
 "what's covered / what needs manual testing" story is told from ONE place.
 
 Keep it honest: a criterion is only ``automated`` when a deterministic
@@ -48,8 +48,8 @@ METHOD_BLURB: dict[str, str] = {
     "automated": "Deterministic checks cover defined machine-testable conditions; "
     "an expert verifies applicability and remaining states.",
     "partial": "Automated checks catch the mechanical failures; the rest needs a human.",
-    "ai-assisted": "A local model flags candidates — a human confirms before counting them.",
-    "manual": "No automated detection — a human must test this criterion.",
+    "ai-assisted": "A local model flags candidates, a human confirms before counting them.",
+    "manual": "No automated detection, a human must test this criterion.",
 }
 
 
@@ -75,8 +75,8 @@ class Criterion:
     def needs_manual(self) -> bool:
         """True if a human must still test something for this criterion.
 
-        Almost always true — even ``automated`` criteria leave a residual
-        judgement — which is the whole point of the transparency model.
+        Almost always true, even ``automated`` criteria leave a residual
+        judgement, which is the whole point of the transparency model.
         """
         return bool(self.manual_check.strip())
 

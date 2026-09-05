@@ -1,8 +1,8 @@
 """Pull image references out of a rendered HTML body.
 
 Covers ``<img>`` (including ``srcset``) and ``<picture><source>`` (both ``src``
-and ``srcset``). Every candidate is kept — e.g. all four entries in
-``srcset="a.png 1x, b.png 2x"`` become separate refs — because art-direction
+and ``srcset``). Every candidate is kept, e.g. all four entries in
+``srcset="a.png 1x, b.png 2x"`` become separate refs, because art-direction
 ``<picture>`` setups really can swap in completely different images. Bytes-level
 dedupe happens later against the blob store.
 """

@@ -24,7 +24,7 @@ export interface ScanSummary {
   seed_url: string;
   status: ScanStatus;
   page_count: number;
-  /** DOM states reached by operating controls — menus opened, dialogs shown,
+  /** DOM states reached by operating controls, menus opened, dialogs shown,
    *  tabs switched. A page count alone understates an application whose
    *  content mostly does not exist until something is used. */
   dom_state_count: number;
@@ -58,7 +58,7 @@ export interface ScanProgress {
     fetched_at: string | null;
   }[];
   /**
-   * URLs currently leased by a worker — the things being fetched *right
+   * URLs currently leased by a worker, the things being fetched *right
    * now*, not yet recorded in the pages table. Useful for live activity.
    */
   in_flight_pages: {
@@ -273,7 +273,7 @@ export interface NewScanPayload {
   /**
    * Opt-OUT fast path: fetch pages with plain HTTP instead of rendering
    * each one in Playwright. Disables the axe, keyboard, and responsive
-   * checks on statically-fetched pages — full rendering is the default
+   * checks on statically-fetched pages, full rendering is the default
    * because three of the four pipelines need a live DOM.
    */
   static_only: boolean;
@@ -291,6 +291,12 @@ export interface NewScanPayload {
   skip_focus: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
+  /**
+   * Do not persist each page's rendered HTML snapshot. Keeps the report
+   * database smaller; the Page inspector then re-renders the live page on
+   * demand instead of opening the stored capture.
+   */
+  skip_rendered_storage: boolean;
   axe_level: "A" | "AA" | "AAA";
 }
 
@@ -348,6 +354,8 @@ export interface LocalLoginScanPayload {
   skip_responsive: boolean;
   skip_ocr: boolean;
   skip_vlm: boolean;
+  /** Do not persist rendered-page snapshots; the Page inspector re-renders. */
+  skip_rendered_storage: boolean;
   /** Required before protected images or extracted text are stored locally. */
   image_analysis_acknowledged: boolean;
 }
@@ -606,7 +614,7 @@ export interface A11yRollup {
 
 // ---------------------------------------------------------------
 // Image-of-text findings (WCAG 1.4.5 pipeline) grouped by
-// `(classification, alt_adequacy)` — every group shares one
+// `(classification, alt_adequacy)`, every group shares one
 // remediation hint. Served by /api/scans/{id}/findings/grouped.
 // ---------------------------------------------------------------
 
@@ -693,7 +701,7 @@ export interface IssueRow {
   evidence_confidence: EvidenceConfidence;
   evidence_summary: string;
   high_confidence_occurrence_count: number;
-  // Inline expansion content — populated from rules/audit_report.yaml.
+  // Inline expansion content, populated from rules/audit_report.yaml.
   // The Issues list cards surface what/why/how directly from these
   // fields without a second API call to the detail endpoint.
   description: string | null;
@@ -716,6 +724,12 @@ export interface IssueLocation {
    *  was present at page load. Without it the URL alone does not show a
    *  defect that only appears once a menu is opened. */
   revealed_by: string | null;
+  /** Blob hash of the scan-time screenshot with the location circled, when
+   *  one was captured, lets the evidence expand inline in the Issues view. */
+  screenshot_hash: string | null;
+  /** Captured outerHTML of the flagged element, shown as escaped source in
+   *  the inline inspector, never executed. Null when none was recorded. */
+  html_snippet: string | null;
 }
 
 export interface IssuePage {
@@ -754,7 +768,7 @@ export interface IssuesResponse {
 }
 
 // ---------------------------------------------------------------
-// WCAG axe findings grouped by *rule* — the fixing axis. Pairs with
+// WCAG axe findings grouped by *rule*, the fixing axis. Pairs with
 // the by-SC rollup at /api/scans/{id}/a11y, which is the reporting axis.
 // Served by /api/scans/{id}/a11y/by-rule.
 // ---------------------------------------------------------------
@@ -873,7 +887,7 @@ export interface RoadmapItem {
   note: string;
 }
 
-// Per-WCAG coverage breakdown — mirrors src/audit/coverage_matrix.py.
+// Per-WCAG coverage breakdown, mirrors src/audit/coverage_matrix.py.
 export type CoverageMethod = "automated" | "partial" | "ai-assisted" | "manual";
 
 export interface CoverageCriterion {
@@ -1000,6 +1014,44 @@ export interface PageEvidence {
     vlm_classification: Classification | null;
     vlm_rationale: string | null;
   }>;
+}
+
+// ---------------------------------------------------------------
+// Page / DOM inspector (served by /api/scans/{id}/pages/{page}/inspect).
+// Serves the rendered document captured at scan time when the scan stored it;
+// otherwise a live re-render of one recorded page. The issue highlight is
+// applied client-side as a CSS outline. Never a legal/conformance verdict,
+// just evidence that the page still shows what the scan saw.
+// ---------------------------------------------------------------
+
+export interface PageInspection {
+  page: {
+    id: number;
+    url: string;
+    title: string | null;
+    /** Status captured at scan time (the re-render status is on `render`). */
+    status_code: number | null;
+    render_mode: string;
+    captured_at: string | null;
+  };
+  /**
+   * Whether the scan was configured to persist rendered pages. When false
+   * the render source is always "live" (on-demand re-render), and the UI
+   * says so instead of implying a missing capture.
+   */
+  store_rendered_html: boolean;
+  render: {
+    ok: boolean;
+    /** "stored" = rendered HTML persisted at scan time; "live" = re-rendered now. */
+    source?: "stored" | "live";
+    /** Present when `ok` is false, why the live page could not be captured. */
+    error?: string;
+    final_url?: string;
+    status_code?: number;
+    dom_html?: string;
+    dom_chars?: number;
+    dom_truncated?: boolean;
+  };
 }
 
 

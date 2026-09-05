@@ -1,8 +1,8 @@
-"""Review UI backend — FastAPI JSON API + the React SPA shell.
+"""Review UI backend, FastAPI JSON API + the React SPA shell.
 
 All UI is served by the React bundle under ``/app/``; every data route
 lives under ``/api/*``. The legacy Jinja/HTMX server-rendered pages have
-been removed — this module is now the JSON surface, the SPA shell, blob
+been removed, this module is now the JSON surface, the SPA shell, blob
 serving, exports, and the optional shared-token gate.
 """
 
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import ipaddress
 import json
 import math
@@ -17,6 +18,7 @@ import re
 import secrets
 import shutil
 import sqlite3
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -43,6 +45,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation
@@ -147,6 +150,7 @@ class LocalLoginScanRequest(BaseModel):
     skip_responsive: bool = False
     skip_ocr: bool = True
     skip_vlm: bool = True
+    skip_rendered_storage: bool = False
     image_analysis_acknowledged: bool = False
     search: SearchConfig | None = None
 
@@ -361,6 +365,49 @@ class ManualEvidenceCreate(BaseModel):
     evidence_url: str = Field(default="", max_length=4096)
 
 
+class GzippedJsonResponse(JSONResponse):
+    """``JSONResponse`` that gzips bodies above a size floor.
+
+    Used only by the Page/DOM inspector, whose rendered-DOM payload can be
+    several megabytes of highly compressible HTML inside JSON, gzip cuts
+    the transfer several-fold. The floor keeps tiny responses (and the CPU
+    spent re-encoding them) off the table. ``mtime=0`` keeps the encoding
+    deterministic. Everything else, serialization, content-length, status,
+    and background handling, stays exactly as ``JSONResponse`` does it.
+    """
+
+    min_body_bytes: int = 1024
+
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        media_type: str | None = None,
+        background: BackgroundTask | None = None,
+        *,
+        accept_gzip: bool = True,
+        min_body_bytes: int = 1024,
+    ) -> None:
+        self.accept_gzip = accept_gzip
+        self.min_body_bytes = min_body_bytes
+        self._was_gzipped = False
+        super().__init__(content, status_code, headers, media_type, background)
+
+    def render(self, content: Any) -> bytes:
+        body = super().render(content)
+        if self.accept_gzip and self.status_code == 200 and len(body) >= self.min_body_bytes:
+            self._was_gzipped = True
+            return gzip.compress(body, compresslevel=6, mtime=0)
+        return body
+
+    def init_headers(self, headers: Mapping[str, str] | None = None) -> None:
+        super().init_headers(headers)
+        if self._was_gzipped:
+            self.raw_headers.append((b"content-encoding", b"gzip"))
+            self.raw_headers.append((b"vary", b"Accept-Encoding"))
+
+
 _EXPORT_RENDERERS: dict[str, Any] = {
     "csv": render_csv,
     "json": render_json,
@@ -506,7 +553,7 @@ def _validation_error_body(
 
     FastAPI's default 422 embeds the rejected ``input``. For these forms that
     input is the whole scan request, and the browser client then truncates
-    the body to a couple of hundred characters — which is exactly long enough
+    the body to a couple of hundred characters, which is exactly long enough
     to lose the field name and keep the payload. Pydantic's ``msg`` is
     generated from the schema, never from the value, so it is safe to return;
     ``input`` and ``ctx`` are dropped.
@@ -533,7 +580,7 @@ def _validation_error_body(
         if error.get("type") == "extra_forbidden":
             # The reported case: a browser tab newer than the server process,
             # which had started before the setting existed and does not reload.
-            detail += " — this Axcess server does not know this setting; restart it."
+            detail += ", this Axcess server does not know this setting; restart it."
         messages.append(f"{label}: {detail}"[:200])
         if path:
             fields.append(path)
@@ -587,7 +634,7 @@ def create_app(
 
     # Optional shared-token gate. No-op when ``AUDIT_ACCESS_TOKEN`` is
     # unset (the default) so local dev + the test suite are untouched.
-    # When set, every request must carry the token — as ``?token=…``,
+    # When set, every request must carry the token, as ``?token=…``,
     # an ``X-Access-Token`` header, or a ``Bearer`` Authorization header.
     # On success we drop a cookie so the browser doesn't need the query
     # string on every navigation. This is intentionally simple: it's a
@@ -624,7 +671,7 @@ def create_app(
                 )
             response = await call_next(request)
             # Persist a correct token as a cookie so the operator only
-            # pastes ?token=… once. Session cookie (no Max-Age) — clears
+            # pastes ?token=… once. Session cookie (no Max-Age), clears
             # on browser close; HttpOnly so page JS can't read it.
             if request.query_params.get("token") == _access_token:
                 response.set_cookie(_cookie_name, _access_token, httponly=True, samesite="lax")
@@ -657,7 +704,7 @@ def create_app(
     local_login_runs: dict[int, _LocalLoginRun] = {}
 
     # Startup sweep: any scan left in 'running' when the server boots is
-    # stale by definition — its live asyncio task is gone. Flip those to
+    # stale by definition, its live asyncio task is gone. Flip those to
     # 'interrupted' so they don't pollute the UI or block "single crawl
     # at a time" gating for new submissions.
     _sweep_stale_running_scans(resolved_db)
@@ -836,13 +883,13 @@ def create_app(
 
         Three paths because browsers, tooling, and Vite are inconsistent:
 
-        * ``/favicon.svg`` — modern browsers honor the ``<link rel="icon">``
+        * ``/favicon.svg``, modern browsers honor the ``<link rel="icon">``
           tag in the Jinja base template.
-        * ``/favicon.ico`` — devtools, screenshot pipelines, and a handful
+        * ``/favicon.ico``, devtools, screenshot pipelines, and a handful
           of older clients still poke this URL from the root regardless of
           the link tag. Every browser we care about accepts an SVG payload
           at the ``.ico`` path.
-        * ``/app/favicon.svg`` — the SPA's index.html ships with
+        * ``/app/favicon.svg``, the SPA's index.html ships with
           ``base: "/app/"`` (vite.config.ts), so Vite rewrites
           ``href="/favicon.svg"`` to ``href="/app/favicon.svg"`` at build
           time. We mirror the route under that prefix so the SPA tab
@@ -865,7 +912,7 @@ def create_app(
             # the column list is fixed, so a literal query keeps this
             # obviously free of interpolation. On a database predating
             # migration 0024 the counter is simply not selected, and
-            # _scan_row_to_summary reports 0 for the missing key — the
+            # _scan_row_to_summary reports 0 for the missing key, the
             # truthful answer for a scan that ran before it existed.
             has_states = _scans_have_interaction_columns(conn)
             if _protected_scan_table_exists(conn):
@@ -1121,6 +1168,7 @@ def create_app(
             focus_checks_enabled=True,
             visual_checks_enabled=False,
             capture_screenshots=False,
+            store_rendered_html=not body.skip_rendered_storage,
             ignore_robots=True,
         )
         # A manual-login session is deliberately memory-only and cannot be
@@ -1265,7 +1313,7 @@ def create_app(
         )
         # One refusal per cause. The combined message could not tell an
         # auditor which of five settings it meant, and the reported failure
-        # was a search term typed into the page-URL box — a mistake the
+        # was a search term typed into the page-URL box, a mistake the
         # message has to name to be worth reading.
         search: SearchConfig | None = None
         if body.get("search"):
@@ -1315,6 +1363,7 @@ def create_app(
             "skip_semantic": bool(body.get("skip_semantic")),
             "skip_focus": bool(body.get("skip_focus")),
             "skip_visual": bool(body.get("skip_visual")),
+            "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
         }
         config = _build_crawl_config(form, settings)
@@ -1375,14 +1424,14 @@ def create_app(
         0001_initial_schema.sql. Two things they don't cover and we have
         to handle ourselves:
 
-        * ``images.first_seen_scan_id`` has no ``ON DELETE`` action — if
+        * ``images.first_seen_scan_id`` has no ``ON DELETE`` action, if
           left pointing at a doomed scan, the DELETE FK-violates. We NULL
           it instead of cascading because images are dedupe'd by
           ``content_hash`` and may be referenced by later scans; losing
           the image row would orphan blobs and break diff history.
         * ``jobs`` rows aren't FK-bound (``scan_id`` lives inside
           ``payload_json``), so they need an explicit DELETE keyed on
-          ``json_extract`` — same trick the cancel endpoint uses.
+          ``json_extract``, same trick the cancel endpoint uses.
 
         We refuse to delete a currently-running scan: the live asyncio
         task would keep writing rows after the DELETE, leaving
@@ -1575,6 +1624,40 @@ def create_app(
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
 
+    @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
+    async def api_page_inspect(
+        request: Request,
+        scan_id: int,
+        page_id: int,
+    ) -> JSONResponse:
+        """Rendered page + DOM for the Page/DOM inspector.
+
+        Scan-scoped and read-only on the report: refuses running / failed /
+        interrupted scans, login-protected reports, and any target outside the
+        scan's recorded scope. Serves the rendered document persisted at scan
+        time when present; otherwise (a predating scan, an over-bound page, or
+        a scan configured not to store rendered pages) it loads that single
+        page once in a throwaway headless Chromium and returns its rendered
+        DOM. Nothing is stored by this route, the issue highlight is applied
+        client-side as a CSS outline. The only live fetch is of a URL the scan
+        already recorded, and this route sits behind the existing
+        access-token gate.
+        """
+        from audit.web.page_inspector import InspectionUnavailableError, inspect_page
+
+        with get_conn() as conn:
+            try:
+                payload = await inspect_page(
+                    conn,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    user_agent=settings.user_agent,
+                )
+            except InspectionUnavailableError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        accept_gzip = "gzip" in request.headers.get("accept-encoding", "").lower()
+        return GzippedJsonResponse(payload, accept_gzip=accept_gzip)
+
     @app.get("/api/scans/{scan_id:int}/findings")
     def api_list_findings(
         scan_id: int,
@@ -1615,7 +1698,7 @@ def create_app(
         issue_key: str,
         sort: str = Query(default="occurrences_desc"),
     ) -> JSONResponse:
-        """JSON form of the per-issue detail — used by the SPA."""
+        """JSON form of the per-issue detail, used by the SPA."""
         from dataclasses import asdict
 
         from audit.web import issues as issues_mod
@@ -1642,7 +1725,7 @@ def create_app(
         q: str = Query(default=""),
         sort: str = Query(default="priority_desc"),
     ) -> JSONResponse:
-        """JSON form of the unified Issues list — used by the SPA."""
+        """JSON form of the unified Issues list, used by the SPA."""
         from dataclasses import asdict
 
         from audit.web import issues as issues_mod
@@ -1737,7 +1820,7 @@ def create_app(
     ) -> JSONResponse:
         """Drill-down list for a single WCAG SC (or null = best-practice).
 
-        Optional ``status`` filter mirrors the Jinja side — pass a
+        Optional ``status`` filter mirrors the Jinja side, pass a
         status name to hide already-handled findings; omit (or pass
         empty) for all rows.
         """
@@ -2706,7 +2789,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
         # Render-every-page is the default (audit mode). `static_only`
-        # is the opt-out fast path — HTML checkboxes can't post
+        # is the opt-out fast path, HTML checkboxes can't post
         # "unchecked", so the form field is the inversion.
         js_eager=not bool(form.get("static_only")),
         browser_headless=not bool(form.get("show_browser")),
@@ -2722,7 +2805,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
             and scan_engine in {"axe", "both"}
         ),
         # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
-        # the wiring to the runner lands in Phase 9.1 — for now this
+        # the wiring to the runner lands in Phase 9.1, for now this
         # just plumbs the flag through so the web form has the same
         # surface as the CLI's `--skip-semantic`.
         semantic_enabled=not bool(form.get("skip_semantic")),
@@ -2730,6 +2813,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
+        store_rendered_html=not bool(form.get("skip_rendered_storage")),
     )
 
 
@@ -2843,7 +2927,7 @@ async def _run_local_login_background(
         # SSO round trip, then a dashboard or landing page. Start the crawl
         # from where the auditor actually is rather than from the pre-login
         # URL, which for a login handoff is frequently the sign-in page
-        # itself — re-fetching it produced a scan of the login form. The
+        # itself, re-fetching it produced a scan of the login form. The
         # verified URL has already passed the approved-target-origin check
         # inside verify_authenticated_target, so an IdP or OAuth-callback URL
         # can never become the entry point. Scope still derives from the
@@ -2865,7 +2949,7 @@ async def _run_local_login_background(
         # unauthenticated crawl. The probe re-runs axe on each state a click
         # reveals, so it needs the same analyzer: without one there is
         # nothing to re-run, and interaction would be enabled but inert. Say
-        # so rather than repeating that silence — a scan that reports every
+        # so rather than repeating that silence, a scan that reports every
         # page as probed while reaching zero states explains nothing.
         login_axe = (
             AxeAnalyzer.from_bundled(suppress_diagnostics=True) if config.axe_enabled else None
@@ -2997,7 +3081,7 @@ def _local_login_completion(summary: CrawlSummary) -> tuple[str, str | None]:
             "Start a new login scan; if it happens again, check the server log.",
         )
     # Every page turned out to be a sign-in wall. The crawl drained its queue
-    # and would otherwise report "completed" — a scan of a login form filed as
+    # and would otherwise report "completed", a scan of a login form filed as
     # an audit of the application, which is worse than an error because the
     # report looks legitimate. It means the session did not reach the crawl,
     # so the pages tell us nothing about the signed-in product.
@@ -3157,7 +3241,7 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     # the queue writes ISO-8601 strings via ``_iso(dt)`` (``2026-04-27T16:48:53
     # +00:00``), but the default ``convert_timestamp`` expects space-separated
     # ``YYYY-MM-DD HH:MM:SS`` and raises ``ValueError`` on the ``T`` form. We
-    # don't need the parsed datetime — ``_to_iso_string`` will pass the raw
+    # don't need the parsed datetime, ``_to_iso_string`` will pass the raw
     # string through unchanged. (We can't use the ``[text]`` colname alias
     # trick because schema.py only opens connections with PARSE_DECLTYPES,
     # not PARSE_COLNAMES.)
@@ -3225,7 +3309,7 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
                 "status_code": r["status_code"],
                 "render_mode": r["render_mode"],
                 # sqlite returns this as a datetime under PARSE_DECLTYPES;
-                # JSONResponse can't serialize raw datetimes — coerce here.
+                # JSONResponse can't serialize raw datetimes, coerce here.
                 "fetched_at": _to_iso_string(r["fetched_at"]),
             }
             for r in recent
@@ -3308,7 +3392,7 @@ def _detect_blocked_scan(
 
       * The seed URL is present in ``pages`` and its ``status_code`` is not 2xx.
         That's the classic "crawler hit a WAF challenge / 403 / login wall"
-        pattern — the crawl completed but found no real content.
+        pattern, the crawl completed but found no real content.
       * ``page_count == 1`` AND that page is non-2xx.
 
     Returns ``{'status_code': int | None, 'title': str | None, 'seed_url': str}``
@@ -3419,7 +3503,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         },
         {
             "key": "alfa",
-            "label": "Siteimprove Alfa — ACT (Accessibility Conformance Testing)",
+            "label": "Siteimprove Alfa, ACT (Accessibility Conformance Testing)",
             "enabled": flag("alfa_enabled", default=False) or alfa_ran_counters,
             "checked_count": int(scan.get("alfa_pages_scanned") or 0),
             "total_count": page_count,
@@ -3431,7 +3515,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "fail, or cannot-tell."
             ),
             "caveat": (
-                "A failed rule is evidence about that condition—not proof that the "
+                "A failed rule is evidence about that condition, not proof that the "
                 "whole page or site fails WCAG. Cannot-tell requires expert review."
             ),
         },
@@ -3820,7 +3904,7 @@ def _pagination(*, page: int, size: int, total: int, filters: dict[str, str]) ->
 
 def _short_url(url: str | None) -> str:
     if not url:
-        return "—"
+        return "n/a"
     if url.startswith("inline-svg://"):
         return "(inline svg)"
     match = re.match(r"^https?://[^/]+(/.*)?$", url)

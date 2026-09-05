@@ -1,4 +1,4 @@
-"""``python -m audit.analyzer.model_registry_dump`` — print the model matrix.
+"""``python -m audit.analyzer.model_registry_dump``, print the model matrix.
 
 A tiny CLI wrapper around :mod:`audit.analyzer.model_registry`. Useful
 when an operator runs ``make list-analyzer-models`` and wants to see
@@ -27,8 +27,8 @@ def main() -> int:
     for kind, block in defaults.items():
         if not isinstance(block, dict):
             continue
-        primary = block.get("primary", "—")
-        fast = block.get("fast", "—")
+        primary = block.get("primary", "n/a")
+        fast = block.get("fast", "n/a")
         print(f"  {kind:10s}  primary={primary:<32s}  fast={fast}")
     print()
 
@@ -40,8 +40,8 @@ def main() -> int:
         for sc, entry in criteria.items():
             if not isinstance(entry, dict):
                 continue
-            kind = entry.get("kind", "—")
-            primary = entry.get("primary", "—")
+            kind = entry.get("kind", "n/a")
+            primary = entry.get("primary", "n/a")
             title = entry.get("title", "")
             print(f"  {sc:<8s}{kind:<12s}{primary:<32s}{title}")
         print()

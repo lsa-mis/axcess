@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import http.server
 import socketserver
 import sqlite3
@@ -307,13 +308,44 @@ def test_crawl_records_html_hash_and_title(tmp_db: sqlite3.Connection) -> None:
         summary = asyncio.run(run_crawl(tmp_db, config))
 
     row = tmp_db.execute(
-        "SELECT title, html_hash, render_mode FROM pages WHERE scan_id = ? AND url_normalized = ?",
+        "SELECT title, html_hash, render_mode, rendered_html "
+        "FROM pages WHERE scan_id = ? AND url_normalized = ?",
         (summary.scan_id, f"{base}/"),
     ).fetchone()
     assert row is not None
     assert row["title"] == "Fixture home"
     assert row["render_mode"] == "static"
     assert row["html_hash"] and len(row["html_hash"]) == 64
+    # Storing the rendered document is the default: the gzip blob decodes
+    # back to the served body so the inspector can open it instantly.
+    assert row["rendered_html"] is not None
+    assert gzip.decompress(row["rendered_html"]).startswith(b"<!doctype html>")
+
+
+def test_crawl_skips_rendered_storage_when_configured(tmp_db: sqlite3.Connection) -> None:
+    """``store_rendered_html=False`` keeps ``pages.rendered_html`` NULL so the
+    report database never holds page snapshots — the inspector re-renders."""
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            max_pages=10,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+            js_enabled=False,
+            store_rendered_html=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    rows = tmp_db.execute(
+        "SELECT url_normalized, rendered_html FROM pages WHERE scan_id = ?",
+        (summary.scan_id,),
+    ).fetchall()
+    assert rows, "the crawl must still record every page"
+    for row in rows:
+        assert row["rendered_html"] is None
 
 
 def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection) -> None:

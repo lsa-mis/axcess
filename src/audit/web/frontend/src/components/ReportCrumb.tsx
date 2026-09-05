@@ -6,20 +6,21 @@ import { api } from "../api/client";
 /**
  * The topbar's orientation line for everything under a report.
  *
- * ``Reports › lsa-mis.github.io/axcess › Issues`` — where you are in the app,
+ * ``Reports › lsa-mis.github.io/axcess › Issues``, where you are in the app,
  * which site's evidence you are reading, and which view of it. The last
  * segment tracks the tab, so the trail and the tabs never disagree.
  *
  * Everything here is derived from the pathname, so the trail is complete on
  * the first paint of a route rather than appearing once data lands. The scan
  * query only upgrades the middle crumb from "Report #46" to the site itself,
- * and it shares ``["scan", id]`` with the routes below — a cache hit, not a
+ * and it shares ``["scan", id]`` with the routes below, a cache hit, not a
  * second request.
  */
 const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
+  [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
   [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],
   [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
@@ -28,7 +29,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/?$/, "Overview"],
 ];
 
-/** Strip the scheme and trailing slash — the host and path are the identity. */
+/** Strip the scheme and trailing slash, the host and path are the identity. */
 export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }

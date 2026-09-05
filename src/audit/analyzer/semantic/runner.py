@@ -5,7 +5,7 @@ page. It owns:
 
 * Picking which criteria to run (from ``config.semantic_criteria``).
 * Calling each analyzer in parallel via ``asyncio.gather`` (bounded
-  by the shared :class:`OllamaTextProvider` semaphore — *not* by a
+  by the shared :class:`OllamaTextProvider` semaphore, *not* by a
   per-criterion semaphore, because the bottleneck is Ollama, not
   Python's event loop).
 * Collecting :class:`SemanticFinding` rows.
@@ -39,7 +39,7 @@ async def analyze_page(
     """Run every analyzer against ``page``; return the flat list of findings.
 
     Per-criterion failures are logged at WARNING and dropped from the
-    result list — they must not bubble out and kill the page's other
+    result list, they must not bubble out and kill the page's other
     analyzers or the crawl's other pages. This mirrors the axe runner's
     behavior in ``audit.analyzer.axe`` so the failure-mode contract is
     uniform across pipelines.
@@ -47,7 +47,7 @@ async def analyze_page(
     Analyzers run concurrently via :func:`asyncio.gather`; the actual
     throttling is at the Ollama-client level (each analyzer shares the
     same :class:`OllamaTextProvider` instance and its semaphore), so
-    ``gather`` here doesn't multiply load on the daemon — it just gives
+    ``gather`` here doesn't multiply load on the daemon, it just gives
     each analyzer a chance to make progress while others wait for the
     semaphore.
     """
