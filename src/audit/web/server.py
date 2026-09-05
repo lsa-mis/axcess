@@ -2247,16 +2247,57 @@ def create_app(
                     "WHERE content_hash = ? AND blob_path IS NOT NULL",
                     (content_hash,),
                 ).fetchone()
-        if row is None:
-            raise HTTPException(status_code=404, detail="Blob not found")
-        full = blob_store.path_for(row["blob_path"]).resolve()
+        if row is not None:
+            rel_path = row["blob_path"]
+            mime = row["mime"] or "application/octet-stream"
+        else:
+            # Per-finding screenshots live in the same content-addressed store
+            # but have no `images` row: the crawler captures them from the live
+            # element, they are not image content extracted from the page. This
+            # lookup used to consider `images` only, so every circled screenshot
+            # 404'd while its file sat on disk.
+            with get_conn() as conn:
+                if _protected_scan_table_exists(conn):
+                    shot = conn.execute(
+                        """
+                        SELECT 1
+                          FROM page_a11y_findings f
+                          JOIN pages p ON p.id = f.page_id
+                         WHERE f.screenshot_hash = ?
+                           AND NOT EXISTS (
+                               SELECT 1
+                                 FROM protected_scans ps
+                                WHERE ps.scan_id = p.scan_id
+                           )
+                         LIMIT 1
+                        """,
+                        (content_hash,),
+                    ).fetchone()
+                else:
+                    shot = conn.execute(
+                        """
+                        SELECT 1
+                          FROM page_a11y_findings f
+                          JOIN pages p ON p.id = f.page_id
+                         WHERE f.screenshot_hash = ?
+                         LIMIT 1
+                        """,
+                        (content_hash,),
+                    ).fetchone()
+            if shot is None:
+                raise HTTPException(status_code=404, detail="Blob not found")
+            # `_store_screenshot` always writes PNG, and the store's layout is
+            # derived from the hash, so the path needs no extra column.
+            rel_path = f"{content_hash[:2]}/{content_hash}.png"
+            mime = "image/png"
+        full = blob_store.path_for(rel_path).resolve()
         try:
             full.relative_to(blob_store.root.resolve())
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Path outside blob root") from exc
         if not full.exists():
             raise HTTPException(status_code=404, detail="Blob file missing")
-        return FileResponse(full, media_type=row["mime"] or "application/octet-stream")
+        return FileResponse(full, media_type=mime)
 
     return app
 

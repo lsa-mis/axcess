@@ -753,45 +753,74 @@ async def test_scan_mode_choice_is_a_radio_group_that_keeps_other_params(
 async def test_tracking_coverage_table_filters_and_sorts(
     live_server: tuple[str, int],
 ) -> None:
-    """The coverage matrix can be narrowed and reordered, and says so."""
+    """The coverage matrix can be narrowed and reordered, and says so.
+
+    The tracker splits criteria into two views: "Current coverage" (what
+    Axcess checks, filterable by method) and "Not covered yet" (the
+    manual-only long tail). "Manual only" is therefore a view, not one of the
+    method filters — filtering the covered table by it would always be empty.
+    Expectations are derived from /api/tracking so this cannot drift again
+    when a criterion changes method.
+    """
     base, _scan_id = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
+            tracking = await (await page.request.get(f"{base}/api/tracking")).json()
+            criteria = tracking["coverage"]["criteria"]
+            covered = [c for c in criteria if c["method"] != "manual"]
+            manual = [c for c in criteria if c["method"] == "manual"]
+            assert covered and manual, "fixture needs both covered and manual criteria"
+            labels = tracking["coverage"]["method_labels"]
+
             await page.goto(f"{base}/app/tracking", wait_until="networkidle")
-
-            manual = page.get_by_role("group", name="Filter coverage by method").get_by_role(
-                "button", name=re.compile(r"^Manual only")
-            )
-            await manual.click()
-            await playwright_async.expect(manual).to_have_attribute("aria-pressed", "true")
-            assert "method=manual" in page.url
             matrix = page.get_by_role(
-                "table",
-                name="Every WCAG 2.2 A/AA success criterion and how Axcess covers it",
+                "table", name="WCAG 2.2 A/AA criteria with current Axcess coverage"
             )
-            coverage_cells = matrix.locator("tbody tr td:nth-child(4)")
-            labels = set(await coverage_cells.all_inner_texts())
-            assert labels == {"Manual only"}, labels
+            methods = page.get_by_role("group", name="Filter coverage by method")
 
-            reset = page.get_by_role("group", name="Filter coverage by method").get_by_role(
-                "button", name=re.compile(r"^All")
-            )
+            # Narrowing to one method leaves only that method's rows.
+            automated = methods.get_by_role("button", name=re.compile(r"^Automated"))
+            await automated.click()
+            await playwright_async.expect(automated).to_have_attribute("aria-pressed", "true")
+            assert "method=automated" in page.url
+            coverage_cells = matrix.locator("tbody tr td:nth-child(4)")
+            shown_labels = set(await coverage_cells.all_inner_texts())
+            assert shown_labels == {labels["automated"]}, shown_labels
+
+            reset = methods.get_by_role("button", name=re.compile(r"^All"))
             await reset.click()
             await playwright_async.expect(matrix.locator("tbody tr th[scope='row']")).to_have_count(
-                55
+                len(covered)
             )
 
             # Success criteria sort as numbers: 1.4.4 before 1.4.10.
             sc_header = matrix.get_by_role("columnheader", name="SC")
             await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "ascending")
-            shown = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
-            assert shown == sorted(shown, key=lambda sc: tuple(int(part) for part in sc.split(".")))
+            ascending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+            assert ascending == sorted(
+                ascending, key=lambda sc: tuple(int(part) for part in sc.split("."))
+            )
 
             await sc_header.get_by_role("button").click()
             await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "descending")
-            assert await matrix.locator("tbody tr th[scope='row']").first.inner_text() == "4.1.3"
+            descending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+            assert descending == list(reversed(ascending))
+
+            # The manual-only long tail is its own view, and it is the rest of
+            # the criteria — the two views together account for all of them.
+            await (
+                page.get_by_role("group", name="Tracker sections")
+                .get_by_role("button", name="Not covered yet")
+                .click()
+            )
+            uncovered = page.get_by_role(
+                "table", name="WCAG 2.2 A/AA criteria not covered by Axcess yet"
+            )
+            await playwright_async.expect(
+                uncovered.locator("tbody tr th[scope='row']")
+            ).to_have_count(len(manual))
         finally:
             await browser.close()
 

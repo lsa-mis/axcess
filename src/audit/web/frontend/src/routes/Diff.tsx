@@ -85,7 +85,7 @@ export default function DiffRoute() {
         {(data.limitations.length > 0 || data.coverage?.length > 0) && <Card className="mb-5 px-4 py-2 text-sm">
           <p className="py-2 text-fg-muted">{data.limitations.length > 0 ? "Some checks have gaps or differences. Read these before treating a missing finding as a fix." : "Check which methods ran in each report before interpreting the results."}</p>
           <details open={!data.baseline}>
-            <summary className="min-h-target cursor-pointer focus-visible:outline-none focus-visible:shadow-focus content-center py-2 font-semibold">What was checked · Coverage details{data.limitations.length > 0 ? ` · ${data.limitations.length} notes` : ""}</summary>
+            <summary className="min-h-target cursor-pointer focus-visible:outline-none focus-visible:shadow-focus content-center py-2 font-semibold">Comparison coverage{data.limitations.length > 0 ? ` · ${data.limitations.length} notes` : ""}</summary>
             {data.coverage?.length > 0 && <table className="my-2 w-full text-xs">
               <caption className="sr-only">Detection method coverage in the compared reports</caption>
               <thead><tr><th scope="col" className="p-2 text-left">Method</th><th scope="col" className="p-2 text-left">Before</th><th scope="col" className="p-2 text-left">After</th></tr></thead>

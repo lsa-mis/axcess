@@ -249,7 +249,7 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
             await playwright_async.expect(
                 page.get_by_text("The finding and page counts are unchanged", exact=False)
             ).to_be_visible()
-            coverage = page.locator("summary").filter(has_text="What was checked")
+            coverage = page.locator("summary").filter(has_text="Comparison coverage")
             await coverage.focus()
             await page.keyboard.press("Enter")
             await playwright_async.expect(
@@ -395,7 +395,13 @@ async def test_actual_comparison_links_reach_stored_finding(
             ).to_be_visible()
             violations = await _run_axe(page)
             assert not violations, _render_violations(violations)
+            # Each snapshot keeps its evidence behind an "Example evidence"
+            # disclosure, so the link is in the DOM but not yet focusable.
+            # Open the one holding this link, by keyboard, before following it.
             link = page.locator(f'a[href="/app{target}"]')
+            await link.locator("xpath=ancestor::details[1]").locator("summary").focus()
+            await page.keyboard.press("Enter")
+            await playwright_async.expect(link).to_be_visible()
             await link.focus()
             await page.keyboard.press("Enter")
             await page.wait_for_url(f"{base}/app{target}")

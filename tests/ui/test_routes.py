@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import sqlite3
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -1167,6 +1168,53 @@ def test_blob_serves_png_bytes(client: TestClient, seeded_db: tuple[object, obje
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/")
     assert resp.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_blob_serves_a_finding_screenshot(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """A circled finding screenshot is served even though it has no image row.
+
+    Finding screenshots are written straight to the content-addressed store by
+    the crawler; they are evidence about an element, not image content lifted
+    off the page, so nothing inserts them into ``images``. The blob route used
+    to resolve hashes against that table alone, which 404'd every screenshot on
+    the page-evidence view while the PNG sat on disk.
+    """
+    db_path, blob_dir, _scan_id = seeded_db
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    content_hash = hashlib.sha256(png).hexdigest()
+    shard = blob_dir / content_hash[:2]
+    shard.mkdir(parents=True, exist_ok=True)
+    (shard / f"{content_hash}.png").write_bytes(png)
+
+    conn = connect(db_path)
+    try:
+        page_id, scan_id = conn.execute("SELECT id, scan_id FROM pages LIMIT 1").fetchone()[:2]
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings (
+                page_id, scan_id, rule_id, help, target_selector, target_hash,
+                status, created_at, updated_at, screenshot_hash, engine_outcome,
+                pipeline
+            ) VALUES (?, ?, 'color-contrast', 'Contrast (Minimum)', 'main p',
+                      'deadbeef', 'new', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                      ?, 'failed', 'axe')
+            """,
+            (page_id, scan_id, content_hash),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get(f"/blobs/{content_hash}")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/png")
+    assert resp.content == png
 
 
 def test_blob_rejects_invalid_hash(client: TestClient) -> None:
