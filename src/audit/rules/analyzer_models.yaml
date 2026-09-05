@@ -4,10 +4,10 @@
 # should this analyzer use." The codebase reads it through
 # `src/audit/analyzer/model_registry.py`. Three things drive each row:
 #
-#   1. Task shape — vision / text / code-aware / reasoning-heavy.
-#   2. Output discipline — does the model reliably emit valid JSON when
+#   1. Task shape, vision / text / code-aware / reasoning-heavy.
+#   2. Output discipline, does the model reliably emit valid JSON when
 #      asked? (We test against the structured-output behavior of each.)
-#   3. Hardware budget — every entry has to fit on Apple Silicon
+#   3. Hardware budget, every entry has to fit on Apple Silicon
 #      consumer hardware (M-series, ≤32GB RAM) running through Ollama.
 #
 # All models are pullable via `ollama pull <tag>` and free to run.
@@ -17,7 +17,7 @@
 # Last reviewed: 2026-08.
 
 # ---------------------------------------------------------------------
-# Default models — used when an analyzer has no explicit override.
+# Default models, used when an analyzer has no explicit override.
 # These are the "safe" picks: strong instruction following, reliable
 # JSON output, broad criterion coverage.
 # ---------------------------------------------------------------------
@@ -44,7 +44,7 @@ defaults:
     fast:    "llama3.2:3b-instruct"
 
   code:
-    # DOM-heavy criteria (SC 1.3.1, 4.1.2) — code-tuned variants parse
+    # DOM-heavy criteria (SC 1.3.1, 4.1.2), code-tuned variants parse
     # HTML / ARIA attributes more reliably than general models.
     primary: "qwen2.5-coder:7b-instruct"
     fast:    "qwen2.5-coder:3b-instruct"
@@ -73,7 +73,7 @@ defaults:
 criteria:
 
   "1.1.1":
-    title: "Non-text Content — alt-text descriptiveness"
+    title: "Non-text Content: alt-text descriptiveness"
     kind: vision
     primary: "qwen2.5-vl:7b"
     fast: "qwen3-vl:2b-instruct"
@@ -104,12 +104,12 @@ criteria:
       calibration suite establishes measured precision.
 
   "1.2.1":
-    title: "Audio-only (Prerecorded) — transcript presence"
+    title: "Audio-only (Prerecorded): transcript presence"
     kind: text
     primary: "qwen2.5:7b-instruct"
     fast: "llama3.2:3b-instruct"
     rationale: |
-      Light judgement over nearby link labels + surrounding text — is a
+      Light judgement over nearby link labels + surrounding text, is a
       transcript reachable for an <audio> element? Pure text; a small
       model is plenty.
 
@@ -122,12 +122,12 @@ criteria:
       Needs only the link text + a few ancestor/sibling elements.
       Token-light. 7B is plenty. Currently pinned to gemma2:9b for
       the Phase-9.1 demo because that's the model already on the
-      developer machine — swap back to qwen2.5:7b-instruct for the
+      developer machine, swap back to qwen2.5:7b-instruct for the
       Phase-9.4 calibration runs where the precision numbers are
       pinned against the qwen baseline.
 
   "2.4.6":
-    title: "Headings and Labels — descriptiveness"
+    title: "Headings and Labels: descriptiveness"
     kind: text
     primary: "qwen2.5:7b-instruct"
     rationale: |
@@ -163,7 +163,7 @@ criteria:
     kind: code
     primary: "qwen2.5-coder:7b-instruct"
     rationale: |
-      DOM structure check — semantic markup vs styled divs, list-
+      DOM structure check, semantic markup vs styled divs, list-
       element parents, etc. Code-tuned model handles the HTML
       structure better than the general 7B.
 
@@ -172,7 +172,7 @@ criteria:
     kind: code
     primary: "qwen2.5-coder:7b-instruct"
     rationale: |
-      ARIA attribute validation. Code model is the right call —
+      ARIA attribute validation. Code model is the right call,
       same reasoning as 1.3.1.
 
 
@@ -184,7 +184,7 @@ criteria:
 # ---------------------------------------------------------------------
 fetch_set:
   required:
-    - "qwen3-vl:2b-instruct" # SC 1.4.5 — 1.9GB local vision default
+    - "qwen3-vl:2b-instruct" # SC 1.4.5, 1.9GB local vision default
     - "qwen2.5:7b-instruct"  # default text + most criteria
   recommended:
     - "qwen2.5-vl:7b"        # vision criteria w/ improved OCR

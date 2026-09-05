@@ -1,16 +1,16 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { createElement, forwardRef, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
 
-/** Severity chip — pairs color + text, so the signal isn't color-only. */
+/** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
   return <span className={cn("sev-chip", `sev-chip--${value}`)}>{value}</span>;
 }
 
-/** Status chip that uses neutral surfaces — we DON'T color-code status,
+/** Status chip that uses neutral surfaces, we DON'T color-code status,
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
@@ -76,7 +76,7 @@ export function StatCard({
   );
 }
 
-/** Page header — breadcrumb + title + trailing actions. */
+/** Page header, breadcrumb + title + trailing actions. */
 export function PageHeader({
   title,
   subtitle,
@@ -107,7 +107,7 @@ export function PageHeader({
                   // mounted under basename="/app", and a raw anchor would
                   // navigate to ``/scans`` (legacy Jinja UI) instead of the
                   // SPA's ``/app/scans`` route. Same goes for any internal
-                  // breadcrumb target — always Link, never <a>.
+                  // breadcrumb target, always Link, never <a>.
                   <Link
                     className="rounded-2xs text-fg-muted no-underline hover:text-fg hover:underline hover:underline-offset-2"
                     to={c.to}
@@ -174,27 +174,27 @@ export function EmptyState({
 /**
  * Shared chrome for ``Button`` and ``LinkButton`` so a primary <button>
  * and a primary <Link>-styled-as-button look identical. Keeping this in
- * one place is the single source of truth for action affordances — if a
+ * one place is the single source of truth for action affordances, if a
  * designer changes "primary" to a different blue, both elements update.
  *
  * **Sizing.** Three sizes, all of which clear the WCAG 2.2 SC 2.5.5
  * (AAA, 44×44) floor. The `size` prop is therefore *visual emphasis*,
  * not a way to drop below the floor:
  *
- * - `lg` — primary page-level CTA. Use when there is exactly one
+ * - `lg`, primary page-level CTA. Use when there is exactly one
  *   "the thing the user came here to do" on a route ("Start crawl",
  *   "Start a new scan", "Save"). Larger type, more padding, stands out
  *   in the visual hierarchy.
- * - `md` — every other action. The default. Buttons in cards, table
+ * - `md`, every other action. The default. Buttons in cards, table
  *   row actions, modal confirms, secondary affordances. Still 44×44.
- * - `sm` — *only* dense table cells where a 44px button would crowd
+ * - `sm`, *only* dense table cells where a 44px button would crowd
  *   the row layout. Pairs with `min-h-target` on the parent `<td>` so
  *   the *click target* is still 44×44 even though the chip is shorter.
  *   Use sparingly; if you reach for `sm`, double-check the layout
  *   actually needs it.
  *
  * **Why a baseline of `md` = 44px.** The Phase 1 baseline scan flagged
- * `py-1.5 text-sm` row buttons as ~30px tall — a SC 2.5.5 fail. The
+ * `py-1.5 text-sm` row buttons as ~30px tall, a SC 2.5.5 fail. The
  * earlier Phase 2 fix only addressed the checkbox; this sweep finishes
  * the job for the entire button surface.
  */
@@ -205,12 +205,12 @@ const BUTTON_BASE =
   "inline-flex items-center justify-center gap-2 rounded-xs font-semibold shadow-sm transition-[background-color,border-color,box-shadow,transform] duration-150 no-underline disabled:cursor-not-allowed disabled:opacity-60 active:translate-y-px";
 
 const SIZE_CLASSES: Record<Size, string> = {
-  // `sm` is sub-44px on its own — callers must wrap in a min-h-target cell
+  // `sm` is sub-44px on its own, callers must wrap in a min-h-target cell
   // when used in tables. Documented above; not the default.
   sm: "px-2.5 py-1 text-xs",
-  // `md` is the baseline — 44×44 hit target via min-h-target.
+  // `md` is the baseline, 44×44 hit target via min-h-target.
   md: "min-h-target px-4 py-2.5 text-sm",
-  // `lg` is the primary-CTA size — 52px tall, larger type for visual weight.
+  // `lg` is the primary-CTA size, 52px tall, larger type for visual weight.
   lg: "min-h-[52px] px-6 py-3 text-base",
 };
 
@@ -230,8 +230,8 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
 };
-// forwardRef so callers that must move focus back to the trigger — a
-// disclosure closing on Escape, for one — can hold the element itself
+// forwardRef so callers that must move focus back to the trigger, a
+// disclosure closing on Escape, for one, can hold the element itself
 // instead of re-querying the DOM for it.
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button({ variant = "secondary", size = "md", className, ...rest }, ref) {
@@ -253,7 +253,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 /**
  * Internal styled link that LOOKS like a button. Always renders a Router
  * ``<Link>`` so the SPA basename is honored and the click is intercepted
- * — never a raw ``<a href>`` (which under ``basename="/app"`` would
+ *, never a raw ``<a href>`` (which under ``basename="/app"`` would
  * silently navigate to the legacy Jinja UI).
  *
  * Use this anywhere a styled "go to another SPA route" affordance is
@@ -289,7 +289,7 @@ export function LinkButton({
  *
  * The SPA is mounted at ``basename="/app"``, which means
  * ``<Link to="/api/scans/.../export/csv">`` rewrites to
- * ``/app/api/scans/.../export/csv`` — a path React Router doesn't
+ * ``/app/api/scans/.../export/csv``, a path React Router doesn't
  * recognize, so the user sees a 404 page instead of the file. Even
  * ``reloadDocument`` doesn't help because the URL prefix has already
  * been applied by the time the browser navigates.
@@ -343,7 +343,7 @@ export function DownloadLink({
  * browser, which is why the href must be http(s).
  *
  * Pass ``aria-label`` whenever the visible text is hidden at small
- * widths, and say "opens in a new tab" in it — the new window is a
+ * widths, and say "opens in a new tab" in it, the new window is a
  * change of context the user should hear about before they activate it
  * (WCAG 3.2.5).
  */
@@ -385,7 +385,7 @@ export function ExternalLinkButton({
  * DOM state with React state is a footgun. Native ``<details>`` also
  * gives no way to style the open state of the summary row or to swap the
  * marker for our own caret, which is exactly the affordance users told
- * us was missing — nothing on the row said "this can be clicked" or
+ * us was missing, nothing on the row said "this can be clicked" or
  * "this is now open".
  *
  * **The panel is always mounted and hidden with the ``hidden``
@@ -451,7 +451,7 @@ export function Disclosure({
   );
 }
 
-/** Alt-attribute pill (missing / empty / authored) — Siteimprove-style tag. */
+/** Alt-attribute pill (missing / empty / authored), Siteimprove-style tag. */
 export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
     return (
@@ -476,7 +476,7 @@ export function AltTag({ value }: { value: string | null }) {
 
 /**
  * Color-coded scan status. Unlike findings (where status is workflow and we
- * stay neutral), scan status is operational state — running scans want a
+ * stay neutral), scan status is operational state, running scans want a
  * "live" pulse, failures want red, interrupted wants amber. This is the
  * only place in the SPA we color-code status.
  *
@@ -505,11 +505,11 @@ export function ScanStatusBadge({ value }: { value: ScanStatus }) {
 }
 
 /**
- * Accessible checkbox — promoted out of NewScan for reuse.
+ * Accessible checkbox, promoted out of NewScan for reuse.
  *
  * **Why a custom component over a styled native input.**
  * The audit baseline scan flagged the New-Scan form's native checkboxes
- * as 13×13 px — failing WCAG 2.2 SC 2.5.8 (AA, 24×24) and the AAA
+ * as 13×13 px, failing WCAG 2.2 SC 2.5.8 (AA, 24×24) and the AAA
  * SC 2.5.5 (44×44). This component keeps the *visual* control at 22 px
  * (recognisable as a checkbox; respects platform conventions) but makes
  * the *whole label row* a 44 px hit target by wrapping the input in a
@@ -520,11 +520,11 @@ export function ScanStatusBadge({ value }: { value: ScanStatus }) {
  * **Variants.**
  * - `tone="warning"`: when checked, renders a soft amber surface to
  *   reinforce that the option has a real consequence (used for
- *   "Ignore robots.txt"). Color is reinforcement, never the only signal —
+ *   "Ignore robots.txt"). Color is reinforcement, never the only signal,
  *   the label text and the optional `hint` carry the actual meaning.
  *
  * **Focus.** Uses the global `focus-visible:` outline (solid UMich Blue,
- * 3 px). Don't add a per-component ring — single source of truth keeps
+ * 3 px). Don't add a per-component ring, single source of truth keeps
  * focus consistent across every interactive element.
  */
 export function Checkbox({
@@ -547,7 +547,7 @@ export function Checkbox({
   name?: string;
   disabled?: boolean;
   /**
-   * Id of an element that explains the consequence of ticking this box —
+   * Id of an element that explains the consequence of ticking this box,
    * for the authorization checkbox, the note describing what the visible
    * browser does during sign-in. The `hint` prop is part of the label
    * (and so of the accessible name); this is a description instead,
@@ -577,7 +577,7 @@ export function Checkbox({
         aria-describedby={describedBy}
         // 22×22 visual control. Padding on the parent label provides the
         // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
-        // surface for the unchecked state — SC 1.4.11.
+        // surface for the unchecked state, SC 1.4.11.
         className={cn(
           "mt-0.5 h-[22px] w-[22px] shrink-0 rounded-2xs",
           disabled ? "cursor-not-allowed" : "cursor-pointer",
@@ -600,21 +600,23 @@ export function Checkbox({
 }
 
 /**
- * PageLink — standardized rendering for "click to see the actual page
- * that has the issue." Used everywhere a page URL surfaces.
+ * PageLink, standardized rendering for "open this page's in-app inspector."
+ * Used everywhere a page URL surfaces.
  *
- * Visual contract (mirrors Siteimprove's pattern):
- *   • Primary affordance: page title (or URL when title is missing) is
- *     the link, opens the actual page in a new tab. Visible "↗" icon
- *     plus an sr-only "opens in a new tab" announce makes the affordance
- *     unambiguous to both sighted and screen-reader users.
- *   • Secondary affordance: a smaller "view in audit" link goes to our
- *     in-app /pages/{id} view where image thumbnails + filtered axe
- *     findings live. Smaller treatment so the external link reads as
- *     primary.
+ * Visual contract:
+ *   • Primary affordance: page title (or URL when title is missing) is the
+ *     link, and it opens the IN-APP page/DOM inspector, it no longer sends
+ *     the reviewer to the live site in a new tab. The inspector re-renders
+ *     the page and (when ``selector``/``issue`` is supplied) circles the
+ *     flagged element, and it shows the loaded DOM.
+ *   • Secondary affordances (small, muted): "open live page ↗" for the rare
+ *     case the reviewer wants the real site, and "stored evidence" for the
+ *     in-app /pages/{id} view (findings + image thumbnails).
+ *   • ``origin`` / ``context`` / ``backTo`` travel to the inspector so the
+ *     reviewer always knows which view they came from and how to return.
  *
- * Centralizing this is what makes the link-sweep durable — future
- * routes that show a page URL use <PageLink> and inherit the contract.
+ * Centralizing this is what makes the link-sweep durable, every route that
+ * shows a page URL uses <PageLink> and inherits the contract.
  */
 export function PageLink({
   pageId,
@@ -622,62 +624,131 @@ export function PageLink({
   pageUrl,
   pageTitle,
   showUrlBelow = true,
+  selector = null,
+  snippet = null,
+  issue = null,
+  origin,
+  context,
+  contextTo,
+  backTo,
 }: {
   pageId: number;
-  /** Report scope required for the in-app evidence route. */
+  /** Report scope required for the in-app inspector route. */
   scanId?: number;
   pageUrl: string;
   pageTitle?: string | null;
   /** Show the raw URL as a microcopy line below the title. */
   showUrlBelow?: boolean;
+  /** Target selector to circle on the inspected page (when known directly). */
+  selector?: string | null;
+  /** Exact element markup (html_snippet), the most reliable locator. */
+  snippet?: string | null;
+  /** Issue key to resolve the selector for (used when ``selector`` is absent). */
+  issue?: string | null;
+  /** Label of the view this link lives in (orientation breadcrumb). */
+  origin?: string;
+  /** Short context label (rule/issue/finding) shown on the inspector. */
+  context?: string;
+  /** In-app path the context label links to (issue detail, finding, …). */
+  contextTo?: string;
+  /** In-app path the inspector's "Back" link returns to. */
+  backTo?: string;
 }) {
   const display = pageTitle?.trim() || pageUrl;
+
+  // Build the inspector URL with whatever orientation/selector context the
+  // caller can offer. The params are kept sparse so the route stays legible.
+  const inspectTo = (() => {
+    if (scanId == null) return null;
+    const params = new URLSearchParams();
+    if (selector) params.set("selector", selector);
+    // The snippet (exact element markup) is the reliable locator; the DB caps
+    // it at 4000 chars, so mirror that, no point truncating below the source.
+    if (snippet) params.set("snippet", snippet.slice(0, 4000));
+    if (issue) params.set("issue", issue);
+    if (origin) params.set("origin", origin);
+    if (context) params.set("context", context);
+    if (contextTo) params.set("contextTo", contextTo);
+    if (backTo) params.set("back", backTo);
+    const qs = params.toString();
+    return `/scans/${scanId}/pages/${pageId}/inspect${qs ? `?${qs}` : ""}`;
+  })();
+
   return (
     <div className="min-w-0">
-      <a
-        href={pageUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
-      >
-        <span className="break-words">{display}</span>
-        <span aria-hidden className="text-2xs">
-          ↗
-        </span>
-        <span className="sr-only">opens in a new tab</span>
-      </a>
+      {inspectTo ? (
+        <Link
+          to={inspectTo}
+          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+        >
+          <ScanEye className="h-3.5 w-3.5 shrink-0 self-center text-fg-subtle" aria-hidden />
+          <span className="break-words">{display}</span>
+          <span className="sr-only">, opens the in-app page inspector</span>
+        </Link>
+      ) : (
+        // Without a scan scope there is no in-app inspector to link to; keep
+        // the external affordance as the fallback.
+        <a
+          href={pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+        >
+          <span className="break-words">{display}</span>
+          <span aria-hidden className="text-2xs">
+            ↗
+          </span>
+          <span className="sr-only">opens in a new tab</span>
+        </a>
+      )}
       {showUrlBelow && pageTitle && (
         <div className="break-all text-2xs text-fg-subtle" title={pageUrl}>
           {pageUrl}
         </div>
       )}
-      {scanId != null && (
-        <Link
-          to={`/scans/${scanId}/pages/${pageId}`}
-          className="mt-1 inline-block text-2xs text-fg-muted underline underline-offset-2 hover:text-fg"
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-fg-muted">
+        <a
+          href={pageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-fg"
         >
-          view evidence →
-        </Link>
-      )}
+          open live page ↗
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        {scanId != null && (
+          <>
+            <span aria-hidden className="text-fg-subtle">
+              ·
+            </span>
+            <Link
+              to={`/scans/${scanId}/pages/${pageId}`}
+              className="underline underline-offset-2 hover:text-fg"
+            >
+              stored evidence
+            </Link>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 /**
  * Render an ISO-8601 timestamp as a short, human-friendly relative string
- * (``"2h ago"``, ``"3d ago"``). Returns ``"—"`` for null/empty input so
+ * (``"2h ago"``, ``"3d ago"``). Returns ``"n/a"`` for null/empty input so
  * callers don't have to guard.
  *
- * We round down — "59 minutes" reads as "59m ago", not "1h ago" — because
+ * We round down, "59 minutes" reads as "59m ago", not "1h ago", because
  * scan timing matters for the user ("did this finish recently?") and
  * over-rounding hides recency. The full ISO timestamp should be passed
  * via a ``title`` attribute on the wrapping element so hovering reveals
  * the exact moment; this helper only formats, it doesn't render.
  */
 export function relativeTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "n/a";
   const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return "—";
+  if (Number.isNaN(ts)) return "n/a";
   const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;

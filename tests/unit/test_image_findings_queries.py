@@ -131,9 +131,9 @@ def scan(tmp_db: sqlite3.Connection) -> int:
 
 
 def test_group_label_renders_human_readable() -> None:
-    assert group_label("essential", "missing") == "Essential image — missing alt"
-    assert group_label("logo", "adequate") == "Logo — adequate alt"
-    assert group_label(None, "missing") == "Image (unclassified) — missing alt"
+    assert group_label("essential", "missing") == "Essential image, missing alt"
+    assert group_label("logo", "adequate") == "Logo, adequate alt"
+    assert group_label(None, "missing") == "Image (unclassified), missing alt"
 
 
 def test_grouped_findings_shape(tmp_db: sqlite3.Connection, scan: int) -> None:

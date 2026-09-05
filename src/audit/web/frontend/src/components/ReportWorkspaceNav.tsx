@@ -2,12 +2,12 @@ import { Link, useLocation } from "react-router";
 import { cn } from "../lib/cn";
 
 /**
- * Report navigation: overview, the issue table, and optional comparison.
+ * Report navigation: overview, the issue table, and change verification.
  *
  * These are three *views of the same report*, not three steps of a task, so
  * they render as underline tabs. The earlier numbered-pill treatment read as
  * a wizard ("1 Overview → 2 Issues → 3 Verify changes") and implied both an
- * order and a completion state that the report does not have — users asked
+ * order and a completion state that the report does not have, users asked
  * what they were supposed to have finished in step 1.
  */
 export default function ReportWorkspaceNav({
@@ -30,13 +30,11 @@ export default function ReportWorkspaceNav({
       active: pathname.includes("/issues"),
     },
   ];
-  if (previousScanId != null) {
-    items.push({
-      label: "Verify changes",
-      to: `/scans/${scanId}/diff?compare_to=${previousScanId}`,
-      active: pathname.includes("/diff"),
-    });
-  }
+  items.push({
+    label: "Verify changes",
+    to: `/scans/${scanId}/diff${previousScanId != null ? `?compare_to=${previousScanId}` : ""}`,
+    active: pathname.includes("/diff"),
+  });
 
   return (
     <nav
@@ -51,8 +49,8 @@ export default function ReportWorkspaceNav({
             <Link
               to={item.to}
               aria-current={item.active ? "page" : undefined}
-              // The active tab is marked three ways — weight, color, and the
-              // underline bar — so the current view is never color-only.
+              // The active tab is marked three ways, weight, color, and the
+              // underline bar, so the current view is never color-only.
               className={cn(
                 "inline-flex min-h-target items-center whitespace-nowrap border-b-2 px-0.5 text-sm font-semibold no-underline transition-colors",
                 item.active

@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root container");
 
-// Match Vite's `base` — production bundle is served under /app/, dev is /.
+// Match Vite's `base`, production bundle is served under /app/, dev is /.
 const BASENAME = import.meta.env.PROD ? "/app" : "/";
 
 ReactDOM.createRoot(root).render(

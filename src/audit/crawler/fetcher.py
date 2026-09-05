@@ -1,6 +1,6 @@
 """Async HTTP fetcher for static pages.
 
-Returns every completed HTTP response as a :class:`FetchResult` — 4xx/5xx are
+Returns every completed HTTP response as a :class:`FetchResult`, 4xx/5xx are
 not raised, since the caller wants to persist the status. Only genuine network
 failures (DNS, timeout, connection reset) raise :class:`FetchError`.
 """
@@ -35,7 +35,7 @@ class FetchResult:
 
     ``axe_violations`` is populated only by :class:`JsFetcher` when it
     has been constructed with an :class:`AxeAnalyzer`. The static
-    :class:`StaticFetcher` always leaves it empty — axe needs a rendered
+    :class:`StaticFetcher` always leaves it empty, axe needs a rendered
     DOM, which httpx cannot provide. Every page goes through Playwright
     by default; only ``--static-only`` crawls hit this gap.
     """
@@ -55,10 +55,10 @@ class FetchResult:
     # 1.4.12). Same population rules as the keyboard probe; default on,
     # ``--skip-responsive`` disables.
     responsive_findings: tuple[ResponsiveFinding, ...] = field(default=())
-    # SC 2.4.11 Focus Not Obscured — live-page focus probe results. Same
+    # SC 2.4.11 Focus Not Obscured, live-page focus probe results. Same
     # population rules: JsFetcher only, default on, ``--skip-focus`` disables.
     focus_findings: tuple[FocusFinding, ...] = field(default=())
-    # SC 1.3.2 Meaningful Sequence — visual (VLM) probe. JsFetcher only;
+    # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())
     # Violations reachable only by operating a control (opening a menu,

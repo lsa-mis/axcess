@@ -1,4 +1,4 @@
-# WCAG 2.2 Level A + AA coverage matrix — the authoritative source of truth
+# WCAG 2.2 Level A + AA coverage matrix, the authoritative source of truth
 # for "what Axcess checks automatically, what it AI-assists, and what still
 # needs manual testing." Every A/AA success criterion is listed exactly once.
 #
@@ -11,7 +11,7 @@
 #                   but meaningful manual testing remains (most axe rules).
 #   - `ai-assisted` when a local model flags candidates that a human must
 #                   confirm (image-of-text VLM, semantic LLM).
-#   - `manual`      when no Axcess pipeline detects it — a human must test it.
+#   - `manual`      when no Axcess pipeline detects it, a human must test it.
 #
 # EVERY criterion carries a `manual_check`: even fully automated SCs usually
 # leave a residual human judgement. This is what powers the per-scan
@@ -29,7 +29,7 @@ meta:
   wcag_version: "2.2"
   levels: [A, AA]
   note: >-
-    Level A + AA only — the standard legal/conformance target. WCAG 2.2
+    Level A + AA only, the standard legal/conformance target. WCAG 2.2
     removed 4.1.1 Parsing, so it is intentionally absent. AAA criteria are
     out of scope for this matrix (the tool still audits its own UI at AAA).
 
@@ -45,8 +45,8 @@ criteria:
       axe flags missing alt on img / area / input[type=image] and unlabelled
       SVGs; the image-of-text VLM separately flags pictures that are really text.
     manual_check: >-
-      Whether the alt text that IS present is a meaningful equivalent — and the
-      decorative-vs-informative call — needs a human.
+      Whether the alt text that IS present is a meaningful equivalent, and the
+      decorative-vs-informative call, needs a human.
 
   - sc: "1.2.1"
     name: "Audio-only and Video-only (Prerecorded)"
@@ -59,7 +59,7 @@ criteria:
       text alternative is reachable (nearby "Transcript" link / surrounding text).
     manual_check: >-
       Confirm the transcript is accurate and equivalent. Video-only (silent
-      video) can't be detected from the DOM — still a manual check.
+      video) can't be detected from the DOM, still a manual check.
 
   - sc: "1.2.2"
     name: "Captions (Prerecorded)"
@@ -139,7 +139,7 @@ criteria:
     automated_check: ""
     manual_check: >-
       Read instructions for reliance on shape/size/location/sound alone
-      ("click the round button to the right") — judgement only a human can make.
+      ("click the round button to the right"), judgement only a human can make.
 
   - sc: "1.3.4"
     name: "Orientation"
@@ -162,7 +162,7 @@ criteria:
       axe validates that any autocomplete tokens used are valid.
     manual_check: >-
       Confirm autocomplete IS present on fields collecting the user's own info
-      (name, email, address) — missing autocomplete isn't auto-detected.
+      (name, email, address), missing autocomplete isn't auto-detected.
 
   - sc: "1.4.1"
     name: "Use of Color"
@@ -174,8 +174,8 @@ criteria:
       axe flags links distinguished from surrounding text by colour alone
       (a narrow heuristic).
     manual_check: >-
-      Most colour-only meaning — form errors, chart series, required-field
-      markers, status — needs a human to confirm a non-colour cue exists.
+      Most colour-only meaning, form errors, chart series, required-field
+      markers, status, needs a human to confirm a non-colour cue exists.
 
   - sc: "1.4.2"
     name: "Audio Control"
@@ -289,7 +289,7 @@ criteria:
       focus can move through the page.
     manual_check: >-
       Confirm every control (menus, custom widgets, drag handles) is fully
-      operable by keyboard — the deepest part of this SC is manual.
+      operable by keyboard, the deepest part of this SC is manual.
 
   - sc: "2.1.2"
     name: "No Keyboard Trap"
@@ -340,7 +340,7 @@ criteria:
       <marquee> as an expert-review lead.
     manual_check: >-
       CSS animations, auto-advancing carousels, and auto-updating regions
-      aren't auto-detected — confirm any content that moves >5s can be paused,
+      aren't auto-detected, confirm any content that moves >5s can be paused,
       stopped, or hidden.
 
   - sc: "2.3.1"
@@ -385,12 +385,12 @@ criteria:
     pipelines: [focus]
     confidence: medium
     automated_check: >-
-      The focus probe flags positive tabindex (WCAG failure F44) — a manual
+      The focus probe flags positive tabindex (WCAG failure F44), a manual
       tab order that overrides the natural DOM order and usually breaks the
       sequence.
     manual_check: >-
       Tab through the whole page and confirm the focus order preserves meaning
-      and operability — the order can break without a positive tabindex (e.g.
+      and operability, the order can break without a positive tabindex (e.g.
       CSS-reordered columns), which still needs a human.
 
   - sc: "2.4.4"
@@ -403,7 +403,7 @@ criteria:
       axe flags empty/unnamed links; the semantic LLM judges whether the link
       text plus its context conveys where it goes.
     manual_check: >-
-      Confirm the LLM's borderline calls ("read more", icon links) — it flags
+      Confirm the LLM's borderline calls ("read more", icon links), it flags
       strong leads, not verdicts.
 
   - sc: "2.5.1"
@@ -475,7 +475,7 @@ criteria:
       whether each heading actually describes the content it introduces.
     manual_check: >-
       Confirm the LLM's borderline heading calls, and check that form-control
-      LABELS are descriptive — label descriptiveness is not yet AI-assisted.
+      LABELS are descriptive, label descriptiveness is not yet AI-assisted.
 
   - sc: "2.4.7"
     name: "Focus Visible"
@@ -487,7 +487,7 @@ criteria:
       axe has limited checks for suppressed focus indicators.
     manual_check: >-
       Tab the whole page and confirm a clearly visible focus indicator on every
-      interactive element — largely manual.
+      interactive element, largely manual.
 
   - sc: "2.4.11"
     name: "Focus Not Obscured (Minimum)"
@@ -501,7 +501,7 @@ criteria:
       "focus hidden behind the sticky header" failure).
     manual_check: >-
       Confirm partial-overlap cases the centre-point check can miss, and tab
-      through interactively — overlays that appear only after a click still
+      through interactively, overlays that appear only after a click still
       need a human.
 
   - sc: "2.5.7"
@@ -627,7 +627,7 @@ criteria:
       axe checks a programmatic label exists; the semantic LLM judges whether
       each control's label/instructions are sufficient to know what to enter.
     manual_check: >-
-      Confirm the LLM's sufficiency calls, and test real form submissions —
+      Confirm the LLM's sufficiency calls, and test real form submissions,
       error-time instructions (SC 3.3.x) still need a human.
 
   - sc: "3.3.3"
@@ -702,4 +702,4 @@ criteria:
       axe checks for some live-region / role=status markup.
     manual_check: >-
       Confirm dynamic updates (added-to-cart, validation, search counts) are
-      actually announced — needs screen-reader testing.
+      actually announced, needs screen-reader testing.

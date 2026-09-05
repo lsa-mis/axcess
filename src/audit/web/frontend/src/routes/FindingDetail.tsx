@@ -151,14 +151,14 @@ export default function FindingDetailRoute() {
             <div className="p-8 text-center">
               <strong className="text-fg">Inline SVG</strong>
               <p className="mt-1 text-sm text-fg-muted">
-                Embedded directly in the page — no image file stored.
+                Embedded directly in the page, no image file stored.
               </p>
             </div>
           ) : data.content_hash ? (
             <img
               src={blobUrl(data.content_hash)}
               // The audited graphic itself. Avoid the literal word "image"
-              // here — screen readers already announce <img> as an image,
+              // here, screen readers already announce <img> as an image,
               // so saying "Image under audit" doubles up
               // (jsx-a11y/img-redundant-alt). The wider page chrome makes
               // it clear *why* the graphic is on screen; the alt only needs
@@ -201,7 +201,7 @@ export default function FindingDetailRoute() {
               <div className="mt-3">
                 <VerdictCell label="VLM classification">
                   <strong className="text-fg">
-                    {data.vlm_classification ?? "—"}
+                    {data.vlm_classification ?? "n/a"}
                   </strong>
                   {data.vlm_rationale && (
                     <p className="mt-1 text-sm italic text-fg-muted">
@@ -234,7 +234,7 @@ export default function FindingDetailRoute() {
                 </span>
               )}
             </h2>
-            {/* The triage row is the page's primary affordance — the
+            {/* The triage row is the page's primary affordance, the
                 whole reason the user is on FindingDetail. Each control
                 clears 44px (label gets a min-h-target so click-the-label
                 still works for the dropdown), the dropdown is base
@@ -306,6 +306,10 @@ export default function FindingDetailRoute() {
                       scanId={data.scan_id}
                       pageUrl={o.page_url}
                       pageTitle={null}
+                      origin="Finding"
+                      context={`Finding ${id}`}
+                      contextTo={`/findings/${id}`}
+                      backTo={`/findings/${id}`}
                     />
                   </td>
                   <td className="px-4 py-2">

@@ -3,11 +3,11 @@
 # Drives `audit/exports/audit_report.py`, which produces the
 # senior-engineer-style audit report. Each entry below corresponds to:
 #
-#   * `axe_rules[<rule_id>]` — one per axe-core rule we want to surface
+#   * `axe_rules[<rule_id>]`, one per axe-core rule we want to surface
 #     in proper card form. Rules NOT listed here still appear in the
 #     report, but flagged "human review needed" because we don't have a
 #     templated fix.
-#   * `image_findings[<key>]` — keyed on `<classification>_<adequacy>`
+#   * `image_findings[<key>]`, keyed on `<classification>_<adequacy>`
 #     so it matches the synthesizer's grouping output (e.g.
 #     `essential_missing`, `logo_adequate`).
 #
@@ -45,7 +45,7 @@ axe_rules:
       context, so the information the image conveys is unreachable.
     why_matters: >-
       Blind, low-vision, and screen-reader users get a broken version of
-      the page — the image's content is silently dropped.
+      the page, the image's content is silently dropped.
     owner: editor
     effort: under_15m
     fix_steps:
@@ -113,7 +113,7 @@ axe_rules:
         Run the pair through WebAIM's Contrast Checker. Find a darker
         foreground (or lighter background) that clears 4.5:1.
       - >-
-        Update the CSS custom property or design-system token — most
+        Update the CSS custom property or design-system token, most
         contrast failures cascade from one token, so one change
         often fixes many findings at once.
     fix_options:
@@ -172,7 +172,7 @@ axe_rules:
         If the link wraps an <img>, ensure the image has a non-empty alt
         attribute that describes the link's destination.
       - >-
-        Avoid "click here" and "read more" — write text that describes
+        Avoid "click here" and "read more", write text that describes
         the destination so users scanning a link list can decide.
     fix_options:
       - label: "Give the link visible text"
@@ -234,7 +234,7 @@ axe_rules:
         Where a visible label is impossible (icon-only inputs), add
         <code>aria-label="…"</code> directly on the input.
       - >-
-        Avoid <code>placeholder</code> as a label substitute — it
+        Avoid <code>placeholder</code> as a label substitute, it
         disappears on focus and fails most contrast thresholds.
     fix_options:
       - label: "Associate a visible label element"
@@ -343,7 +343,7 @@ axe_rules:
         entirely for natively-focusable elements).
       - >-
         If the focus order is wrong without forced tabindex, the DOM
-        order itself is wrong — reorder the HTML rather than papering
+        order itself is wrong, reorder the HTML rather than papering
         over it with tabindex.
     fix_options:
       - label: "Remove the positive tabindex values"
@@ -391,7 +391,7 @@ axe_rules:
         want to clear SC 2.5.5 (AAA) at the same time.
       - >-
         For icon-only buttons, give the wrapping <code>&lt;button&gt;</code>
-        or <code>&lt;a&gt;</code> the size, not the icon itself — the
+        or <code>&lt;a&gt;</code> the size, not the icon itself, the
         hit target is the element, not its visual contents.
     fix_options:
       - label: "Enlarge the control's hit area"
@@ -412,7 +412,7 @@ axe_rules:
           denser row or an extra control is added nearby.
     verify_manual: >-
       Inspect each affected control; the rendered box should be at
-      least 24×24 CSS pixels. Tap on a phone — it should activate
+      least 24×24 CSS pixels. Tap on a phone, it should activate
       reliably without zoom.
     verify_automated: "axe-core target-size rule passes after the fix."
     acceptance: >-
@@ -428,7 +428,7 @@ axe_rules:
     abilities_affected: [vision]
     what_happening: >-
       Links inside paragraphs rely on color alone to distinguish them
-      from the surrounding text — there's no underline, weight, or
+      from the surrounding text, there's no underline, weight, or
       icon. Users who can't perceive the color difference can't
       see the links at all.
     why_matters: >-
@@ -444,8 +444,8 @@ axe_rules:
         always is the bug.
       - >-
         If you must avoid underlines for branding reasons, use a
-        different non-color signal — bold weight, a small icon, or a
-        bottom-border — combined with at least 3:1 contrast against
+        different non-color signal, bold weight, a small icon, or a
+        bottom-border, combined with at least 3:1 contrast against
         the surrounding text.
     fix_options:
       - label: "Add a cue that does not rely on colour"
@@ -476,7 +476,7 @@ axe_rules:
 
   region:
     title: "Top-level content isn't inside a landmark"
-    wcag_sc: null      # best-practice — no SC
+    wcag_sc: null      # best-practice, no SC
     wcag_name: null
     wcag_level: null
     abilities_affected: [vision, cognition]
@@ -561,7 +561,7 @@ axe_rules:
           may not. Confirm in the accessibility tree rather than by looking at the
           page.
     verify_manual: >-
-      View source / DevTools — count the <main> elements. Should be
+      View source / DevTools, count the <main> elements. Should be
       exactly 1.
     verify_automated: "axe-core landmark-one-main rule passes after the fix."
     acceptance: >-
@@ -586,7 +586,7 @@ axe_rules:
     why_matters: >-
       Screen reader users navigate by heading. Without an outline they cannot
       jump to a section, cannot get a sense of what the page contains, and
-      cannot confirm which page they are on — they are left reading the page
+      cannot confirm which page they are on, they are left reading the page
       line by line. Sighted users with cognitive disabilities lose the same
       structural cue.
     owner: dev
@@ -645,7 +645,7 @@ axe_rules:
     wcag_level: "A"
     abilities_affected: [vision, cognition]
     what_happening: >-
-      The page uses heading levels out of order — for example, an
+      The page uses heading levels out of order, for example, an
       <h1> followed directly by an <h3> with no <h2> in between.
       The document outline becomes incoherent.
     why_matters: >-
@@ -661,7 +661,7 @@ axe_rules:
         h1 → h3).
       - >-
         If you used a heading level for visual styling, replace it
-        with a CSS class on the correct heading level — styling is
+        with a CSS class on the correct heading level, styling is
         not the same as structure.
     fix_options:
       - label: "Promote the visible text into real headings via the component's tag prop"
@@ -698,7 +698,7 @@ axe_rules:
       a time, with no skips.
     confidence_default: high
 
-# Image-of-text findings — keyed on `<classification>_<adequacy>` so the
+# Image-of-text findings, keyed on `<classification>_<adequacy>` so the
 # renderer can look up by `(group.classification, group.alt_adequacy)`.
 image_findings:
 
@@ -713,7 +713,7 @@ image_findings:
       action, signage) but have no alt attribute, or alt="" marking
       them decorative. Screen readers skip the content entirely.
     why_matters: >-
-      Blind and low-vision users get a broken version of the page —
+      Blind and low-vision users get a broken version of the page,
       the headline is silently dropped. Additionally, image text
       can't be zoomed without pixelation, translated, or selected.
     owner: editor
@@ -726,7 +726,7 @@ image_findings:
         Short-term fix: add an alt attribute matching the image's
         full visible text exactly.
     verify_manual: >-
-      With a screen reader, tab to each affected image — it should
+      With a screen reader, tab to each affected image, it should
       announce the visible text verbatim. Better: see real HTML text
       in the DOM where the image used to be.
     verify_automated: "Re-run the audit; finding moves to alt_adequacy=adequate or disappears."
@@ -774,7 +774,7 @@ image_findings:
       The alt attribute mentions some of the image's text but not all
       of it. Users get a truncated version of the content.
     why_matters: >-
-      Subtle data loss — screen-reader users may not realize content
+      Subtle data loss, screen-reader users may not realize content
       is missing, so they make decisions on incomplete information.
     owner: editor
     effort: under_15m
@@ -798,7 +798,7 @@ image_findings:
     wcag_level: "AA"
     abilities_affected: [vision]
     what_happening: >-
-      Alt matches the visible text — assistive tech reads it correctly.
+      Alt matches the visible text, assistive tech reads it correctly.
       But the content is still trapped inside a raster image: it can't
       be zoomed without blur, translated by the browser, or selected.
     why_matters: >-
@@ -814,8 +814,8 @@ image_findings:
         Use a web font or SVG with proper <text> elements if a custom
         typeface is required.
     verify_manual: >-
-      Zoom the page to 200% — text should remain sharp. Use Chrome's
-      built-in translate — text should translate.
+      Zoom the page to 200%, text should remain sharp. Use Chrome's
+      built-in translate, text should translate.
     verify_automated: "Manual / design review."
     acceptance: >-
       Essential image text is rendered as HTML text wherever feasible.
@@ -864,7 +864,7 @@ image_findings:
       Brand logos appear as <img> with no alt attribute.
     why_matters: >-
       Users who can't see the logo can't tell whose site they're on
-      from the brand mark alone — particularly an issue at the start
+      from the brand mark alone, particularly an issue at the start
       of a page when the user is still orienting.
     owner: editor
     effort: under_15m
@@ -873,7 +873,7 @@ image_findings:
         Set alt to the organization or product name (e.g.
         <code>alt="Acme Corp"</code>). If the logo links home, the
         alt should reflect that the link is the home link
-        ("Acme Corp — home" works).
+        ("Acme Corp, home" works).
     verify_manual: "Screen reader announces the brand name when focus reaches the logo."
     verify_automated: "Re-run the audit; finding moves to alt_adequacy=adequate."
     acceptance: "Each logo on the affected pages has alt text naming the organization or product."
@@ -890,7 +890,7 @@ image_findings:
       for visual texture, ornamental icons) have no alt attribute.
       Screen readers announce them as "image" with no context.
     why_matters: >-
-      Cluttered audio output — every decorative image becomes a
+      Cluttered audio output, every decorative image becomes a
       meaningless interruption.
     owner: editor
     effort: under_15m
@@ -930,9 +930,9 @@ semantic_criteria:
       cycles, modal containment, and focus inside opaque iframes or closed
       shadow roots are excluded because those observations do not prove a trap.
     why_matters: >-
-      Keyboard-only users — including people who use sip-and-puff,
+      Keyboard-only users, including people who use sip-and-puff,
       head-tracking, voice control, or simply mice with broken right
-      buttons — can't interact with any content past a trap. Screen
+      buttons, can't interact with any content past a trap. Screen
       reader users hit the same wall when navigating in focus mode.
       WCAG 2.1.2 is Level A: the lowest possible bar. Failing this
       criterion functionally locks a portion of your users out of the
@@ -973,8 +973,8 @@ semantic_criteria:
     what_happening: >-
       Our per-criterion language model reviewed every link on the page,
       together with up to five levels of ancestor context, and flagged
-      cases where the link text — alone OR with its surrounding
-      paragraph / heading / list-item — doesn't tell a user where the
+      cases where the link text, alone OR with its surrounding
+      paragraph / heading / list-item, doesn't tell a user where the
       link goes. Common offenders: "click here", "read more", "details",
       raw URLs, and icon-only links with no aria-label.
     why_matters: >-
@@ -992,7 +992,7 @@ semantic_criteria:
         download" becomes "Download the 2025 annual report (PDF)".
       - >-
         For icon-only links, add an <code>aria-label</code> that names
-        the action — e.g. <code>aria-label="Search the catalog"</code>.
+        the action, e.g. <code>aria-label="Search the catalog"</code>.
       - >-
         When the link wraps an image, give the image meaningful alt
         text describing the destination, not the picture.
@@ -1001,7 +1001,7 @@ semantic_criteria:
       Links; NVDA: K key). Every link should announce its destination
       clearly without needing the surrounding paragraph for context.
     verify_automated: >-
-      Re-run a scan with semantic analyzers enabled — the same model
+      Re-run a scan with semantic analyzers enabled, the same model
       shouldn't flag fixed links on the next pass. Watch for false
       positives that the model can't reliably distinguish (very long
       brand names, abbreviations).
@@ -1016,20 +1016,20 @@ semantic_criteria:
   #    in issues.py, same mechanism the keyboard probe uses for 2.1.2.
 
   "1.4.10":
-    title: "Content doesn't reflow — horizontal scrolling at 320px"
+    title: "Content doesn't reflow, horizontal scrolling at 320px"
     wcag_sc: "1.4.10"
     wcag_name: "Reflow"
     wcag_level: "AA"
     abilities_affected: [vision]
     what_happening: >-
       Our responsive probe resized the live page to a 320px-wide
-      viewport (the WCAG reflow baseline — equivalent to 400% zoom on
+      viewport (the WCAG reflow baseline, equivalent to 400% zoom on
       a 1280px screen) and the page needed a horizontal scrollbar.
       The finding names the widest offending element(s).
     why_matters: >-
       Low-vision users who zoom to 200-400% effectively browse at
       narrow widths. When content forces horizontal scrolling, they
-      must scroll back and forth on every single line of text —
+      must scroll back and forth on every single line of text,
       reading becomes exhausting or impossible. This also breaks the
       page for real phones.
     owner: dev
@@ -1037,7 +1037,7 @@ semantic_criteria:
     fix_steps:
       - >-
         Open the page at a 320px viewport (DevTools responsive mode).
-        Find the element named in the finding — usual culprits are
+        Find the element named in the finding, usual culprits are
         fixed-width containers (<code>width: 900px</code>), wide
         tables, unbroken long strings, and images without
         <code>max-width: 100%</code>.
@@ -1045,13 +1045,13 @@ semantic_criteria:
         Replace fixed widths with <code>max-width</code> + fluid
         units; add <code>overflow-wrap: anywhere</code> for long
         strings; wrap data tables in an <code>overflow-x: auto</code>
-        container (a scrollable *table* is allowed — a scrollable
+        container (a scrollable *table* is allowed, a scrollable
         *page* is not).
     verify_manual: >-
       DevTools responsive mode at 320px wide: no horizontal scrollbar
       on the page body, and all content remains reachable.
     verify_automated: >-
-      Re-run the crawl — the responsive probe re-checks every page at
+      Re-run the crawl, the responsive probe re-checks every page at
       320px on each pass.
     acceptance: >-
       At a 320 CSS px viewport the affected pages show all content
@@ -1073,7 +1073,7 @@ semantic_criteria:
     why_matters: >-
       Keyboard and screen-magnifier users rely on the focus indicator to
       know what they've selected. If the focused control scrolls under a
-      sticky header, they're acting blind — submitting forms or following
+      sticky header, they're acting blind, submitting forms or following
       links they can't see.
     owner: dev
     effort: under_2h
@@ -1087,9 +1087,9 @@ semantic_criteria:
         collapse on scroll, so it covers less of the viewport.
     verify_manual: >-
       Tab through the page with the keyboard. Every focused control stays
-      fully visible — none disappears under a sticky/fixed element.
+      fully visible, none disappears under a sticky/fixed element.
     verify_automated: >-
-      Re-run the crawl — the focus probe re-checks every page on each pass.
+      Re-run the crawl, the focus probe re-checks every page on each pass.
     acceptance: >-
       No focusable element is hidden behind a sticky/fixed overlay when it
       receives keyboard focus.
@@ -1105,12 +1105,12 @@ semantic_criteria:
       The focus probe found an element with a positive
       <code>tabindex</code> (e.g. <code>tabindex="1"</code>). Positive
       values pull elements to the front of the tab sequence regardless of
-      where they sit in the document — WCAG failure technique F44 — so the
+      where they sit in the document, WCAG failure technique F44, so the
       tab order stops matching the visual/reading order.
     why_matters: >-
       Keyboard and screen-reader users navigate in tab order. When a manual
-      positive tabindex reorders it, focus jumps around unpredictably —
-      skipping fields, looping oddly, or landing in the wrong place — which
+      positive tabindex reorders it, focus jumps around unpredictably,
+      skipping fields, looping oddly, or landing in the wrong place, which
       breaks meaning and operability, especially in forms.
     owner: dev
     effort: under_15m
@@ -1127,7 +1127,7 @@ semantic_criteria:
       Tab through the page. Focus moves in a sensible reading order with no
       surprising jumps, and no control is reached out of sequence.
     verify_automated: >-
-      Re-run the crawl — the focus probe re-checks for positive tabindex on
+      Re-run the crawl, the focus probe re-checks for positive tabindex on
       every page.
     acceptance: >-
       No element uses a positive tabindex; the tab order follows DOM/visual
@@ -1179,7 +1179,7 @@ semantic_criteria:
       and controls.
     why_matters: >-
       Motion that can't be stopped is a barrier for people with attention,
-      reading, or vestibular disorders — it pulls focus, makes text impossible
+      reading, or vestibular disorders, it pulls focus, makes text impossible
       to read, and can trigger nausea or migraines.
     owner: dev
     effort: under_15m
@@ -1195,7 +1195,7 @@ semantic_criteria:
       carousels, which this check doesn't catch) can be paused, stopped, or
       hidden.
     verify_automated: >-
-      Re-run the crawl — the visual probe measures actual video playback and
+      Re-run the crawl, the visual probe measures actual video playback and
       re-checks marquee elements on every page.
     acceptance: >-
       No content moves for more than 5 seconds without a pause/stop/hide
@@ -1210,14 +1210,14 @@ semantic_criteria:
     abilities_affected: [vision, cognition]
     what_happening: >-
       Our visual probe screenshotted the page and a vision model judged that
-      the visual reading order doesn't match the DOM/source order — usually
+      the visual reading order doesn't match the DOM/source order, usually
       because CSS (flex/grid <code>order</code>, floats, or absolute
       positioning) places content somewhere other than where it sits in the
       markup.
     why_matters: >-
       Screen readers and keyboard users follow the DOM order; sighted users
       follow the visual order. When the two diverge, screen-reader users hear
-      content in a different, often nonsensical sequence — a form's submit
+      content in a different, often nonsensical sequence, a form's submit
       button before its fields, a caption before its image, steps out of order.
     owner: dev
     effort: under_2h
@@ -1232,7 +1232,7 @@ semantic_criteria:
       Read the page with a screen reader (or tab through it) and confirm the
       sequence matches what a sighted user sees.
     verify_automated: >-
-      Re-run the crawl with a vision model available — the visual probe
+      Re-run the crawl with a vision model available, the visual probe
       re-checks the reading order on each page.
     acceptance: >-
       The DOM/source order matches the visual reading order on the affected
@@ -1248,13 +1248,13 @@ semantic_criteria:
     what_happening: >-
       At the standard 200%-zoom proxy viewport, our probe found text
       inside <code>overflow: hidden</code> containers whose content is
-      larger than the box — characters are cut off. (Elements using
+      larger than the box, characters are cut off. (Elements using
       <code>text-overflow: ellipsis</code> are skipped as designed
       truncation; a human should still review those.)
     why_matters: >-
       Zooming to 200% is exactly how many low-vision users read the
       web. Text that clips at zoom is content they simply cannot
-      reach — and unlike reflow issues there's often no scrollbar
+      reach, and unlike reflow issues there's often no scrollbar
       escape hatch, the characters are just gone.
     owner: dev
     effort: under_2h
@@ -1271,7 +1271,7 @@ semantic_criteria:
       Browser zoom at 200% (Cmd/Ctrl +): all text on the affected
       pages remains fully visible and readable.
     verify_automated: >-
-      Re-run the crawl — the probe re-checks text clipping on each pass.
+      Re-run the crawl, the probe re-checks text clipping on each pass.
     acceptance: >-
       All text remains visible and readable at 200% browser zoom on
       the affected pages.
@@ -1286,8 +1286,8 @@ semantic_criteria:
     what_happening: >-
       Our probe injected the canonical WCAG text-spacing override
       (line-height 1.5, letter-spacing 0.12em, word-spacing 0.16em,
-      paragraph spacing 2em) — the exact stylesheet readers with
-      dyslexia or low vision apply — and text clipped inside
+      paragraph spacing 2em), the exact stylesheet readers with
+      dyslexia or low vision apply, and text clipped inside
       fixed-size containers.
     why_matters: >-
       People with dyslexia, low vision, or cognitive disabilities
@@ -1305,10 +1305,10 @@ semantic_criteria:
         Spot-check with a user-spacing bookmarklet (the WCAG
         Understanding doc for 1.4.12 links one) while editing.
     verify_manual: >-
-      Apply the WCAG text-spacing bookmarklet on the affected pages —
+      Apply the WCAG text-spacing bookmarklet on the affected pages,
       no text should clip or overlap.
     verify_automated: >-
-      Re-run the crawl — the probe re-applies the spacing override on
+      Re-run the crawl, the probe re-applies the spacing override on
       each pass.
     acceptance: >-
       With the WCAG text-spacing values applied, all content on the

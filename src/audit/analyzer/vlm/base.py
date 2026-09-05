@@ -26,7 +26,7 @@ class VlmLabel(StrEnum):
     """Brand logo or wordmark."""
 
     DECORATIVE = "decorative"
-    """Text is stylistic only — same info is available in the page text."""
+    """Text is stylistic only, same info is available in the page text."""
 
     NO_MEANINGFUL_TEXT = "no_meaningful_text"
     """OCR false positive: no intentional text in the image."""

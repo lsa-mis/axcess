@@ -5,7 +5,7 @@ What it does
 
 The probe runs one conservative check against an already-loaded Playwright page:
 
-1. **Bidirectional Tab-walk** — press Tab through the page and record
+1. **Bidirectional Tab-walk**, press Tab through the page and record
    ``document.activeElement`` after each press. A review lead is emitted
    only when the same observable element blocks several consecutive
    Tab attempts *and* several consecutive Shift+Tab attempts.
@@ -97,7 +97,7 @@ class KeyboardProbe:
     async def run(self, page: Page) -> list[KeyboardTrap]:
         """Probe ``page`` for keyboard traps. Returns a (possibly empty) list.
 
-        Safe to call from inside ``JsFetcher.fetch`` — operates on the
+        Safe to call from inside ``JsFetcher.fetch``, operates on the
         live page before the context closes. Never raises; any failure
         logs at WARNING and returns the findings collected so far.
         """
@@ -109,7 +109,7 @@ class KeyboardProbe:
         return findings
 
     # -----------------------------------------------------------------
-    # Check 1 — Tab walk.
+    # Check 1, Tab walk.
     # -----------------------------------------------------------------
 
     async def _probe_tab_walk(self, page: Page) -> list[KeyboardTrap]:
@@ -131,7 +131,7 @@ class KeyboardProbe:
         # the walk starts wherever the page's autofocus landed, which
         # makes test results non-deterministic.
         # Some pages reject focus on body (e.g. designMode). The probe
-        # still works — Playwright's keyboard.press routes to whatever
+        # still works, Playwright's keyboard.press routes to whatever
         # element is currently focused. Suppression is deliberate.
         with contextlib.suppress(Exception):
             await page.evaluate("() => { try { document.body.focus(); } catch (e) {} }")
@@ -154,7 +154,7 @@ class KeyboardProbe:
                 break
             el_id = int(sig["el_id"])
 
-            # Body focus (id 0) means "no element is trapped" — either
+            # Body focus (id 0) means "no element is trapped", either
             # the page has no focusable controls or Tab wrapped through
             # the document. Reset all trap state.
             if el_id == 0:
@@ -229,7 +229,7 @@ class KeyboardProbe:
         return True
 
     # -----------------------------------------------------------------
-    # Legacy observations — intentionally excluded from run().
+    # Legacy observations, intentionally excluded from run().
     # -----------------------------------------------------------------
 
     # These helpers remain temporarily for direct downstream callers. Escape
@@ -238,7 +238,7 @@ class KeyboardProbe:
     # output as SC 2.1.2 findings.
 
     async def _probe_modal_escape(self, page: Page) -> list[KeyboardTrap]:
-        """For each open dialog, focus inside and press Esc — verify exit."""
+        """For each open dialog, focus inside and press Esc, verify exit."""
         try:
             modals = await page.evaluate(
                 # Arrow functions don't have `arguments`, so we
@@ -285,7 +285,7 @@ class KeyboardProbe:
             snippet: str = modal.get("snippet", "")
             try:
                 # Move focus into the modal's first focusable element.
-                # Playwright's locator API is the safe path — query
+                # Playwright's locator API is the safe path, query
                 # selectors via the live frame.
                 focused = await page.evaluate(
                     f"""
@@ -303,7 +303,7 @@ class KeyboardProbe:
                 )
                 if not focused:
                     # Couldn't put focus inside; can't probe Escape
-                    # reliably. Skip — not the same as a known trap.
+                    # reliably. Skip, not the same as a known trap.
                     continue
 
                 await page.keyboard.press("Escape")
@@ -362,7 +362,7 @@ class KeyboardProbe:
         return findings
 
     # -----------------------------------------------------------------
-    # Check 3 — Iframe heuristic.
+    # Check 3, Iframe heuristic.
     # -----------------------------------------------------------------
 
     async def _probe_iframe_sanity(self, page: Page) -> list[KeyboardTrap]:
@@ -380,8 +380,8 @@ class KeyboardProbe:
                     const hasContent = !!(f.src || f.srcdoc);
                     // Only an iframe a keyboard user can actually Tab INTO can
                     // trap focus. Tracking / ad / pixel iframes are
-                    // display:none, 0x0, hidden, or aria-hidden — never in the
-                    // tab order — so flagging them as keyboard traps is a false
+                    // display:none, 0x0, hidden, or aria-hidden, never in the
+                    // tab order, so flagging them as keyboard traps is a false
                     // positive (and they're on nearly every real page). Gate on
                     // real visibility.
                     // clientWidth/Height are the content-box size: 0 for a
@@ -462,7 +462,7 @@ class KeyboardProbe:
                   // focused element. Without this, a web component's HOST
                   // shows up as document.activeElement for every Tab press
                   // while focus actually moves through its internal
-                  // controls — which the tab-walk misreads as focus being
+                  // controls, which the tab-walk misreads as focus being
                   // "stuck" on the host (a false trap). Closed shadow roots
                   // expose no activeElement, so those stay opaque.
                   let ae = document.activeElement;

@@ -13,7 +13,7 @@ Design notes:
   string I can hand to Ollama"; the editorial decision lives outside
   Python.
 * **Graceful degradation.** Missing YAML, parse errors, unknown
-  criterion keys — all return the configured fallback rather than
+  criterion keys, all return the configured fallback rather than
   raising. The analyzer pipeline then falls back to whatever the user
   passed via ``--vlm-model`` or has in ``config.py``. Never block a
   scan because the model registry is unhappy.
@@ -53,8 +53,8 @@ def get_pick(criterion_sc: str | None, *, kind: Kind | None = None) -> ModelPick
     """Return the recommended model for a criterion (or for a kind).
 
     Resolution order, top to bottom:
-      1. ``criteria[<sc>]`` exact match — picks override default.
-      2. ``defaults[<kind>]`` — used when the criterion isn't pinned
+      1. ``criteria[<sc>]`` exact match, picks override default.
+      2. ``defaults[<kind>]``, used when the criterion isn't pinned
          or no SC is given.
       3. Last-ditch hardcoded fallback so the call never raises.
 
@@ -141,7 +141,7 @@ def _default_for(data: dict[str, Any], kind: str | None, *, slot: str = "primary
         block = defaults[kind] or {}
         if isinstance(block, dict) and block.get(slot):
             return str(block[slot])
-    # Hard fallback — this is the "the YAML is broken or absent" case.
+    # Hard fallback, this is the "the YAML is broken or absent" case.
     # qwen2.5:7b is a reasonable safe default at the 7B parameter
     # band; if it's not installed, the analyzer fails loudly and the
     # user pulls it.

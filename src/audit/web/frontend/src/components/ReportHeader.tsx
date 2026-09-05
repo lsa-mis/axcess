@@ -7,8 +7,8 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  * Overview, Issues and Verify changes are three views of the same evidence,
  * so they get the same chrome in the same order: title, a single meta line,
  * the view's actions, then the tabs. Before this each route invented its own
- * arrangement — different crumbs, different subtitle shapes, tabs on some
- * pages and not others — and the report stopped feeling like one place.
+ * arrangement, different crumbs, different subtitle shapes, tabs on some
+ * pages and not others, and the report stopped feeling like one place.
  *
  * The breadcrumb is deliberately absent: it lives in the topbar
  * (see ``ReportCrumb``) where it stays put while this content scrolls.
@@ -59,10 +59,10 @@ export function ReportMeta({
   return (
     <>
       <span className="font-semibold tabular-nums text-fg">{counts}</span>
-      <span aria-hidden className="px-1.5 text-border-strong">
-        |
-      </span>
-      <span className="text-fg-subtle">{note}</span>
+      {note && (<>
+        <span aria-hidden className="px-1.5 text-border-strong">|</span>
+        <span className="text-fg-subtle">{note}</span>
+      </>)}
     </>
   );
 }

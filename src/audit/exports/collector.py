@@ -1,7 +1,7 @@
 """Shared data collector for every export format.
 
 One DB query pass produces a list of :class:`ExportFinding` rows with every
-piece of context an export needs — severity, classification, OCR + VLM
+piece of context an export needs, severity, classification, OCR + VLM
 text, remediation hint, all occurrences on the scanned site, and a deep
 link back into the local review UI.
 
@@ -16,6 +16,7 @@ import sqlite3
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from audit.analyzer.alfa_evidence import normalize_finding
 from audit.synthesizer.alt_compare import AltAdequacy, compare, worst
 
 DEFAULT_UI_BASE = "http://127.0.0.1:8765"
@@ -68,7 +69,7 @@ class ExportA11yFinding:
     """One DOM-engine finding, flattened for export.
 
     Parallels :class:`ExportFinding` but for the page-scoped axe pipeline.
-    Each row is a distinct DOM target — duplicates of the same rule
+    Each row is a distinct DOM target, duplicates of the same rule
     across many pages collapse into many rows here (one per page+target),
     matching how axe reports them.
     """
@@ -93,6 +94,9 @@ class ExportA11yFinding:
     pipeline: str = "axe"
     engine_outcome: str = "failed"
     engine_evidence_json: str | None = None
+    engine_evidence_status: str | None = None
+    target_display: str | None = None
+    manual_review_hint: str | None = None
     # Label of the control that had to be operated before this finding was
     # visible. ``None`` means the load-state pass saw it. Exports turn this
     # into a reproduction step: a developer who cannot reach the barrier
@@ -214,14 +218,12 @@ def _collect_a11y_findings(
     none), then within an impact tier by page URL so a developer
     grouping by file gets adjacent rows for the same template.
     """
+    # The optional revealed_by column arrived after Alfa support. Select the
+    # stored row and default that field below so older public reports can still
+    # be exported while forward migrations are pending.
     rows = conn.execute(
         """
-        SELECT a.id, a.scan_id, a.pipeline, a.engine_outcome, a.engine_evidence_json,
-               a.rule_id, a.wcag_sc, a.wcag_scs,
-               a.wcag_level, a.impact, a.help, a.help_url,
-               a.target_selector, a.failure_summary, a.html_snippet,
-               a.status, a.revealed_by,
-               p.id AS page_id, p.url_normalized AS page_url,
+        SELECT a.*, p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
           JOIN pages p ON p.id = a.page_id
@@ -238,8 +240,12 @@ def _collect_a11y_findings(
         """,
         (scan_id,),
     ).fetchall()
+    spa_base = ui_base_url.rstrip("/")
+    if not spa_base.endswith("/app"):
+        spa_base += "/app"
     out: list[ExportA11yFinding] = []
-    for r in rows:
+    for raw in rows:
+        r = normalize_finding(dict(raw))
         out.append(
             ExportA11yFinding(
                 id=int(r["id"]),
@@ -258,17 +264,14 @@ def _collect_a11y_findings(
                 page_id=int(r["page_id"]),
                 page_url=str(r["page_url"]),
                 page_title=r["page_title"],
-                # No per-finding detail page yet for axe rows (drill-down
-                # lives at /scans/{id}/a11y?wcag_sc=…). Link to the SC
-                # bucket as the next-best context.
-                ui_url=(
-                    f"{ui_base_url.rstrip('/')}/scans/{scan_id}/a11y"
-                    + (f"?wcag_sc={r['wcag_sc']}" if r["wcag_sc"] else "")
-                ),
+                ui_url=(f"{spa_base}/scans/{scan_id}/pages/{r['page_id']}#finding-{r['id']}"),
                 pipeline=str(r["pipeline"] or "axe"),
                 engine_outcome=str(r["engine_outcome"] or "failed"),
                 engine_evidence_json=r["engine_evidence_json"],
-                revealed_by=(str(r["revealed_by"]) if r["revealed_by"] else None),
+                engine_evidence_status=r.get("engine_evidence_status"),
+                target_display=r.get("target_display"),
+                manual_review_hint=r.get("manual_review_hint"),
+                revealed_by=(str(r["revealed_by"]) if r.get("revealed_by") else None),
             )
         )
     return out

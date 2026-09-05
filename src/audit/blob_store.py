@@ -1,6 +1,6 @@
 """Content-addressed image blob storage.
 
-Layout: ``<root>/<aa>/<full_sha256>.<ext>`` — first two hex chars are used as a
+Layout: ``<root>/<aa>/<full_sha256>.<ext>``, first two hex chars are used as a
 bucket so no single directory grows without bound. Writes are idempotent: if a
 file already exists at the target path we assume the content is already ours
 (SHA-256 collisions are not realistic for our purposes).

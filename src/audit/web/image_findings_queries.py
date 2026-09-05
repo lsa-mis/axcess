@@ -2,7 +2,7 @@
 
 Parallels :mod:`audit.web.a11y_queries` for the other pipeline. Where
 the WCAG view groups by ``wcag_sc``, this view groups by the
-``(classification, alt_adequacy)`` pair — because that pair is the
+``(classification, alt_adequacy)`` pair, because that pair is the
 *natural identity of an issue type*: every finding sharing that pair
 maps to the same row in ``rules/remediation.yaml`` and therefore the
 same recommended fix.
@@ -13,7 +13,7 @@ The shape returned by :func:`grouped_by_remediation`:
         {
             "classification": "essential",
             "alt_adequacy": "missing",
-            "label": "Essential — missing alt",          # human-readable
+            "label": "Essential, missing alt",          # human-readable
             "remediation_hint": "This image contains...",
             "finding_count": 8,
             "occurrence_count": 14,
@@ -67,7 +67,7 @@ ALT_ADEQUACIES = ("missing", "inadequate", "partial", "adequate")
 
 # Human-readable labels for the (classification, alt_adequacy) pairs.
 # Kept here, not in the template, because both the SPA and Jinja views
-# render the same label — duplicating it would invite drift.
+# render the same label, duplicating it would invite drift.
 _CLASSIFICATION_LABELS = {
     "essential": "Essential image",
     "informational": "Informational image",
@@ -88,7 +88,7 @@ def group_label(classification: str | None, alt_adequacy: str) -> str:
     """Render a human label for a (classification, alt_adequacy) pair."""
     cls = _CLASSIFICATION_LABELS.get(classification, classification or "Image")
     adq = _ADEQUACY_LABELS.get(alt_adequacy, alt_adequacy)
-    return f"{cls} — {adq}"
+    return f"{cls}, {adq}"
 
 
 def grouped_by_remediation(
@@ -120,7 +120,7 @@ def grouped_by_remediation(
                 # group. Because the rules table is keyed on
                 # (classification, alt_adequacy) and rendered by the
                 # synthesizer at write-time, every finding in the same
-                # group carries the *same* hint string — there is no
+                # group carries the *same* hint string, there is no
                 # ambiguity here, just first-write-wins.
                 "remediation_hint": f["remediation_hint"],
                 "finding_count": 0,
@@ -193,7 +193,7 @@ def _load_findings(
 ) -> list[dict[str, Any]]:
     """Flat list of image findings with per-row classification and adequacy.
 
-    Joins to ``analyses`` (best-rank per image — same trick as the
+    Joins to ``analyses`` (best-rank per image, same trick as the
     exports collector) for OCR / VLM context, then recomputes
     ``alt_adequacy`` from the image's occurrences. We keep adequacy
     out of the DB schema deliberately: it's cheap to compute and the
@@ -233,7 +233,7 @@ def _load_findings(
           LEFT JOIN best b ON b.image_id = i.id AND b.rank = 1
          WHERE f.scan_id = ?{extra_clause}
          ORDER BY f.priority_score DESC, f.id ASC
-        """,  # noqa: S608 — `extra_clause` is one of two fixed strings
+        """,  # noqa: S608, `extra_clause` is one of two fixed strings
         tuple(params),
     ).fetchall()
 

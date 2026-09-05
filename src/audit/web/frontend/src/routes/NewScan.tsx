@@ -31,8 +31,8 @@ export default function NewScanRoute() {
 
   /**
    * Switching scan type is a navigation, so the choice stays bookmarkable
-   * and the Back button undoes it. Every other param rides along — in
-   * particular ``url``, which ScanDetail uses to pre-fill a rescan —
+   * and the Back button undoes it. Every other param rides along, in
+   * particular ``url``, which ScanDetail uses to pre-fill a rescan,
    * except ``scan``, a handoff id that only means something in the login
    * flow it was issued for.
    */
@@ -65,7 +65,7 @@ export default function NewScanRoute() {
     // model calls off. They are useful expert-review leads, not prerequisites
     // for the core accessibility report, and can dominate scan time.
     skip_vlm: true,
-    // Full rendering is the default — three of the four pipelines (axe,
+    // Full rendering is the default, three of the four pipelines (axe,
     // keyboard, responsive) need the live DOM. `static_only` is the
     // opt-out fast path, exposed as a warning-toned checkbox below.
     static_only: false,
@@ -81,11 +81,14 @@ export default function NewScanRoute() {
     skip_semantic: true,
     skip_focus: false,
     skip_visual: true,
+    // Stored rendered pages make the Page inspector open instantly; the
+    // opt-out keeps the database smaller and re-renders on demand instead.
+    skip_rendered_storage: false,
     axe_level: "AA",
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Debounced scope preview. Driven by React Query — effectively a
+  // Debounced scope preview. Driven by React Query, effectively a
   // "derived state" that rerenders when url or whole_host changes.
   const [debouncedUrl, setDebouncedUrl] = useState(form.url);
   useEffect(() => {
@@ -243,7 +246,7 @@ export default function NewScanRoute() {
           <Card className="max-w-3xl p-5">
             <form onSubmit={onSubmit} className="flex flex-col gap-5">
               {/* The seed URL is the most important field on the most
-              important form in the app — there is exactly one of it,
+              important form in the app, there is exactly one of it,
               and the user cannot proceed without it. Treat it as the
               page's hero input: bigger label, base font size, taller
               control. The smaller secondary controls (Max pages, etc.)
@@ -264,7 +267,7 @@ export default function NewScanRoute() {
                 />
                 <span className="text-xs text-fg-muted">
                   Must start with http:// or https://. By default the crawl
-                  stays under this URL&rsquo;s path — e.g.{" "}
+                  stays under this URL&rsquo;s path, e.g.{" "}
                   <code className="rounded bg-surface-muted px-1">
                     /section/
                   </code>{" "}
@@ -422,7 +425,7 @@ export default function NewScanRoute() {
                       Options
                     </legend>
 
-                    {/* Conformance target — the standard to check against. Drives the
+                    {/* Conformance target, the standard to check against. Drives the
                 axe rule set (tags_for_level) and frames the report. AA is the
                 default because it's the near-universal legal/compliance
                 target (Section 508, EN 301 549, ADA all map to WCAG AA). */}
@@ -453,12 +456,12 @@ export default function NewScanRoute() {
                         }
                         className="min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg"
                       >
-                        <option value="A">WCAG 2.2 — Level A (minimum)</option>
+                        <option value="A">WCAG 2.2, Level A (minimum)</option>
                         <option value="AA">
-                          WCAG 2.2 — Level AA (recommended)
+                          WCAG 2.2, Level AA (recommended)
                         </option>
                         <option value="AAA">
-                          WCAG 2.2 — Level AAA (strictest)
+                          WCAG 2.2, Level AAA (strictest)
                         </option>
                       </select>
                     </div>
@@ -551,7 +554,7 @@ export default function NewScanRoute() {
                           update("static_only", v);
                           if (v) update("skip_interaction", true);
                         }}
-                        label="Fast crawl — skip browser rendering (static only)"
+                        label="Fast crawl, skip browser rendering (static only)"
                         hint={
                           form.scan_engine === "alfa"
                             ? "5–10× faster for Axcess’ crawler. Alfa still opens its own local browser capture for each included page."
@@ -591,6 +594,12 @@ export default function NewScanRoute() {
                               ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
                               : "Opens menus, dialogs, tabs, and disclosure controls, checks revealed states, and discovers additional routes to scan. Exploration is bounded and adds scan time. Skips payment, subscription, submission, and other blocked actions; blocks HTTP writes during automatic clicks."
                         }
+                      />
+                      <Checkbox
+                        checked={form.skip_rendered_storage}
+                        onChange={(v) => update("skip_rendered_storage", v)}
+                        label="Don't store rendered pages"
+                        hint="Keeps the report database smaller. The Page inspector then re-renders the live page on demand instead of opening the stored capture; findings and screenshots are stored exactly as before."
                       />
                       <Checkbox
                         tone="warning"
@@ -681,7 +690,7 @@ export default function NewScanRoute() {
                           aria-live="polite"
                         >
                           <p className="font-semibold">
-                            Local AI—no automatic model downloads
+                            Local AI: no automatic model downloads
                           </p>
                           <p className="mt-1 text-xs text-fg-muted">
                             No model download will start with this scan. Axcess
@@ -700,7 +709,7 @@ export default function NewScanRoute() {
 
               {/* Submit + Cancel. The submit is the page's primary CTA
               (`size="lg"`); Cancel stays at the default `md` to make the
-              hierarchy unambiguous — the user shouldn't have to read the
+              hierarchy unambiguous, the user shouldn't have to read the
               colors to know which one commits the form. */}
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -766,6 +775,6 @@ function formatBytes(value: number | null): string {
   return `${Math.round(value / 1024 ** 2)} MB`;
 }
 
-// `Checkbox` lives in components/ui.tsx — see that file for the 44×44
+// `Checkbox` lives in components/ui.tsx, see that file for the 44×44
 // hit-target rationale. Removed the local copy that shipped with a 16×16
 // native input (failed SC 2.5.5 AAA + SC 2.5.8 AA).

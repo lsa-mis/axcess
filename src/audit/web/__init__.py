@@ -1,1 +1,1 @@
-"""Web UI — FastAPI + Jinja + HTMX. See Phase 6."""
+"""Web UI, FastAPI + Jinja + HTMX. See Phase 6."""

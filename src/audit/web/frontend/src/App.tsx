@@ -20,6 +20,7 @@ const FindingDetailRoute = lazy(() => import("./routes/FindingDetail"));
 const DiffRoute = lazy(() => import("./routes/Diff"));
 const TrackingRoute = lazy(() => import("./routes/Tracking"));
 const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
+const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const NotFoundRoute = lazy(() => import("./routes/NotFound"));
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/scans/:scanId/manual-checks" element={<ProtectedReportGate><LegacyReportRedirect /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/handoff" element={<ProtectedReportGate><LegacyReportRedirect /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/pages/:pageId" element={<ProtectedReportGate><PageEvidenceRoute /></ProtectedReportGate>} />
+        <Route path="/scans/:scanId/pages/:pageId/inspect" element={<ProtectedReportGate><InspectorRoute /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/issues" element={<ProtectedReportGate><IssuesRoute /></ProtectedReportGate>} />
         <Route
           path="/scans/:scanId/issues/:issueKey"

@@ -44,6 +44,13 @@ desktop/out/
 .env
 .env.local
 
+# Runtime caches
+.tldextract-cache/
+
+# Local-only agent skills
+.claude/skills/gauntlet-loop/
+.claude/skills/gauntlet-loop-deepseek/
+
 # Frontend (src/audit/web/frontend)
 # Vite build output is already ignored by the global "dist/" rule above.
 node_modules/

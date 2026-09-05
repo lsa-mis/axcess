@@ -138,7 +138,7 @@ function IssueRow({ group }: { group: ProtectedIssueIndexGroup }) {
     <tr className="transition-colors hover:bg-surface-muted/60">
       <td className="px-4 py-3 text-fg">{SOURCE_LABEL[group.source_layer]}</td>
       <td className="px-4 py-3 font-mono text-xs text-fg">{group.rule_id}</td>
-      <td className="px-4 py-3 text-fg">{group.wcag_sc ? `${group.wcag_sc} ${group.wcag_level ?? ""}`.trim() : "—"}</td>
+      <td className="px-4 py-3 text-fg">{group.wcag_sc ? `${group.wcag_sc} ${group.wcag_level ?? ""}`.trim() : "n/a"}</td>
       <td className="px-4 py-3 text-fg">{result.replaceAll("_", " ")}</td>
       <td className="px-4 py-3 text-right tabular-nums text-fg">{group.occurrence_count.toLocaleString()}</td>
       <td className="px-4 py-3 text-right tabular-nums text-fg">{group.page_count.toLocaleString()}</td>

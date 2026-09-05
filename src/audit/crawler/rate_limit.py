@@ -2,7 +2,7 @@
 
 ``HostLimiter`` owns one :class:`asyncio.Semaphore` and one token-bucket
 rate limiter per host. Acquire with :meth:`throttle` as an async context
-manager — it blocks until both budgets allow the request.
+manager, it blocks until both budgets allow the request.
 """
 
 from __future__ import annotations

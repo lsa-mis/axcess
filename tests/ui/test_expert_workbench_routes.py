@@ -206,7 +206,7 @@ def test_not_tested_with_rationale_is_a_documented_export_limitation(
     assert exported.status_code == 200, exported.text
     assert f'filename="scan_{scan_id}.audit.md"' in exported.headers["content-disposition"]
     assert "DRAFT" not in exported.headers["content-disposition"]
-    assert "### Not-tested criteria — documented evaluation limitations" in exported.text
+    assert "### Not-tested criteria, documented evaluation limitations" in exported.text
     assert "| 3.3.8 |" in exported.text
     assert "Authentication journey was outside the owner-approved test scope." in exported.text
 
@@ -261,7 +261,7 @@ def test_legacy_invalid_completed_evaluation_is_not_export_ready(
     )
     assert draft.status_code == 200
     assert f"scan_{scan_id}_DRAFT.md" in draft.headers["content-disposition"]
-    assert draft.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+    assert draft.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
 
 
 def test_page_evidence_route_is_scan_scoped(
@@ -312,7 +312,7 @@ def test_structured_audit_export_includes_expert_context(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/markdown")
     assert f'filename="scan_{scan_id}_DRAFT.audit.md"' in response.headers["content-disposition"]
-    assert response.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+    assert response.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
     assert "## Expert evaluation record" in response.text
     assert "Public landing pages" in response.text
     assert "Authenticated journeys excluded." in response.text

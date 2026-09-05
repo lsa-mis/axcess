@@ -1,3 +1,4 @@
+import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,11 +38,11 @@ const STATUS_OPTIONS: FindingStatus[] = [
 ];
 
 /**
- * WCAG DOM-engine findings, grouped by rule — the actionable cut.
+ * WCAG DOM-engine findings, grouped by rule, the actionable cut.
  *
  * The existing /a11y route groups by WCAG SC (the *reporting* axis: "we
  * fail 1.4.3 on 47 pages"). This one groups by axe `rule_id` (the
- * *fixing* axis: "color-contrast fails 800 times — one CSS class").
+ * *fixing* axis: "color-contrast fails 800 times, one CSS class").
  * Bulk-status lives per group: one decision touches every violation
  * of one rule.
  */
@@ -88,7 +89,7 @@ export default function A11yByRuleRoute() {
   return (
     <>
       <PageHeader
-        title="WCAG DOM-engine findings — grouped by rule"
+        title="WCAG DOM-engine findings, grouped by rule"
         subtitle={scan.seed_url}
         actions={
           <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
@@ -106,7 +107,7 @@ export default function A11yByRuleRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this view groups findings.</strong> Findings are
-            grouped by source and rule ID — the <em>fixing</em>{" "}
+            grouped by source and rule ID, the <em>fixing</em>{" "}
             axis. A rule like <code>color-contrast</code> failing 800
             times is usually one CSS class on one template; seeing one
             group of 800 tells you where one fix has the biggest payoff.{" "}
@@ -116,7 +117,7 @@ export default function A11yByRuleRoute() {
             >
               Group-by-SC
             </Link>{" "}
-            is the reporting axis — useful when stakeholders ask
+            is the reporting axis, useful when stakeholders ask
             &ldquo;which WCAG SCs are we failing?&rdquo;
           </p>
         </div>
@@ -165,7 +166,7 @@ export default function A11yByRuleRoute() {
             status
               ? "Clear the filter to see findings in other statuses."
               : coverage.axe_pages_scanned === 0 && coverage.alfa_pages_scanned === 0
-                ? "No DOM engine ran on this scan — start a new scan and select axe-core, Alfa, or both."
+                ? "No DOM engine ran on this scan, start a new scan and select axe-core, Alfa, or both."
                 : "The selected DOM engine(s) returned no retained findings. Manual review is still required for conformance."
           }
         />
@@ -271,7 +272,7 @@ function RuleGroupCard({
             {Object.entries(group.status_breakdown)
               .filter(([, v]) => v > 0)
               .map(([k, v]) => `${k} (${v})`)
-              .join(" · ") || "—"}
+              .join(" · ") || "n/a"}
           </div>
           {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
@@ -304,7 +305,7 @@ function RuleGroupCard({
               </thead>
               <tbody className="divide-y divide-border">
                 {group.findings.map((f) => (
-                  <FindingRow key={f.id} finding={f} scanId={scanId} />
+                  <FindingRow key={f.id} finding={f} scanId={scanId} ruleId={group.rule_id} />
                 ))}
               </tbody>
             </table>
@@ -315,7 +316,15 @@ function RuleGroupCard({
   );
 }
 
-function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId: number }) {
+function FindingRow({
+  finding,
+  scanId,
+  ruleId,
+}: {
+  finding: A11yRuleGroupFinding;
+  scanId: number;
+  ruleId: string;
+}) {
   return (
     <tr className="align-top">
       <td className="max-w-xs px-3 py-2">
@@ -324,13 +333,18 @@ function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId
           scanId={scanId}
           pageUrl={finding.page_url}
           pageTitle={finding.page_title}
+          selector={finding.target_selector}
+          snippet={finding.html_snippet}
+          origin="DOM-engine rules"
+          context={ruleId}
+          backTo={`/scans/${scanId}/a11y/by-rule`}
         />
       </td>
       <td className="px-3 py-2">
         <code className="block break-all font-mono text-2xs text-fg">
-          {finding.target_selector.length > 90
-            ? `${finding.target_selector.slice(0, 90)}…`
-            : finding.target_selector}
+          {(finding.target_display || finding.target_selector).length > 90
+            ? `${(finding.target_display || finding.target_selector).slice(0, 90)}…`
+            : (finding.target_display || finding.target_selector)}
         </code>
         {finding.html_snippet && (
           <details className="mt-1">
@@ -342,6 +356,8 @@ function FindingRow({ finding, scanId }: { finding: A11yRuleGroupFinding; scanId
             </pre>
           </details>
         )}
+        <AlfaEvidenceNote evidence={finding} />
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${finding.page_id}#finding-${finding.id}`}>Open stored finding evidence</Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}
@@ -429,7 +445,7 @@ function RuleBulkBar({
   );
 }
 
-/** Mirror of the chip used in the by-SC view — keep both in sync. */
+/** Mirror of the chip used in the by-SC view, keep both in sync. */
 function ImpactChip({ value }: { value: AxeImpact }) {
   const tone: Severity = (
     {

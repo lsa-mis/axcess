@@ -28,7 +28,7 @@ const PIPELINE_LABEL: Record<string, string> = {
 
 const LANE_META: Record<ReviewLane, { label: string; description: string }> = {
   likely_barrier: {
-    label: "Likely barriers",
+    label: "Barriers",
     description: "Deterministic failed outcomes ready for expert triage.",
   },
   expert_review: {
@@ -493,10 +493,10 @@ function statusLabel(lane: ReviewLane, status: FindingStatus): string {
   const labels: Record<FindingStatus, string> = {
     new: "Not reviewed",
     reviewing: "Needs follow-up",
-    in_progress: "Barrier confirmed — remediation planned",
-    remediated: "Barrier confirmed — remediated",
-    accepted_risk: "Barrier confirmed — risk accepted",
-    false_positive: "Reviewed — not a barrier",
+    in_progress: "Barrier confirmed, remediation planned",
+    remediated: "Barrier confirmed, remediated",
+    accepted_risk: "Barrier confirmed, risk accepted",
+    false_positive: "Reviewed, not a barrier",
   };
   return labels[status];
 }

@@ -293,7 +293,7 @@ export default function ManualChecksRoute() {
             <label className="lg:hidden">
               <span className="mb-1 block text-sm font-semibold">Selected criterion</span>
               <select value={selected?.criterion.sc ?? ""} onChange={(event) => selectCriterion(event.target.value)} className="field">
-                {filtered.map((check) => <option key={check.criterion.sc} value={check.criterion.sc}>{check.criterion.sc} · {check.criterion.name} — {OUTCOME_LABELS[check.outcome]}</option>)}
+                {filtered.map((check) => <option key={check.criterion.sc} value={check.criterion.sc}>{check.criterion.sc} · {check.criterion.name}, {OUTCOME_LABELS[check.outcome]}</option>)}
               </select>
             </label>
             <nav aria-label="Manual check criteria" className="hidden min-w-0 max-h-[68vh] overflow-y-auto pr-1 lg:block">

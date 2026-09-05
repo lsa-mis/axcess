@@ -83,7 +83,7 @@
       "ocr_confidence": 88.0,
       "ocr_text": "Acme Corp",
       "priority_score": 1.693,
-      "remediation_hint": "Good — logo alt names the brand. No action required.",
+      "remediation_hint": "Good, logo alt names the brand. No action required.",
       "scan_id": 1,
       "severity": "info",
       "status": "new",

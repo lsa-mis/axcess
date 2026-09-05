@@ -32,7 +32,7 @@ const STATUS_OPTIONS: FindingStatus[] = [
 /**
  * Image-of-text findings, grouped by remediation key.
  *
- * The parallel to the WCAG axe rollup at `/scans/:id/a11y` — instead of
+ * The parallel to the WCAG axe rollup at `/scans/:id/a11y`, instead of
  * grouping by `wcag_sc`, we group by `(classification, alt_adequacy)`
  * because that pair is the natural identity of an issue type: every
  * finding in the same group inherits the same row from
@@ -85,7 +85,7 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Image-of-text findings — grouped by issue"
+        title="Image-of-text findings, grouped by issue"
         subtitle={scan.seed_url}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
@@ -95,7 +95,7 @@ export default function GroupedFindingsRoute() {
         }
       />
 
-      {/* Up-front explainer — analogue of the WCAG view's scope-honesty
+      {/* Up-front explainer, analogue of the WCAG view's scope-honesty
           banner. The story here is different: every group has one fix,
           so the operator decides once per group instead of per row. */}
       <Card
@@ -106,7 +106,7 @@ export default function GroupedFindingsRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this view groups findings.</strong> Findings are
-            bucketed by <code>(classification, alt&nbsp;adequacy)</code> —
+            bucketed by <code>(classification, alt&nbsp;adequacy)</code>,
             the same pair our remediation rule book is keyed on. Everything
             in one group has the <em>same recommended fix</em>, so you can
             decide once per group instead of once per row. Expand a group
@@ -122,7 +122,7 @@ export default function GroupedFindingsRoute() {
         <StatCard label="Pages crawled" value={coverage.page_count} />
       </div>
 
-      {/* Status filter — URL-persistent, auto-applies on change. Same
+      {/* Status filter, URL-persistent, auto-applies on change. Same
           UX shape as the WCAG drill-down filter. */}
       <Card className="mb-4 p-3">
         <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
@@ -174,7 +174,7 @@ export default function GroupedFindingsRoute() {
 }
 
 /**
- * One group card — header summarizes the bucket, the body shows the
+ * One group card, header summarizes the bucket, the body shows the
  * shared remediation hint and a table of the individual findings.
  *
  * We use a controlled `useState` toggle rather than the browser-native
@@ -182,7 +182,7 @@ export default function GroupedFindingsRoute() {
  * already React; mixing imperative DOM state with React state is a
  * footgun (closing the details element doesn't unmount its children).
  * Native keyboard handling is mirrored by making the `<button>` the
- * focusable target — Enter/Space toggle naturally.
+ * focusable target, Enter/Space toggle naturally.
  */
 function GroupCard({
   group,
@@ -243,17 +243,17 @@ function GroupCard({
               {(["critical", "major", "minor", "info"] as const)
                 .filter((s) => group.severity_breakdown[s])
                 .map((s) => `${s} (${group.severity_breakdown[s]})`)
-                .join(" · ") || "—"}
+                .join(" · ") || "n/a"}
             </span>
             <span>
               <strong className="text-fg">Status:</strong>{" "}
               {Object.entries(group.status_breakdown)
                 .map(([k, v]) => `${k} (${v})`)
-                .join(" · ") || "—"}
+                .join(" · ") || "n/a"}
             </span>
           </div>
 
-          {/* Bulk-status — the whole point of this view. Apply one
+          {/* Bulk-status, the whole point of this view. Apply one
               decision to every finding in the group in one POST. */}
           <BulkStatusBar
             scanId={scanId}
@@ -273,7 +273,7 @@ function GroupCard({
  * Bulk-status action row.
  *
  * Reused by both the image-of-text grouped view and the WCAG axe
- * grouped view (once that lands) — switch by `kind`. The destructive
+ * grouped view (once that lands), switch by `kind`. The destructive
  * transitions (`accepted_risk`, `false_positive`, `remediated`) get a
  * rationale prompt naming exactly how many findings the action will touch and
  * which group. `in_progress` also requires rationale because it now means the
@@ -418,7 +418,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
             />
           </Link>
         ) : (
-          <span className="text-fg-subtle">—</span>
+          <span className="text-fg-subtle">n/a</span>
         )}
       </td>
       <td className="px-3 py-2">
@@ -436,7 +436,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
             )}
           </>
         ) : (
-          <span className="text-fg-subtle">—</span>
+          <span className="text-fg-subtle">n/a</span>
         )}
       </td>
       <td className="px-3 py-2">
@@ -449,7 +449,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
         <StatusChip value={finding.status} />
       </td>
       <td className="px-3 py-2">
-        {/* Per-finding occurrence drawer — keyed off a local toggle so
+        {/* Per-finding occurrence drawer, keyed off a local toggle so
             opening row 3 doesn't change row 4. Collapsed by default
             because most findings appear on 1-3 pages and the row stays
             scannable; expanded reveals every page + alt + above-fold. */}
@@ -466,7 +466,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
           <ul className="mt-2 space-y-1 text-xs">
             {finding.occurrences.map((occ) => (
               <li key={`${occ.page_id}-${occ.position}`}>
-                {/* Compact inline page link — opens the actual page in
+                {/* Compact inline page link, opens the actual page in
                     a new tab so the operator can spot-check the
                     occurrence. The previous stub (preventDefault) was
                     a stub from an earlier phase; users could see a

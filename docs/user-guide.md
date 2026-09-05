@@ -149,13 +149,26 @@ scan of the same logical site as `compare_to` — even across dev-server
 port changes on localhost — and writes `first_seen` / `resolved` rows
 into `finding_history`.
 
-In the UI, the scan detail page gains a **Diff vs scan #N** link pointing
-at `/scans/<new>/diff?compare_to=<old>`, which breaks the change into:
+In the report workspace, open **Verify changes** after publishing fixes and
+scanning the same site with the same checks. It compares all issue pipelines
+with the latest earlier completed report for the same normalized seed URL.
+An explicit earlier report can be selected with `?compare_to=<old>` on
+`/app/scans/<new>/diff`.
 
-- **New** — `(content_hash, url)` pairs present now but not before.
-- **Resolved** — pairs present before but not now.
-- **Status changed** — same pair in both scans with different statuses.
-- **Still open** — same pair, same open status, unchanged.
+- **New** — an issue group appeared in the current report.
+- **Still detected** — the same locations, counts, statuses, and outcomes remain.
+- **Changed** — occurrences, locations, statuses, or engine outcomes changed.
+- **No longer detected** — the group disappeared with sufficient saved coverage
+  to compare its absence. Confirm on the page before marking it remediated.
+- **Cannot compare reliably** — coverage or evidence cannot support the comparison.
+
+Filter by category or pipeline and open either report's issue or finding evidence
+to inspect a change. Alfa failures and manual-review outcomes are counted
+separately within a comparison of the same rule. Missing pages, skipped methods,
+changed settings, and historical coverage limitations are shown explicitly.
+Comparison does not change finding statuses or history.
+
+The CLI's image diff and `finding_history` behavior above remain available.
 
 Override the auto-diff target:
 

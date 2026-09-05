@@ -1,7 +1,7 @@
-"""SC 3.3.2 — Labels or Instructions analyzer.
+"""SC 3.3.2, Labels or Instructions analyzer.
 
 Judges whether each form control's label/instructions are sufficient for a
-first-time user to know what to enter — the sufficiency call no rule engine
+first-time user to know what to enter, the sufficiency call no rule engine
 can make (axe only checks that a programmatic label *exists*).
 
 Mirrors the SC 2.4.4 / 2.4.6 shape: extract the focused slice, one bounded

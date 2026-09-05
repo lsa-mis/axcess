@@ -284,6 +284,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
             await _mock_repeated_review_leads(page, base=base, scan_id=scan_id, copies=3)
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
+            await issues.locator("summary").filter(has_text="Needs manual review").click()
             rows = issues.get_by_role("link")
 
             # The first issue is selected on load, so the shape of an issue is
@@ -328,6 +329,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
             page = await browser.new_page(viewport={"width": 320, "height": 800})
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
+            await issues.locator("summary").filter(has_text="Needs manual review").click()
             await playwright_async.expect(issues).to_be_visible()
 
             widths = await page.evaluate(
@@ -372,9 +374,21 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
+            page_errors: list[str] = []
+            failed_responses: list[str] = []
+            page.on("pageerror", lambda error: page_errors.append(str(error)))
+            page.on(
+                "response",
+                lambda response: (
+                    failed_responses.append(f"{response.status}: {response.url}")
+                    if response.status >= 400
+                    else None
+                ),
+            )
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            row_link = page.get_by_role("link", name="Logo image — adequate alt")
-            informational_row = page.locator("li").filter(has=row_link)
+            await page.locator("summary").filter(has_text="Informational (1)").click()
+            row_link = page.get_by_role("link", name="Logo image, adequate alt")
+            informational_row = row_link.locator("xpath=ancestor::li[1]")
             await playwright_async.expect(
                 informational_row.get_by_text("Informational", exact=True)
             ).to_be_visible()
@@ -395,13 +409,22 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             assert await page.get_by_role("link", name="Audit report").count() == 0
             assert await page.get_by_role("heading", name="Fix (do this)").count() == 0
 
-            await page.goto(
+            response = await page.goto(
                 f"{base}/app/scans/{scan_id}/issues",
                 wait_until="networkidle",
             )
-            await playwright_async.expect(
-                page.get_by_role("heading", name="Issues", exact=True, level=1)
-            ).to_be_visible()
+            assert response is not None and response.ok
+            try:
+                await playwright_async.expect(
+                    page.get_by_role("heading", name="Issues", exact=True, level=1)
+                ).to_be_visible()
+            except AssertionError as error:
+                body = await page.locator("body").inner_text()
+                pytest.fail(
+                    f"{error}\nURL: {page.url}\nBrowser errors: {page_errors}\n"
+                    f"Failed responses: {failed_responses}\nRendered page: {body}"
+                )
+            assert not page_errors, page_errors
             assert await page.get_by_role("link", name="Audit report").count() == 0
         finally:
             await browser.close()
@@ -442,13 +465,13 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
                 page.get_by_text("Click Through DOM States", exact=True)
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("heading", name="Automated evidence is ready")
+                page.get_by_role("heading", name="Overview", exact=True, level=1)
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_role("link", name="Open issue table")
+                page.get_by_role("link", name=re.compile(r"^Open the \d+ issues?$"))
             ).to_be_visible()
             await playwright_async.expect(
-                page.get_by_text("issue groups /", exact=False)
+                page.get_by_text("Barriers", exact=True)
             ).to_be_visible()
             # Overview, Issues and Verify changes are three views of one
             # report, so the tab bar is visible on all of them.
@@ -678,7 +701,7 @@ async def test_header_offers_one_external_feedback_link(
             await page.goto(f"{base}/app/", wait_until="networkidle")
 
             feedback = page.get_by_role("banner").get_by_role(
-                "link", name="Send feedback (opens in a new tab)", exact=True
+                "link", name="Give feedback (opens in a new tab)", exact=True
             )
             await playwright_async.expect(feedback).to_have_count(1)
             assert await feedback.get_attribute("href") == (
@@ -730,45 +753,74 @@ async def test_scan_mode_choice_is_a_radio_group_that_keeps_other_params(
 async def test_tracking_coverage_table_filters_and_sorts(
     live_server: tuple[str, int],
 ) -> None:
-    """The coverage matrix can be narrowed and reordered, and says so."""
+    """The coverage matrix can be narrowed and reordered, and says so.
+
+    The tracker splits criteria into two views: "Current coverage" (what
+    Axcess checks, filterable by method) and "Not covered yet" (the
+    manual-only long tail). "Manual only" is therefore a view, not one of the
+    method filters — filtering the covered table by it would always be empty.
+    Expectations are derived from /api/tracking so this cannot drift again
+    when a criterion changes method.
+    """
     base, _scan_id = live_server
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
             page = await browser.new_page()
+            tracking = await (await page.request.get(f"{base}/api/tracking")).json()
+            criteria = tracking["coverage"]["criteria"]
+            covered = [c for c in criteria if c["method"] != "manual"]
+            manual = [c for c in criteria if c["method"] == "manual"]
+            assert covered and manual, "fixture needs both covered and manual criteria"
+            labels = tracking["coverage"]["method_labels"]
+
             await page.goto(f"{base}/app/tracking", wait_until="networkidle")
-
-            manual = page.get_by_role("group", name="Filter coverage by method").get_by_role(
-                "button", name=re.compile(r"^Manual only")
-            )
-            await manual.click()
-            await playwright_async.expect(manual).to_have_attribute("aria-pressed", "true")
-            assert "method=manual" in page.url
             matrix = page.get_by_role(
-                "table",
-                name="Every WCAG 2.2 A/AA success criterion and how Axcess covers it",
+                "table", name="WCAG 2.2 A/AA criteria with current Axcess coverage"
             )
-            coverage_cells = matrix.locator("tbody tr td:nth-child(4)")
-            labels = set(await coverage_cells.all_inner_texts())
-            assert labels == {"Manual only"}, labels
+            methods = page.get_by_role("group", name="Filter coverage by method")
 
-            reset = page.get_by_role("group", name="Filter coverage by method").get_by_role(
-                "button", name=re.compile(r"^All")
-            )
+            # Narrowing to one method leaves only that method's rows.
+            automated = methods.get_by_role("button", name=re.compile(r"^Automated"))
+            await automated.click()
+            await playwright_async.expect(automated).to_have_attribute("aria-pressed", "true")
+            assert "method=automated" in page.url
+            coverage_cells = matrix.locator("tbody tr td:nth-child(4)")
+            shown_labels = set(await coverage_cells.all_inner_texts())
+            assert shown_labels == {labels["automated"]}, shown_labels
+
+            reset = methods.get_by_role("button", name=re.compile(r"^All"))
             await reset.click()
             await playwright_async.expect(matrix.locator("tbody tr th[scope='row']")).to_have_count(
-                55
+                len(covered)
             )
 
             # Success criteria sort as numbers: 1.4.4 before 1.4.10.
             sc_header = matrix.get_by_role("columnheader", name="SC")
             await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "ascending")
-            shown = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
-            assert shown == sorted(shown, key=lambda sc: tuple(int(part) for part in sc.split(".")))
+            ascending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+            assert ascending == sorted(
+                ascending, key=lambda sc: tuple(int(part) for part in sc.split("."))
+            )
 
             await sc_header.get_by_role("button").click()
             await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "descending")
-            assert await matrix.locator("tbody tr th[scope='row']").first.inner_text() == "4.1.3"
+            descending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+            assert descending == list(reversed(ascending))
+
+            # The manual-only long tail is its own view, and it is the rest of
+            # the criteria — the two views together account for all of them.
+            await (
+                page.get_by_role("group", name="Tracker sections")
+                .get_by_role("button", name="Not covered yet")
+                .click()
+            )
+            uncovered = page.get_by_role(
+                "table", name="WCAG 2.2 A/AA criteria not covered by Axcess yet"
+            )
+            await playwright_async.expect(
+                uncovered.locator("tbody tr th[scope='row']")
+            ).to_have_count(len(manual))
         finally:
             await browser.close()
 
@@ -878,7 +930,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
             await playwright_async.expect(use_vlm).to_be_enabled()
             await use_vlm.check()
             await playwright_async.expect(
-                page.get_by_text("Local AI—no automatic model downloads", exact=True)
+                page.get_by_text("Local AI: no automatic model downloads", exact=True)
             ).to_be_visible()
             await playwright_async.expect(
                 page.get_by_text(re.compile(r"No model download will start with this scan"))

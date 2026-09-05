@@ -3,7 +3,7 @@
 The orchestrator reads ``config.semantic_criteria`` (a tuple of WCAG
 SC dotted strings), looks each one up here, and instantiates the
 matching analyzer with a shared :class:`OllamaTextProvider`. Unknown
-SCs are logged and skipped — that lets ``--semantic-criteria 2.4.4,
+SCs are logged and skipped, that lets ``--semantic-criteria 2.4.4,
 9.9.9`` still run 2.4.4 cleanly while flagging the typo.
 
 To add a new criterion: write the analyzer class, import it here,
@@ -50,7 +50,7 @@ def build_analyzers(
 ) -> list[SemanticAnalyzer]:
     """Instantiate the analyzers for the requested ``criteria``.
 
-    Unknown SCs are logged at WARNING and skipped — never raise. This
+    Unknown SCs are logged at WARNING and skipped, never raise. This
     keeps the orchestrator's "list of criteria" config robust: a
     typo doesn't crash a 10k-page crawl, it just means one fewer
     analyzer runs.

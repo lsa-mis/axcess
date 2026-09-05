@@ -2,14 +2,14 @@
 
 Compares two scans by the ``(content_hash, url_normalized)`` pair so an image
 that moved to a new page counts as "resolved at the old URL, new at the new
-URL" — which is what a reviewer wants to see.
+URL", which is what a reviewer wants to see.
 
 Buckets:
-  * ``new`` — pair present in current scan but not in the compare-to scan.
-  * ``resolved`` — pair present in the compare-to scan but not in the current.
-  * ``still_open`` — pair present in both; current status is open-ish
+  * ``new``, pair present in current scan but not in the compare-to scan.
+  * ``resolved``, pair present in the compare-to scan but not in the current.
+  * ``still_open``, pair present in both; current status is open-ish
     (``new``, ``reviewing``, or ``in_progress``).
-  * ``status_changed`` — pair present in both, status differs.
+  * ``status_changed``, pair present in both, status differs.
 """
 
 from __future__ import annotations

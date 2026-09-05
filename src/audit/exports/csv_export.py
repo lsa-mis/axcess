@@ -1,13 +1,13 @@
-"""CSV export — flat, one row per atomic finding.
+"""CSV export, flat, one row per atomic finding.
 
 Two finding kinds coexist in the same CSV, distinguished by the
 ``finding_kind`` column:
 
-* ``image_of_text`` — one row per (finding, occurrence) for the WCAG
+* ``image_of_text``, one row per (finding, occurrence) for the WCAG
   1.4.5 pipeline. Original column set is preserved unchanged so
   existing Jira / Excel import scripts that ignore the new
   ``finding_kind`` column keep working.
-* ``wcag_axe`` — one row per axe DOM violation. Image-pipeline columns
+* ``wcag_axe``, one row per axe DOM violation. Image-pipeline columns
   (``image_url``, ``ocr_text``, etc.) are blank for these; the axe-only
   columns (``rule_id``, ``wcag_sc``, ``target_selector``…) are blank for
   the image rows.
@@ -52,7 +52,7 @@ CSV_COLUMNS = (
     "failure_summary",
     "help_url",
     # Empty for a finding the page load showed. Otherwise the control that
-    # had to be operated first — without it a click-revealed row cannot be
+    # had to be operated first, without it a click-revealed row cannot be
     # reproduced from this file alone. Appended last so existing column
     # positions stay stable for saved spreadsheet templates.
     "revealed_by",
@@ -104,7 +104,7 @@ def _image_row(
         finding.severity,
         finding.status,
         finding.wcag_criterion,
-        "",  # wcag_level — N/A for image findings
+        "",  # wcag_level, N/A for image findings
         page_url,
         finding.ui_url,
         f"{finding.priority_score:.3f}",
@@ -118,7 +118,7 @@ def _image_row(
         "" if finding.ocr_confidence is None else f"{finding.ocr_confidence:.2f}",
         _one_line(finding.vlm_rationale),
         _one_line(finding.remediation_hint),
-        # WCAG axe columns left blank (incl. revealed_by — an image finding
+        # WCAG axe columns left blank (incl. revealed_by, an image finding
         # is discovered by the load-state extractor, never by a click).
         "",
         "",

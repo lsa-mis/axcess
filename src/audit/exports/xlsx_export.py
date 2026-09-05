@@ -1,15 +1,15 @@
-"""Excel (.xlsx) audit report — the whole report, every section a table.
+"""Excel (.xlsx) audit report, the whole report, every section a table.
 
 A multi-sheet workbook that turns the Markdown audit report into something
 you can sort, filter, and track in a spreadsheet:
 
-* **Summary** — the at-a-glance dashboard: scan metadata plus every headline
+* **Summary**, the at-a-glance dashboard: scan metadata plus every headline
   rollup (counts, severity, WCAG level, POUR principle, coverage).
-* **Issues Overview** — the ticket index: a metadata header block plus one
+* **Issues Overview**, the ticket index: a metadata header block plus one
   sortable row per issue (ID · Issue · Severity · Conformance Level ·
   Remediation Ownership · Status · Instances · Pages), each linking into that
   issue's own tab.
-* **One tab per issue** — the ticket itself: a Current Behavior / Severity /
+* **One tab per issue**, the ticket itself: a Current Behavior / Severity /
   Impact / Should be / Instances / References summary block, then one row per
   place the defect was actually seen (Where · User action · Element · What to
   fix · How to reproduce), the acceptance criteria, and a circled location
@@ -17,22 +17,22 @@ you can sort, filter, and track in a spreadsheet:
   issues the index still lists everything and the remaining instances pool
   into a single **More Issues** sheet.
 
-  Fields a scan cannot establish — the component framework and assistive tech
-  used, a fix-approach category, competing fix options with trade-offs — are
+  Fields a scan cannot establish, the component framework and assistive tech
+  used, a fix-approach category, competing fix options with trade-offs, are
   omitted rather than emitted blank or inferred. Everything in the workbook
   came out of the scan.
-* **Page Hotspots** — pages ranked by a severity-weighted load.
-* **Page References** — every affected page as a clickable link, with a
+* **Page Hotspots**, pages ranked by a severity-weighted load.
+* **Page References**, every affected page as a clickable link, with a
   plain-language element location and the retained technical target.
-* **Who's Affected** — open issues by the user ability each one blocks.
-* **Coverage & Method** — per-criterion automated-vs-manual coverage.
-* **Test Tracking** — the manual Pass / Fail checklist, one row per WCAG 2.2
+* **Who's Affected**, open issues by the user ability each one blocks.
+* **Coverage & Method**, per-criterion automated-vs-manual coverage.
+* **Test Tracking**, the manual Pass / Fail checklist, one row per WCAG 2.2
   A/AA criterion.
-* **Manual Review Evidence** — human outcomes, rationale, page references,
+* **Manual Review Evidence**, human outcomes, rationale, page references,
   and external evidence links kept with the workbook handoff.
 
 Every issue-derived sheet is built from :func:`audit_report.build_audit_cards`
-— the exact card model the Markdown audit report renders — so the two
+— the exact card model the Markdown audit report renders, so the two
 deliverables can't drift. The coverage/checklist sheets come from
 ``coverage_matrix``. All of it is pinned by tests.
 """
@@ -123,7 +123,7 @@ _OWNER_DISPLAY = {
 }
 
 _GUIDANCE = (
-    "Prioritization Guidance — Start with rows whose Evidence decision is "
+    "Prioritization Guidance, Start with rows whose Evidence decision is "
     "Likely Barrier. Rows marked Expert Review require a human decision before "
     "they are described as barriers; Informational rows are not worklist items. "
     "Within the Likely Barrier lane, fix issues in conformance-level order. "
@@ -131,7 +131,7 @@ _GUIDANCE = (
     "disabilities outright; remediate these first. Level AA issues are "
     "required for WCAG 2.2 AA conformance (the standard most policies and "
     "laws reference) and should follow. Items marked S are best-practice "
-    "recommendations that go beyond the success criteria — address them "
+    "recommendations that go beyond the success criteria, address them "
     "once the A and AA issues are resolved. Within a level, work top-down: "
     "the table is sorted by Axcess's priority score (occurrence count, "
     "impact, and reach)."
@@ -160,7 +160,7 @@ _INSTANCE_HEADERS = (
     "What to fix",
     "How to reproduce",
 )
-_INSTANCE_WIDTHS = (5.0, 34.0, 26.0, 40.0, 46.0, 34.0)
+_INSTANCE_WIDTHS = (24.0, 34.0, 26.0, 40.0, 46.0, 34.0)
 
 # Excel hard-limits sheet names to 31 characters and forbids these.
 _SHEET_NAME_BANNED = str.maketrans(dict.fromkeys("[]:*?/\\", "-"))
@@ -183,10 +183,10 @@ _LOCATION_CAP = 6  # page links listed before collapsing to "+N more"
 
 # Most-urgent-first ordering for the severity rollups.
 _SEVERITY_ORDER = ("Critical", "Serious", "Moderate", "Minor")
-# Page-hotspot weighting — mirrors audit_report._page_hotspots so the Excel
+# Page-hotspot weighting, mirrors audit_report._page_hotspots so the Excel
 # "Page Hotspots" sheet ranks pages identically to the Markdown report.
 _SEVERITY_WEIGHT = {"Critical": 4.0, "Serious": 3.0, "Moderate": 2.0, "Minor": 1.0}
-# User-group labels — mirrors audit_report._abilities_rollup.
+# User-group labels, mirrors audit_report._abilities_rollup.
 _ABILITY_LABEL = {
     "vision": "Vision (blind / low-vision / color-blind)",
     "motor": "Motor (keyboard-only / switch / tremor)",
@@ -226,8 +226,8 @@ def _locations(pages: list[issues.IssuePage], total_pages: int) -> str:
         return "No page-level location was recorded."
     # Site-wide problem (every crawled page) reads better as a phrase.
     if total_pages > 1 and len(set(urls)) >= total_pages:
-        return "All scanned pages — open Page References."
-    return f"{len(set(urls))} linked page(s) — open Page References."
+        return "All scanned pages, open Page References."
+    return f"{len(set(urls))} linked page(s), open Page References."
 
 
 def _link_first_url(cell: Any) -> None:
@@ -265,7 +265,7 @@ def _embed_evidence(
 
     Pulls the first screenshot hash across ``detail.pages``, resolves it to a
     PNG in the blob store, scales it to fit the column, and anchors it to the
-    Evidence cell — growing the row to fit. A missing or corrupt file never
+    Evidence cell, growing the row to fit. A missing or corrupt file never
     breaks the export (the whole body is defensive); the cell stays blank.
     """
     if detail is None:
@@ -370,7 +370,7 @@ class _Ticket:
 
 
 _ENVIRONMENT_TO_SUPPLY = (
-    "Component framework and assistive technology tested: — (add before sharing)"
+    "Component framework and assistive technology tested:, (add before sharing)"
 )
 
 
@@ -470,9 +470,9 @@ def _instance_rows(ticket: _Ticket) -> list[tuple[Any, ...]]:
     reproduce = ticket.reproduce
     rows: list[tuple[Any, ...]] = []
     for number, loc in enumerate(ticket.locations, start=1):
-        where = loc.page_title or loc.page_url or "—"
+        where = loc.page_title or loc.page_url or "n/a"
         action = f'Open "{loc.revealed_by}" on this page.' if loc.revealed_by else "Load the page."
-        element = loc.selector or loc.image_url or loc.description or "—"
+        element = loc.selector or loc.image_url or loc.description or "n/a"
         rows.append((number, where, action, element, fix, reproduce))
     return rows
 
@@ -492,7 +492,7 @@ def _build_issue_index_sheet(
         ws.column_dimensions[get_column_letter(i)].width = w
 
     meta = [
-        ("Page", scan.seed_url or "—"),
+        ("Page", scan.seed_url or "n/a"),
         ("Compliance Standard", f"WCAG 2.2 Level {scan.axe_level}"),
         ("Audit Date", audit_date),
         ("Auditor", auditor),
@@ -603,7 +603,7 @@ def _write_fix_options(ws: Worksheet, ticket: _Ticket, *, row: int, ncols: int) 
             f"{chr(ord('A') + idx)}. {option.label}",
             applies,
             option.approach,
-            option.watch_out or "—",
+            option.watch_out or "n/a",
         )
         for c, value in enumerate(values, start=1):
             cell = ws.cell(row=row, column=c, value=value)
@@ -684,7 +684,7 @@ def _build_issue_detail_sheet(
     # Not just "Instances": that word is already a field in the block above,
     # and a reader scanning column A should not meet it twice meaning two
     # different things.
-    heading = ws.cell(row=r, column=1, value="Instances — one row per occurrence found")
+    heading = ws.cell(row=r, column=1, value="Instances, one row per occurrence found")
     heading.font = _META_LABEL_FONT
     r += 1
     header_row = r
@@ -888,7 +888,7 @@ def _build_summary_sheet(
     ws.column_dimensions["B"].width = 58
 
     ws.merge_cells("A1:B1")
-    title = ws.cell(row=1, column=1, value=f"Accessibility audit — Scan #{scan.id}")
+    title = ws.cell(row=1, column=1, value=f"Accessibility audit, Scan #{scan.id}")
     title.font = _TITLE_FONT
     ws.merge_cells("A2:B2")
     sub = ws.cell(
@@ -927,7 +927,7 @@ def _build_summary_sheet(
         return vc
 
     section("Scan")
-    seed_url_cell = metric("Seed URL", scan.seed_url or "—")
+    seed_url_cell = metric("Seed URL", scan.seed_url or "n/a")
     if scan.seed_url.startswith(("https://", "http://")):
         seed_url_cell.hyperlink = scan.seed_url
         seed_url_cell.style = "Hyperlink"
@@ -976,7 +976,7 @@ def _build_summary_sheet(
 
     by_level: dict[str, int] = {}
     for c in cards:
-        by_level[c.wcag_level or "—"] = by_level.get(c.wcag_level or "—", 0) + 1
+        by_level[c.wcag_level or "n/a"] = by_level.get(c.wcag_level or "n/a", 0) + 1
     section("Likely barriers by WCAG level")
     for lvl in ("A", "AA", "AAA"):
         if by_level.get(lvl):
@@ -1022,7 +1022,7 @@ def _build_hotspots_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
         ws,
         title="Page hotspots",
         subtitle=(
-            "Pages carrying the most (and most severe) open findings — fix shared "
+            "Pages carrying the most (and most severe) open findings, fix shared "
             "templates here to clear issues across the site. Weighted load = sum of "
             "severity weights (Critical 4 · Serious 3 · Moderate 2 · Minor 1)."
         ),
@@ -1046,7 +1046,7 @@ def _build_dom_states_sheet(
     """Per-page ledger for the click-through probe.
 
     The operational question this answers is not "how many states" but "where
-    was the sweep incomplete, and why" — so ``Controls operated`` sits next to
+    was the sweep incomplete, and why", so ``Controls operated`` sits next to
     ``Controls found`` rather than being reported as a bare total, and the
     bound that stopped a page is spelled out in words. Pages that stopped early
     sort first: they are the ones that still need a human.
@@ -1055,7 +1055,7 @@ def _build_dom_states_sheet(
     if not coverage.enabled:
         _styled_table(
             ws,
-            title="DOM states — content behind a click",
+            title="DOM states, content behind a click",
             subtitle=(
                 "Click-through DOM state discovery was turned off for this scan. "
                 "Content that appears only after operating a menu, tab, or dialog "
@@ -1069,7 +1069,7 @@ def _build_dom_states_sheet(
         )
         return
 
-    # Incomplete pages first, then the busiest — a reader scanning the top of
+    # Incomplete pages first, then the busiest, a reader scanning the top of
     # this sheet should be looking at the gaps, not at page one of the crawl.
     ordered = sorted(
         coverage.pages,
@@ -1090,7 +1090,7 @@ def _build_dom_states_sheet(
         subtitle += "  " + "  ".join(coverage.caveats)
     _styled_table(
         ws,
-        title="DOM states — content behind a click",
+        title="DOM states, content behind a click",
         subtitle=subtitle,
         headers=("Page", "Controls found", "Controls operated", "States", "Why it stopped"),
         rows=rows,
@@ -1157,7 +1157,7 @@ def _build_page_references_sheet(
                 for selector in selectors
             ):
                 technical_target = (
-                    "Structured engine target recorded — open the issue evidence in Axcess."
+                    "Structured engine target recorded, open the issue evidence in Axcess."
                 )
             elif selectors:
                 shown = selectors[:5]
@@ -1252,14 +1252,14 @@ def _build_coverage_sheet(ws: Worksheet) -> None:
             c.name,
             c.level,
             coverage_matrix.METHOD_LABELS[c.method],
-            c.automated_check or "—",
+            c.automated_check or "n/a",
             c.manual_check,
         )
         for c in crit
     ]
     _styled_table(
         ws,
-        title="Coverage & method — what's automated vs. manual",
+        title="Coverage & method, what's automated vs. manual",
         subtitle=(
             "For every WCAG 2.2 A/AA success criterion: how Axcess covers it and "
             "what a human must still confirm. Filter Coverage = 'Manual only' to see "
@@ -1357,20 +1357,20 @@ def render_xlsx(
 
     The sheet count varies with the number of issues:
 
-    1. **Summary** — the at-a-glance dashboard (counts, severity, level,
+    1. **Summary**, the at-a-glance dashboard (counts, severity, level,
        principle, coverage headline).
-    2. **Issues Overview** — the ticket index, one row per issue, each
+    2. **Issues Overview**, the ticket index, one row per issue, each
        linking into that issue's tab.
-    3. **One tab per issue** — summary block, instance table, acceptance
+    3. **One tab per issue**, summary block, instance table, acceptance
        criteria (capped at ``_MAX_ISSUE_SHEETS``; the rest pool into
        **More Issues**).
-    4. **Page Hotspots** — pages ranked by severity-weighted load.
-    5. **Page References** — affected pages, plain-language locations, and
+    4. **Page Hotspots**, pages ranked by severity-weighted load.
+    5. **Page References**, affected pages, plain-language locations, and
        retained technical targets.
-    6. **Who's Affected** — open issues by the ability each blocks.
-    7. **Coverage & Method** — per-criterion automated-vs-manual coverage.
-    8. **Test Tracking** — the manual Pass / Fail checklist.
-    9. **Manual Review Evidence** — criterion outcomes and supporting notes.
+    6. **Who's Affected**, open issues by the ability each blocks.
+    7. **Coverage & Method**, per-criterion automated-vs-manual coverage.
+    8. **Test Tracking**, the manual Pass / Fail checklist.
+    9. **Manual Review Evidence**, criterion outcomes and supporting notes.
 
     ``conn`` is required: the issue tables are built live from the same
     ``issues.list_issues()`` / audit-report card model the Markdown report

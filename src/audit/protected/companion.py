@@ -506,8 +506,8 @@ class _ProtectedBrowserCrawler:
         self._target_policy = ProtectedEgressPolicy(work.approved_target_origins)
         self._scope = url_policy.build_scope(url_policy.normalize_seed_url(work.seed_url))
         # Where sign-in actually landed. Scope above stays anchored to the
-        # work spec's seed — the auditor's approved area does not move
-        # because an identity provider redirected somewhere deeper — but the
+        # work spec's seed, the auditor's approved area does not move
+        # because an identity provider redirected somewhere deeper, but the
         # crawl starts from the signed-in page rather than re-fetching a seed
         # that is often the sign-in form itself. Out-of-scope landings fall
         # back to the seed, since every URL is scope-checked again below and

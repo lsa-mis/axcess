@@ -27,12 +27,12 @@ import tldextract
 _DEFAULT_PORTS = {"http": "80", "https": "443"}
 
 _extract = tldextract.TLDExtract(suffix_list_urls=())
-"""Offline-only PSL extractor — uses the snapshot bundled with tldextract."""
+"""Offline-only PSL extractor, uses the snapshot bundled with tldextract."""
 
 
 # Ported from a11y-crawler (lib/crawler/config.ts). A crawl that follows a
 # "Sign out" link destroys the session it was given and then reports every
-# remaining page as the login screen — the scan looks like it completed,
+# remaining page as the login screen, the scan looks like it completed,
 # having tested nothing. The defaults are path fragments rather than whole
 # paths because applications spell the same action many ways
 # (``/logout``, ``/account/logout``, ``/auth/sign-out``).
@@ -191,7 +191,7 @@ def build_scope(seed_url: str, *, whole_host: bool = False) -> HostScope:
 
     Set ``whole_host=True`` to keep the old behavior (ignore path; follow
     every in-host link). By default the scope is path-constrained, so
-    ``/bicentennial/`` crawls only ``/bicentennial/*`` — not the whole site.
+    ``/bicentennial/`` crawls only ``/bicentennial/*``, not the whole site.
     """
     parts = urlsplit(seed_url)
     host = (parts.hostname or "").lower()
@@ -225,7 +225,7 @@ def compare_key(url: str) -> str:
       * Inline-SVG pseudo-URLs (``inline-svg://<page_url>#<position>``) have
         the embedded page URL normalized the same way.
 
-    For any other host, the input is returned unchanged — a port change on
+    For any other host, the input is returned unchanged, a port change on
     a real host is semantically significant and should not be papered over.
     """
     if url.startswith(_INLINE_SVG_SCHEME):
@@ -286,7 +286,7 @@ def is_in_scope(url: str, scope: HostScope, *, allow_subdomains: bool = False) -
         return True
     path = parts.path or "/"
     # Match against the prefix itself OR the prefix with its trailing '/'
-    # dropped — so a link to ``/bicentennial`` resolves as in-scope for a
+    # dropped, so a link to ``/bicentennial`` resolves as in-scope for a
     # ``/bicentennial/`` prefix, letting the server's redirect settle it.
     bare = scope.path_prefix.rstrip("/")
     return path == bare or path.startswith(scope.path_prefix)

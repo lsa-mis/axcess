@@ -1,7 +1,7 @@
 """Text-only Ollama client for per-criterion semantic analyzers.
 
 Generic ``generate(prompt) -> str`` over a local Ollama daemon. The
-shared HTTP plumbing — semaphore, retry, healthy() probe, timeouts —
+shared HTTP plumbing, semaphore, retry, healthy() probe, timeouts —
 lives in :class:`audit.analyzer.ollama_base.OllamaBase`; this class
 adds only the text-payload shape and a parsed-JSON convenience.
 
@@ -36,7 +36,7 @@ class OllamaTextProvider(OllamaBase):
     a malformed payload from the model becomes the empty string
     instead of a parser-killing token salad).
 
-    The caller passes the fully-rendered prompt — we do not interpolate
+    The caller passes the fully-rendered prompt, we do not interpolate
     anything here. The runner reads the per-criterion prompt template,
     fills it with the extracted elements, and hands the result to
     :meth:`generate`. That keeps this class one-job-only.
@@ -78,7 +78,7 @@ class OllamaTextProvider(OllamaBase):
     ) -> str:
         """Call ``/api/generate`` once. Returns the raw ``response`` field.
 
-        ``model`` overrides the constructor default — useful for the
+        ``model`` overrides the constructor default, useful for the
         runner switching models per criterion without spawning a
         second provider.
 
@@ -89,7 +89,7 @@ class OllamaTextProvider(OllamaBase):
         Errors:
         * :class:`OllamaError` on HTTP failures, exhausted retries, or
           a malformed Ollama envelope. **Does NOT** raise on a model
-          producing valid-JSON-but-wrong-schema output — the caller
+          producing valid-JSON-but-wrong-schema output, the caller
           owns that parse step.
         """
         payload: dict[str, Any] = {

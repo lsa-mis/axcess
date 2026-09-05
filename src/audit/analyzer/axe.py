@@ -1,4 +1,4 @@
-"""Axe-core runner — full WCAG 2.x AA scan against an already-rendered page.
+"""Axe-core runner, full WCAG 2.x AA scan against an already-rendered page.
 
 This module is the **second analyzer** in the codebase (after `ocr/` and
 `vlm/` which feed the WCAG 1.4.5 image-of-text pipeline). It runs at a
@@ -10,20 +10,20 @@ Why axe-core specifically:
 
 * It's a Deque-maintained, open-source library that codifies most of the
   WCAG 2.x AA criteria that can be checked from the DOM alone. It
-  catches the obvious-but-tedious failures — color contrast, missing
-  form labels, ARIA misuse — that human auditors burn hours on.
+  catches the obvious-but-tedious failures, color contrast, missing
+  form labels, ARIA misuse, that human auditors burn hours on.
 * We already bundle ``axe.min.js`` (553 KB, served at
   ``/static/axe.min.js``) for our own UI's in-test baseline scan. Same
   bundle, used on the user's site instead of ours.
 
-Important scope caveats — surface these in the UI:
+Important scope caveats, surface these in the UI:
 
 * Axe auto-detects roughly **30-40% of WCAG 2.x AA SCs**. The remainder
   (SC 1.1.1 *meaningful* alt text, SC 2.4.6 *descriptive* headings,
   SC 3.3.2 *clear* labels, etc.) need human judgment. A clean axe scan
   is necessary, not sufficient.
 * The product's existing WCAG 1.4.5 pipeline (image-of-text) catches
-  things axe can't — axe flags ``image-alt`` (missing) but never
+  things axe can't, axe flags ``image-alt`` (missing) but never
   "this image *contains text* and the alt is decorative." The two
   passes are complementary, not redundant.
 
@@ -53,7 +53,7 @@ log = logging.getLogger(__name__)
 
 
 # Path to the axe-core bundle inside the repo. The web UI serves the same
-# file at /static/axe.min.js — we just read it off disk for crawl-time
+# file at /static/axe.min.js, we just read it off disk for crawl-time
 # injection so we don't depend on a running web server.
 DEFAULT_AXE_BUNDLE = Path(__file__).resolve().parents[1] / "web" / "static" / "axe.min.js"
 
@@ -95,9 +95,9 @@ _LEVEL_TAGS: dict[Level, frozenset[str]] = {
 def tags_for_level(level: Level) -> list[str]:
     """Axe tag list to pass into ``axe.run`` for a given WCAG level.
 
-    The list always includes ``best-practice`` — axe's own recommended
+    The list always includes ``best-practice``, axe's own recommended
     rules that don't map cleanly to a single SC but catch real bugs
-    (e.g. ``region`` — top-level content not in a landmark). Best-practice
+    (e.g. ``region``, top-level content not in a landmark). Best-practice
     findings are tagged ``best-practice`` and we surface them with
     ``wcag_level = None`` in the DB so the user can filter them out.
     """
@@ -110,7 +110,7 @@ def _extract_wcag_scs(tags: list[str]) -> tuple[str | None, str | None, Level | 
     Returns ``(primary_sc, all_scs_csv, level)``. Picks the lowest-numbered
     SC as primary (so ``["wcag143","wcag146"]`` → primary ``"1.4.3"``)
     because the lower SC is usually the more universally-applicable one
-    (1.4.3 is AA, 1.4.6 is AAA — fix the AA bar first).
+    (1.4.3 is AA, 1.4.6 is AAA, fix the AA bar first).
     """
     scs: list[str] = []
     levels: set[Level] = set()
@@ -118,7 +118,7 @@ def _extract_wcag_scs(tags: list[str]) -> tuple[str | None, str | None, Level | 
         if not tag.startswith("wcag"):
             continue
         rest = tag.removeprefix("wcag")
-        # Level tags like wcag2a, wcag21aa, wcag22aaa — distinguish from
+        # Level tags like wcag2a, wcag21aa, wcag22aaa, distinguish from
         # SC tags like wcag143 by checking whether the suffix is purely
         # digits (SC) vs has letters (level).
         if not rest or not rest[0].isdigit():
@@ -171,7 +171,7 @@ def _digits_to_sc(digits: str) -> str | None:
 
 
 def _sc_sort_key(sc: str) -> tuple[int, int, int]:
-    """Numeric sort for SC strings — ``"1.4.11"`` should follow ``"1.4.3"``."""
+    """Numeric sort for SC strings, ``"1.4.11"`` should follow ``"1.4.3"``."""
     parts = sc.split(".")
     if len(parts) != 3:
         return (99, 99, 99)
@@ -186,7 +186,7 @@ class AxeViolation:
     """One axe rule failure against one DOM node.
 
     Multiple nodes on the same page failing the same rule become multiple
-    ``AxeViolation`` instances — axe groups them under one rule in its
+    ``AxeViolation`` instances, axe groups them under one rule in its
     raw output, but we flatten because the UI's natural unit is "one
     finding = one thing to fix in one place."
     """
@@ -204,7 +204,7 @@ class AxeViolation:
 
     @property
     def target_hash(self) -> str:
-        """Stable hash for the (rule, target, snippet) tuple — dedupe key."""
+        """Stable hash for the (rule, target, snippet) tuple, dedupe key."""
         h = hashlib.sha256()
         h.update(self.rule_id.encode("utf-8", errors="replace"))
         h.update(b"\x00")
@@ -233,7 +233,7 @@ class AxeAnalyzer:
         bundle = path or DEFAULT_AXE_BUNDLE
         if not bundle.is_file():
             raise FileNotFoundError(
-                f"axe bundle not found at {bundle} — run `make setup` to fetch it."
+                f"axe bundle not found at {bundle}, run `make setup` to fetch it."
             )
         return cls(
             axe_source=bundle.read_text(encoding="utf-8"),
@@ -278,7 +278,7 @@ class AxeAnalyzer:
                 tags,
             )
         except Exception as exc:
-            # Don't kill the crawl on an axe failure — log and return empty.
+            # Don't kill the crawl on an axe failure, log and return empty.
             if self.suppress_diagnostics:
                 log.warning("axe.run failed in protected context")
             else:

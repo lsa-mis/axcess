@@ -130,8 +130,8 @@ def test_issue_rows_include_bounded_exact_locations(tmp_db: sqlite3.Connection) 
     assert len(contrast.locations) == 2
     assert contrast.locations[0].page_url.startswith("http://example.com/")
     assert contrast.locations[0].target.startswith("p:nth-child(")
-    assert contrast.locations[0].evidence_url == (
-        f"/scans/{scan_id}/pages/{contrast.locations[0].page_id}"
+    assert contrast.locations[0].evidence_url.startswith(
+        f"/scans/{scan_id}/pages/{contrast.locations[0].page_id}#finding-"
     )
 
     image = next(row for row in rows if row.pipeline == "image")

@@ -242,8 +242,8 @@ def test_audit_report_structure(tmp_db: sqlite3.Connection) -> None:
         "## Page hotspots",
         "## Remediation worklist by owner",
         "## Issue cards",
-        "## Appendix A — Findings dropped during self-critique",
-        "## Appendix B — Review leads and informational evidence",
+        "## Appendix A, Findings dropped during self-critique",
+        "## Appendix B, Review leads and informational evidence",
     ]
     last = -1
     for heading in expected_in_order:

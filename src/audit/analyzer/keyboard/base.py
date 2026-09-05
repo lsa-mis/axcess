@@ -3,7 +3,7 @@
 Mirrors the shape used by the semantic analyzers
 (``audit.analyzer.semantic.base``) so the orchestrator can persist
 keyboard findings into ``page_a11y_findings`` with the same
-``to_repo_kwargs()`` contract — no per-pipeline branching in the
+``to_repo_kwargs()`` contract, no per-pipeline branching in the
 persistence layer.
 """
 
@@ -41,7 +41,7 @@ class KeyboardTrap:
     """
 
     rule_id: str
-    impact: str  # always 'critical' — keyboard traps fully block users
+    impact: str  # always 'critical', keyboard traps fully block users
     target_selector: str
     failure_summary: str
     html_snippet: str
@@ -60,7 +60,7 @@ class KeyboardTrap:
     def target_hash(self) -> str:
         """Dedupe key for the (page, rule, target) tuple.
 
-        Same approach as the axe pipeline — a sha256 over the rule
+        Same approach as the axe pipeline, a sha256 over the rule
         id + selector + (a slice of) the HTML snippet. Stable across
         rescans of the same page; differs from one trap to another on
         the same page (different selectors).
@@ -76,7 +76,7 @@ class KeyboardTrap:
     def to_repo_kwargs(self) -> dict[str, Any]:
         """Match the kwargs accepted by ``repo.upsert_axe_violation``.
 
-        Mirrors :meth:`SemanticFinding.to_repo_kwargs` — the orchestrator
+        Mirrors :meth:`SemanticFinding.to_repo_kwargs`, the orchestrator
         calls ``upsert_axe_violation(**finding.to_repo_kwargs())`` and
         the same row format works for axe, semantic, and keyboard.
         """

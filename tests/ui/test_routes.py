@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import sqlite3
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -679,6 +680,7 @@ def test_api_create_scan_respects_whole_host(
         captured["focus_checks_enabled"] = config.focus_checks_enabled
         captured["visual_checks_enabled"] = config.visual_checks_enabled
         captured["interaction_checks_enabled"] = config.interaction_checks_enabled
+        captured["store_rendered_html"] = config.store_rendered_html
 
     monkeypatch.setattr(_server, "_run_background_crawl", _capture)
     resp = client.post(
@@ -698,6 +700,7 @@ def test_api_create_scan_respects_whole_host(
             "skip_focus": True,
             "skip_visual": True,
             "skip_interaction": True,
+            "skip_rendered_storage": True,
         },
     )
     assert resp.status_code == 201
@@ -717,6 +720,8 @@ def test_api_create_scan_respects_whole_host(
     assert captured.get("focus_checks_enabled") is False
     assert captured.get("visual_checks_enabled") is False
     assert captured.get("interaction_checks_enabled") is False
+    # The "don't store rendered pages" opt-out reaches the crawl config.
+    assert captured.get("store_rendered_html") is False
 
 
 def test_api_create_scan_selects_alfa_engine(
@@ -1169,6 +1174,53 @@ def test_blob_serves_png_bytes(client: TestClient, seeded_db: tuple[object, obje
     assert resp.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_blob_serves_a_finding_screenshot(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """A circled finding screenshot is served even though it has no image row.
+
+    Finding screenshots are written straight to the content-addressed store by
+    the crawler; they are evidence about an element, not image content lifted
+    off the page, so nothing inserts them into ``images``. The blob route used
+    to resolve hashes against that table alone, which 404'd every screenshot on
+    the page-evidence view while the PNG sat on disk.
+    """
+    db_path, blob_dir, _scan_id = seeded_db
+    png = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    content_hash = hashlib.sha256(png).hexdigest()
+    shard = blob_dir / content_hash[:2]
+    shard.mkdir(parents=True, exist_ok=True)
+    (shard / f"{content_hash}.png").write_bytes(png)
+
+    conn = connect(db_path)
+    try:
+        page_id, scan_id = conn.execute("SELECT id, scan_id FROM pages LIMIT 1").fetchone()[:2]
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings (
+                page_id, scan_id, rule_id, help, target_selector, target_hash,
+                status, created_at, updated_at, screenshot_hash, engine_outcome,
+                pipeline
+            ) VALUES (?, ?, 'color-contrast', 'Contrast (Minimum)', 'main p',
+                      'deadbeef', 'new', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                      ?, 'failed', 'axe')
+            """,
+            (page_id, scan_id, content_hash),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = client.get(f"/blobs/{content_hash}")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/png")
+    assert resp.content == png
+
+
 def test_blob_rejects_invalid_hash(client: TestClient) -> None:
     resp = client.get("/blobs/not_a_hash")
     assert resp.status_code == 400
@@ -1295,7 +1347,7 @@ def test_export_markdown_route(client: TestClient, seeded_db: tuple[object, obje
     resp = client.get(f"/api/scans/{scan_id}/export/markdown")
     assert resp.status_code == 200
     assert "text/markdown" in resp.headers["content-type"]
-    assert resp.text.startswith(f"# Accessibility evidence inventory — Scan #{scan_id}")
+    assert resp.text.startswith(f"# Accessibility evidence inventory, Scan #{scan_id}")
 
 
 def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
@@ -1341,18 +1393,18 @@ def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
     assert f"scan_{scan_id}_DRAFT." in response.headers["content-disposition"]
     assert response.headers["x-axcess-export-state"] == "draft"
     if fmt in {"markdown", "audit"}:
-        assert response.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+        assert response.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
         assert "do not treat it as a conformance determination" in response.text
     elif fmt == "json":
         notice = response.json()["export_notice"]
         assert notice["draft"] is True
         assert notice["evaluation_status"] == "draft"
-        assert notice["label"] == "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+        assert notice["label"] == "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
     elif fmt == "xlsx":
         workbook = load_workbook(BytesIO(response.content))
         assert workbook.sheetnames[0] == "DRAFT NOTICE"
         assert workbook["DRAFT NOTICE"]["A1"].value == (
-            "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+            "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
         )
         assert workbook["DRAFT NOTICE"]["B3"].value == "draft"
     elif fmt == "csv":
@@ -1433,7 +1485,7 @@ def test_unreviewed_actionable_findings_block_final_but_allow_acknowledged_draft
     )
     assert draft.status_code == 200
     assert f"scan_{scan_id}_DRAFT.md" in draft.headers["content-disposition"]
-    assert draft.text.startswith("> **DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION**")
+    assert draft.text.startswith("> **DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION**")
 
 
 @pytest.mark.parametrize(

@@ -882,7 +882,7 @@ function PairingCode({
       aria-labelledby="pairing-code-heading"
     >
       <h3 id="pairing-code-heading" className="text-sm font-semibold text-fg">
-        One-time pairing code — shown once
+        One-time pairing code, shown once
       </h3>
       <p className="mt-1 text-sm text-fg-muted">
         Enter this only into the local companion prompt. Axcess will not copy it to your clipboard or show it again after you hide this section.
@@ -918,7 +918,7 @@ function PairingCode({
         </div>
       </dl>
       <Button type="button" className="mt-4" onClick={onHide}>
-        I recorded it — hide pairing code
+        I recorded it, hide pairing code
       </Button>
     </section>
   );

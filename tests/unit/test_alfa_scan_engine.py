@@ -315,7 +315,7 @@ def test_alfa_findings_are_source_separated_and_keep_outcome(tmp_db: sqlite3.Con
         ("axe", "axe:sia-r2"),
     }
     alfa_row = next(row for row in rows if row.pipeline == "alfa")
-    assert alfa_row.title == "Non-text Content — expert decision needed (Alfa sia-r2)"
+    assert alfa_row.title == "Non-text Content, expert decision needed (Alfa sia-r2)"
     assert alfa_row.description is not None and "cantTell" in alfa_row.description
     assert alfa_row.why_matters is not None
     assert "not a failure" in alfa_row.why_matters

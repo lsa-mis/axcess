@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
 import { cn } from "../lib/cn";
-import { Card, EmptyState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, PageHeader } from "../components/ui";
 import type {
   CoverageCriterion,
   CoverageData,
@@ -14,12 +14,23 @@ import type {
 } from "../api/types";
 
 /**
- * Coverage & feature tracker — what the tool detects today versus what's
+ * Coverage & feature tracker, what the tool detects today versus what's
  * planned, across every pipeline. Reads from /api/tracking, which is
  * backed by the same source of truth as docs/coverage-tracker.md
  * (coverage_status.py) so the page can't claim coverage the code lacks.
  */
 export default function TrackingRoute() {
+  const [params, setParams] = useSearchParams();
+  const requestedView = params.get("view");
+  const view = requestedView === "roadmap" || requestedView === "pipelines" || requestedView === "uncovered" ? requestedView : "coverage";
+  const status = params.get("status");
+  const roadmapStatus = status === "shipped" || status === "in_progress" || status === "planned" ? status : "";
+  const select = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  };
   const { data, isLoading, error } = useQuery({
     queryKey: ["tracking"],
     queryFn: api.getTracking,
@@ -45,38 +56,49 @@ export default function TrackingRoute() {
         </Card>
       )}
 
-      {data?.coverage && <CoverageSection coverage={data.coverage} />}
+      <div role="group" aria-label="Tracker sections" className="mb-5 flex flex-wrap gap-2 rounded-lg border border-border bg-surface-muted p-2">
+        {([
+          ["coverage", "Current coverage"],
+          ["uncovered", "Not covered yet"],
+          ["roadmap", "AI roadmap"],
+          ["pipelines", "Shipped pipelines"],
+        ] as const).map(([key, label]) => (
+          <Button key={key} variant={view === key ? "primary" : "ghost"} aria-pressed={view === key} aria-controls="tracker-content" onClick={() => select("view", key)} className="rounded-lg transition-none">
+            {label}
+          </Button>
+        ))}
+      </div>
+      <p role="status" className="sr-only">Showing {view === "coverage" ? "current coverage" : view === "roadmap" ? "AI roadmap" : view === "uncovered" ? "criteria not covered yet" : "shipped pipelines"}</p>
+      {isLoading && <p role="status">Loading tracker…</p>}
+      <div id="tracker-content">
+      {(view === "coverage" || view === "uncovered") && data?.coverage && <CoverageSection coverage={data.coverage} notCovered={view === "uncovered"} />}
 
-      <section aria-labelledby="roadmap-h" className="mb-8">
+      {view === "roadmap" && <section aria-labelledby="roadmap-h" className="mb-8">
         <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
           AI Roadmap
         </h2>
         <p className="mb-3 text-sm text-fg-muted">
           The queue to close the AI coverage gap. A criterion listed in the
           orchestrator&apos;s default criteria but with no analyzer class is
-          skipped at runtime — those read “planned,” not “shipped.”
+          skipped at runtime, those read “planned,” not “shipped.”
         </p>
         {counts && (
-          <ul className="mb-3 flex flex-wrap gap-2" aria-label="Roadmap items by status">
-            <li>
-              <StatusBadge status="shipped">{counts.shipped} shipped</StatusBadge>
-            </li>
-            <li>
-              <StatusBadge status="in_progress">
-                {counts.in_progress} in progress
-              </StatusBadge>
-            </li>
-            <li>
-              <StatusBadge status="planned">{counts.planned} planned</StatusBadge>
-            </li>
-          </ul>
+          <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filter roadmap by status">
+            <Button className="transition-none" variant={roadmapStatus ? "ghost" : "primary"} aria-pressed={!roadmapStatus} onClick={() => select("status", "")}>All</Button>
+            {(["shipped", "in_progress", "planned"] as const).map((key) => (
+              <Button className="transition-none" key={key} variant={roadmapStatus === key ? "primary" : "ghost"} aria-pressed={roadmapStatus === key} onClick={() => select("status", key)}>
+                {STATUS_LABEL[key]} ({counts[key]})
+              </Button>
+            ))}
+          </div>
         )}
+        <p role="status" className="mb-2 text-xs text-fg-muted">Showing {data?.roadmap.filter((item) => !roadmapStatus || item.status === roadmapStatus).length ?? 0} roadmap items{roadmapStatus ? ` · ${STATUS_LABEL[roadmapStatus]}` : ""}</p>
         <Card className="overflow-x-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">
               Planned AI analyzers by WCAG criterion
             </caption>
-            <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+            <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
               <tr>
                 <Th>SC</Th>
                 <Th>Criterion</Th>
@@ -87,17 +109,17 @@ export default function TrackingRoute() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border align-top">
-              {data?.roadmap.map((r) => (
+              {data?.roadmap.filter((item) => !roadmapStatus || item.status === roadmapStatus).map((r) => (
                 <RoadmapRow key={r.wcag} item={r} />
               ))}
             </tbody>
           </table>
         </Card>
-      </section>
+      </section>}
 
-      <section aria-labelledby="shipped-h" className="mb-8">
+      {view === "pipelines" && <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
-          Shipped Pipelines — What Runs Today
+          Shipped Pipelines, What Runs Today
         </h2>
         {/* Counted from the data, not written down: the previous sentence
         said "three deterministic, two AI" and had been wrong since two
@@ -111,7 +133,7 @@ export default function TrackingRoute() {
             <caption className="sr-only">
               Detection pipelines that run on a default crawl
             </caption>
-            <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+            <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
               <tr>
                 <Th>Pipeline</Th>
                 <Th>Engine</Th>
@@ -158,7 +180,8 @@ export default function TrackingRoute() {
             </tbody>
           </table>
         </Card>
-      </section>
+      </section>}
+      </div>
 
       <p className="mt-4 text-xs text-fg-subtle">
         Long-form version with the verification map:{" "}
@@ -355,12 +378,21 @@ function CoverageMethodBadge({
 }
 
 /**
- * The honest WCAG 2.2 A/AA coverage breakdown — what Axcess checks
+ * The honest WCAG 2.2 A/AA coverage breakdown, what Axcess checks
  * automatically, what it AI-assists, and (the long tail) what still needs
  * manual testing. Rendered straight from the coverage matrix so it can't
  * over-claim. The "What you must still test" column is the whole point.
  */
-function CoverageSection({ coverage }: { coverage: CoverageData }) {
+function CoverageSection({ coverage: fullCoverage, notCovered = false }: { coverage: CoverageData; notCovered?: boolean }) {
+  const coverage = useMemo(() => {
+    const criteria = fullCoverage.criteria.filter((criterion) => (criterion.method === "manual") === notCovered);
+    return {
+      ...fullCoverage,
+      criteria,
+      total: criteria.length,
+      methods: fullCoverage.methods.filter((method) => (method === "manual") === notCovered),
+    };
+  }, [fullCoverage, notCovered]);
   const label = (m: CoverageMethod) => coverage.method_labels[m];
   const [params, setParams] = useSearchParams();
 
@@ -414,35 +446,40 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
   return (
     <section aria-labelledby="cov-h" className="mb-8">
       <h2 id="cov-h" className="mb-3 text-base font-semibold text-fg">
-        Current Coverage
+        {notCovered ? "Not covered yet" : "Current Coverage"}
       </h2>
+      <p className="mb-3 text-sm text-fg-muted">
+        {notCovered
+          ? "Axcess has no automated detection for these WCAG 2.2 A/AA criteria yet. They require manual testing; this list does not imply an implementation is planned."
+          : "WCAG 2.2 A/AA criteria with an implemented automated, partial, or AI-assisted check. Coverage does not mean every requirement is tested; review the manual checks below."}
+      </p>
 
       {/* The method tiles double as the table's filter. They already
       carried the counts, so making them the control removes a separate
       filter row and keeps the number and the thing it filters together. */}
-      <div
+      {!notCovered && <div
         role="group"
         aria-label="Filter coverage by method"
-        className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5"
+        className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
       >
         <FilterTile
           active={!method}
           onClick={() => setParam("method", "")}
           count={coverage.total}
-          blurb="Every Level A/AA success criterion."
+          blurb="Criteria with an implemented Axcess check."
           label="All"
         />
         {coverage.methods.map((m) => (
           <FilterTile
             key={m}
             active={method === m}
-            onClick={() => setParam("method", method === m ? "" : m)}
+            onClick={() => setParam("method", m)}
             count={coverage.by_method[m] ?? 0}
             blurb={coverage.method_blurb[m]}
             badge={<CoverageMethodBadge method={m} label={label(m)} />}
           />
         ))}
-      </div>
+      </div>}
 
       <p role="status" className="mb-2 text-xs text-fg-muted">
         Showing {rows.length} of {coverage.total} criteria
@@ -452,9 +489,9 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
       <Card className="overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">
-            Every WCAG 2.2 A/AA success criterion and how Axcess covers it
+            {notCovered ? "WCAG 2.2 A/AA criteria not covered by Axcess yet" : "WCAG 2.2 A/AA criteria with current Axcess coverage"}
           </caption>
-          <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+          <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
             <tr>
               <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
               <SortableTh
@@ -488,10 +525,10 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
                 <td className="px-4 py-3 text-fg">{c.name}</td>
                 <td className="px-4 py-3 text-xs text-fg-muted">{c.level}</td>
                 <td className="px-4 py-3">
-                  <CoverageMethodBadge method={c.method} label={label(c.method)} />
+                  <CoverageMethodBadge method={c.method} label={notCovered ? "Not covered yet" : label(c.method)} />
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-muted">
-                  {c.automated_check || <span className="text-fg-subtle">—</span>}
+                  {c.automated_check || <span className="text-fg-subtle">n/a</span>}
                 </td>
                 <td className="px-4 py-3 text-xs text-fg-muted">
                   {c.manual_check}
@@ -504,7 +541,7 @@ function CoverageSection({ coverage }: { coverage: CoverageData }) {
       {rows.length === 0 && (
         <EmptyState
           title="No criteria match"
-          message="Clear the method filter to see the whole matrix again."
+          message="Choose All to see every criterion in this section."
         />
       )}
     </section>

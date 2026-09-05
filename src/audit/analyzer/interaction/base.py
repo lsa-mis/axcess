@@ -4,7 +4,7 @@ Every other analyzer pipeline in this package invents its own rule
 vocabulary and persists through a dedicated ``upsert_*`` helper with its own
 ``pipeline`` discriminator. This one deliberately does not.
 
-What the interaction probe produces *is* an axe violation — the same rules,
+What the interaction probe produces *is* an axe violation, the same rules,
 against the same DOM, read by the same engine. The only new fact it
 contributes is **which control had to be operated** before the violating
 markup existed. So its findings ride the ordinary
@@ -44,7 +44,7 @@ class RevealedViolation:
 
     @property
     def target_hash(self) -> str:
-        """Delegate to the wrapped violation — screenshots key on this."""
+        """Delegate to the wrapped violation, screenshots key on this."""
         return self.violation.target_hash
 
     @property
@@ -66,7 +66,7 @@ class InteractionResult:
     """
 
     findings: tuple[RevealedViolation, ...] = ()
-    #: Clicks that actually changed the DOM — states a load-time pass cannot
+    #: Clicks that actually changed the DOM, states a load-time pass cannot
     #: reach, counted whether or not they held a defect.
     states: int = 0
     urls: tuple[str, ...] = ()

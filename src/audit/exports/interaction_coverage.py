@@ -2,17 +2,17 @@
 
 Five export formats and the stakeholder report all need to answer the same
 question about the interaction probe, so they read it from here rather than
-each re-joining the tables and drifting apart — the same reason
+each re-joining the tables and drifting apart, the same reason
 ``coverage_matrix`` is the single source of truth for WCAG claims and
 ``web.issues`` for the unified issue view.
 
 The auditor's question is not "how many states." It is:
 
-* **Coverage** — of the controls this page exposes, which were operated, and
+* **Coverage**, of the controls this page exposes, which were operated, and
   what stopped the rest?  (``scan_interaction_runs``)
-* **Provenance** — for this finding, what had to be clicked to see it?
+* **Provenance**, for this finding, what had to be clicked to see it?
   (``page_a11y_findings.revealed_by``)
-* **Reproduction** — how does a developer get back to it?  (:func:`reproduction_step`)
+* **Reproduction**, how does a developer get back to it?  (:func:`reproduction_step`)
 
 Three states are deliberately distinguishable and must never collapse into one
 number: the probe was **off**, the probe **ran and found nothing**, and the
@@ -116,7 +116,7 @@ class InteractionCoverage:
 
     @property
     def limited_pages(self) -> list[PageInteraction]:
-        """Pages where a bound stopped the sweep — the "not fully checked" list."""
+        """Pages where a bound stopped the sweep, the "not fully checked" list."""
         return [p for p in self.pages if p.was_limited]
 
     @property
@@ -184,7 +184,7 @@ class InteractionCoverage:
         # a later scan is not evidence that anyone fixed it.
         out.append(
             "Click-revealed findings are not yet compared across scans. If one is absent "
-            "from a later report, confirm the fix directly — absence is not proof of repair."
+            "from a later report, confirm the fix directly, absence is not proof of repair."
         )
         return out
 
@@ -226,7 +226,7 @@ def load(conn: sqlite3.Connection, scan_id: int) -> InteractionCoverage:
     )
 
     # The ledger table grew columns after the first scans were written, and
-    # those scans already carry coverage_version 2 — so the version alone is
+    # those scans already carry coverage_version 2, so the version alone is
     # not a safe gate and a bare SELECT would raise on a real user's older
     # database. Check the columns that are actually present.
     #

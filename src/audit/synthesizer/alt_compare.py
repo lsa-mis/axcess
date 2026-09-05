@@ -1,16 +1,16 @@
 """Compare an image's alt text against its visible text content.
 
 Returns an :class:`AltAdequacy` bucket based on:
-  * missing — no alt attribute was present on the ``<img>``,
-  * inadequate — alt present but the text dissimilar,
-  * partial — some overlap with the visible text,
-  * adequate — alt captures the visible text (or there was no visible text).
+  * missing, no alt attribute was present on the ``<img>``,
+  * inadequate, alt present but the text dissimilar,
+  * partial, some overlap with the visible text,
+  * adequate, alt captures the visible text (or there was no visible text).
 
 An empty ``alt=""`` is treated as ``inadequate`` here because its suitability
 depends on the VLM classification: decorative images with ``alt=""`` get a
 low-priority finding, while essential/informational ones are a real failure.
 The priority formula in :mod:`audit.synthesizer.priority` handles that
-weighting — this module stays a pure string-similarity check.
+weighting, this module stays a pure string-similarity check.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def compare(alt: str | None, visible_text: str) -> AltAdequacy:
         return AltAdequacy.ADEQUATE
 
     if not norm_alt:
-        # alt="" on an image that DOES contain visible text — author declared
+        # alt="" on an image that DOES contain visible text, author declared
         # it decorative. Downstream, the priority weight plus the VLM
         # classification will determine severity.
         return AltAdequacy.INADEQUATE

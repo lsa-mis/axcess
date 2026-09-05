@@ -21,7 +21,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from audit import evaluation
 from audit.web import issues
 
-_DRAFT_TITLE = "DRAFT — INCOMPLETE ACCESSIBILITY EVALUATION"
+_DRAFT_TITLE = "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
 _DRAFT_EXPLANATION = (
     "This export was explicitly downloaded as a draft. Expert review is incomplete; "
     "do not treat it as a conformance determination."

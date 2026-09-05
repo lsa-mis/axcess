@@ -8,10 +8,10 @@ its ``status`` here and both the page and any generated summary update.
 
 Status values are deliberately few:
 
-* ``"shipped"``  — a wired pipeline persists findings for this (verify in
+* ``"shipped"`` , a wired pipeline persists findings for this (verify in
   the registry / probe modules).
-* ``"in_progress"`` — code exists but isn't wired end-to-end yet.
-* ``"planned"`` — designed, not started. ``note`` explains any nuance
+* ``"in_progress"``, code exists but isn't wired end-to-end yet.
+* ``"planned"``, designed, not started. ``note`` explains any nuance
   (e.g. "configured in default criteria but no analyzer class").
 
 Keep this honest: an accessibility tool that *claims* coverage it doesn't
@@ -59,13 +59,13 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         scs="dozens (1.1.1 presence, 1.3.1, 1.4.3, 2.4.x, 4.1.2, meta-viewport, …)",
         needs_ai=False,
         note="Largest coverage source by rule count. Needs the rendered "
-        "DOM — runs on every page now that JS rendering is the default.",
+        "DOM, runs on every page now that JS rendering is the default.",
     ),
     ShippedPipeline(
         name="Keyboard-trap probe",
         pipeline="keyboard",
         engine="Deterministic Playwright (bidirectional Tab/Shift+Tab exit attempts)",
-        scs="2.1.2 No Keyboard Trap — conservative review leads",
+        scs="2.1.2 No Keyboard Trap, conservative review leads",
         needs_ai=False,
         note="Suppresses ordinary focus wrapping, small cycles, modal containment, "
         "and opaque iframe/closed-shadow focus; every lead still needs expert confirmation.",
@@ -150,7 +150,7 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         model_class="VLM",
         what="Screenshot + DOM-order text; does source order match the visual reading order?",
         status="shipped",
-        reuse="visual (VLM) probe — OllamaVisionProvider + live-page screenshot",
+        reuse="visual (VLM) probe, OllamaVisionProvider + live-page screenshot",
         note="MeaningfulSequenceProbe; runs when a local vision model is available.",
     ),
     RoadmapItem(
@@ -161,7 +161,7 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         what="Embed each page's nav, cluster; outliers = nav diverges.",
         status="planned",
         reuse="cross-page analyzer (net-new)",
-        note="No code yet — original triage marked in-progress.",
+        note="No code yet, original triage marked in-progress.",
     ),
     RoadmapItem(
         wcag="2.4.6",
@@ -240,7 +240,7 @@ ROADMAP: tuple[RoadmapItem, ...] = (
         what="Focus each element; is its centre covered by a sticky/fixed overlay?",
         status="shipped",
         reuse="live-page focus probe (no model needed)",
-        note="FocusProbe — turned out to be doable deterministically "
+        note="FocusProbe, turned out to be doable deterministically "
         "(elementFromPoint geometry), no VLM required.",
     ),
     RoadmapItem(

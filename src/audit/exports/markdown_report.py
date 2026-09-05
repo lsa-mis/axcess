@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from audit.analyzer.alfa_evidence import evidence_notice
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 
 TOP_N = 20
@@ -37,7 +38,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
     lines: list[str] = []
     when = generated_at or datetime.now(UTC)
 
-    lines.append(f"# Accessibility evidence inventory — Scan #{scan.id}")
+    lines.append(f"# Accessibility evidence inventory, Scan #{scan.id}")
     lines.append("")
     lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
@@ -110,13 +111,13 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
                     status=f.status,
                     sev=f.severity,
                     score=f.priority_score,
-                    cls=f.vlm_classification or "—",
+                    cls=f.vlm_classification or "n/a",
                     adeq=f.alt_adequacy,
                     img=_short(f.image_url, 48),
                 )
             )
 
-    # DOM-engine section — only emitted when a selected engine ran or left
+    # DOM-engine section, only emitted when a selected engine ran or left
     # retained evidence. This preserves legacy reports that predate both
     # engine counters while making an Alfa-only scan reportable.
     if scan.axe_pages_scanned or scan.alfa_pages_scanned or scan.a11y_findings:
@@ -164,9 +165,9 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
                         id=af.id,
                         source=_source_label(af),
                         outcome=_outcome_label(af),
-                        imp=af.impact or "—",
-                        sc=af.wcag_sc or "—",
-                        lvl=af.wcag_level or "—",
+                        imp=af.impact or "n/a",
+                        sc=af.wcag_sc or "n/a",
+                        lvl=af.wcag_level or "n/a",
                         rule=af.rule_id,
                         pg=_short(af.page_url, 48),
                     )
@@ -198,18 +199,21 @@ def _format_axe_block(af: ExportA11yFinding) -> list[str]:
     lines: list[str] = []
     sc = af.wcag_sc or "best-practice"
     lvl = f" (Level {af.wcag_level})" if af.wcag_level else ""
-    impact = af.impact or "—"
-    lines.append(f"### [{impact}] {af.rule_id} — SC {sc}{lvl}")
+    impact = af.impact or "n/a"
+    lines.append(f"### [{impact}] {af.rule_id}, SC {sc}{lvl}")
     lines.append(f"- **Source:** {_source_label(af)}")
     lines.append(f"- **Outcome:** {_outcome_label(af)}")
     if af.help:
         lines.append(f"- **Rule:** {af.help}")
     lines.append(f"- **Page:** {af.page_url}")
-    lines.append(f"- **Target:** `{_short(af.target_selector, 100)}`")
+    lines.append(f"- **Target:** `{_short(af.target_display or af.target_selector, 100)}`")
     if af.failure_summary:
         # Failure summaries can be multi-line; collapse to one for the bullet.
         one_line = " ".join(af.failure_summary.split())
-        lines.append(f"- **Why it failed:** {_short(one_line, 240)}")
+        label = "Diagnostic" if af.pipeline == "alfa" else "Why it failed"
+        lines.append(f"- **{label}:** {_short(one_line, 240)}")
+    if af.pipeline == "alfa" and evidence_notice(af.engine_evidence_status):
+        lines.append(f"- **Evidence:** {evidence_notice(af.engine_evidence_status)}")
     if af.help_url:
         lines.append(f"- **Docs:** {af.help_url}")
     lines.append(f"- **Status:** {af.status}")
@@ -223,10 +227,10 @@ def _source_label(af: ExportA11yFinding) -> str:
 
 def _outcome_label(af: ExportA11yFinding) -> str:
     reviewed = {
-        "in_progress": "Barrier confirmed by expert — remediation planned",
-        "remediated": "Barrier confirmed by expert — remediated",
-        "accepted_risk": "Barrier confirmed by expert — risk accepted",
-        "false_positive": "Reviewed — not a barrier",
+        "in_progress": "Barrier confirmed by expert, remediation planned",
+        "remediated": "Barrier confirmed by expert, remediated",
+        "accepted_risk": "Barrier confirmed by expert, risk accepted",
+        "false_positive": "Reviewed, not a barrier",
     }
     if af.status in reviewed:
         return reviewed[af.status]
@@ -268,7 +272,7 @@ def _summary_line(scan: ExportScan) -> str:
 def _format_finding_block(finding: ExportFinding) -> list[str]:
     lines: list[str] = []
     lines.append(
-        f"### [{finding.severity}] Finding #{finding.id} — priority {finding.priority_score:.2f}"
+        f"### [{finding.severity}] Finding #{finding.id}, priority {finding.priority_score:.2f}"
     )
     lines.append(f"- **Review status:** {finding.status}")
     if finding.vlm_classification:
@@ -287,8 +291,8 @@ def _format_finding_block(finding: ExportFinding) -> list[str]:
         lines.append(f"- **Occurrences:** {len(finding.occurrences)}")
         for occ in finding.occurrences[:5]:
             alt = "(missing)" if occ.alt_text is None else occ.alt_text or "(empty)"
-            fold = " — above fold" if occ.above_fold else ""
-            lines.append(f"  - {occ.page_url} — alt={alt!r}{fold}")
+            fold = ", above fold" if occ.above_fold else ""
+            lines.append(f"  - {occ.page_url}, alt={alt!r}{fold}")
         if len(finding.occurrences) > 5:
             lines.append(f"  - …{len(finding.occurrences) - 5} more")
     lines.append(f"- **Review:** {finding.ui_url}")

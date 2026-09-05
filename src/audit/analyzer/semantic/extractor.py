@@ -3,7 +3,7 @@
 GenA11y's central insight: feeding the model the whole page is worse
 than feeding it the focused slice relevant to one criterion. So for
 each WCAG SC the semantic pipeline targets, we extract only the
-elements that criterion cares about — usually a list of dicts the
+elements that criterion cares about, usually a list of dicts the
 model can read directly.
 
 Each extractor returns JSON-friendly data (dict-of-strings,
@@ -63,9 +63,9 @@ def extract_links(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> list[
     Skipped:
 
     * Empty / whitespace-only ``href``.
-    * Schemes in ``_SKIP_SCHEMES`` — they have their own a11y semantics
+    * Schemes in ``_SKIP_SCHEMES``, they have their own a11y semantics
       that don't fit the "is this link descriptive?" question.
-    * Fragment-only links (``href="#section"``) — the destination IS the
+    * Fragment-only links (``href="#section"``), the destination IS the
       anchor; SC 2.4.4 doesn't apply the same way.
 
     Note: we deliberately **do not** dedupe by URL. Two ``<a>`` elements
@@ -120,14 +120,14 @@ def extract_links(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> list[
 # text > nested img alt > title > empty. This is not the full ARIA
 # accessible-name algorithm (that's recursive and considers
 # pseudo-elements + label CSS content); for SC 2.4.4 the model wants
-# "what does a screen-reader user hear?" — the compressed version
+# "what does a screen-reader user hear?", the compressed version
 # captures the cases that matter in practice.
 # --------------------------------------------------------------------
 
 
 def _accessible_name(node: Node) -> tuple[str, str]:
     """Return ``(accessible_name, source_label)`` for an anchor."""
-    # aria-labelledby — references another element by id. We resolve
+    # aria-labelledby, references another element by id. We resolve
     # against the document root so the lookup hits any element.
     labelledby = node.attributes.get("aria-labelledby")
     if labelledby:
@@ -186,7 +186,7 @@ def _ancestor_texts(node: Node, *, depth: int) -> list[str]:
     SC 2.4.4 says a link's purpose can be derived from "the link text
     *together with its programmatically determined link context*."
     The model wants the ancestor section / paragraph / list item /
-    figure-caption / heading text — pretty much anything close enough
+    figure-caption / heading text, pretty much anything close enough
     to disambiguate "read more" links. We collapse whitespace and
     truncate per ancestor so the prompt doesn't explode on
     document-length ancestors (e.g. <body>).
@@ -217,7 +217,7 @@ def _stable_selector(node: Node, ordinal: int) -> str:
         return f"a#{id_attr}"
     klass = node.attributes.get("class")
     if klass:
-        # First class only — multi-class selectors get ugly in reports
+        # First class only, multi-class selectors get ugly in reports
         # and the index is what actually disambiguates.
         first = klass.split()[0]
         return f"a.{first}[ord={ordinal}]"
@@ -230,7 +230,7 @@ def _truncated_html(node: Node, *, limit: int) -> str:
     Used in the model prompt and the persisted ``html_snippet`` field.
     selectolax decodes the source as UTF-8 lazily; on a non-UTF-8 body
     ``node.html`` can raise ``UnicodeDecodeError``. We swallow it and
-    return an empty snippet rather than crash the analyzer — a page
+    return an empty snippet rather than crash the analyzer, a page
     in the wrong encoding shouldn't lose its links entirely.
     """
     try:
@@ -248,7 +248,7 @@ def _collapse(text: str) -> str:
 
 
 # --------------------------------------------------------------------
-# Headings (SC 2.4.6 — Headings and Labels).
+# Headings (SC 2.4.6, Headings and Labels).
 # --------------------------------------------------------------------
 
 _HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6, [role=heading]"
@@ -351,13 +351,13 @@ def _stable_selector_for(node: Node, tag_hint: str, ordinal: int) -> str:
 
 
 # --------------------------------------------------------------------
-# Form fields (SC 3.3.2 — Labels or Instructions).
+# Form fields (SC 3.3.2, Labels or Instructions).
 # --------------------------------------------------------------------
 
 # Input types that don't take free-form user input the way 3.3.2 means
 # (buttons trigger actions; hidden isn't user-facing). Everything else —
 # text, email, tel, number, date, password, search, url, checkbox, radio,
-# file, range, color — is in scope.
+# file, range, color, is in scope.
 _SKIP_INPUT_TYPES = frozenset({"hidden", "submit", "reset", "button", "image"})
 
 
@@ -380,7 +380,7 @@ def extract_form_fields(body: bytes) -> list[FormFieldRecord]:
 
     SC 3.3.2 asks whether labels OR instructions are provided (and clear
     enough) when content requires user input. We hand the model the
-    control's type plus every textual cue a user could rely on — the model
+    control's type plus every textual cue a user could rely on, the model
     judges sufficiency; a *missing* programmatic label is also flagged
     (that overlaps with axe, but the sufficiency call is the unique value).
     """
@@ -488,7 +488,7 @@ def _described_by_text(node: Node) -> str:
 
 
 # --------------------------------------------------------------------
-# Media elements (SC 1.2.1 — Audio-only and Video-only (Prerecorded)).
+# Media elements (SC 1.2.1, Audio-only and Video-only (Prerecorded)).
 # --------------------------------------------------------------------
 
 
@@ -500,7 +500,7 @@ class MediaRecord:
     kind: str  # "audio" | "video"
     src: str  # the src attribute, or the first <source> src ("" if none)
     track_kinds: tuple[str, ...]  # <track kind> values (captions/subtitles/descriptions)
-    nearby_links: tuple[str, ...]  # nearby <a> texts — transcript-link candidates
+    nearby_links: tuple[str, ...]  # nearby <a> texts, transcript-link candidates
     nearby_text: str  # surrounding container text
     snippet: str = ""
 

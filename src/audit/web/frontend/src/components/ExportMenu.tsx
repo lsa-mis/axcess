@@ -9,7 +9,7 @@ import { Button } from "./ui";
  * The header used to carry two side-by-side download buttons ("Download
  * workbook", "Download report") competing with the page's own actions, while
  * the CSV and JSON renderers the server already exposes had no UI at all.
- * They are all the same job — take this report elsewhere — so they share one
+ * They are all the same job, take this report elsewhere, so they share one
  * button.
  *
  * This is the APG *disclosure* pattern, deliberately not the menu pattern:

@@ -52,7 +52,7 @@ class OcrPool:
     async def run(self, image_bytes: bytes) -> OcrResult:
         """Run OCR on ``image_bytes``. Raises on worker crash or unreadable image."""
         if self._executor is None:
-            # In-process path — keeps tests hermetic.
+            # In-process path, keeps tests hermetic.
             return run_tesseract(image_bytes, self._lang)
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self._executor, run_tesseract, image_bytes, self._lang)

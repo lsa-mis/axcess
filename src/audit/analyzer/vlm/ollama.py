@@ -10,7 +10,7 @@ lives in :mod:`audit.analyzer.ollama_base` so the semantic text
 provider can share it without forking copy-pasted code.
 
 Backward compatibility: ``OllamaProvider`` and ``VlmError`` are still
-importable from this module verbatim — call sites in the orchestrator
+importable from this module verbatim, call sites in the orchestrator
 and extractor.pipeline don't need to change.
 """
 
@@ -57,8 +57,8 @@ class OllamaProvider(OllamaBase):
     """VLM classifier that dispatches to a local Ollama ``/api/generate`` endpoint.
 
     Inherits the shared HTTP plumbing from :class:`OllamaBase`. The
-    image-specific bits — prompt template loading, base64 image
-    encoding, classification-response parsing — stay here.
+    image-specific bits, prompt template loading, base64 image
+    encoding, classification-response parsing, stay here.
     """
 
     def __init__(

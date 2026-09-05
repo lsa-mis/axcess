@@ -12,7 +12,7 @@ For a single page we:
 5. Detect inline ``<svg>`` elements with visible ``<text>`` and record them
    as content-addressed "images" with ``has_svg_text=1`` and no blob.
 
-Download and OCR failures are logged and swallowed — we still want the page
+Download and OCR failures are logged and swallowed, we still want the page
 row and all the other images. Counts are surfaced via :class:`PageExtractionResult`.
 """
 
@@ -283,5 +283,5 @@ async def _ocr_image(cfg: OcrConfig, image_id: int, downloaded: DownloadedImage)
 
 
 def _svg_text_hash(visible_text: str) -> str:
-    """Content hash for inline SVG text — same text anywhere hashes the same."""
+    """Content hash for inline SVG text, same text anywhere hashes the same."""
     return hashlib.sha256(b"inline-svg:" + visible_text.encode("utf-8")).hexdigest()

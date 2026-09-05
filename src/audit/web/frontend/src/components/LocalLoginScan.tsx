@@ -66,6 +66,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     skip_responsive: false,
     skip_ocr: true,
     skip_vlm: true,
+    skip_rendered_storage: false,
     image_analysis_acknowledged: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -401,12 +402,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     }
                     className="min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg"
                   >
-                    <option value="A">WCAG 2.2 — Level A (minimum)</option>
+                    <option value="A">WCAG 2.2, Level A (minimum)</option>
                     <option value="AA">
-                      WCAG 2.2 — Level AA (recommended)
+                      WCAG 2.2, Level AA (recommended)
                     </option>
                     <option value="AAA">
-                      WCAG 2.2 — Level AAA (strictest)
+                      WCAG 2.2, Level AAA (strictest)
                     </option>
                   </select>
                 </div>
@@ -485,7 +486,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                     checked={false}
                     onChange={() => undefined}
                     disabled
-                    label="Fast crawl — skip browser rendering (static only)"
+                    label="Fast crawl, skip browser rendering (static only)"
                     hint="Unavailable: the temporary signed-in browser is required for every protected page."
                   />
                   <Checkbox
@@ -500,6 +501,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                         ? "Choose axe-core or both engines. DOM state discovery re-runs axe-core after each page control reveals new content."
                         : "Opens menus, dialogs, tabs, and disclosure controls in the signed-in site, checks revealed states, and discovers additional routes to scan. Exploration is bounded and adds scan time. Skips payment, subscription, submission, and other blocked actions; blocks HTTP writes during automatic clicks."
                     }
+                  />
+                  <Checkbox
+                    checked={form.skip_rendered_storage}
+                    onChange={(v) => update("skip_rendered_storage", v)}
+                    label="Don't store rendered pages"
+                    hint="Keeps the report database smaller. The Page inspector then re-renders the live page on demand instead of opening the stored capture; findings and evidence are stored exactly as before."
                   />
                   <Checkbox
                     checked
@@ -544,7 +551,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                       aria-live="polite"
                     >
                       <p className="font-semibold">
-                        Local AI—no automatic model downloads
+                        Local AI: no automatic model downloads
                       </p>
                       <p className="mt-1 text-xs text-fg-muted">
                         No model download will start with this scan. Axcess uses
@@ -776,7 +783,7 @@ function LocalLoginHandoff({
           <div className="mt-6 rounded-md border-2 border-umich-blue bg-umich-blue/5 p-5">
             <h3 className="font-semibold text-fg">Finished signing in?</h3>
             <p className="mt-1 text-sm text-fg-muted">
-              Make sure the visible browser shows the protected application—not
+              Make sure the visible browser shows the protected application, not
               the U-M or Duo login screen.
             </p>
             <Button
@@ -786,7 +793,7 @@ function LocalLoginHandoff({
             >
               {confirm.isPending
                 ? "Checking sign-in…"
-                : "I’m signed in — start scan"}
+                : "I’m signed in, start scan"}
             </Button>
           </div>
         )}

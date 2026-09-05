@@ -7,13 +7,13 @@ export type ScanMode = "public" | "login";
  * One scan-type card. The whole box is the control.
  *
  * Earlier this was a Card with a "Select …" button inside it, which gave
- * the page two competing targets — the box looked clickable but wasn't,
+ * the page two competing targets, the box looked clickable but wasn't,
  * and the button repeated the card's own title. A native radio fixes
  * both: click anywhere on the card, arrow between the options, and the
  * selected state is real form state rather than a styled div.
  *
  * ``footer`` renders as a sibling of the label, never inside it, because
- * it can contain a link — a link nested in a label would also toggle the
+ * it can contain a link, a link nested in a label would also toggle the
  * radio when activated.
  */
 export default function ScanModeChoice({

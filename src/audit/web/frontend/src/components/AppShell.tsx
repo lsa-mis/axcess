@@ -4,19 +4,23 @@ import {
   ListChecks,
   Menu,
   MessageSquarePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Radar,
+  Search,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
 import { ExternalLinkButton, LinkButton } from "./ui";
-import ReportCrumb from "./ReportCrumb";
+import CommandPalette from "./CommandPalette";
+import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
- * as the highlighted current section — we compute it ourselves rather
+ * as the highlighted current section, we compute it ourselves rather
  * than relying on ``NavLink``'s built-in matching because the routes
  * overlap (``/scans/new`` is a child of ``/scans``) and the default
  * matcher can't disambiguate "you're inside a scan" from "you're on
@@ -30,7 +34,7 @@ interface NavItem {
 }
 
 /**
- * Nav lists DESTINATIONS only. "New scan" is an action, not a place —
+ * Nav lists DESTINATIONS only. "New scan" is an action, not a place,
  * it lives in the topbar as the single global CTA, never in the nav.
  * (Earlier versions had it in both places plus per-page header buttons:
  * three simultaneous "New scan" affordances per screen.)
@@ -46,7 +50,7 @@ const NAV: NavItem[] = [
     // ``Scans`` highlights for any /scans/* route INCLUDING the new-scan
     // form (it's contextually part of the scans section now that it has
     // no nav item of its own) and /findings/* (a finding always belongs
-    // to a scan) — the user never loses context for which section
+    // to a scan), the user never loses context for which section
     // they're in.
     to: "/scans",
     label: "Reports",
@@ -63,7 +67,7 @@ const NAV: NavItem[] = [
 ];
 
 /**
- * Brand mark: maize rounded square with blue "Ax" — the product wordmark
+ * Brand mark: maize rounded square with blue "Ax", the product wordmark
  * (Axcess = access + the axe-core engine at its centre). Inverted relative
  * to the favicon (blue square, maize letters) because the sidebar is
  * already UMich blue.
@@ -82,6 +86,16 @@ function BrandMark({ className }: { className?: string }) {
   );
 }
 
+/** Remember the sidebar collapse across sessions; fail soft when storage is
+ * unavailable (private mode / test environment). */
+function readSidebarPref(): boolean {
+  try {
+    return localStorage.getItem("axcess.sidebar.collapsed") === "1";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * App shell: UMich-Blue sidebar with Maize accent for the active item,
  * topbar with the product name + the single global "New scan" CTA,
@@ -90,8 +104,36 @@ function BrandMark({ className }: { className?: string }) {
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarPref);
+  const [commandOpen, setCommandOpen] = useState(false);
   const previousPath = useRef(pathname);
   const routeLabel = routeTitle(pathname);
+  const reportMatch = reportRouteMatch(pathname);
+
+  // Cmd/Ctrl+K opens the search-everything palette anywhere in the app.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && (event.key === "k" || event.key === "K")) {
+        event.preventDefault();
+        setCommandOpen((was) => !was);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      try {
+        localStorage.setItem("axcess.sidebar.collapsed", next ? "1" : "0");
+      } catch {
+        // Storage unavailable (private mode / tests), the toggle still works
+        // for the session, it just won't persist.
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     document.title = `${routeLabel} · Axcess`;
@@ -129,13 +171,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </a>
 
       <div className="flex min-h-screen items-start">
-        <Sidebar />
+        <Sidebar collapsed={sidebarCollapsed} />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
+            onSearch={() => setCommandOpen(true)}
           />
           {mobileNavOpen && <MobileNav pathname={pathname} />}
+          <div className="border-b border-border bg-surface px-2 py-1 md:hidden"><ReportCrumb /></div>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>
@@ -148,32 +194,50 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        scanId={reportMatch?.scanId ?? null}
+      />
     </div>
   );
 }
 
-function Sidebar() {
+function Sidebar({ collapsed }: { collapsed: boolean }) {
   const { pathname } = useLocation();
   return (
     <aside
-      className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] md:flex"
+      className={cn(
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] transition-[width] duration-150 md:flex",
+        collapsed ? "w-16" : "w-64",
+      )}
       aria-label="Primary"
     >
-      <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
+      <div
+        className={cn(
+          "flex h-[72px] items-center gap-3 border-b border-white/10",
+          collapsed ? "justify-center px-2" : "px-5",
+        )}
+      >
         <BrandMark className="h-9 w-9 text-sm" />
-        <div className="min-w-0">
-          <span className="block text-lg font-semibold leading-tight tracking-[-0.025em]">
-            Axcess
-          </span>
-          <span className="block text-2xs font-medium tracking-wide text-surface-inverse-fg-subtle">
-            Accessibility workbench
-          </span>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <span className="block text-lg font-semibold leading-tight tracking-[-0.025em]">
+              Axcess
+            </span>
+            <span className="block text-2xs font-medium tracking-wide text-surface-inverse-fg-subtle">
+              Accessibility workbench
+            </span>
+          </div>
+        )}
       </div>
-      <nav className="flex-1 px-3 py-5">
-        <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.16em] text-surface-inverse-fg-subtle">
-          Workspace
-        </p>
+      <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
+        {!collapsed && (
+          <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.16em] text-surface-inverse-fg-subtle">
+            Workspace
+          </p>
+        )}
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -183,40 +247,45 @@ function Sidebar() {
                 <Link
                   to={item.to}
                   aria-current={active ? "page" : undefined}
+                  title={collapsed ? item.label : undefined}
+                  aria-label={collapsed ? item.label : undefined}
                   // min-h-target keeps every nav row at 44px for SC 2.5.5,
                   // and the slightly larger icon (h-5) plus base text reads
                   // as a primary surface, not a sub-list of links.
                   className={cn(
-                    "group relative flex min-h-target items-center gap-3 rounded-xs px-3 py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
+                    "group relative flex min-h-target items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
+                    collapsed ? "justify-center px-2" : "px-3",
                     active
                       ? "bg-white text-umich-blue shadow-[0_6px_18px_rgba(0,0,0,0.13)]"
                       : "text-surface-inverse-fg-subtle hover:bg-white/10 hover:text-white",
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
-                  <span>{item.label}</span>
+                  {!collapsed && <span>{item.label}</span>}
                 </Link>
               </li>
             );
           })}
         </ul>
       </nav>
-      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0) — at
+      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0), at
           10:1 against UMich Blue it clears AAA. Plain `text-white/60`
           rendered as ~#99A9B7, which axe flagged at 6.24:1 (fails AAA). */}
-      <div className="border-t border-white/10 px-5 py-4 text-2xs text-surface-inverse-fg-subtle">
-        <p className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-umich-maize" aria-hidden />
-          Local-first evidence workspace
-        </p>
-      </div>
+      {!collapsed && (
+        <div className="border-t border-white/10 px-5 py-4 text-2xs text-surface-inverse-fg-subtle">
+          <p className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-umich-maize" aria-hidden />
+            Local-first evidence workspace
+          </p>
+        </div>
+      )}
     </aside>
   );
 }
 
 /**
  * A pure action bar. It used to also print "Accessibility audit /
- * <route name>", which restated the <h1> sitting a few pixels below it —
+ * <route name>", which restated the <h1> sitting a few pixels below it,
  * two orientation lines saying the same thing, neither of which said
  * *which report* you were in. The breadcrumb above each page title is now
  * the single answer to "where am I", and this bar carries only the two
@@ -225,9 +294,15 @@ function Sidebar() {
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
+  sidebarCollapsed,
+  onToggleSidebar,
+  onSearch,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
+  onSearch: () => void;
 }) {
   const { pathname } = useLocation();
   const onNewScanForm = pathname === "/scans/new";
@@ -236,7 +311,25 @@ function TopBar({
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
-      {/* Mobile brand — the sidebar (which carries the brand on desktop)
+      {/* Desktop sidebar toggle, reclaims the sidebar's 256px for wide views
+          such as the page inspector, while keeping nav one click away. */}
+      <button
+        type="button"
+        aria-label={
+          sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
+        }
+        aria-expanded={!sidebarCollapsed}
+        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={onToggleSidebar}
+        className="hidden min-h-target min-w-target items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg md:inline-flex"
+      >
+        {sidebarCollapsed ? (
+          <PanelLeftOpen className="h-5 w-5" aria-hidden />
+        ) : (
+          <PanelLeftClose className="h-5 w-5" aria-hidden />
+        )}
+      </button>
+      {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
         <button
@@ -270,21 +363,32 @@ function TopBar({
           from every screen, and a single fixed home is easier to find than a
           per-page control. It carries no scan context: Asana forms have no
           documented URL-prefill contract, so there is no supported way to
-          attach the current page — and guessing at one could put a scanned
+          attach the current page, and guessing at one could put a scanned
           URL into a third-party form. */}
       <div className="hidden min-w-0 md:block">
         <ReportCrumb />
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label="Search everything (Cmd+K)"
+          title="Search everything (Cmd/Ctrl+K)"
+          className="inline-flex min-h-target items-center gap-1.5 rounded-xs px-3 text-sm font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
+        >
+          <Search className="h-5 w-5" aria-hidden />
+          <span className="hidden sm:inline">Search</span>
+        </button>
         <ExternalLinkButton
           href={FEEDBACK_FORM_URL}
           variant="ghost"
           size="md"
-          className="w-11 px-0"
-          aria-label="Send feedback (opens in a new tab)"
-          title="Send feedback (opens in a new tab)"
+          className="px-3"
+          aria-label="Give feedback (opens in a new tab)"
+          title="Give feedback (opens in a new tab)"
         >
           <MessageSquarePlus className="h-5 w-5" aria-hidden />
+          <span className="hidden sm:inline">Give feedback</span>
         </ExternalLinkButton>
         <LinkButton
           to="/scans/new"
@@ -351,6 +455,7 @@ function routeTitle(pathname: string): string {
       /^\/scans\/\d+\/(?:review|manual-checks|handoff)\/?$/,
       "Accessibility issues",
     ],
+    [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
     [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],

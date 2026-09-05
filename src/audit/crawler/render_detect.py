@@ -71,7 +71,7 @@ def _mount_is_empty(tree: HTMLParser) -> bool:
 
 
 # Status codes where a bot-challenge interstitial is plausible. Genuine 404s
-# or 401s are excluded deliberately — we don't want to retry those in a
+# or 401s are excluded deliberately, we don't want to retry those in a
 # real browser.
 _CHALLENGE_STATUSES = frozenset({403, 429, 503})
 

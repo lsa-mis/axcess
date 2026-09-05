@@ -19,7 +19,7 @@ class OcrResult:
     """Number of words with non-negative confidence."""
 
     engine_version: str
-    """Identifier suitable for ``analyses.model_versions_json`` — e.g. ``"tesseract-5.5.2-eng"``."""
+    """Identifier suitable for ``analyses.model_versions_json``, e.g. ``"tesseract-5.5.2-eng"``."""
 
     def is_text_candidate(self, *, min_confidence: float, min_word_count: int) -> bool:
         """Apply the Phase 3 text-candidate gate."""

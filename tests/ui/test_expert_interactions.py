@@ -110,7 +110,7 @@ async def test_issue_table_filters_are_keyboard_operable(
             await search.fill("logo")
             await page.wait_for_url("**?q=logo")
             await playwright_async.expect(
-                page.get_by_role("link", name="Logo image — adequate alt")
+                page.get_by_role("link", name="Logo image, adequate alt")
             ).to_be_visible()
             await search.press("Tab")
             await playwright_async.expect(

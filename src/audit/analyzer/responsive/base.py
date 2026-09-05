@@ -14,7 +14,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
-# Rule ids — narrow, grep-able, and prefixed so `issues.py` can route
+# Rule ids, narrow, grep-able, and prefixed so `issues.py` can route
 # the pipeline label the same way it does for `keyboard-trap-*`.
 RULE_REFLOW = "responsive-reflow-overflow"  # SC 1.4.10 at 320px
 RULE_TEXT_CLIPPED = "responsive-text-clipped"  # SC 1.4.4 zoom proxy
@@ -38,7 +38,7 @@ class ResponsiveFinding:
 
     rule_id: str
     criterion_sc: str  # "1.4.4" | "1.4.10" | "1.4.12"
-    impact: str  # serious for all three — barriers with partial workarounds
+    impact: str  # serious for all three, barriers with partial workarounds
     target_selector: str
     failure_summary: str
     html_snippet: str
@@ -51,7 +51,7 @@ class ResponsiveFinding:
 
     @property
     def target_hash(self) -> str:
-        """Dedupe key — stable across rescans of the same page+element."""
+        """Dedupe key, stable across rescans of the same page+element."""
         h = hashlib.sha256()
         h.update(self.rule_id.encode("utf-8", errors="replace"))
         h.update(b"\x00")
@@ -61,7 +61,7 @@ class ResponsiveFinding:
         return h.hexdigest()
 
     def to_repo_kwargs(self) -> dict[str, Any]:
-        """Kwargs for ``repo.upsert_axe_violation`` — same row format as
+        """Kwargs for ``repo.upsert_axe_violation``, same row format as
         the axe / semantic / keyboard pipelines."""
         return {
             "rule_id": self.rule_id,
