@@ -75,6 +75,36 @@ PAGE_TIMEOUT_SECONDS = 300
 PROBE_TIMEOUT_SECONDS = 60
 D9_NAME = "D9 behavioural differential"
 D10_NAME = "D10a coverage differential (Enter only, no baseline subtraction)"
+# Upstream's three formulations we had not measured. Each is a faithful port of
+# the rule in their DETECTORS.md, kept as its own row rather than folded into
+# ours, so the comparison stays a comparison.
+D9U_NAME = "D9u upstream-style differential (8 channels, keys in sequence)"
+D10B_NAME = "D10b coverage set-difference (Enter only, no baseline subtraction)"
+D10BASE_NAME = "D10a+base coverage differential (Enter only, baseline subtracted)"
+
+# Upstream observed eight channels and compared presence: "did anything change
+# on this channel?" Ours drops `mutations` -- a MutationObserver record count
+# that the `dom` digest already covers except when edits net out -- and compares
+# payloads instead. D9u restores both their channel set and their comparison so
+# the difference is measured rather than asserted.
+UPSTREAM_CHANNELS: tuple[str, ...] = (
+    "dom", "geometry", "mutations", "net", "storage", "console", "canvas", "nav",
+)
+
+
+def upstream_delta(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
+    """Channels that changed, by upstream's presence test rather than by payload."""
+    changed: set[str] = set()
+    for channel in ("dom", "geometry", "nav"):
+        if before.get(channel) != after.get(channel):
+            changed.add(channel)
+    for channel in ("net", "console", "storage"):
+        if len(after.get(channel) or []) > len(before.get(channel) or []):
+            changed.add(channel)
+    for channel in ("canvas", "mutations"):
+        if int(after.get(channel) or 0) > int(before.get(channel) or 0):
+            changed.add(channel)
+    return changed
 CHEAP_METHODS = (
     "D0 axcess collectClickables",
     "D2 inline onclick attribute",
@@ -197,35 +227,48 @@ async def run_page(
         order = await compute_tab_order(page)
         page.require_success()
 
+        # One DOM walk feeds six detectors. Upstream ran a separate
+        # querySelectorAll pass per detector and so could quote a whole-page cost
+        # for each; here the walk is shared, so the shared cost and each
+        # detector's own filter are timed separately and reported as both.
         t0 = time.monotonic()
         rows = await detectors.survey(page)
-        meta["timings"]["survey"] = round((time.monotonic() - t0) * 1000, 1)
+        meta["timings"]["survey (shared DOM walk)"] = round((time.monotonic() - t0) * 1000, 1)
         seen = {r["probe"] for r in rows}
         meta["unobservable"] = sorted(set(probe_ids) - seen)
 
-        survey_detectors = [
-            detectors.d0_axcess_clickables(rows),
-            detectors.d2_inline_attribute(rows),
-            detectors.d2b_handler_property(rows),
-            detectors.d3_tabindex_aria(rows),
-            detectors.d4_css_lexical(rows),
-            detectors.d7_react_props(rows),
-        ]
-        for result in survey_detectors:
+        for build in (
+            detectors.d0_axcess_clickables,
+            detectors.d2_inline_attribute,
+            detectors.d2b_handler_property,
+            detectors.d3_tabindex_aria,
+            detectors.d4_css_lexical,
+            detectors.d7_react_props,
+        ):
+            t0 = time.monotonic()
+            result = build(rows)
+            elapsed = round((time.monotonic() - t0) * 1000, 3)
             reported[result.detector] = result.reported(order)
+            meta["timings"][result.detector] = elapsed
             if result.note:
                 meta["notes"][result.detector] = result.note
 
+        t0 = time.monotonic()
         d5 = await detectors.d5_cdp_listeners(page, cdp, probe_ids)
         cdp.require_success()
+        meta["timings"][d5.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d5.detector] = d5.reported(order)
 
+        t0 = time.monotonic()
         d6 = await detectors.d6_listener_shim(page)
+        meta["timings"][d6.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d6.detector] = d6.reported(order)
         if d6.note:
             meta["notes"][d6.detector] = d6.note
 
+        t0 = time.monotonic()
         d8 = await detectors.d8_hover_diff(page, probe_ids)
+        meta["timings"][d8.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d8.detector] = d8.reported(order)
 
         # --- D1: axe-core, the scanner axcess already ships ------------------
@@ -339,14 +382,60 @@ class CoveragePair:
     keyboard: set[str] = field(default_factory=set)
     uncertainties: dict[str, str] = field(default_factory=dict)
 
+    baseline: set[str] = field(default_factory=set)
+
     @property
     def reported(self) -> bool:
+        """D10a: the mouse ran something and the keyboard ran nothing at all."""
         return not self.uncertainties and bool(self.mouse) and not self.keyboard
+
+    @property
+    def reported_setdiff(self) -> bool:
+        """D10b: the mouse ran something the keyboard never reached.
+
+        Upstream's other formulation. It is strictly weaker than D10a's "ran
+        nothing", and that is the point: an element the keyboard *reaches* runs
+        focus code, so D10a goes quiet while the handler itself still never
+        runs. This is the focusable-but-not-actionable case.
+        """
+        return not self.uncertainties and bool(self.mouse - self.keyboard)
+
+    @property
+    def reported_baselined(self) -> bool:
+        """D10a with the page's handler-free baseline removed from both sides."""
+        if self.uncertainties:
+            return False
+        mouse = self.mouse - self.baseline
+        keyboard = self.keyboard - self.baseline
+        return bool(mouse) and not keyboard
 
     def to_json(self) -> dict[str, Any]:
         return {
             "mouse_coverage": sorted(self.mouse),
             "enter_coverage": sorted(self.keyboard),
+            "baseline_size": len(self.baseline),
+            "mouse_not_keyboard": sorted(self.mouse - self.keyboard),
+            "uncertainties": self.uncertainties,
+        }
+
+
+@dataclass
+class UpstreamPass:
+    """One probe measured the way upstream's D9 measured it."""
+
+    mouse_changed: set[str] = field(default_factory=set)
+    keyboard_changed: set[str] = field(default_factory=set)
+    uncertainties: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def reported(self) -> bool:
+        """Upstream's rule: the mouse changed something and the keyboard did not."""
+        return not self.uncertainties and bool(self.mouse_changed) and not self.keyboard_changed
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "mouse_changed": sorted(self.mouse_changed),
+            "keyboard_changed": sorted(self.keyboard_changed),
             "uncertainties": self.uncertainties,
         }
 
@@ -357,8 +446,14 @@ class BehaviouralResult:
     d10: set[str] = field(default_factory=set)
     d9_unknown: set[str] = field(default_factory=set)
     d10_unknown: set[str] = field(default_factory=set)
+    d10b: set[str] = field(default_factory=set)
+    d10base: set[str] = field(default_factory=set)
+    d9u: set[str] = field(default_factory=set)
+    d9u_unknown: set[str] = field(default_factory=set)
     reasons: dict[str, str] = field(default_factory=dict)
     coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
+    upstream: dict[str, dict[str, Any]] = field(default_factory=dict)
+    timings: dict[str, float] = field(default_factory=dict)
 
 
 async def run_behavioural(
@@ -378,7 +473,14 @@ async def run_behavioural(
     result = BehaviouralResult()
     outcomes = []
 
+    # Upstream subtracts a per-page handler-free baseline before comparing
+    # coverage: click something with no handler, see what ran anyway, and
+    # discount it. On a framework page that removes the scheduler and the
+    # synthetic event system, which every click runs.
+    baseline = await _coverage_baseline(factory, config)
+
     for probe_id in probe_ids:
+        t0 = time.monotonic()
         try:
             async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
                 outcomes.append(await runner.run_probe(probe_id, page_path, order))
@@ -387,18 +489,160 @@ async def run_behavioural(
             # its context in a finally block. The factory tracks those too.
             async with asyncio.timeout(15):
                 await factory.close_open_contexts()
+        result.timings.setdefault(D9_NAME, 0.0)
+        result.timings[D9_NAME] += (time.monotonic() - t0) * 1000
+
+        t0 = time.monotonic()
         pair = await _coverage_pair(factory, config, probe_id, order)
+        pair.baseline = baseline
+        result.timings.setdefault(D10_NAME, 0.0)
+        result.timings[D10_NAME] += (time.monotonic() - t0) * 1000
         if pair.reported:
             result.d10.add(probe_id)
+        if pair.reported_setdiff:
+            result.d10b.add(probe_id)
+        if pair.reported_baselined:
+            result.d10base.add(probe_id)
         if pair.uncertainties:
             result.d10_unknown.add(probe_id)
         result.coverage[probe_id] = pair.to_json()
+
+        t0 = time.monotonic()
+        up = await _upstream_pass(factory, config, probe_id, order)
+        result.timings.setdefault(D9U_NAME, 0.0)
+        result.timings[D9U_NAME] += (time.monotonic() - t0) * 1000
+        if up.reported:
+            result.d9u.add(probe_id)
+        if up.uncertainties:
+            result.d9u_unknown.add(probe_id)
+        result.upstream[probe_id] = up.to_json()
 
     confirmed, _ = apply_equivalence(outcomes)
     result.d9 = {o.probe_id for o in confirmed if o.verdict is Verdict.VIOLATION}
     result.d9_unknown = {o.probe_id for o in confirmed if o.verdict is Verdict.UNKNOWN}
     for outcome in confirmed:
         result.reasons[outcome.probe_id] = f"{outcome.verdict.value}: {outcome.reason}"
+    return result
+
+
+async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> set[str]:
+    """What executes on a click that hits no handler, for upstream's D10 baseline.
+
+    Clicks the top-left corner of the document, which in this corpus is page
+    padding rather than any probe. Returns an empty set on failure: an absent
+    baseline subtracts nothing, which leaves D10a+base equal to D10a rather than
+    silently deleting evidence.
+    """
+    context = None
+    try:
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            context = await factory()
+            page = await context.new_page()
+            cdp: Any = CheckedInstrument(await context.new_cdp_session(page))
+            await page.goto(config.url, wait_until="load")
+            await detectors.start_coverage(cdp)
+            cdp.require_success()
+            await detectors.take_coverage(cdp)
+            cdp.require_success()
+            await page.mouse.click(2, 2)
+            await page.wait_for_timeout(200)
+            executed = await detectors.take_coverage(cdp)
+            cdp.require_success()
+            return set(executed)
+    except Exception:
+        return set()
+    finally:
+        try:
+            if context is not None:
+                async with asyncio.timeout(15):
+                    await context.close()
+        finally:
+            async with asyncio.timeout(15):
+                await factory.close_open_contexts()
+
+
+async def _upstream_pass(
+    factory: ContextFactory, config: TrialConfig, probe_id: str, order: TabOrder
+) -> UpstreamPass:
+    """Measure one probe exactly as upstream's D9 did, including its known bugs.
+
+    Two things here are deliberately *not* our design, because reproducing them
+    is the point:
+
+    * **All three keys against one page state.** Upstream pressed Enter, Space
+      and ArrowDown in sequence without reloading, so a control that opens on
+      Enter and closes on Space nets to no change. We press one key per fresh
+      context; this row shows what that difference costs.
+    * **Presence, not payload.** A channel counts as changed if anything on it
+      changed, over their eight channels including `mutations`. An unrelated
+      console warning from the keypress therefore clears a real defect.
+    """
+    result = UpstreamPass()
+    position = order.position(probe_id)
+    if position is None and order.capped:
+        result.uncertainties["keyboard"] = "tab_cap: probe not reached before traversal cap"
+
+    for modality in ("mouse", "keyboard"):
+        if modality == "keyboard" and position is None:
+            # Not reachable by Tab, so upstream performed no keyboard action at
+            # all and the delta is empty by construction, not by measurement.
+            continue
+        context = None
+        try:
+            async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+                context = await factory()
+                await context.add_init_script(channels.INIT_SCRIPT)
+                page = await context.new_page()
+                await page.goto(config.url, wait_until="load")
+                await page.wait_for_timeout(150)
+                locator = page.locator(f'[data-probe="{probe_id}"]').first
+                before = await page.evaluate(channels.SNAPSHOT_JS)
+                if modality == "mouse":
+                    box = await locator.bounding_box(timeout=1000)
+                    if not box or box["width"] <= 0 or box["height"] <= 0:
+                        result.uncertainties[modality] = "not_rendered: probe has no visible box"
+                        continue
+                    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+                    viewport = page.viewport_size
+                    if viewport is None or not (
+                        0 <= x < viewport["width"] and 0 <= y < viewport["height"]
+                    ):
+                        result.uncertainties[modality] = (
+                            "not_rendered: click point outside viewport"
+                        )
+                        continue
+                    await page.mouse.move(x, y)
+                    await page.wait_for_timeout(config.settle_ms)
+                    await page.mouse.click(x, y)
+                else:
+                    for _ in range(position or 0):
+                        await page.keyboard.press("Tab")
+                    if not await locator.evaluate("el => el.getRootNode().activeElement === el"):
+                        result.uncertainties[modality] = (
+                            "unresolved: tab replay did not reach probe"
+                        )
+                        continue
+                    # Sequence against one page state, as upstream did.
+                    for key in ("Enter", "Space", "ArrowDown"):
+                        await page.keyboard.press(key)
+                        await page.wait_for_timeout(50)
+                await page.wait_for_timeout(config.settle_ms)
+                after = await page.evaluate(channels.SNAPSHOT_JS)
+                changed = upstream_delta(before, after)
+                if modality == "mouse":
+                    result.mouse_changed = changed
+                else:
+                    result.keyboard_changed = changed
+        except Exception as exc:
+            result.uncertainties[modality] = f"{type(exc).__name__}: {exc}"[:240]
+        finally:
+            try:
+                if context is not None:
+                    async with asyncio.timeout(15):
+                        await context.close()
+            finally:
+                async with asyncio.timeout(15):
+                    await factory.close_open_contexts()
     return result
 
 
@@ -531,11 +775,13 @@ async def main_async(args: argparse.Namespace) -> int:
     print(f"corpus: {args.corpus}  ({len(labels)} probes, {len(pages)} pages)")
     print(f"caveat: {caveat}\n")
 
-    methods = [*CHEAP_METHODS, *([] if args.cheap_only else [D9_NAME, D10_NAME])]
+    behavioural = [D9_NAME, D9U_NAME, D10_NAME, D10B_NAME, D10BASE_NAME]
+    methods = [*CHEAP_METHODS, *([] if args.cheap_only else behavioural)]
     all_reported: dict[str, set[str]] = {name: set() for name in methods}
     all_unknown: dict[str, set[str]] = {name: set() for name in methods}
     reasons: dict[str, str] = {}
     coverage: dict[str, dict[str, Any]] = {}
+    upstream_evidence: dict[str, dict[str, Any]] = {}
     notes: dict[str, str] = {}
     tab_info: dict[str, Any] = {}
     actual_viewports: dict[str, dict[str, int]] = {}
@@ -583,11 +829,19 @@ async def main_async(args: argparse.Namespace) -> int:
                         if not args.cheap_only:
                             result = await run_behavioural(factory, page_path, probe_ids, order)
                             all_reported[D9_NAME].update(result.d9)
+                            all_reported[D9U_NAME].update(result.d9u)
                             all_reported[D10_NAME].update(result.d10)
+                            all_reported[D10B_NAME].update(result.d10b)
+                            all_reported[D10BASE_NAME].update(result.d10base)
                             all_unknown[D9_NAME].update(result.d9_unknown)
-                            all_unknown[D10_NAME].update(result.d10_unknown)
+                            all_unknown[D9U_NAME].update(result.d9u_unknown)
+                            for name in (D10_NAME, D10B_NAME, D10BASE_NAME):
+                                all_unknown[name].update(result.d10_unknown)
                             reasons.update(result.reasons)
                             coverage.update(result.coverage)
+                            upstream_evidence.update(result.upstream)
+                            for name, ms in result.timings.items():
+                                page_timings[page_path][name] = round(ms, 1)
                 finally:
                     try:
                         if factory is not None:
@@ -664,6 +918,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "notes": notes,
         "reasons": reasons,
         "coverage_evidence": coverage,
+        "upstream_evidence": upstream_evidence,
         "reported": {k: sorted(v) for k, v in all_reported.items()},
         "unobservable": {k: sorted(v) for k, v in all_unknown.items() if v},
         "scores": [s.to_json() for s in scores],

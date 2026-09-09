@@ -41,15 +41,24 @@ uv run --offline --no-sync python experiments/tabbing/runner/bakeoff.py --corpus
 Use `--corpus edgecases` for the supplemental development stress tests. Their
 fixtures and detector share an author; they do not support an unbiased ranking.
 
-Schema 2 records the start and finish, the actual browser version, and detector
-and runner fingerprints before and after measurement. A changed source or frozen
-input invalidates the run and suppresses its scores. The main JSON contains
+The main runner's schema-2 records include the start and finish, the actual
+browser version, and detector and runner fingerprints before and after
+measurement. A changed source or frozen input invalidates the run and suppresses
+its scores. The main JSON contains
 post-equivalence `probes`, the separately scored `candidate_gated_probes`,
 per-page/window `candidates_by_page`, and contextual dismissal evidence. Compare
 `mouse_effect` with each `keyboard_by_key[key].effect`; keys are independent
 trials and there is no combined keyboard effect. A null candidate list means
 discovery failed, whereas an empty list means it completed and selected none.
-The process returns nonzero for an invalid or incomplete run.
+The main process returns nonzero for an invalid or incomplete run. It rejects
+source changes between import and execution before starting measurement.
+
+The comparison runner writes `bakeoff-<corpus>-<label>.json` under the selected
+corpus's `results/` directory, unless `--out` selects another directory. It uses
+a separate record shape with `reported` and `unobservable` sets for each method,
+D10a coverage evidence, and validity/provenance metadata under `run`. Its source
+checks run before and after measurement. A page-level instrumentation failure
+invalidates the comparison and suppresses its scores.
 
 ## Inputs
 
