@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Controls without visual hints</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Controls without visual hints</h1>
+<p data-probe="h120" id="direct">Open the timetable.</p>
+<p data-probe="h121" id="delegated">Open the reading list.</p>
+<div data-probe="h122" id="property">Open the course description.</div>
+<div data-probe="h123" class="control">A decorative box with no action.</div>
+<output id="message">Nothing open</output>
+<script>
+  document.getElementById('direct').addEventListener('click', () => {
+    document.getElementById('message').textContent = 'Timetable opened';
+  });
+  document.addEventListener('click', event => {
+    if (event.target.id === 'delegated') {
+      document.getElementById('message').textContent = 'Reading list opened';
+    }
+  });
+  document.getElementById('property').onclick = () => {
+    document.getElementById('message').textContent = 'Course description opened';
+  };
+</script></html>

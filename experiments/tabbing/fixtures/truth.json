@@ -1,0 +1,638 @@
+{
+  "version": 1,
+  "description": "Frozen supplied-target benchmark. Upstream labels are inherited; holdout labels were authored by Codex without reading the Axcess detector.",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 900
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "pages": {
+    "upstream/a-vanilla.html": [
+      "p01",
+      "p02",
+      "p03",
+      "p04",
+      "p05",
+      "p06",
+      "p07",
+      "p08",
+      "p09",
+      "p10",
+      "p11",
+      "p12"
+    ],
+    "upstream/b-decoys.html": [
+      "p20",
+      "p21",
+      "p22",
+      "p23",
+      "p23a",
+      "p24",
+      "p25",
+      "p25i",
+      "p26",
+      "p26i",
+      "p27",
+      "p27b"
+    ],
+    "upstream/c-hover.html": [
+      "p30",
+      "p31",
+      "p32",
+      "p33"
+    ],
+    "upstream/d-delegation.html": [
+      "p40",
+      "p41",
+      "p42"
+    ],
+    "upstream/e-nodom.html": [
+      "p60",
+      "p61",
+      "p62",
+      "p63",
+      "p64"
+    ],
+    "upstream/f-occlusion.html": [
+      "p70",
+      "p71",
+      "p72",
+      "p73",
+      "p74",
+      "p75"
+    ],
+    "upstream/g-taborder.html": [
+      "p80",
+      "p81",
+      "p82",
+      "p83",
+      "p84",
+      "p85",
+      "p86"
+    ],
+    "upstream/h-shadow.html": [
+      "p90",
+      "p91",
+      "p92",
+      "p93",
+      "p94"
+    ],
+    "upstream/react/index.html": [
+      "p50",
+      "p51",
+      "p52",
+      "p53",
+      "p54",
+      "p55"
+    ],
+    "holdout/effects.html": [
+      "h101",
+      "h102",
+      "h103",
+      "h104",
+      "h105"
+    ],
+    "holdout/equivalence.html": [
+      "h110",
+      "h111",
+      "h112",
+      "h113"
+    ],
+    "holdout/discovery.html": [
+      "h120",
+      "h121",
+      "h122",
+      "h123"
+    ],
+    "holdout/pointer.html": [
+      "h130",
+      "h131",
+      "h132",
+      "h133"
+    ],
+    "holdout/responsive.html": [
+      "h140",
+      "h141",
+      "h142"
+    ],
+    "holdout/hover.html": [
+      "h150",
+      "h151",
+      "h152"
+    ],
+    "holdout/scopes.html": [
+      "h160",
+      "h161",
+      "h162",
+      "h163",
+      "h164"
+    ],
+    "holdout/keyboard-paths.html": [
+      "h170",
+      "h171",
+      "h172",
+      "h173"
+    ],
+    "holdout/timing.html": [
+      "h180",
+      "h181"
+    ],
+    "holdout/long-order.html": [
+      "h182"
+    ]
+  },
+  "probes": {
+    "p01": {
+      "label": "violation",
+      "note": "div + addEventListener('click'), no tabindex \u2014 the canonical defect",
+      "cohort": "upstream"
+    },
+    "p02": {
+      "label": "violation",
+      "note": "icon span + addEventListener('click')",
+      "cohort": "upstream"
+    },
+    "p03": {
+      "label": "violation",
+      "note": "clickable <p>",
+      "cohort": "upstream"
+    },
+    "p04": {
+      "label": "violation",
+      "note": "clickable <li>",
+      "cohort": "upstream"
+    },
+    "p05": {
+      "label": "violation",
+      "note": "clickable <td>",
+      "cohort": "upstream"
+    },
+    "p06": {
+      "label": "violation",
+      "note": "clickable <svg>",
+      "cohort": "upstream"
+    },
+    "p07": {
+      "label": "ok",
+      "note": "native button",
+      "cohort": "upstream"
+    },
+    "p08": {
+      "label": "ok",
+      "note": "native anchor with href",
+      "cohort": "upstream"
+    },
+    "p09": {
+      "label": "ok",
+      "note": "role=button + tabindex=0 + Enter/Space handler",
+      "cohort": "upstream"
+    },
+    "p10": {
+      "label": "violation",
+      "note": "tabindex=0 + click, no key handler \u2014 focusable, NOT actionable (KAFE sub-case 2)",
+      "cohort": "upstream"
+    },
+    "p11": {
+      "label": "violation",
+      "note": "inline onclick= attribute, no tabindex \u2014 the only variant attribute scanners can see",
+      "cohort": "upstream"
+    },
+    "p12": {
+      "label": "violation",
+      "note": "<a> with no href driving JS (KAFE: 34 instances in the wild)",
+      "cohort": "upstream"
+    },
+    "p20": {
+      "label": "decoy",
+      "note": "class btn + cursor:pointer, no handler \u2014 lexical/CSS heuristic trap",
+      "cohort": "upstream"
+    },
+    "p21": {
+      "label": "decoy",
+      "note": "styled toggle icon, no handler",
+      "cohort": "upstream"
+    },
+    "p22": {
+      "label": "decoy",
+      "note": "click handler that produces no observable effect",
+      "cohort": "upstream"
+    },
+    "p23": {
+      "label": "decoy",
+      "note": "clickable card \u2014 equivalent functionality reachable via the <a> it contains (Stage 4 dismissal)",
+      "cohort": "upstream"
+    },
+    "p23a": {
+      "label": "ok",
+      "note": "the real link inside the card",
+      "cohort": "upstream"
+    },
+    "p24": {
+      "label": "decoy",
+      "note": "plain paragraph, unstyled, no handler",
+      "cohort": "upstream"
+    },
+    "p25": {
+      "label": "ok",
+      "note": "label for a clip-hidden (still focusable) checkbox",
+      "cohort": "upstream"
+    },
+    "p25i": {
+      "label": "ok",
+      "note": "the clip-hidden checkbox \u2014 reachable by Tab, toggled by Space",
+      "cohort": "upstream"
+    },
+    "p26": {
+      "label": "violation",
+      "note": "label for a display:none checkbox \u2014 mouse-only toggle",
+      "cohort": "upstream"
+    },
+    "p26i": {
+      "label": "excluded",
+      "note": "display:none checkbox \u2014 not mouse-operable either",
+      "cohort": "upstream"
+    },
+    "p27": {
+      "label": "decoy",
+      "note": "decorative span inside a real button \u2014 functionality is the button's",
+      "cohort": "upstream"
+    },
+    "p27b": {
+      "label": "ok",
+      "note": "the real button",
+      "cohort": "upstream"
+    },
+    "p30": {
+      "label": "violation",
+      "note": "menu that expands on pure CSS :hover \u2014 no JS, no DOM mutation",
+      "cohort": "upstream"
+    },
+    "p31": {
+      "label": "violation",
+      "note": "menu that expands on a JS mouseover listener",
+      "cohort": "upstream"
+    },
+    "p32": {
+      "label": "ok",
+      "note": "anchor menu opening on :hover AND :focus-within",
+      "cohort": "upstream"
+    },
+    "p33": {
+      "label": "decoy",
+      "note": "hover tooltip on running text \u2014 not an operable control (SC 1.4.13, not 2.1.1)",
+      "cohort": "upstream"
+    },
+    "p40": {
+      "label": "violation",
+      "note": "delegated listener on document \u2014 invisible to getEventListeners(el)",
+      "cohort": "upstream"
+    },
+    "p41": {
+      "label": "violation",
+      "note": "delegated, nested three levels deep",
+      "cohort": "upstream"
+    },
+    "p42": {
+      "label": "ok",
+      "note": "real button served by the same delegated handler",
+      "cohort": "upstream"
+    },
+    "p60": {
+      "label": "violation",
+      "note": "handler fires fetch() only \u2014 no DOM trace",
+      "cohort": "upstream"
+    },
+    "p61": {
+      "label": "violation",
+      "note": "handler writes localStorage only \u2014 no DOM trace",
+      "cohort": "upstream"
+    },
+    "p62": {
+      "label": "violation",
+      "note": "handler draws to canvas only \u2014 no DOM trace",
+      "cohort": "upstream"
+    },
+    "p63": {
+      "label": "violation",
+      "note": "handler logs to console only \u2014 no DOM trace",
+      "cohort": "upstream"
+    },
+    "p64": {
+      "label": "ok",
+      "note": "real button, fetch-only handler",
+      "cohort": "upstream"
+    },
+    "p70": {
+      "label": "decoy",
+      "note": "covered by a transparent overlay \u2014 no user can operate it; element.click() fires it anyway",
+      "cohort": "upstream"
+    },
+    "p71": {
+      "label": "violation",
+      "note": "unobstructed clickable div (occlusion control)",
+      "cohort": "upstream"
+    },
+    "p72": {
+      "label": "decoy",
+      "note": "pointer-events:none \u2014 not mouse-operable",
+      "cohort": "upstream"
+    },
+    "p73": {
+      "label": "excluded",
+      "note": "zero-size (KAFE visibility heuristic 2)",
+      "cohort": "upstream"
+    },
+    "p74": {
+      "label": "excluded",
+      "note": "display:none (KAFE visibility heuristic 1)",
+      "cohort": "upstream"
+    },
+    "p75": {
+      "label": "excluded",
+      "note": "visibility:hidden (KAFE visibility heuristic 1)",
+      "cohort": "upstream"
+    },
+    "p80": {
+      "label": "ok",
+      "note": "button with tabindex=5 \u2014 in tab order, but reordered away from document order",
+      "cohort": "upstream"
+    },
+    "p81": {
+      "label": "violation",
+      "note": "tabindex=-1 + click handler \u2014 focusable via .focus(), NOT in tab order",
+      "cohort": "upstream"
+    },
+    "p82": {
+      "label": "excluded",
+      "note": "inside an inert container \u2014 blocked for mouse and keyboard alike",
+      "cohort": "upstream"
+    },
+    "p83": {
+      "label": "excluded",
+      "note": "tabindex=0 inside visibility:hidden",
+      "cohort": "upstream"
+    },
+    "p84": {
+      "label": "ok",
+      "note": "plain button, first in document order",
+      "cohort": "upstream"
+    },
+    "p85": {
+      "label": "excluded",
+      "note": "disabled button",
+      "cohort": "upstream"
+    },
+    "p86": {
+      "label": "ok",
+      "note": "plain button, last in document order",
+      "cohort": "upstream"
+    },
+    "p90": {
+      "label": "violation",
+      "note": "clickable div inside an OPEN shadow root",
+      "cohort": "upstream"
+    },
+    "p91": {
+      "label": "violation",
+      "note": "clickable div inside a CLOSED shadow root",
+      "cohort": "upstream"
+    },
+    "p92": {
+      "label": "violation",
+      "note": "clickable div inside a same-origin iframe",
+      "cohort": "upstream"
+    },
+    "p93": {
+      "label": "ok",
+      "note": "real button inside an OPEN shadow root",
+      "cohort": "upstream"
+    },
+    "p94": {
+      "label": "ok",
+      "note": "real button inside an iframe",
+      "cohort": "upstream"
+    },
+    "p50": {
+      "label": "violation",
+      "note": "React <div onClick> \u2014 handler is delegated to the root container",
+      "cohort": "upstream"
+    },
+    "p51": {
+      "label": "ok",
+      "note": "React <button onClick>",
+      "cohort": "upstream"
+    },
+    "p52": {
+      "label": "ok",
+      "note": "React div with role/tabIndex/onKeyDown",
+      "cohort": "upstream"
+    },
+    "p53": {
+      "label": "violation",
+      "note": "React <span onClick> wrapping an icon",
+      "cohort": "upstream"
+    },
+    "p54": {
+      "label": "violation",
+      "note": "React div tabIndex=0 with onClick only \u2014 focusable, not actionable",
+      "cohort": "upstream"
+    },
+    "p55": {
+      "label": "decoy",
+      "note": "React div styled as a button with no onClick",
+      "cohort": "upstream"
+    },
+    "h101": {
+      "label": "violation",
+      "note": "Tab reaches the div and changes focus-status, but only clicking opens attendance; focus feedback is not the requested functionality.",
+      "cohort": "holdout"
+    },
+    "h102": {
+      "label": "violation",
+      "note": "Enter/Space/ArrowDown update unrelated key feedback; clicking opens grades. Any DOM change is not necessarily an equivalent result.",
+      "cohort": "holdout"
+    },
+    "h103": {
+      "label": "ok",
+      "note": "A custom button toggles the same details through click, Enter, or Space. Independent key trials avoid cancelling the toggle.",
+      "cohort": "holdout"
+    },
+    "h104": {
+      "label": "ok",
+      "note": "A native button writes a persistent preference once. Fresh contexts must reset storage between mouse and keyboard trials.",
+      "cohort": "holdout"
+    },
+    "h105": {
+      "label": "violation",
+      "note": "A click-only div changes a theme preference in localStorage with no DOM effect.",
+      "cohort": "holdout"
+    },
+    "h110": {
+      "label": "violation",
+      "note": "Shared openReport function uses currentTarget.dataset.report=A. The keyboard button selects B, which is a different result despite identical function identity.",
+      "cohort": "holdout"
+    },
+    "h111": {
+      "label": "ok",
+      "note": "Native keyboard button opens report B.",
+      "cohort": "holdout"
+    },
+    "h112": {
+      "label": "decoy",
+      "note": "Card clicks bubble to an action also delivered by its nested native help button.",
+      "cohort": "holdout"
+    },
+    "h113": {
+      "label": "ok",
+      "note": "Native help button invokes the card action through click bubbling.",
+      "cohort": "holdout"
+    },
+    "h120": {
+      "label": "violation",
+      "note": "Direct click listener on a plain paragraph; no role, tabindex, class, or pointer cursor.",
+      "cohort": "holdout"
+    },
+    "h121": {
+      "label": "violation",
+      "note": "Plain paragraph served by a delegated document listener, with no per-element handler property or visual control hint.",
+      "cohort": "holdout"
+    },
+    "h122": {
+      "label": "violation",
+      "note": "Plain div has an onclick property assigned from JavaScript, no inline attribute.",
+      "cohort": "holdout"
+    },
+    "h123": {
+      "label": "decoy",
+      "note": "Styled as a button but has no functionality or listener.",
+      "cohort": "holdout"
+    },
+    "h130": {
+      "label": "decoy",
+      "note": "Transparent overlay intercepts pointer input. Its diagnostic attribute change is not the covered action.",
+      "cohort": "holdout"
+    },
+    "h131": {
+      "label": "excluded",
+      "note": "pointer-events:none blocks real pointer activation.",
+      "cohort": "holdout"
+    },
+    "h132": {
+      "label": "excluded",
+      "note": "Inert ancestor blocks pointer and keyboard activation.",
+      "cohort": "holdout"
+    },
+    "h133": {
+      "label": "violation",
+      "note": "Uncovered click-only div changes visible output.",
+      "cohort": "holdout"
+    },
+    "h140": {
+      "label": "decoy",
+      "note": "Desktop: a separate native button supplies the same action. Mobile: that equivalent is display:none, leaving mouse-only functionality.",
+      "cohort": "holdout",
+      "labels_by_viewport": {
+        "desktop": "decoy",
+        "mobile": "violation"
+      }
+    },
+    "h141": {
+      "label": "ok",
+      "note": "Desktop native equivalent for h140; hidden and excluded at widths <=600px.",
+      "cohort": "holdout",
+      "labels_by_viewport": {
+        "desktop": "ok",
+        "mobile": "excluded"
+      }
+    },
+    "h142": {
+      "label": "excluded",
+      "note": "Hidden on desktop; visible click-only timetable control at widths <=600px.",
+      "cohort": "holdout",
+      "labels_by_viewport": {
+        "desktop": "excluded",
+        "mobile": "violation"
+      }
+    },
+    "h150": {
+      "label": "ok",
+      "note": "Menu content is revealed by focus-within as well as hover, and its real link is then reachable by Tab.",
+      "cohort": "holdout"
+    },
+    "h151": {
+      "label": "violation",
+      "note": "Menu links start hidden and can only be revealed through hover; no keyboard opening path exists.",
+      "cohort": "holdout"
+    },
+    "h152": {
+      "label": "decoy",
+      "note": "Hover changes colour only, adding no content and exposing no functionality.",
+      "cohort": "holdout"
+    },
+    "h160": {
+      "label": "violation",
+      "note": "Click-only control updates output entirely inside an open shadow root.",
+      "cohort": "holdout"
+    },
+    "h161": {
+      "label": "ok",
+      "note": "Native button updates output inside an open shadow root.",
+      "cohort": "holdout"
+    },
+    "h162": {
+      "label": "violation",
+      "note": "Click-only control and its changed output both live in a same-origin iframe.",
+      "cohort": "holdout"
+    },
+    "h163": {
+      "label": "ok",
+      "note": "Native button and output inside a same-origin iframe.",
+      "cohort": "holdout"
+    },
+    "h164": {
+      "label": "ok",
+      "note": "Native button inside a closed shadow root has normal keyboard operation; opaque observation is not a failure.",
+      "cohort": "holdout"
+    },
+    "h170": {
+      "label": "ok",
+      "note": "First item in a two-item roving-tabindex menubar; Enter/Space activate.",
+      "cohort": "holdout"
+    },
+    "h171": {
+      "label": "ok",
+      "note": "Second menu item starts tabindex=-1, but ArrowRight/ArrowLeft from the first item reaches it and Enter/Space activate it.",
+      "cohort": "holdout"
+    },
+    "h172": {
+      "label": "ok",
+      "note": "Documented Alt+K shortcut exposes the same panel as clicking the unfocusable div.",
+      "cohort": "holdout"
+    },
+    "h173": {
+      "label": "violation",
+      "note": "Focus handler immediately blurs this click-only div; clicking still opens a distinct panel.",
+      "cohort": "holdout"
+    },
+    "h180": {
+      "label": "violation",
+      "note": "Click-only result arrives after 700ms; a shorter observation window may miss the effect.",
+      "cohort": "holdout"
+    },
+    "h181": {
+      "label": "ok",
+      "note": "Native button delivers the same result after 700ms by click or keyboard.",
+      "cohort": "holdout"
+    },
+    "h182": {
+      "label": "ok",
+      "note": "Native button is after 100 unlabelled Tab stops; a budget-limited walk cannot establish unreachability.",
+      "cohort": "holdout"
+    }
+  }
+}

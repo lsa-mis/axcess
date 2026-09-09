@@ -1,0 +1,4 @@
+body { font: 15px/1.5 system-ui, sans-serif; margin: 24px; max-width: 800px; }
+.btnish { cursor: pointer; padding: 8px 12px; margin: 6px 0; border: 1px solid #888;
+          border-radius: 4px; display: inline-block; background: #f4f4f4; }
+#out { font-family: monospace; background: #eee; padding: 6px; }

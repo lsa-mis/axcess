@@ -1,0 +1,13 @@
+body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; max-width: 900px; }
+h1 { font-size: 18px; } h2 { font-size: 15px; margin-top: 28px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.btnish {
+  display: inline-block; padding: 6px 14px; border-radius: 999px;
+  background: #e6eefc; border: 1px solid #b9cdf0; cursor: pointer; user-select: none;
+}
+.btnish:hover { background: #d3e2fb; }
+#sink { margin-top: 24px; padding: 8px; border: 1px dashed #ccc; min-height: 24px; font-family: monospace; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}

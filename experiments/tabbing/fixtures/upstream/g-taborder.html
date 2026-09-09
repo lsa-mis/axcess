@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>G — tab-order semantics</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<h1>G — focusability is not tab-order membership (tabbing.md §3.3)</h1>
+
+<div class="row">
+  <button data-probe="p84" class="btn">First in document order</button>
+  <button data-probe="p80" class="btn" tabindex="5">tabindex=5 (reordered)</button>
+  <div    data-probe="p81" class="btnish" tabindex="-1">tabindex=-1 + click handler</div>
+  <button data-probe="p85" class="btn" disabled>disabled</button>
+</div>
+
+<div inert>
+  <div class="row"><button data-probe="p82" class="btn">inside an inert container</button></div>
+</div>
+
+<div style="visibility:hidden">
+  <div class="row"><div data-probe="p83" class="btnish" tabindex="0">inside visibility:hidden</div></div>
+</div>
+
+<div class="row"><button data-probe="p86" class="btn">Last in document order</button></div>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  function actReordered() { fired('p80'); }
+  function actNegative()  { fired('p81'); }
+  function actInert()     { fired('p82'); }
+  function actInvisible() { fired('p83'); }
+  function actFirst()     { fired('p84'); }
+  function actDisabled()  { fired('p85'); }
+  function actLast()      { fired('p86'); }
+  var H = { p80: actReordered, p81: actNegative, p82: actInert, p83: actInvisible,
+            p84: actFirst, p85: actDisabled, p86: actLast };
+  Object.keys(H).forEach(function (id) {
+    var el = document.querySelector('[data-probe="' + id + '"]');
+    el.addEventListener('click', H[id]);
+    if (el.tagName === 'BUTTON') return;             // native keyboard activation
+    el.addEventListener('keydown', function () {});  // no-op: still not actionable
+  });
+</script>

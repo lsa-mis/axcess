@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Frame tool</title>
+<link rel="stylesheet" href="shared.css">
+<div data-probe="h162" id="frame-action" class="control">Open embedded chart</div>
+<button data-probe="h163" id="frame-button">Open embedded table</button>
+<output id="frame-output">Closed</output>
+<script>
+  document.getElementById('frame-action').addEventListener('click', () => {
+    document.getElementById('frame-output').textContent = 'Embedded chart open';
+  });
+  document.getElementById('frame-button').addEventListener('click', () => {
+    document.getElementById('frame-output').textContent = 'Embedded table open';
+  });
+</script></html>

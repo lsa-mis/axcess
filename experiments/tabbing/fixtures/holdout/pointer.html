@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Pointer hit testing</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Pointer hit testing</h1>
+<div style="position:relative; width:280px; height:70px">
+  <div data-probe="h130" id="covered" class="control" style="margin:0;width:100%;height:100%">Covered action</div>
+  <div id="cover" style="position:absolute;inset:0;background:transparent" aria-hidden="true"></div>
+</div>
+<div data-probe="h131" id="no-pointer" class="control" style="pointer-events:none">Pointer disabled</div>
+<div inert><div data-probe="h132" id="inert-item" class="control">Inert action</div></div>
+<div data-probe="h133" id="real" class="control">Uncovered action</div>
+<output id="message">No action</output>
+<script>
+  for (const id of ['covered', 'no-pointer', 'inert-item', 'real']) {
+    document.getElementById(id).addEventListener('click', () => {
+      document.getElementById('message').textContent = id + ' activated';
+    });
+  }
+  // The overlay is not a control. A diagnostic-only attribute change must not
+  // be credited to the covered target as evidence that its action succeeded.
+  document.getElementById('cover').addEventListener('click', event => {
+    event.currentTarget.setAttribute('data-last-pointer', 'received');
+  });
+</script></html>

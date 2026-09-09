@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>F — occlusion and hit-testing</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<style>
+  .stack { position: relative; width: 320px; height: 60px; margin: 12px 0; }
+  .stack > * { position: absolute; inset: 0; }
+  .veil { background: rgba(0,0,0,0.001); z-index: 10; }
+</style>
+<h1>F — trusted input vs <code>element.click()</code> (tabbing.md §1.3)</h1>
+
+<h2>Covered by a transparent overlay</h2>
+<div class="stack">
+  <div data-probe="p70" class="btnish">Under a transparent veil — a real user cannot click this</div>
+  <div class="veil"></div>
+</div>
+
+<h2>Unobstructed control</h2>
+<div class="row"><div data-probe="p71" class="btnish">Plainly clickable</div></div>
+
+<h2>Not mouse-operable at all</h2>
+<div class="row">
+  <div data-probe="p72" class="btnish" style="pointer-events:none">pointer-events: none</div>
+  <div data-probe="p73" class="btnish" style="width:0;height:0;overflow:hidden;padding:0;border:0">zero-size</div>
+  <div data-probe="p74" class="btnish" style="display:none">display:none</div>
+  <div data-probe="p75" class="btnish" style="visibility:hidden">visibility:hidden</div>
+</div>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  function actVeiled()   { fired('p70'); }
+  function actPlain()    { fired('p71'); }
+  function actNoPointer(){ fired('p72'); }
+  function actZeroSize() { fired('p73'); }
+  function actDisplayNone(){ fired('p74'); }
+  function actHidden()   { fired('p75'); }
+  var H = { p70: actVeiled, p71: actPlain, p72: actNoPointer, p73: actZeroSize, p74: actDisplayNone, p75: actHidden };
+  Object.keys(H).forEach(function (id) {
+    document.querySelector('[data-probe="' + id + '"]').addEventListener('click', H[id]);
+  });
+</script>

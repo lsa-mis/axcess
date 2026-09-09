@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Component and frame boundaries</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Component and frame boundaries</h1>
+<div id="open-host"></div><div id="closed-host"></div>
+<iframe title="Embedded course tool" src="scopes-frame.html" style="width:100%;height:170px"></iframe>
+<script>
+  const root = document.getElementById('open-host').attachShadow({mode:'open'});
+  root.innerHTML = '<style>div,button{padding:10px;margin:5px;cursor:pointer}</style>' +
+    '<div data-probe="h160" id="shadow-action">Open component help</div>' +
+    '<button data-probe="h161" id="shadow-button">Open component settings</button>' +
+    '<output id="shadow-output">Closed</output>';
+  root.getElementById('shadow-action').addEventListener('click', () => {
+    root.getElementById('shadow-output').textContent = 'Component help open';
+  });
+  root.getElementById('shadow-button').addEventListener('click', () => {
+    root.getElementById('shadow-output').textContent = 'Component settings open';
+  });
+  const closed = document.getElementById('closed-host').attachShadow({mode:'closed'});
+  closed.innerHTML = '<button data-probe="h164">Open closed component</button><output>Closed</output>';
+  closed.querySelector('button').addEventListener('click', () => {
+    closed.querySelector('output').textContent = 'Closed component open';
+  });
+</script></html>

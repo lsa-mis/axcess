@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>D — event delegation</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<h1>D — delegated listeners (nothing attached to the element itself)</h1>
+<p>A single listener on <code>document</code> dispatches by selector match, so
+<code>getEventListeners(el)</code> returns nothing for any of these.</p>
+
+<table>
+  <tbody>
+    <tr><td>Row 1</td><td><span data-probe="p40" class="row-action btnish">Archive</span></td></tr>
+    <tr><td>Row 2</td><td><div class="wrap"><div class="inner"><i data-probe="p41" class="row-action icon-x btnish">delete_forever</i></div></div></td></tr>
+  </tbody>
+</table>
+
+<div class="row">
+  <button data-probe="p42" class="row-action btn">Archive (real button, same delegated handler)</button>
+</div>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  // Delegation is the point of this page, but each control still routes to its
+  // own action so the three are distinguishable by execution coverage.
+  function archiveRow1() { fired('p40'); }
+  function deleteRow2()  { fired('p41'); }
+  function archiveRow3() { fired('p42'); }
+  var ACTIONS = { p40: archiveRow1, p41: deleteRow2, p42: archiveRow3 };
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('.row-action') : null;
+    if (!t) return;
+    var fn = ACTIONS[t.getAttribute('data-probe')];
+    if (fn) fn();
+  });
+</script>

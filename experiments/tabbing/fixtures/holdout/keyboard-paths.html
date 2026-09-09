@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Keyboard paths beyond Tab</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Keyboard paths beyond Tab</h1>
+<p>Use Left and Right arrows in the menu, then Enter or Space. Press Alt+K anywhere to open the shortcut panel.</p>
+<div role="menubar" aria-label="Sections">
+  <div data-probe="h170" id="first" role="menuitem" tabindex="0">First section</div>
+  <div data-probe="h171" id="second" role="menuitem" tabindex="-1">Second section</div>
+</div>
+<div data-probe="h172" id="shortcut" class="control">Open shortcut panel (Alt+K)</div>
+<div data-probe="h173" id="blurred" tabindex="0" class="control">Open mouse panel</div>
+<output id="section">No section</output><output id="panel">No panel</output>
+<script>
+  const entries = ['first', 'second'].map(id => document.getElementById(id));
+  entries.forEach((item, index) => {
+    const activate = () => { document.getElementById('section').textContent = item.textContent; };
+    item.addEventListener('click', activate);
+    item.addEventListener('keydown', event => {
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const next = entries[1 - index]; item.tabIndex = -1; next.tabIndex = 0; next.focus();
+      } else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+    });
+  });
+  const openShortcut = () => { document.getElementById('panel').textContent = 'Shortcut panel open'; };
+  document.getElementById('shortcut').addEventListener('click', openShortcut);
+  document.addEventListener('keydown', event => {
+    if (event.altKey && event.key.toLowerCase() === 'k') { event.preventDefault(); openShortcut(); }
+  });
+  const blurred = document.getElementById('blurred');
+  blurred.addEventListener('focus', () => blurred.blur());
+  blurred.addEventListener('click', () => { document.getElementById('panel').textContent = 'Mouse panel open'; });
+</script></html>

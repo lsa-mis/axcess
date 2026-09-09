@@ -1,0 +1,33 @@
+<!doctype html><meta charset=utf-8><title>hover-only affordances</title>
+<link rel=stylesheet href="_shared.css">
+<style>
+  /* A menu that opens on hover with NO JavaScript at all. Every listener route
+     is blind to it by construction: there is no listener to find. Only a
+     rendering-diff or a behavioural oracle can see it. */
+  .menu .panel { display: none; }
+  .menu:hover .panel { display: block; background: #efe; padding: 6px; }
+
+  /* The accessible version of the same pattern: opens on focus too. */
+  .menu2 .panel { display: none; }
+  .menu2:hover .panel, .menu2:focus-within .panel { display: block; background: #eef; padding: 6px; }
+
+  /* A tooltip. Upstream's single surviving false positive was one of these, and
+     Codex's W3C reading in LLMTalk [11] argues the label is disputable. */
+  .tip .bubble { display: none; }
+  .tip:hover .bubble { display: inline; background: #ffe; }
+</style>
+<h1>Hover-triggered content with no JavaScript</h1>
+<p id=out>idle</p>
+
+<div class="menu" data-probe="e31" style="cursor:pointer">
+  Products
+  <div class="panel">CSS-only dropdown, mouse only</div>
+</div>
+
+<div class="menu2" data-probe="e32" tabindex="0" style="cursor:pointer">
+  Services
+  <div class="panel">opens on hover AND focus</div>
+</div>
+
+<p>Some running text with an <span class="tip" data-probe="e33">abbreviation<span class="bubble">
+  the expansion</span></span> in it.</p>

@@ -1,0 +1,37 @@
+<!doctype html><meta charset=utf-8><title>decoys and equivalents</title>
+<link rel=stylesheet href="_shared.css">
+<h1>Things that look operable, and things whose function lives elsewhere</h1>
+<p id=out>idle</p>
+
+<button data-probe="e80">native button</button>
+<a href="#e81" data-probe="e81">real anchor</a>
+<div data-probe="e82" class="btnish" role="button" tabindex="0">role=button done correctly</div>
+
+<div data-probe="e83" class="btnish">cursor:pointer, no handler at all</div>
+<div data-probe="e84" class="btn primary card">class says button, no handler</div>
+
+<div data-probe="e85" class="card" style="cursor:pointer;border:1px solid #bbb;padding:10px">
+  clickable card wrapper
+  <a href="#e85a" data-probe="e85a">the real link inside it</a>
+</div>
+
+<label data-probe="e86" for="chk" style="cursor:pointer">label for a checkbox</label>
+<input id="chk" type="checkbox" data-probe="e86a">
+
+<button data-probe="e87b"><span data-probe="e87" style="cursor:pointer">decorative span inside a button</span></button>
+
+<script src="_helpers.js"></script>
+<script>
+const q = (id) => document.querySelector('[data-probe="' + id + '"]');
+q('e80').addEventListener('click', function f80() { mark('e80'); });
+q('e82').addEventListener('click', function f82() { mark('e82'); });
+q('e82').addEventListener('keydown', function f82k(e) { if (e.key === 'Enter') mark('e82'); });
+
+// e83 and e84 get NO handler. They only look clickable, which is precisely what
+// the CSS and lexical detectors key on -- upstream measured that family at 71%
+// precision, its worst result, and these are why.
+
+// The card and the link do the same thing. The card is not a defect because the
+// link inside it is one Tab away; Stage 4 equivalence should dismiss it.
+q('e85').addEventListener('click', function f85() { location.hash = 'e85a'; });
+</script>

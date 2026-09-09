@@ -1,0 +1,383 @@
+{
+  "corpus": "edgecases",
+  "authored_by": "claude",
+  "warning": "Detectors and fixtures share one author, so no absolute accuracy figure from this corpus is admissible. It exists to compare detectors against each other on identical pages, and to stress the instrument.",
+  "pages": {
+    "pages/binding.html": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10"
+    ],
+    "pages/effects.html": [
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30"
+    ],
+    "pages/keyboard.html": [
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48"
+    ],
+    "pages/geometry.html": [
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e67",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e73"
+    ],
+    "pages/decoys.html": [
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e86a",
+      "e87",
+      "e87b"
+    ],
+    "pages/scale.html": [
+      "e90",
+      "e91"
+    ],
+    "pages/hover.html": [
+      "e31",
+      "e32",
+      "e33"
+    ]
+  },
+  "probes": {
+    "e01": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "inline onclick attribute on a div, no tabindex"
+    },
+    "e02": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "el.onclick property assignment"
+    },
+    "e03": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "addEventListener('click')"
+    },
+    "e04": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "addEventListener with capture=true"
+    },
+    "e05": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "delegated on document; nothing bound to the element"
+    },
+    "e06": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "delegated on an ancestor container"
+    },
+    "e07": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "handler installed via setAttribute('onclick')"
+    },
+    "e08": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "mousedown only; a keypress never produces mousedown"
+    },
+    "e09": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "dblclick only; expected FN for any single-click oracle"
+    },
+    "e10": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "native button with addEventListener"
+    },
+    "e20": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "DOM mutation"
+    },
+    "e21": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "fetch only; invisible to a DOM-hash oracle"
+    },
+    "e22": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "localStorage only"
+    },
+    "e23": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "canvas draw only"
+    },
+    "e24": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "console.log only; logging is not user-facing functionality"
+    },
+    "e25": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "navigation via location.hash"
+    },
+    "e26": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "CSS reveal; innerHTML unchanged, geometry changes"
+    },
+    "e27": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "empty handler; a listener exists and nothing happens"
+    },
+    "e28": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "effect after 600ms, beyond the 250ms settle window"
+    },
+    "e29": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "effect deferred through requestAnimationFrame"
+    },
+    "e30": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "idempotent storage write, reachable with a working Enter handler"
+    },
+    "e40": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "click plus keydown Enter"
+    },
+    "e41": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "click plus Space only"
+    },
+    "e42": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "click plus keyup only"
+    },
+    "e43": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "Enter runs a DIFFERENT action; reachable but not equivalent"
+    },
+    "e44": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "tabindex=0 and a click handler, no key handler at all"
+    },
+    "e45": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "tabindex=-1; script-focusable, never a tab stop"
+    },
+    "e46": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "positive tabindex with a working Enter handler"
+    },
+    "e47": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "key handler delegated on document"
+    },
+    "e48": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "native button baseline"
+    },
+    "e60": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "far below the fold; operable after scrolling"
+    },
+    "e61": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "off-canvas at left:-9999px; no mouse can reach it"
+    },
+    "e62": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "1x1 px target; tiny but genuinely clickable"
+    },
+    "e63": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "zero-size box"
+    },
+    "e64": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "covered by a transparent overlay"
+    },
+    "e65": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "pointer-events:none"
+    },
+    "e66": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "inside an inert subtree"
+    },
+    "e67": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "disabled"
+    },
+    "e68": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "opacity:0; imperceptible, a 1.4.x concern not 2.1.1"
+    },
+    "e69": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "visibility:hidden"
+    },
+    "e70": {
+      "label": "excluded",
+      "cohort": "edge",
+      "note": "display:none"
+    },
+    "e71": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "inside an overflow:auto container; needs scrolling"
+    },
+    "e72": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "inline span wrapping across lines; box centre can miss it"
+    },
+    "e73": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "aria-hidden=true yet focusable and clickable"
+    },
+    "e80": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "native button"
+    },
+    "e81": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "real anchor with href"
+    },
+    "e82": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "role=button, tabindex=0, Enter handler"
+    },
+    "e83": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "cursor:pointer with no handler whatsoever"
+    },
+    "e84": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "button-ish class names, no handler"
+    },
+    "e85": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "clickable card; the link inside delivers the same thing"
+    },
+    "e85a": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "the real link inside the card"
+    },
+    "e86": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "label for a checkbox; the checkbox is the control"
+    },
+    "e86a": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "the checkbox itself"
+    },
+    "e87": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "decorative span inside a real button"
+    },
+    "e87b": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "the button wrapping that span"
+    },
+    "e90": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "one broken div among 120 identical correct buttons"
+    },
+    "e91": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "clickable div 150 wrappers deep"
+    },
+    "e31": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "pure CSS :hover dropdown, no JS; invisible to every listener route"
+    },
+    "e32": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "same pattern with :focus-within, so the keyboard reaches it"
+    },
+    "e33": {
+      "label": "decoy",
+      "cohort": "edge",
+      "note": "hover tooltip; behaviourally identical to a broken menu, but 1.4.13 not 2.1.1 -- the disputed-label case"
+    }
+  }
+}

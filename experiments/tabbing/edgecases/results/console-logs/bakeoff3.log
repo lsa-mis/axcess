@@ -1,0 +1,30 @@
+corpus: edgecases  (60 probes, 7 pages)
+caveat: author-conflicted: ranking only, absolute accuracy inadmissible
+
+  pages/binding.html (10 probes) ...
+  pages/decoys.html (11 probes) ...
+  pages/effects.html (11 probes) ...
+  pages/geometry.html (14 probes) ...
+2026-09-08 15:06:26 [info     ] kbdiff.mouse_trial_failed      error="Page.evaluate: TypeError: Cannot read properties of undefined (reading '0')\n    at eval (eval at evaluate (:290:30), <anonymous>:77:35)\n    at UtilityScript.eva" probe=e63
+2026-09-08 15:06:31 [info     ] kbdiff.mouse_trial_failed      error="Page.evaluate: TypeError: Cannot read properties of undefined (reading '0')\n    at eval (eval at evaluate (:290:30), <anonymous>:77:35)\n    at UtilityScript.eva" probe=e70
+  pages/hover.html (3 probes) ...
+  pages/keyboard.html (9 probes) ...
+  pages/scale.html (2 probes) ...
+
+detector                              TP  FP  FN    prec  recall      F1
+----------------------------------------------------------------------------
+D9 behavioural differential           26   4   2   86.7%   92.9%   89.7%
+D4 CSS + lexical                      25  15   3   62.5%   89.3%   73.5%
+D10 coverage differential             26  19   2   57.8%   92.9%   71.2%
+D5 CDP getEventListeners              22  12   6   64.7%   78.6%   71.0%
+D1x axe-core (any rule, unsound)      22  13   6   62.9%   78.6%   69.8%
+D6 addEventListener shim              18  12  10   60.0%   64.3%   62.1%
+D2b onclick property                   3   0  25  100.0%   10.7%   19.4%
+D0 axcess collectClickables            2   0  26  100.0%    7.1%   13.3%
+D2 inline onclick attribute            2   0  26  100.0%    7.1%   13.3%
+D3 tabindex / ARIA                     1   0  27  100.0%    3.6%    6.9%
+D8 hover-diff                          1   1  27   50.0%    3.6%    6.7%
+D1 axe-core (keyboard rules)           1   1  27   50.0%    3.6%    6.7%
+D7 React fiber props                   0   0  28     —      0.0%     —  
+
+wrote /var/home/me/Development/axcess/experiments/tabbing/edgecases/results/bakeoff-edgecases.json  (145.3s)

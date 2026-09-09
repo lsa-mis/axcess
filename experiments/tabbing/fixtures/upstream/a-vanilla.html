@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>A — vanilla direct listeners</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<h1>A — vanilla, directly-attached listeners</h1>
+
+<h2>The canonical defect (verbatim from tabbing.md §0)</h2>
+<div class="row">
+  <div data-probe="p01" class="dropout-btn dropout selected btnish">Inactive Students (<span class="count">0</span>)</div>
+  <span data-probe="p02" id="last-responses-btn" class="last-responses-btn"><i class="material-icons calendar">calendar_month</i></span>
+</div>
+
+<h2>The broader class</h2>
+<p data-probe="p03" class="clickable-para btnish">A clickable paragraph.</p>
+<ul>
+  <li data-probe="p04" class="list-action btnish">A clickable list item</li>
+</ul>
+<table>
+  <tbody><tr><td data-probe="p05" class="cell-action btnish">A clickable table cell</td></tr></tbody>
+</table>
+<svg data-probe="p06" class="icon-action" width="32" height="32" viewBox="0 0 32 32" style="cursor:pointer">
+  <circle cx="16" cy="16" r="14" fill="#4a7fd0"></circle>
+</svg>
+
+<h2>Correctly-built controls (negatives)</h2>
+<div class="row">
+  <button data-probe="p07" class="btn btn-primary">Real button</button>
+  <a data-probe="p08" href="#anchor-target">Real link</a>
+  <div data-probe="p09" role="button" tabindex="0" class="btnish">role=button + tabindex + key handler</div>
+</div>
+
+<h2>Focusable but not actionable (KAFE sub-case 2)</h2>
+<div class="row">
+  <div data-probe="p10" tabindex="0" class="btnish">tabindex=0, click handler, no key handler</div>
+</div>
+
+<h2>Inline attribute, and href-less anchor</h2>
+<div class="row">
+  <div data-probe="p11" class="btnish" onclick="fired('p11')">inline onclick=, no tabindex</div>
+  <a data-probe="p12" class="js-trigger">&lt;a&gt; with no href</a>
+</div>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<div id="anchor-target"></div>
+
+<script>
+  // Each probe gets its OWN handler function. A shared closure would give every
+  // probe an identical V8 coverage signature, which would make the functional
+  // equivalence test of tabbing.md §5 Stage 4 dismiss genuine defects.
+  function on(id, ev, fn) {
+    document.querySelector('[data-probe="' + id + '"]').addEventListener(ev, fn);
+  }
+  function actDropout()   { fired('p01'); }
+  function actResponses() { fired('p02'); }
+  function actPara()      { fired('p03'); }
+  function actListItem()  { fired('p04'); }
+  function actCell()      { fired('p05'); }
+  function actIcon()      { fired('p06'); }
+  function actRealButton(){ fired('p07'); }
+  function actRealLink()  { fired('p08'); }
+  function actAriaButton(){ fired('p09'); }
+  function actFocusable() { fired('p10'); }
+  function actHrefless()  { fired('p12'); }
+
+  on('p01', 'click', actDropout);
+  on('p02', 'click', actResponses);
+  on('p03', 'click', actPara);
+  on('p04', 'click', actListItem);
+  on('p05', 'click', actCell);
+  on('p06', 'click', actIcon);
+  on('p07', 'click', actRealButton);
+  on('p08', 'click', actRealLink);
+  on('p12', 'click', actHrefless);
+  on('p09', 'click', actAriaButton);
+  on('p09', 'keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); actAriaButton(); }
+  });
+  on('p10', 'click', actFocusable);
+</script>

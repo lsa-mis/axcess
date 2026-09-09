@@ -51,6 +51,9 @@ desktop/out/
 .claude/skills/gauntlet-loop/
 .claude/skills/gauntlet-loop-deepseek/
 
+# Local-only agent coordination log
+LLMTalk
+
 # Frontend (src/audit/web/frontend)
 # Vite build output is already ignored by the global "dist/" rule above.
 node_modules/

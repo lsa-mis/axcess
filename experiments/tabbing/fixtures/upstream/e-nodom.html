@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>E — handlers with no DOM trace</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<h1>E — handlers whose effect never touches the DOM (tabbing.md §3.7)</h1>
+<p>A DOM-diff oracle sees nothing here. Network / storage / canvas / coverage do.</p>
+
+<div class="row">
+  <div data-probe="p60" class="btnish">fetch() only</div>
+  <div data-probe="p61" class="btnish">localStorage write only</div>
+  <div data-probe="p62" class="btnish">canvas draw only</div>
+  <div data-probe="p63" class="btnish">console.log only</div>
+  <button data-probe="p64" class="btn">fetch() only, but a real button</button>
+</div>
+
+<canvas id="cv" width="120" height="60" style="border:1px solid #ccc"></canvas>
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+
+<script>
+  function q(id) { return document.querySelector('[data-probe="' + id + '"]'); }
+  function actFetchOnly()    { firedSilently('p60'); fetch('/api/ping?p=60'); }
+  function actStorageOnly()  { firedSilently('p61'); localStorage.setItem('p61', String(Date.now())); }
+  function actCanvasOnly()   {
+    firedSilently('p62');
+    var c = document.getElementById('cv').getContext('2d');
+    c.fillStyle = '#4a7fd0'; c.fillRect(Math.random() * 80, 10, 30, 30);
+  }
+  function actConsoleOnly()  { firedSilently('p63'); console.log('p63 activated'); }
+  function actButtonFetch()  { firedSilently('p64'); fetch('/api/ping?p=64'); }
+  q('p60').addEventListener('click', actFetchOnly);
+  q('p61').addEventListener('click', actStorageOnly);
+  q('p62').addEventListener('click', actCanvasOnly);
+  q('p63').addEventListener('click', actConsoleOnly);
+  q('p64').addEventListener('click', actButtonFetch);
+</script>

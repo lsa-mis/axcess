@@ -1,0 +1,11 @@
+/* Original Axcess holdout fixtures, authored before detector results were read. */
+* { box-sizing: border-box; }
+body { font: 16px/1.4 system-ui, sans-serif; margin: 16px; max-width: 900px; }
+h1 { font-size: 22px; }
+button, .control, [role="menuitem"] {
+  display: inline-block; padding: 9px; margin: 6px; border: 1px solid #777;
+  background: #eee; color: #111; cursor: pointer;
+}
+:focus-visible { outline: 3px solid #1356bd; outline-offset: 2px; }
+output { display: block; min-height: 32px; }
+.spacer { height: 20px; }

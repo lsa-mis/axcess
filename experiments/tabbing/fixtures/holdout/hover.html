@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Menus opened on focus or hover</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .menu { display:inline-block; position:relative; margin:8px; }
+  .panel { display:none; position:absolute; top:100%; left:0; width:140px; background:white; border:1px solid #444; z-index:5; }
+  .menu:hover .panel { display:block; }
+  .keyboard-menu:focus-within .panel { display:block; }
+  .decorative:hover { color:#035; background:#ddf; }
+</style>
+<h1>Menus opened on focus or hover</h1>
+<div class="menu keyboard-menu">
+  <div data-probe="h150" tabindex="0" class="control">Course links</div>
+  <div class="panel"><a href="#course">Course home</a></div>
+</div>
+<div class="menu">
+  <div data-probe="h151" class="control">Library links</div>
+  <div class="panel"><a href="#library">Library home</a></div>
+</div>
+<p data-probe="h152" class="decorative">This sentence changes colour on hover; no content or action is added.</p>
+<div id="course">Course section</div><div id="library">Library section</div>
+</html>

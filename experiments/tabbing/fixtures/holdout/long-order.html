@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Long keyboard path</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Long keyboard path</h1>
+<div id="earlier-controls"></div>
+<button data-probe="h182" id="late-control">Open the final result</button>
+<output id="result">Closed</output>
+<script>
+  const container = document.getElementById('earlier-controls');
+  for (let i = 0; i < 100; i++) {
+    const button = document.createElement('button'); button.textContent = 'Earlier control ' + (i + 1);
+    container.appendChild(button);
+  }
+  document.getElementById('late-control').addEventListener('click', () => {
+    document.getElementById('result').textContent = 'Final result open';
+  });
+</script></html>

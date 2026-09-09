@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>H — shadow DOM and iframes</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<h1>H — shadow roots and same-origin frames</h1>
+
+<div id="host-open"></div>
+<div id="host-closed"></div>
+<iframe id="frame" src="h-frame.html" width="420" height="140" style="border:1px solid #ccc" title="embedded tool"></iframe>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  var openRoot = document.getElementById('host-open').attachShadow({ mode: 'open' });
+  openRoot.innerHTML =
+    '<style>.btnish{display:inline-block;padding:6px 14px;border-radius:999px;' +
+    'background:#e6eefc;border:1px solid #b9cdf0;cursor:pointer}</style>' +
+    '<div data-probe="p90" class="btnish">clickable div in an OPEN shadow root</div>' +
+    '<button data-probe="p93" class="btn">real button in an OPEN shadow root</button>';
+  function actShadowDiv()    { fired('p90'); }
+  function actShadowButton() { fired('p93'); }
+  openRoot.querySelector('[data-probe="p90"]').addEventListener('click', actShadowDiv);
+  openRoot.querySelector('[data-probe="p93"]').addEventListener('click', actShadowButton);
+
+  var closedRoot = document.getElementById('host-closed').attachShadow({ mode: 'closed' });
+  closedRoot.innerHTML =
+    '<style>.btnish{display:inline-block;padding:6px 14px;border-radius:999px;' +
+    'background:#fde6ee;border:1px solid #f0b9cd;cursor:pointer}</style>' +
+    '<div data-probe="p91" class="btnish">clickable div in a CLOSED shadow root</div>';
+  function actClosedShadowDiv() { fired('p91'); }
+  closedRoot.querySelector('[data-probe="p91"]').addEventListener('click', actClosedShadowDiv);
+</script>

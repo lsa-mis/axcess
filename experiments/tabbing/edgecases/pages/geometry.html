@@ -1,0 +1,51 @@
+<!doctype html><meta charset=utf-8><title>geometry and reachability</title>
+<link rel=stylesheet href="_shared.css">
+<style>
+  .veil { position:absolute; inset:0; }
+  .occlusion-demo { position:relative; height:60px; overflow:hidden; }
+  .sticky { position:fixed; top:0; left:0; right:0; height:70px; background:#dde; z-index:5; }
+  .scroller { height:100px; overflow:auto; border:1px solid #999; }
+  .spacer { height:1400px; }
+</style>
+<div class="sticky">sticky header</div>
+<h1 style="margin-top:80px">Geometry and reachability</h1>
+<p id=out>idle</p>
+
+<div class="scroller">
+  <div style="height:300px"></div>
+  <div data-probe="e71" class="btnish">inside a scroll container, needs scrolling</div>
+</div>
+
+<p style="width:110px">words words words
+  <span data-probe="e72" class="wrapped" style="cursor:pointer">a clickable span that wraps across lines</span>
+  more words</p>
+
+<div class="occlusion-demo">
+  <div data-probe="e64" class="btnish" style="position:absolute;top:0;left:0">under a transparent overlay</div>
+  <div class="veil"></div>
+</div>
+
+<div data-probe="e62" style="width:1px;height:1px;cursor:pointer;background:#333"></div>
+<div data-probe="e63" style="width:0;height:0;cursor:pointer"></div>
+<div data-probe="e61" style="position:absolute;left:-9999px;cursor:pointer">off-canvas</div>
+<div data-probe="e65" class="btnish" style="pointer-events:none">pointer-events none</div>
+<div inert><div data-probe="e66" class="btnish">inside inert</div></div>
+<button data-probe="e67" disabled>disabled</button>
+<div data-probe="e68" class="btnish" style="opacity:0">opacity 0</div>
+<div data-probe="e69" class="btnish" style="visibility:hidden">visibility hidden</div>
+<div data-probe="e70" class="btnish" style="display:none">display none</div>
+<div data-probe="e73" class="btnish" tabindex="0" aria-hidden="true">aria-hidden but focusable</div>
+
+<div class="spacer">tall spacer, pushes the next probe far below the fold</div>
+<div data-probe="e60" class="btnish">far below the fold</div>
+
+<script src="_helpers.js"></script>
+<script>
+const q = (id) => document.querySelector('[data-probe="' + id + '"]');
+// Every one of these gets a real click handler. What differs is whether a mouse
+// can actually reach it, which is what separates a defect from an exclusion.
+for (const id of ['e60','e61','e62','e63','e64','e65','e66','e67','e68','e69','e70','e71','e72','e73']) {
+  const el = q(id);
+  if (el) el.addEventListener('click', new Function('return function d_' + id + '(){ mark("' + id + '"); }')());
+}
+</script>

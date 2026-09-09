@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>B — decoys and false-positive traps</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<style>
+  .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; max-width: 320px; cursor: pointer; }
+  .switch { display: inline-block; width: 44px; height: 24px; border-radius: 999px; background: #ccd; cursor: pointer; }
+  input:checked + .switch { background: #4a7fd0; }
+  .hidden-cb { display: none; }
+</style>
+<h1>B — decoys and false-positive traps</h1>
+
+<h2>Styled like a control, wired to nothing</h2>
+<div class="row">
+  <div data-probe="p20" class="btn btn-primary btnish">Looks like a button, no handler</div>
+  <span data-probe="p21" class="toggle-icon btnish" style="cursor:pointer">toggle</span>
+  <div data-probe="p22" class="btnish">Click handler that does nothing</div>
+</div>
+
+<h2>Equivalence: clickable card wrapping a real link (tabbing.md §2)</h2>
+<div data-probe="p23" class="card">
+  <strong>Quarterly report</strong>
+  <p>The whole card is clickable, but it contains…</p>
+  <a data-probe="p23a" href="#report" class="card-link">…this real link, which does the same thing</a>
+</div>
+
+<h2>Inert content</h2>
+<p data-probe="p24">Just a paragraph of text. Nothing is bound to it.</p>
+
+<h2>Visually-hidden checkbox driven by a styled label (KAFE root cause)</h2>
+<div class="row">
+  <input data-probe="p25i" id="cb-ok" type="checkbox" class="sr-only">
+  <label data-probe="p25" for="cb-ok"><span class="switch"></span> clip-hidden checkbox (focusable)</label>
+</div>
+<div class="row">
+  <input data-probe="p26i" id="cb-bad" type="checkbox" class="hidden-cb">
+  <label data-probe="p26" for="cb-bad"><span class="switch"></span> display:none checkbox (not focusable)</label>
+</div>
+
+<h2>Decorative span nested inside a real button</h2>
+<div class="row">
+  <button data-probe="p27b" class="btn">
+    <span data-probe="p27" class="icon" style="cursor:pointer">★</span> Favourite
+  </button>
+</div>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<div id="report"></div>
+
+<script>
+  function q(id) { return document.querySelector('[data-probe="' + id + '"]'); }
+  // p22: a handler that runs but changes nothing observable at all.
+  q('p22').addEventListener('click', function () { /* intentionally empty */ });
+  // p23: card click duplicates what the inner link already does.
+  // p23 and p23a deliberately share openReport(): that IS the equivalence the
+  // Stage-4 dismissal of §5 is supposed to recognise.
+  function openReport() { fired('p23'); location.hash = 'report'; }
+  function toggleOk()   { fired('p25'); }
+  function toggleBad()  { fired('p26'); }
+  function favourite()  { fired('p27'); }
+  q('p23').addEventListener('click', openReport);
+  q('p23a').addEventListener('click', openReport);
+  q('p25i').addEventListener('change', toggleOk);
+  q('p26i').addEventListener('change', toggleBad);
+  q('p27b').addEventListener('click', favourite);
+</script>

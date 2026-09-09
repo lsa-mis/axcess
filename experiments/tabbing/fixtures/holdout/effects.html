@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Activation effects</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Activation effects</h1>
+<div data-probe="h101" id="focus-noise" tabindex="0" class="control">Open attendance</div>
+<output id="focus-status">Waiting for focus</output><output id="attendance">Closed</output>
+<div data-probe="h102" id="different-key" tabindex="0" class="control">Open grades</div>
+<output id="grades">Closed</output><output id="key-feedback">No key pressed</output>
+<div data-probe="h103" id="toggle" tabindex="0" role="button" class="control">Toggle details</div>
+<output id="details">Closed</output>
+<button data-probe="h104" id="once">Save local preference once</button>
+<div data-probe="h105" id="store-only" class="control">Set local theme</div>
+<script>
+  const focusNoise = document.getElementById('focus-noise');
+  focusNoise.addEventListener('focus', () => {
+    document.getElementById('focus-status').textContent = 'Attendance control has focus';
+  });
+  focusNoise.addEventListener('click', () => {
+    document.getElementById('attendance').textContent = 'Attendance is open';
+  });
+  const differentKey = document.getElementById('different-key');
+  differentKey.addEventListener('click', () => {
+    document.getElementById('grades').textContent = 'Grades are open';
+  });
+  differentKey.addEventListener('keydown', event => {
+    if (['Enter', ' ', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault();
+      document.getElementById('key-feedback').textContent = 'A key was received';
+    }
+  });
+  const toggle = document.getElementById('toggle');
+  const toggleDetails = () => {
+    const output = document.getElementById('details');
+    output.textContent = output.textContent === 'Closed' ? 'Open' : 'Closed';
+  };
+  toggle.addEventListener('click', toggleDetails);
+  toggle.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleDetails(); }
+  });
+  document.getElementById('once').addEventListener('click', () => {
+    if (!localStorage.getItem('preference-saved')) localStorage.setItem('preference-saved', 'yes');
+  });
+  document.getElementById('store-only').addEventListener('click', () => {
+    localStorage.setItem('theme', 'night');
+  });
+</script></html>

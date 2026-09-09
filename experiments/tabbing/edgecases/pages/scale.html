@@ -1,0 +1,43 @@
+<!doctype html><meta charset=utf-8><title>scale and repetition</title>
+<link rel=stylesheet href="_shared.css">
+<h1>A large, repetitive, deeply nested page</h1>
+<p id=out>idle</p>
+<div id="grid"></div>
+<div id="deep"></div>
+<script src="_helpers.js"></script>
+<script>
+// 120 identical, correct buttons. Repetition is the norm in tables and lists,
+// and it is where ambiguous selectors collide: upstream found their crawler's
+// `tag.class1.class2` strings matched more than one element 8 times out of 14.
+const grid = document.getElementById('grid');
+for (let i = 0; i < 120; i++) {
+  const b = document.createElement('button');
+  b.className = 'row-action btn';
+  b.textContent = 'act ' + i;
+  b.addEventListener('click', function g(){ mark('row' + i); });
+  grid.appendChild(b);
+}
+
+// One broken div hidden in the crowd, wearing the same classes as its neighbours.
+const bad = document.createElement('div');
+bad.setAttribute('data-probe', 'e90');
+bad.className = 'row-action btn';
+bad.style.cursor = 'pointer';
+bad.textContent = 'act BROKEN';
+bad.addEventListener('click', function h90(){ mark('e90'); });
+grid.appendChild(bad);
+
+// 150 levels of wrapper divs, which build tools emit routinely.
+let node = document.getElementById('deep');
+for (let i = 0; i < 150; i++) {
+  const d = document.createElement('div');
+  node.appendChild(d);
+  node = d;
+}
+const deepEl = document.createElement('div');
+deepEl.setAttribute('data-probe', 'e91');
+deepEl.className = 'btnish';
+deepEl.textContent = 'deeply nested clickable';
+deepEl.addEventListener('click', function h91(){ mark('e91'); });
+node.appendChild(deepEl);
+</script>

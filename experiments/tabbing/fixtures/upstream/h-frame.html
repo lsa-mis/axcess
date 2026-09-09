@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>H frame</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<div class="row">
+  <div data-probe="p92" class="btnish">clickable div inside an iframe</div>
+  <button data-probe="p94" class="btn">real button inside an iframe</button>
+</div>
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  function actFrameDiv()    { fired('p92'); }
+  function actFrameButton() { fired('p94'); }
+  document.querySelector('[data-probe="p92"]').addEventListener('click', actFrameDiv);
+  document.querySelector('[data-probe="p94"]').addEventListener('click', actFrameButton);
+</script>

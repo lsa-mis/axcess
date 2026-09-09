@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Asynchronous effects</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Asynchronous effects</h1>
+<div data-probe="h180" id="late-mouse" class="control">Load delayed mouse result</div>
+<button data-probe="h181" id="late-button">Load delayed keyboard result</button>
+<output id="mouse-output">Pending</output><output id="keyboard-output">Pending</output>
+<script>
+  document.getElementById('late-mouse').addEventListener('click', () => {
+    setTimeout(() => { document.getElementById('mouse-output').textContent = 'Mouse result loaded'; }, 700);
+  });
+  document.getElementById('late-button').addEventListener('click', () => {
+    setTimeout(() => { document.getElementById('keyboard-output').textContent = 'Keyboard result loaded'; }, 700);
+  });
+</script></html>

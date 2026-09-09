@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>C — hover-driven menus</title>
+<link rel="stylesheet" href="_shared.css">
+<script src="_helpers.js"></script>
+<style>
+  nav ul { list-style: none; display: flex; gap: 18px; padding: 0; }
+  nav li { position: relative; }
+  .top { padding: 6px 10px; background: #eef; border-radius: 4px; cursor: pointer; }
+  .sub { display: none; position: absolute; top: 100%; left: 0; background: #fff;
+         border: 1px solid #ccd; padding: 8px; min-width: 160px; z-index: 5; }
+  /* p30: pure CSS :hover reveal — no JavaScript at all. */
+  #nav-css:hover .sub { display: block; }
+  /* p32: the accessible version — opens on hover AND on focus. */
+  #nav-ok:hover .sub, #nav-ok:focus-within .sub { display: block; }
+  .sub.open { display: block; }
+  .tip { position: relative; border-bottom: 1px dotted #666; cursor: help; }
+  .tip .bubble { display: none; position: absolute; top: 100%; background: #333; color: #fff; padding: 4px 8px; }
+  .tip:hover .bubble { display: block; }
+</style>
+<h1>C — hover-driven menus (tabbing.md §3.9: 35 of 49 were inaccessible)</h1>
+
+<nav>
+  <ul>
+    <li id="nav-css"><div data-probe="p30" class="top">Products (CSS :hover)</div>
+      <div class="sub"><a href="#a">Alpha</a><br><a href="#b">Beta</a></div></li>
+    <li id="nav-js"><div data-probe="p31" class="top">Services (JS mouseover)</div>
+      <div class="sub" id="sub-js"><a href="#c">Gamma</a><br><a href="#d">Delta</a></div></li>
+    <li id="nav-ok"><a data-probe="p32" href="#e" class="top">Support (hover + focus-within)</a>
+      <div class="sub"><a href="#f">Epsilon</a></div></li>
+  </ul>
+</nav>
+
+<h2>Hover affordance that is not an operable control</h2>
+<p>The <span data-probe="p33" class="tip">abbreviation<span class="bubble">a tooltip on hover</span></span> in this sentence.</p>
+
+<div id="baseline-target" style="height:48px;margin-top:24px;background:#fafafa">baseline (no handler)</div>
+<div id="sink"></div>
+<script>
+  var js = document.querySelector('[data-probe="p31"]');
+  js.addEventListener('mouseover', function () { document.getElementById('sub-js').classList.add('open'); fired('p31'); });
+  js.addEventListener('mouseout',  function () { document.getElementById('sub-js').classList.remove('open'); });
+</script>

@@ -1,0 +1,60 @@
+<!doctype html><meta charset=utf-8><title>effect channels</title>
+<link rel=stylesheet href="_shared.css">
+<h1>What the handler actually does</h1>
+<p id=out>idle</p>
+<canvas id="cv" width="120" height="40" style="border:1px solid #ccc"></canvas>
+<div id="reveal" hidden>revealed panel</div>
+
+<div data-probe="e20" class="btnish">DOM mutation</div>
+<div data-probe="e21" class="btnish">fetch only</div>
+<div data-probe="e22" class="btnish">localStorage only</div>
+<div data-probe="e23" class="btnish">canvas draw only</div>
+<div data-probe="e24" class="btnish">console only</div>
+<div data-probe="e25" class="btnish">navigation (hash)</div>
+<div data-probe="e26" class="btnish">CSS class toggle</div>
+<div data-probe="e27" class="btnish">empty handler</div>
+<div data-probe="e28" class="btnish">effect after 600ms</div>
+<div data-probe="e29" class="btnish">effect via rAF</div>
+<div data-probe="e30" class="btnish">idempotent storage write</div>
+
+<script src="_helpers.js"></script>
+<script>
+const q = (id) => document.querySelector('[data-probe="' + id + '"]');
+
+q('e20').addEventListener('click', function b20() { mark('e20'); });
+
+// Effects invisible to an innerHTML-hash oracle. Upstream measured exactly this
+// family as the 80.8% -> 100% recall gap between "dom only" and all channels.
+q('e21').addEventListener('click', function b21() { fetch('/api/ping'); });
+q('e22').addEventListener('click', function b22() { localStorage.setItem('e22', String(Date.now())); });
+q('e23').addEventListener('click', function b23() {
+  const c = document.getElementById('cv').getContext('2d');
+  c.fillRect(Math.random() * 80, 5, 20, 20);
+});
+
+// Codex's point in LLMTalk [7]: a console line is not user-facing functionality.
+// Labelled a decoy so a detector that reports it is penalised.
+q('e24').addEventListener('click', function b24() { console.log('e24 clicked'); });
+
+q('e25').addEventListener('click', function b25() { location.hash = 'e25-' + Date.now(); });
+q('e26').addEventListener('click', function b26() { document.getElementById('reveal').hidden = false; });
+
+// A listener exists and a function runs, but nothing happens. Any detector that
+// equates "a handler is bound" with "there is functionality" reports it.
+q('e27').addEventListener('click', function b27() { /* intentionally empty */ });
+
+// Beyond our 250ms settle window: a known limitation we would rather measure
+// than omit.
+q('e28').addEventListener('click', function b28() { setTimeout(() => mark('e28'), 600); });
+q('e29').addEventListener('click', function b29() { requestAnimationFrame(() => mark('e29')); });
+
+// Writes the SAME value every time. A store-comparison oracle sees no change on
+// the second modality and calls it "keyboard did nothing"; our write-log does
+// not have that failure. This is the bug we found in upstream's shared context.
+q('e30').addEventListener('click', function b30() { localStorage.setItem('e30', 'constant'); });
+q('e30').addEventListener('keydown', function b30k(ev) {
+  if (ev.key === 'Enter') localStorage.setItem('e30', 'constant');
+});
+q('e30').setAttribute('tabindex', '0');
+q('e30').setAttribute('role', 'button');
+</script>

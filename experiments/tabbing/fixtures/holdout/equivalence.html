@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Different functions and equivalent controls</title>
+<link rel="stylesheet" href="shared.css">
+<h1>Different functions and equivalent controls</h1>
+<div data-probe="h110" id="report-a" data-report="A" class="control">Open report A</div>
+<button data-probe="h111" id="report-b" data-report="B">Open report B</button>
+<output id="report">No report open</output>
+<section data-probe="h112" id="card" class="control">
+  <p>Shared help action: the surrounding card and the button below do the same thing.</p>
+  <button data-probe="h113" id="help-button">Open help</button>
+</section>
+<output id="help">Help is closed</output>
+<script>
+  function openReport(event) {
+    document.getElementById('report').textContent = 'Report ' + event.currentTarget.dataset.report;
+  }
+  document.getElementById('report-a').addEventListener('click', openReport);
+  document.getElementById('report-b').addEventListener('click', openReport);
+  document.getElementById('card').addEventListener('click', () => {
+    document.getElementById('help').textContent = 'Help is open';
+  });
+</script></html>

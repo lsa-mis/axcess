@@ -1,0 +1,54 @@
+<!doctype html><meta charset=utf-8><title>keyboard equivalence</title>
+<link rel=stylesheet href="_shared.css">
+<h1>Does a keyboard equivalent exist, and is it the same thing?</h1>
+<p id=out>idle</p>
+
+<div data-probe="e40" class="btnish" role="button" tabindex="0">click + keydown Enter</div>
+<div data-probe="e41" class="btnish" role="button" tabindex="0">click + Space only</div>
+<div data-probe="e42" class="btnish" role="button" tabindex="0">click + keyup only</div>
+<div data-probe="e43" class="btnish" role="button" tabindex="0">Enter does something DIFFERENT</div>
+<div data-probe="e44" class="btnish" tabindex="0">tabindex=0, click, NO key handler</div>
+<div data-probe="e45" class="btnish" tabindex="-1">tabindex=-1 + click</div>
+<div data-probe="e46" class="btnish" role="button" tabindex="3">positive tabindex + Enter</div>
+<div data-probe="e47" class="btnish" role="button" tabindex="0">key handler delegated on document</div>
+<button data-probe="e48">native button baseline</button>
+
+<script src="_helpers.js"></script>
+<script>
+const q = (id) => document.querySelector('[data-probe="' + id + '"]');
+
+q('e40').addEventListener('click', function c40() { mark('e40'); });
+q('e40').addEventListener('keydown', function c40k(e) { if (e.key === 'Enter') mark('e40'); });
+
+q('e41').addEventListener('click', function c41() { mark('e41'); });
+q('e41').addEventListener('keydown', function c41k(e) { if (e.key === ' ') mark('e41'); });
+
+q('e42').addEventListener('click', function c42() { mark('e42'); });
+q('e42').addEventListener('keyup', function c42k(e) { if (e.key === 'Enter') mark('e42'); });
+
+// Reachable AND actionable, but the keyboard does something else entirely.
+// "A key produced an effect" is not the same as "the functionality is
+// available", and a verdict that only checks for *any* keyboard effect passes
+// this. Ours compares payloads, so it should not.
+q('e43').addEventListener('click', function c43() { mark('e43-CLICKED'); });
+q('e43').addEventListener('keydown', function c43k(e) {
+  if (e.key === 'Enter') mark('e43-SOMETHING-ELSE');
+});
+
+// The p10/p54 blind spot: in the tab order, so every `candidates - T` detector
+// deletes it by construction, yet no key does anything.
+q('e44').addEventListener('click', function c44() { mark('e44'); });
+
+// Focusable by script, never a tab stop.
+q('e45').addEventListener('click', function c45() { mark('e45'); });
+
+q('e46').addEventListener('click', function c46() { mark('e46'); });
+q('e46').addEventListener('keydown', function c46k(e) { if (e.key === 'Enter') mark('e46'); });
+
+q('e47').addEventListener('click', function c47() { mark('e47'); });
+document.addEventListener('keydown', function c47k(e) {
+  if (e.key === 'Enter' && document.activeElement === q('e47')) mark('e47');
+});
+
+q('e48').addEventListener('click', function c48() { mark('e48'); });
+</script>

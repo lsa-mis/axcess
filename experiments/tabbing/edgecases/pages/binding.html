@@ -1,0 +1,57 @@
+<!doctype html><meta charset=utf-8><title>binding mechanisms</title>
+<link rel=stylesheet href="_shared.css">
+<h1>How the click handler is attached</h1>
+<p id=out>idle</p>
+
+<div data-probe="e01" class="btnish" onclick="a01()">inline onclick attribute</div>
+
+<div data-probe="e02" class="btnish">onclick property</div>
+
+<div data-probe="e03" class="btnish">addEventListener</div>
+
+<div data-probe="e04" class="btnish">addEventListener capture</div>
+
+<div data-probe="e05" class="btnish">delegated on document</div>
+
+<div id="container">
+  <div data-probe="e06" class="btnish">delegated on container</div>
+</div>
+
+<div data-probe="e07" class="btnish">setAttribute onclick</div>
+
+<div data-probe="e08" class="btnish">mousedown only, no click</div>
+
+<div data-probe="e09" class="btnish">dblclick only</div>
+
+<button data-probe="e10">native button, addEventListener</button>
+
+<script src="_helpers.js"></script>
+<script>
+function a01() { mark('e01'); }
+document.querySelector('[data-probe="e02"]').onclick = function a02() { mark('e02'); };
+document.querySelector('[data-probe="e03"]').addEventListener('click', function a03() { mark('e03'); });
+document.querySelector('[data-probe="e04"]').addEventListener('click', function a04() { mark('e04'); }, true);
+
+// Delegation: nothing is bound to the element itself, so listener sniffing on
+// the element finds nothing. Upstream measured this as the blind spot shared by
+// getEventListeners and the addEventListener shim.
+document.addEventListener('click', function a05(ev) {
+  if (ev.target.closest('[data-probe="e05"]')) mark('e05');
+});
+document.getElementById('container').addEventListener('click', function a06(ev) {
+  if (ev.target.closest('[data-probe="e06"]')) mark('e06');
+});
+
+document.querySelector('[data-probe="e07"]').setAttribute('onclick', 'mark("e07")');
+
+// Fires on mousedown but never on click. A trusted pointer press triggers it; a
+// keyboard Enter never produces a mousedown at all.
+document.querySelector('[data-probe="e08"]').addEventListener('mousedown', function a08() { mark('e08'); });
+
+// Single click does nothing. Real mouse-only functionality that our single-click
+// oracle cannot reach, so we expect this to be a false negative and want it on
+// the record rather than absent from the corpus.
+document.querySelector('[data-probe="e09"]').addEventListener('dblclick', function a09() { mark('e09'); });
+
+document.querySelector('[data-probe="e10"]').addEventListener('click', function a10() { mark('e10'); });
+</script>
