@@ -67,11 +67,11 @@ expert. Every matrix row includes a residual manual check.
 | 2.4.6 Headings and Labels | axe checks structural/name failures; semantic review judges heading descriptiveness. | Confirm heading calls and review label descriptiveness manually. |
 | 3.3.2 Labels or Instructions | axe checks programmatic labels; semantic review judges instruction sufficiency. | Confirm sufficiency and test real form states/submissions. |
 
-### Partly automated criteria (18)
+### Partly automated criteria (19)
 
 1.1.1, 1.3.1, 1.3.5, 1.4.1, 1.4.2, 1.4.3, 2.1.1, 2.1.2,
 2.2.2, 2.4.1, 2.4.3, 2.4.7, 2.4.11, 2.5.3, 2.5.8, 3.1.2,
-4.1.2, and 4.1.3.
+3.3.1, 4.1.2, and 4.1.3.
 
 See the matrix for the exact automated condition and residual manual test for
 each criterion. In particular, a keyboard-trap lead is intentionally
@@ -96,6 +96,7 @@ requires manual reproduction.
 | Keyboard probe | `keyboard` | Tab/Shift+Tab exit evidence and Escape behavior for likely traps. | Conservative review leads; full keyboard operability is manual. |
 | Responsive and zoom probe | `responsive` | 320 CSS-pixel reflow, approximately 200% text zoom, and text-spacing overrides. | Geometry identifies likely clipping/loss; an expert determines user impact. |
 | Focus probe | `focus` | Positive `tabindex` and focus obscured by fixed/sticky overlays. | Full focus order and interaction-created overlays remain manual. |
+| Error-identification probe | `error_id` | Triggers each invalid form's client-side validation (never submits) and flags an invalid control whose error is not identified in text or not tied to the field (SC 3.3.1). | Server-only validation and message quality remain manual. |
 | Visual probe | `visual` | Meaningful sequence through local vision analysis; measured autoplay/moving-content leads. | Model-dependent 1.3.2 results require confirmation; media coverage remains partial. |
 | Image analysis | `image` | Image discovery, Tesseract OCR, and local VLM classification. | OCR/VLM results are evidence, not a legal conclusion. |
 | Semantic review | `semantic` | Registered analyzers for 1.2.1, 2.4.4, 2.4.6, and 3.3.2. | Requires an explicitly configured local Ollama service; unsupported configured criteria are skipped and logged. |

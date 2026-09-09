@@ -408,7 +408,7 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in ("keyboard", "responsive", "focus", "visual", "error_id"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids, e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
@@ -458,6 +458,7 @@ def _pages_for_issue(
         "responsive",
         "focus",
         "visual",
+        "error_id",
         "protected_image",
     ):
         # All four DOM pipelines live in page_a11y_findings; the DB
@@ -777,6 +778,13 @@ def _axe_issue_rows(
             default_title = f"Focus not visible: {raw_rule_id}"
             evidence_summary = (
                 "Browser focus probe lead; confirm across the full interaction state."
+            )
+        elif pipeline == "error_id":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            default_title = "Form error not identified for assistive technology"
+            evidence_summary = (
+                "Form-validation probe lead (SC 3.3.1); confirm the error is shown in "
+                "text and tied to the field, and check server-only validation manually."
             )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"

@@ -78,11 +78,11 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 5 | Deterministic checks cover defined machine-testable conditions; an expert verifies applicability and remaining states. |
-| **Partly automated** | 18 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **Partly automated** | 19 | Automated checks catch the mechanical failures; the rest needs a human. |
 | **AI-assisted** | 6 | A local model flags candidates, a human confirms before counting them. |
-| **Manual only** | 26 | No automated detection, a human must test this criterion. |
+| **Manual only** | 25 | No automated detection, a human must test this criterion. |
 
-### Automated &amp; AI-assisted (29 criteria)
+### Automated &amp; AI-assisted (30 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
@@ -112,11 +112,12 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
 | 3.1.1 | Language of Page | A | Automated | axe checks <html> has a present and valid lang attribute. | Confirm the declared language actually matches the page's main content. |
 | 3.1.2 | Language of Parts | AA | Partly automated | axe validates lang attributes that are present on parts of the page. | Detecting foreign-language passages that are *missing* a lang attribute needs a human reader. |
+| 3.3.1 | Error Identification | A | Partly automated | The live-page error-identification probe triggers each invalid form's client-side validation with reportValidity() (it never submits) and flags an invalid control when the resulting error is not identified in text, or when a visible error message is not programmatically tied to the field (no aria-invalid / aria-describedby / aria-errormessage). | Confirm server-only validation and multi-step flows the probe can't trigger, and judge whether each error message actually describes the problem. Errors that appear only after a real submission still need a human. |
 | 3.3.2 | Labels or Instructions | A | AI-assisted | axe checks a programmatic label exists; the semantic LLM judges whether each control's label/instructions are sufficient to know what to enter. | Confirm the LLM's sufficiency calls, and test real form submissions, error-time instructions (SC 3.3.x) still need a human. |
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
 | 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing. |
 
-### Needs manual testing (26 criteria)
+### Needs manual testing (25 criteria)
 
 No Axcess pipeline detects these, they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
@@ -143,7 +144,6 @@ No Axcess pipeline detects these, they require a human. Treat this as your manua
 | 3.2.3 | Consistent Navigation | AA | Confirm navigation repeated across pages stays in the same relative order. A cross-page embedding analyzer is on the roadmap. |
 | 3.2.4 | Consistent Identification | AA | Confirm components with the same function are labelled consistently across pages. A cross-page analyzer is on the roadmap. |
 | 3.2.6 | Consistent Help | A | Confirm help mechanisms (contact, self-help) appear in the same relative order on every page that has them. |
-| 3.3.1 | Error Identification | A | Submit forms with invalid data and confirm errors are identified in text. Requires interaction the crawler doesn't perform. |
 | 3.3.3 | Error Suggestion | AA | Trigger validation errors and confirm the page suggests how to fix them. |
 | 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | For legal/financial/data submissions, confirm reversal, checking, or confirmation is available. |
 | 3.3.7 | Redundant Entry | A | In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. |

@@ -15,6 +15,7 @@ import httpx
 
 if TYPE_CHECKING:
     from audit.analyzer.axe import AxeViolation
+    from audit.analyzer.error_id import ErrorIdentificationFinding
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.interaction import RevealedViolation
     from audit.analyzer.keyboard import KeyboardTrap
@@ -61,6 +62,10 @@ class FetchResult:
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())
+    # SC 3.3.1 Error Identification, live-page form-validation probe. Same
+    # population rules: JsFetcher only, default on, ``--skip-error-id``
+    # disables. Never submits a form (see error_id.probe).
+    error_id_findings: tuple[ErrorIdentificationFinding, ...] = field(default=())
     # Violations reachable only by operating a control (opening a menu,
     # expanding a form). Same population rules as the probes above;
     # opt-in via ``--interaction``. Each carries the accessible name of

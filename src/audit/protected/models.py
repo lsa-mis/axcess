@@ -484,6 +484,7 @@ class ProtectedIndexPipeline(StrEnum):
     KEYBOARD = "keyboard"
     RESPONSIVE = "responsive"
     FOCUS = "focus"
+    ERROR_ID = "error_id"
     PROTECTED_IMAGE = "protected_image"
 
 

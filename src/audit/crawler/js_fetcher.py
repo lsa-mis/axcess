@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Self
 from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.error_id import ErrorIdentificationFinding, ErrorIdentificationProbe
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.interaction import (
     InteractionProbe,
@@ -130,6 +131,7 @@ class JsFetcher:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        error_id_probe: ErrorIdentificationProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
@@ -161,6 +163,11 @@ class JsFetcher:
         # SC 1.3.2 visual probe. Screenshots the page, must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
+        # SC 3.3.1 error-identification probe. Triggers each invalid form's
+        # client-side validation (never submits) and checks the resulting
+        # error is identified in text + associated with the field. Runs after
+        # the read-only probes because it mutates form state; see run order.
+        self._error_id_probe = error_id_probe
         # Interaction probe. Runs after every read-only pass and after the
         # probes that only move focus, but BEFORE the responsive probe:
         # it clicks things, so the DOM it leaves behind is not the DOM the
@@ -365,6 +372,18 @@ class JsFetcher:
             ):
                 responsive_findings = await self._responsive_probe.run(page)
 
+            # SC 3.3.1 error-identification probe LAST of the finding probes:
+            # it triggers form validation (firing invalid events, letting the
+            # page inject error DOM + set aria-invalid), which mutates state
+            # the read-only probes above must not see. It never submits.
+            error_id_findings: list[ErrorIdentificationFinding] = []
+            if (
+                self._error_id_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                error_id_findings = await self._error_id_probe.run(page)
+
             # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes
             # (the page is still live). One bad selector or a screenshot
@@ -379,6 +398,7 @@ class JsFetcher:
                         *focus_findings,
                         *visual_findings,
                         *responsive_findings,
+                        *error_id_findings,
                     ]
                     for finding in all_findings:
                         if len(screenshots) >= MAX_SHOTS_PER_PAGE:
@@ -424,6 +444,7 @@ class JsFetcher:
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
                 visual_findings=tuple(visual_findings),
+                error_id_findings=tuple(error_id_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
                 interaction_evaluated=interaction_evaluated,

@@ -102,6 +102,7 @@ engines into a single unexplained verdict.
 | **Keyboard probe** | Bidirectional Tab and Shift+Tab exit attempts, Escape behavior, focus cycles, frames, and modal context | Conservative WCAG 2.1.2 review leads | Chromium |
 | **Responsive probe** | 320 CSS-pixel reflow, resize behavior, clipping, and text-spacing overrides | Browser-observed evidence for 1.4.4, 1.4.10, and 1.4.12 | Chromium |
 | **Focus probe** | Obscured focus and positive `tabindex` behavior | Browser-observed focus evidence | Chromium |
+| **Error-identification probe** | Triggers each invalid form's client-side validation (never submits) and checks the error is shown in text and tied to the field | Browser-observed review leads for 3.3.1 | Chromium |
 | **Image-of-text** | OCR plus vision-model assessment of meaningful text embedded in images | AI-assisted evidence for 1.4.5 | Tesseract; Ollama for VLM classification |
 | **DOM State Discovery** | Operates a page's menus, dialogs, tabs, and disclosure controls, then re-runs axe on every DOM state a click reveals | Deterministic rule evidence from states a load-time pass cannot reach. `--skip-interaction` turns it off when crawl time matters more. | Chromium |
 | **Semantic analyzer** | Whether contextual content such as a link purpose or heading is understandable | Local-LLM lead requiring expert confirmation | Ollama |
@@ -365,7 +366,7 @@ an unrestricted public service. See [`docs/hosting.md`](./docs/hosting.md).
 src/audit/
 ├── crawler/          URL policy, fetchers, renderer, queue orchestration
 ├── extractor/        image discovery, download policy, blob storage
-├── analyzer/         axe, Alfa, OCR/VLM, semantic, keyboard/focus/visual probes
+├── analyzer/         axe, Alfa, OCR/VLM, semantic, keyboard/focus/visual/error_id probes
 ├── synthesizer/      grouping, priority, remediation, rescan diffs
 ├── protected/        authenticated-session, encryption, redaction, retention
 ├── exports/          workbook, report, CSV, JSON, Jira, Markdown

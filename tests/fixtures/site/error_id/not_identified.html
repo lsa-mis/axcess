@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Error not identified in text</title></head>
+<body>
+  <h1>Sign up</h1>
+  <!-- novalidate: the site opted out of the browser's own accessible messages,
+       so it owns the error UX. The required field is invalid but there is no
+       error text anywhere. Expect one error-not-identified-in-text on #email. -->
+  <form novalidate>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <button type="submit">Sign up</button>
+  </form>
+</body>
+</html>

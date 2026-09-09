@@ -41,6 +41,7 @@ from selectolax.parser import HTMLParser
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaError, AlfaFinding, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
+from audit.analyzer.error_id import ErrorIdentificationFinding, ErrorIdentificationProbe
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -548,12 +549,18 @@ class _ProtectedBrowserCrawler:
             if _config_bool(self._config, "focus_checks_enabled", True)
             else None
         )
+        error_id = (
+            ErrorIdentificationProbe(suppress_diagnostics=True)
+            if _config_bool(self._config, "error_id_checks_enabled", True)
+            else None
+        )
         fetcher = self._session.create_shared_js_fetcher(
             axe_analyzer=axe,
             axe_level=_config_level(self._config),
             keyboard_probe=keyboard,
             responsive_probe=responsive,
             focus_probe=focus,
+            error_id_probe=error_id,
             capture_screenshots=False,
             max_rendered_html_chars=_MAX_RENDERED_HTML_CHARS,
         )
@@ -968,6 +975,14 @@ def _index_findings_from_result(
             index_hmac_key=index_hmac_key,
         )
     )
+    findings.extend(
+        _index_findings_from_probe(
+            "error_id",
+            result.error_id_findings,
+            page_url=result.url,
+            index_hmac_key=index_hmac_key,
+        )
+    )
     return findings
 
 
@@ -996,8 +1011,10 @@ def _index_findings_from_axe(
 
 
 def _index_findings_from_probe(
-    pipeline: Literal["keyboard", "responsive", "focus"],
-    findings: Iterable[KeyboardTrap | ResponsiveFinding | FocusFinding],
+    pipeline: Literal["keyboard", "responsive", "focus", "error_id"],
+    findings: Iterable[
+        KeyboardTrap | ResponsiveFinding | FocusFinding | ErrorIdentificationFinding
+    ],
     *,
     page_url: str,
     index_hmac_key: bytes,

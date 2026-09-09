@@ -1059,6 +1059,49 @@ semantic_criteria:
       need 2D layout, like data tables and maps).
     confidence_default: high
 
+  "3.3.1":
+    title: "Form error not identified for assistive technology"
+    wcag_sc: "3.3.1"
+    wcag_name: "Error Identification"
+    wcag_level: "A"
+    abilities_affected: [vision, cognitive]
+    what_happening: >-
+      Our live-page probe triggered a form's client-side validation (without
+      submitting it) and found an invalid field whose error is either not
+      shown in text at all, or shown visually but not tied to the field with
+      <code>aria-invalid</code> / <code>aria-describedby</code> /
+      <code>aria-errormessage</code>. A screen-reader user is not told what is
+      wrong.
+    why_matters: >-
+      When a form rejects input, users need to know which field failed and
+      why. If the error is only a colour change, or a message that assistive
+      technology never announces, blind and low-vision users cannot correct
+      the form and are locked out of the task.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        When validation fails, present a text error message next to the field
+        (not colour alone).
+      - >-
+        Set <code>aria-invalid="true"</code> on the failing control and point
+        <code>aria-describedby</code> (or <code>aria-errormessage</code>) at
+        the message element so it is announced.
+      - >-
+        Consider moving focus to the first field in error, or to a summary
+        that links to each error.
+    verify_manual: >-
+      Submit the form with invalid/empty required fields using a screen
+      reader. Each error is announced, names the field, and describes the
+      problem in text.
+    verify_automated: >-
+      Re-run the crawl, the error-identification probe re-checks every form on
+      each pass.
+    acceptance: >-
+      Every invalid control exposes a text error that is programmatically
+      associated with the field.
+    confidence_default: medium
+
   "2.4.11":
     title: "Focused element hidden behind a sticky header / overlay"
     wcag_sc: "2.4.11"

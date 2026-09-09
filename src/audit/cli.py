@@ -403,6 +403,17 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_error_id: Annotated[
+        bool,
+        typer.Option(
+            "--skip-error-id",
+            help=(
+                "Skip the error-identification probe (SC 3.3.1). It triggers each "
+                "invalid form's client-side validation (never submits) and checks "
+                "the error is identified in text and tied to the field."
+            ),
+        ),
+    ] = False,
     skip_interaction: Annotated[
         bool,
         typer.Option(
@@ -523,6 +534,7 @@ def crawl(
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
             visual_checks_enabled=not skip_visual,
+            error_id_checks_enabled=not skip_error_id,
             interaction_checks_enabled=not skip_interaction,
             capture_screenshots=not skip_screenshots,
             store_rendered_html=not skip_rendered_storage,
@@ -602,6 +614,9 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     if summary.visual_pages_probed:
         table.add_row("Pages visually probed (SC 1.3.2)", str(summary.visual_pages_probed))
         table.add_row("Visual-sequence findings total", str(summary.visual_findings_total))
+    if summary.error_id_pages_probed:
+        table.add_row("Pages error-id probed (SC 3.3.1)", str(summary.error_id_pages_probed))
+        table.add_row("Error-identification findings total", str(summary.error_id_findings_total))
     if summary.findings_written:
         table.add_row("Findings written", str(summary.findings_written))
         for level in ("critical", "major", "minor", "info"):

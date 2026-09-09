@@ -52,6 +52,7 @@ from audit import __version__, coverage_matrix, evaluation
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
+from audit.analyzer.error_id import ErrorIdentificationProbe
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
@@ -2987,6 +2988,11 @@ async def _run_local_login_background(
                 else None
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
+            error_id_probe=(
+                ErrorIdentificationProbe(suppress_diagnostics=True)
+                if config.error_id_checks_enabled
+                else None
+            ),
             interaction_probe=login_interaction,
             capture_screenshots=False,
             shared_pages=scan_pages,

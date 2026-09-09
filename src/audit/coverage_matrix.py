@@ -34,6 +34,7 @@ PIPELINES: tuple[str, ...] = (
     "visual",
     "image",
     "semantic",
+    "error_id",
 )
 LEVELS: tuple[str, ...] = ("A", "AA")
 

@@ -609,13 +609,20 @@ criteria:
   - sc: "3.3.1"
     name: "Error Identification"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [error_id]
+    confidence: medium
+    automated_check: >-
+      The live-page error-identification probe triggers each invalid form's
+      client-side validation with reportValidity() (it never submits) and flags
+      an invalid control when the resulting error is not identified in text, or
+      when a visible error message is not programmatically tied to the field
+      (no aria-invalid / aria-describedby / aria-errormessage).
     manual_check: >-
-      Submit forms with invalid data and confirm errors are identified in text.
-      Requires interaction the crawler doesn't perform.
+      Confirm server-only validation and multi-step flows the probe can't
+      trigger, and judge whether each error message actually describes the
+      problem. Errors that appear only after a real submission still need a
+      human.
 
   - sc: "3.3.2"
     name: "Labels or Instructions"

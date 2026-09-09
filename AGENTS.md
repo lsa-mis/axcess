@@ -30,7 +30,7 @@ The tool combines evidence with different confidence levels:
 | Pipeline | Main records | Nature of result |
 | --- | --- | --- |
 | axe-core | `page_a11y_findings` | Deterministic DOM-rule violation; still needs remediation verification. |
-| Keyboard, responsive, focus, visual probes | `page_a11y_findings` with pipeline discrimination | Browser-observed behavior; retain selectors, screenshots, and failure details. |
+| Keyboard, responsive, focus, visual, error-identification probes | `page_a11y_findings` with pipeline discrimination | Browser-observed behavior; retain selectors, screenshots, and failure details. |
 | Image-of-text OCR/VLM | `findings`, `analyses`, `page_images` | OCR plus local Ollama judgment; treat classification/rationale as evidence, not a legal conclusion. |
 | Semantic analyzer | `page_a11y_findings` with pipeline discrimination | Local LLM judgment of contextual WCAG criteria; explicitly present it as a lead requiring human confirmation. |
 

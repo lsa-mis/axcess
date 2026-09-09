@@ -35,6 +35,7 @@ from audit.analyzer.alfa import (
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
+from audit.analyzer.error_id import ErrorIdentificationFinding, ErrorIdentificationProbe
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe, RevealedViolation
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
@@ -217,6 +218,12 @@ class CrawlConfig:
     # one. One VLM call per page, so it respects the same vlm_enabled gate.
     # Default on; disable with ``--skip-visual``.
     visual_checks_enabled: bool = True
+    # SC 3.3.1 Error Identification, live-page form-validation probe.
+    # Deterministic (triggers each invalid form's client-side validation via
+    # reportValidity() — never submits — and checks the error is identified in
+    # text + tied to the field); no model. Default on; disable with
+    # ``--skip-error-id``.
+    error_id_checks_enabled: bool = True
     # Interaction probe. Clicks the page's controls and re-runs axe on
     # each state a click reveals, so defects inside closed menus,
     # unopened dialogs, and unswitched tabs become visible. Findings
@@ -290,6 +297,8 @@ class CrawlSummary:
     responsive_findings_total: int = 0
     focus_pages_probed: int = 0
     focus_findings_total: int = 0
+    error_id_pages_probed: int = 0
+    error_id_findings_total: int = 0
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
     interaction_pages_probed: int = 0
@@ -452,6 +461,10 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
+    # SC 3.3.1 error-identification probe, default on. Deterministic, stateless.
+    error_id_probe: ErrorIdentificationProbe | None = None
+    if config.error_id_checks_enabled:
+        error_id_probe = ErrorIdentificationProbe()
     # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
     # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
     # the provider only when one is reachable (else that check no-ops).
@@ -489,6 +502,7 @@ async def run_crawl(
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
             visual_probe=visual_probe,
+            error_id_probe=error_id_probe,
             interaction_probe=interaction_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
@@ -656,6 +670,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,
+            "error_id_checks_enabled": config.error_id_checks_enabled,
             "interaction_checks_enabled": config.interaction_checks_enabled,
             # 1: scan-level probed/states counters are persisted.
             # 2: adds the per-page scan_interaction_runs ledger, so a
@@ -752,6 +767,7 @@ class _LazyJs:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        error_id_probe: ErrorIdentificationProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
         capture_screenshots: bool = False,
         headless: bool = True,
@@ -766,6 +782,7 @@ class _LazyJs:
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
         self._visual_probe = visual_probe
+        self._error_id_probe = error_id_probe
         self._interaction_probe = interaction_probe
         self._capture_screenshots = capture_screenshots
         self._headless = headless
@@ -781,6 +798,7 @@ class _LazyJs:
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
                 visual_probe=self._visual_probe,
+                error_id_probe=self._error_id_probe,
                 interaction_probe=self._interaction_probe,
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
@@ -1202,6 +1220,16 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 ctx,
                 page_id=page_id,
                 findings=result.focus_findings,
+                screenshots=result.screenshots,
+            )
+
+        # SC 3.3.1 error-identification probe. Same gating; rows tagged
+        # ``pipeline='error_id'``.
+        if render_mode == "js" and ctx.config.error_id_checks_enabled:
+            _persist_error_id(
+                ctx,
+                page_id=page_id,
+                findings=result.error_id_findings,
                 screenshots=result.screenshots,
             )
 
@@ -1730,6 +1758,34 @@ def _persist_focus(
             )
     ctx.summary.focus_pages_probed += 1
     ctx.summary.focus_findings_total += len(findings)
+
+
+def _persist_error_id(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[ErrorIdentificationFinding, ...],
+    screenshots: Mapping[str, bytes],
+) -> None:
+    """Write error-identification probe findings (SC 3.3.1) + bump counters."""
+    for f in findings:
+        try:
+            repo.upsert_error_id_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "error_id.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    ctx.summary.error_id_pages_probed += 1
+    ctx.summary.error_id_findings_total += len(findings)
 
 
 def _persist_visual(

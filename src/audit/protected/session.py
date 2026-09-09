@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
+from audit.analyzer.error_id import ErrorIdentificationProbe
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
@@ -696,6 +697,7 @@ class ManualAuthenticationSession:
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
+        error_id_probe: ErrorIdentificationProbe | None = None,
         # Operates the page's controls and re-runs axe on each state a click
         # reveals. Omitting it was silent: a login scan ran with interaction
         # enabled in its config, recorded every page as probed, and reached
@@ -724,6 +726,7 @@ class ManualAuthenticationSession:
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
             visual_probe=visual_probe,
+            error_id_probe=error_id_probe,
             interaction_probe=interaction_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,
