@@ -44,7 +44,10 @@ from audit.analyzer.keyboard.kbdiff.differential import (  # noqa: E402
     DifferentialRunner,
     TrialConfig,
 )
-from audit.analyzer.keyboard.kbdiff.equivalence import apply_equivalence  # noqa: E402
+from audit.analyzer.keyboard.kbdiff.equivalence import (  # noqa: E402
+    apply_equivalence,
+    by_coverage_exact,
+)
 from audit.analyzer.keyboard.kbdiff.model import Uncertainty, Verdict  # noqa: E402
 from audit.analyzer.keyboard.kbdiff.score import (  # noqa: E402
     Score,
@@ -79,6 +82,11 @@ D10_NAME = "D10a coverage differential (Enter only, no baseline subtraction)"
 # the rule in their DETECTORS.md, kept as its own row rather than folded into
 # ours, so the comparison stays a comparison.
 D9U_NAME = "D9u upstream-style differential (8 channels, keys in sequence)"
+# Stage 4 is upstream's highest-scoring stage. Scoring the differential with no
+# equivalence, with ours, and with theirs isolates what the stage itself
+# contributes -- the three rows differ only in that filter.
+D9_NOS4_NAME = "D9-noS4 differential with no equivalence filter"
+D9_S4U_NAME = "D9+S4u differential with upstream Stage 4 (coverage-exact)"
 D10B_NAME = "D10b coverage set-difference (Enter only, no baseline subtraction)"
 D10BASE_NAME = "D10a+base coverage differential (Enter only, baseline subtracted)"
 
@@ -450,6 +458,10 @@ class BehaviouralResult:
     d10base: set[str] = field(default_factory=set)
     d9u: set[str] = field(default_factory=set)
     d9u_unknown: set[str] = field(default_factory=set)
+    d9_nos4: set[str] = field(default_factory=set)
+    d9_s4u: set[str] = field(default_factory=set)
+    d9_s4u_unknown: set[str] = field(default_factory=set)
+    s4u_dismissals: dict[str, str] = field(default_factory=dict)
     reasons: dict[str, str] = field(default_factory=dict)
     coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
     upstream: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -517,12 +529,55 @@ async def run_behavioural(
             result.d9u_unknown.add(probe_id)
         result.upstream[probe_id] = up.to_json()
 
+    # The differential's own verdicts, before any equivalence filter. This is
+    # the baseline the two Stage-4 rows are measured against.
+    result.d9_nos4 = {o.probe_id for o in outcomes if o.verdict is Verdict.VIOLATION}
+
     confirmed, _ = apply_equivalence(outcomes)
     result.d9 = {o.probe_id for o in confirmed if o.verdict is Verdict.VIOLATION}
     result.d9_unknown = {o.probe_id for o in confirmed if o.verdict is Verdict.UNKNOWN}
+
+    # Upstream's Stage 4 compares executed-function sets, which our default
+    # config does not collect. Measure the page a second time with V8 coverage
+    # armed so their formulation is scored on the same probes rather than
+    # described from the outside.
+    t0 = time.monotonic()
+    cov_outcomes = await _coverage_armed_outcomes(factory, page_path, probe_ids, order)
+    confirmed_u, dismissed_u = apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
+    result.d9_s4u = {o.probe_id for o in confirmed_u if o.verdict is Verdict.VIOLATION}
+    result.d9_s4u_unknown = {o.probe_id for o in confirmed_u if o.verdict is Verdict.UNKNOWN}
+    result.s4u_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_u}
+    result.timings[D9_S4U_NAME] = round((time.monotonic() - t0) * 1000, 1)
     for outcome in confirmed:
         result.reasons[outcome.probe_id] = f"{outcome.verdict.value}: {outcome.reason}"
     return result
+
+
+async def _coverage_armed_outcomes(
+    factory: ContextFactory, page_path: str, probe_ids: list[str], order: TabOrder
+) -> list[Any]:
+    """Re-measure one page with V8 coverage on, for upstream's Stage 4.
+
+    Same oracle, same keys, same fresh context per trial — the only difference
+    is that each :class:`ModalityResult` carries the executed-function set that
+    ``by_coverage_exact`` needs. A probe that raises is dropped from this list
+    rather than guessed at; it simply cannot dismiss or be dismissed.
+    """
+    config = TrialConfig(url=page_url(page_path), viewport="desktop", collect_coverage=True)
+    runner = DifferentialRunner(factory, config)
+    outcomes: list[Any] = []
+    for probe_id in probe_ids:
+        try:
+            async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+                outcomes.append(await runner.run_probe(probe_id, page_path, order))
+        except Exception as exc:
+            # Dropped, not guessed at: without a clean trial this probe can
+            # neither dismiss another nor be dismissed.
+            log.debug("bakeoff.s4u_probe_failed", probe=probe_id, error=str(exc)[:200])
+        finally:
+            async with asyncio.timeout(15):
+                await factory.close_open_contexts()
+    return outcomes
 
 
 async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> set[str]:
@@ -775,13 +830,17 @@ async def main_async(args: argparse.Namespace) -> int:
     print(f"corpus: {args.corpus}  ({len(labels)} probes, {len(pages)} pages)")
     print(f"caveat: {caveat}\n")
 
-    behavioural = [D9_NAME, D9U_NAME, D10_NAME, D10B_NAME, D10BASE_NAME]
+    behavioural = [
+        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9U_NAME,
+        D10_NAME, D10B_NAME, D10BASE_NAME,
+    ]
     methods = [*CHEAP_METHODS, *([] if args.cheap_only else behavioural)]
     all_reported: dict[str, set[str]] = {name: set() for name in methods}
     all_unknown: dict[str, set[str]] = {name: set() for name in methods}
     reasons: dict[str, str] = {}
     coverage: dict[str, dict[str, Any]] = {}
     upstream_evidence: dict[str, dict[str, Any]] = {}
+    s4u_dismissals: dict[str, str] = {}
     notes: dict[str, str] = {}
     tab_info: dict[str, Any] = {}
     actual_viewports: dict[str, dict[str, int]] = {}
@@ -829,12 +888,17 @@ async def main_async(args: argparse.Namespace) -> int:
                         if not args.cheap_only:
                             result = await run_behavioural(factory, page_path, probe_ids, order)
                             all_reported[D9_NAME].update(result.d9)
+                            all_reported[D9_NOS4_NAME].update(result.d9_nos4)
+                            all_reported[D9_S4U_NAME].update(result.d9_s4u)
                             all_reported[D9U_NAME].update(result.d9u)
                             all_reported[D10_NAME].update(result.d10)
                             all_reported[D10B_NAME].update(result.d10b)
                             all_reported[D10BASE_NAME].update(result.d10base)
                             all_unknown[D9_NAME].update(result.d9_unknown)
+                            all_unknown[D9_NOS4_NAME].update(result.d9_unknown)
+                            all_unknown[D9_S4U_NAME].update(result.d9_s4u_unknown)
                             all_unknown[D9U_NAME].update(result.d9u_unknown)
+                            s4u_dismissals.update(result.s4u_dismissals)
                             for name in (D10_NAME, D10B_NAME, D10BASE_NAME):
                                 all_unknown[name].update(result.d10_unknown)
                             reasons.update(result.reasons)
@@ -919,6 +983,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "reasons": reasons,
         "coverage_evidence": coverage,
         "upstream_evidence": upstream_evidence,
+        "s4u_dismissals": s4u_dismissals,
         "reported": {k: sorted(v) for k, v in all_reported.items()},
         "unobservable": {k: sorted(v) for k, v in all_unknown.items() if v},
         "scores": [s.to_json() for s in scores],
