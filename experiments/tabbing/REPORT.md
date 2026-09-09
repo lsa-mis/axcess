@@ -174,7 +174,7 @@ positive labels; two received no lead and three were unknown, giving the same
 `34/39` recall for a different reason. Only 75 of 95 targets received a supported
 classification. An unknown is not a successful negative result.
 
-Candidate discovery selected 32/39 positive targets on desktop (**82.1%**) and
+Candidate discovery selected 32/39 positive targets on desktop (**82.0%**) and
 34/41 in the narrow window (**82.9%**). This limits achievable candidate-gated
 recall. Examples missed by discovery include a plain paragraph with a click
 listener (`h120`) and one using event delegation (`h121`). Both lack the visual
@@ -191,7 +191,7 @@ run to 75/95 in `diamond-fixes`.
 
 ### Comparing detector ideas
 
-The [legacy twelve-method comparison](fixtures/results/bakeoff-fixtures.json)
+The [reviewed twelve-method comparison](fixtures/results/bakeoff-fixtures-reviewed.json)
 runs on the same 95 frozen targets, at the desktop size only. These are Axcess
 reimplementations of upstream-inspired ideas, with method differences described
 below. Percentages use all positive labels as the recall denominator.
@@ -199,11 +199,11 @@ below. Percentages use all positive labels as the recall denominator.
 | Method | Precision | Recall | F1 |
 | --- | ---: | ---: | ---: |
 | D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% |
-| D10a JavaScript ran for mouse, none for keyboard | 52.2% | 89.7% | 66.0% |
+| D10a JavaScript ran for mouse, none for keyboard | 57.1% | 82.0% | 67.4% |
 | D4 CSS appearance and text hints | 56.2% | 69.2% | 62.1% |
 | D5 browser-debugger event listeners | 58.1% | 64.1% | 61.0% |
 | D8 changes after hover | 75.0% | 46.2% | 57.1% |
-| D6 intercepted listener registration | 53.7% | 56.4% | 55.0% |
+| D6 intercepted listener registration | 53.8% | 53.8% | 53.8% |
 | D2b JavaScript `onclick` property | 100.0% | 10.3% | 18.6% |
 | D7 React event-handler properties | 100.0% | 5.1% | 9.8% |
 | D3 tabindex / ARIA hints | 50.0% | 5.1% | 9.3% |
@@ -219,9 +219,19 @@ D0 approximates a discovery heuristic, not Axcess's complete normal scan pipelin
 
 On these examples, behavioral comparison gives the strongest balance. Cheap
 markup checks can have perfect precision while missing almost every defect.
-D10a catches more positives than D9 here, but almost half its alerts are false
-alarms: executing JavaScript is not the same as performing a useful action.
-The ranking describes this corpus and implementation, not every website.
+D10a raises 56 alerts to reach 32 of the 39 positive labels, so more than two
+in five of its alerts are false: executing JavaScript is not the same as
+performing a useful action. The ranking describes this corpus and
+implementation, not every website.
+
+These are the reviewed figures. The superseded
+[legacy matrix](fixtures/results/bakeoff-fixtures.json) is kept for comparison
+and differs in two rows: it recorded D10a as `D10` before the name was made
+specific, at 52.2% / 89.7% / 66.0%, and D6 at 53.7% / 56.4% / 55.0%. The other
+ten methods scored identically in both. The legacy file was written before the
+runner recorded provenance, so only the reviewed file carries the fingerprints
+and validity flag described below; where the two disagree, the reviewed file is
+the measurement of record.
 
 **We did not reproduce upstream's strongest Stage-4 filter.** Upstream compared
 sets of executed V8 functions, using exact equality plus matching effect-channel
@@ -256,6 +266,9 @@ Ten further targets per window were recorded as not rendered or not reachable
 by the sampled mouse points. Four produced instrumentation errors. Together
 with the six unresolved targets, that explains the historical 20 unknowns.
 The outer runner's empty `errors` list did not mean all measurements succeeded.
+The reviewed runs still have twenty, but split 14 / 0 / 6: those four
+instrumentation errors were the harness mis-reporting a zero-sized element, and
+are described under *Final reviewed run and reproducibility* below.
 
 ### Supplemental stress tests
 
@@ -284,7 +297,9 @@ operability here also does not assess the separate WCAG target-size criterion.
 Review found problems worth fixing even when they did not improve F1: failed
 probes could disappear from scoring; saved individual verdicts preceded the
 alternative-control filter while score tables followed it; and browser version
-and start-time fields were inaccurate. All five saved main runs remain untouched.
+and start-time fields were inaccurate. All five historical main runs remain
+untouched, and the two reviewed runs were added beside them rather than over
+them, so seven are now saved.
 The legacy matrix files were updated in place during development; their earlier
 versions are not retained. New runs use unique labels and refuse overwrites.
 The old main runs' post-filter oracle scores were independently reconstructed
@@ -299,7 +314,84 @@ as unknowns. New schema-2 artifacts save the final verdicts for both scoring
 modes, per-key observations, candidate lists, and page/window-specific dismissals.
 There is no invented effect formed by combining parts of different key trials.
 
-Final reviewed-run measurements and reproducibility checks follow here.
+### Final reviewed run and reproducibility
+
+Two full runs of the frozen experiment were measured against the reviewed
+source: [`reviewed`](results/reviewed.raw.json), started 13:14 UTC, and
+[`reviewed-repeat`](results/reviewed-repeat.raw.json), started 20:08 UTC the
+same day. Both report the same corpus fingerprint `763e0495…`, the same
+detector fingerprint `c897005148…`, zero errors, and `valid: true`. Wall times
+were 315.9 s and 319.4 s.
+
+The repeat reproduces the reviewed run exactly:
+
+| compared | records | differences |
+| --- | ---: | ---: |
+| Oracle verdicts | 190 | 0 |
+| Candidate-gated verdicts | 190 | 0 |
+| Candidate lists per page/window | 38 | 0 |
+| Equivalence dismissals | 7 | 0 |
+| Tab orders | 38 | 0 |
+
+**One instability was found, and it is the disclosed one.** Two of the 190
+saved probe records differ between the runs, both `p61`, and both only in a
+stored value: the page writes `local:set:p61=<epoch ms>`, so the payload
+carries a timestamp that necessarily changes. This is the cost of the decision
+recorded in `channels.py` not to normalize digit runs — collapsing them would
+absorb order numbers and record ids along with clocks. Here it changed nothing:
+`p61` is not in the tab order, so its verdict follows from reachability and the
+payload never enters a comparison. But the mechanism is real. Had the same
+element been focusable, the mouse and keyboard trials would have written
+different timestamps, the effects would not have matched, and a working control
+would have been reported as a defect. It is the only such payload the two runs
+exposed: every other one of the 190 records was byte-identical across them.
+
+**Method improvements are not accuracy improvements, and this run separates
+them.** The reviewed scores are identical — cell for cell — to `diamond-fixes`
+and `audit-fixes`:
+
+| run | source state | desktop oracle F1 | mobile oracle F1 | desktop gated F1 | mobile gated F1 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `diamond-fixes` | pre-review | 87.2% | 87.8% | 82.2% | 83.1% |
+| `audit-fixes` | audit applied | 87.2% | 87.8% | 82.2% | 83.1% |
+| `reviewed` | reviewed and frozen | 87.2% | 87.8% | 82.2% | 83.1% |
+| `reviewed-repeat` | unchanged | 87.2% | 87.8% | 82.2% | 83.1% |
+
+Everything the review corrected — probes that could vanish from the
+denominator, saved verdicts that disagreed with the scores computed from them,
+inaccurate browser and start-time fields, effects assembled from parts of
+different key trials — changed **no score on this corpus**. That is the
+honest reading, and it cuts both ways. These were defects in the evidence, not
+in the detector: they governed whether a published number could be trusted and
+audited, not what the number was. A corpus that happened not to exercise them
+cannot show a gain, and the absence of a gain is not evidence the fixes were
+unnecessary. It does mean none of the accuracy figures in this report should be
+attributed to them.
+
+**The measured gaps are unchanged**, which is expected given identical
+verdicts, and they remain the four described in *What the errors teach us*:
+documented keyboard shortcuts and roving-menu keys the trial never tries
+(`h171`, `h172`); actions slower than the 250 ms observation window (`h180` at
+700 ms); iframe targets (`p92`, `p94`, `h162`, `h163`); and shadow-root
+internals, both content changes the top-document snapshot misses (`h160`) and
+closed roots that cannot be resolved at all (`p91`, `h164`). Twenty targets per
+window remain undecided. These are limits of what was tried and observed, not
+findings about the pages.
+
+**The composition of those twenty did change, and it is the one review fix with
+a visible effect.** Earlier runs split them 10 not-rendered / 4
+instrument-error / 6 unresolved; the reviewed runs split them 14 / 0 / 6. Eight
+records moved from `instrument_error` to `not_rendered` and now carry a cause,
+*not mouse-operable: display:none, zero-size*: `p26i`, `p73` and `p74` in both
+windows, plus `h142` on desktop and `h141` on mobile, the two whose labels are
+themselves viewport-dependent. A zero-sized element yields no client
+rects, so the locator had no point to aim at, dereferenced the empty list and
+threw; the failure was recorded as an internal fault indistinguishable from a
+browser problem. The element was simply not rendered. The count is unchanged
+and no score moves, because an undecided probe stays undecided either way — but
+four probes per window stopped blaming the instrument for the page's own
+markup. That is the difference between a number that is right and a number that
+can be read.
 
 
 ## Limits of the evidence
