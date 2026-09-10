@@ -553,3 +553,143 @@ class TestBaselineFailurePropagates:
         )
         assert not broken.reported_coverage
         assert not broken.reported_coverage_setdiff
+
+
+class TestUpstreamStage4IsTranscribed:
+    """Pins `upstream_stage4` to the rules in tabbing-experiment.spec.ts.
+
+    Their filter has four guards that are easy to drop in translation, and each
+    one changes results: an empty mouse coverage abstains, an empty candidate
+    coverage is skipped, the channel signatures must match exactly, and the
+    coverage sets must be equal rather than merely overlapping.
+    """
+
+    @staticmethod
+    def _pass(**kw):
+        from experiments.tabbing.runner.bakeoff import UpstreamPass
+
+        return UpstreamPass(**kw)
+
+    def test_equal_coverage_and_signature_dismisses(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}, mouse_coverage=frozenset({"a"})),
+            "k": self._pass(
+                keyboard_changed={"dom"}, keyboard_coverage=frozenset({"a"}), in_tab_order=True
+            ),
+        }
+        kept, dismissed = upstream_stage4(passes)
+        assert kept == set() and dismissed == {"f": "k"}
+
+    def test_a_different_signature_does_not_dismiss(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}, mouse_coverage=frozenset({"a"})),
+            "k": self._pass(
+                keyboard_changed={"console"}, keyboard_coverage=frozenset({"a"}), in_tab_order=True
+            ),
+        }
+        assert upstream_stage4(passes)[0] == {"f"}
+
+    def test_overlapping_but_unequal_coverage_does_not_dismiss(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}, mouse_coverage=frozenset({"a"})),
+            "k": self._pass(
+                keyboard_changed={"dom"},
+                keyboard_coverage=frozenset({"a", "b"}),
+                in_tab_order=True,
+            ),
+        }
+        assert upstream_stage4(passes)[0] == {"f"}
+
+    def test_a_candidate_with_no_coverage_is_skipped(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}, mouse_coverage=frozenset({"a"})),
+            "k": self._pass(keyboard_changed={"dom"}, in_tab_order=True),
+        }
+        assert upstream_stage4(passes)[0] == {"f"}
+
+    def test_a_finding_without_coverage_is_kept_not_dismissed(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}),
+            "k": self._pass(
+                keyboard_changed={"dom"}, keyboard_coverage=frozenset({"a"}), in_tab_order=True
+            ),
+        }
+        assert upstream_stage4(passes)[0] == {"f"}
+
+    def test_a_candidate_outside_the_tab_order_cannot_dismiss(self):
+        from experiments.tabbing.runner.bakeoff import upstream_stage4
+
+        passes = {
+            "f": self._pass(mouse_changed={"dom"}, mouse_coverage=frozenset({"a"})),
+            "k": self._pass(keyboard_changed={"dom"}, keyboard_coverage=frozenset({"a"})),
+        }
+        assert upstream_stage4(passes)[0] == {"f"}
+
+
+class TestUpstreamDeltaMatchesInstrumentTs:
+    """`upstream_delta` must mirror instrument.ts `delta()`, nav rule included."""
+
+    def _snap(self, **kw):
+        base = {
+            "dom": 1, "geometry": 2, "mutations": 0, "net": 0, "storage": 0,
+            "console": 0, "canvas": 0, "nav": 0, "href": "u",
+        }
+        base.update(kw)
+        return base
+
+    def test_counters_fire_only_when_strictly_greater(self):
+        from experiments.tabbing.runner.bakeoff import upstream_delta
+
+        assert upstream_delta(self._snap(net=1), self._snap(net=1)) == set()
+        assert upstream_delta(self._snap(net=1), self._snap(net=2)) == {"net"}
+
+    def test_a_pushstate_to_the_same_url_still_counts_as_nav(self):
+        """The case a href-only comparison misses entirely."""
+        from experiments.tabbing.runner.bakeoff import upstream_delta
+
+        assert upstream_delta(self._snap(nav=0), self._snap(nav=1)) == {"nav"}
+
+    def test_an_href_change_counts_as_nav(self):
+        from experiments.tabbing.runner.bakeoff import upstream_delta
+
+        assert upstream_delta(self._snap(), self._snap(href="v")) == {"nav"}
+
+    def test_digests_compare_unequal_in_either_direction(self):
+        from experiments.tabbing.runner.bakeoff import upstream_delta
+
+        assert upstream_delta(self._snap(dom=1), self._snap(dom=9)) == {"dom"}
+
+
+class TestUpstreamStage4Wiring:
+    """The filtered row must be a subset of what the differential found.
+
+    An ordering slip once computed this row *after* scoring, so it was scored
+    from an empty reported set and published as 0.0% recall with 39 false
+    negatives — a number that looks like a finding and is a wiring bug.
+    """
+
+    def test_kept_is_a_subset_of_confirmed(self):
+        from experiments.tabbing.runner.bakeoff import UpstreamPass, upstream_stage4
+
+        passes = {
+            "a": UpstreamPass(mouse_changed={"dom"}, mouse_coverage=frozenset({"x"})),
+            "b": UpstreamPass(mouse_changed={"net"}, mouse_coverage=frozenset({"y"})),
+            "k": UpstreamPass(
+                keyboard_changed={"dom"}, keyboard_coverage=frozenset({"x"}), in_tab_order=True
+            ),
+        }
+        confirmed = {pid for pid, up in passes.items() if up.reported}
+        kept, dismissed = upstream_stage4(passes)
+        assert kept <= confirmed
+        assert kept | set(dismissed) == confirmed, "every finding is kept or dismissed, never lost"
+        assert kept, "a pool with no equivalent control must keep something"

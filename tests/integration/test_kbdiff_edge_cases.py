@@ -487,32 +487,47 @@ async def test_zero_box_is_reported_without_locator_exception(page, style):
 
 
 class TestCoverageAcrossReloads:
-    """V8 must keep reporting a handler that runs again after a reload.
+    """V8 must keep reporting a *named fixture handler* that runs again.
 
-    With ``callCount`` false, precise coverage marks a function as covered once
-    and every later read omits it. A coverage differential then sees an empty
-    keyboard set for a handler that demonstrably ran, and reports a violation
-    the page does not have. This is a real-browser regression because no mock
-    reproduces the profiler's behaviour.
+    With ``callCount`` false, precise coverage marks a function covered once and
+    omits it from every later read, so a coverage differential sees an empty
+    keyboard set for a handler that demonstrably ran.
+
+    An earlier version of this test asserted only that *some* functions were
+    recorded, and passed under both settings because the harness itself
+    executes dozens of functions per read. The assertion has to name the
+    fixture's own handler, over fixture-origin-filtered coverage, or it tests
+    the instrument instead of the page.
     """
 
-    async def test_the_same_handler_is_reported_on_a_second_run(self, page):
-        await page.set_content(
-            "<button id='t1' onclick='window.__ran = (window.__ran || 0) + 1'>go</button>"
+    async def test_the_named_handler_is_reported_on_a_second_run(self, page):
+        origin = "https://example.test"
+        await page.route(
+            f"{origin}/**",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body=(
+                    "<script>function openReport(){window.__ran=(window.__ran||0)+1;}</script>"
+                    "<button id='t1' onclick='openReport()'>go</button>"
+                ),
+            ),
         )
         cdp = await page.context.new_cdp_session(page)
         await coverage.start(cdp)
 
         seen = []
         for _ in range(2):
-            await coverage.take(cdp)  # resets the counters
+            await page.goto(f"{origin}/p.html", wait_until="load")
+            await coverage.take(cdp, origin)  # reset
             await page.click("#t1")
-            await page.wait_for_timeout(100)
-            seen.append(await coverage.take(cdp))
+            await page.wait_for_timeout(150)
+            executed = await coverage.take(cdp, origin)
+            seen.append({c for c in executed if "openReport" in c})
 
-        assert await page.evaluate("window.__ran") == 2, "the handler really ran twice"
-        assert seen[0], "the first click recorded executed functions"
+        assert seen[0], "first click did not record the fixture handler at all"
         assert seen[1], (
-            "the second click recorded none: precise coverage armed with "
-            "callCount false makes a re-executed function invisible"
+            "the handler ran again after a reload but coverage reported nothing: "
+            "precise coverage was armed with callCount false"
         )
+        assert seen[0] == seen[1], "the same handler must have the same identity"

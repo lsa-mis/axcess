@@ -275,8 +275,8 @@ it decided while deciding slightly less.
 
 ### 6.4 Comparing every detector idea
 
-The [full matrix](fixtures/results/bakeoff-fixtures-upstream-callcount.json)
-runs twenty-one approaches over the same 95 frozen targets, desktop only. These are
+The [full matrix](fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json)
+runs twenty-two approaches over the same 95 frozen targets, desktop only. These are
 Axcess reimplementations of upstream's published detectors, not the original
 code. Recall uses all positive labels as the denominator.
 
@@ -284,7 +284,8 @@ code. Recall uses all positive labels as the denominator.
 | --- | ---: | ---: | ---: |
 | D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% |
 | **D9+S4u, the same with upstream's Stage 4** | **89.2%** | **84.6%** | **86.8%** |
-| **D9u upstream's differential, faithful** | **79.5%** | **89.7%** | **84.3%** |
+| **D9u+S4u upstream's complete pipeline (1:1)** | **87.5%** | **89.7%** | **88.6%** |
+| **D9u upstream's differential alone** | **78.3%** | **92.3%** | **84.7%** |
 | **D9+S4ours, our filter over the same coverage-armed inputs** | **87.2%** | **87.2%** | **87.2%** |
 | **D9-noS4, the same inputs with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** |
 | **D10b-u upstream set-difference (sequential keys, baselined)** | **75.5%** | **94.9%** | **84.1%** |
@@ -374,18 +375,40 @@ defect, and their F1 differs by 0.4 points. The honest summary is that the
 stage is worth roughly 4 to 10 points of precision either way, and that the
 signal choice decides *which* mistake you make.
 
+**Upstream's complete pipeline beats ours on this corpus.** Ported end to end —
+their instrument, their differential, their Stage 4 over a corpus-wide candidate
+pool — `D9u+S4u` scores **87.5% / 89.7% / 88.6% F1** against our
+**87.2% / 87.2% / 87.2%**. It finds two more real defects than we do and raises
+the same number of false alarms.
+
+That is the uncomfortable result of doing the port properly, and it replaces an
+earlier draft of this section which reported the opposite. The earlier
+comparison was not measuring their method: it ran their detector through *our*
+instrument, gave it our fresh-context fix, withheld their frame observation, and
+applied their Stage 4 to our findings rather than theirs. Each of those changes
+flattered us.
+
+What survives is narrower and still worth saying. Their Stage 4 dismisses
+`h110`, a real defect — it is one of the four false negatives above — so their
+higher score is bought partly with a mistake ours does not make. And our
+detector reaches its figure while abstaining on 20 targets to their 4, because
+we refuse to score a measurement we could not take. Their pipeline is better
+here; it is not better in every respect, and the corpus is small enough that a
+1.4-point F1 gap should not be read as a general ranking.
+
 **D9u, upstream's differential, now faithful.** It reloads one page between
 modalities rather than using a fresh context, observes every frame rather than
 the top document, resolves targets through the pierced CDP tree, parks the
 pointer, settles for 200 ms and presses Enter, Space and ArrowDown 120 ms apart
 against a single page state.
 
-Ported properly it scores **79.5% / 89.7% / 84.3%** — and it **finds more real
-defects than ours does**, 35 against 34, because observing every frame catches
-iframe effects our top-document snapshot misses entirely. It decides 91 of 95
-targets to our 75. Our advantage is precision: 87.2% against 79.5%, because
-comparing payloads rather than mere presence stops an unrelated console line
-from clearing a finding.
+Ported properly — reading through their instrument, transcribed verbatim from
+`instrument.ts` — it scores **78.3% / 92.3% / 84.7%** unfiltered, and **finds
+more real defects than ours does**, 36 against 34, because observing every frame
+catches iframe effects our top-document snapshot misses entirely. It decides 91
+of 95 targets to our 75. Its weakness is precision, 78.3% against our 87.2%:
+comparing mere presence lets an unrelated console line clear a finding, which is
+what their Stage 4 then partly repairs.
 
 That is a more uncomfortable and more useful result than the earlier one, which
 compared our detector against a version of theirs that had quietly acquired our
@@ -421,6 +444,26 @@ the run now records that as an explicit per-page note rather than an
 indistinguishable empty set. An earlier draft said the baseline did real work
 "only on the React page"; that was imprecise, and the evidence is now published
 per page in `baseline_evidence`.
+
+#### What is still not 1:1
+
+The ported rows read through upstream's own instrument — `INIT_SCRIPT`
+extracted byte-for-byte from the pinned `instrument.ts` and installed for those
+rows only — and reproduce their timings, key sequence, pointer parking, pierced
+target resolution, same-page reload, per-frame observation and corpus-wide
+Stage 4. Four differences remain, and they are stated rather than implied:
+
+| Difference | Why |
+| --- | --- |
+| Failed measurements score **UNKNOWN**, not as a verdict | Upstream's `verdict()` has no uncertainty concept and scores every probe. Matching it exactly would reinstate the defect this whole experiment exists to avoid. Costs the ported rows 4 abstentions. |
+| Coverage identities are `url#name@offset`, theirs `url:name:offset` | Cosmetic. Sets are only ever compared within one run. |
+| Tab-order walk caps differ | Ours 300 presses, theirs 80. Affects which targets are reachable at all, not how any reachable one is judged. |
+| Our own rows keep our instrument and per-page equivalence | Deliberate. Those are the comparison, not the port. |
+
+An earlier draft called these rows a faithful port while they read through our
+instrument, used fresh contexts per modality, observed only the top document and
+filtered our findings rather than theirs. That claim was wrong; the audit that
+found it is the reason the numbers above changed.
 
 #### What each detector costs
 
@@ -801,7 +844,8 @@ To reproduce the experiment with installed dependencies, follow the commands in
 | [`results/audit-fixes.raw.json`](results/audit-fixes.raw.json) | Audit applied; scores unchanged. |
 | [`results/reviewed.raw.json`](results/reviewed.raw.json) | **The measurement of record.** |
 | [`results/reviewed-repeat.raw.json`](results/reviewed-repeat.raw.json) | Separate repeat run; identical verdicts. |
-| [`fixtures/results/bakeoff-fixtures-upstream-callcount.json`](fixtures/results/bakeoff-fixtures-upstream-callcount.json) | **The measurement of record for the matrix**: twenty-one methods, faithful upstream ports, the Stage-4 ablation over one shared input set, per-detector timings, and per-probe coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json`](fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json) | **The measurement of record for the matrix**: twenty-two methods, upstream's own instrument transcribed verbatim, their complete pipeline end to end, the Stage-4 ablation over one shared input set, and per-probe coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-upstream-callcount.json`](fixtures/results/bakeoff-fixtures-upstream-callcount.json) | Superseded: its ported rows read through our instrument rather than upstream's. |
 | [`fixtures/results/bakeoff-fixtures-upstream-faithful.json`](fixtures/results/bakeoff-fixtures-upstream-faithful.json) | Superseded: its coverage was armed with `callCount: false`, inflating false positives on the two upstream coverage rows. |
 | [`fixtures/results/bakeoff-fixtures-upstream-s4.json`](fixtures/results/bakeoff-fixtures-upstream-s4.json) | Superseded: its coverage was unfiltered, so its Stage-4 rows measured harness noise. |
 | [`fixtures/results/bakeoff-fixtures-upstream-full.json`](fixtures/results/bakeoff-fixtures-upstream-full.json) | Superseded: its D9u was a partial ablation, not a port. |

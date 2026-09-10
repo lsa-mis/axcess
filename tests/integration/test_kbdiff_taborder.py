@@ -144,3 +144,46 @@ async def test_shadow_dom_probes_are_found(page):
     order = await compute_tab_order(page)
 
     assert order.contains("in-shadow")
+
+
+class TestUpstreamInstrumentActuallyRuns:
+    """The transcribed upstream instrument must execute, not merely exist.
+
+    Two source-level bugs got past unit tests because nothing asserted the JS
+    ran in a browser: the snapshot was held in a non-raw Python string, so a
+    ``\\n`` escape became a real newline inside a JS string literal and every
+    ``evaluate`` raised SyntaxError; and the nav hook was an arrow function
+    passed to ``add_init_script``, which injects source rather than calling it,
+    so it was never installed. Both failed silently as "no channels changed".
+    """
+
+    async def test_the_init_script_installs_and_snapshots(self, page):
+        from experiments.tabbing.runner.bakeoff import _frame_snapshot
+        from experiments.tabbing.runner.upstream_instrument import UPSTREAM_INIT_JS
+
+        await page.context.add_init_script(UPSTREAM_INIT_JS)
+        await page.goto("about:blank")
+        await page.set_content("<button id='b'>go</button>")
+
+        snapshot, failures = await _frame_snapshot(page)
+        assert not failures, f"upstream instrument did not run: {failures}"
+        fields = set(next(iter(snapshot.values())))
+        assert {
+            "dom", "geometry", "mutations", "net", "storage", "console", "canvas", "nav", "href",
+        } <= fields
+
+    async def test_a_same_url_pushstate_counts_as_navigation(self, page):
+        """The case a href-only comparison misses entirely."""
+        from experiments.tabbing.runner.bakeoff import _frame_snapshot, upstream_delta
+        from experiments.tabbing.runner.upstream_instrument import UPSTREAM_INIT_JS
+
+        await page.context.add_init_script(UPSTREAM_INIT_JS)
+        await page.goto("about:blank")
+        await page.set_content("<p>x</p>")
+
+        before, _ = await _frame_snapshot(page)
+        await page.evaluate("() => history.pushState({}, '', location.href)")
+        after, _ = await _frame_snapshot(page)
+
+        delta = upstream_delta(next(iter(before.values())), next(iter(after.values())))
+        assert "nav" in delta, "history hook was not installed"

@@ -78,6 +78,10 @@ from experiments.tabbing.runner.serve import (  # noqa: E402
     ContextFactory,
     page_url,
 )
+from experiments.tabbing.runner.upstream_instrument import (  # noqa: E402
+    UPSTREAM_INIT_JS,
+    UPSTREAM_SNAPSHOT_CALL,
+)
 
 log = get_logger(__name__)
 
@@ -95,6 +99,8 @@ D9U_NAME = "D9u upstream-style differential (8 channels, keys in sequence)"
 # contributes -- the three rows differ only in that filter.
 D9_NOS4_NAME = "D9-noS4 coverage-armed differential, no equivalence filter"
 D9_S4OURS_NAME = "D9+S4ours coverage-armed differential, our payload Stage 4"
+# The 1:1 pipeline: upstream's differential filtered by upstream's Stage 4.
+D9U_S4U_NAME = "D9u+S4u upstream differential with upstream Stage 4 (1:1)"
 # Upstream's D10a/D10b run over the SAME sequential trial as their D9, with the
 # handler-free baseline subtracted from both sides. Our Enter-only rows are
 # modified variants and are named as such; these two are the ports.
@@ -115,17 +121,23 @@ UPSTREAM_CHANNELS: tuple[str, ...] = (
 
 
 def upstream_delta(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
-    """Channels that changed, by upstream's presence test rather than by payload."""
+    """One frame's channel delta, mirroring ``instrument.ts``'s ``delta()``.
+
+    Every rule here is theirs: digests compare unequal, counters compare
+    strictly greater, and ``nav`` fires on either a new navigation event or a
+    changed href.
+    """
     changed: set[str] = set()
-    for channel in ("dom", "geometry", "nav"):
+    for channel in ("dom", "geometry"):
         if before.get(channel) != after.get(channel):
             changed.add(channel)
-    for channel in ("net", "console", "storage"):
-        if len(after.get(channel) or []) > len(before.get(channel) or []):
-            changed.add(channel)
-    for channel in ("canvas", "mutations"):
+    for channel in ("mutations", "net", "storage", "console", "canvas"):
         if int(after.get(channel) or 0) > int(before.get(channel) or 0):
             changed.add(channel)
+    if int(after.get("nav") or 0) > int(before.get("nav") or 0) or before.get(
+        "href"
+    ) != after.get("href"):
+        changed.add("nav")
     return changed
 CHEAP_METHODS = (
     "D0 axcess collectClickables",
@@ -522,6 +534,10 @@ class BehaviouralResult:
     d9_s4ours_unknown: set[str] = field(default_factory=set)
     s4ours_dismissals: dict[str, str] = field(default_factory=dict)
     s4_inputs: dict[str, Any] = field(default_factory=dict)
+    d9u_s4u: set[str] = field(default_factory=set)
+    upstream_passes: dict[str, Any] = field(default_factory=dict)
+    d9u_s4u_unknown: set[str] = field(default_factory=set)
+    upstream_s4_dismissals: dict[str, str] = field(default_factory=dict)
     reasons: dict[str, str] = field(default_factory=dict)
     coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
     upstream: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -639,10 +655,27 @@ async def run_behavioural(
     result.d9_nos4 = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.VIOLATION}
     result.d9_nos4_unknown = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.UNKNOWN}
 
+    if baseline_failed:
+        # S4 compares baseline-subtracted sets. Without a floor there is nothing
+        # to subtract and no comparison we can stand behind, so every Stage-4
+        # row on this page abstains. The effect-only rows stay decided.
+        result.d9_s4u_unknown |= set(probe_ids)
+        result.d9_s4ours_unknown |= set(probe_ids)
+        result.d9_nos4_unknown |= set(probe_ids)
     confirmed_u, dismissed_u = apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
     result.d9_s4u = {o.probe_id for o in confirmed_u if o.verdict is Verdict.VIOLATION}
     result.d9_s4u_unknown = {o.probe_id for o in confirmed_u if o.verdict is Verdict.UNKNOWN}
     result.s4u_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_u}
+
+    # Upstream's Stage 4 searches the WHOLE corpus for an equivalent control,
+    # not just the current page, so the passes are handed up and filtered once
+    # after every page is measured. Our own filter is deliberately per-page --
+    # a control on another page is not an alternative a user has -- and that
+    # difference is one of the results, so the two must not be quietly aligned.
+    result.upstream_passes = dict(upstream_passes)
+    result.d9u_s4u_unknown = set(result.d9u_unknown) | (
+        set(probe_ids) if baseline_failed else set()
+    )
 
     confirmed_p, dismissed_p = apply_equivalence(cov_outcomes)
     result.d9_s4ours = {o.probe_id for o in confirmed_p if o.verdict is Verdict.VIOLATION}
@@ -865,7 +898,7 @@ async def _park_mouse(page: Any) -> None:
     await page.mouse.move(viewport["width"] - 2, viewport["height"] - 2)
 
 
-async def _frame_snapshot(page: Any) -> dict[str, Any]:
+async def _frame_snapshot(page: Any) -> tuple[dict[str, Any], list[str]]:
     """Snapshot every frame, keyed by URL, as upstream does.
 
     A clickable element inside an iframe mutates that frame's document, which a
@@ -874,15 +907,22 @@ async def _frame_snapshot(page: Any) -> dict[str, Any]:
     top document is one of the ways our earlier D9u was not their detector.
     """
     out: dict[str, Any] = {}
+    failures: list[str] = []
     for frame in page.frames:
         try:
-            state = await frame.evaluate(channels.SNAPSHOT_JS)
+            state = await frame.evaluate(UPSTREAM_SNAPSHOT_CALL)
         except Exception as exc:
-            log.debug("bakeoff.frame_snapshot_failed", frame=frame.url, error=str(exc)[:120])
+            # Never swallowed. A snapshot that raises produced no channels, and
+            # "no channels changed" is a verdict; the caller must abstain
+            # instead. A JS SyntaxError here once silently reported every frame
+            # as inert across an entire run.
+            failures.append(f"{frame.url}: {type(exc).__name__}: {exc}"[:200])
             continue
-        if state:
-            out[frame.url] = state
-    return out
+        if state is None:
+            failures.append(f"{frame.url}: __a11y absent, init script did not run")
+            continue
+        out[frame.url] = state
+    return out, failures
 
 
 def upstream_frame_delta(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
@@ -899,6 +939,57 @@ def upstream_frame_delta(before: dict[str, Any], after: dict[str, Any]) -> set[s
             continue
         changed |= upstream_delta(b, a)
     return changed
+
+
+def upstream_stage4(passes: dict[str, UpstreamPass]) -> tuple[set[str], dict[str, str]]:
+    """Upstream's Stage 4, applied to upstream's own findings.
+
+    This is the missing half of the 1:1 port. Their ``stage4`` filters the set
+    their D9 confirmed, using their channel signatures and their coverage sets;
+    our ``D9+S4u`` row instead applied their *signal* to *our* differential's
+    findings, which isolates the filter but is not their pipeline. Both are now
+    reported, and only this one is a replication.
+
+    Transcribed from ``tests/tabbing-experiment.spec.ts``:
+
+        confirmed        = probes where the mouse changed something and the
+                           keyboard changed nothing
+        keyboardReachable = probes in the tab order whose keyboard changed
+                           something
+        keep a finding unless some reachable probe has the identical channel
+        signature and an exactly equal executed-function set; a finding with no
+        mouse coverage, or a candidate with no keyboard coverage, is skipped
+    """
+    confirmed = [pid for pid, up in passes.items() if up.reported]
+    reachable = [
+        (pid, up)
+        for pid, up in passes.items()
+        if up.in_tab_order and up.keyboard_changed and up.coverage_is_trustworthy
+    ]
+    kept: set[str] = set()
+    dismissed: dict[str, str] = {}
+    for pid in confirmed:
+        finding = passes[pid]
+        if not finding.mouse_coverage:
+            kept.add(pid)
+            continue
+        signature = ",".join(sorted(finding.mouse_changed))
+        match = None
+        for candidate_id, candidate in reachable:
+            if candidate_id == pid or not candidate.keyboard_coverage:
+                continue
+            if ",".join(sorted(candidate.keyboard_changed)) != signature:
+                continue
+            # Jaccard at threshold 1.0 is exactly set equality, and both sets
+            # are known non-empty here.
+            if candidate.keyboard_coverage == finding.mouse_coverage:
+                match = candidate_id
+                break
+        if match is None:
+            kept.add(pid)
+        else:
+            dismissed[pid] = match
+    return kept, dismissed
 
 
 async def _upstream_differential(
@@ -934,7 +1025,9 @@ async def _upstream_differential(
     try:
         async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
             context = await factory()
-            await context.add_init_script(channels.INIT_SCRIPT)
+            # Their instrument, not ours: the ported rows must observe what
+            # their detector observed.
+            await context.add_init_script(UPSTREAM_INIT_JS)
             page = await context.new_page()
             cdp: Any = CheckedInstrument(await context.new_cdp_session(page))
 
@@ -957,12 +1050,14 @@ async def _upstream_differential(
                 if cdp.errors:
                     result.coverage_uncertainties["mouse"] = f"profiler: {cdp.errors[0]}"[:200]
                     cdp.errors.clear()
-                before = await _frame_snapshot(page)
+                before, before_fail = await _frame_snapshot(page)
                 await page.mouse.move(centre[0], centre[1])
                 await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
                 await page.mouse.click(centre[0], centre[1], delay=20)
                 await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
-                after = await _frame_snapshot(page)
+                after, after_fail = await _frame_snapshot(page)
+                if before_fail or after_fail:
+                    result.uncertainties["mouse"] = f"snapshot: {(before_fail + after_fail)[0]}"
                 result.mouse_changed = upstream_frame_delta(before, after)
                 result.mouse_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
                 if cdp.errors:
@@ -978,7 +1073,7 @@ async def _upstream_differential(
             if cdp.errors:
                 result.coverage_uncertainties["keyboard"] = f"profiler: {cdp.errors[0]}"[:200]
                 cdp.errors.clear()
-            kb_before = await _frame_snapshot(page)
+            kb_before, kb_before_fail = await _frame_snapshot(page)
             if in_tab_order:
                 await page.evaluate("() => document.activeElement && document.activeElement.blur()")
                 for _ in range(position or 0):
@@ -988,7 +1083,11 @@ async def _upstream_differential(
                     await page.keyboard.press(key)
                     await page.wait_for_timeout(UPSTREAM_KEY_GAP_MS)
             await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
-            kb_after = await _frame_snapshot(page)
+            kb_after, kb_after_fail = await _frame_snapshot(page)
+            if kb_before_fail or kb_after_fail:
+                result.uncertainties["keyboard"] = (
+                    f"snapshot: {(kb_before_fail + kb_after_fail)[0]}"
+                )
             result.keyboard_changed = upstream_frame_delta(kb_before, kb_after)
             result.keyboard_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
             if cdp.errors:
@@ -1138,7 +1237,7 @@ async def main_async(args: argparse.Namespace) -> int:
     print(f"caveat: {caveat}\n")
 
     behavioural = [
-        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9_S4OURS_NAME, D9U_NAME,
+        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9_S4OURS_NAME, D9U_NAME, D9U_S4U_NAME,
         D10A_U_NAME, D10B_U_NAME,
         D10_NAME, D10B_NAME, D10BASE_NAME,
     ]
@@ -1150,6 +1249,8 @@ async def main_async(args: argparse.Namespace) -> int:
     upstream_evidence: dict[str, dict[str, Any]] = {}
     s4u_dismissals: dict[str, str] = {}
     s4ours_dismissals: dict[str, str] = {}
+    upstream_s4_dismissals: dict[str, str] = {}
+    all_upstream_passes: dict[str, Any] = {}
     s4_inputs: dict[str, Any] = {}
     baseline_evidence: dict[str, Any] = {}
     notes: dict[str, str] = {}
@@ -1203,6 +1304,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             all_reported[D9_S4U_NAME].update(result.d9_s4u)
                             all_reported[D9_S4OURS_NAME].update(result.d9_s4ours)
                             all_reported[D9U_NAME].update(result.d9u)
+                            all_upstream_passes.update(result.upstream_passes)
                             all_reported[D10A_U_NAME].update(result.d10a_u)
                             all_reported[D10B_U_NAME].update(result.d10b_u)
                             all_reported[D10_NAME].update(result.d10)
@@ -1215,6 +1317,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             s4ours_dismissals.update(result.s4ours_dismissals)
                             s4_inputs.update(result.s4_inputs)
                             all_unknown[D9U_NAME].update(result.d9u_unknown)
+                            all_unknown[D9U_S4U_NAME].update(result.d9u_s4u_unknown)
                             for name in (D10A_U_NAME, D10B_U_NAME):
                                 all_unknown[name].update(result.d10u_unknown)
                             baseline_evidence[page_path] = result.baseline_evidence
@@ -1248,6 +1351,12 @@ async def main_async(args: argparse.Namespace) -> int:
             errors.append("corpus inputs changed during measurement; scores suppressed")
     except (OSError, RuntimeError, ValueError) as exc:
         errors.append(f"corpus verification after measurement failed: {exc}"[:500])
+    # Upstream's Stage 4, applied once over the whole corpus as theirs is --
+    # and necessarily BEFORE scoring, since it decides that row's reported set.
+    if all_upstream_passes:
+        kept_u, upstream_s4_dismissals = upstream_stage4(all_upstream_passes)
+        all_reported[D9U_S4U_NAME].update(kept_u)
+
     scores = []
     if not errors:
         try:
@@ -1305,6 +1414,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "upstream_evidence": upstream_evidence,
         "s4u_dismissals": s4u_dismissals,
         "s4ours_dismissals": s4ours_dismissals,
+        "upstream_s4_dismissals": upstream_s4_dismissals,
         # The exact trials the Stage-4 rows were computed from, so a
         # dismissal or its absence can be reconstructed from this file.
         "s4_inputs": s4_inputs,
