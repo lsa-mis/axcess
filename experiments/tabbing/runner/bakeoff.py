@@ -69,7 +69,10 @@ from experiments.tabbing.runner.provenance import (  # noqa: E402
     source_sha256,
     write_new,
 )
-from experiments.tabbing.runner.run import unknown_outcome  # noqa: E402
+from experiments.tabbing.runner.run import (  # noqa: E402
+    serialize_outcome,
+    unknown_outcome,
+)
 from experiments.tabbing.runner.serve import (  # noqa: E402
     BASE_URL,
     ContextFactory,
@@ -90,7 +93,8 @@ D9U_NAME = "D9u upstream-style differential (8 channels, keys in sequence)"
 # Stage 4 is upstream's highest-scoring stage. Scoring the differential with no
 # equivalence, with ours, and with theirs isolates what the stage itself
 # contributes -- the three rows differ only in that filter.
-D9_NOS4_NAME = "D9-noS4 differential with no equivalence filter"
+D9_NOS4_NAME = "D9-noS4 coverage-armed differential, no equivalence filter"
+D9_S4OURS_NAME = "D9+S4ours coverage-armed differential, our payload Stage 4"
 # Upstream's D10a/D10b run over the SAME sequential trial as their D9, with the
 # handler-free baseline subtracted from both sides. Our Enter-only rows are
 # modified variants and are named as such; these two are the ports.
@@ -447,6 +451,12 @@ class UpstreamPass:
     keyboard_coverage: frozenset[str] = frozenset()
     in_tab_order: bool = False
     uncertainties: dict[str, str] = field(default_factory=dict)
+    # Kept apart from `uncertainties` on purpose. A profiler that fails says
+    # nothing about the channel measurement, so D9u can still be decided while
+    # the coverage rules must abstain. Folding them together would either
+    # discard a good channel reading or, worse, let an empty coverage set from a
+    # failed read masquerade as "the keyboard ran nothing".
+    coverage_uncertainties: dict[str, str] = field(default_factory=dict)
 
     @property
     def reported(self) -> bool:
@@ -454,10 +464,15 @@ class UpstreamPass:
         return not self.uncertainties and bool(self.mouse_changed) and not self.keyboard_changed
 
     @property
+    def coverage_is_trustworthy(self) -> bool:
+        """No run-level and no coverage-level failure touched these sets."""
+        return not self.uncertainties and not self.coverage_uncertainties
+
+    @property
     def reported_coverage(self) -> bool:
         """Upstream's D10a rule, over the same sequential trial."""
         return (
-            not self.uncertainties
+            self.coverage_is_trustworthy
             and bool(self.mouse_coverage)
             and not self.keyboard_coverage
         )
@@ -465,7 +480,7 @@ class UpstreamPass:
     @property
     def reported_coverage_setdiff(self) -> bool:
         """Upstream's D10b rule, over the same sequential trial."""
-        return not self.uncertainties and bool(self.mouse_coverage - self.keyboard_coverage)
+        return self.coverage_is_trustworthy and bool(self.mouse_coverage - self.keyboard_coverage)
 
     def to_json(self) -> dict[str, Any]:
         """Publish the sets themselves, not just their sizes.
@@ -480,6 +495,7 @@ class UpstreamPass:
             "keyboard_coverage": sorted(self.keyboard_coverage),
             "in_tab_order": self.in_tab_order,
             "uncertainties": self.uncertainties,
+            "coverage_uncertainties": self.coverage_uncertainties,
         }
 
 
@@ -495,11 +511,17 @@ class BehaviouralResult:
     d9u_unknown: set[str] = field(default_factory=set)
     d10a_u: set[str] = field(default_factory=set)
     d10b_u: set[str] = field(default_factory=set)
+    d10u_unknown: set[str] = field(default_factory=set)
     baseline_evidence: dict[str, Any] = field(default_factory=dict)
     d9_nos4: set[str] = field(default_factory=set)
     d9_s4u: set[str] = field(default_factory=set)
     d9_s4u_unknown: set[str] = field(default_factory=set)
     s4u_dismissals: dict[str, str] = field(default_factory=dict)
+    d9_nos4_unknown: set[str] = field(default_factory=set)
+    d9_s4ours: set[str] = field(default_factory=set)
+    d9_s4ours_unknown: set[str] = field(default_factory=set)
+    s4ours_dismissals: dict[str, str] = field(default_factory=dict)
+    s4_inputs: dict[str, Any] = field(default_factory=dict)
     reasons: dict[str, str] = field(default_factory=dict)
     coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
     upstream: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -527,12 +549,19 @@ async def run_behavioural(
     # coverage: click something with no handler, see what ran anyway, and
     # discount it. On a framework page that removes the scheduler and the
     # synthetic event system, which every click runs.
-    baseline = await _coverage_baseline(factory, config)
-    upstream_baseline, baseline_note = await _upstream_baseline(factory, config, BASE_URL)
+    upstream_baseline, baseline_note, baseline_failed = await _upstream_baseline(
+        factory, config, BASE_URL
+    )
+    # One baseline concept for the whole file. The earlier corner-click at (2,2)
+    # was not upstream's method and could miss a framework root's delegated
+    # handlers, so the variant rows now subtract the same measured floor as the
+    # ports and the two are directly comparable.
+    baseline = upstream_baseline
     result.baseline_evidence = {
         "target": "#baseline-target",
         "functions": sorted(upstream_baseline),
         "note": baseline_note,
+        "failed": baseline_failed,
     }
     upstream_passes: dict[str, UpstreamPass] = {}
 
@@ -560,6 +589,8 @@ async def run_behavioural(
             result.d10b.add(probe_id)
         if pair.reported_baselined:
             result.d10base.add(probe_id)
+        if baseline_failed:
+            pair.uncertainties["baseline"] = baseline_note
         if pair.uncertainties:
             result.d10_unknown.add(probe_id)
         result.coverage[probe_id] = pair.to_json()
@@ -572,34 +603,51 @@ async def run_behavioural(
         result.timings[D9U_NAME] += (time.monotonic() - t0) * 1000
         if up.reported:
             result.d9u.add(probe_id)
+        if baseline_failed:
+            # No floor means no subtraction we can vouch for. The channel-based
+            # D9u is unaffected; every coverage rule on this page abstains.
+            up.coverage_uncertainties["baseline"] = baseline_note
         if up.reported_coverage:
             result.d10a_u.add(probe_id)
         if up.reported_coverage_setdiff:
             result.d10b_u.add(probe_id)
         if up.uncertainties:
             result.d9u_unknown.add(probe_id)
+        if up.uncertainties or up.coverage_uncertainties:
+            result.d10u_unknown.add(probe_id)
         result.upstream[probe_id] = up.to_json()
         upstream_passes[probe_id] = up
-
-    # The differential's own verdicts, before any equivalence filter. This is
-    # the baseline the two Stage-4 rows are measured against.
-    result.d9_nos4 = {o.probe_id for o in outcomes if o.verdict is Verdict.VIOLATION}
 
     confirmed, _ = apply_equivalence(outcomes)
     result.d9 = {o.probe_id for o in confirmed if o.verdict is Verdict.VIOLATION}
     result.d9_unknown = {o.probe_id for o in confirmed if o.verdict is Verdict.UNKNOWN}
 
-    # Upstream's Stage 4 compares executed-function sets, which our default
-    # config does not collect. Measure the page a second time with V8 coverage
-    # armed so their formulation is scored on the same probes rather than
-    # described from the outside.
+    # ---- the Stage-4 ablation ------------------------------------------
+    # Upstream's filter needs V8 coverage, which the production config does not
+    # collect, so the page is measured once more with it armed. Every row of the
+    # ablation is then derived from THAT ONE set of outcomes, so the three rows
+    # really do differ only in the filter applied afterwards. Deriving the
+    # no-filter row from the uninstrumented pass instead would have compared two
+    # different measurements and called the difference a filter effect.
     t0 = time.monotonic()
-    cov_outcomes = await _coverage_armed_outcomes(factory, page_path, probe_ids, order)
+    cov_outcomes = await _coverage_armed_outcomes(
+        factory, page_path, probe_ids, order, upstream_baseline
+    )
+    result.timings[D9_S4U_NAME] = round((time.monotonic() - t0) * 1000, 1)
+    result.s4_inputs = {o.probe_id: _s4_record(o) for o in cov_outcomes}
+
+    result.d9_nos4 = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.VIOLATION}
+    result.d9_nos4_unknown = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.UNKNOWN}
+
     confirmed_u, dismissed_u = apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
     result.d9_s4u = {o.probe_id for o in confirmed_u if o.verdict is Verdict.VIOLATION}
     result.d9_s4u_unknown = {o.probe_id for o in confirmed_u if o.verdict is Verdict.UNKNOWN}
     result.s4u_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_u}
-    result.timings[D9_S4U_NAME] = round((time.monotonic() - t0) * 1000, 1)
+
+    confirmed_p, dismissed_p = apply_equivalence(cov_outcomes)
+    result.d9_s4ours = {o.probe_id for o in confirmed_p if o.verdict is Verdict.VIOLATION}
+    result.d9_s4ours_unknown = {o.probe_id for o in confirmed_p if o.verdict is Verdict.UNKNOWN}
+    result.s4ours_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_p}
     for outcome in confirmed:
         result.reasons[outcome.probe_id] = f"{outcome.verdict.value}: {outcome.reason}"
     return result
@@ -610,8 +658,38 @@ def _fixture_only(functions: frozenset[str]) -> frozenset[str]:
     return frozenset(f for f in functions if f.split("#", 1)[0].startswith(BASE_URL))
 
 
+def _s4_record(outcome: Any) -> dict[str, Any]:
+    """The exact trial Stage 4 was computed from, function identities included.
+
+    ``serialize_outcome`` publishes ``coverage_size`` only, which cannot settle
+    whether two sets were equal — and set equality is the entire question here.
+    Every list below is **after** fixture-origin filtering and **after**
+    subtracting the page's handler-free baseline, which is published separately
+    per page under ``baseline_evidence``.
+
+    A note on the failure direction, since the shared differential's coverage
+    helpers swallow profiler errors: an unread set comes back empty, and an
+    empty candidate set can never equal a non-empty finding set, so a failed
+    read can only *withhold* a dismissal, never manufacture one. It costs
+    precision, not soundness — and the sets are published here so that any such
+    case can be found rather than trusted.
+    """
+    record = serialize_outcome(outcome)
+    record["mouse_coverage"] = sorted(outcome.mouse.coverage)
+    record["mouse_attempted"] = outcome.mouse.attempted
+    record["keyboard_coverage"] = {
+        key: sorted(result.coverage) for key, result in sorted(outcome.keyboard_by_key.items())
+    }
+    record["coverage_scope"] = "fixture-origin, baseline subtracted"
+    return record
+
+
 async def _coverage_armed_outcomes(
-    factory: ContextFactory, page_path: str, probe_ids: list[str], order: TabOrder
+    factory: ContextFactory,
+    page_path: str,
+    probe_ids: list[str],
+    order: TabOrder,
+    baseline: frozenset[str] = frozenset(),
 ) -> list[Any]:
     """Re-measure one page with V8 coverage on, for upstream's Stage 4.
 
@@ -634,11 +712,14 @@ async def _coverage_armed_outcomes(
         an empty URL. Two modalities drive the browser differently, so those 85
         never agree, and an equivalence test over them can only ever say no.
         """
+        def clean(functions: frozenset[str]) -> frozenset[str]:
+            return _fixture_only(functions) - baseline
+
         return replace(
             outcome,
-            mouse=replace(outcome.mouse, coverage=_fixture_only(outcome.mouse.coverage)),
+            mouse=replace(outcome.mouse, coverage=clean(outcome.mouse.coverage)),
             keyboard_by_key={
-                key: replace(result, coverage=_fixture_only(result.coverage))
+                key: replace(result, coverage=clean(result.coverage))
                 for key, result in outcome.keyboard_by_key.items()
             },
         )
@@ -666,51 +747,32 @@ async def _coverage_armed_outcomes(
     return outcomes
 
 
+# Upstream's measured waits, from their differential.ts. Ours differ (250 ms
+# settle, no inter-key gap because each key gets a fresh page), so the port has
+# to carry theirs or it is not their detector.
+UPSTREAM_SETTLE_MS = 200
+UPSTREAM_KEY_GAP_MS = 120
+UPSTREAM_KEYS = ("Enter", "Space", "ArrowDown")
+
+_PROBE_ATTR = "data-probe"
+
+
 async def _upstream_baseline(
     factory: ContextFactory, config: TrialConfig, origin: str
-) -> tuple[frozenset[str], str]:
+) -> tuple[frozenset[str], str, bool]:
     """Upstream's per-page coverage floor: click ``#baseline-target``.
 
-    Returns the functions and a note. The note matters: an empty set because
-    the page has no such target is a different fact from an empty set because
-    the measurement failed, and storing only a size cannot tell them apart or
-    let anyone reconstruct a baseline-subtracted verdict afterwards.
-    """
-    context = None
-    try:
-        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
-            context = await factory()
-            page = await context.new_page()
-            cdp: Any = await context.new_cdp_session(page)
-            await page.goto(config.url, wait_until="load")
-            box = await page.locator("#baseline-target").first.bounding_box(timeout=1000)
-            await detectors.start_coverage(cdp)
-            await coverage.take(cdp, origin)
-            if box is None:
-                return frozenset(), "no #baseline-target on this page"
-            await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-            await page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-            await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
-            return frozenset(await coverage.take(cdp, origin)), "measured"
-    except Exception as exc:
-        return frozenset(), f"baseline failed: {type(exc).__name__}: {exc}"[:200]
-    finally:
-        try:
-            if context is not None:
-                async with asyncio.timeout(15):
-                    await context.close()
-        finally:
-            async with asyncio.timeout(15):
-                await factory.close_open_contexts()
+    Returns the functions, a note, and whether the measurement *failed*. Three
+    outcomes have to stay distinguishable, and a bare size cannot tell them
+    apart:
 
-
-async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> set[str]:
-    """What executes on a click that hits no handler, for upstream's D10 baseline.
-
-    Clicks the top-left corner of the document, which in this corpus is page
-    padding rather than any probe. Returns an empty set on failure: an absent
-    baseline subtracts nothing, which leaves D10a+base equal to D10a rather than
-    silently deleting evidence.
+    * **measured** — the target was there and the click was observed.
+    * **absent** — the page carries no ``#baseline-target``, so an empty floor
+      is the correct answer. Upstream does the same: no box, empty set. Our ten
+      holdout pages are in this case, being our fixtures rather than theirs.
+    * **failed** — the target exists but we could not read it. That is not a
+      baseline of zero; it is no baseline, and every coverage rule on the page
+      has to abstain rather than subtract nothing and score on confidently.
     """
     context = None
     try:
@@ -719,17 +781,25 @@ async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> se
             page = await context.new_page()
             cdp: Any = CheckedInstrument(await context.new_cdp_session(page))
             await page.goto(config.url, wait_until="load")
+            target = page.locator("#baseline-target").first
+            if await page.locator("#baseline-target").count() == 0:
+                return frozenset(), "absent: no #baseline-target on this page", False
+            box = await target.bounding_box(timeout=1000)
             await detectors.start_coverage(cdp)
-            cdp.require_success()
-            await detectors.take_coverage(cdp)
-            cdp.require_success()
-            await page.mouse.click(2, 2)
-            await page.wait_for_timeout(200)
-            executed = await detectors.take_coverage(cdp)
-            cdp.require_success()
-            return set(executed)
-    except Exception:
-        return set()
+            await coverage.take(cdp, origin)
+            if cdp.errors:
+                return frozenset(), f"failed: profiler: {cdp.errors[0]}"[:200], True
+            if box is None:
+                return frozenset(), "absent: #baseline-target has no rendered box", False
+            await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            await page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+            measured = frozenset(await coverage.take(cdp, origin))
+            if cdp.errors:
+                return frozenset(), f"failed: profiler: {cdp.errors[0]}"[:200], True
+            return measured, "measured", False
+    except Exception as exc:
+        return frozenset(), f"failed: {type(exc).__name__}: {exc}"[:200], True
     finally:
         try:
             if context is not None:
@@ -738,13 +808,6 @@ async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> se
         finally:
             async with asyncio.timeout(15):
                 await factory.close_open_contexts()
-
-
-UPSTREAM_SETTLE_MS = 200
-UPSTREAM_KEY_GAP_MS = 120
-UPSTREAM_KEYS = ("Enter", "Space", "ArrowDown")
-
-_PROBE_ATTR = "data-probe"
 
 
 async def _pierced_centre(cdp: Any, probe_id: str) -> tuple[tuple[float, float] | None, str | None]:
@@ -873,7 +936,7 @@ async def _upstream_differential(
             context = await factory()
             await context.add_init_script(channels.INIT_SCRIPT)
             page = await context.new_page()
-            cdp: Any = await context.new_cdp_session(page)
+            cdp: Any = CheckedInstrument(await context.new_cdp_session(page))
 
             # ---- mouse -------------------------------------------------
             await page.goto(config.url, wait_until="load")
@@ -886,8 +949,14 @@ async def _upstream_differential(
             elif not (0 <= centre[0] <= viewport["width"] and 0 <= centre[1] <= viewport["height"]):
                 result.uncertainties["mouse"] = "outside the viewport"
             else:
+                # `coverage.start`/`take` swallow profiler errors and return an
+                # empty set. Unguarded, a failed read is indistinguishable from
+                # "the keyboard ran nothing", which is a confident violation.
                 await detectors.start_coverage(cdp)
                 await coverage.take(cdp, origin)
+                if cdp.errors:
+                    result.coverage_uncertainties["mouse"] = f"profiler: {cdp.errors[0]}"[:200]
+                    cdp.errors.clear()
                 before = await _frame_snapshot(page)
                 await page.mouse.move(centre[0], centre[1])
                 await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
@@ -896,6 +965,9 @@ async def _upstream_differential(
                 after = await _frame_snapshot(page)
                 result.mouse_changed = upstream_frame_delta(before, after)
                 result.mouse_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
+                if cdp.errors:
+                    result.coverage_uncertainties["mouse"] = f"profiler: {cdp.errors[0]}"[:200]
+                    cdp.errors.clear()
 
             # ---- keyboard, on the SAME page after a full reload ---------
             await page.goto(config.url, wait_until="load")
@@ -903,6 +975,9 @@ async def _upstream_differential(
             await page.wait_for_timeout(80)
             await detectors.start_coverage(cdp)
             await coverage.take(cdp, origin)
+            if cdp.errors:
+                result.coverage_uncertainties["keyboard"] = f"profiler: {cdp.errors[0]}"[:200]
+                cdp.errors.clear()
             kb_before = await _frame_snapshot(page)
             if in_tab_order:
                 await page.evaluate("() => document.activeElement && document.activeElement.blur()")
@@ -916,6 +991,9 @@ async def _upstream_differential(
             kb_after = await _frame_snapshot(page)
             result.keyboard_changed = upstream_frame_delta(kb_before, kb_after)
             result.keyboard_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
+            if cdp.errors:
+                result.coverage_uncertainties["keyboard"] = f"profiler: {cdp.errors[0]}"[:200]
+                cdp.errors.clear()
             result.in_tab_order = in_tab_order
     except Exception as exc:
         result.uncertainties["run"] = f"{type(exc).__name__}: {exc}"[:240]
@@ -1060,7 +1138,7 @@ async def main_async(args: argparse.Namespace) -> int:
     print(f"caveat: {caveat}\n")
 
     behavioural = [
-        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9U_NAME,
+        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9_S4OURS_NAME, D9U_NAME,
         D10A_U_NAME, D10B_U_NAME,
         D10_NAME, D10B_NAME, D10BASE_NAME,
     ]
@@ -1071,6 +1149,8 @@ async def main_async(args: argparse.Namespace) -> int:
     coverage: dict[str, dict[str, Any]] = {}
     upstream_evidence: dict[str, dict[str, Any]] = {}
     s4u_dismissals: dict[str, str] = {}
+    s4ours_dismissals: dict[str, str] = {}
+    s4_inputs: dict[str, Any] = {}
     baseline_evidence: dict[str, Any] = {}
     notes: dict[str, str] = {}
     tab_info: dict[str, Any] = {}
@@ -1121,6 +1201,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             all_reported[D9_NAME].update(result.d9)
                             all_reported[D9_NOS4_NAME].update(result.d9_nos4)
                             all_reported[D9_S4U_NAME].update(result.d9_s4u)
+                            all_reported[D9_S4OURS_NAME].update(result.d9_s4ours)
                             all_reported[D9U_NAME].update(result.d9u)
                             all_reported[D10A_U_NAME].update(result.d10a_u)
                             all_reported[D10B_U_NAME].update(result.d10b_u)
@@ -1128,10 +1209,14 @@ async def main_async(args: argparse.Namespace) -> int:
                             all_reported[D10B_NAME].update(result.d10b)
                             all_reported[D10BASE_NAME].update(result.d10base)
                             all_unknown[D9_NAME].update(result.d9_unknown)
-                            all_unknown[D9_NOS4_NAME].update(result.d9_unknown)
+                            all_unknown[D9_NOS4_NAME].update(result.d9_nos4_unknown)
                             all_unknown[D9_S4U_NAME].update(result.d9_s4u_unknown)
-                            for name in (D9U_NAME, D10A_U_NAME, D10B_U_NAME):
-                                all_unknown[name].update(result.d9u_unknown)
+                            all_unknown[D9_S4OURS_NAME].update(result.d9_s4ours_unknown)
+                            s4ours_dismissals.update(result.s4ours_dismissals)
+                            s4_inputs.update(result.s4_inputs)
+                            all_unknown[D9U_NAME].update(result.d9u_unknown)
+                            for name in (D10A_U_NAME, D10B_U_NAME):
+                                all_unknown[name].update(result.d10u_unknown)
                             baseline_evidence[page_path] = result.baseline_evidence
                             s4u_dismissals.update(result.s4u_dismissals)
                             for name in (D10_NAME, D10B_NAME, D10BASE_NAME):
@@ -1219,6 +1304,10 @@ async def main_async(args: argparse.Namespace) -> int:
         "coverage_evidence": coverage,
         "upstream_evidence": upstream_evidence,
         "s4u_dismissals": s4u_dismissals,
+        "s4ours_dismissals": s4ours_dismissals,
+        # The exact trials the Stage-4 rows were computed from, so a
+        # dismissal or its absence can be reconstructed from this file.
+        "s4_inputs": s4_inputs,
         "baseline_evidence": baseline_evidence,
         "reported": {k: sorted(v) for k, v in all_reported.items()},
         "unobservable": {k: sorted(v) for k, v in all_unknown.items() if v},

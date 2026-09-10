@@ -393,9 +393,15 @@ async def d8_hover_diff(page: Page, probe_ids: list[str]) -> DetectorResult:
 
 
 async def start_coverage(cdp: CDPSession) -> None:
+    """Arm precise coverage, counting calls.
+
+    ``callCount`` false makes V8 report each function as covered only once, so
+    the second read of a handler that really ran comes back empty. See
+    ``coverage.start`` for the measurement that establishes this.
+    """
     with contextlib.suppress(Exception):
         await cdp.send("Profiler.enable")
-        await cdp.send("Profiler.startPreciseCoverage", {"callCount": False, "detailed": True})
+        await cdp.send("Profiler.startPreciseCoverage", {"callCount": True, "detailed": True})
 
 
 async def take_coverage(cdp: CDPSession) -> set[str]:

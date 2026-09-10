@@ -224,6 +224,14 @@ async def test_wrong_tab_focus_is_unknown_without_sending_enter():
 
 
 async def test_behavioural_methods_keep_independent_unknown_sets(monkeypatch):
+    # A measured baseline, so this test isolates what it means to isolate: the
+    # per-method unknown sets. Baseline failure is covered separately below.
+    monkeypatch.setattr(
+        bakeoff, "_upstream_baseline", AsyncMock(return_value=(frozenset(), "measured", False))
+    )
+    monkeypatch.setattr(
+        bakeoff, "_upstream_differential", AsyncMock(return_value=bakeoff.UpstreamPass())
+    )
     outcomes = [
         bakeoff.to_outcome_stub("p1", set(), {"p1"}),
         bakeoff.to_outcome_stub("p2", set(), set()),
@@ -496,3 +504,52 @@ class TestFixtureOriginFilter:
         from experiments.tabbing.runner.bakeoff import _fixture_only
 
         assert _fixture_only(frozenset({"#a@0", "#b@1"})) == frozenset()
+
+
+class TestBaselineFailurePropagates:
+    """A floor we could not measure is not a floor of zero.
+
+    Subtracting nothing and scoring on regardless turns a failed profiler read
+    into a confident coverage verdict, which is the same defect as counting an
+    unreachable probe as a pass.
+    """
+
+    async def test_failed_baseline_makes_every_coverage_rule_abstain(self, monkeypatch):
+        monkeypatch.setattr(
+            bakeoff,
+            "_upstream_baseline",
+            AsyncMock(return_value=(frozenset(), "failed: profiler: boom", True)),
+        )
+        monkeypatch.setattr(
+            bakeoff, "_upstream_differential", AsyncMock(return_value=bakeoff.UpstreamPass())
+        )
+        runner = SimpleNamespace(
+            run_probe=AsyncMock(side_effect=[bakeoff.to_outcome_stub("p1", set(), set())])
+        )
+        monkeypatch.setattr(bakeoff, "DifferentialRunner", lambda *_args: runner)
+        monkeypatch.setattr(
+            bakeoff, "_coverage_pair", AsyncMock(return_value=bakeoff.CoveragePair(mouse={"h"}))
+        )
+        result = await bakeoff.run_behavioural(
+            SimpleNamespace(close_open_contexts=AsyncMock()),
+            "a.html",
+            ["p1"],
+            TabOrder({}, False, 1),
+        )
+        assert result.d10_unknown == {"p1"}
+        assert result.d10u_unknown == {"p1"}
+        assert result.baseline_evidence["failed"] is True
+
+    async def test_absent_baseline_target_is_not_a_failure(self):
+        """Ten holdout pages carry no #baseline-target; an empty floor is correct there."""
+        assert bakeoff.UpstreamPass().coverage_is_trustworthy
+
+    async def test_a_profiler_failure_stops_a_confident_coverage_verdict(self):
+        """Without this, an unread keyboard set reads as "the keyboard ran nothing"."""
+        clean = bakeoff.UpstreamPass(mouse_coverage=frozenset({"f"}))
+        assert clean.reported_coverage
+        broken = bakeoff.UpstreamPass(
+            mouse_coverage=frozenset({"f"}), coverage_uncertainties={"keyboard": "profiler: boom"}
+        )
+        assert not broken.reported_coverage
+        assert not broken.reported_coverage_setdiff

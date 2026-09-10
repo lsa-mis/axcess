@@ -25,10 +25,20 @@ log = get_logger(__name__)
 
 
 async def start(cdp: Any) -> None:
-    """Arm precise coverage. Safe to call more than once."""
+    """Arm precise coverage. Safe to call more than once.
+
+    ``callCount`` must be true, and this is not a preference. With it false V8
+    reports a function as covered only the first time, so on any read after the
+    first the same handler comes back as *not executed* even though it ran. The
+    measured effect on these fixtures: click ``h110``, reload, click again, and
+    the second read returns zero functions where the first returned
+    ``openReport@3``. Every coverage comparison whose keyboard pass follows its
+    mouse pass then under-reports the keyboard side and manufactures a
+    "the keyboard ran nothing" violation. Upstream sets it true.
+    """
     with contextlib.suppress(Exception):
         await cdp.send("Profiler.enable")
-        await cdp.send("Profiler.startPreciseCoverage", {"callCount": False, "detailed": True})
+        await cdp.send("Profiler.startPreciseCoverage", {"callCount": True, "detailed": True})
 
 
 async def take(cdp: Any, origin: str | None = None) -> frozenset[str]:

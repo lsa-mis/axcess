@@ -275,8 +275,8 @@ it decided while deciding slightly less.
 
 ### 6.4 Comparing every detector idea
 
-The [full matrix](fixtures/results/bakeoff-fixtures-upstream-faithful.json)
-runs twenty approaches over the same 95 frozen targets, desktop only. These are
+The [full matrix](fixtures/results/bakeoff-fixtures-upstream-callcount.json)
+runs twenty-one approaches over the same 95 frozen targets, desktop only. These are
 Axcess reimplementations of upstream's published detectors, not the original
 code. Recall uses all positive labels as the denominator.
 
@@ -285,9 +285,10 @@ code. Recall uses all positive labels as the denominator.
 | D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% |
 | **D9+S4u, the same with upstream's Stage 4** | **89.2%** | **84.6%** | **86.8%** |
 | **D9u upstream's differential, faithful** | **79.5%** | **89.7%** | **84.3%** |
-| **D9-noS4, the same differential with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** |
-| **D10b-u upstream set-difference (sequential keys, baselined)** | **51.4%** | **94.9%** | **66.7%** |
-| **D10a-u upstream coverage presence (sequential keys, baselined)** | **53.1%** | **87.2%** | **66.0%** |
+| **D9+S4ours, our filter over the same coverage-armed inputs** | **87.2%** | **87.2%** | **87.2%** |
+| **D9-noS4, the same inputs with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** |
+| **D10b-u upstream set-difference (sequential keys, baselined)** | **75.5%** | **94.9%** | **84.1%** |
+| **D10a-u upstream coverage presence (sequential keys, baselined)** | **75.0%** | **84.6%** | **79.5%** |
 | D10b set-difference (Enter only, unbaselined variant) | 53.7% | 92.3% | 67.9% |
 | D10a ran for the mouse, none for Enter (unbaselined variant) | 57.1% | 82.1% | 67.4% |
 | D10a+base, the same with a handler-free baseline subtracted | 57.1% | 82.1% | 67.4% |
@@ -339,15 +340,21 @@ Enter press on `p27b` execute **exactly the same two functions**,
 `_helpers.js#fired@157` and `b-decoys.html#favourite@586`, and upstream's
 Stage 4 dismisses the finding correctly.
 
-**What upstream's Stage 4 actually does here.** All three D9 rows below run the
-same differential over the same targets and differ only in the filter that
-follows, so the difference between them is the filter:
+**What upstream's Stage 4 actually does here.** All three rows below are
+computed from **one** set of measured outcomes — the coverage-armed pass — and
+differ only in the filter applied afterwards. That matters: an earlier draft
+took the no-filter row from a separate uninstrumented pass and called the
+difference a filter effect, which compared two different measurements.
 
 | Stage 4 applied | TP | FP | FN | Precision | Recall | F1 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | none | 34 | 9 | 2 | 79.1% | 87.2% | 82.9% |
 | upstream's, on filtered baseline-subtracted coverage | 33 | 4 | 3 | **89.2%** | 84.6% | 86.8% |
 | ours, on effect payloads | 34 | 5 | 2 | 87.2% | **87.2%** | **87.2%** |
+
+Our filter over these shared inputs scores exactly what the production detector
+scores on its own pass — 87.2% across the board — so arming the profiler does
+not perturb the result, and the comparison is clean.
 
 Upstream's filter is **more aggressive than ours and buys higher precision for
 it** — 89.2% against our 87.2%, clearing five false alarms to our four. It
@@ -386,10 +393,23 @@ fresh-context fix and lost their frame observation.
 
 **D10a-u and D10b-u** are upstream's coverage rules over that same sequential
 trial, with the baseline subtracted from both sides. D10b-u has the **highest
-recall anywhere in this study, 94.9%, with only two false negatives** — at 51.4%
-precision, so it is a funnel stage and never an output. The Enter-only,
-unbaselined `D10a`/`D10b`/`D10a+base` rows are kept below as modified variants,
-clearly labelled; they are not ports.
+recall anywhere in this study — 94.9%, with two false negatives — at 75.5%
+precision**, making it the strongest coverage-based configuration measured here
+and a serious candidate for the funnel stage. The Enter-only, unbaselined
+`D10a`/`D10b`/`D10a+base` rows are kept below as modified variants, clearly
+labelled; they are not ports.
+
+Those two rows were wrong in an earlier draft, at 53.1% and 51.4% precision, and
+the cause is worth recording because it is invisible without a real browser.
+V8's precise coverage was armed with `callCount: false`, which marks a function
+covered **once**: on every later read the same handler comes back as not
+executed. Click `h110`, reload, click again, and the second read returns zero
+functions where the first returned `openReport@3`. Since the keyboard pass
+follows the mouse pass, the keyboard side was systematically under-reported and
+the rules manufactured "the keyboard ran nothing" violations — 30 and 35 false
+positives, against 11 and 12 once corrected. Upstream sets `callCount: true`.
+There is now a browser regression for it, because no mock reproduces a
+profiler.
 
 **The handler-free baseline.** Upstream clicks a neutral `#baseline-target` on
 each page. On their React page this strips 28 functions per click; measured
@@ -413,19 +433,19 @@ with like; the per-page and per-target columns are that total divided by 19 and
 | Detector | Total | Per page | Per target | Recall |
 | --- | ---: | ---: | ---: | ---: |
 | D2, D2b, D3, D4, D0, D7 (filters over one shared walk) | < 0.01 s | < 0.01 ms | - | 2.6-69.2% |
-| shared DOM walk feeding all six | 0.13 s | 6.7 ms | - | - |
+| shared DOM walk feeding all six | 0.15 s | 7.9 ms | - | - |
 | D6 `addEventListener` shim | 0.07 s | 3.5 ms | - | 53.8% |
-| D5 CDP `getEventListeners` | 0.49 s | 25.8 ms | - | 64.1% |
-| D1 axe-core | 6.15 s | 323.9 ms | - | 0.0% |
-| D8 hover-diff | 20.98 s | 1104.4 ms | - | 46.2% |
-| D10a coverage (Enter only) | 87.97 s | - | 926 ms | 82.1% |
-| D9u upstream differential | 119.08 s | - | 1253 ms | 89.7% |
-| **D9 our differential** | **151.97 s** | - | **1600 ms** | **87.2%** |
-| D9+S4u, coverage armed | 158.46 s | - | 1668 ms | 84.6% |
+| D5 CDP `getEventListeners` | 0.60 s | 31.6 ms | - | 64.1% |
+| D1 axe-core | 6.09 s | 320.5 ms | - | 0.0% |
+| D8 hover-diff | 20.63 s | 1085.8 ms | - | 46.2% |
+| D10a coverage (Enter only) | 87.85 s | - | 925 ms | 82.1% |
+| D9u upstream differential | 119.01 s | - | 1253 ms | 89.7% |
+| **D9 our differential** | **152.86 s** | - | **1609 ms** | **87.2%** |
+| D9+S4u, coverage armed | 159.76 s | - | 1682 ms | 84.6% |
 
 The cheap family — six detectors and the DOM walk that feeds them — costs
-**0.13 s for the entire corpus**. Our differential costs **151.97 s**, about
-**1150x** as much, and upstream measured the same order of ratio on theirs
+**0.15 s for the entire corpus**. Our differential costs **152.86 s**, about
+**1000x** as much, and upstream measured the same order of ratio on theirs
 (1.20 s per probe against 34 ms for a whole page of cheap checks).
 
 That is the economic argument for the funnel, and it is why §6.2's 82% candidate
@@ -434,28 +454,27 @@ competing with the differential; they decide what the expensive one runs on. D4
 is the clearest case: 69.2% recall for an unmeasurably small cost, at a
 precision far too low to report to anyone.
 
-Two costs deserve singling out. **D1 axe-core spends 6.15 s across the corpus to
+Two costs deserve singling out. **D1 axe-core spends 6.09 s across the corpus to
 find nothing at all** on this defect class. And **D8 hover-diff is the worst
-trade measured**: 20.98 s for 46.2% recall, against D5's 0.49 s for 64.1% —
-**43x the cost for worse recall**. (An earlier draft quoted this ratio as 240x
+trade measured**: 20.63 s for 46.2% recall, against D5's 0.60 s for 64.1% —
+**34x the cost for worse recall**. (An earlier draft quoted this ratio as 240x
 by dividing a per-page figure by a per-target one; the corrected comparison is
 total against total.)
 
 Setup costs are excluded from every row: page loads, tab-order computation and
 the per-page coverage baseline are shared across detectors and are not
-attributable to any one of them. Wall time for the whole run was 572.7 s.
+attributable to any one of them. Wall time for the whole run was 559.1 s.
 
-**We did not reproduce upstream's strongest filter.** Upstream compared sets of
-executed V8 functions using exact equality plus matching effect-channel sets.
-This port compares effect signatures and restricts alternatives to the same page
-and window size. The main experiment collects no V8 coverage by default; only
-the matrix's D10a does, for a different test. The optional coverage strategies
-in the source are unscored prototypes, and the structural one abstains outright
-because the records do not capture real DOM containment. Neither function
-identity nor our lossy signatures prove two things are semantically the same.
-Upstream's **98.1% F1** and our **92.3% F1 on its original 60 cases** come from
-different procedures. This port improves parts of the method; it does not beat
-that published headline.
+**We reproduce upstream's strongest filter, but not their headline.** Their
+Stage 4 compares executed-function sets under exact equality plus matching
+effect channels; it is ported, scored above, and it works. What remains
+genuinely unreproduced is only `by_containment`, which abstains outright because
+our records carry no real DOM relationships, and the Jaccard sweep, which their
+own data condemned. Neither function identity nor our lossy payloads prove two
+things are semantically the same. Upstream's **98.1% F1** and our **92.3% F1 on
+its original 60 cases** come from different procedures on different corpora.
+This port improves parts of the method and matches others; it does not beat that
+published headline.
 
 ### 6.5 Stage 4: functionality the keyboard can already reach
 
@@ -511,13 +530,15 @@ round trip per trial, measured at 158.5 s against 152.0 s over the corpus.
 
 **On the same 60 upstream fixtures**, their configuration and ours:
 
-| | TP | FP | FN | Undecided | Precision | Recall |
+| | TP | FP | FN | Undecided positives | Precision | Recall |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Upstream, with Stage 4 | 26 | 1 | 0 | - | 96.3% | 100% |
 | Ours, reviewed | 24 | 2 | 0 | 2 | 92.3% | 92.3% |
 
 Both corpora hold 26 positives. We missed none outright - our two shortfalls are
-*undecided*, and over decided targets alone our recall is also 100%. Strict
+undecided **positives**, and over decided targets alone our recall is also 100%.
+(The column counts undecided positives only; 13 targets in this cohort are
+undecided in total, the other 11 being negatives.) Strict
 recall counts those two against us, which is the intended behaviour: refusing to
 answer must never raise a score. The comparison is still not like-for-like,
 because 96.3 / 100 is their whole configuration measured by a different
@@ -735,9 +756,17 @@ any lead becomes a remediation conclusion.
 After Claude drafted this report, Codex checked its numbers against the saved
 evidence. All 12 score rows in each reviewed main run were reconstructed from
 the individual verdicts and frozen labels. Every matrix row was checked against
-its reported and unobservable target sets. Source fingerprints match across both
-main runs, the reviewed matrix and the current source files; frozen input hashes
-also match. The repeat comparisons above come from the records themselves.
+its reported and unobservable target sets. Frozen input hashes match everywhere.
+
+**Source fingerprints no longer match the current files, and should not.** The
+two reviewed main runs and the early matrices recorded the source as it stood
+when they ran; `coverage.py`, `detectors.py` and the matrix runner have since
+been corrected — origin filtering, `callCount`, the faithful upstream pass — so
+their recorded hashes describe that older source, which is exactly what a
+fingerprint is for. Each remains valid evidence about the code it names. The
+main runs' *results* are unaffected: they collect no V8 coverage, and nothing in
+`kbdiff`'s decision path changed. Only the matrix has been re-measured, under new
+labels, with every earlier artifact preserved.
 
 Validation completed during implementation and final review:
 
@@ -772,7 +801,8 @@ To reproduce the experiment with installed dependencies, follow the commands in
 | [`results/audit-fixes.raw.json`](results/audit-fixes.raw.json) | Audit applied; scores unchanged. |
 | [`results/reviewed.raw.json`](results/reviewed.raw.json) | **The measurement of record.** |
 | [`results/reviewed-repeat.raw.json`](results/reviewed-repeat.raw.json) | Separate repeat run; identical verdicts. |
-| [`fixtures/results/bakeoff-fixtures-upstream-faithful.json`](fixtures/results/bakeoff-fixtures-upstream-faithful.json) | **The measurement of record for the matrix**: twenty methods, faithful upstream ports, per-detector timings, baseline and coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-upstream-callcount.json`](fixtures/results/bakeoff-fixtures-upstream-callcount.json) | **The measurement of record for the matrix**: twenty-one methods, faithful upstream ports, the Stage-4 ablation over one shared input set, per-detector timings, and per-probe coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-upstream-faithful.json`](fixtures/results/bakeoff-fixtures-upstream-faithful.json) | Superseded: its coverage was armed with `callCount: false`, inflating false positives on the two upstream coverage rows. |
 | [`fixtures/results/bakeoff-fixtures-upstream-s4.json`](fixtures/results/bakeoff-fixtures-upstream-s4.json) | Superseded: its coverage was unfiltered, so its Stage-4 rows measured harness noise. |
 | [`fixtures/results/bakeoff-fixtures-upstream-full.json`](fixtures/results/bakeoff-fixtures-upstream-full.json) | Superseded: its D9u was a partial ablation, not a port. |
 | [`fixtures/results/bakeoff-fixtures-reviewed.json`](fixtures/results/bakeoff-fixtures-reviewed.json) | Reviewed twelve-method matrix; every shared row reproduces in the full run. |

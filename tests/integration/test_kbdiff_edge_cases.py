@@ -17,7 +17,7 @@ from __future__ import annotations
 import pytest
 from playwright.async_api import async_playwright
 
-from audit.analyzer.keyboard.kbdiff import channels
+from audit.analyzer.keyboard.kbdiff import channels, coverage
 from audit.analyzer.keyboard.kbdiff.differential import _LOCATE_JS
 from audit.analyzer.keyboard.kbdiff.taborder import compute_tab_order
 
@@ -484,3 +484,35 @@ async def test_zero_box_is_reported_without_locator_exception(page, style):
     assert "zero-size" in found["reasons"]
     assert not found["hit_testable"]
     assert found["x"] is None and found["y"] is None
+
+
+class TestCoverageAcrossReloads:
+    """V8 must keep reporting a handler that runs again after a reload.
+
+    With ``callCount`` false, precise coverage marks a function as covered once
+    and every later read omits it. A coverage differential then sees an empty
+    keyboard set for a handler that demonstrably ran, and reports a violation
+    the page does not have. This is a real-browser regression because no mock
+    reproduces the profiler's behaviour.
+    """
+
+    async def test_the_same_handler_is_reported_on_a_second_run(self, page):
+        await page.set_content(
+            "<button id='t1' onclick='window.__ran = (window.__ran || 0) + 1'>go</button>"
+        )
+        cdp = await page.context.new_cdp_session(page)
+        await coverage.start(cdp)
+
+        seen = []
+        for _ in range(2):
+            await coverage.take(cdp)  # resets the counters
+            await page.click("#t1")
+            await page.wait_for_timeout(100)
+            seen.append(await coverage.take(cdp))
+
+        assert await page.evaluate("window.__ran") == 2, "the handler really ran twice"
+        assert seen[0], "the first click recorded executed functions"
+        assert seen[1], (
+            "the second click recorded none: precise coverage armed with "
+            "callCount false makes a re-executed function invisible"
+        )
