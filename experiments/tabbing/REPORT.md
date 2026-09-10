@@ -275,20 +275,22 @@ it decided while deciding slightly less.
 
 ### 6.4 Comparing every detector idea
 
-The [full matrix](fixtures/results/bakeoff-fixtures-upstream-s4.json) runs
-seventeen approaches over the same 95 frozen targets, desktop only. These are
+The [full matrix](fixtures/results/bakeoff-fixtures-upstream-faithful.json)
+runs twenty approaches over the same 95 frozen targets, desktop only. These are
 Axcess reimplementations of upstream's published detectors, not the original
 code. Recall uses all positive labels as the denominator.
 
 | Method | Precision | Recall | F1 |
 | --- | ---: | ---: | ---: |
 | D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% |
+| **D9+S4u, the same with upstream's Stage 4** | **89.2%** | **84.6%** | **86.8%** |
+| **D9u upstream's differential, faithful** | **79.5%** | **89.7%** | **84.3%** |
 | **D9-noS4, the same differential with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** |
-| **D9+S4u, the same with upstream's Stage 4 (coverage-exact)** | **79.1%** | **87.2%** | **82.9%** |
-| **D9u upstream's differential (8 channels, keys in sequence)** | **78.0%** | **82.1%** | **80.0%** |
-| **D10b coverage set-difference (mouse ran what the keyboard never reached)** | **53.7%** | **92.3%** | **67.9%** |
-| D10a JavaScript ran for the mouse, none for Enter | 57.1% | 82.1% | 67.4% |
-| **D10a+base, the same with a handler-free baseline subtracted** | **57.1%** | **82.1%** | **67.4%** |
+| **D10b-u upstream set-difference (sequential keys, baselined)** | **51.4%** | **94.9%** | **66.7%** |
+| **D10a-u upstream coverage presence (sequential keys, baselined)** | **53.1%** | **87.2%** | **66.0%** |
+| D10b set-difference (Enter only, unbaselined variant) | 53.7% | 92.3% | 67.9% |
+| D10a ran for the mouse, none for Enter (unbaselined variant) | 57.1% | 82.1% | 67.4% |
+| D10a+base, the same with a handler-free baseline subtracted | 57.1% | 82.1% | 67.4% |
 | D4 CSS appearance and text hints | 56.2% | 69.2% | 62.1% |
 | D5 browser-debugger event listeners | 58.1% | 64.1% | 61.0% |
 | D8 changes after hover | 75.0% | 46.2% | 57.1% |
@@ -318,121 +320,130 @@ during a mouse click against those executed for **Enter only**. It does not
 apply the equivalent-control filter. It is a coarser instrument than D9 by
 construction.
 
-#### The three upstream formulations we had not measured
+#### Upstream's own detectors, faithfully ported
 
-The first version of this matrix was missing three of upstream's detectors. They
-are now implemented and scored, as their own rows rather than folded into ours,
-because a comparison stops being one the moment the alternatives are merged.
+An earlier version of this section reported that upstream's Stage 4 dismissed
+nothing on this corpus, and explained it with the claim that two different
+controls cannot execute the same set of functions. **Both were wrong**, and the
+correction is instructive enough to keep in view rather than quietly restate.
 
-**D9u is upstream's differential, bugs included** - the same eight channels
-(ours drops `mutations`, which the `dom` digest covers except when edits net
-out), compared by *presence* rather than payload, with Enter, Space and
-ArrowDown pressed in sequence against a single page state. It scores
-78.0% / 82.1% / **80.0% F1** against our D9's **87.2%**.
+The measurement had not been filtered to fixture scripts. Upstream's
+`takeCoverage` keeps only scripts served from the page's own origin; ours kept
+everything. Unfiltered, a single click on these fixtures records **87 executed
+functions of which 85 have an empty URL** — harness `evaluate` bodies, init
+scripts, driver internals. The mouse and keyboard passes drive the browser
+differently, so those 85 can never agree, and an equivalence test over them can
+only ever answer no. The conclusion was an artefact of measuring our own
+instrumentation. With the filter applied, the mouse click on `p27` and the
+Enter press on `p27b` execute **exactly the same two functions**,
+`_helpers.js#fired@157` and `b-decoys.html#favourite@586`, and upstream's
+Stage 4 dismisses the finding correctly.
 
-The interesting part is not the 7.2-point gap but its shape. D9u raises **9
-false alarms to our 5**, which is the presence comparison clearing or creating
-findings on unrelated channel activity, and it returns **10 unknowns to our
-20** - it decides twice as much and is wrong more often. That is the cost of
-folding "could not measure" into a verdict, measured rather than asserted.
+**What upstream's Stage 4 actually does here.** All three D9 rows below run the
+same differential over the same targets and differ only in the filter that
+follows, so the difference between them is the filter:
 
-**D9-noS4 and D9+S4u isolate the Stage-4 filter.** All three D9 rows run the
-same differential over the same targets and differ only in which equivalence
-filter runs afterwards, so the difference between them *is* the filter:
+| Stage 4 applied | TP | FP | FN | Precision | Recall | F1 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| none | 34 | 9 | 2 | 79.1% | 87.2% | 82.9% |
+| upstream's, on filtered baseline-subtracted coverage | 33 | 4 | 3 | **89.2%** | 84.6% | 86.8% |
+| ours, on effect payloads | 34 | 5 | 2 | 87.2% | **87.2%** | **87.2%** |
 
-| Stage 4 applied | TP | FP | FN | Precision | F1 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| none | 34 | 9 | 2 | 79.1% | 82.9% |
-| upstream's, executed-function sets compared exactly | 34 | 9 | 2 | 79.1% | 82.9% |
-| ours, effect payloads compared | 34 | 5 | 2 | **87.2%** | **87.2%** |
+Upstream's filter is **more aggressive than ours and buys higher precision for
+it** — 89.2% against our 87.2%, clearing five false alarms to our four. It
+dismisses six findings where we dismiss four: `h112`, `h140`, `p25` and `p27`
+in common, plus `p23` and `h110`.
 
-**Upstream's Stage 4 dismissed nothing at all on this corpus** — its row is
-identical to running no filter, and `s4u_dismissals` is empty. Ours removed four
-false alarms and cost no recall.
+`h110` is the one that matters. **It is a real defect, and upstream's Stage 4
+cleared it.** Its supposed keyboard alternative `h111` executes the same
+functions but does not produce the same observable effect, so a coverage
+comparison calls them equivalent and a payload comparison does not. That single
+target is the difference between 87.2% recall and 84.6%, and it is the concrete
+case for comparing what the user can observe rather than what the engine ran —
+made here by counterexample rather than by assertion.
 
-That result needs guarding against the obvious explanation, so: the coverage was
-really there. The armed pass collected 22 to 29 executed functions per trial, on
-85 of the 95 targets. `by_coverage_exact` abstains when coverage is missing, and
-had it abstained everywhere this row would be vacuous rather than a finding. It
-is not.
+Neither filter dominates. Upstream's is more precise, ours loses no real
+defect, and their F1 differs by 0.4 points. The honest summary is that the
+stage is worth roughly 4 to 10 points of precision either way, and that the
+signal choice decides *which* mistake you make.
 
-The mechanism is visible in the pair our filter did dismiss. On `p27`, the mouse
-click ran **29 functions**; on `p27b`, the keyboard-reachable control that does
-the same job, activation ran **25**. Both produce the identical observable
-effect — the same `dom;geometry` payload, which is why our filter cleared it —
-but two different elements cannot execute the *same set* of functions, because
-each drags in its own dispatch path. Exact set equality is therefore unable to
-recognise equivalent functionality across two different controls, which is
-precisely what Stage 4 exists to do.
+**D9u, upstream's differential, now faithful.** It reloads one page between
+modalities rather than using a fresh context, observes every frame rather than
+the top document, resolves targets through the pierced CDP tree, parks the
+pointer, settles for 200 ms and presses Enter, Space and ArrowDown 120 ms apart
+against a single page state.
 
-Upstream reported this stage as the single highest-value step in their pipeline,
-taking precision from 86.7% to 96.3%. We reproduce the stage's *value* — ours is
-worth 8.1 points of precision — but not through their signal. On their corpus
-exact equality worked; on ours it never fires once.
+Ported properly it scores **79.5% / 89.7% / 84.3%** — and it **finds more real
+defects than ours does**, 35 against 34, because observing every frame catches
+iframe effects our top-document snapshot misses entirely. It decides 91 of 95
+targets to our 75. Our advantage is precision: 87.2% against 79.5%, because
+comparing payloads rather than mere presence stops an unrelated console line
+from clearing a finding.
 
-**D10b is the set-difference form**, asking whether the mouse ran anything the
-keyboard never reached, rather than whether the keyboard ran nothing at all. It
-has the **highest recall of any detector here, 92.3%, and zero false
-negatives** - the only method that missed no decidable defect. Upstream
-predicted exactly this: an element the keyboard *reaches* runs focus code, so
-D10a falls silent while the handler itself still never runs. It costs 31 false
-alarms for that recall, so it is a funnel stage, not an output.
+That is a more uncomfortable and more useful result than the earlier one, which
+compared our detector against a version of theirs that had quietly acquired our
+fresh-context fix and lost their frame observation.
 
-**D10a+base subtracts a per-page handler-free baseline** - click something with
-no handler, see what runs anyway, discount it. It changed **no verdict at all**,
-and that null result needs its qualification stated: the baseline was *empty for
-82 of the 95 targets*, because these fixtures are static pages where an inert
-click executes nothing. It only had real work to do on the React page, where it
-removed 15 functions per click (upstream reported 28 on theirs). The mechanism
-is implemented and correct; this corpus barely exercises it, and a
-framework-heavy corpus is where it would earn its place.
+**D10a-u and D10b-u** are upstream's coverage rules over that same sequential
+trial, with the baseline subtracted from both sides. D10b-u has the **highest
+recall anywhere in this study, 94.9%, with only two false negatives** — at 51.4%
+precision, so it is a funnel stage and never an output. The Enter-only,
+unbaselined `D10a`/`D10b`/`D10a+base` rows are kept below as modified variants,
+clearly labelled; they are not ports.
 
-The [legacy matrix](fixtures/results/bakeoff-fixtures.json) is kept for
-comparison but is **superseded, not an equally reliable second opinion**. It
-recorded D10a as `D10` before the name was made specific (52.2% / 89.7% /
-66.0%), and D6 at 53.7% / 56.4% / 55.0%. The other ten methods scored
-identically in precision, recall and F1. The legacy implementation swallowed
-coverage failures and caps, and let a reported violation override an `unknown`,
-which could turn failed measurements into confident verdicts. It also predates
-provenance recording, so only the reviewed file carries fingerprints and a
-validity flag. Where they disagree, the reviewed file is the measurement of
-record.
+**The handler-free baseline.** Upstream clicks a neutral `#baseline-target` on
+each page. On their React page this strips 28 functions per click; measured
+here it strips **27**, which is about as close a corroboration as this study
+gets. Elsewhere it is nearly idle: 1 function on `d-delegation.html` and none on
+the other seven upstream pages. The ten holdout pages carry no
+`#baseline-target` at all, since they are our fixtures rather than theirs, and
+the run now records that as an explicit per-page note rather than an
+indistinguishable empty set. An earlier draft said the baseline did real work
+"only on the React page"; that was imprecise, and the evidence is now published
+per page in `baseline_evidence`.
 
 #### What each detector costs
 
-Measured on this corpus, 19 pages and 95 targets, from
-[`page_timings_ms`](fixtures/results/bakeoff-fixtures-upstream-s4.json). The
-behavioural detectors are quoted per target because that is how they scale; the
-rest are quoted per page.
+Measured on this corpus — 19 pages, 95 targets — from `page_timings_ms` in the
+[full matrix](fixtures/results/bakeoff-fixtures-upstream-faithful.json). **All
+figures are total wall time over the whole corpus**, so the ratios compare like
+with like; the per-page and per-target columns are that total divided by 19 and
+95 respectively, and are shown only to indicate how each detector scales.
 
-| Detector | Cost | Recall | Cost per point of recall |
-| --- | ---: | ---: | --- |
-| D0, D2, D2b, D3, D4, D7 (filters) | < 0.01 ms/page each | 2.6-69.2% | effectively free |
-| shared DOM walk feeding all six | 4.2 ms/page | - | paid once |
-| D6 `addEventListener` shim | 1.6 ms/page | 53.8% | negligible |
-| D5 CDP `getEventListeners` | 13.3 ms/page | 64.1% | negligible |
-| D1 axe-core | 205 ms/page | 0.0% | no return at any price |
-| D8 hover-diff | 1.02 s/page | 46.2% | 240x D5 for worse recall |
-| D10a / D10b coverage | 0.78 s/target | 82.1 / 92.3% | ~1000x the cheap filters |
-| D9u upstream differential | 1.33 s/target | 82.1% | ~1700x |
-| **D9 our differential** | **1.49 s/target** | **87.2%** | **~1900x** |
-| D9+S4u, coverage armed for upstream's Stage 4 | 1.53 s/target | 87.2% | +3% for no dismissals |
+| Detector | Total | Per page | Per target | Recall |
+| --- | ---: | ---: | ---: | ---: |
+| D2, D2b, D3, D4, D0, D7 (filters over one shared walk) | < 0.01 s | < 0.01 ms | - | 2.6-69.2% |
+| shared DOM walk feeding all six | 0.13 s | 6.7 ms | - | - |
+| D6 `addEventListener` shim | 0.07 s | 3.5 ms | - | 53.8% |
+| D5 CDP `getEventListeners` | 0.49 s | 25.8 ms | - | 64.1% |
+| D1 axe-core | 6.15 s | 323.9 ms | - | 0.0% |
+| D8 hover-diff | 20.98 s | 1104.4 ms | - | 46.2% |
+| D10a coverage (Enter only) | 87.97 s | - | 926 ms | 82.1% |
+| D9u upstream differential | 119.08 s | - | 1253 ms | 89.7% |
+| **D9 our differential** | **151.97 s** | - | **1600 ms** | **87.2%** |
+| D9+S4u, coverage armed | 158.46 s | - | 1668 ms | 84.6% |
 
-The whole cheap family - six detectors and the DOM walk that feeds them - costs
-about **4.2 ms per page**. Our differential costs **1.49 s per target**, which
-on this corpus is roughly 350x the entire cheap suite per page, and upstream
-measured the same ratio on theirs (1.20 s/probe against 34 ms).
+The cheap family — six detectors and the DOM walk that feeds them — costs
+**0.13 s for the entire corpus**. Our differential costs **151.97 s**, about
+**1150x** as much, and upstream measured the same order of ratio on theirs
+(1.20 s per probe against 34 ms for a whole page of cheap checks).
 
 That is the economic argument for the funnel, and it is why §6.2's 82% candidate
-ceiling matters more than any accuracy number here. The cheap detectors are not
-competing with the differential; they exist to decide what the expensive one
-runs on. D4 is the clearest case - 69.2% recall for a rounding error of a
-millisecond, at precision far too low to report to anyone.
+ceiling matters more than any accuracy figure here. The cheap detectors are not
+competing with the differential; they decide what the expensive one runs on. D4
+is the clearest case: 69.2% recall for an unmeasurably small cost, at a
+precision far too low to report to anyone.
 
-Two costs deserve singling out. **D1 axe-core spends 205 ms per page to find
-nothing at all** on this defect class. And **D8 hover-diff is the worst trade
-measured**: a full second per page, two screenshots and a buffer comparison, for
-recall below the listener route that costs 13 ms.
+Two costs deserve singling out. **D1 axe-core spends 6.15 s across the corpus to
+find nothing at all** on this defect class. And **D8 hover-diff is the worst
+trade measured**: 20.98 s for 46.2% recall, against D5's 0.49 s for 64.1% —
+**43x the cost for worse recall**. (An earlier draft quoted this ratio as 240x
+by dividing a per-page figure by a per-target one; the corrected comparison is
+total against total.)
+
+Setup costs are excluded from every row: page loads, tab-order computation and
+the per-page coverage baseline are shared across detectors and are not
+attributable to any one of them. Wall time for the whole run was 572.7 s.
 
 **We did not reproduce upstream's strongest filter.** Upstream compared sets of
 executed V8 functions using exact equality plus matching effect-channel sets.
@@ -455,7 +466,9 @@ the output is accurate and unusable, because it reports every such wrapper.
 
 Upstream calls this Stage 4 and reports it as the single highest-value step in
 their pipeline: precision 86.7% to 96.3%, recall unchanged at 100%, for no extra
-page loads. We implement the stage, and it fired **7 times** in the reviewed run
+page loads. We reproduce that shape — it is worth 8.1 points of precision here,
+and upstream's own signal is worth 10.1 — though neither reaches their figure on
+our harder corpus. Our filter fired **7 times** in the reviewed run
 - four on desktop, three in the narrow window. Every dismissal was correct:
 `p25` (labelled ok), `p27`, `h112` and `h140` (decoys). **No real defect was
 lost**, and each is recorded in `dismissals` with the control that cleared it.
@@ -481,18 +494,20 @@ framework share nearly every function they execute - the scheduler, the
 reconciler, the synthetic event system. Any tolerant threshold silently deletes
 real defects. We compare what the user can observe instead.
 
-Upstream's signal is implemented as `by_coverage_exact`, and §6.4 now scores it:
-armed with real V8 coverage on this corpus it dismisses **nothing**, leaving the
-differential exactly where it started, while ours removes four false alarms for
-no loss of recall. Their threshold sweep is implemented too, as
-`by_coverage_jaccard`; it stays an unscored prototype, because their own data
-already showed every tolerance below 1.0 deleting real defects. A third
-strategy, `by_containment`, abstains unconditionally because the outcome records
-carry no real DOM relationships.
+Upstream's signal is implemented as `by_coverage_exact`, and §6.4 scores it on
+the same measurements. Armed with fixture-filtered, baseline-subtracted
+coverage it dismisses **six** findings to our four, reaching higher precision
+than ours — 89.2% against 87.2% — but clearing `h110`, which is a real defect.
+Its keyboard "alternative" runs the same functions without producing the same
+effect. Neither filter dominates; the signal decides which mistake you make.
 
-The main experiment still collects no V8 coverage by default. It costs a CDP
-round trip per trial — measured at 1.53 s per target against 1.49 s without —
-and on this corpus it buys no dismissals at all.
+Their threshold sweep is implemented too, as `by_coverage_jaccard`, and stays an
+unscored prototype because their own data showed every tolerance below 1.0
+deleting real defects. A third strategy, `by_containment`, abstains
+unconditionally because the outcome records carry no real DOM relationships.
+
+The main experiment still collects no V8 coverage by default: it costs a CDP
+round trip per trial, measured at 158.5 s against 152.0 s over the corpus.
 
 **On the same 60 upstream fixtures**, their configuration and ours:
 
@@ -757,8 +772,9 @@ To reproduce the experiment with installed dependencies, follow the commands in
 | [`results/audit-fixes.raw.json`](results/audit-fixes.raw.json) | Audit applied; scores unchanged. |
 | [`results/reviewed.raw.json`](results/reviewed.raw.json) | **The measurement of record.** |
 | [`results/reviewed-repeat.raw.json`](results/reviewed-repeat.raw.json) | Separate repeat run; identical verdicts. |
-| [`fixtures/results/bakeoff-fixtures-upstream-s4.json`](fixtures/results/bakeoff-fixtures-upstream-s4.json) | **The full seventeen-method matrix**, incl. the Stage-4 ablation and per-detector timings. |
-| [`fixtures/results/bakeoff-fixtures-upstream-full.json`](fixtures/results/bakeoff-fixtures-upstream-full.json) | Fifteen-method matrix; superseded by the run above, which reproduces every row. |
+| [`fixtures/results/bakeoff-fixtures-upstream-faithful.json`](fixtures/results/bakeoff-fixtures-upstream-faithful.json) | **The measurement of record for the matrix**: twenty methods, faithful upstream ports, per-detector timings, baseline and coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-upstream-s4.json`](fixtures/results/bakeoff-fixtures-upstream-s4.json) | Superseded: its coverage was unfiltered, so its Stage-4 rows measured harness noise. |
+| [`fixtures/results/bakeoff-fixtures-upstream-full.json`](fixtures/results/bakeoff-fixtures-upstream-full.json) | Superseded: its D9u was a partial ablation, not a port. |
 | [`fixtures/results/bakeoff-fixtures-reviewed.json`](fixtures/results/bakeoff-fixtures-reviewed.json) | Reviewed twelve-method matrix; every shared row reproduces in the full run. |
 | [`fixtures/results/bakeoff-fixtures.json`](fixtures/results/bakeoff-fixtures.json) | Legacy matrix; superseded. |
 | [`edgecases/results/bakeoff-edgecases.json`](edgecases/results/bakeoff-edgecases.json) | Development stress run; not an evaluation. |

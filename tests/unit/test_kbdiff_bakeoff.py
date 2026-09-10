@@ -437,3 +437,62 @@ async def test_actual_overall_timeout_writes_invalid_result_and_closes_browser(
     assert payload["scores"] == []
     assert "TimeoutError" in payload["run"]["errors"][0]
     browser.close.assert_awaited_once()
+
+
+class TestCoverageArmedFailuresStayUnknown:
+    """A coverage-armed trial that raises must not quietly become a verdict.
+
+    The first version of ``_coverage_armed_outcomes`` dropped a failed probe
+    from its list. The score denominator still contained the target, so a
+    missing positive was counted as a false negative and a missing negative as
+    a true negative -- the collapse of "could not measure" into an answer that
+    the whole experiment exists to refuse. It is only reachable when the
+    browser fails mid-run, which no other test drove.
+    """
+
+    def test_a_raising_probe_becomes_an_unknown_outcome(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from audit.analyzer.keyboard.kbdiff.model import Uncertainty, Verdict
+        from experiments.tabbing.runner import bakeoff
+
+        factory = AsyncMock()
+        factory.close_open_contexts = AsyncMock()
+        order = SimpleNamespace(position=lambda pid: 1, capped=False)
+
+        with patch.object(bakeoff, "DifferentialRunner") as runner_cls:
+            runner_cls.return_value.run_probe = AsyncMock(side_effect=RuntimeError("browser died"))
+            outcomes = asyncio.run(
+                bakeoff._coverage_armed_outcomes(factory, "a.html", ["p01", "p02"], order)
+            )
+
+        assert len(outcomes) == 2, "every probe must stay in the record"
+        assert {o.probe_id for o in outcomes} == {"p01", "p02"}
+        for outcome in outcomes:
+            assert outcome.verdict is Verdict.UNKNOWN
+            assert outcome.uncertainty is Uncertainty.INSTRUMENT_ERROR
+
+
+class TestFixtureOriginFilter:
+    """Coverage comparisons must see the page, not the harness."""
+
+    def test_harness_functions_are_excluded(self):
+        from experiments.tabbing.runner.bakeoff import BASE_URL, _fixture_only
+
+        mixed = frozenset({
+            f"{BASE_URL}/upstream/b-decoys.html#favourite@586",
+            f"{BASE_URL}/upstream/_helpers.js#fired@157",
+            "#(anon)@0",                      # an evaluate body: empty url
+            "chrome-extension://x/y.js#f@1",  # not the fixture origin
+        })
+        assert _fixture_only(mixed) == {
+            f"{BASE_URL}/upstream/b-decoys.html#favourite@586",
+            f"{BASE_URL}/upstream/_helpers.js#fired@157",
+        }
+
+    def test_an_all_harness_set_becomes_empty_rather_than_equal(self):
+        """Two unfiltered sets of harness noise must not be mistaken for a match."""
+        from experiments.tabbing.runner.bakeoff import _fixture_only
+
+        assert _fixture_only(frozenset({"#a@0", "#b@1"})) == frozenset()

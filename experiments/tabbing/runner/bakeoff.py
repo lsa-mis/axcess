@@ -25,7 +25,7 @@ import json
 import platform
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -39,7 +39,7 @@ for extra in (REPO_ROOT, REPO_ROOT / "src"):
 from playwright.async_api import async_playwright  # noqa: E402
 
 from audit.analyzer.axe import AxeAnalyzer  # noqa: E402
-from audit.analyzer.keyboard.kbdiff import channels, detectors  # noqa: E402
+from audit.analyzer.keyboard.kbdiff import channels, coverage, detectors  # noqa: E402
 from audit.analyzer.keyboard.kbdiff.differential import (  # noqa: E402
     DifferentialRunner,
     TrialConfig,
@@ -69,7 +69,12 @@ from experiments.tabbing.runner.provenance import (  # noqa: E402
     source_sha256,
     write_new,
 )
-from experiments.tabbing.runner.serve import ContextFactory, page_url  # noqa: E402
+from experiments.tabbing.runner.run import unknown_outcome  # noqa: E402
+from experiments.tabbing.runner.serve import (  # noqa: E402
+    BASE_URL,
+    ContextFactory,
+    page_url,
+)
 
 log = get_logger(__name__)
 
@@ -86,6 +91,11 @@ D9U_NAME = "D9u upstream-style differential (8 channels, keys in sequence)"
 # equivalence, with ours, and with theirs isolates what the stage itself
 # contributes -- the three rows differ only in that filter.
 D9_NOS4_NAME = "D9-noS4 differential with no equivalence filter"
+# Upstream's D10a/D10b run over the SAME sequential trial as their D9, with the
+# handler-free baseline subtracted from both sides. Our Enter-only rows are
+# modified variants and are named as such; these two are the ports.
+D10A_U_NAME = "D10a-u upstream coverage presence (sequential keys, baselined)"
+D10B_U_NAME = "D10b-u upstream coverage set-difference (sequential keys, baselined)"
 D9_S4U_NAME = "D9+S4u differential with upstream Stage 4 (coverage-exact)"
 D10B_NAME = "D10b coverage set-difference (Enter only, no baseline subtraction)"
 D10BASE_NAME = "D10a+base coverage differential (Enter only, baseline subtracted)"
@@ -433,17 +443,42 @@ class UpstreamPass:
 
     mouse_changed: set[str] = field(default_factory=set)
     keyboard_changed: set[str] = field(default_factory=set)
+    mouse_coverage: frozenset[str] = frozenset()
+    keyboard_coverage: frozenset[str] = frozenset()
+    in_tab_order: bool = False
     uncertainties: dict[str, str] = field(default_factory=dict)
 
     @property
     def reported(self) -> bool:
-        """Upstream's rule: the mouse changed something and the keyboard did not."""
+        """Upstream's D9 rule: the mouse changed something and the keyboard did not."""
         return not self.uncertainties and bool(self.mouse_changed) and not self.keyboard_changed
 
+    @property
+    def reported_coverage(self) -> bool:
+        """Upstream's D10a rule, over the same sequential trial."""
+        return (
+            not self.uncertainties
+            and bool(self.mouse_coverage)
+            and not self.keyboard_coverage
+        )
+
+    @property
+    def reported_coverage_setdiff(self) -> bool:
+        """Upstream's D10b rule, over the same sequential trial."""
+        return not self.uncertainties and bool(self.mouse_coverage - self.keyboard_coverage)
+
     def to_json(self) -> dict[str, Any]:
+        """Publish the sets themselves, not just their sizes.
+
+        A zero-dismissal result cannot be audited from counts alone, so the
+        function identities that produced it are part of the record.
+        """
         return {
             "mouse_changed": sorted(self.mouse_changed),
             "keyboard_changed": sorted(self.keyboard_changed),
+            "mouse_coverage": sorted(self.mouse_coverage),
+            "keyboard_coverage": sorted(self.keyboard_coverage),
+            "in_tab_order": self.in_tab_order,
             "uncertainties": self.uncertainties,
         }
 
@@ -458,6 +493,9 @@ class BehaviouralResult:
     d10base: set[str] = field(default_factory=set)
     d9u: set[str] = field(default_factory=set)
     d9u_unknown: set[str] = field(default_factory=set)
+    d10a_u: set[str] = field(default_factory=set)
+    d10b_u: set[str] = field(default_factory=set)
+    baseline_evidence: dict[str, Any] = field(default_factory=dict)
     d9_nos4: set[str] = field(default_factory=set)
     d9_s4u: set[str] = field(default_factory=set)
     d9_s4u_unknown: set[str] = field(default_factory=set)
@@ -490,6 +528,13 @@ async def run_behavioural(
     # discount it. On a framework page that removes the scheduler and the
     # synthetic event system, which every click runs.
     baseline = await _coverage_baseline(factory, config)
+    upstream_baseline, baseline_note = await _upstream_baseline(factory, config, BASE_URL)
+    result.baseline_evidence = {
+        "target": "#baseline-target",
+        "functions": sorted(upstream_baseline),
+        "note": baseline_note,
+    }
+    upstream_passes: dict[str, UpstreamPass] = {}
 
     for probe_id in probe_ids:
         t0 = time.monotonic()
@@ -520,14 +565,21 @@ async def run_behavioural(
         result.coverage[probe_id] = pair.to_json()
 
         t0 = time.monotonic()
-        up = await _upstream_pass(factory, config, probe_id, order)
+        up = await _upstream_differential(
+            factory, config, probe_id, order, BASE_URL, upstream_baseline
+        )
         result.timings.setdefault(D9U_NAME, 0.0)
         result.timings[D9U_NAME] += (time.monotonic() - t0) * 1000
         if up.reported:
             result.d9u.add(probe_id)
+        if up.reported_coverage:
+            result.d10a_u.add(probe_id)
+        if up.reported_coverage_setdiff:
+            result.d10b_u.add(probe_id)
         if up.uncertainties:
             result.d9u_unknown.add(probe_id)
         result.upstream[probe_id] = up.to_json()
+        upstream_passes[probe_id] = up
 
     # The differential's own verdicts, before any equivalence filter. This is
     # the baseline the two Stage-4 rows are measured against.
@@ -553,6 +605,11 @@ async def run_behavioural(
     return result
 
 
+def _fixture_only(functions: frozenset[str]) -> frozenset[str]:
+    """Executed functions belonging to the fixture, dropping harness noise."""
+    return frozenset(f for f in functions if f.split("#", 1)[0].startswith(BASE_URL))
+
+
 async def _coverage_armed_outcomes(
     factory: ContextFactory, page_path: str, probe_ids: list[str], order: TabOrder
 ) -> list[Any]:
@@ -566,18 +623,85 @@ async def _coverage_armed_outcomes(
     config = TrialConfig(url=page_url(page_path), viewport="desktop", collect_coverage=True)
     runner = DifferentialRunner(factory, config)
     outcomes: list[Any] = []
+
+    def to_fixture_scripts(outcome: Any) -> Any:
+        """Restrict every trial's coverage to fixture-origin scripts.
+
+        Upstream filters inside ``takeCoverage``; doing it here yields the same
+        sets without touching the shared differential. It is the difference
+        between measuring the page and measuring the harness: unfiltered, one
+        click on these fixtures records 87 executed functions of which 85 have
+        an empty URL. Two modalities drive the browser differently, so those 85
+        never agree, and an equivalence test over them can only ever say no.
+        """
+        return replace(
+            outcome,
+            mouse=replace(outcome.mouse, coverage=_fixture_only(outcome.mouse.coverage)),
+            keyboard_by_key={
+                key: replace(result, coverage=_fixture_only(result.coverage))
+                for key, result in outcome.keyboard_by_key.items()
+            },
+        )
     for probe_id in probe_ids:
         try:
             async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
-                outcomes.append(await runner.run_probe(probe_id, page_path, order))
+                outcomes.append(
+                    to_fixture_scripts(await runner.run_probe(probe_id, page_path, order))
+                )
         except Exception as exc:
-            # Dropped, not guessed at: without a clean trial this probe can
-            # neither dismiss another nor be dismissed.
+            # A failed trial must stay in the denominator as UNKNOWN. Dropping
+            # it silently turned a missing positive into a false negative and a
+            # missing negative into a true negative -- the exact collapse of
+            # "could not measure" into a verdict that this experiment exists to
+            # refuse.
             log.debug("bakeoff.s4u_probe_failed", probe=probe_id, error=str(exc)[:200])
+            outcomes.append(
+                unknown_outcome(
+                    probe_id, page_path, "desktop", f"coverage-armed trial raised: {exc}"[:200]
+                )
+            )
         finally:
             async with asyncio.timeout(15):
                 await factory.close_open_contexts()
     return outcomes
+
+
+async def _upstream_baseline(
+    factory: ContextFactory, config: TrialConfig, origin: str
+) -> tuple[frozenset[str], str]:
+    """Upstream's per-page coverage floor: click ``#baseline-target``.
+
+    Returns the functions and a note. The note matters: an empty set because
+    the page has no such target is a different fact from an empty set because
+    the measurement failed, and storing only a size cannot tell them apart or
+    let anyone reconstruct a baseline-subtracted verdict afterwards.
+    """
+    context = None
+    try:
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            context = await factory()
+            page = await context.new_page()
+            cdp: Any = await context.new_cdp_session(page)
+            await page.goto(config.url, wait_until="load")
+            box = await page.locator("#baseline-target").first.bounding_box(timeout=1000)
+            await detectors.start_coverage(cdp)
+            await coverage.take(cdp, origin)
+            if box is None:
+                return frozenset(), "no #baseline-target on this page"
+            await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            await page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+            return frozenset(await coverage.take(cdp, origin)), "measured"
+    except Exception as exc:
+        return frozenset(), f"baseline failed: {type(exc).__name__}: {exc}"[:200]
+    finally:
+        try:
+            if context is not None:
+                async with asyncio.timeout(15):
+                    await context.close()
+        finally:
+            async with asyncio.timeout(15):
+                await factory.close_open_contexts()
 
 
 async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> set[str]:
@@ -616,88 +740,193 @@ async def _coverage_baseline(factory: ContextFactory, config: TrialConfig) -> se
                 await factory.close_open_contexts()
 
 
-async def _upstream_pass(
-    factory: ContextFactory, config: TrialConfig, probe_id: str, order: TabOrder
+UPSTREAM_SETTLE_MS = 200
+UPSTREAM_KEY_GAP_MS = 120
+UPSTREAM_KEYS = ("Enter", "Space", "ArrowDown")
+
+_PROBE_ATTR = "data-probe"
+
+
+async def _pierced_centre(cdp: Any, probe_id: str) -> tuple[tuple[float, float] | None, str | None]:
+    """Upstream's target resolution: the pierced CDP tree, then the box model.
+
+    ``DOM.getDocument`` with ``pierce`` walks shadow roots — closed ones
+    included — and frame content documents, which a Playwright locator cannot
+    reach. Returns the centre of the border box, or a reason it has none.
+    """
+    try:
+        doc = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
+    except Exception as exc:
+        return None, f"pierced tree unavailable: {type(exc).__name__}"
+
+    found: list[int] = []
+
+    def walk(node: dict[str, Any]) -> None:
+        if found:
+            return
+        attrs = node.get("attributes") or []
+        for i in range(0, len(attrs) - 1, 2):
+            if attrs[i] == _PROBE_ATTR and attrs[i + 1] == probe_id:
+                found.append(node["nodeId"])
+                return
+        for key in ("children", "shadowRoots"):
+            for child in node.get(key) or []:
+                walk(child)
+        for key in ("contentDocument", "templateContent"):
+            child = node.get(key)
+            if child:
+                walk(child)
+
+    walk(doc.get("root", {}))
+    if not found:
+        return None, "probe not present in the pierced DOM tree"
+    try:
+        model = await cdp.send("DOM.getBoxModel", {"nodeId": found[0]})
+    except Exception:
+        return None, "no rendered box (display:none / zero-size)"
+    border = (model.get("model") or {}).get("border") or []
+    if len(border) < 8:
+        return None, "no rendered box (display:none / zero-size)"
+    width = (model["model"].get("width") or 0)
+    height = (model["model"].get("height") or 0)
+    if width == 0 or height == 0:
+        return None, "no rendered box (display:none / zero-size)"
+    xs = border[0::2]
+    ys = border[1::2]
+    return ((sum(xs) / 4.0, sum(ys) / 4.0), None)
+
+
+async def _park_mouse(page: Any) -> None:
+    """Upstream parks the pointer so a stale ``:hover`` never leaks into a probe."""
+    viewport = page.viewport_size or {"width": 1280, "height": 900}
+    await page.mouse.move(viewport["width"] - 2, viewport["height"] - 2)
+
+
+async def _frame_snapshot(page: Any) -> dict[str, Any]:
+    """Snapshot every frame, keyed by URL, as upstream does.
+
+    A clickable element inside an iframe mutates that frame's document, which a
+    top-level snapshot cannot see at all. Upstream recorded this as the reason
+    one probe scored a false negative in their first run, and reading only the
+    top document is one of the ways our earlier D9u was not their detector.
+    """
+    out: dict[str, Any] = {}
+    for frame in page.frames:
+        try:
+            state = await frame.evaluate(channels.SNAPSHOT_JS)
+        except Exception as exc:
+            log.debug("bakeoff.frame_snapshot_failed", frame=frame.url, error=str(exc)[:120])
+            continue
+        if state:
+            out[frame.url] = state
+    return out
+
+
+def upstream_frame_delta(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
+    """Union of per-frame channel deltas, by upstream's presence test.
+
+    A frame that appears or disappears between the two reads counts as ``nav``,
+    which is upstream's rule and not merely a convenience.
+    """
+    changed: set[str] = set()
+    for key in set(before) | set(after):
+        b, a = before.get(key), after.get(key)
+        if not b or not a:
+            changed.add("nav")
+            continue
+        changed |= upstream_delta(b, a)
+    return changed
+
+
+async def _upstream_differential(
+    factory: ContextFactory,
+    config: TrialConfig,
+    probe_id: str,
+    order: TabOrder,
+    origin: str,
+    baseline: frozenset[str],
 ) -> UpstreamPass:
-    """Measure one probe exactly as upstream's D9 did, including its known bugs.
+    """One probe measured the way upstream's ``runDifferential`` measures it.
 
-    Two things here are deliberately *not* our design, because reproducing them
-    is the point:
+    Faithful to their procedure, including the parts we consider defects,
+    because reproducing them is the whole point of this row:
 
-    * **All three keys against one page state.** Upstream pressed Enter, Space
-      and ArrowDown in sequence without reloading, so a control that opens on
-      Enter and closes on Space nets to no change. We press one key per fresh
-      context; this row shows what that difference costs.
-    * **Presence, not payload.** A channel counts as changed if anything on it
-      changed, over their eight channels including `mutations`. An unrelated
-      console warning from the keypress therefore clears a real defect.
+    * **One page, reloaded between modalities** — not a fresh context. Their
+      storage-contamination bug lives here, and giving each modality its own
+      context silently removes it.
+    * **Every frame is observed**, not just the top document.
+    * **All three keys in sequence against one page state**, 120 ms apart, so a
+      control that opens on Enter and closes on Space nets to no change.
+    * **The keyboard baseline is taken before the Tab walk**, so every focus
+      side effect of every element passed on the way is attributed to this probe.
+    * **Presence, not payload**: any change on a channel counts, so an unrelated
+      console line from the keypress clears a real finding.
+    * 200 ms settle, pointer parked before each pass, target resolved through
+      the pierced tree.
     """
     result = UpstreamPass()
     position = order.position(probe_id)
-    if position is None and order.capped:
-        result.uncertainties["keyboard"] = "tab_cap: probe not reached before traversal cap"
+    in_tab_order = position is not None
+    context = None
+    try:
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            context = await factory()
+            await context.add_init_script(channels.INIT_SCRIPT)
+            page = await context.new_page()
+            cdp: Any = await context.new_cdp_session(page)
 
-    for modality in ("mouse", "keyboard"):
-        if modality == "keyboard" and position is None:
-            # Not reachable by Tab, so upstream performed no keyboard action at
-            # all and the delta is empty by construction, not by measurement.
-            continue
-        context = None
+            # ---- mouse -------------------------------------------------
+            await page.goto(config.url, wait_until="load")
+            await _park_mouse(page)
+            await page.wait_for_timeout(80)
+            centre, reason = await _pierced_centre(cdp, probe_id)
+            viewport = page.viewport_size or {"width": 1280, "height": 900}
+            if centre is None:
+                result.uncertainties["mouse"] = reason or "unresolved"
+            elif not (0 <= centre[0] <= viewport["width"] and 0 <= centre[1] <= viewport["height"]):
+                result.uncertainties["mouse"] = "outside the viewport"
+            else:
+                await detectors.start_coverage(cdp)
+                await coverage.take(cdp, origin)
+                before = await _frame_snapshot(page)
+                await page.mouse.move(centre[0], centre[1])
+                await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+                await page.mouse.click(centre[0], centre[1], delay=20)
+                await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+                after = await _frame_snapshot(page)
+                result.mouse_changed = upstream_frame_delta(before, after)
+                result.mouse_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
+
+            # ---- keyboard, on the SAME page after a full reload ---------
+            await page.goto(config.url, wait_until="load")
+            await _park_mouse(page)
+            await page.wait_for_timeout(80)
+            await detectors.start_coverage(cdp)
+            await coverage.take(cdp, origin)
+            kb_before = await _frame_snapshot(page)
+            if in_tab_order:
+                await page.evaluate("() => document.activeElement && document.activeElement.blur()")
+                for _ in range(position or 0):
+                    await page.keyboard.press("Tab")
+                await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+                for key in UPSTREAM_KEYS:
+                    await page.keyboard.press(key)
+                    await page.wait_for_timeout(UPSTREAM_KEY_GAP_MS)
+            await page.wait_for_timeout(UPSTREAM_SETTLE_MS)
+            kb_after = await _frame_snapshot(page)
+            result.keyboard_changed = upstream_frame_delta(kb_before, kb_after)
+            result.keyboard_coverage = frozenset(await coverage.take(cdp, origin)) - baseline
+            result.in_tab_order = in_tab_order
+    except Exception as exc:
+        result.uncertainties["run"] = f"{type(exc).__name__}: {exc}"[:240]
+    finally:
         try:
-            async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
-                context = await factory()
-                await context.add_init_script(channels.INIT_SCRIPT)
-                page = await context.new_page()
-                await page.goto(config.url, wait_until="load")
-                await page.wait_for_timeout(150)
-                locator = page.locator(f'[data-probe="{probe_id}"]').first
-                before = await page.evaluate(channels.SNAPSHOT_JS)
-                if modality == "mouse":
-                    box = await locator.bounding_box(timeout=1000)
-                    if not box or box["width"] <= 0 or box["height"] <= 0:
-                        result.uncertainties[modality] = "not_rendered: probe has no visible box"
-                        continue
-                    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-                    viewport = page.viewport_size
-                    if viewport is None or not (
-                        0 <= x < viewport["width"] and 0 <= y < viewport["height"]
-                    ):
-                        result.uncertainties[modality] = (
-                            "not_rendered: click point outside viewport"
-                        )
-                        continue
-                    await page.mouse.move(x, y)
-                    await page.wait_for_timeout(config.settle_ms)
-                    await page.mouse.click(x, y)
-                else:
-                    for _ in range(position or 0):
-                        await page.keyboard.press("Tab")
-                    if not await locator.evaluate("el => el.getRootNode().activeElement === el"):
-                        result.uncertainties[modality] = (
-                            "unresolved: tab replay did not reach probe"
-                        )
-                        continue
-                    # Sequence against one page state, as upstream did.
-                    for key in ("Enter", "Space", "ArrowDown"):
-                        await page.keyboard.press(key)
-                        await page.wait_for_timeout(50)
-                await page.wait_for_timeout(config.settle_ms)
-                after = await page.evaluate(channels.SNAPSHOT_JS)
-                changed = upstream_delta(before, after)
-                if modality == "mouse":
-                    result.mouse_changed = changed
-                else:
-                    result.keyboard_changed = changed
-        except Exception as exc:
-            result.uncertainties[modality] = f"{type(exc).__name__}: {exc}"[:240]
-        finally:
-            try:
-                if context is not None:
-                    async with asyncio.timeout(15):
-                        await context.close()
-            finally:
+            if context is not None:
                 async with asyncio.timeout(15):
-                    await factory.close_open_contexts()
+                    await context.close()
+        finally:
+            async with asyncio.timeout(15):
+                await factory.close_open_contexts()
     return result
 
 
@@ -832,6 +1061,7 @@ async def main_async(args: argparse.Namespace) -> int:
 
     behavioural = [
         D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9U_NAME,
+        D10A_U_NAME, D10B_U_NAME,
         D10_NAME, D10B_NAME, D10BASE_NAME,
     ]
     methods = [*CHEAP_METHODS, *([] if args.cheap_only else behavioural)]
@@ -841,6 +1071,7 @@ async def main_async(args: argparse.Namespace) -> int:
     coverage: dict[str, dict[str, Any]] = {}
     upstream_evidence: dict[str, dict[str, Any]] = {}
     s4u_dismissals: dict[str, str] = {}
+    baseline_evidence: dict[str, Any] = {}
     notes: dict[str, str] = {}
     tab_info: dict[str, Any] = {}
     actual_viewports: dict[str, dict[str, int]] = {}
@@ -891,13 +1122,17 @@ async def main_async(args: argparse.Namespace) -> int:
                             all_reported[D9_NOS4_NAME].update(result.d9_nos4)
                             all_reported[D9_S4U_NAME].update(result.d9_s4u)
                             all_reported[D9U_NAME].update(result.d9u)
+                            all_reported[D10A_U_NAME].update(result.d10a_u)
+                            all_reported[D10B_U_NAME].update(result.d10b_u)
                             all_reported[D10_NAME].update(result.d10)
                             all_reported[D10B_NAME].update(result.d10b)
                             all_reported[D10BASE_NAME].update(result.d10base)
                             all_unknown[D9_NAME].update(result.d9_unknown)
                             all_unknown[D9_NOS4_NAME].update(result.d9_unknown)
                             all_unknown[D9_S4U_NAME].update(result.d9_s4u_unknown)
-                            all_unknown[D9U_NAME].update(result.d9u_unknown)
+                            for name in (D9U_NAME, D10A_U_NAME, D10B_U_NAME):
+                                all_unknown[name].update(result.d9u_unknown)
+                            baseline_evidence[page_path] = result.baseline_evidence
                             s4u_dismissals.update(result.s4u_dismissals)
                             for name in (D10_NAME, D10B_NAME, D10BASE_NAME):
                                 all_unknown[name].update(result.d10_unknown)
@@ -984,6 +1219,7 @@ async def main_async(args: argparse.Namespace) -> int:
         "coverage_evidence": coverage,
         "upstream_evidence": upstream_evidence,
         "s4u_dismissals": s4u_dismissals,
+        "baseline_evidence": baseline_evidence,
         "reported": {k: sorted(v) for k, v in all_reported.items()},
         "unobservable": {k: sorted(v) for k, v in all_unknown.items() if v},
         "scores": [s.to_json() for s in scores],

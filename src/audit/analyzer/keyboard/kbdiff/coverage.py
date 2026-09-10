@@ -31,13 +31,22 @@ async def start(cdp: Any) -> None:
         await cdp.send("Profiler.startPreciseCoverage", {"callCount": False, "detailed": True})
 
 
-async def take(cdp: Any) -> frozenset[str]:
+async def take(cdp: Any, origin: str | None = None) -> frozenset[str]:
     """Executed-function identities since the previous call.
 
     A function counts as executed when any of its ranges has a non-zero count.
     Identity is ``url#name@offset`` — the offset keeps two same-named functions
     in one file distinct, which matters because minified bundles reuse names
     heavily.
+
+    ``origin`` restricts the result to scripts served from that URL prefix, and
+    upstream's implementation does this unconditionally. It is not cosmetic:
+    unfiltered, a single click on these fixtures records 87 executed functions
+    of which **85 have an empty URL** — harness ``evaluate`` bodies, init
+    scripts and driver internals — leaving 2 that belong to the page. Comparing
+    unfiltered sets compares instrumentation, and since the mouse and keyboard
+    passes drive the browser differently they can never agree. Pass the fixture
+    origin whenever the sets are going to be compared.
     """
     try:
         result = await cdp.send("Profiler.takePreciseCoverage")
@@ -48,6 +57,8 @@ async def take(cdp: Any) -> frozenset[str]:
     executed: set[str] = set()
     for script in result.get("result", []):
         url = script.get("url", "")
+        if origin is not None and not url.startswith(origin):
+            continue
         for func in script.get("functions", []):
             ranges = func.get("ranges", [])
             if any(r.get("count", 0) > 0 for r in ranges):
