@@ -275,34 +275,51 @@ it decided while deciding slightly less.
 
 ### 6.4 Comparing every detector idea
 
-The [full matrix](fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json)
+The [full matrix](fixtures/results/bakeoff-fixtures-guards-fixed.json)
 runs twenty-two approaches over the same 95 frozen targets, desktop only. These are
 Axcess reimplementations of upstream's published detectors, not the original
 code. Recall uses all positive labels as the denominator.
 
-| Method | Precision | Recall | F1 |
-| --- | ---: | ---: | ---: |
-| D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% |
-| **D9+S4u, the same with upstream's Stage 4** | **89.2%** | **84.6%** | **86.8%** |
-| **D9u+S4u upstream's complete pipeline (1:1)** | **87.5%** | **89.7%** | **88.6%** |
-| **D9u upstream's differential alone** | **78.3%** | **92.3%** | **84.7%** |
-| **D9+S4ours, our filter over the same coverage-armed inputs** | **87.2%** | **87.2%** | **87.2%** |
-| **D9-noS4, the same inputs with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** |
-| **D10b-u upstream set-difference (sequential keys, baselined)** | **75.5%** | **94.9%** | **84.1%** |
-| **D10a-u upstream coverage presence (sequential keys, baselined)** | **75.0%** | **84.6%** | **79.5%** |
-| D10b set-difference (Enter only, unbaselined variant) | 53.7% | 92.3% | 67.9% |
-| D10a ran for the mouse, none for Enter (unbaselined variant) | 57.1% | 82.1% | 67.4% |
-| D10a+base, the same with a handler-free baseline subtracted | 57.1% | 82.1% | 67.4% |
-| D4 CSS appearance and text hints | 56.2% | 69.2% | 62.1% |
-| D5 browser-debugger event listeners | 58.1% | 64.1% | 61.0% |
-| D8 changes after hover | 75.0% | 46.2% | 57.1% |
-| D6 intercepted listener registration | 53.8% | 53.8% | 53.8% |
-| D2b JavaScript `onclick` property | 100.0% | 10.3% | 18.6% |
-| D7 React event-handler properties | 100.0% | 5.1% | 9.8% |
-| D3 tabindex / ARIA hints | 50.0% | 5.1% | 9.3% |
-| D2 inline event attribute | 100.0% | 2.6% | 5.0% |
-| D0 approximation of the existing clickable collection | 50.0% | 2.6% | 4.9% |
-| D1 selected keyboard-related axe rules | 0.0% | 0.0% | - |
+| Method | Precision | Recall | F1 | Speed per target |
+| --- | ---: | ---: | ---: | ---: |
+| D9 mouse/keyboard effects plus equivalent alternative | 87.2% | 87.2% | 87.2% | 1623 ms |
+| **D9+S4u, the same with upstream's Stage 4** | **89.2%** | **84.6%** | **86.8%** | 1695 ms |
+| **D9u+S4u upstream's complete pipeline (1:1)** | **87.5%** | **89.7%** | **88.6%** | **1278 ms** |
+| **D9u upstream's differential alone** | **78.3%** | **92.3%** | **84.7%** | 1278 ms |
+| **D9+S4ours, our filter over the same coverage-armed inputs** | **87.2%** | **87.2%** | **87.2%** | 1695 ms |
+| **D9-noS4, the same inputs with no equivalence filter** | **79.1%** | **87.2%** | **82.9%** | 1695 ms |
+| **D10b-u upstream set-difference (sequential keys, baselined)** | **75.5%** | **94.9%** | **84.1%** | 1278 ms |
+| **D10a-u upstream coverage presence (sequential keys, baselined)** | **75.0%** | **84.6%** | **79.5%** | 1278 ms |
+| D10b set-difference (Enter only, unbaselined variant) | 53.7% | 92.3% | 67.9% | 953 ms |
+| D10a ran for the mouse, none for Enter (unbaselined variant) | 57.1% | 82.1% | 67.4% | 953 ms |
+| D10a+base, the same with a handler-free baseline subtracted | 57.1% | 82.1% | 67.4% | 953 ms |
+| D4 CSS appearance and text hints | 56.2% | 69.2% | 62.1% | 1.7 ms |
+| D5 browser-debugger event listeners | 58.1% | 64.1% | 61.0% | 6.1 ms |
+| D8 changes after hover | 75.0% | 46.2% | 57.1% | 223 ms |
+| D6 intercepted listener registration | 53.8% | 53.8% | 53.8% | 0.9 ms |
+| D2b JavaScript `onclick` property | 100.0% | 10.3% | 18.6% | 1.7 ms |
+| D7 React event-handler properties | 100.0% | 5.1% | 9.8% | 1.7 ms |
+| D3 tabindex / ARIA hints | 50.0% | 5.1% | 9.3% | 1.7 ms |
+| D2 inline event attribute | 100.0% | 2.6% | 5.0% | 1.7 ms |
+| D0 approximation of the existing clickable collection | 50.0% | 2.6% | 4.9% | 1.7 ms |
+| D1 selected keyboard-related axe rules | 0.0% | 0.0% | - | 67 ms |
+
+**Reading the speed column.** It is wall time for one target: the whole
+measurement a row depends on, divided by the 95 targets, from `page_timings_ms`
+in the artifact. **The numbers are not additive, because rows share
+measurements.** Six detectors — D0, D2, D2b, D3, D4, D7 — are filters over *one*
+DOM walk, so 1.7 ms/target buys all six rather than each; the filters themselves
+are 0.0002 to 0.0004 ms/target, measured separately and below the noise of
+anything else here. D1 and its D1x diagnostic share one axe run. The four rows
+built on upstream's sequential pass share its 1278 ms, and the Stage-4 filter
+over the whole corpus costs 0.022 ms — 0.0002 ms/target, which is to say
+nothing. The same holds for the coverage-armed group at 1695 ms and the
+Enter-only group at 953 ms.
+
+So the honest unit is "what does it cost to add this *family* to a scan", not
+"what does this row cost on its own". A page-level detector is also amortised:
+it runs once per page over every target at once, so its per-target figure falls
+as a page gets busier, while the behavioural rows scale strictly per target.
 
 The dash follows the scorer's convention for an undefined F1 when precision and
 recall are both zero. D1 raised one false alarm (`p80`) and found none of the 39
@@ -413,6 +430,42 @@ what their Stage 4 then partly repairs.
 That is a more uncomfortable and more useful result than the earlier one, which
 compared our detector against a version of theirs that had quietly acquired our
 fresh-context fix and lost their frame observation.
+
+#### Is our Stage 4 the same as theirs?
+
+Two rows carry upstream's Stage-4 signal and only one of them is a replication,
+so the distinction is worth stating rather than leaving to the row names.
+
+**`D9u+S4u` is their pipeline.** Their differential, filtered by their Stage 4.
+The filter is transcribed clause for clause from `tabbing-experiment.spec.ts`:
+the confirmed set is "mouse changed something, keyboard changed nothing"; the
+candidate pool is "in the tab order and the keyboard changed something"; a
+finding with no mouse coverage is kept untested; a candidate with no keyboard
+coverage is skipped; the channel signatures must match exactly; and the
+executed-function sets must be equal, which is what their Jaccard threshold of
+1.0 reduces to on two non-empty sets.
+
+It carries **two additions**, both our uncertainty gate: a probe whose
+measurement failed is excluded from the confirmed set, and a candidate whose
+coverage read is untrustworthy cannot dismiss. Upstream has no such concept.
+Both additions are conservative — they can only withhold a finding or a
+dismissal, never create one.
+
+**On this corpus both are inert, which is checkable rather than asserted.** The
+first changes the outcome for no probe at all. The second flags `h142`, `p26i`
+and `p74`, and all three are outside the tab order, so upstream's own
+`inTabOrder` test excludes them anyway. The four probes we abstain on are all
+labelled `excluded`, so scoring them the way upstream would — as non-findings,
+since an unattempted mouse yields no channels and fails their `verdict` test —
+gives **the identical 87.5% / 89.7% / 88.6%**. The gates are real, and here they
+cost nothing.
+
+**`D9+S4u` is not a replication**, and should not be read as one. It applies
+their *signal* to *our* differential's findings, through our equivalence
+machinery, which searches **per page** where theirs searches the whole corpus.
+It is an ablation that isolates the filter against a fixed set of findings, and
+it is useful for exactly that — but two of its three differences from upstream
+are ours, not theirs.
 
 **D10a-u and D10b-u** are upstream's coverage rules over that same sequential
 trial, with the baseline subtracted from both sides. D10b-u has the **highest
@@ -844,7 +897,7 @@ To reproduce the experiment with installed dependencies, follow the commands in
 | [`results/audit-fixes.raw.json`](results/audit-fixes.raw.json) | Audit applied; scores unchanged. |
 | [`results/reviewed.raw.json`](results/reviewed.raw.json) | **The measurement of record.** |
 | [`results/reviewed-repeat.raw.json`](results/reviewed-repeat.raw.json) | Separate repeat run; identical verdicts. |
-| [`fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json`](fixtures/results/bakeoff-fixtures-upstream-1to1-fixed.json) | **The measurement of record for the matrix**: twenty-two methods, upstream's own instrument transcribed verbatim, their complete pipeline end to end, the Stage-4 ablation over one shared input set, and per-probe coverage evidence. |
+| [`fixtures/results/bakeoff-fixtures-guards-fixed.json`](fixtures/results/bakeoff-fixtures-guards-fixed.json) | **The measurement of record for the matrix**: twenty-two methods, upstream's own instrument transcribed verbatim, their complete pipeline end to end, the Stage-4 ablation over one shared input set, and per-probe coverage evidence. |
 | [`fixtures/results/bakeoff-fixtures-upstream-callcount.json`](fixtures/results/bakeoff-fixtures-upstream-callcount.json) | Superseded: its ported rows read through our instrument rather than upstream's. |
 | [`fixtures/results/bakeoff-fixtures-upstream-faithful.json`](fixtures/results/bakeoff-fixtures-upstream-faithful.json) | Superseded: its coverage was armed with `callCount: false`, inflating false positives on the two upstream coverage rows. |
 | [`fixtures/results/bakeoff-fixtures-upstream-s4.json`](fixtures/results/bakeoff-fixtures-upstream-s4.json) | Superseded: its coverage was unfiltered, so its Stage-4 rows measured harness noise. |
