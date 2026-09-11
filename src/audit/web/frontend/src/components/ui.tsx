@@ -42,7 +42,12 @@ export function Card({
   );
 }
 
-/** Compact metric surface with strong numeric hierarchy. */
+/** Compact metric readout with strong numeric hierarchy.
+ *
+ * Deliberately chrome-free: no card fill, border, shadow or accent rule. Four
+ * of these sit in a row, so a box around each one draws four rectangles the
+ * reader has to look past to reach the numbers -- the chrome competes with the
+ * data it frames. Spacing and type hierarchy do the grouping instead. */
 export function StatCard({
   label,
   value,
@@ -55,13 +60,13 @@ export function StatCard({
   tone?: "default" | "critical" | "major" | "minor" | "info";
 }) {
   return (
-    <Card className="relative overflow-hidden p-5 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-umich-blue">
+    <div className="px-1 py-2">
       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
         {label}
       </div>
       <div
         className={cn(
-          "mt-2 text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
+          "mt-2 text-[2rem] font-semibold leading-none tracking-tight",
           tone === "critical" && "text-sev-critical",
           tone === "major" && "text-sev-major",
           tone === "minor" && "text-sev-minor",
@@ -72,7 +77,7 @@ export function StatCard({
         {value}
       </div>
       {hint && <div className="mt-2 text-xs text-fg-muted">{hint}</div>}
-    </Card>
+    </div>
   );
 }
 
