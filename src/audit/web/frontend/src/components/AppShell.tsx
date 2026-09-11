@@ -235,7 +235,7 @@ function Sidebar({
       <div
         className={cn(
           "flex h-[72px] items-center border-b border-border",
-          collapsed ? "justify-center px-2" : "gap-3 px-5",
+          collapsed ? "justify-center px-2" : "gap-2 px-5",
         )}
       >
         {/* Collapsed, the rail is 64px: a 44px target and the wordmark cannot
@@ -244,7 +244,7 @@ function Sidebar({
         {!collapsed && (
           <>
             <BrandMark className="h-8 w-8 text-umich-blue" />
-            <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight tracking-[-0.025em]">
+            <span className="min-w-0 flex-1 truncate text-xl font-medium leading-tight tracking-[-0.025em]">
               Axcess
             </span>
           </>
@@ -347,7 +347,7 @@ function TopBar({
           )}
         </button>
         <BrandMark className="h-8 w-8 text-xs" />
-        <span className="hidden font-semibold leading-tight text-fg sm:inline">
+        <span className="hidden font-medium leading-tight text-fg sm:inline">
           Axcess
         </span>
       </div>
