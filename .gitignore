@@ -47,9 +47,8 @@ desktop/out/
 # Runtime caches
 .tldextract-cache/
 
-# Local-only agent skills
-.claude/skills/gauntlet-loop/
-.claude/skills/gauntlet-loop-deepseek/
+# Local-only agent/editor config. Kept on disk, never tracked.
+.claude/
 
 # Frontend (src/audit/web/frontend)
 # Vite build output is already ignored by the global "dist/" rule above.
