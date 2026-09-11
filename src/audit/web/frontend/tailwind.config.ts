@@ -76,7 +76,11 @@ const config: Config = {
         },
       },
       fontFamily: {
+        // Atkinson Hyperlegible leads both stacks; see `src/fonts.css` for why
+        // and for the offline constraint that makes it self-hosted. The system
+        // stack stays behind it so the UI still renders if a font file 404s.
         sans: [
+          '"Atkinson Hyperlegible Next"',
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
@@ -86,6 +90,7 @@ const config: Config = {
           "sans-serif",
         ],
         mono: [
+          '"Atkinson Hyperlegible Mono"',
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",

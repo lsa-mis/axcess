@@ -1,3 +1,6 @@
+/* Ahead of Tailwind so the @font-face rules land before anything uses them. */
+@import "./fonts.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,7 +8,10 @@
 /* Base typographic + color defaults layered on top of Tailwind's reset. */
 @layer base {
   html {
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Was a set of Inter character-variant features ("cv02" ...). Atkinson
+       Hyperlegible has no such axes -- its disambiguated letterforms are the
+       default outlines, not an opt-in feature -- so the old list addressed a
+       font this app never shipped. */
     /* Wide evidence tables scroll in their named local region; they must not
        create a second, document-level horizontal scroll area at 320px. */
     overflow-x: hidden;

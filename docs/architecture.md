@@ -341,6 +341,7 @@ only writer and it's single-process.
 | Ollama model | `ollama pull qwen3-vl:2b-instruct` downloads the 1.9GB local vision model once |
 | Public Suffix List | tldextract opened with `suffix_list_urls=()` → bundled snapshot |
 | axe-core | vendored under `src/audit/web/static/` (test harness) |
+| Atkinson Hyperlegible | woff2 vendored under `src/audit/web/frontend/public/fonts/`, served from `/app/fonts/`; never fetched from a CDN |
 | Defusedxml | local pure-Python parser for sitemaps |
 
 After the one-time setup, disconnecting from the internet and running a
