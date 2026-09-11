@@ -181,13 +181,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </a>
 
       <div className="flex min-h-screen items-start">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
             onSearch={() => setCommandOpen(true)}
           />
           {mobileNavOpen && <MobileNav pathname={pathname} />}
@@ -214,7 +212,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function Sidebar({ collapsed }: { collapsed: boolean }) {
+function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const { pathname } = useLocation();
   return (
     <aside
@@ -230,16 +234,37 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
     >
       <div
         className={cn(
-          "flex h-[72px] items-center gap-3 border-b border-border",
-          collapsed ? "justify-center px-2" : "px-5",
+          "flex h-[72px] items-center border-b border-border",
+          collapsed ? "justify-center px-2" : "gap-3 px-5",
         )}
       >
-        <BrandMark className="h-8 w-8 text-umich-blue" />
+        {/* Collapsed, the rail is 64px: a 44px target and the wordmark cannot
+            both sit here, and the toggle has to win because it is the only way
+            back. Expanded, the brand leads and the toggle sits at the far end. */}
         {!collapsed && (
-          <span className="min-w-0 truncate text-lg font-semibold leading-tight tracking-[-0.025em]">
-            Axcess
-          </span>
+          <>
+            <BrandMark className="h-8 w-8 text-umich-blue" />
+            <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight tracking-[-0.025em]">
+              Axcess
+            </span>
+          </>
         )}
+        <button
+          type="button"
+          aria-label={
+            collapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
+          }
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={onToggle}
+          className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted transition-colors hover:bg-umich-blue/10 hover:text-umich-blue"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-5 w-5" aria-hidden />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" aria-hidden />
+          )}
+        </button>
       </div>
       <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
@@ -287,14 +312,10 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
-  sidebarCollapsed,
-  onToggleSidebar,
   onSearch,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
   onSearch: () => void;
 }) {
   const { pathname } = useLocation();
@@ -304,24 +325,6 @@ function TopBar({
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
-      {/* Desktop sidebar toggle, reclaims the sidebar's 256px for wide views
-          such as the page inspector, while keeping nav one click away. */}
-      <button
-        type="button"
-        aria-label={
-          sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
-        }
-        aria-expanded={!sidebarCollapsed}
-        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        onClick={onToggleSidebar}
-        className="hidden min-h-target min-w-target items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg md:inline-flex"
-      >
-        {sidebarCollapsed ? (
-          <PanelLeftOpen className="h-5 w-5" aria-hidden />
-        ) : (
-          <PanelLeftClose className="h-5 w-5" aria-hidden />
-        )}
-      </button>
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
