@@ -159,6 +159,13 @@ function createWindow() {
     backgroundColor: "#f7f8fa",
     title: "Axcess",
     icon: appIcon,
+    // Hide the File/Edit/View menu bar by default. `autoHideMenuBar` rather
+    // than `Menu.setApplicationMenu(null)`: removing the menu outright would
+    // also remove its accelerators, and a keyboard-only user would lose the
+    // standard edit and window shortcuts. Hidden, the bar still appears on Alt
+    // and every shortcut keeps working. No effect on macOS, where the menu
+    // lives in the system bar and cannot be hidden per-window.
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

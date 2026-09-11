@@ -67,22 +67,32 @@ const NAV: NavItem[] = [
 ];
 
 /**
- * Brand mark: maize rounded square with blue "Ax", the product wordmark
- * (Axcess = access + the axe-core engine at its centre). Inverted relative
- * to the favicon (blue square, maize letters) because the sidebar is
- * already UMich blue.
+ * Brand mark: the A11y Crawler logo — an open scan path with a node riding its
+ * leading edge. The outer ring is a crawl that has not closed yet, the dot is
+ * the page it is on, the inner ring is the scan itself.
+ *
+ * Drawn in currentColor with no tile behind it, so it takes the colour of
+ * whatever surface it sits on: UMich blue on the light sidebar, white on the
+ * blue mobile bar. Stroke geometry is the original's, unaltered.
+ *
+ * Decorative: it always sits beside the word "Axcess", so naming it here would
+ * only make a screen reader say it twice.
  */
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span
+    <svg
+      viewBox="0 0 32 32"
+      className={cn("shrink-0", className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
       aria-hidden
-      className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-[10px] bg-umich-maize font-black tracking-tighter text-umich-blue shadow-[0_5px_16px_rgba(255,203,5,0.18)]",
-        className,
-      )}
     >
-      Ax
-    </span>
+      <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95" />
+      <circle cx="16" cy="16" r="5.6" />
+      <circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
@@ -171,13 +181,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </a>
 
       <div className="flex min-h-screen items-start">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
             onSearch={() => setCommandOpen(true)}
           />
           {mobileNavOpen && <MobileNav pathname={pathname} />}
@@ -204,40 +212,61 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-function Sidebar({ collapsed }: { collapsed: boolean }) {
+function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const { pathname } = useLocation();
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] transition-[width] duration-150 md:flex",
+        // Light neutral ramp drawn from the surface tokens. Everything on it
+        // uses the standard foreground ramp rather than the inverse one: at the
+        // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
+        // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,#F8FAFC_0%,#F1F4F8_52%,#E6EBF2_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
         collapsed ? "w-16" : "w-64",
       )}
       aria-label="Primary"
     >
       <div
         className={cn(
-          "flex h-[72px] items-center gap-3 border-b border-white/10",
-          collapsed ? "justify-center px-2" : "px-5",
+          "flex h-[72px] items-center border-b border-border",
+          collapsed ? "justify-center px-2" : "gap-2 px-5",
         )}
       >
-        <BrandMark className="h-9 w-9 text-sm" />
+        {/* Collapsed, the rail is 64px: a 44px target and the wordmark cannot
+            both sit here, and the toggle has to win because it is the only way
+            back. Expanded, the brand leads and the toggle sits at the far end. */}
         {!collapsed && (
-          <div className="min-w-0">
-            <span className="block text-lg font-semibold leading-tight tracking-[-0.025em]">
+          <>
+            <BrandMark className="h-8 w-8 text-umich-blue" />
+            <span className="min-w-0 flex-1 truncate text-xl font-medium leading-tight tracking-[-0.025em]">
               Axcess
             </span>
-            <span className="block text-2xs font-medium tracking-wide text-surface-inverse-fg-subtle">
-              Accessibility workbench
-            </span>
-          </div>
+          </>
         )}
+        <button
+          type="button"
+          aria-label={
+            collapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
+          }
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={onToggle}
+          className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted transition-colors hover:bg-umich-blue/10 hover:text-umich-blue"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-5 w-5" aria-hidden />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" aria-hidden />
+          )}
+        </button>
       </div>
       <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
-        {!collapsed && (
-          <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.16em] text-surface-inverse-fg-subtle">
-            Workspace
-          </p>
-        )}
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -256,8 +285,8 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
                     "group relative flex min-h-target items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
                     collapsed ? "justify-center px-2" : "px-3",
                     active
-                      ? "bg-white text-umich-blue shadow-[0_6px_18px_rgba(0,0,0,0.13)]"
-                      : "text-surface-inverse-fg-subtle hover:bg-white/10 hover:text-white",
+                      ? "bg-umich-blue text-fg-inverse shadow-[0_6px_18px_rgba(0,39,76,0.18)]"
+                      : "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue",
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -268,17 +297,6 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
           })}
         </ul>
       </nav>
-      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0), at
-          10:1 against UMich Blue it clears AAA. Plain `text-white/60`
-          rendered as ~#99A9B7, which axe flagged at 6.24:1 (fails AAA). */}
-      {!collapsed && (
-        <div className="border-t border-white/10 px-5 py-4 text-2xs text-surface-inverse-fg-subtle">
-          <p className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-umich-maize" aria-hidden />
-            Local-first evidence workspace
-          </p>
-        </div>
-      )}
     </aside>
   );
 }
@@ -294,14 +312,10 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
-  sidebarCollapsed,
-  onToggleSidebar,
   onSearch,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
   onSearch: () => void;
 }) {
   const { pathname } = useLocation();
@@ -311,24 +325,6 @@ function TopBar({
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
-      {/* Desktop sidebar toggle, reclaims the sidebar's 256px for wide views
-          such as the page inspector, while keeping nav one click away. */}
-      <button
-        type="button"
-        aria-label={
-          sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
-        }
-        aria-expanded={!sidebarCollapsed}
-        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        onClick={onToggleSidebar}
-        className="hidden min-h-target min-w-target items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg md:inline-flex"
-      >
-        {sidebarCollapsed ? (
-          <PanelLeftOpen className="h-5 w-5" aria-hidden />
-        ) : (
-          <PanelLeftClose className="h-5 w-5" aria-hidden />
-        )}
-      </button>
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
@@ -351,7 +347,7 @@ function TopBar({
           )}
         </button>
         <BrandMark className="h-8 w-8 text-xs" />
-        <span className="hidden font-semibold leading-tight text-fg sm:inline">
+        <span className="hidden font-medium leading-tight text-fg sm:inline">
           Axcess
         </span>
       </div>

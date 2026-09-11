@@ -259,7 +259,7 @@ function FindingCard({
       )}
       <AlfaEvidenceNote evidence={finding} />
 
-      <p className="mt-3 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+      <p className="mt-3 text-2xs font-semibold text-fg-subtle">
         Where on the page
       </p>
       <p className="mt-1 break-words text-sm text-fg">{location.label}</p>

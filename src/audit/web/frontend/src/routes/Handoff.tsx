@@ -94,7 +94,7 @@ export default function HandoffRoute() {
             <li key={item.label} className="flex items-start gap-2 bg-surface p-3 text-sm">
               <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${item.ready ? "border-umich-blue bg-umich-blue text-white" : "border-sev-major text-sev-major"}`}>{item.ready ? "✓" : "!"}</span>
               <span>
-                <span className={`block text-xs font-semibold uppercase tracking-wide ${item.ready ? "text-umich-blue" : "text-sev-major"}`}>
+                <span className={`block text-xs font-semibold ${item.ready ? "text-umich-blue" : "text-sev-major"}`}>
                   {item.ready ? "Complete" : "Missing"}
                 </span>
                 <strong className="block">{item.label}</strong>

@@ -14,7 +14,7 @@ export function SeverityChip({ value }: { value: Severity }) {
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-fg-muted">
+    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted">
       {value.replace(/_/g, " ")}
     </span>
   );
@@ -42,7 +42,12 @@ export function Card({
   );
 }
 
-/** Compact metric surface with strong numeric hierarchy. */
+/** Compact metric readout with strong numeric hierarchy.
+ *
+ * Deliberately chrome-free: no card fill, border, shadow or accent rule. Four
+ * of these sit in a row, so a box around each one draws four rectangles the
+ * reader has to look past to reach the numbers -- the chrome competes with the
+ * data it frames. Spacing and type hierarchy do the grouping instead. */
 export function StatCard({
   label,
   value,
@@ -55,13 +60,13 @@ export function StatCard({
   tone?: "default" | "critical" | "major" | "minor" | "info";
 }) {
   return (
-    <Card className="relative overflow-hidden p-5 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-umich-blue">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+    <div className="px-1 py-2">
+      <div className="text-xs font-semibold text-fg-subtle">
         {label}
       </div>
       <div
         className={cn(
-          "mt-2 text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
+          "mt-2 text-[2rem] font-semibold leading-none tracking-tight",
           tone === "critical" && "text-sev-critical",
           tone === "major" && "text-sev-major",
           tone === "minor" && "text-sev-minor",
@@ -72,7 +77,7 @@ export function StatCard({
         {value}
       </div>
       {hint && <div className="mt-2 text-xs text-fg-muted">{hint}</div>}
-    </Card>
+    </div>
   );
 }
 
@@ -455,7 +460,7 @@ export function Disclosure({
 export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
     return (
-      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sev-critical">
+      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
         missing
       </span>
     );
@@ -495,7 +500,7 @@ export function ScanStatusBadge({ value }: { value: ScanStatus }) {
     <span
       aria-label={`Scan status: ${value}`}
       className={cn(
-        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide",
+        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold",
         SCAN_STATUS_CLASS[value],
       )}
     >
@@ -681,7 +686,10 @@ export function PageLink({
           to={inspectTo}
           className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
         >
-          <ScanEye className="h-3.5 w-3.5 shrink-0 self-center text-fg-subtle" aria-hidden />
+          {/* self-start, not self-center: the flex line is as tall as the wrapped
+              title, so centring drops the icon into the gap between lines on
+              any title that wraps. Top-aligned it stays beside the first line. */}
+          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
           <span className="sr-only">, opens the in-app page inspector</span>
         </Link>

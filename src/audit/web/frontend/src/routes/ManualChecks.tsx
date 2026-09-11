@@ -215,7 +215,7 @@ export default function ManualChecksRoute() {
       <Card className="mb-5 overflow-hidden">
         <div className="grid gap-4 bg-umich-blue p-4 text-white sm:grid-cols-[1fr_auto] sm:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-white">Expert review progress</p>
+            <p className="text-xs font-semibold text-white">Expert review progress</p>
             <p className="mt-1 text-2xl font-semibold">{decided} of {checks.length} criteria finalized</p>
             <p className="mt-1 text-sm text-white">“Not tested” is an honest decision when its rationale documents the limitation. A machine result is never substituted for one.</p>
           </div>
@@ -277,7 +277,7 @@ export default function ManualChecksRoute() {
         <Card className="mb-4 p-3">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label>
-              <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle"><Search className="h-3.5 w-3.5" aria-hidden /> Search</span>
+              <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-fg-subtle"><Search className="h-3.5 w-3.5" aria-hidden /> Search</span>
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Criterion or test procedure" className="field" />
             </label>
             <FilterSelect label="Outcome" value={outcomeFilter} onChange={setOutcomeFilter} options={[{ value: "", label: `All outcomes (${checks.length})` }, ...Object.entries(OUTCOME_LABELS).map(([value, label]) => ({ value, label: `${label} (${counts[value as ManualOutcome]})` }))]} />
@@ -347,7 +347,7 @@ function Field({ label, wide, children }: { label: string; wide?: boolean; child
 }
 
 function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <label><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-subtle">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="field">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  return <label><span className="mb-1 block text-xs font-semibold text-fg-subtle">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="field">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function OutcomeMark({ outcome }: { outcome: ManualOutcome }) {
@@ -403,7 +403,7 @@ function ManualCheckEditor({
         <header className="border-b border-border bg-surface-muted p-4">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">{PRINCIPLES[check.criterion.sc[0]]} · Level {check.criterion.level}</p>
+              <p className="text-xs font-semibold text-fg-subtle">{PRINCIPLES[check.criterion.sc[0]]} · Level {check.criterion.level}</p>
               <h3 id="criterion-heading" data-criterion-heading tabIndex={-1} className="mt-1 text-lg font-semibold outline-none focus-visible:ring-4 focus-visible:ring-umich-maize">{check.criterion.sc} · {check.criterion.name}</h3>
             </div>
             <span className="rounded-full border border-border bg-surface px-2 py-1 text-xs font-semibold">{check.criterion.method}</span>

@@ -112,9 +112,13 @@ export default function IssueEvidence({
             key={fact.label}
             className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2"
           >
-            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-fg-subtle">
-              {fact.label}
-            </dt>
+            {/* Sentence case and a lighter weight. Capitals strip the
+                ascenders and descenders that give a word its outline, so the
+                reader spells the label out instead of recognising its shape --
+                and that cost lands hardest on the low-vision and dyslexic
+                readers this tool exists to serve. Size and colour already mark
+                the label as secondary; it need not shout as well. */}
+            <dt className="text-xs font-medium text-fg-subtle">{fact.label}</dt>
             <dd className="text-sm font-semibold tabular-nums text-fg">
               {fact.value}
             </dd>
@@ -145,7 +149,7 @@ export default function IssueEvidence({
           {isInformational ? "Evidence summary" : "About this issue"}
         </h3>
 
-        <h4 className="text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+        <h4 className="text-2xs font-semibold text-fg-subtle">
           What it is
         </h4>
         <p className="mt-1 text-sm text-fg">
@@ -161,7 +165,7 @@ export default function IssueEvidence({
 
         {!isInformational && fix_steps.length > 0 && (
           <>
-            <h4 className="mt-4 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+            <h4 className="mt-4 text-2xs font-semibold text-fg-subtle">
               Expected behavior
             </h4>
             <ol className="mt-1 list-decimal space-y-1.5 pl-5 text-sm text-fg">
@@ -184,7 +188,7 @@ export default function IssueEvidence({
 
         {!isInformational && (verify_manual || verify_automated) && (
           <>
-            <h4 className="mt-4 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+            <h4 className="mt-4 text-2xs font-semibold text-fg-subtle">
               {row.review_lane === "expert_review"
                 ? "What to check to confirm"
                 : "How to verify"}
@@ -210,7 +214,7 @@ export default function IssueEvidence({
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>
           </h3>
-          <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <label className="flex items-center gap-2 text-xs font-semibold text-fg-subtle">
             Sort by
             <select
               value={sort}
@@ -234,7 +238,7 @@ export default function IssueEvidence({
               <caption className="sr-only">
                 Pages with the evidence group {row.title}
               </caption>
-              <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+              <thead className="bg-surface-muted text-2xs text-fg-subtle">
                 <tr>
                   <th scope="col" className="w-10 px-3 py-2 text-right font-semibold">
                     <span aria-hidden="true">#</span>
@@ -253,16 +257,24 @@ export default function IssueEvidence({
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              {/* Finder-style banding rather than a rule between every row: with
+                  a title, a wrapped URL and two links in each cell, horizontal
+                  lines added a fourth thing to look at. The band is keyed to
+                  `pageIndex`, NOT to the `<tr>` position, because a page with
+                  screenshots renders two rows and CSS `odd:`/`even:` would then
+                  stripe halfway through a record. Both rows of a page share one
+                  band, so a record reads as a single block. */}
+              <tbody>
                 {pages.map((p, pageIndex) => {
                   const missingScreenshots = Math.max(
                     0,
                     p.occurrence_count - p.screenshot_hashes.length,
                   );
                   const pageLabel = p.page_title || p.page_url;
+                  const band = pageIndex % 2 === 1 ? "bg-surface-subtle" : "bg-surface";
                   return (
                     <Fragment key={p.page_id}>
-                      <tr>
+                      <tr className={band}>
                         <th
                           scope="row"
                           className="px-3 py-2 text-right align-top font-normal tabular-nums text-fg-subtle"
@@ -311,9 +323,9 @@ export default function IssueEvidence({
                         )}
                       </tr>
                       {p.screenshot_hashes.length > 0 && (
-                        <tr className="bg-surface-muted/40">
+                        <tr className={band}>
                           <td colSpan={isInformational ? 3 : 4} className="px-3 pb-4 pt-2">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                            <h4 className="text-xs font-semibold text-fg-subtle">
                               Instance screenshots
                             </h4>
                             <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

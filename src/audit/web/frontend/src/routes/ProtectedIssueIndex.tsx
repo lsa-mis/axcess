@@ -107,7 +107,7 @@ export default function ProtectedIssueIndexRoute() {
             <Card className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <caption className="sr-only">Protected grouped automated issue leads</caption>
-                <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+                <thead className="bg-surface-muted text-2xs text-fg-subtle">
                   <tr>
                     <th scope="col" className="px-4 py-2 text-left font-semibold">Source layer</th>
                     <th scope="col" className="px-4 py-2 text-left font-semibold">Rule</th>

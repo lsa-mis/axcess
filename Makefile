@@ -83,8 +83,16 @@ frontend-dev: ## Run Vite dev server on :5173 (proxies /api to FastAPI)
 alfa-install: ## Install the optional, pinned Siteimprove Alfa local runner
 	cd $(ALFA_RUNNER) && npm ci
 
+# npm 12 refuses git-sourced dependencies by default (allow-git=none). Forge's
+# @electron/rebuild pulls @electron/node-gyp from a git URL, and because that is
+# a transitive dep the narrower --allow-git=root does not cover it. The flag is
+# kept here, on the one command that needs it, rather than in a desktop/.npmrc
+# that would relax the rule for every npm invocation in that directory.
+# Electron 43 also ships no postinstall, so its binary must be fetched by hand;
+# without this the shell installs "successfully" and then cannot launch.
 desktop-install: ## Install the Electron desktop-shell dependencies
-	cd $(DESKTOP) && npm ci
+	cd $(DESKTOP) && npm ci --allow-git=all
+	cd $(DESKTOP) && node node_modules/electron/install.js
 
 desktop-setup: frontend-install alfa-install desktop-install ## Prepare desktop development
 	uv sync --group desktop

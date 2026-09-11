@@ -94,7 +94,7 @@ export default function DashboardRoute() {
         <Card className="mb-5 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-fg-subtle">
+              <p className="text-2xs font-semibold text-fg-subtle">
                 Waiting on you · report #{latest.id} ·{" "}
                 <span className="break-all normal-case tracking-normal text-fg-muted">
                   {siteLabel(latest.seed_url)}

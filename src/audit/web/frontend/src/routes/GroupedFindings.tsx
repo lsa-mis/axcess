@@ -125,7 +125,7 @@ export default function GroupedFindingsRoute() {
       {/* Status filter, URL-persistent, auto-applies on change. Same
           UX shape as the WCAG drill-down filter. */}
       <Card className="mb-4 p-3">
-        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <label className="flex flex-col text-xs font-semibold text-fg-subtle">
           Status filter
           <select
             value={status}
@@ -369,7 +369,7 @@ function FindingsInGroup({ findings }: { findings: GroupedFinding[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+        <thead className="bg-surface-muted text-2xs text-fg-subtle">
           <tr>
             <th scope="col" className="px-3 py-2 text-left font-semibold">
               Image

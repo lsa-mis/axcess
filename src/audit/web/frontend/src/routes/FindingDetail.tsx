@@ -177,7 +177,7 @@ export default function FindingDetailRoute() {
 
         <div className="flex flex-col gap-4">
           <Card className="p-4">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
+            <h2 className="mb-3 text-sm font-semibold text-fg-subtle">
               Decision grid
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -213,7 +213,7 @@ export default function FindingDetailRoute() {
             )}
             {data.remediation_hint && (
               <div className="mt-3 rounded-xs border-l-2 border-umich-blue bg-umich-blue/5 p-3 text-sm text-fg">
-                <div className="mb-1 text-2xs font-semibold uppercase tracking-wide text-umich-blue">
+                <div className="mb-1 text-2xs font-semibold text-umich-blue">
                   Suggested fix
                 </div>
                 {data.remediation_hint}
@@ -222,7 +222,7 @@ export default function FindingDetailRoute() {
           </Card>
 
           <Card className="p-4">
-            <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
+            <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-fg-subtle">
               <span>Triage status</span>
               {toast && (
                 <span
@@ -279,12 +279,12 @@ export default function FindingDetailRoute() {
 
       {data.occurrences.length > 0 && (
         <Card className="mt-6 overflow-hidden">
-          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-subtle">
             Appears on {data.occurrences.length} page
             {data.occurrences.length === 1 ? "" : "s"}
           </div>
           <table className="w-full text-sm">
-            <thead className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+            <thead className="text-2xs font-semibold text-fg-subtle">
               <tr>
                 <th scope="col" className="px-4 py-2 text-left">
                   Page
@@ -337,7 +337,7 @@ function VerdictCell({
 }) {
   return (
     <div>
-      <div className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+      <div className="text-2xs font-semibold text-fg-subtle">
         {label}
       </div>
       <div className="mt-1">{children}</div>

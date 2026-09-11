@@ -690,6 +690,20 @@ def create_app(
             name="app-assets",
         )
 
+    # Self-hosted fonts live beside the hashed assets and need their own mount:
+    # without one they fall through to the /app/{path} catch-all below, which
+    # answers every unknown path with index.html. The browser then receives
+    # HTML where a woff2 should be, the @font-face fails to parse, and the UI
+    # silently renders in the fallback stack -- a 200 response the whole way,
+    # so nothing looks broken except the typeface.
+    _frontend_fonts = _FRONTEND_DIST / "fonts"
+    if _frontend_fonts.is_dir():
+        app.mount(
+            "/app/fonts",
+            StaticFiles(directory=_frontend_fonts),
+            name="app-fonts",
+        )
+
     # Single running crawl at a time. Tracked here (not in the DB) because
     # "running" in the scans table can be stale after a server restart.
     crawl_state: dict[str, asyncio.Task[Any] | int | None] = {

@@ -318,7 +318,7 @@ function IssueListRow({ row, selected }: { row: IssueRow; selected: boolean }) {
             {row.title}
           </span>
           {selected && (
-            <span className="mt-0.5 shrink-0 rounded-full bg-umich-blue px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-white">
+            <span className="mt-0.5 shrink-0 rounded-full bg-umich-blue px-2 py-0.5 text-2xs font-semibold text-white">
               Current
             </span>
           )}

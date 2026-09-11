@@ -76,7 +76,11 @@ const config: Config = {
         },
       },
       fontFamily: {
+        // Atkinson Hyperlegible leads both stacks; see `src/fonts.css` for why
+        // and for the offline constraint that makes it self-hosted. The system
+        // stack stays behind it so the UI still renders if a font file 404s.
         sans: [
+          '"Atkinson Hyperlegible Next"',
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
@@ -86,6 +90,7 @@ const config: Config = {
           "sans-serif",
         ],
         mono: [
+          '"Atkinson Hyperlegible Mono"',
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",
@@ -115,8 +120,16 @@ const config: Config = {
         "2xs": "5px",
         xs: "8px",
       },
+      // Smallest-step floor. WCAG sets no minimum size (1.4.4 asks only that
+      // text survive 200% zoom), but low-vision guidance converges on ~16px
+      // body and treats anything under 12px as unreadable for sustained use.
+      // `2xs` was 11px and appears ~80 times, `xs` 12px and appears ~200, so
+      // most of the interface's secondary text sat at or below that floor.
+      // Lifting the tokens raises every one of those at once and keeps the
+      // steps in proportion, rather than editing hundreds of call sites.
       fontSize: {
-        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+        "2xs": ["0.75rem", { lineHeight: "1.05rem" }], // 12px, was 11px
+        xs: ["0.8125rem", { lineHeight: "1.15rem" }], // 13px, was 12px
       },
     },
   },

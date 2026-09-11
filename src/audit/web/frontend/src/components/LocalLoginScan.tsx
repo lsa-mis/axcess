@@ -372,7 +372,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
               {/* One left edge for every option: the nested boxes made
               siblings look ranked. Fieldsets stay for grouping, minus chrome. */}
               <fieldset className="min-w-0 border-0 p-0">
-                <legend className="px-0 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                <legend className="px-0 text-xs font-semibold text-fg-subtle">
                   Options
                 </legend>
                 <div className="mb-3 mt-1">
@@ -644,7 +644,7 @@ function LoginNumberField({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <label className="flex flex-col gap-1 text-xs font-semibold text-fg-subtle">
       {label}
       <input
         type="number"
@@ -750,7 +750,7 @@ function LocalLoginHandoff({
     <>
       {showSteps && <ProtectedScanSteps current={stage} className="mb-5" />}
       <Card className="max-w-3xl p-6 [overflow-anchor:none]">
-        <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">
+        <p className="text-xs font-semibold text-umich-blue">
           Login scan #{scanId}
         </p>
         <h2 className="mt-1 text-xl font-semibold text-fg" aria-live="polite">
@@ -831,7 +831,7 @@ function LocalLoginHandoff({
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-xs border border-border bg-surface p-3">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                <p className="flex items-center gap-2 text-xs font-semibold text-fg-subtle">
                   <Clock3 className="h-4 w-4" aria-hidden /> Estimated time
                 </p>
                 <p className="mt-2 text-sm font-semibold text-fg">
@@ -839,7 +839,7 @@ function LocalLoginHandoff({
                 </p>
               </div>
               <div className="rounded-xs border border-border bg-surface p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                <p className="text-xs font-semibold text-fg-subtle">
                   Progress
                 </p>
                 <p className="mt-2 text-sm font-semibold text-fg">
