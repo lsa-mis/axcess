@@ -71,36 +71,28 @@ const NAV: NavItem[] = [
  * leading edge. The outer ring is a crawl that has not closed yet, the dot is
  * the page it is on, the inner ring is the scan itself.
  *
- * Kept on the maize tile the sidebar was already built around, so the shell
- * kicks its accent colour and visual weight unchanged; the mark itself is drawn
- * in UMich blue against it. Stroke geometry is the original's, unaltered.
+ * Drawn in currentColor with no tile behind it, so it takes the colour of
+ * whatever surface it sits on: UMich blue on the light sidebar, white on the
+ * blue mobile bar. Stroke geometry is the original's, unaltered.
  *
  * Decorative: it always sits beside the word "Axcess", so naming it here would
  * only make a screen reader say it twice.
  */
 function BrandMark({ className }: { className?: string }) {
   return (
-    <span
+    <svg
+      viewBox="0 0 32 32"
+      className={cn("shrink-0", className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
       aria-hidden
-      className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-[10px] bg-umich-maize text-umich-blue shadow-[0_5px_16px_rgba(255,203,5,0.18)]",
-        className,
-      )}
     >
-      <svg
-        viewBox="0 0 32 32"
-        className="h-[70%] w-[70%]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        aria-hidden
-      >
-        <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95" />
-        <circle cx="16" cy="16" r="5.6" />
-        <circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none" />
-      </svg>
-    </span>
+      <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95" />
+      <circle cx="16" cy="16" r="5.6" />
+      <circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
@@ -227,35 +219,29 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] transition-[width] duration-150 md:flex",
+        // Light neutral ramp drawn from the surface tokens. Everything on it
+        // uses the standard foreground ramp rather than the inverse one: at the
+        // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
+        // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,#F8FAFC_0%,#F1F4F8_52%,#E6EBF2_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
         collapsed ? "w-16" : "w-64",
       )}
       aria-label="Primary"
     >
       <div
         className={cn(
-          "flex h-[72px] items-center gap-3 border-b border-white/10",
+          "flex h-[72px] items-center gap-3 border-b border-border",
           collapsed ? "justify-center px-2" : "px-5",
         )}
       >
-        <BrandMark className="h-9 w-9 text-sm" />
+        <BrandMark className="h-8 w-8 text-umich-blue" />
         {!collapsed && (
-          <div className="min-w-0">
-            <span className="block text-lg font-semibold leading-tight tracking-[-0.025em]">
-              Axcess
-            </span>
-            <span className="block text-2xs font-medium tracking-wide text-surface-inverse-fg-subtle">
-              Accessibility workbench
-            </span>
-          </div>
+          <span className="min-w-0 truncate text-lg font-semibold leading-tight tracking-[-0.025em]">
+            Axcess
+          </span>
         )}
       </div>
       <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
-        {!collapsed && (
-          <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.16em] text-surface-inverse-fg-subtle">
-            Workspace
-          </p>
-        )}
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -274,8 +260,8 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
                     "group relative flex min-h-target items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
                     collapsed ? "justify-center px-2" : "px-3",
                     active
-                      ? "bg-white text-umich-blue shadow-[0_6px_18px_rgba(0,0,0,0.13)]"
-                      : "text-surface-inverse-fg-subtle hover:bg-white/10 hover:text-white",
+                      ? "bg-umich-blue text-fg-inverse shadow-[0_6px_18px_rgba(0,39,76,0.18)]"
+                      : "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue",
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -286,17 +272,6 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
           })}
         </ul>
       </nav>
-      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0), at
-          10:1 against UMich Blue it clears AAA. Plain `text-white/60`
-          rendered as ~#99A9B7, which axe flagged at 6.24:1 (fails AAA). */}
-      {!collapsed && (
-        <div className="border-t border-white/10 px-5 py-4 text-2xs text-surface-inverse-fg-subtle">
-          <p className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-umich-maize" aria-hidden />
-            Local-first evidence workspace
-          </p>
-        </div>
-      )}
     </aside>
   );
 }
