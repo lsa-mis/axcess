@@ -67,21 +67,39 @@ const NAV: NavItem[] = [
 ];
 
 /**
- * Brand mark: maize rounded square with blue "Ax", the product wordmark
- * (Axcess = access + the axe-core engine at its centre). Inverted relative
- * to the favicon (blue square, maize letters) because the sidebar is
- * already UMich blue.
+ * Brand mark: the A11y Crawler logo — an open scan path with a node riding its
+ * leading edge. The outer ring is a crawl that has not closed yet, the dot is
+ * the page it is on, the inner ring is the scan itself.
+ *
+ * Kept on the maize tile the sidebar was already built around, so the shell
+ * kicks its accent colour and visual weight unchanged; the mark itself is drawn
+ * in UMich blue against it. Stroke geometry is the original's, unaltered.
+ *
+ * Decorative: it always sits beside the word "Axcess", so naming it here would
+ * only make a screen reader say it twice.
  */
 function BrandMark({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
       className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-[10px] bg-umich-maize font-black tracking-tighter text-umich-blue shadow-[0_5px_16px_rgba(255,203,5,0.18)]",
+        "flex shrink-0 select-none items-center justify-center rounded-[10px] bg-umich-maize text-umich-blue shadow-[0_5px_16px_rgba(255,203,5,0.18)]",
         className,
       )}
     >
-      Ax
+      <svg
+        viewBox="0 0 32 32"
+        className="h-[70%] w-[70%]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        aria-hidden
+      >
+        <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95" />
+        <circle cx="16" cy="16" r="5.6" />
+        <circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none" />
+      </svg>
     </span>
   );
 }

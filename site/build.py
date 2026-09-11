@@ -149,10 +149,15 @@ ICONS = {
     "text": f'<svg {_I}><path d="M4 6h16M4 12h10M4 18h14"/></svg>',
     "play": f'<svg {_I}><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>',
     "layers": f'<svg {_I}><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>',
+    # The A11y Crawler mark: an open scan path with a node on its leading edge.
+    # Stroked in currentColor so it takes the header's text colour and flips
+    # with the theme, which the old filled tile could not do.
     "mark": (
-        '<svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false">'
-        '<rect width="32" height="32" rx="7" fill="#00274C"/>'
-        '<text x="16" y="22" text-anchor="middle" fill="#FFCB05" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="800">Ax</text></svg>'
+        '<svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false" '
+        'fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">'
+        '<path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>'
+        '<circle cx="16" cy="16" r="5.6"/>'
+        '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg>'
     ),
 }
 CARET = f'<svg class="caret" {_I}><path d="m6 9 6 6 6-6"/></svg>'
