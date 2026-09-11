@@ -4,7 +4,12 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
-const { desktopEnvironment, isAxcessUrl, isSafeExternalUrl } = require("./runtime.cjs");
+const {
+  contentSecurityPolicy,
+  desktopEnvironment,
+  isAxcessUrl,
+  isSafeExternalUrl,
+} = require("./runtime.cjs");
 
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
@@ -128,12 +133,7 @@ function configureWindowSecurity(window) {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        "Content-Security-Policy": [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-            "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; " +
-            "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'; " +
-            "frame-ancestors 'none'",
-        ],
+        "Content-Security-Policy": [contentSecurityPolicy()],
       },
     });
   });
