@@ -175,14 +175,12 @@ export default function ScanDetailRoute() {
           meta={
             <ReportMeta
               note=""
+              // Crawl counts lived here and measured the crawler rather than
+              // the audit: how many pages were fetched says nothing about what
+              // was found, and it was the first thing under the title. The
+              // page-level numbers below carry the findings instead.
               counts={
-                <>
-                  {data.finished_at ? `Completed ${formatCompleted(data.finished_at)} · ` : ""}
-                  {data.page_count.toLocaleString()} page
-                  {data.page_count === 1 ? "" : "s"} crawled,{" "}
-                  {data.error_count.toLocaleString()} error
-                  {data.error_count === 1 ? "" : "s"}
-                </>
+                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : ""
               }
             />
           }
