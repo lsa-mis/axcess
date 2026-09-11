@@ -34,9 +34,20 @@ export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
+/** Routes that belong in the trail but have no report behind them yet. */
+const STANDALONE: Array<[RegExp, string]> = [[/^\/scans\/new\/?$/, "New scan"]];
+
 export function reportRouteMatch(
   pathname: string,
-): { scanId: number; view: string } | null {
+): { scanId: number | null; view: string } | null {
+  // New scan sits under /scans but has no report yet, so it carries no middle
+  // crumb. It still belongs in the topbar: the trail is where orientation
+  // lives in this app, and a page that draws its own breadcrumb above the
+  // title puts the same information in two different places depending on which
+  // route you are standing in.
+  const standalone = STANDALONE.find(([pattern]) => pattern.test(pathname))?.[1];
+  if (standalone) return { scanId: null, view: standalone };
+
   const scanId = Number(pathname.match(/^\/scans\/(\d+)(?:\/|$)/)?.[1]);
   if (!Number.isFinite(scanId)) return null;
   const view = VIEWS.find(([pattern]) => pattern.test(pathname))?.[1];
@@ -48,8 +59,8 @@ export default function ReportCrumb() {
   const match = reportRouteMatch(pathname);
   const scanQuery = useQuery({
     queryKey: ["scan", match?.scanId],
-    queryFn: () => api.getScan(match!.scanId),
-    enabled: match != null,
+    queryFn: () => api.getScan(match!.scanId as number),
+    enabled: match != null && match.scanId != null,
   });
   if (!match) return null;
 
@@ -62,11 +73,16 @@ export default function ReportCrumb() {
         <Crumb to="/scans">Reports</Crumb>
         <Separator />
         {/* The site is the middle crumb and links to the report's own
-            overview: from any view, one click gets back to the whole report. */}
-        <Crumb to={`/scans/${match.scanId}`} className="max-w-[18rem] truncate">
-          {middle}
-        </Crumb>
-        <Separator />
+            overview: from any view, one click gets back to the whole report.
+            A route with no report yet (New scan) skips straight to the chip. */}
+        {match.scanId != null && (
+          <>
+            <Crumb to={`/scans/${match.scanId}`} className="max-w-[18rem] truncate">
+              {middle}
+            </Crumb>
+            <Separator />
+          </>
+        )}
         <li className="min-w-0">
           {/* The current view is a filled chip, not just bolder text: at a
               glance the trail should show which of the report's views you are

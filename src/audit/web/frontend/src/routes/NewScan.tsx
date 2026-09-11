@@ -162,10 +162,10 @@ export default function NewScanRoute() {
 
   return (
     <>
-      <PageHeader
-        crumbs={[{ label: "Reports", to: "/scans" }, { label: "New scan" }]}
-        title="New scan"
-      />
+      {/* No `crumbs` here: the trail lives in the topbar, same as every report
+          view. Passing it again would print the breadcrumb twice on this one
+          route and in a different place from the rest of the app. */}
+      <PageHeader title="New scan" />
 
       <fieldset className="mb-6 max-w-4xl">
         <legend
