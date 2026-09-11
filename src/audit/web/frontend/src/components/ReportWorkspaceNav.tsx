@@ -37,13 +37,16 @@ export default function ReportWorkspaceNav({
   });
 
   return (
-    <nav
-      aria-label="Report workspace"
-      className="mt-4 overflow-x-auto border-b border-border"
-    >
+    <nav aria-label="Report workspace" className="mt-4 border-b border-border">
       {/* -mb-px pulls the active tab's 2px underline over the nav's own
-          hairline so the two read as a single rule, not a double border. */}
-      <ul className="-mb-px flex w-max min-w-full flex-nowrap gap-6">
+          hairline so the two read as a single rule, not a double border.
+          The horizontal scroll lives on the <ul>, never on this <nav>:
+          `overflow-x: auto` forces `overflow-y` to `auto` as well, so putting
+          it here made the nav a scroll container one pixel shorter than its
+          own content. That clipped the active underline out of view and raised
+          a stray vertical scrollbar down the right-hand side. On the <ul> the
+          content fits vertically, so it scrolls sideways and nothing else. */}
+      <ul className="-mb-px flex w-max min-w-full flex-nowrap gap-6 overflow-x-auto">
         {items.map((item) => (
           <li key={item.to}>
             <Link
