@@ -2,9 +2,9 @@ import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import { Card, PageLink, StatCard } from "./ui";
+import { Card, PageLink } from "./ui";
 import ConformanceBadge from "./ConformanceBadge";
-import type { AbilityLabel } from "../api/types";
+import type { AbilityLabel, IssueRow } from "../api/types";
 
 const STATUS_LABELS_ORDER = [
   "new",
@@ -101,32 +101,29 @@ export default function IssueEvidence({
         )}
       </Card>
 
-      {/* Stat tiles, same visual primitives as the Issues list, so the
-          design language stays continuous between list and detail. */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        <StatCard label="Criterion level" value={row.wcag_sc ? row.conformance : "n/a"} />
-        {!isInformational && (
-          <StatCard
-            label="Priority"
-            value={`${row.priority.toFixed(2)} · ${priorityTier(row.priority)}`}
-            hint="Fix sooner when it's both severe and affects many pages."
-          />
-        )}
-        <StatCard label="Pages affected" value={row.page_count} />
-        <StatCard label="Occurrences" value={row.occurrence_count} />
-        {!isInformational && row.difficulty !== "Unknown" && (
-          <StatCard label="Difficulty" value={row.difficulty} />
-        )}
-        {!isInformational && (
-          <StatCard
-            label="Responsibility"
-            value={
-              row.responsibility.charAt(0).toUpperCase() +
-              row.responsibility.slice(1)
-            }
-          />
-        )}
-      </div>
+      {/* A quiet spec list, not a row of stat tiles. Six equal-weight boxes
+          gave this metadata the same visual weight as the evidence below it,
+          and at anything under a wide viewport the values truncated inside
+          their own tiles ("Interm…", "Desig…"). A list reads at a glance, cannot
+          truncate, and keeps the reader's attention on the issue itself. */}
+      <dl className="mb-4 divide-y divide-border rounded-xs border border-border bg-surface">
+        {issueFacts(row, isInformational).map((fact) => (
+          <div
+            key={fact.label}
+            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2"
+          >
+            <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-fg-subtle">
+              {fact.label}
+            </dt>
+            <dd className="text-sm font-semibold tabular-nums text-fg">
+              {fact.value}
+            </dd>
+            {fact.hint && (
+              <dd className="w-full text-2xs font-normal text-fg-muted">{fact.hint}</dd>
+            )}
+          </div>
+        ))}
+      </dl>
 
       {!isInformational && row.abilities_affected.length > 0 && (
         <p className="mb-3 text-sm">
@@ -398,6 +395,44 @@ export default function IssueEvidence({
       )}
     </div>
   );
+}
+
+/** One label/value line in the issue's spec list. */
+type IssueFact = { label: string; value: string | number; hint?: string };
+
+/**
+ * The issue's at-a-glance metadata, in reading order: what the criterion is,
+ * how urgent it is, how far it spreads, and who fixes it. Entries that carry no
+ * meaning for the record are dropped rather than shown empty, an informational
+ * record has no priority, difficulty or owner because nothing is being asked of
+ * anyone.
+ */
+function issueFacts(row: IssueRow, isInformational: boolean): IssueFact[] {
+  const facts: IssueFact[] = [
+    { label: "Criterion level", value: row.wcag_sc ? row.conformance : "n/a" },
+  ];
+  if (!isInformational) {
+    facts.push({
+      label: "Priority",
+      value: `${row.priority.toFixed(2)} · ${priorityTier(row.priority)}`,
+      hint: "Fix sooner when it's both severe and affects many pages.",
+    });
+  }
+  facts.push(
+    { label: "Pages affected", value: row.page_count },
+    { label: "Occurrences", value: row.occurrence_count },
+  );
+  if (!isInformational && row.difficulty !== "Unknown") {
+    facts.push({ label: "Difficulty", value: row.difficulty });
+  }
+  if (!isInformational) {
+    facts.push({ label: "Responsibility", value: capitalize(row.responsibility) });
+  }
+  return facts;
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 /** A plain-English band for the priority score (severity × log1p(pages)). */
