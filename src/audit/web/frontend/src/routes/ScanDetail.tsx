@@ -702,7 +702,7 @@ function ProgressStage({
           {icon}
         </span>
         <strong className="text-sm text-fg">{title}</strong>
-        <span className="ml-auto text-2xs font-semibold uppercase tracking-wide text-fg-muted">
+        <span className="ml-auto text-2xs font-semibold text-fg-muted">
           {status === "complete"
             ? "Complete"
             : status === "active"

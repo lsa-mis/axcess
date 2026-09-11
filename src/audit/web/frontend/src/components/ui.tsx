@@ -14,7 +14,7 @@ export function SeverityChip({ value }: { value: Severity }) {
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-fg-muted">
+    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted">
       {value.replace(/_/g, " ")}
     </span>
   );
@@ -61,7 +61,7 @@ export function StatCard({
 }) {
   return (
     <div className="px-1 py-2">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+      <div className="text-xs font-semibold text-fg-subtle">
         {label}
       </div>
       <div
@@ -460,7 +460,7 @@ export function Disclosure({
 export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
     return (
-      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sev-critical">
+      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
         missing
       </span>
     );
@@ -500,7 +500,7 @@ export function ScanStatusBadge({ value }: { value: ScanStatus }) {
     <span
       aria-label={`Scan status: ${value}`}
       className={cn(
-        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide",
+        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold",
         SCAN_STATUS_CLASS[value],
       )}
     >

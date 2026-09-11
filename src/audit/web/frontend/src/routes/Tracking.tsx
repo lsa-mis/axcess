@@ -98,7 +98,7 @@ export default function TrackingRoute() {
             <caption className="sr-only">
               Planned AI analyzers by WCAG criterion
             </caption>
-            <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+            <thead className="bg-surface-muted text-xs text-fg-muted">
               <tr>
                 <Th>SC</Th>
                 <Th>Criterion</Th>
@@ -133,7 +133,7 @@ export default function TrackingRoute() {
             <caption className="sr-only">
               Detection pipelines that run on a default crawl
             </caption>
-            <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+            <thead className="bg-surface-muted text-xs text-fg-muted">
               <tr>
                 <Th>Pipeline</Th>
                 <Th>Engine</Th>
@@ -263,14 +263,14 @@ function SortableTh({
       aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
       className="px-4 py-2 text-left font-semibold"
     >
-      {/* The uppercase treatment stays on the label span, per the house
+      {/* The label span carries the type treatment, per the house
       rule that interactive controls reset the header's text styling. */}
       <button
         type="button"
         onClick={() => onSort(sortKey)}
         className="inline-flex min-h-target items-center gap-1 font-semibold normal-case tracking-normal text-fg-subtle hover:text-fg"
       >
-        <span className="uppercase tracking-wide">{label}</span>
+        <span className="">{label}</span>
         <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
       </button>
     </th>
@@ -306,7 +306,7 @@ function FilterTile({
       )}
     >
       <span className="flex items-baseline justify-between gap-2">
-        {badge ?? <span className="text-2xs font-bold uppercase">{label}</span>}
+        {badge ?? <span className="text-2xs font-bold">{label}</span>}
         <span className="text-lg font-bold tabular-nums">{count}</span>
       </span>
       <span
@@ -491,7 +491,7 @@ function CoverageSection({ coverage: fullCoverage, notCovered = false }: { cover
           <caption className="sr-only">
             {notCovered ? "WCAG 2.2 A/AA criteria not covered by Axcess yet" : "WCAG 2.2 A/AA criteria with current Axcess coverage"}
           </caption>
-          <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+          <thead className="bg-surface-muted text-xs text-fg-muted">
             <tr>
               <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
               <SortableTh

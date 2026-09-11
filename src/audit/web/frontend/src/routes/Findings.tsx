@@ -121,7 +121,7 @@ export default function FindingsRoute() {
             options={CLASSES}
             onChange={(v) => setParam("classification", v)}
           />
-          <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <label className="flex flex-col text-xs font-semibold text-fg-subtle">
             Search
             <div className="relative mt-1">
               <Search
@@ -212,11 +212,11 @@ function FilterSelect({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <label className="flex flex-col text-xs font-semibold text-fg-subtle">
       {label}
       {/* min-h-target + text-base so each filter clears the 44×44
           SC 2.5.5 floor and the option list is comfortable to read.
-          The label uppercase/tracking class is text-only, the
+          The label class is text-only, the
           `font-normal normal-case tracking-normal` resets it on the
           interactive control so the value renders as natural sentence
           case, not THE LIKE. */}
@@ -272,7 +272,7 @@ function FindingsTable({
       >
         <div
           role="row"
-          className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-fg-subtle"
+          className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-subtle"
         >
           <span role="columnheader">Severity</span>
           <span role="columnheader">Image</span>

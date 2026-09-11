@@ -132,7 +132,7 @@ export default function ScansRoute() {
           <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Public reports table" aria-describedby="reports-help" tabIndex={0}>
             <table className="min-w-[58rem] w-full text-sm">
               <caption className="sr-only">Public reports, newest first</caption>
-              <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+              <thead className="bg-surface-muted text-xs text-fg-muted">
                 <tr>
                   <th scope="col" className="px-4 py-2 text-left font-semibold">
                     Report
@@ -209,7 +209,7 @@ export default function ScansRoute() {
               <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Protected reports table" tabIndex={0}>
                 <table className="min-w-[58rem] w-full text-sm">
                   <caption className="sr-only">Your protected reports, newest activity first</caption>
-                  <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+                  <thead className="bg-surface-muted text-xs text-fg-muted">
                     <tr>
                       <th scope="col" className="px-4 py-2 text-left font-semibold">Report</th>
                       <th scope="col" className="px-4 py-2 text-left font-semibold">Status</th>

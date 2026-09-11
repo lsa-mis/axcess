@@ -171,7 +171,7 @@ export default function CommandPalette({
               return (
                 <Fragment key={item.id}>
                   {showHeader && (
-                    <li className="px-4 pb-1 pt-3 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                    <li className="px-4 pb-1 pt-3 text-2xs font-semibold text-fg-subtle">
                       {item.group}
                     </li>
                   )}

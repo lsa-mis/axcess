@@ -136,7 +136,7 @@ export default function A11yByRuleRoute() {
       </div>
 
       <Card className="mb-4 p-3">
-        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <label className="flex flex-col text-xs font-semibold text-fg-subtle">
           Status filter
           <select
             value={status}
@@ -290,7 +290,7 @@ function RuleGroupCard({
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
+              <thead className="bg-surface-muted text-2xs text-fg-subtle">
                 <tr>
                   <th scope="col" className="px-3 py-2 text-left font-semibold">
                     Page
@@ -457,7 +457,7 @@ function ImpactChip({ value }: { value: AxeImpact }) {
   )[value];
   return (
     <span
-      className={`inline-flex items-center rounded-xs px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-white bg-sev-${tone}-bg`}
+      className={`inline-flex items-center rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
     >
       {value}
     </span>

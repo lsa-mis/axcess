@@ -59,7 +59,7 @@ export default function ProtectedScanSteps({
       aria-labelledby="protected-scan-steps-title"
     >
       <div className="max-w-3xl">
-        <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">
+        <p className="text-xs font-semibold text-umich-blue">
           Login before scanning
         </p>
         <h2 id="protected-scan-steps-title" className="mt-1 text-lg font-semibold text-fg">

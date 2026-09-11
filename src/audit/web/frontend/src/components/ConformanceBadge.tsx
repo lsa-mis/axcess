@@ -10,7 +10,7 @@ export default function ConformanceBadge({ level }: { level: ConformanceLabel })
   }[level];
   return (
     <span
-      className={`${bg} inline-block rounded-xs px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white`}
+      className={`${bg} inline-block rounded-xs px-2 py-0.5 text-xs font-bold text-white`}
       title="WCAG conformance level"
     >
       {level}

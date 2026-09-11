@@ -170,7 +170,7 @@ export default function NewScanRoute() {
       <fieldset className="mb-6 max-w-4xl">
         <legend
           id="scan-type-title"
-          className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-subtle"
+          className="mb-3 text-xs font-semibold text-fg-subtle"
         >
           Choose the type of site you want to scan
         </legend>
@@ -421,7 +421,7 @@ export default function NewScanRoute() {
                   look ranked when they are all siblings. The fieldsets stay
                   for their legends and grouping semantics, minus the chrome. */}
                   <fieldset className="min-w-0 border-0 p-0">
-                    <legend className="px-0 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                    <legend className="px-0 text-xs font-semibold text-fg-subtle">
                       Options
                     </legend>
 
@@ -752,7 +752,7 @@ function NumberField({
   step?: number;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <label className="flex flex-col gap-1 text-xs font-semibold text-fg-subtle">
       {label}
       {/* min-h-target keeps the input at the SC 2.5.5 floor; px-3 gives
           enough horizontal room for the spinner controls browsers add. */}

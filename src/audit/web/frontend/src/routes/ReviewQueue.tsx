@@ -226,7 +226,7 @@ export default function ReviewQueueRoute() {
       <Card className="mb-4 p-3">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
           <label>
-            <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-fg-subtle">
               <Search className="h-3.5 w-3.5" aria-hidden /> Search evidence
             </span>
             <input
@@ -238,7 +238,7 @@ export default function ReviewQueueRoute() {
             />
           </label>
           <label>
-            <span className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+            <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-fg-subtle">
               <Filter className="h-3.5 w-3.5" aria-hidden /> Evidence source
             </span>
             <select value={source} onChange={(event) => setParam("source", event.target.value)} className="field">
@@ -371,7 +371,7 @@ function IssuePreview({
           <div className="flex items-start gap-3">
             <span className="rounded-full bg-umich-blue/10 p-2 text-umich-blue"><Icon className="h-5 w-5" aria-hidden /></span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">{LANE_META[issue.review_lane].label}</p>
+              <p className="text-xs font-semibold text-fg-subtle">{LANE_META[issue.review_lane].label}</p>
               <h2
                 ref={headingRef}
                 id="selected-issue-heading"
@@ -482,7 +482,7 @@ function IssuePreview({
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">{label}</dt>
+      <dt className="text-xs font-semibold text-fg-subtle">{label}</dt>
       <dd className="mt-0.5 break-words font-semibold capitalize text-fg">{value}</dd>
     </div>
   );

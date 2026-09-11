@@ -461,7 +461,7 @@ export default function ProtectedCompanionRoute() {
             </div>
           </div>
           <span
-            className={`inline-flex rounded-xs border px-2 py-1 text-2xs font-semibold uppercase tracking-wide ${status.className}`}
+            className={`inline-flex rounded-xs border px-2 py-1 text-2xs font-semibold ${status.className}`}
             aria-label={`Protected scan status: ${status.label}`}
           >
             {status.label}
@@ -557,7 +557,7 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <LaptopMinimal className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">Step 2</p>
+                <p className="text-xs font-semibold text-umich-blue">Step 2</p>
                 <h2 className="mt-1 text-lg font-semibold text-fg">Connect the secure browser on this computer</h2>
                 <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-fg-muted">
                   <li>Enter the SHA-256 fingerprint of the pre-provisioned companion certificate, then generate a one-time pairing code.</li>
@@ -665,7 +665,7 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <Play className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">Step 3</p>
+                <p className="text-xs font-semibold text-umich-blue">Step 3</p>
                 <h2 className="mt-1 text-lg font-semibold text-fg">Open the browser and sign in</h2>
                 <p className="mt-1 text-sm text-fg-muted">
                   Record the handoff, then run the local companion command shown above. Chromium opens visibly; complete password, passkey, or 2FA there, return to the terminal, and press Enter. Axcess verifies the resulting application page before scanning.
@@ -889,19 +889,19 @@ function PairingCode({
       </p>
       <dl className="mt-4 space-y-3">
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Pairing code</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Pairing code</dt>
           <dd>
-            <code className="mt-1 block break-all rounded-xs border border-border bg-surface px-3 py-2 text-base font-semibold tracking-[0.16em] text-fg">
+            <code className="mt-1 block break-all rounded-xs border border-border bg-surface px-3 py-2 text-base font-semibold text-fg">
               {pairing.pairing_code}
             </code>
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Expires</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Expires</dt>
           <dd className="mt-1 text-sm text-fg-muted" title={pairing.expires_at}>{displayTime(pairing.expires_at)}</dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Local companion command</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Local companion command</dt>
           <dd>
             <code className="mt-1 block overflow-x-auto rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
               {pairing.companion_command}
@@ -909,7 +909,7 @@ function PairingCode({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">After pairing</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">After pairing</dt>
           <dd>
             <code className="mt-1 block overflow-x-auto rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
               {pairing.companion_run_command}
@@ -948,7 +948,7 @@ function PairedCompanion({
       </p>
       <dl className="mt-4 space-y-3">
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <dt className="text-xs font-semibold text-fg-subtle">
             Enrollment ID
           </dt>
           <dd className="mt-1">
@@ -958,7 +958,7 @@ function PairedCompanion({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <dt className="text-xs font-semibold text-fg-subtle">
             Re-run on the paired computer
           </dt>
           <dd className="mt-1">

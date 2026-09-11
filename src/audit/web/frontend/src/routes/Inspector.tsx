@@ -412,7 +412,7 @@ export default function InspectorRoute() {
           <div>
             {currentFindings.length > 0 && (
               <div className="border-b border-border bg-surface-muted/40 px-3 py-2">
-                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+                <p className="text-2xs font-semibold text-fg-subtle">
                   Stored evidence
                 </p>
                 <ul className="mt-1.5 space-y-2">
@@ -443,7 +443,7 @@ export default function InspectorRoute() {
               </div>
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-muted/40 px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+              <span className="text-xs font-semibold text-fg-subtle">
                 {highlightPending
                   ? "Highlighting…"
                   : showHighlights && highlightedCount > 0
@@ -548,7 +548,7 @@ export default function InspectorRoute() {
         {render.ok && render.dom_html ? (
           <div className="p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+              <p className="flex items-center gap-1.5 text-2xs font-semibold text-fg-subtle">
                 <FileCode2 className="h-4 w-4" aria-hidden />
                 Loaded DOM, captured at render time
               </p>

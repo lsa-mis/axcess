@@ -261,7 +261,7 @@ export default function ProtectedScanRoute() {
         <ProtectedScanHeader />
         <ProtectedScanSteps current="scope" className="mb-5" />
         <Card className="max-w-3xl border-sev-major/40 bg-sev-major-bg p-5" role="note">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sev-major">Not ready on this server</p>
+          <p className="text-xs font-semibold text-sev-major">Not ready on this server</p>
           <h2 className="mt-1 text-lg font-semibold text-fg">Connect the protected-scan services</h2>
           <p className="mt-2 text-sm text-fg-muted">
             {capability.error instanceof Error
@@ -849,7 +849,7 @@ function NumberField({
   step?: number;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+    <label className="flex flex-col gap-1 text-xs font-semibold text-fg-subtle">
       {label}
       <input
         id={id}
