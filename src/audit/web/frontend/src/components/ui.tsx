@@ -686,7 +686,10 @@ export function PageLink({
           to={inspectTo}
           className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
         >
-          <ScanEye className="h-3.5 w-3.5 shrink-0 self-center text-fg-subtle" aria-hidden />
+          {/* self-start, not self-center: the flex line is as tall as the wrapped
+              title, so centring drops the icon into the gap between lines on
+              any title that wraps. Top-aligned it stays beside the first line. */}
+          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
           <span className="sr-only">, opens the in-app page inspector</span>
         </Link>
