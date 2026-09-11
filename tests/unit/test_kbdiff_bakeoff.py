@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import sys
 from datetime import datetime
@@ -471,9 +472,10 @@ class TestCoverageArmedFailuresStayUnknown:
 
         with patch.object(bakeoff, "DifferentialRunner") as runner_cls:
             runner_cls.return_value.run_probe = AsyncMock(side_effect=RuntimeError("browser died"))
-            outcomes = asyncio.run(
+            outcomes, coverage_errors = asyncio.run(
                 bakeoff._coverage_armed_outcomes(factory, "a.html", ["p01", "p02"], order)
             )
+        assert coverage_errors == {}, "a raised trial is not a profiler failure"
 
         assert len(outcomes) == 2, "every probe must stay in the record"
         assert {o.probe_id for o in outcomes} == {"p01", "p02"}
@@ -702,3 +704,145 @@ class TestUpstreamStage4Wiring:
         assert kept <= confirmed
         assert kept | set(dismissed) == confirmed, "every finding is kept or dismissed, never lost"
         assert kept, "a pool with no equivalent control must keep something"
+
+
+class TestSilentProfilerReadIsNotAVerdict:
+    """A swallowed profiler error must not reach the scores as a confident row.
+
+    `coverage.take` catches its own exceptions and returns an empty set, and an
+    empty keyboard set reads as "the keyboard ran nothing" — a violation. So a
+    broken profiler could manufacture a finding, and nothing in the published
+    sets would say which read had failed. `CoverageSessionWatcher` records the
+    failure before the inner handler swallows it.
+
+    The split matters as much as the detection: only the rows that compare
+    coverage may abstain. The no-filter and payload rows compare observable
+    effects and never read a function set, so their verdicts stand.
+    """
+
+    def test_the_watcher_sees_an_error_the_helper_swallows(self):
+        import asyncio
+
+        from experiments.tabbing.runner.bakeoff import CoverageSessionWatcher
+
+        class FailingSession:
+            async def send(self, method, *_args, **_kwargs):
+                if method == "Profiler.takePreciseCoverage":
+                    raise RuntimeError("profiler detached")
+                return {}
+
+        class Context:
+            async def new_cdp_session(self, _page):
+                return FailingSession()
+
+        async def factory():
+            return Context()
+
+        factory.close_open_contexts = AsyncMock()  # type: ignore[attr-defined]
+
+        async def run():
+            watcher = CoverageSessionWatcher(factory)
+            context = await watcher()
+            cdp = await context.new_cdp_session(object())
+            # Exactly what `coverage.take` does: call, swallow, return empty.
+            with contextlib.suppress(Exception):
+                await cdp.send("Profiler.takePreciseCoverage")
+            return watcher.drain()
+
+        errors = asyncio.run(run())
+        assert errors, "the swallowed profiler failure must still be recorded"
+        assert "Profiler" in errors[0] or "profiler" in errors[0]
+
+    def test_draining_clears_between_probes(self):
+        import asyncio
+
+        from experiments.tabbing.runner.bakeoff import CoverageSessionWatcher
+
+        class Session:
+            def __init__(self):
+                self.errors = ["send: RuntimeError: boom"]
+
+        async def factory():
+            raise AssertionError("not used")
+
+        watcher = CoverageSessionWatcher(factory)
+        watcher._sessions.append(Session())
+        assert watcher.drain() == ["send: RuntimeError: boom"]
+        assert watcher.drain() == [], "a drained error must not be reported twice"
+        del asyncio
+
+    async def test_a_failed_coverage_read_abstains_only_on_the_coverage_rows(self, monkeypatch):
+        """The baseline and the effect both succeed; only the profiler fails."""
+        monkeypatch.setattr(
+            bakeoff,
+            "_upstream_baseline",
+            AsyncMock(return_value=(frozenset({"base"}), "measured", False)),
+        )
+        monkeypatch.setattr(
+            bakeoff, "_upstream_differential", AsyncMock(return_value=bakeoff.UpstreamPass())
+        )
+        monkeypatch.setattr(
+            bakeoff, "_coverage_pair", AsyncMock(return_value=bakeoff.CoveragePair(mouse={"h"}))
+        )
+        runner = SimpleNamespace(
+            run_probe=AsyncMock(side_effect=[bakeoff.to_outcome_stub("p1", set(), set())])
+        )
+        monkeypatch.setattr(bakeoff, "DifferentialRunner", lambda *_args: runner)
+        monkeypatch.setattr(
+            bakeoff,
+            "_coverage_armed_outcomes",
+            AsyncMock(
+                return_value=(
+                    [bakeoff.to_outcome_stub("p1", set(), set())],
+                    {"p1": "send: RuntimeError: profiler detached"},
+                )
+            ),
+        )
+        result = await bakeoff.run_behavioural(
+            SimpleNamespace(close_open_contexts=AsyncMock()),
+            "a.html",
+            ["p1"],
+            TabOrder({}, False, 1),
+        )
+        assert result.coverage_errors == {"p1": "send: RuntimeError: profiler detached"}
+        assert "p1" in result.d9_s4u_unknown, "coverage-exact must abstain"
+        assert "p1" in result.d9u_s4u_unknown, "upstream Stage 4 compares coverage too"
+        assert "p1" not in result.d9_nos4_unknown, "the no-filter row reads no coverage"
+        assert "p1" not in result.d9_s4ours_unknown, "the payload row reads no coverage"
+
+
+class TestBaselineFailureReachesTheScores:
+    """The union must survive to the published set, not be overwritten after it."""
+
+    async def test_a_failed_baseline_is_not_overwritten_by_trial_unknowns(self, monkeypatch):
+        monkeypatch.setattr(
+            bakeoff,
+            "_upstream_baseline",
+            AsyncMock(return_value=(frozenset(), "failed: profiler: boom", True)),
+        )
+        monkeypatch.setattr(
+            bakeoff, "_upstream_differential", AsyncMock(return_value=bakeoff.UpstreamPass())
+        )
+        monkeypatch.setattr(
+            bakeoff, "_coverage_pair", AsyncMock(return_value=bakeoff.CoveragePair(mouse={"h"}))
+        )
+        runner = SimpleNamespace(
+            run_probe=AsyncMock(side_effect=[bakeoff.to_outcome_stub("p1", set(), set())])
+        )
+        monkeypatch.setattr(bakeoff, "DifferentialRunner", lambda *_args: runner)
+        monkeypatch.setattr(
+            bakeoff,
+            "_coverage_armed_outcomes",
+            AsyncMock(return_value=([bakeoff.to_outcome_stub("p1", set(), set())], {})),
+        )
+        result = await bakeoff.run_behavioural(
+            SimpleNamespace(close_open_contexts=AsyncMock()),
+            "a.html",
+            ["p1"],
+            TabOrder({}, False, 1),
+        )
+        assert "p1" in result.d9_s4u_unknown, (
+            "a failed baseline must survive into the coverage-exact unknown set"
+        )
+        assert "p1" in result.d9u_s4u_unknown
+        assert "p1" not in result.d9_s4ours_unknown, "payload comparison needs no baseline"

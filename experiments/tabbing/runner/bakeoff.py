@@ -116,7 +116,14 @@ D10BASE_NAME = "D10a+base coverage differential (Enter only, baseline subtracted
 # payloads instead. D9u restores both their channel set and their comparison so
 # the difference is measured rather than asserted.
 UPSTREAM_CHANNELS: tuple[str, ...] = (
-    "dom", "geometry", "mutations", "net", "storage", "console", "canvas", "nav",
+    "dom",
+    "geometry",
+    "mutations",
+    "net",
+    "storage",
+    "console",
+    "canvas",
+    "nav",
 )
 
 
@@ -134,11 +141,13 @@ def upstream_delta(before: dict[str, Any], after: dict[str, Any]) -> set[str]:
     for channel in ("mutations", "net", "storage", "console", "canvas"):
         if int(after.get(channel) or 0) > int(before.get(channel) or 0):
             changed.add(channel)
-    if int(after.get("nav") or 0) > int(before.get("nav") or 0) or before.get(
+    if int(after.get("nav") or 0) > int(before.get("nav") or 0) or before.get("href") != after.get(
         "href"
-    ) != after.get("href"):
+    ):
         changed.add("nav")
     return changed
+
+
 CHEAP_METHODS = (
     "D0 axcess collectClickables",
     "D2 inline onclick attribute",
@@ -534,6 +543,7 @@ class BehaviouralResult:
     d9_s4ours_unknown: set[str] = field(default_factory=set)
     s4ours_dismissals: dict[str, str] = field(default_factory=dict)
     s4_inputs: dict[str, Any] = field(default_factory=dict)
+    coverage_errors: dict[str, str] = field(default_factory=dict)
     d9u_s4u: set[str] = field(default_factory=set)
     upstream_passes: dict[str, Any] = field(default_factory=dict)
     d9u_s4u_unknown: set[str] = field(default_factory=set)
@@ -646,25 +656,36 @@ async def run_behavioural(
     # no-filter row from the uninstrumented pass instead would have compared two
     # different measurements and called the difference a filter effect.
     t0 = time.monotonic()
-    cov_outcomes = await _coverage_armed_outcomes(
+    cov_outcomes, coverage_errors = await _coverage_armed_outcomes(
         factory, page_path, probe_ids, order, upstream_baseline
     )
     result.timings[D9_S4U_NAME] = round((time.monotonic() - t0) * 1000, 1)
     result.s4_inputs = {o.probe_id: _s4_record(o) for o in cov_outcomes}
+    result.coverage_errors = coverage_errors
+
+    # Which rows a failed *coverage* read can touch, and which it cannot. The
+    # no-filter and payload rows compare observable effects and never read a
+    # function set, so a broken profiler or a missing baseline is irrelevant to
+    # them; making them abstain would throw away verdicts that are perfectly
+    # sound. Only the two rows that actually compare coverage are affected.
+    coverage_blind = set(coverage_errors)
+    if baseline_failed:
+        # No floor means no subtraction we can stand behind, for every probe on
+        # the page rather than for any single trial.
+        coverage_blind |= set(probe_ids)
 
     result.d9_nos4 = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.VIOLATION}
     result.d9_nos4_unknown = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.UNKNOWN}
 
-    if baseline_failed:
-        # S4 compares baseline-subtracted sets. Without a floor there is nothing
-        # to subtract and no comparison we can stand behind, so every Stage-4
-        # row on this page abstains. The effect-only rows stay decided.
-        result.d9_s4u_unknown |= set(probe_ids)
-        result.d9_s4ours_unknown |= set(probe_ids)
-        result.d9_nos4_unknown |= set(probe_ids)
     confirmed_u, dismissed_u = apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
     result.d9_s4u = {o.probe_id for o in confirmed_u if o.verdict is Verdict.VIOLATION}
-    result.d9_s4u_unknown = {o.probe_id for o in confirmed_u if o.verdict is Verdict.UNKNOWN}
+    # Its own trial-level unknowns first, then the coverage-blind probes on top.
+    # An earlier version built the union before this line and had it silently
+    # overwritten here, so a failed baseline reached the published scores as a
+    # confident verdict.
+    result.d9_s4u_unknown = {
+        o.probe_id for o in confirmed_u if o.verdict is Verdict.UNKNOWN
+    } | coverage_blind
     result.s4u_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_u}
 
     # Upstream's Stage 4 searches the WHOLE corpus for an equivalent control,
@@ -673,12 +694,13 @@ async def run_behavioural(
     # a control on another page is not an alternative a user has -- and that
     # difference is one of the results, so the two must not be quietly aligned.
     result.upstream_passes = dict(upstream_passes)
-    result.d9u_s4u_unknown = set(result.d9u_unknown) | (
-        set(probe_ids) if baseline_failed else set()
-    )
+    # Their Stage 4 compares coverage too, so it inherits the same blindness.
+    result.d9u_s4u_unknown = set(result.d9u_unknown) | coverage_blind
 
     confirmed_p, dismissed_p = apply_equivalence(cov_outcomes)
     result.d9_s4ours = {o.probe_id for o in confirmed_p if o.verdict is Verdict.VIOLATION}
+    # Payload comparison: no coverage dependency, so `coverage_blind` is not
+    # applied here and these verdicts stand.
     result.d9_s4ours_unknown = {o.probe_id for o in confirmed_p if o.verdict is Verdict.UNKNOWN}
     result.s4ours_dismissals = {d.probe_id: d.dismissed_by for d in dismissed_p}
     for outcome in confirmed:
@@ -689,6 +711,56 @@ async def run_behavioural(
 def _fixture_only(functions: frozenset[str]) -> frozenset[str]:
     """Executed functions belonging to the fixture, dropping harness noise."""
     return frozenset(f for f in functions if f.split("#", 1)[0].startswith(BASE_URL))
+
+
+class _WatchedContext:
+    """A browser context whose CDP sessions are checked for silent failures."""
+
+    def __init__(self, context: Any, sessions: list[Any]) -> None:
+        self._context = context
+        self._sessions = sessions
+
+    async def new_cdp_session(self, page: Any) -> Any:
+        session = CheckedInstrument(await self._context.new_cdp_session(page))
+        self._sessions.append(session)
+        return session
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._context, name)
+
+
+class CoverageSessionWatcher:
+    """Wraps a context factory so a swallowed profiler error cannot pass as data.
+
+    The shared differential arms coverage through helpers that suppress their
+    own exceptions and return an empty set. An empty set is indistinguishable
+    from "the keyboard ran nothing", which is a confident violation — so a
+    broken profiler read could manufacture a finding, and the published sets
+    could not reveal which read had failed.
+
+    ``CheckedInstrument`` records the failure before the inner handler swallows
+    it, so wrapping every session the runner is handed makes the failure
+    visible without touching the production model. The errors are drained per
+    probe, and only the rows that actually compare coverage abstain; the raw and
+    payload rows keep their verdicts, because a profiler has nothing to do with
+    an effect comparison.
+    """
+
+    def __init__(self, factory: Any) -> None:
+        self._factory = factory
+        self._sessions: list[Any] = []
+
+    async def __call__(self) -> Any:
+        return _WatchedContext(await self._factory(), self._sessions)
+
+    async def close_open_contexts(self) -> None:
+        await self._factory.close_open_contexts()
+
+    def drain(self) -> list[str]:
+        """Errors seen since the last drain, clearing the record."""
+        errors = [error for session in self._sessions for error in session.errors]
+        self._sessions.clear()
+        return errors
 
 
 def _s4_record(outcome: Any) -> dict[str, Any]:
@@ -723,17 +795,24 @@ async def _coverage_armed_outcomes(
     probe_ids: list[str],
     order: TabOrder,
     baseline: frozenset[str] = frozenset(),
-) -> list[Any]:
+) -> tuple[list[Any], dict[str, str]]:
     """Re-measure one page with V8 coverage on, for upstream's Stage 4.
 
     Same oracle, same keys, same fresh context per trial — the only difference
     is that each :class:`ModalityResult` carries the executed-function set that
-    ``by_coverage_exact`` needs. A probe that raises is dropped from this list
-    rather than guessed at; it simply cannot dismiss or be dismissed.
+    ``by_coverage_exact`` needs.
+
+    Returns the outcomes and, separately, the probes whose profiler reads
+    failed. A probe that raises outright becomes an explicit UNKNOWN rather than
+    disappearing; a probe whose *coverage* read failed keeps its effect-based
+    verdict, because a broken profiler says nothing about what the page did —
+    only the rows that compare coverage have to abstain on it.
     """
     config = TrialConfig(url=page_url(page_path), viewport="desktop", collect_coverage=True)
-    runner = DifferentialRunner(factory, config)
+    watcher = CoverageSessionWatcher(factory)
+    runner = DifferentialRunner(watcher, config)
     outcomes: list[Any] = []
+    coverage_errors: dict[str, str] = {}
 
     def to_fixture_scripts(outcome: Any) -> Any:
         """Restrict every trial's coverage to fixture-origin scripts.
@@ -745,6 +824,7 @@ async def _coverage_armed_outcomes(
         an empty URL. Two modalities drive the browser differently, so those 85
         never agree, and an equivalence test over them can only ever say no.
         """
+
         def clean(functions: frozenset[str]) -> frozenset[str]:
             return _fixture_only(functions) - baseline
 
@@ -756,7 +836,9 @@ async def _coverage_armed_outcomes(
                 for key, result in outcome.keyboard_by_key.items()
             },
         )
+
     for probe_id in probe_ids:
+        watcher.drain()
         try:
             async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
                 outcomes.append(
@@ -775,9 +857,12 @@ async def _coverage_armed_outcomes(
                 )
             )
         finally:
+            failures = watcher.drain()
+            if failures:
+                coverage_errors[probe_id] = failures[0]
             async with asyncio.timeout(15):
                 await factory.close_open_contexts()
-    return outcomes
+    return outcomes, coverage_errors
 
 
 # Upstream's measured waits, from their differential.ts. Ours differ (250 ms
@@ -883,8 +968,8 @@ async def _pierced_centre(cdp: Any, probe_id: str) -> tuple[tuple[float, float] 
     border = (model.get("model") or {}).get("border") or []
     if len(border) < 8:
         return None, "no rendered box (display:none / zero-size)"
-    width = (model["model"].get("width") or 0)
-    height = (model["model"].get("height") or 0)
+    width = model["model"].get("width") or 0
+    height = model["model"].get("height") or 0
     if width == 0 or height == 0:
         return None, "no rendered box (display:none / zero-size)"
     xs = border[0::2]
@@ -1237,9 +1322,17 @@ async def main_async(args: argparse.Namespace) -> int:
     print(f"caveat: {caveat}\n")
 
     behavioural = [
-        D9_NAME, D9_NOS4_NAME, D9_S4U_NAME, D9_S4OURS_NAME, D9U_NAME, D9U_S4U_NAME,
-        D10A_U_NAME, D10B_U_NAME,
-        D10_NAME, D10B_NAME, D10BASE_NAME,
+        D9_NAME,
+        D9_NOS4_NAME,
+        D9_S4U_NAME,
+        D9_S4OURS_NAME,
+        D9U_NAME,
+        D9U_S4U_NAME,
+        D10A_U_NAME,
+        D10B_U_NAME,
+        D10_NAME,
+        D10B_NAME,
+        D10BASE_NAME,
     ]
     methods = [*CHEAP_METHODS, *([] if args.cheap_only else behavioural)]
     all_reported: dict[str, set[str]] = {name: set() for name in methods}
@@ -1251,6 +1344,7 @@ async def main_async(args: argparse.Namespace) -> int:
     s4ours_dismissals: dict[str, str] = {}
     upstream_s4_dismissals: dict[str, str] = {}
     all_upstream_passes: dict[str, Any] = {}
+    coverage_errors: dict[str, str] = {}
     s4_inputs: dict[str, Any] = {}
     baseline_evidence: dict[str, Any] = {}
     notes: dict[str, str] = {}
@@ -1316,6 +1410,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             all_unknown[D9_S4OURS_NAME].update(result.d9_s4ours_unknown)
                             s4ours_dismissals.update(result.s4ours_dismissals)
                             s4_inputs.update(result.s4_inputs)
+                            coverage_errors.update(result.coverage_errors)
                             all_unknown[D9U_NAME].update(result.d9u_unknown)
                             all_unknown[D9U_S4U_NAME].update(result.d9u_s4u_unknown)
                             for name in (D10A_U_NAME, D10B_U_NAME):
@@ -1415,6 +1510,9 @@ async def main_async(args: argparse.Namespace) -> int:
         "s4u_dismissals": s4u_dismissals,
         "s4ours_dismissals": s4ours_dismissals,
         "upstream_s4_dismissals": upstream_s4_dismissals,
+        # Probes whose profiler read failed. The coverage rows abstain on
+        # these; the effect-based rows do not, and this names which is which.
+        "coverage_errors": coverage_errors,
         # The exact trials the Stage-4 rows were computed from, so a
         # dismissal or its absence can be reconstructed from this file.
         "s4_inputs": s4_inputs,
