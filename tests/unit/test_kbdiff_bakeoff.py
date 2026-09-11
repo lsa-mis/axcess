@@ -488,12 +488,14 @@ class TestFixtureOriginFilter:
     def test_harness_functions_are_excluded(self):
         from experiments.tabbing.runner.bakeoff import BASE_URL, _fixture_only
 
-        mixed = frozenset({
-            f"{BASE_URL}/upstream/b-decoys.html#favourite@586",
-            f"{BASE_URL}/upstream/_helpers.js#fired@157",
-            "#(anon)@0",                      # an evaluate body: empty url
-            "chrome-extension://x/y.js#f@1",  # not the fixture origin
-        })
+        mixed = frozenset(
+            {
+                f"{BASE_URL}/upstream/b-decoys.html#favourite@586",
+                f"{BASE_URL}/upstream/_helpers.js#fired@157",
+                "#(anon)@0",  # an evaluate body: empty url
+                "chrome-extension://x/y.js#f@1",  # not the fixture origin
+            }
+        )
         assert _fixture_only(mixed) == {
             f"{BASE_URL}/upstream/b-decoys.html#favourite@586",
             f"{BASE_URL}/upstream/_helpers.js#fired@157",
@@ -641,8 +643,15 @@ class TestUpstreamDeltaMatchesInstrumentTs:
 
     def _snap(self, **kw):
         base = {
-            "dom": 1, "geometry": 2, "mutations": 0, "net": 0, "storage": 0,
-            "console": 0, "canvas": 0, "nav": 0, "href": "u",
+            "dom": 1,
+            "geometry": 2,
+            "mutations": 0,
+            "net": 0,
+            "storage": 0,
+            "console": 0,
+            "canvas": 0,
+            "nav": 0,
+            "href": "u",
         }
         base.update(kw)
         return base

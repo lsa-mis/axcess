@@ -169,7 +169,15 @@ class TestUpstreamInstrumentActuallyRuns:
         assert not failures, f"upstream instrument did not run: {failures}"
         fields = set(next(iter(snapshot.values())))
         assert {
-            "dom", "geometry", "mutations", "net", "storage", "console", "canvas", "nav", "href",
+            "dom",
+            "geometry",
+            "mutations",
+            "net",
+            "storage",
+            "console",
+            "canvas",
+            "nav",
+            "href",
         } <= fields
 
     async def test_a_same_url_pushstate_counts_as_navigation(self, page):
