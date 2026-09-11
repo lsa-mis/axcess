@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, ExternalLink, FileCode2, Loader2 } from "lucide-react";
@@ -22,7 +22,10 @@ type Target = { selector: string | null; snippet: string | null };
  * or an over-bound page falls back to a one-page on-demand render in a
  * throwaway headless Chromium. The "Rendered page" tab loads that HTML into a
  * sandboxed iframe and highlights the flagged element(s) (a CSS outline baked
- * into the markup, computed off the main render path); the "Loaded DOM" tab
+ * into the markup, computed off the main render path). The capture is given
+ * the page's own URL as `<base href>` first, without which its relative
+ * stylesheets and images would resolve against the review UI and the page
+ * would render unstyled (see `withBaseHref`); the "Loaded DOM" tab
  * shows the same markup as escaped source with the element's markup
  * highlighted. No screenshot is captured or stored. An "Open live page"
  * action stays available in the header.
@@ -100,7 +103,6 @@ export default function InspectorRoute() {
     }
     return out;
   }, [currentFindings]);
-  const target = targets[0] ?? null;
   const hasTarget = targets.length > 0;
 
   // Human-readable breadcrumb label, e.g. "WCAG 1.4.3: Contrast (Minimum)"
@@ -147,6 +149,21 @@ export default function InspectorRoute() {
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
+  // The captured markup is shown via `srcDoc`, which gives the frame no
+  // document URL of its own, so every relative stylesheet/font/image in the
+  // capture would resolve against the review UI's origin and 404 (the page
+  // rendered unstyled). Injecting the page's own URL as <base> makes those
+  // subresources resolve against the site they came from. The DOM tab keeps
+  // the untouched capture.
+  const documentHtml = useMemo(
+    () =>
+      withBaseHref(
+        data?.render.dom_html ?? null,
+        data?.render.final_url || data?.page.url || null,
+      ),
+    [data?.render.dom_html, data?.render.final_url, data?.page.url],
+  );
+
   // Bake the highlight into the srcdoc rather than reaching into the frame's
   // contentDocument: the sandbox can make that document opaque, which is exactly
   // why the outline never showed. The captured HTML can be several megabytes,
@@ -160,7 +177,7 @@ export default function InspectorRoute() {
   useEffect(() => {
     highlightRequest.current += 1;
     const request = highlightRequest.current;
-    const html = data?.render.dom_html ?? null;
+    const html = documentHtml;
     if (!showHighlights || !html || targets.length === 0) {
       setHighlight(null);
       return;
@@ -170,10 +187,9 @@ export default function InspectorRoute() {
       if (request !== highlightRequest.current) return; // superseded
       setHighlight(buildHighlightedHtml(html, targets));
     });
-  }, [showHighlights, data?.render.dom_html, targets]);
+  }, [showHighlights, documentHtml, targets]);
 
-  const srcDoc =
-    showHighlights && highlight ? highlight.srcDoc : (data?.render.dom_html ?? "");
+  const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
   const highlightPending = showHighlights && hasTarget && highlight === null;
 
@@ -191,7 +207,9 @@ export default function InspectorRoute() {
             el = findTargetElement(doc, t);
             if (el) break;
           }
-          (el as HTMLElement | null)?.scrollIntoView?.({ block: "center" });
+          const target = el as HTMLElement | null;
+          if (!target?.scrollIntoView) return;
+          keepCentered(target);
           return;
         }
       } catch {
@@ -214,9 +232,19 @@ export default function InspectorRoute() {
   // present in the captured markup. Computed lazily, only when the DOM tab is
   // actually open, because it needs its own unmarked parse of the document.
   const domParts = useMemo(
-    () => (tab === "dom" ? highlightInDom(data?.render.dom_html ?? null, target) : null),
-    [tab, data?.render.dom_html, target],
+    () => (tab === "dom" ? highlightInDom(data?.render.dom_html ?? null, targets) : null),
+    [tab, data?.render.dom_html, targets],
   );
+  const domMarkCount = domParts?.filter((s) => s.marked).length ?? 0;
+
+  // Bring the first marked run into view. The source of a real page is far too
+  // long to expect anyone to hunt through it for the flagged markup.
+  const domPreRef = useRef<HTMLPreElement | null>(null);
+  useEffect(() => {
+    if (tab !== "dom" || domMarkCount === 0) return;
+    const mark = domPreRef.current?.querySelector("mark");
+    mark?.scrollIntoView({ block: "center" });
+  }, [tab, domMarkCount, domParts]);
 
   const onTabKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -491,6 +519,16 @@ export default function InspectorRoute() {
                 </span>
               )}
             </div>
+            {/* Outside the live region above: this is standing context about
+                the capture, not a status that changes, so it should not be
+                re-announced every time the highlight count updates. */}
+            <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
+              The markup is the stored capture; its stylesheets, fonts and
+              images load from the live site now, so styling can differ from
+              how the page looked when it was scanned. The page&rsquo;s own scripts
+              never run here, so a flagged element the site would have revealed
+              with JavaScript is forced visible to be highlighted.
+            </p>
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
@@ -514,28 +552,47 @@ export default function InspectorRoute() {
                 <FileCode2 className="h-4 w-4" aria-hidden />
                 Loaded DOM, captured at render time
               </p>
-              {render.dom_truncated && (
-                <span className="text-2xs text-sev-major">
-                  Truncated for length (shown at 2,000,000 characters).
-                </span>
-              )}
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {hasTarget && (
+                  <span className="text-2xs text-fg-muted">
+                    {domMarkCount > 0
+                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
+                      : "The flagged markup was not found in this capture."}
+                  </span>
+                )}
+                {render.dom_truncated && (
+                  <span className="text-2xs text-sev-major">
+                    Truncated for length (shown at 2,000,000 characters).
+                  </span>
+                )}
+              </span>
             </div>
             {/* Scanned page markup is untrusted and rendered as escaped text,
-                never executed. The flagged element's markup is wrapped in a
+                never executed. Each flagged element's markup is wrapped in a
                 <mark> so it is visible in the source, matching the page view. */}
-            <pre className="max-h-[70vh] overflow-auto rounded-2xs border border-border bg-surface-muted p-3 text-2xs leading-relaxed text-fg">
+            <pre
+              ref={domPreRef}
+              // A serialized DOM is one enormous line, so an unwrapped <pre>
+              // shows a mostly empty box with everything scrolled off to the
+              // right. Wrapping (breaking inside long attribute values) keeps
+              // the marked markup readable in place.
+              className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface-muted p-3 text-2xs leading-relaxed text-fg"
+            >
               <code>
-                {domParts ? (
-                  <>
-                    {domParts.before}
-                    <mark className="rounded-[2px] bg-umich-maize/40 px-0 text-fg">
-                      {domParts.el}
-                    </mark>
-                    {domParts.after}
-                  </>
-                ) : (
-                  render.dom_html
-                )}
+                {domParts
+                  ? domParts.map((segment, i) =>
+                      segment.marked ? (
+                        <mark
+                          key={i}
+                          className="rounded-[2px] bg-umich-maize/40 px-0 text-fg outline outline-1 outline-umich-maize"
+                        >
+                          {segment.text}
+                        </mark>
+                      ) : (
+                        <Fragment key={i}>{segment.text}</Fragment>
+                      ),
+                    )
+                  : render.dom_html}
               </code>
             </pre>
           </div>
@@ -592,6 +649,82 @@ function TabButton({
   );
 }
 
+/**
+ * Give the captured markup the page's own URL as its base.
+ *
+ * A `srcDoc` frame has no document URL, so a capture's relative and
+ * root-relative subresources (`href="/site.css"`, `src="logo.png"`) would be
+ * requested from the review UI's origin and 404 — the page renders with no CSS
+ * at all. A single `<base href>` restores the original resolution, so the frame
+ * loads the site's real stylesheets, fonts and images.
+ *
+ * Left untouched when the capture already carries its own `<base href>` (the
+ * first one in the document wins, and the page's own is the authoritative one)
+ * or when the URL is not an http(s) address we should point a browser at.
+ */
+function withBaseHref(html: string | null, url: string | null): string | null {
+  if (!html || !url) return html;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return html;
+  } catch {
+    return html;
+  }
+  if (/<base\b[^>]*\bhref\b/i.test(html)) return html;
+  const tag = `<base href="${escapeAttribute(url)}">`;
+  const head = /<head\b[^>]*>/i.exec(html);
+  if (head) {
+    const at = head.index + head[0].length;
+    return html.slice(0, at) + tag + html.slice(at);
+  }
+  // No <head> in the capture (rare, but a malformed document can serialize
+  // without one): put it ahead of everything so it still applies.
+  const htmlTag = /<html\b[^>]*>/i.exec(html);
+  if (htmlTag) {
+    const at = htmlTag.index + htmlTag[0].length;
+    return html.slice(0, at) + `<head>${tag}</head>` + html.slice(at);
+  }
+  return tag + html;
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+/**
+ * Center ``target`` in its frame and hold it there while the layout settles.
+ *
+ * A single `scrollIntoView` is not enough: the capture's stylesheets, fonts and
+ * images are fetched from the live site *after* the frame fires `load`, and
+ * every one of them reflows the document, so an element centered at load time
+ * drifts far off-screen a moment later. This re-centers until the element's
+ * position in the document stops moving (two consecutive quiet checks), with a
+ * hard ceiling so a page that never stops animating cannot spin forever.
+ */
+function keepCentered(target: HTMLElement): void {
+  let previous: number | null = null;
+  let quiet = 0;
+  let ticks = 0;
+  const step = () => {
+    try {
+      const win = target.ownerDocument?.defaultView;
+      if (!target.isConnected || !win) return;
+      // Position in the *document*, not the viewport: the viewport-relative
+      // top barely moves once we have centered it, so it cannot tell us
+      // whether the page beneath is still reflowing.
+      const top = target.getBoundingClientRect().top + win.scrollY;
+      quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
+      previous = top;
+      target.scrollIntoView({ block: "center" });
+      ticks += 1;
+      if (quiet < 2 && ticks < 20) window.setTimeout(step, 300);
+    } catch {
+      // The frame navigated or unmounted mid-settle; nothing left to center.
+    }
+  };
+  step();
+}
+
 /** Result of baking the highlight into the srcdoc. */
 type HighlightResult = { srcDoc: string; found: number; total: number };
 
@@ -605,35 +738,61 @@ const SNIPPET_HEAD = 64;
  *  equal the element's full serialization; match them by normalized prefix. */
 const TRUNCATED_SNIPPET_LENGTH = 3900;
 
+/** A run of the captured source, either plain or inside a highlight mark. */
+type DomSegment = { text: string; marked: boolean };
+
 /**
- * Split the captured HTML so the flagged element's serialized markup can be
- * highlighted in the Loaded DOM (source) tab. Parses the HTML with DOMParser,
- * finds the flagged element (verified CSS selector/XPath first, then a
- * bounded exact-markup walk), and locates its ``outerHTML`` in the source.
- * Returns ``null`` when it cannot be found (the source is then shown
+ * Split the captured HTML into segments so every flagged occurrence can be
+ * marked in the Loaded DOM (source) tab, matching what the Rendered page tab
+ * outlines. Each target is located in the parsed document and its markup found
+ * in the source; overlapping matches are merged so the marks can never cross.
+ * Returns ``null`` when nothing could be located (the source is then shown
  * unhighlighted rather than guessed at).
  */
-function highlightInDom(
-  html: string | null,
-  target: Target | null,
-): { before: string; el: string; after: string } | null {
-  if (!html || !target) return null;
+function highlightInDom(html: string | null, targets: Target[]): DomSegment[] | null {
+  if (!html || targets.length === 0) return null;
+  let doc: Document | null = null;
   try {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const el = findTargetElement(doc, target);
-    if (!el) return null;
-    const markup = el.outerHTML;
-    if (!markup) return null;
-    const index = html.indexOf(markup);
-    if (index < 0) return null;
-    return {
-      before: html.slice(0, index),
-      el: markup,
-      after: html.slice(index + markup.length),
-    };
+    doc = new DOMParser().parseFromString(html, "text/html");
   } catch {
-    return null;
+    doc = null; // fall through to matching the stored snippets literally
   }
+
+  const ranges: Array<[number, number]> = [];
+  for (const target of targets) {
+    const located = doc ? findTargetElement(doc, target) : null;
+    // The element's own serialization first. It can differ from the source
+    // text (the parser normalizes quoting, entities and void elements), so the
+    // stored snippet is the fallback: it is frequently the literal source.
+    for (const candidate of [located?.outerHTML, target.snippet]) {
+      if (!candidate) continue;
+      const index = html.indexOf(candidate);
+      if (index >= 0) {
+        ranges.push([index, index + candidate.length]);
+        break;
+      }
+    }
+  }
+  if (ranges.length === 0) return null;
+
+  // Merge overlaps so nested or repeated matches can't produce crossing marks.
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else merged.push([range[0], range[1]]);
+  }
+
+  const segments: DomSegment[] = [];
+  let cursor = 0;
+  for (const [start, end] of merged) {
+    if (start > cursor) segments.push({ text: html.slice(cursor, start), marked: false });
+    segments.push({ text: html.slice(start, end), marked: true });
+    cursor = end;
+  }
+  if (cursor < html.length) segments.push({ text: html.slice(cursor), marked: false });
+  return segments;
 }
 
 /**
@@ -783,8 +942,42 @@ function truncatedSnippetMatches(raw: string, needle: string): boolean {
 function markElement(el: HTMLElement, outlineColor: string, bg: string): void {
   el.classList.add("axcess-inspect-highlight");
   el.style.setProperty("outline", `3px solid ${outlineColor}`, "important");
-  el.style.setProperty("outline-offset", "2px", "important");
+  // Inset, not outset. A flagged element that fills an `overflow: hidden`
+  // ancestor (the ubiquitous image-tile pattern: `w-full h-full` inside a
+  // clipped tile) has an outset ring drawn entirely outside the clip box, so
+  // it is never painted. Drawing just inside the border box is always visible.
+  el.style.setProperty("outline-offset", "-3px", "important");
   el.style.setProperty("background-color", bg, "important");
+  el.style.setProperty("scroll-margin-top", "96px", "important");
+  forceVisible(el);
+  // An ancestor can hide the element no matter what we set on the element
+  // itself (opacity is inherited-by-compositing, not by cascade), so the whole
+  // chain has to be cleared too.
+  let parent = el.parentElement;
+  while (parent && parent !== el.ownerDocument.documentElement) {
+    forceVisible(parent);
+    parent = parent.parentElement;
+  }
+}
+
+/**
+ * Undo the ways a *frozen* page hides an element we need to point at.
+ *
+ * The frame runs the capture with scripts disabled, so any state the site's
+ * own JS would have transitioned out of stays exactly as it was at scan time.
+ * The common case is a lazy-loaded image still carrying `opacity-0` because
+ * the load handler that swaps in `opacity-100` never runs; scroll-reveal
+ * wrappers behave the same way. Those elements are genuinely invisible, and so
+ * is any highlight on them.
+ *
+ * Transitions and animations are cleared as well so nothing re-hides what we
+ * just revealed. This only ever touches the flagged element and its ancestors.
+ */
+function forceVisible(el: HTMLElement): void {
+  el.style.setProperty("opacity", "1", "important");
+  el.style.setProperty("visibility", "visible", "important");
+  el.style.setProperty("animation", "none", "important");
+  el.style.setProperty("transition", "none", "important");
 }
 
 function readShowHighlights(): boolean {
