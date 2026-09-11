@@ -253,16 +253,24 @@ export default function IssueEvidence({
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              {/* Finder-style banding rather than a rule between every row: with
+                  a title, a wrapped URL and two links in each cell, horizontal
+                  lines added a fourth thing to look at. The band is keyed to
+                  `pageIndex`, NOT to the `<tr>` position, because a page with
+                  screenshots renders two rows and CSS `odd:`/`even:` would then
+                  stripe halfway through a record. Both rows of a page share one
+                  band, so a record reads as a single block. */}
+              <tbody>
                 {pages.map((p, pageIndex) => {
                   const missingScreenshots = Math.max(
                     0,
                     p.occurrence_count - p.screenshot_hashes.length,
                   );
                   const pageLabel = p.page_title || p.page_url;
+                  const band = pageIndex % 2 === 1 ? "bg-surface-subtle" : "bg-surface";
                   return (
                     <Fragment key={p.page_id}>
-                      <tr>
+                      <tr className={band}>
                         <th
                           scope="row"
                           className="px-3 py-2 text-right align-top font-normal tabular-nums text-fg-subtle"
@@ -311,7 +319,7 @@ export default function IssueEvidence({
                         )}
                       </tr>
                       {p.screenshot_hashes.length > 0 && (
-                        <tr className="bg-surface-muted/40">
+                        <tr className={band}>
                           <td colSpan={isInformational ? 3 : 4} className="px-3 pb-4 pt-2">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
                               Instance screenshots
