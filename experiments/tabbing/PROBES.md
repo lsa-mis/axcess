@@ -234,7 +234,9 @@ noise on real pages.
 
 *Cost of R8 + R9 together:* a median of **442 ms** and a maximum of **1580 ms**
 per lead that reaches them, on the 42 of 95 targets the free rules could not
-settle. Amortised over all 95: **283 ms/target**.
+settle. Amortised over all 95 that is **283 ms/target** for the behavioural
+pass alone; a C15 or C16 run also pays the 146 ms static stack that produced
+those 42 leads, so the full cost is **429 ms/target**.
 
 ## Reading the cost column
 
@@ -246,9 +248,19 @@ divided by the corpus's 95 targets. That amortises per-page setup, so it is a
 - C15 and C16 are not. They triage first and run the behavioural pass only on
   survivors, so most targets cost nothing and a few cost over a second.
 
-Under a hard per-button ceiling of 300 ms the best rule is **C14** — 92.5%
-precision, 94.9% strict recall, 146 ms/target. Under an average-across-the-page
-ceiling it is C16, at 283 ms/target against D9's 1278 ms.
+Under a 300 ms budget — per button or averaged across the page — the best rule
+is **C14**: 92.5% precision, 94.9% strict recall, 146 ms/target. C16 reaches
+100% precision and 97.4% recall but costs 429 ms/target all in, so it clears
+D9's 1278 ms by threefold while missing a 300 ms budget by the same margin.
+
+## The whole table in one place
+
+[results/detector-matrix.results.md](results/detector-matrix.results.md) is
+generated from the published artifacts and lists all 48 rows together —
+our twelve ports, upstream's transcribed generators, every combination rule,
+and the behavioural and coverage oracles — each with TP/FP/FN, undecided
+counts, precision, strict recall, F1, and ms per target. Regenerate it with
+`python experiments/tabbing/results_matrix.py`.
 
 ## Running them
 

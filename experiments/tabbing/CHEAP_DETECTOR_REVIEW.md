@@ -51,22 +51,28 @@ or descriptive notes while making a decision.
 | C12: C11 minus declared shortcuts (R3) | 37 | 6 | 1 | 1 / 1 | 86.0% | 94.9% | 90.2% | 42 |
 | C13: C12 minus leads with no action path (R5) | 37 | **4** | 1 | 1 / 1 | **90.2%** | **94.9%** | **92.5%** | 146 |
 | C14: C13 minus name-twinned leads (R6) | 37 | 3 | 1 | 1 / 1 | 92.5% | 94.9% | 93.7% | 146 |
-| C15: C14 minus leads with no click effect (R7, R8) | 37 | 0 | 1 | 1 / 1 | 100% | 94.9% | 97.4% | 283 |
-| C16: C15 plus divergent-key-effect promotions (R9) | 38 | 0 | 0 | 1 / 0 | **100%** | **97.4%** | **98.7%** | 283 |
+| C15: C14 minus leads with no click effect (R7, R8) | 37 | 0 | 1 | 1 / 1 | 100% | 94.9% | 97.4% | 429 |
+| C16: C15 plus divergent-key-effect promotions (R9) | 38 | 0 | 0 | 1 / 1 | **100%** | **97.4%** | **98.7%** | 429 |
 
 The `ms per target` column divides each rule's measured browser work by the 95
 targets in the corpus. It amortises per-page setup, so it is a throughput
 figure, not a promise about any one button. C1–C14 are per-target uniform.
 C15 and C16 are not: they run a behavioural pass only on the leads C14 still
 holds, 42 of 95 here, and those cost a median of 442 ms and up to 1580 ms each
-while the other 53 cost nothing. Under a hard per-button ceiling of 300 ms,
-**C14 is the best available rule**; under an average-across-the-page ceiling,
-C16 is, at 283 ms per target against the 1278 ms of the behavioural arm.
+while the other 53 cost nothing. Their 429 ms is the whole cost of a run — the
+146 ms static stack that produces the 42 leads, plus 283 ms of behavioural work
+amortised over all 95 targets. **Under a 300 ms budget, per button or averaged
+across the page, C14 is the best available rule.** C15 and C16 buy their last
+four false alarms and last miss at roughly three times C14's cost, and still
+undercut the 1278 ms behavioural arm threefold.
 
 ## The four rules that clear C9's false alarms
 
 [PROBES.md](PROBES.md) explains every detector and rule in detail: what each
 one observes, what it costs, and what it is not entitled to conclude.
+[detector-matrix.results.md](results/detector-matrix.results.md) is the
+generated table of all 48 rows — every family, generator, combination rule
+and oracle — with precision, strict recall, F1 and ms per target.
 
 R1–R3 and R5 are static. They read the DOM and one hover; none of them runs
 page code.
