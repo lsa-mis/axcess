@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Roving tabindex with and without an entry point</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>A skipped Tab stop can have a valid arrow-key path</h1>
+<p>In each toolbar, Left/Right arrows move focus and Home/End select an endpoint. Enter or Space activates.</p>
+<p id="out">idle</p>
+<button id="before">Before the toolbars</button>
+<h2>Working toolbar</h2>
+<div role="toolbar" aria-label="Working actions" id="working-toolbar">
+  <button data-probe="e160" tabindex="0">First working action</button>
+  <button data-probe="e161" tabindex="-1">Second working action</button>
+</div>
+<h2>Broken toolbar: all entry points removed</h2>
+<div role="toolbar" aria-label="Unreachable actions" id="broken-toolbar">
+  <button data-probe="e162" tabindex="-1">First unreachable action</button>
+  <button data-probe="e163" tabindex="-1">Second unreachable action</button>
+</div>
+<button id="after">After the toolbars</button>
+<script src="_helpers.js"></script>
+<script>
+// Both widgets implement arrows. Only the first can be entered from Tab.
+// Clicking a broken item supplies focus and masks the bug on a reused page.
+for (const toolbar of document.querySelectorAll('[role="toolbar"]')) {
+  const buttons = Array.from(toolbar.querySelectorAll('button'));
+  toolbar.addEventListener('keydown', function rove(event) {
+    const current = buttons.indexOf(document.activeElement);
+    if (current < 0) return;
+    let next;
+    if (event.key === 'ArrowRight') next = (current + 1) % buttons.length;
+    else if (event.key === 'ArrowLeft') next = (current + buttons.length - 1) % buttons.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = buttons.length - 1;
+    else return;
+    event.preventDefault();
+    buttons.forEach((button, index) => { button.tabIndex = index === next ? 0 : -1; });
+    buttons[next].focus();
+  });
+}
+document.querySelector('[data-probe="e160"]').addEventListener('click', function click160() { mark('e160'); });
+document.querySelector('[data-probe="e161"]').addEventListener('click', function click161() { mark('e161'); });
+document.querySelector('[data-probe="e162"]').addEventListener('click', function click162() { mark('e162'); });
+document.querySelector('[data-probe="e163"]').addEventListener('click', function click163() { mark('e163'); });
+</script>
+</html>

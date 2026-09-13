@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Negative tabindex on shadow hosts</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  #open-host, #closed-host { display: inline-block; margin: 8px 0; }
+</style>
+<h1>Native buttons excluded by their shadow hosts</h1>
+<p>The buttons have no negative tabindex themselves. Their hosts remove the shadow trees from sequential focus.</p>
+<p id="out">idle</p>
+<button id="before">Before the components</button>
+<div id="open-host" tabindex="-1"></div>
+<div id="closed-host" tabindex="-1"></div>
+<button id="after">After the components</button>
+<script src="_helpers.js"></script>
+<script>
+const buttonStyle = '<style>button{font:inherit;padding:12px;cursor:pointer}</style>';
+const openRoot = document.getElementById('open-host').attachShadow({ mode: 'open' });
+openRoot.innerHTML = buttonStyle + '<button data-probe="e130">Open-root action</button>';
+openRoot.querySelector('button').addEventListener('click', function click130() { mark('e130'); });
+
+// Do not mirror the closed-root probe onto its host or expose its root on window.
+// DOM-based discovery should report it as unobservable, not as a clean result.
+const closedRoot = document.getElementById('closed-host').attachShadow({ mode: 'closed' });
+closedRoot.innerHTML = buttonStyle + '<button data-probe="e131">Closed-root action</button>';
+closedRoot.querySelector('button').addEventListener('click', function click131() { mark('e131'); });
+</script>
+</html>

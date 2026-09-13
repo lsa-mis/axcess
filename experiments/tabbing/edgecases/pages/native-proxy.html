@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Hidden native control proxy</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>A file-picker button made from a label</h1>
+<p>Click Choose file to open the picker. Tab skips both the label and its hidden input.</p>
+<p id="out">idle</p>
+<button id="before">Before the picker</button>
+<label data-probe="e100" class="btnish" for="upload">Choose file</label>
+<input id="upload" type="file" hidden>
+<button id="after">After the picker</button>
+<script src="_helpers.js"></script>
+<script>
+// Unlike e86, the associated native input supplies no keyboard alternative.
+// The label needs no click listener: the browser forwards activation to input.
+document.getElementById('upload').addEventListener('click', function proxy100() {
+  mark('e100');
+});
+</script>
+</html>

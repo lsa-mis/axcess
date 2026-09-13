@@ -1,7 +1,7 @@
 {
   "corpus": "edgecases",
-  "authored_by": "claude",
-  "warning": "Detectors and fixtures share one author, so no absolute accuracy figure from this corpus is admissible. It exists to compare detectors against each other on identical pages, and to stress the instrument.",
+  "authored_by": "claude (original corpus); codex (e100-e163 additions)",
+  "warning": "Development corpus authored with access to detector implementations; no unbiased accuracy or ranking claim. It exists to compare detectors against each other on identical pages, and to stress the instrument.",
   "pages": {
     "pages/binding.html": [
       "e01",
@@ -76,6 +76,36 @@
       "e31",
       "e32",
       "e33"
+    ],
+    "pages/native-proxy.html": [
+      "e100"
+    ],
+    "pages/focus-redirect.html": [
+      "e110"
+    ],
+    "pages/tab-trap.html": [
+      "e111"
+    ],
+    "pages/pointer-gated.html": [
+      "e120",
+      "e121"
+    ],
+    "pages/shadow-tab-scope.html": [
+      "e130",
+      "e131"
+    ],
+    "pages/iframe-tab-scope.html": [
+      "e140"
+    ],
+    "pages/graphical-controls.html": [
+      "e150",
+      "e151"
+    ],
+    "pages/roving-tabindex.html": [
+      "e160",
+      "e161",
+      "e162",
+      "e163"
     ]
   },
   "probes": {
@@ -378,6 +408,76 @@
       "label": "decoy",
       "cohort": "edge",
       "note": "hover tooltip; behaviourally identical to a broken menu, but 1.4.13 not 2.1.1 -- the disputed-label case"
+    },
+    "e100": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "label opens a hidden file input through native activation; unlike e86, the associated input provides no keyboard alternative"
+    },
+    "e110": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "native button immediately redirects focus to a sibling; nominal tabIndex is 0 but neither Tab direction leaves usable focus on it"
+    },
+    "e111": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "document intercepts Tab and Shift+Tab in a stale focus trap; visible native button remains mouse-operable outside the trap"
+    },
+    "e120": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "native button changes tabindex from -1 to 0 only on pointer entry; requires fresh keyboard trials with pointer parked outside"
+    },
+    "e121": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "wrapper pointer entry enables a disabled native button before click; unlike e67, a real pointer approach can activate it"
+    },
+    "e130": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "native button in an open shadow root is skipped because its host has tabindex=-1; the button itself has no negative tabindex"
+    },
+    "e131": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "native button in a closed shadow root under a tabindex=-1 host; clickable by coordinates but intentionally unobservable to DOM-walking discovery"
+    },
+    "e140": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "native button inside a same-origin srcdoc iframe with tabindex=-1; parent tab sequence skips the frame, mouse can enter it"
+    },
+    "e150": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "SVG group with role=button and a click listener; rendered rect/text hit targets but no sequential focus or keyboard handler"
+    },
+    "e151": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "canvas role=button handles clicks only within a painted hit region; unlike e23, the bitmap itself is the control, with no keyboard path"
+    },
+    "e160": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "working roving-tabindex toolbar entry; native Enter and Space activation and Left/Right/Home/End focus movement"
+    },
+    "e161": {
+      "label": "ok",
+      "cohort": "edge",
+      "note": "working toolbar item starts with tabindex=-1 but Tab to e160 then ArrowRight or End reaches it; skipping Tab is not itself a defect"
+    },
+    "e162": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "broken roving toolbar has all items at tabindex=-1; arrow handlers exist but no keyboard entry point; fresh trials avoid mouse-seeded focus"
+    },
+    "e163": {
+      "label": "violation",
+      "cohort": "edge",
+      "note": "second item in the toolbar with no initial tab stop; unlike e161, no reachable peer can transfer keyboard focus"
     }
   }
 }

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Negative tabindex on an iframe</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>A native button inside a skipped frame</h1>
+<p>Click the embedded action. Tab and Shift+Tab skip its frame even though the button itself has a natural tab stop.</p>
+<p id="out">idle</p>
+<button id="before">Before the frame</button>
+<iframe id="action-frame" title="Embedded action" tabindex="-1" style="display:block; width:280px; height:90px"
+  srcdoc="<!doctype html><html lang='en'><meta charset='utf-8'><title>Embedded action</title>
+  <style>button{font:15px system-ui;padding:12px;cursor:pointer}</style>
+  <button data-probe='e140'>Run embedded action</button>
+  <script>document.querySelector('button').addEventListener('click', function click140() { parent.mark('e140'); });</script>
+  </html>"></iframe>
+<button id="after">After the frame</button>
+<script src="_helpers.js"></script>
+</html>

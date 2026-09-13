@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Pointer-gated focusability</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>Buttons become keyboard candidates only after pointer entry</h1>
+<p>Start each keyboard trial on a fresh page with the pointer outside the controls.</p>
+<p id="out">idle</p>
+<button id="before">Before the actions</button>
+<button data-probe="e120" class="btnish" tabindex="-1">Hover makes me a tab stop</button>
+<span id="enable-zone" style="display:inline-block; padding:8px; border:1px dashed #888">
+  <button data-probe="e121" class="btnish" disabled>Hover enables me</button>
+</span>
+<button id="after">After the actions</button>
+<script src="_helpers.js"></script>
+<script>
+const hoverAction = document.querySelector('[data-probe="e120"]');
+hoverAction.addEventListener('pointerenter', function enter120() { hoverAction.tabIndex = 0; });
+hoverAction.addEventListener('pointerleave', function leave120() { hoverAction.tabIndex = -1; });
+hoverAction.addEventListener('click', function click120() { mark('e120'); });
+
+// The wrapper receives pointer entry even while its native button is disabled.
+// Unlike e67, a normal approach-and-click enables and activates this control.
+const enableZone = document.getElementById('enable-zone');
+const disabledAction = document.querySelector('[data-probe="e121"]');
+enableZone.addEventListener('pointerenter', function enter121() { disabledAction.disabled = false; });
+enableZone.addEventListener('pointerleave', function leave121() { disabledAction.disabled = true; });
+disabledAction.addEventListener('click', function click121() { mark('e121'); });
+</script>
+</html>

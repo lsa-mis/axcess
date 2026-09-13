@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Focus immediately redirected</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>A native button that cannot retain keyboard focus</h1>
+<p>The action briefly receives focus, then sends it to the next button. Clicking still activates it.</p>
+<p id="out">idle</p>
+<button id="before">Before the action</button>
+<button data-probe="e110" class="btnish">Run redirected action</button>
+<button id="after">After the action</button>
+<script src="_helpers.js"></script>
+<script>
+// Static tabIndex inspection says 0. Real Tab and Shift+Tab cannot leave focus
+// here long enough for Enter or Space; this is not a missing tabindex case.
+const action = document.querySelector('[data-probe="e110"]');
+action.addEventListener('focus', function redirect110() {
+  document.getElementById('after').focus();
+});
+action.addEventListener('click', function click110() { mark('e110'); });
+</script>
+</html>

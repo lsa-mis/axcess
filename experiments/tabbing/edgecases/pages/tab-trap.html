@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Tab intercepted before a button</title>
+<link rel="stylesheet" href="_shared.css">
+<h1>A stale focus trap prevents keyboard entry</h1>
+<p>Tab and Shift+Tab are intercepted by a focus trap. The action remains visible and clickable.</p>
+<p id="out">idle</p>
+<button id="trap">Stale focus-trap destination</button>
+<button data-probe="e111" class="btnish">Run action outside the trap</button>
+<button id="after">After the action</button>
+<script src="_helpers.js"></script>
+<script>
+// Keep this on its own page: the document-level trap would mask other probes.
+document.addEventListener('keydown', function trap111(event) {
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    document.getElementById('trap').focus();
+  }
+});
+document.querySelector('[data-probe="e111"]').addEventListener('click', function click111() {
+  mark('e111');
+});
+</script>
+</html>
