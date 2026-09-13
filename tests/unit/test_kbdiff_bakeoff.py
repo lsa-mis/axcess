@@ -300,7 +300,13 @@ def fake_run(monkeypatch, corpus_root: Path, tmp_path: Path):
         return (
             {name: set() for name in bakeoff.CHEAP_METHODS},
             TabOrder({}, False, 2),
-            {"notes": {}, "timings": {}, "unobservable": [], "viewport": dict(bakeoff.VIEWPORT)},
+            {
+                "notes": {},
+                "timings": {},
+                "unobservable": [],
+                "viewport": dict(bakeoff.VIEWPORT),
+                "proposed": {name: [] for name in bakeoff.CHEAP_METHODS},
+            },
         )
 
     monkeypatch.setattr(bakeoff, "run_page", run_page)
@@ -341,6 +347,46 @@ async def test_new_output_has_actual_metadata_and_complete_denominators(fake_run
     browser.close.assert_awaited_once()
 
 
+async def test_proposals_preserve_focusable_controls_removed_from_reports(fake_run, monkeypatch):
+    args, output, _browser, _launcher = fake_run
+    original = bakeoff.run_page
+    method = bakeoff.CHEAP_METHODS[0]
+
+    async def with_candidate(*params):
+        reported, _order, meta = await original(*params)
+        meta["proposed"][method] = ["p1"]
+        return reported, TabOrder({"p1": 1}, False, 3), meta
+
+    monkeypatch.setattr(bakeoff, "run_page", with_candidate)
+    assert await bakeoff.main_async(args) == 0
+    payload = json.loads(output.read_text())
+    assert payload["proposed"][method] == ["p1"]
+    assert payload["reported"][method] == []
+    assert payload["proposal_coverage"][method]["positive_candidates"] == 1
+    assert payload["tab_orders"]["pages/a.html"]["index"] == {"p1": 1}
+
+
+async def test_opt_in_candidate_study_scores_complete_separate_rows(fake_run, monkeypatch):
+    args, output, _browser, _launcher = fake_run
+    args.candidate_study = True
+    ca = bakeoff.candidate_analysis
+    names = [*ca.UPSTREAM_NAMES.values(), *ca.VARIANT_NAMES]
+    study = ca.CandidatePageStudy(
+        proposed={name: {"p1", "p2"} for name in names},
+        reported={name: {"p1"} for name in names},
+        unknown={name: set() for name in names},
+        evidence={"features": {"p1": {"visible": True}}},
+        timings={"candidate study whole page": 1.25},
+    )
+    monkeypatch.setattr(ca, "measure_candidate_page", AsyncMock(return_value=study))
+    assert await bakeoff.main_async(args) == 0
+    payload = json.loads(output.read_text())
+    assert len(payload["scores"]) == len(bakeoff.CHEAP_METHODS) + len(names)
+    assert payload["candidate_evidence"]["pages/a.html"] == study.evidence
+    assert all(payload["proposed"][name] == ["p1", "p2"] for name in names)
+    assert all(payload["reported"][name] == ["p1"] for name in names)
+
+
 async def test_existing_output_is_preserved_before_launch(fake_run):
     args, output, _browser, launcher = fake_run
     output.parent.mkdir()
@@ -375,7 +421,9 @@ async def test_source_change_suppresses_scores_and_fails(fake_run, monkeypatch):
     assert "source changed" in payload["run"]["errors"][0]
 
 
-@pytest.mark.parametrize("failure", ["exception", "missing_method", "viewport", "timeout"])
+@pytest.mark.parametrize(
+    "failure", ["exception", "missing_method", "missing_proposals", "viewport", "timeout"]
+)
 async def test_incomplete_measurement_never_scores_partial_negatives(
     fake_run, monkeypatch, failure
 ):
@@ -390,6 +438,8 @@ async def test_incomplete_measurement_never_scores_partial_negatives(
         reported, order, meta = await original(*args)
         if failure == "missing_method":
             reported.pop(next(iter(reported)))
+        elif failure == "missing_proposals":
+            meta["proposed"].pop(next(iter(meta["proposed"])))
         else:
             meta["viewport"] = {"width": 1, "height": 1}
         return reported, order, meta
@@ -705,6 +755,50 @@ class TestUpstreamStage4Wiring:
         assert kept | set(dismissed) == confirmed, "every finding is kept or dismissed, never lost"
         assert kept, "a pool with no equivalent control must keep something"
 
+    def test_failed_witness_does_not_silently_produce_a_successful_dismissal(self):
+        passes = {
+            "finding": bakeoff.UpstreamPass(mouse_changed={"dom"}, mouse_coverage=frozenset({"x"})),
+            "witness": bakeoff.UpstreamPass(
+                keyboard_changed={"dom"},
+                keyboard_coverage=frozenset({"x"}),
+                in_tab_order=True,
+                coverage_uncertainties={"keyboard": "partial read"},
+            ),
+        }
+        kept, dismissed = bakeoff.upstream_stage4(passes)
+        assert kept == {"finding"} and dismissed == {}
+
+
+async def test_failed_coverage_witness_affects_its_page_but_not_independent_arm(monkeypatch):
+    monkeypatch.setattr(
+        bakeoff, "_upstream_baseline", AsyncMock(return_value=(frozenset(), "measured", False))
+    )
+    monkeypatch.setattr(
+        bakeoff, "_upstream_differential", AsyncMock(return_value=bakeoff.UpstreamPass())
+    )
+    monkeypatch.setattr(bakeoff, "_coverage_pair", AsyncMock(return_value=bakeoff.CoveragePair()))
+    outcomes = [bakeoff.to_outcome_stub(pid, {"finding"}, set()) for pid in ("finding", "witness")]
+    monkeypatch.setattr(
+        bakeoff,
+        "DifferentialRunner",
+        lambda *_: SimpleNamespace(run_probe=AsyncMock(side_effect=outcomes)),
+    )
+    monkeypatch.setattr(
+        bakeoff,
+        "_coverage_armed_outcomes",
+        AsyncMock(return_value=(outcomes, {"witness": "profiler failed"})),
+    )
+    result = await bakeoff.run_behavioural(
+        SimpleNamespace(close_open_contexts=AsyncMock()),
+        "a.html",
+        ["finding", "witness"],
+        TabOrder({}, False, 2),
+    )
+    assert result.d9_s4u_unknown == {"finding", "witness"}
+    assert result.d9u_s4u_unknown == set()
+    assert result.d9_nos4_unknown == set()
+    assert result.s4u_dismissals == {}
+
 
 class TestSilentProfilerReadIsNotAVerdict:
     """A swallowed profiler error must not reach the scores as a confident row.
@@ -806,7 +900,7 @@ class TestSilentProfilerReadIsNotAVerdict:
         )
         assert result.coverage_errors == {"p1": "send: RuntimeError: profiler detached"}
         assert "p1" in result.d9_s4u_unknown, "coverage-exact must abstain"
-        assert "p1" in result.d9u_s4u_unknown, "upstream Stage 4 compares coverage too"
+        assert "p1" not in result.d9u_s4u_unknown, "the independent upstream recording succeeded"
         assert "p1" not in result.d9_nos4_unknown, "the no-filter row reads no coverage"
         assert "p1" not in result.d9_s4ours_unknown, "the payload row reads no coverage"
 

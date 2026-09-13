@@ -34,10 +34,6 @@ import contextlib
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from audit.logging import get_logger
-
-log = get_logger(__name__)
-
 PageDetector = Literal["attrScan", "handlerProp", "tabindexCounter", "cssLexical", "reactProps"]
 
 # candidates.ts `pageDetector`. The constants are theirs exactly: seven inline
@@ -47,7 +43,7 @@ UPSTREAM_SURVEY_JS = r"""
 (kind) => {
   const a11y = window.__a11y;
   const hits = new Set();
-  if (!a11y) return [];
+  if (!a11y) throw new Error('upstream instrumentation is missing');
 
   const NATIVE = new Set(['a', 'button', 'input', 'select', 'textarea', 'summary', 'audio', 'video', 'iframe']);
   const INTERACTIVE_ROLES = new Set([
@@ -105,7 +101,7 @@ UPSTREAM_SURVEY_JS = r"""
 UPSTREAM_VISIBLE_JS = r"""
 () => {
   const a11y = window.__a11y;
-  if (!a11y) return [];
+  if (!a11y) throw new Error('upstream instrumentation is missing');
   const res = [];
   for (const el of a11y.allElements(true)) {
     const id = el.getAttribute ? el.getAttribute('data-probe') : null;
@@ -121,7 +117,7 @@ UPSTREAM_VISIBLE_JS = r"""
 UPSTREAM_D0_JS = r"""
 () => {
   const a11y = window.__a11y;
-  if (!a11y) return [];
+  if (!a11y) throw new Error('upstream instrumentation is missing');
   const candidates = document.querySelectorAll(
     'button, [role="button"], [role="tab"], [role="menuitem"], ' +
     '[role="switch"], [role="checkbox"], [role="radio"], ' +
@@ -146,7 +142,7 @@ UPSTREAM_D0_JS = r"""
 UPSTREAM_D6_JS = r"""
 () => {
   const a11y = window.__a11y;
-  if (!a11y) return [];
+  if (!a11y) throw new Error('upstream instrumentation is missing');
   const MOUSE = ['click', 'mousedown', 'mouseup', 'mouseover', 'mouseenter', 'dblclick', 'pointerdown'];
   const out = [];
   for (const rec of a11y.listeners) {
@@ -183,6 +179,7 @@ class ProbeNode:
     probe: str
     node_id: int
     box: tuple[float, float, float, float] | None  # x, y, w, h
+    via: str = "cdp"
 
     @property
     def centre(self) -> tuple[float, float] | None:
@@ -197,13 +194,9 @@ async def _each_frame(page: Any, expression: str, *args: Any) -> list[Any]:
     """Evaluate in the main frame and every child frame, as upstream does."""
     results: list[Any] = []
     for frame in page.frames:
-        try:
-            results.append(await frame.evaluate(expression, *args))
-        except Exception as exc:
-            # Upstream's `.catch(() => [])`. A frame that cannot be evaluated
-            # proposes nothing; it is not evidence that nothing is there.
-            log.debug("upstream.frame_eval_failed", frame=frame.url, error=str(exc)[:120])
-            results.append([])
+        # Deliberate reliability adaptation: upstream catches this as []. A
+        # failed instrument must invalidate the measurement, not improve scores.
+        results.append(await frame.evaluate(expression, *args))
     return results
 
 
@@ -232,16 +225,33 @@ async def d0_current_crawler(page: Any) -> set[str]:
     return out
 
 
-async def resolve_probe_nodes(cdp: Any) -> dict[str, ProbeNode]:
+UPSTREAM_SHIM_RESOLVE_JS = r"""
+(id) => {
+  if (!window.__a11y) throw new Error('upstream instrumentation is missing');
+  const el = window.__a11y.findProbe(id, true);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  let ox = 0, oy = 0, win = window;
+  while (win !== win.parent) {
+    const fe = win.frameElement;
+    if (!fe) break;
+    const fr = fe.getBoundingClientRect();
+    ox += fr.x; oy += fr.y; win = win.parent;
+  }
+  return {box: r.width || r.height ? [r.x + ox, r.y + oy, r.width, r.height] : null};
+}
+"""
+
+
+async def resolve_probe_nodes(
+    cdp: Any, only: list[str] | None = None, page: Any = None
+) -> dict[str, ProbeNode]:
     """``resolveProbeNodes``: walk the pierced tree, then take each border box.
 
     Pierced means shadow roots, closed ones included, plus frame content
     documents and template contents — reach a Playwright locator does not have.
     """
-    try:
-        document = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
-    except Exception:
-        return {}
+    document = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
 
     found: dict[str, int] = {}
 
@@ -261,21 +271,38 @@ async def resolve_probe_nodes(cdp: Any) -> dict[str, ProbeNode]:
     walk(document.get("root", {}))
 
     nodes: dict[str, ProbeNode] = {}
+    wanted = set(only) if only is not None else None
     for probe, node_id in found.items():
         box: tuple[float, float, float, float] | None = None
+        if wanted is not None and probe not in wanted:
+            nodes[probe] = ProbeNode(probe=probe, node_id=node_id, box=None)
+            continue
         try:
             model = (await cdp.send("DOM.getBoxModel", {"nodeId": node_id})).get("model") or {}
             border = model.get("border") or []
             if len(border) >= 8:
-                box = (
-                    border[0],
-                    border[1],
-                    float(model.get("width") or 0),
-                    float(model.get("height") or 0),
-                )
-        except Exception:
+                xs, ys = border[0:8:2], border[1:8:2]
+                x, y = min(xs), min(ys)
+                box = (x, y, max(xs) - x, max(ys) - y)
+        except Exception as exc:
+            # Normal absence of layout is an upstream exclusion. A detached
+            # session or unsupported command is a failed measurement.
+            if "Could not compute box model" not in str(exc):
+                raise
             box = None
         nodes[probe] = ProbeNode(probe=probe, node_id=node_id, box=box)
+    if page is not None:
+        for probe in only or []:
+            if probe in nodes:
+                continue
+            for frame in page.frames:
+                info = await frame.evaluate(UPSTREAM_SHIM_RESOLVE_JS, probe)
+                if info is None:
+                    continue
+                values = info["box"]
+                box = None if values is None else (values[0], values[1], values[2], values[3])
+                nodes[probe] = ProbeNode(probe=probe, node_id=-1, box=box, via="shim")
+                break
     return nodes
 
 
@@ -292,15 +319,14 @@ async def d5_cdp_listeners(
     for node in nodes.values():
         if visible is not None and node.probe not in visible:
             continue
-        object_id = None
-        try:
-            resolved = await cdp.send("DOM.resolveNode", {"nodeId": node.node_id})
-            object_id = (resolved.get("object") or {}).get("objectId")
-        except Exception as exc:
-            log.debug("upstream.d5_resolve_failed", probe=node.probe, error=str(exc)[:120])
+        if node.via == "shim":
+            # Upstream tries nodeId=-1 and catches the resolution error. The
+            # shim supplies geometry, not a CDP listener object; D6 can see it.
             continue
+        resolved = await cdp.send("DOM.resolveNode", {"nodeId": node.node_id})
+        object_id = (resolved.get("object") or {}).get("objectId")
         if not object_id:
-            continue
+            raise RuntimeError(f"CDP returned no object for {node.probe}")
         try:
             listeners = await cdp.send(
                 "DOMDebugger.getEventListeners",
@@ -310,8 +336,6 @@ async def d5_cdp_listeners(
                 if entry.get("type") in UPSTREAM_MOUSE_EVENTS:
                     hits.add(node.probe)
                     break
-        except Exception as exc:  # the node went away between resolve and read
-            log.debug("upstream.d5_listeners_failed", probe=node.probe, error=str(exc)[:120])
         finally:
             with contextlib.suppress(Exception):
                 await cdp.send("Runtime.releaseObject", {"objectId": object_id})
@@ -336,6 +360,39 @@ async def d6_listener_shim(
             hits.add(probe)
             provenance.setdefault(probe, record.get("stack") or "")
     return hits, provenance
+
+
+async def d1_axe(page: Any, axe_source: str) -> set[str]:
+    """Upstream's three tags and ANY violation -> nearest labelled ancestor.
+
+    Uses Axcess's pinned local axe bundle with direct injection into all frames,
+    not Node's AxeBuilder package. The tag set and main-document selector
+    attribution are transcribed; engine/version and integration parity are not
+    claimed. No candidate-minus-Tab subtraction belongs to this detector.
+    """
+    for frame in page.frames:
+        await frame.evaluate(axe_source)
+    violations = await page.evaluate(
+        """async () => (await axe.run(document, {
+          runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa']}
+        })).violations"""
+    )
+    hits: set[str] = set()
+    for violation in violations:
+        for node in violation["nodes"]:
+            probe = await page.evaluate(
+                """selectors => {
+                  if (!window.__a11y) throw new Error('upstream instrumentation is missing');
+                  let el;
+                  try { el = document.querySelector(selectors.join(' ')); }
+                  catch (e) { if (e.name === 'SyntaxError') return null; throw e; }
+                  return el ? window.__a11y.probeOf(el) : null;
+                }""",
+                node["target"],
+            )
+            if probe:
+                hits.add(probe)
+    return hits
 
 
 async def d8_hover_diff(page: Any, nodes: dict[str, ProbeNode]) -> set[str]:
@@ -365,19 +422,14 @@ async def d8_hover_diff(page: Any, nodes: dict[str, ProbeNode]) -> set[str]:
         }
         if clip["width"] < 1 or clip["height"] < 1:
             continue
-        try:
-            await page.mouse.move(park_x, park_y)
-            await page.wait_for_timeout(60)
-            rest = await page.screenshot(clip=clip)
-            await page.mouse.move(centre[0], centre[1])
-            await page.wait_for_timeout(120)
-            hovered = await page.screenshot(clip=clip)
-        except Exception as exc:
-            log.debug("upstream.d8_screenshot_failed", probe=node.probe, error=str(exc)[:120])
-            continue
+        await page.mouse.move(park_x, park_y)
+        await page.wait_for_timeout(60)
+        rest = await page.screenshot(clip=clip)
+        await page.mouse.move(centre[0], centre[1])
+        await page.wait_for_timeout(120)
+        hovered = await page.screenshot(clip=clip)
         if rest and hovered and rest != hovered:
             hits.add(node.probe)
 
-    with contextlib.suppress(Exception):
-        await page.mouse.move(park_x, park_y)
+    await page.mouse.move(park_x, park_y)
     return hits

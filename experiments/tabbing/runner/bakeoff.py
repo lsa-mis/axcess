@@ -56,6 +56,7 @@ from audit.analyzer.keyboard.kbdiff.score import (  # noqa: E402
 )
 from audit.analyzer.keyboard.kbdiff.taborder import TabOrder, compute_tab_order  # noqa: E402
 from audit.logging import get_logger  # noqa: E402
+from experiments.tabbing.runner import candidate_analysis, upstream_candidates  # noqa: E402
 from experiments.tabbing.runner.corpus import (  # noqa: E402
     LABELS,
     compute_corpus_sha256,
@@ -254,7 +255,7 @@ async def run_page(
     """
     url = page_url(page_path)
     reported: dict[str, set[str]] = {}
-    meta: dict[str, Any] = {"notes": {}, "timings": {}}
+    meta: dict[str, Any] = {"notes": {}, "timings": {}, "proposed": {}}
 
     # --- one context carrying both shims, for the survey + listener routes ---
     context = await factory()
@@ -292,6 +293,7 @@ async def run_page(
             result = build(rows)
             elapsed = round((time.monotonic() - t0) * 1000, 3)
             reported[result.detector] = result.reported(order)
+            meta["proposed"][result.detector] = sorted(result.proposed)
             meta["timings"][result.detector] = elapsed
             if result.note:
                 meta["notes"][result.detector] = result.note
@@ -301,11 +303,13 @@ async def run_page(
         cdp.require_success()
         meta["timings"][d5.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d5.detector] = d5.reported(order)
+        meta["proposed"][d5.detector] = sorted(d5.proposed)
 
         t0 = time.monotonic()
         d6 = await detectors.d6_listener_shim(page)
         meta["timings"][d6.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d6.detector] = d6.reported(order)
+        meta["proposed"][d6.detector] = sorted(d6.proposed)
         if d6.note:
             meta["notes"][d6.detector] = d6.note
 
@@ -313,6 +317,7 @@ async def run_page(
         d8 = await detectors.d8_hover_diff(page, probe_ids)
         meta["timings"][d8.detector] = round((time.monotonic() - t0) * 1000, 1)
         reported[d8.detector] = d8.reported(order)
+        meta["proposed"][d8.detector] = sorted(d8.proposed)
 
         # --- D1: axe-core, the scanner axcess already ships ------------------
         t0 = time.monotonic()
@@ -327,6 +332,8 @@ async def run_page(
         # quietly resolving.
         reported["D1 axe-core (keyboard rules)"] = await _axe_probe_ids(page, relevant)
         reported["D1x axe-core (any rule, unsound)"] = await _axe_probe_ids(page, violations)
+        for name in ("D1 axe-core (keyboard rules)", "D1x axe-core (any rule, unsound)"):
+            meta["proposed"][name] = sorted(reported[name])
 
         fired = sorted({getattr(v, "rule_id", "?") for v in violations})
         meta["notes"]["D1 axe-core (keyboard rules)"] = (
@@ -606,7 +613,7 @@ async def run_behavioural(
 
         t0 = time.monotonic()
         pair = await _coverage_pair(factory, config, probe_id, order)
-        pair.baseline = baseline
+        pair.baseline = set(baseline)
         result.timings.setdefault(D10_NAME, 0.0)
         result.timings[D10_NAME] += (time.monotonic() - t0) * 1000
         if pair.reported:
@@ -666,18 +673,20 @@ async def run_behavioural(
     # Which rows a failed *coverage* read can touch, and which it cannot. The
     # no-filter and payload rows compare observable effects and never read a
     # function set, so a broken profiler or a missing baseline is irrelevant to
-    # them; making them abstain would throw away verdicts that are perfectly
-    # sound. Only the two rows that actually compare coverage are affected.
-    coverage_blind = set(coverage_errors)
-    if baseline_failed:
-        # No floor means no subtraction we can stand behind, for every probe on
-        # the page rather than for any single trial.
-        coverage_blind |= set(probe_ids)
+    # them. Any unread set also compromises comparisons with that control as a
+    # possible keyboard alternative, so this page's coverage-filter arm abstains
+    # as a whole. This conservative failure policy is separate from upstream's
+    # successful-measurement rule.
+    coverage_blind = set(probe_ids) if coverage_errors or baseline_failed else set()
 
     result.d9_nos4 = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.VIOLATION}
     result.d9_nos4_unknown = {o.probe_id for o in cov_outcomes if o.verdict is Verdict.UNKNOWN}
 
-    confirmed_u, dismissed_u = apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
+    confirmed_u, dismissed_u = (
+        (cov_outcomes, [])
+        if coverage_blind
+        else apply_equivalence(cov_outcomes, strategy=by_coverage_exact)
+    )
     result.d9_s4u = {o.probe_id for o in confirmed_u if o.verdict is Verdict.VIOLATION}
     # Its own trial-level unknowns first, then the coverage-blind probes on top.
     # An earlier version built the union before this line and had it silently
@@ -694,8 +703,11 @@ async def run_behavioural(
     # a control on another page is not an alternative a user has -- and that
     # difference is one of the results, so the two must not be quietly aligned.
     result.upstream_passes = dict(upstream_passes)
-    # Their Stage 4 compares coverage too, so it inherits the same blindness.
-    result.d9u_s4u_unknown = set(result.d9u_unknown) | coverage_blind
+    # This arm has its OWN measurements; an error in the independent ablation
+    # must not contaminate it. Its global witness pool is guarded in main_async.
+    result.d9u_s4u_unknown = set(result.d9u_unknown) | {
+        pid for pid, up in upstream_passes.items() if up.coverage_uncertainties
+    }
 
     confirmed_p, dismissed_p = apply_equivalence(cov_outcomes)
     result.d9_s4ours = {o.probe_id for o in confirmed_p if o.verdict is Verdict.VIOLATION}
@@ -772,12 +784,10 @@ def _s4_record(outcome: Any) -> dict[str, Any]:
     subtracting the page's handler-free baseline, which is published separately
     per page under ``baseline_evidence``.
 
-    A note on the failure direction, since the shared differential's coverage
-    helpers swallow profiler errors: an unread set comes back empty, and an
-    empty candidate set can never equal a non-empty finding set, so a failed
-    read can only *withhold* a dismissal, never manufacture one. It costs
-    precision, not soundness — and the sets are published here so that any such
-    case can be found rather than trusted.
+    Failed reads are recorded separately under ``coverage_errors``. They can
+    leave empty or partial sets and compromise both findings and alternative
+    controls. The coverage-filter row therefore abstains for that page; these
+    records remain available for diagnosis, not as successful measurements.
     """
     record = serialize_outcome(outcome)
     record["mouse_coverage"] = sorted(outcome.mouse.coverage)
@@ -1046,6 +1056,11 @@ def upstream_stage4(passes: dict[str, UpstreamPass]) -> tuple[set[str], dict[str
         mouse coverage, or a candidate with no keyboard coverage, is skipped
     """
     confirmed = [pid for pid, up in passes.items() if up.reported]
+    if any(up.coverage_uncertainties for up in passes.values()):
+        # A failed witness can affect another finding anywhere in this global
+        # pool. Preserve the raw leads for diagnosis; main_async abstains on the
+        # filtered row instead of treating this as a successful no-match.
+        return set(confirmed), {}
     reachable = [
         (pid, up)
         for pid, up in passes.items()
@@ -1121,6 +1136,10 @@ async def _upstream_differential(
             await _park_mouse(page)
             await page.wait_for_timeout(80)
             centre, reason = await _pierced_centre(cdp, probe_id)
+            # Resolution failures already have their own mouse uncertainty.
+            # In particular a normal no-box error must not leak into the next
+            # keyboard profiler read and invalidate a global Stage-4 pool.
+            cdp.errors.clear()
             viewport = page.viewport_size or {"width": 1280, "height": 900}
             if centre is None:
                 result.uncertainties["mouse"] = reason or "unresolved"
@@ -1334,9 +1353,19 @@ async def main_async(args: argparse.Namespace) -> int:
         D10B_NAME,
         D10BASE_NAME,
     ]
-    methods = [*CHEAP_METHODS, *([] if args.cheap_only else behavioural)]
+    candidate_study = getattr(args, "candidate_study", False)
+    candidate_methods = (
+        [*candidate_analysis.UPSTREAM_NAMES.values(), *candidate_analysis.VARIANT_NAMES]
+        if candidate_study
+        else []
+    )
+    methods = [*CHEAP_METHODS, *candidate_methods, *([] if args.cheap_only else behavioural)]
     all_reported: dict[str, set[str]] = {name: set() for name in methods}
     all_unknown: dict[str, set[str]] = {name: set() for name in methods}
+    all_proposed: dict[str, set[str]] = {
+        name: set() for name in [*CHEAP_METHODS, *candidate_methods]
+    }
+    candidate_evidence: dict[str, Any] = {}
     reasons: dict[str, str] = {}
     coverage: dict[str, dict[str, Any]] = {}
     upstream_evidence: dict[str, dict[str, Any]] = {}
@@ -1360,6 +1389,11 @@ async def main_async(args: argparse.Namespace) -> int:
     try:
         async with asyncio.timeout(args.timeout_seconds):
             axe = AxeAnalyzer.from_bundled()
+            candidate_axe_source = detectors.AXE_BUNDLE.read_text() if candidate_study else ""
+
+            async def candidate_axe(page: Any) -> set[str]:
+                return await upstream_candidates.d1_axe(page, candidate_axe_source)
+
             async with async_playwright() as pw:
                 browser = await pw.chromium.launch(headless=True)
                 browser_version = browser.version
@@ -1373,6 +1407,8 @@ async def main_async(args: argparse.Namespace) -> int:
                             )
                         if set(reported) != set(CHEAP_METHODS):
                             raise RuntimeError(f"incomplete detector results on {page_path}")
+                        if set(meta.get("proposed", {})) != set(CHEAP_METHODS):
+                            raise RuntimeError(f"incomplete candidate proposals on {page_path}")
                         if meta["viewport"] != VIEWPORT:
                             raise RuntimeError(f"unexpected viewport on {page_path}")
                         actual_viewports[page_path] = meta["viewport"]
@@ -1385,11 +1421,40 @@ async def main_async(args: argparse.Namespace) -> int:
                             if ids - set(probe_ids):
                                 raise RuntimeError(f"{name} returned a probe outside {page_path}")
                             all_reported[name].update(ids)
+                            proposals = set(meta["proposed"][name])
+                            if proposals - set(probe_ids):
+                                raise RuntimeError(f"{name} proposed a probe outside {page_path}")
+                            all_proposed[name].update(proposals)
                             all_unknown[name].update(unobservable)
                             if not name.startswith("D1 ") and not name.startswith("D1x "):
                                 all_unknown[name].update(capped)
                         notes.update(meta["notes"])
-                        tab_info[page_path] = {"presses": order.presses, "capped": order.capped}
+                        tab_info[page_path] = {
+                            "presses": order.presses,
+                            "capped": order.capped,
+                            "index": order.index,
+                        }
+
+                        if candidate_study:
+                            async with asyncio.timeout(PAGE_TIMEOUT_SECONDS):
+                                study = await candidate_analysis.measure_candidate_page(
+                                    factory, page_path, probe_ids, candidate_axe
+                                )
+                            if set(study.reported) != set(candidate_methods):
+                                raise RuntimeError(f"incomplete candidate study on {page_path}")
+                            for name in candidate_methods:
+                                proposals = study.proposed[name]
+                                ids = study.reported[name]
+                                unknown = study.unknown[name]
+                                if (proposals | ids | unknown) - set(probe_ids):
+                                    raise RuntimeError(
+                                        f"{name} returned a probe outside {page_path}"
+                                    )
+                                all_proposed[name].update(proposals)
+                                all_reported[name].update(ids)
+                                all_unknown[name].update(unknown)
+                            candidate_evidence[page_path] = study.evidence
+                            page_timings[page_path].update(study.timings)
 
                         if not args.cheap_only:
                             result = await run_behavioural(factory, page_path, probe_ids, order)
@@ -1450,6 +1515,8 @@ async def main_async(args: argparse.Namespace) -> int:
     # and necessarily BEFORE scoring, since it decides that row's reported set.
     if all_upstream_passes:
         kept_u, upstream_s4_dismissals = upstream_stage4(all_upstream_passes)
+        if any(up.coverage_uncertainties for up in all_upstream_passes.values()):
+            all_unknown[D9U_S4U_NAME].update(all_upstream_passes)
         all_reported[D9U_S4U_NAME].update(kept_u)
 
     scores = []
@@ -1489,6 +1556,7 @@ async def main_async(args: argparse.Namespace) -> int:
                 "viewport": VIEWPORT,
                 "headless": True,
                 "cheap_only": args.cheap_only,
+                "candidate_study": candidate_study,
                 "timeout_seconds": args.timeout_seconds,
                 "page_timeout_seconds": PAGE_TIMEOUT_SECONDS,
                 "probe_timeout_seconds": PROBE_TIMEOUT_SECONDS,
@@ -1517,6 +1585,25 @@ async def main_async(args: argparse.Namespace) -> int:
         # dismissal or its absence can be reconstructed from this file.
         "s4_inputs": s4_inputs,
         "baseline_evidence": baseline_evidence,
+        "proposed": {name: sorted(ids) for name, ids in all_proposed.items()},
+        "proposal_coverage": {
+            name: {
+                "candidates": len(ids),
+                "positive_candidates": sum(labels[pid] == "violation" for pid in ids),
+                "positive_total": sum(label == "violation" for label in labels.values()),
+                "missing_positive_candidates": sorted(
+                    pid for pid, label in labels.items() if label == "violation" and pid not in ids
+                ),
+            }
+            for name, ids in all_proposed.items()
+        },
+        "candidate_evidence": candidate_evidence,
+        "candidate_study_caveat": (
+            "Rules designed after inspecting this corpus's errors: development evaluation, "
+            "not an unseen holdout. Raw proposals measure shortlist coverage, not violations."
+            if candidate_study
+            else None
+        ),
         "reported": {k: sorted(v) for k, v in all_reported.items()},
         "unobservable": {k: sorted(v) for k, v in all_unknown.items() if v},
         "scores": [s.to_json() for s in scores],
@@ -1560,6 +1647,11 @@ def main() -> int:
         type=bounded_int(1, 14_400),
         default=3600,
         help="overall measurement deadline (default: 3600 seconds)",
+    )
+    parser.add_argument(
+        "--candidate-study",
+        action="store_true",
+        help="also measure the upstream candidate rules and predeclared cheap-detector variants",
     )
     parser.add_argument(
         "--cheap-only",

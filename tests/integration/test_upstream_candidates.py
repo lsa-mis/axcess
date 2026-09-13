@@ -15,9 +15,17 @@ shadow tree.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock
+
 import pytest
 from playwright.async_api import async_playwright
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from audit.analyzer.keyboard.kbdiff import detectors
+from experiments.tabbing.runner import bakeoff
 from experiments.tabbing.runner import upstream_candidates as uc
 from experiments.tabbing.runner.upstream_instrument import UPSTREAM_INIT_JS
 
@@ -270,3 +278,79 @@ class TestD5CdpListeners:
         cdp = await page.context.new_cdp_session(page)
         nodes = await uc.resolve_probe_nodes(cdp)
         assert await uc.d5_cdp_listeners(cdp, nodes) == set()
+
+
+async def test_rotated_box_uses_all_quad_corners(armed):
+    page = await armed(
+        '<div data-probe="p1" style="width:100px;height:40px;'
+        'transform:rotate(25deg);margin:80px">Rotated</div>'
+    )
+    cdp = await page.context.new_cdp_session(page)
+    node = (await uc.resolve_probe_nodes(cdp))["p1"]
+    box = await page.locator('[data-probe="p1"]').bounding_box()
+    assert node.box == pytest.approx((box["x"], box["y"], box["width"], box["height"]))
+
+
+async def test_shim_geometry_fallback_is_identified_and_not_a_cdp_object(armed):
+    page = await armed('<div id="host"></div>')
+    await page.evaluate("""() => {
+        const root = document.getElementById('host').attachShadow({mode:'closed'});
+        root.innerHTML = '<div data-probe="p1">Closed target</div>';
+        root.firstChild.addEventListener('click', () => {});
+    }""")
+    # Force the alternate enumeration surface while exercising real shim lookup.
+    cdp = AsyncMock()
+    cdp.send.return_value = {"root": {}}
+    node = (await uc.resolve_probe_nodes(cdp, ["p1"], page))["p1"]
+    assert node.via == "shim" and node.node_id == -1 and node.centre
+    assert await uc.d5_cdp_listeners(cdp, {"p1": node}) == set()
+    assert (await uc.d6_listener_shim(page))[0] == {"p1"}
+
+
+async def test_axe_attributes_any_tagged_violation_to_nearest_probe(armed):
+    page = await armed("""<div data-probe="p1"><button></button></div>
+        <div data-probe="p2"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA=="></div>""")
+    # An unnamed image is not a keyboard-operability defect, but upstream D1
+    # attributes its WCAG violation too. The broad baseline must preserve it.
+    assert await uc.d1_axe(page, detectors.AXE_BUNDLE.read_text()) == {"p1", "p2"}
+
+
+async def test_failed_frame_evaluation_raises_instead_of_empty_hits(armed):
+    page = await armed('<div data-probe="p1">Text</div>')
+    await page.evaluate("delete window.__a11y")
+    with pytest.raises(Exception, match="instrumentation is missing"):
+        await uc.survey(page, "cssLexical")
+
+
+async def test_listener_protocol_failure_raises():
+    cdp = AsyncMock()
+    cdp.send.side_effect = [
+        {"object": {"objectId": "o1"}},
+        RuntimeError("profiler detached"),
+        {},
+    ]
+    with pytest.raises(RuntimeError, match="profiler detached"):
+        await uc.d5_cdp_listeners(cdp, {"p1": uc.ProbeNode("p1", 1, None)})
+
+
+async def test_screenshot_failure_raises(armed):
+    page = await armed('<div data-probe="p1">Text</div>')
+    page.screenshot = AsyncMock(side_effect=RuntimeError("screenshot failed"))
+    with pytest.raises(RuntimeError, match="screenshot failed"):
+        await uc.d8_hover_diff(page, {"p1": uc.ProbeNode("p1", 1, (10, 10, 40, 20))})
+
+
+async def test_hidden_geometry_is_not_misreported_as_a_profiler_failure(armed):
+    page = await armed("<p>Browser fixture</p>")
+    root = Path(__file__).resolve().parents[2] / "experiments/tabbing/fixtures"
+    factory = bakeoff.ContextFactory(page.context.browser, VIEWPORT, root)
+    result = await bakeoff._upstream_differential(
+        factory,
+        bakeoff.TrialConfig(bakeoff.page_url("upstream/b-decoys.html"), "desktop"),
+        "p26i",
+        bakeoff.TabOrder({}, False, 1),
+        bakeoff.BASE_URL,
+        frozenset(),
+    )
+    assert result.uncertainties["mouse"].startswith("no rendered box")
+    assert result.coverage_uncertainties == {}
