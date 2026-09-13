@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Info, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card } from "../components/ui";
 import ExportMenu from "../components/ExportMenu";
@@ -248,10 +248,7 @@ function IssueListPane({
             if (laneRows.length === 0) return null;
             return (
               <li key={lane}>
-                <details open={true}>
-                  <summary className="min-h-target cursor-pointer focus-visible:outline-none focus-visible:shadow-focus bg-surface-subtle px-3.5 py-3 text-sm font-semibold text-fg">
-                    {label} <span className="font-normal tabular-nums">({laneRows.length})</span>
-                  </summary>
+                <LaneGroup lane={lane} label={label} count={laneRows.length}>
                   <ul aria-label={`${label} issue groups`} className="divide-y divide-border">
                     {laneRows.map((row) => (
                       <IssueListRow
@@ -261,13 +258,66 @@ function IssueListPane({
                       />
                     ))}
                   </ul>
-                </details>
+                </LaneGroup>
               </li>
             );
           })}
         </ul>
       )}
     </Card>
+  );
+}
+
+/**
+ * A review lane's heading and the rows under it.
+ *
+ * The lane names are the list's section headings, so they are marked up as
+ * real headings (``h2`` under the page ``h1``, the same level the evidence
+ * pane's issue title uses) and given a banded, higher-contrast row so they
+ * read as structure rather than as one more issue. The count sits in a pill
+ * at the end of the band instead of trailing the label in parentheses.
+ *
+ * Like ``Disclosure`` in ``components/ui``, this is a controlled toggle
+ * rather than a native ``<details>``: native gives no way to style the open
+ * state or swap the marker for our own caret, and the panel must stay
+ * mounted for ``aria-controls`` to point at a real element.
+ */
+function LaneGroup({
+  lane,
+  label,
+  count,
+  children,
+}: {
+  lane: IssueRow["review_lane"];
+  label: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  const panelId = `issue-lane-${lane}`;
+  const Caret = open ? ChevronDown : ChevronRight;
+
+  return (
+    <>
+      <h2 className="m-0">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-h-target w-full items-center gap-2 bg-surface-muted px-3.5 py-2.5 text-left text-base font-semibold tracking-[-0.015em] text-fg hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          <Caret className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+          <span className="flex-1">{label}</span>
+          <span className="rounded-full border border-border-strong bg-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-fg-muted">
+            {count}
+          </span>
+        </button>
+      </h2>
+      <div id={panelId} hidden={!open} className="border-t border-border">
+        {children}
+      </div>
+    </>
   );
 }
 

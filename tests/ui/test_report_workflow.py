@@ -67,7 +67,7 @@ async def test_report_links_and_review_lanes(live_server: tuple[str, int], width
             await playwright_async.expect(
                 page.get_by_role("link", name="Named control failure", exact=False)
             ).to_be_visible()
-            review = page.locator("summary").filter(has_text="Needs manual review (1)")
+            review = page.get_by_role("button", name="Needs manual review")
             await playwright_async.expect(
                 page.get_by_role("link", name="Contrast calculation needs review", exact=False)
             ).to_be_hidden()
