@@ -65,6 +65,9 @@ C16 is, at 283 ms per target against the 1278 ms of the behavioural arm.
 
 ## The four rules that clear C9's false alarms
 
+[PROBES.md](PROBES.md) explains every detector and rule in detail: what each
+one observes, what it costs, and what it is not entitled to conclude.
+
 R1–R3 and R5 are static. They read the DOM and one hover; none of them runs
 page code.
 
