@@ -149,14 +149,15 @@ ICONS = {
     "text": f'<svg {_I}><path d="M4 6h16M4 12h10M4 18h14"/></svg>',
     "play": f'<svg {_I}><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>',
     "layers": f'<svg {_I}><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>',
-    # The A11y Crawler mark: an open scan path with a node on its leading edge.
+    # The A11y Crawler mark: an open scan path with a node on its leading edge,
+    # closing on a rounded 'a' for Axcess.
     # Stroked in currentColor so it takes the header's text colour and flips
     # with the theme, which the old filled tile could not do.
     "mark": (
         '<svg class="mark" viewBox="0 0 32 32" role="img" aria-label="Axcess logo" focusable="false" '
         'fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">'
         '<path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>'
-        '<circle cx="16" cy="16" r="5.6"/>'
+        '<path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>'
         '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg>'
     ),
 }

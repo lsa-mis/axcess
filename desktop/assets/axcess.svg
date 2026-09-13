@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Axcess">
   <!-- Desktop adaptation of the A11y Crawler mark: an open scan path with a
-       node on its leading edge. Platform app icons are composited on unknown
-       backgrounds and cannot follow a theme, so the mark is fixed dark on a
-       light tile rather than inheriting a colour. Stroke geometry is the
-       original's, scaled from its 32-unit box. -->
-  <rect width="1024" height="1024" rx="228" ry="228" fill="#ffffff"/>
+       node on its leading edge, closing on a rounded 'a'. Platform app icons
+       are composited on unknown backgrounds and cannot follow a theme, so the
+       mark is fixed navy on a light tile rather than inheriting a colour.
+       Stroke geometry is the original's, scaled from its 32-unit box. -->
+  <rect width="1024" height="1024" rx="228" ry="228" fill="#F2F5F9"/>
   <g transform="translate(512 512) scale(19.2) translate(-16 -16)"
-     fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="round">
+     fill="none" stroke="#00274C" stroke-width="2.5" stroke-linecap="round">
     <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>
-    <circle cx="16" cy="16" r="5.6"/>
-    <circle cx="20.31" cy="4.16" r="3.2" fill="#111111" stroke="none"/>
+    <path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>
+    <circle cx="20.31" cy="4.16" r="3.2" fill="#00274C" stroke="none"/>
   </g>
 </svg>

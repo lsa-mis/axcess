@@ -207,3 +207,41 @@ Do not run external crawls, pull models, or expose a network listener without
 the user's approval. For local development, `make run` serves the existing UI
 at `http://127.0.0.1:8765/app/`; production/LAN hosting must follow
 `docs/hosting.md` and use `AUDIT_ACCESS_TOKEN`.
+
+## Permissions
+
+Do without asking: read anything; create/edit files in this repo; delete
+**tracked, committed** files (recoverable from git history).
+
+Ask first: `rm` or edits outside this repo; discarding uncommitted work
+(`git checkout .`, `git clean -fd`, `git reset --hard`, `stash drop`) - note
+rule 1 above, this workspace often carries unrelated user changes; history
+rewrites (`push --force`, rebase on a shared branch); anything that leaves the
+machine or costs money (`git push`, PRs, publishing, package installs); `sudo`
+or any permission-bypass flag; reading credentials or `AUDIT_ACCESS_TOKEN`.
+
+If you cannot verify an action is reversible, treat it as irreversible.
+
+**If any premise in your task turns out to be wrong or impossible, stop and
+report that instead of working around it.** State what you **verified** (ran it,
+saw the output) separately from what you **assumed**. Do not report a task
+complete on the basis of code you did not run.
+
+## Session hygiene
+
+Context is re-sent in full on every turn, so a long session pays for its entire
+history repeatedly. Measured on this machine across 24 sessions and 2.54B
+tokens: cache reads were **94.9%** of all tokens while generated output was
+**0.42%**. Within a single session the last 10% of turns cost a median **5.2x**
+the first 10% - 18 of 18 sessions, no exceptions.
+
+This repo is the heaviest offender: its worst session reached **783k context**
+at **426k tokens per turn**.
+
+- One task per session. `/clear` before starting an unrelated task.
+- Above ~150k context every turn costs more even when cached.
+- Auto-compact is an overflow guard, not a cost control - measured median
+  **366k** context before it fires.
+- Hand work to another agent through a **git diff or a file**, never by
+  relaying conversation. Relayed conversation enters both context windows and
+  is then re-sent on every subsequent turn.
