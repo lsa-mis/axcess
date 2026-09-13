@@ -8,7 +8,7 @@ execution -- the cheapest class of signal there is.
 Writes its observations to JSON so the rule can be scored offline against the
 frozen labels, exactly as analyze_candidates.py does.
 """
-import asyncio, json, sys, pathlib
+import asyncio, json, os, sys, pathlib
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -43,7 +43,8 @@ JS = """
 """
 
 async def main(out_path):
-    root = pathlib.Path("experiments/tabbing/fixtures")
+    root = pathlib.Path(os.environ.get("PROBE_CORPUS",
+                        "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     results = {}
     async with async_playwright() as pw:

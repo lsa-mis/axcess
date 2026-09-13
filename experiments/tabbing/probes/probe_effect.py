@@ -10,7 +10,7 @@ Also records whether any activation listener is bound directly to the element
 (CDP, depth 0), so "no handler evidence at all" can be stated precisely rather
 than inferred from the two flags the saved features happen to carry.
 """
-import asyncio, json, sys, pathlib
+import asyncio, json, os, sys, pathlib
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -72,7 +72,8 @@ async def own_listeners(cdp, probe_id):
         return None
 
 async def main(out_path):
-    root = pathlib.Path("experiments/tabbing/fixtures")
+    root = pathlib.Path(os.environ.get("PROBE_CORPUS",
+                        "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     results = {}
     async with async_playwright() as pw:

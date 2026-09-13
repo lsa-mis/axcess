@@ -10,7 +10,7 @@ stop. Pure attribute reading: no layout, no execution.
 Also records `aria-keyshortcuts`, the declared-shortcut attribute, and
 whether the accessible text advertises a chord such as "Alt+K".
 """
-import asyncio, json, sys, pathlib
+import asyncio, json, os, sys, pathlib
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -64,7 +64,8 @@ JS = r"""
 """
 
 async def main(out_path):
-    root = pathlib.Path("experiments/tabbing/fixtures")
+    root = pathlib.Path(os.environ.get("PROBE_CORPUS",
+                        "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     results = {}
     async with async_playwright() as pw:
