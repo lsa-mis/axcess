@@ -144,7 +144,7 @@ jobs:
   publish:
     name: Publish preview release
     needs: [build-macos, build-windows]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/desktop-auto-update'
     runs-on: ubuntu-latest
     permissions:
       contents: write
