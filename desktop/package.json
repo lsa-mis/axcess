@@ -16,7 +16,7 @@
     "premake": "node scripts/verify-resources.cjs",
     "make": "electron-forge make && node scripts/make-macos-dmg.cjs",
     "postmake": "node scripts/verify-packaged.cjs",
-    "test": "node --check src/main.cjs && node --check src/runtime.cjs && node --check forge.config.cjs && node --check scripts/make-macos-dmg.cjs && node --check scripts/verify-resources.cjs && node --check scripts/verify-packaged.cjs && node --test test/*.test.cjs"
+    "test": "node --check src/main.cjs && node --check src/runtime.cjs && node --check src/updates.cjs && node --check forge.config.cjs && node --check scripts/make-macos-dmg.cjs && node --check scripts/verify-resources.cjs && node --check scripts/verify-packaged.cjs && node --test test/*.test.cjs"
   },
   "devDependencies": {
     "@electron-forge/cli": "7.11.2",
@@ -31,5 +31,8 @@
   "overrides": {
     "tar": "7.5.22",
     "tmp": "0.2.7"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "1.0.1"
   }
 }

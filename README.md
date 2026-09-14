@@ -8,7 +8,7 @@ Scan a public or login-protected website, watch each test run, inspect a clear
 issue table, and export a defensible report with source-level evidence.
 
 [Website](https://lsa-mis.github.io/axcess/) ·
-[Desktop builds](https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop) ·
+[Desktop builds](https://github.com/lsa-mis/axcess/releases/latest) ·
 [Documentation](./docs/README.md) ·
 [Coverage](./docs/coverage-tracker.md) ·
 [Desktop guide](./docs/desktop-app.md) ·
@@ -32,9 +32,10 @@ Playwright Chromium, Siteimprove Alfa runner, Tesseract executable, and English
 OCR language data into one macOS app. It does not require separate Python,
 Node.js, Chromium, or Tesseract installations.
 
-**[Open the latest Electron branch build](https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop)**,
-then download `axcess-macos-apple-silicon` for the DMG. GitHub requires sign-in
-to download workflow artifacts, and each build is retained for 14 days.
+**[Download the latest preview build](https://github.com/lsa-mis/axcess/releases/latest)**
+— the `.dmg` for Apple Silicon Macs or the `-Setup.exe` for Windows. Every
+merge to `main` publishes a new build, and an installed copy offers it on its
+next launch (Windows installs in place; macOS opens the new disk image).
 
 This is an ad-hoc signed development preview for Apple Silicon Macs. It is not
 Apple-notarized and is not approved for institutional distribution. macOS may
