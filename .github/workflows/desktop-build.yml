@@ -45,6 +45,12 @@ jobs:
         working-directory: src/audit/alfa_runner
       - run: npm ci
         working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        run: |
+          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: bash
@@ -102,6 +108,12 @@ jobs:
         working-directory: src/audit/alfa_runner
       - run: npm ci
         working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        run: |
+          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: pwsh
@@ -128,3 +140,56 @@ jobs:
           path: desktop/out/make/**
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    name: Publish preview release
+    needs: [build-macos, build-windows]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/desktop-auto-update'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: 0.1.${{ github.run_number }}
+      TAG: desktop-v0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name 'RELEASES' -o -name '*.nupkg' \) -exec cp {} release/ \;
+          ls -l release
+          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" RELEASES; do
+            test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
+          done
+      - name: Create or update the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          subject="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message | head -n 1)"
+          notes="Preview build of \`main\` at ${GITHUB_SHA::7}: ${subject}
+
+          Built by workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
+
+          Installed copies of Axcess offer this build on their next launch. The macOS build is an ad-hoc signed preview: right-click Axcess and choose Open on first launch."
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft \
+              --title "Axcess preview $VERSION" --notes "$notes"
+          fi
+          gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          # Publishing last keeps releases/latest pointing at a complete asset set.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Prune old preview releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("desktop-v"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' \
+            | while read -r tag; do
+                [ -n "$tag" ] || continue
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+              done

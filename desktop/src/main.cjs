@@ -1,4 +1,10 @@
-const { app, BrowserWindow, dialog, session, shell } = require("electron");
+const { app, autoUpdater, BrowserWindow, dialog, session, shell } = require("electron");
+
+// Squirrel.Windows relaunches the app with --squirrel-install / -updated /
+// -obsolete flags while it installs or updates; those runs must exit at once
+// instead of opening a window over the installer.
+if (require("electron-squirrel-startup")) app.quit();
+
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -10,15 +16,24 @@ const {
   isAxcessUrl,
   isSafeExternalUrl,
 } = require("./runtime.cjs");
+const {
+  RELEASES_API_URL,
+  describeRelease,
+  isNewerRelease,
+  isReleaseAssetUrl,
+} = require("./updates.cjs");
+const packageJson = require("../package.json");
 
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
+const UPDATE_FETCH_TIMEOUT_MS = 10_000;
 const repoRoot = path.resolve(__dirname, "../..");
 const appIcon = path.join(__dirname, "../assets/axcess.png");
 let mainWindow = null;
 let backendProcess = null;
 let backendOrigin = null;
 let quitting = false;
+let updateOffered = false;
 
 function findOpenPort() {
   return new Promise((resolve, reject) => {
@@ -195,6 +210,114 @@ function stopBackend() {
   backendProcess = null;
 }
 
+function ownerWindow() {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+}
+
+function buildLabel() {
+  const commit = packageJson.config && packageJson.config.buildCommit;
+  return commit ? `${app.getVersion()} (${String(commit).slice(0, 7)})` : app.getVersion();
+}
+
+async function fetchLatestRelease() {
+  const response = await fetch(RELEASES_API_URL, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": `Axcess/${app.getVersion()}`,
+    },
+    signal: AbortSignal.timeout(UPDATE_FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+// Squirrel.Windows installs the new version in place; the user chooses when
+// the restart that activates it happens.
+async function offerWindowsUpdate(release) {
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail:
+      `You are running ${buildLabel()}. The update downloads in the background; ` +
+      "Axcess only restarts when you choose to.",
+    buttons: ["Update now", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return;
+
+  autoUpdater.once("update-downloaded", async () => {
+    const { response: restart } = await dialog.showMessageBox(ownerWindow(), {
+      type: "info",
+      title: "Update ready",
+      message: `Axcess ${release.version} is ready.`,
+      detail:
+        "Finish or stop any running scan first. Restart now to switch to the " +
+        "new version, or it takes effect the next time Axcess starts.",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (restart === 0) autoUpdater.quitAndInstall();
+  });
+  autoUpdater.once("error", (error) => {
+    void dialog.showMessageBox(ownerWindow(), {
+      type: "warning",
+      title: "Update failed",
+      message: "Axcess could not install the update.",
+      detail: `${error.message}\n\nYou can download it from ${release.pageUrl} instead.`,
+      buttons: ["OK"],
+    });
+  });
+  autoUpdater.setFeedURL({ url: release.feedUrl });
+  autoUpdater.checkForUpdates();
+}
+
+// Squirrel.Mac refuses to update an app that is not Developer ID signed, and
+// the preview build is ad-hoc signed, so macOS gets the disk image instead.
+async function offerMacDownload(release) {
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail:
+      `You are running ${buildLabel()}. Download opens the new disk image in ` +
+      "your browser. Quit Axcess, open the image, and drag Axcess to " +
+      "Applications to replace this copy. Until builds are notarized, macOS " +
+      "may ask you to right-click Axcess and choose Open the first time.",
+    buttons: ["Download", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0 && isReleaseAssetUrl(release.dmgUrl)) {
+    void shell.openExternal(release.dmgUrl);
+  }
+}
+
+// Best-effort and silent: offline, rate-limited, or malformed responses just
+// mean no prompt this launch. Runs after the workbench is showing so it never
+// delays startup.
+async function checkForUpdates() {
+  if (!app.isPackaged || process.env.AXCESS_DISABLE_UPDATE_CHECK === "1" || updateOffered) return;
+  let release = null;
+  try {
+    release = describeRelease(await fetchLatestRelease(), {
+      platform: process.platform,
+      arch: process.arch,
+    });
+  } catch {
+    return;
+  }
+  if (!isNewerRelease(release, app.getVersion())) return;
+  updateOffered = true;
+  if (process.platform === "win32" && release.feedUrl) {
+    await offerWindowsUpdate(release);
+  } else if (process.platform === "darwin" && release.dmgUrl) {
+    await offerMacDownload(release);
+  }
+}
+
 async function launch() {
   mainWindow = createWindow();
   if (!backendProcess || !backendOrigin) {
@@ -206,6 +329,7 @@ async function launch() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     await mainWindow.loadURL(`${backendOrigin}/app/`);
   }
+  void checkForUpdates().catch(() => {});
 }
 
 if (!app.requestSingleInstanceLock()) {
