@@ -92,6 +92,22 @@ def _is_protected_report(conn: sqlite3.Connection, scan_id: int) -> bool:
     )
 
 
+def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """True when ``table`` already carries ``column``.
+
+    ``pages.rendered_html`` arrived in migration 0027, and this module is
+    reachable from a server running against a database that stopped earlier —
+    naming the column unconditionally raised ``OperationalError`` out of the
+    route as a 500. A missing column means nothing was stored, which is the
+    same state as a scan that opted out of storing, so the caller already
+    knows how to fall back.
+    """
+    return any(
+        row["name"] == column
+        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    )
+
+
 def _assert_in_scope(target_url: str, seed_url: str, allow_subdomains: bool) -> None:
     """Refuse a target URL that is not within the scan's recorded scope.
 
@@ -142,9 +158,12 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
             "This is a login-protected report and cannot be re-rendered on demand.",
             status_code=409,
         )
+    stored_column = (
+        "rendered_html" if _has_column(conn, "pages", "rendered_html") else "NULL"
+    )
     page = conn.execute(
         "SELECT id, url_normalized, title, status_code, render_mode, "
-        "rendered_html, fetched_at "
+        f"{stored_column} AS rendered_html, fetched_at "
         "FROM pages WHERE id = ? AND scan_id = ?",
         (page_id, scan_id),
     ).fetchone()
