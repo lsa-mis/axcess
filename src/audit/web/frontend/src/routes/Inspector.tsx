@@ -9,8 +9,21 @@ import { Card, EmptyState, ExternalLinkButton, LinkButton } from "../components/
 
 type TabId = "page" | "dom";
 
-/** What the inspector points at: a CSS selector and/or the exact element markup. */
-type Target = { selector: string | null; snippet: string | null };
+/**
+ * What the inspector points at: a CSS selector and/or the exact element markup.
+ *
+ * `revealedBy` is the accessible name of the control that had to be operated
+ * before this element existed, and null for elements present at page load. The
+ * capture this view searches is the page *as it loaded*, so a revealed element
+ * is legitimately absent from it — without this field the inspector cannot tell
+ * "we could not find it" from "it was never there", and reports the first for
+ * both.
+ */
+type Target = {
+  selector: string | null;
+  snippet: string | null;
+  revealedBy: string | null;
+};
 
 /**
  * Page/DOM inspector for one recorded page.
@@ -95,11 +108,43 @@ export default function InspectorRoute() {
       const key = snippet ? normalizeWhitespace(snippet) : (selector ?? "");
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ selector, snippet });
+      out.push({ selector, snippet, revealedBy: f.revealed_by || null });
     }
     return out;
   }, [currentFindings]);
   const hasTarget = targets.length > 0;
+
+  // The controls that have to be operated before these elements exist, in the
+  // order the probe reached them. Empty when every target was present at load.
+  const revealingControls = useMemo(() => {
+    const out: string[] = [];
+    for (const target of targets) {
+      if (target.revealedBy && !out.includes(target.revealedBy)) {
+        out.push(target.revealedBy);
+      }
+    }
+    return out;
+  }, [targets]);
+  // Only when *every* target is interaction-revealed can a miss be explained
+  // entirely by the capture being the load state. With a mix, some genuinely
+  // should have been found, so the existing wording still applies.
+  const allTargetsRevealed =
+    hasTarget && targets.every((target) => target.revealedBy !== null);
+
+  // One sentence, shared by all three "not found" sites, so the page cannot
+  // explain the same absence two different ways.
+  const revealedExplanation = useMemo(() => {
+    if (!allTargetsRevealed || revealingControls.length === 0) return null;
+    const controls = revealingControls.map((name) => `“${name}”`);
+    const list =
+      controls.length === 1
+        ? controls[0]
+        : `${controls.slice(0, -1).join(", ")} and ${controls[controls.length - 1]}`;
+    const subject = revealingControls.length === 1 ? "this element" : "these elements";
+    return `The capture is the page as it loaded, and ${subject} only ${
+      revealingControls.length === 1 ? "appears" : "appear"
+    } after activating ${list}.`;
+  }, [allTargetsRevealed, revealingControls]);
 
   // Toggle to show/hide the highlight, persisted so a reload keeps the view.
   const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
@@ -418,13 +463,20 @@ export default function InspectorRoute() {
                 highlightedCount < highlight.total && (
                   <span className="text-sev-major">
                     {highlightedCount} of {highlight.total} flagged elements were
-                    found, the rest may have changed since the scan.
+                    found,{" "}
+                    {revealedExplanation
+                      ? "the rest only appear after operating a control."
+                      : "the rest may have changed since the scan."}
                   </span>
                 )}
               {!highlightPending && showHighlights && hasTarget && highlightedCount === 0 && (
-                <span className="text-sev-major">
-                  The flagged element was not found in this capture, it may have
-                  changed since the scan.
+                // Not an error when the element is interaction-revealed: it was
+                // never in this capture, so "not found" is the expected result
+                // and saying it "may have changed" blames the site for a fact
+                // about how the scan works.
+                <span className={revealedExplanation ? undefined : "text-sev-major"}>
+                  {revealedExplanation ??
+                    "The flagged element was not found in this capture, it may have changed since the scan."}
                 </span>
               )}
               {!showHighlights && hasTarget && (
@@ -481,7 +533,8 @@ export default function InspectorRoute() {
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
                       ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
-                      : "The flagged markup was not found in this capture."}
+                      : (revealedExplanation ??
+                        "The flagged markup was not found in this capture.")}
                   </span>
                 )}
                 {render.dom_truncated && (
