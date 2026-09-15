@@ -218,14 +218,23 @@ export default function ScanDetailRoute() {
 
       {!isComplete ? (
         <Card className="p-5">
-          <h2 className="font-semibold text-fg">No report was produced</h2>
+          {/* "No report was produced" was told to scans that had produced
+              thousands of findings across hundreds of pages, because it keyed
+              on the status rather than on whether anything was collected. A
+              stopped scan keeps everything it reached; what it cannot claim is
+              that the site was covered. Say that, and leave the evidence
+              reachable. */}
+          <h2 className="font-semibold text-fg">
+            {data.page_count > 0 ? "Partial report" : "No report was produced"}
+          </h2>
           <p className="mt-1 text-sm text-fg-muted">
             {data.page_count > 0 ? (
               <>
-                This scan ended as <strong>{data.status}</strong> after completing{" "}
+                This scan ended as <strong>{data.status}</strong> after{" "}
                 {data.page_count.toLocaleString()} page
-                {data.page_count === 1 ? "" : "s"}. Partial evidence remains
-                available, but it is not a completed report.
+                {data.page_count === 1 ? "" : "s"}. Everything it reached is
+                saved and can be reviewed below; the rest of the site was not
+                visited, so this is not evidence of full coverage.
               </>
             ) : (
               <>
@@ -261,6 +270,14 @@ export default function ScanDetailRoute() {
             >
               Review settings first
             </LinkButton>
+            {/* Without this the page said evidence "remains available" and
+                then offered no way to reach it, so the only route onward was
+                to run the scan again. */}
+            {data.page_count > 0 && (
+              <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
+                Review what was collected
+              </LinkButton>
+            )}
           </div>
         </Card>
       ) : (

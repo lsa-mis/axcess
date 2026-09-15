@@ -592,12 +592,33 @@ def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
 
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
+    # ``running`` is always adopted: it is either the row the web layer just
+    # prepared for the progress view (which has no queued work yet) or a crawl
+    # whose process died without getting to write a status.
+    #
+    # ``interrupted`` is adopted only while work is still queued. That status
+    # covers two different events -- a crawl cancelled mid-flight, and a scan
+    # the operator stopped -- and the queue is what tells them apart, because
+    # stopping clears it. Without the distinction a stopped report that had
+    # already collected hundreds of pages was quietly adopted and flipped to
+    # completed by a run the operator thought was starting fresh.
     row = conn.execute(
         """
         SELECT id FROM scans
-         WHERE seed_url = ? AND status IN ('running', 'interrupted')
+         WHERE seed_url = ?
            AND NOT EXISTS (
                SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id
+           )
+           AND (
+               status = 'running'
+               OR (
+                   status = 'interrupted'
+                   AND EXISTS (
+                       SELECT 1 FROM jobs
+                        WHERE jobs.state IN ('pending', 'leased')
+                          AND json_extract(jobs.payload_json, '$.scan_id') = scans.id
+                   )
+               )
            )
          ORDER BY id DESC
          LIMIT 1

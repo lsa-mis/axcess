@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import hashlib
+import json
 import sqlite3
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -1874,3 +1875,58 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
     # No analyzer, so no probe — and the log carries the reason.
     assert captured.get("interaction_probe") is None
     assert captured.get("axe_analyzer") is None
+
+
+def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Stopping is not pausing.
+
+    A stopped scan used to keep its leased jobs, so the next crawl of the same
+    seed saw outstanding work, adopted the row, and flipped a report the
+    operator had deliberately ended to completed. Emptying the queue is what
+    makes the two tellable apart.
+    """
+    db_path, _, _ = seeded_db
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://stop.example.test/', 'running', 5, 0, '{}')"
+        )
+        scan_id = int(cur.lastrowid or 0)
+        for state in ("pending", "leased"):
+            conn.execute(
+                "INSERT INTO jobs (kind, payload_json, state, dedupe_key) VALUES "
+                "('fetch', ?, ?, ?)",
+                (
+                    json.dumps({"scan_id": scan_id, "url": "https://stop.example.test/x"}),
+                    state,
+                    f"{scan_id}:{state}",
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert client.post(f"/api/scans/{scan_id}/cancel").status_code == 200
+
+    conn = connect(db_path)
+    try:
+        assert (
+            conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+            == "interrupted"
+        )
+        left = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
+            "AND state IN ('pending', 'leased')",
+            (scan_id,),
+        ).fetchone()[0]
+        assert left == 0, "a stopped scan must leave no work for a later crawl to adopt"
+        # What it did collect is untouched.
+        assert (
+            conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+            == 5
+        )
+    finally:
+        conn.close()

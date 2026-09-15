@@ -1394,7 +1394,6 @@ def create_app(
     async def api_cancel_scan(scan_id: int) -> JSONResponse:
         task = crawl_state.get("task")
         active_scan_id = crawl_state.get("scan_id")
-        is_local_login = scan_id in local_login_runs
         if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
             task.cancel()
         with get_conn() as conn:
@@ -1413,20 +1412,18 @@ def create_app(
                     "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (scan_id,),
                 )
-                if is_local_login:
-                    conn.execute(
-                        "DELETE FROM jobs "
-                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
-                        "AND state IN ('pending', 'leased')",
-                        (scan_id,),
-                    )
-                else:
-                    conn.execute(
-                        "DELETE FROM jobs "
-                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
-                        "AND state = 'pending'",
-                        (scan_id,),
-                    )
+                # Both states, for every scan. A leased job is one a worker
+                # had checked out when the stop arrived; leaving it behind
+                # meant the lease expired, the work became available again,
+                # and the next crawl of this seed treated the scan as merely
+                # interrupted and resumed it. Stopping is not pausing, so the
+                # queue is emptied and what was collected stays as it is.
+                conn.execute(
+                    "DELETE FROM jobs "
+                    "WHERE json_extract(payload_json, '$.scan_id') = ? "
+                    "AND state IN ('pending', 'leased')",
+                    (scan_id,),
+                )
         return JSONResponse({"ok": True})
 
     @app.delete("/api/scans/{scan_id:int}")
