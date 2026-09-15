@@ -41,6 +41,14 @@ class RevealedViolation:
 
     violation: AxeViolation
     revealed_by: str
+    #: The probe's own ``_interaction_key`` for the control that was operated:
+    #: ``scope|selector|label``. ``revealed_by`` alone cannot identify a state,
+    #: because an unlabelled control falls back to its tag name, so every
+    #: unnamed icon button on a page shares the string ``<button>``. This key
+    #: stays distinct per DOM location, which is what lets a stored capture be
+    #: matched back to the finding it belongs to. Empty for producers outside
+    #: the probe (the configured-search pass), which capture no state.
+    state_key: str = ""
 
     @property
     def target_hash(self) -> str:
@@ -52,6 +60,35 @@ class RevealedViolation:
         """Delegate too, so the screenshot pass treats every finding type
         the same way without knowing which pipeline produced it."""
         return self.violation.target_selector
+
+
+@dataclass(frozen=True)
+class StateCapture:
+    """The page's markup in one state a click revealed.
+
+    The stored ``pages.rendered_html`` is the *load* state: it is taken before
+    the probe operates anything, so an element that only exists after a click
+    is legitimately absent from it and the inspector cannot show it. This is
+    that missing document.
+
+    ``html`` is gzipped at capture time rather than held as text. A probe may
+    reach dozens of states per page across four concurrent workers, and the
+    uncompressed markup of a real application page dwarfs everything else the
+    crawl holds in memory.
+
+    ``path_labels`` is the ordered chain of controls that had to be operated to
+    arrive here, ending with this state's own control. A bare depth number
+    tells an auditor nothing; the chain is the reproduction recipe.
+    """
+
+    #: ``RevealedViolation.state_key`` of the control that produced this state.
+    state_key: str
+    #: Accessible name of that control, for display.
+    revealed_by: str
+    path_labels: tuple[str, ...]
+    #: gzip of the UTF-8 document, ``compresslevel=1, mtime=0`` to match
+    #: ``_compress_html`` so identical documents always produce identical bytes.
+    html: bytes
 
 
 @dataclass(frozen=True)
@@ -69,6 +106,12 @@ class InteractionResult:
     #: Clicks that actually changed the DOM, states a load-time pass cannot
     #: reach, counted whether or not they held a defect.
     states: int = 0
+    #: Markup for the subset of those states that held a *new* defect. Never
+    #: the same number as ``states`` and not interchangeable with it: a state
+    #: nothing was found in is real coverage but nothing needs to inspect it,
+    #: so ``len(captures) <= states`` always. Empty when capture is disabled,
+    #: bounded, or failed.
+    captures: tuple[StateCapture, ...] = ()
     urls: tuple[str, ...] = ()
     #: False when exploration could not start with its required safety guard.
     evaluated: bool = True

@@ -5,7 +5,11 @@ from __future__ import annotations
 import inspect
 
 from audit.analyzer.axe import AxeViolation
-from audit.analyzer.interaction import InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import (
+    InteractionProbe,
+    InteractionResult,
+    RevealedViolation,
+)
 from audit.analyzer.interaction.probe import _signature
 
 
@@ -76,6 +80,26 @@ def test_revealed_by_is_not_part_of_the_dedupe_key() -> None:
     a = RevealedViolation(violation=v, revealed_by="Open menu")
     b = RevealedViolation(violation=v, revealed_by="Open dialog")
     assert a.target_hash == b.target_hash
+
+
+def test_state_key_is_optional_for_producers_that_capture_nothing() -> None:
+    """``search.py`` builds these positionally with two arguments.
+
+    ``state_key`` identifies a captured DOM state, and the configured-search
+    pass captures none, so it must stay defaulted rather than becoming a
+    required third positional.
+    """
+    revealed = RevealedViolation(_violation(), "Configured search")
+    assert revealed.state_key == ""
+
+
+def test_captures_are_a_subset_of_the_states_counter() -> None:
+    """``states`` counts every DOM-changing click; ``captures`` only the ones
+    that held a new defect. Conflating them would overstate either coverage or
+    storage, so the default result keeps both at zero."""
+    result = InteractionResult()
+    assert result.states == 0
+    assert result.captures == ()
 
 
 def test_key_cannot_depend_on_recursion_depth() -> None:
