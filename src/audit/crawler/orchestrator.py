@@ -36,7 +36,12 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
-from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import (
+    DEFAULT_BLOCKED_LABELS,
+    InteractionProbe,
+    RevealedViolation,
+    StateCapture,
+)
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -1236,6 +1241,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 findings=result.interaction_findings,
                 states=result.interaction_states,
                 screenshots=result.screenshots,
+                # A tuple, never None: this pass owns the page's states, and an
+                # empty one legitimately means it captured none this time.
+                captures=result.interaction_captures,
             )
             # The per-page ledger is written even when the sweep produced no
             # findings: "37 of 52 controls operated, stopped by the click
@@ -1512,6 +1520,7 @@ def _persist_interaction(
     states: int,
     screenshots: Mapping[str, bytes],
     count_page: bool = True,
+    captures: tuple[StateCapture, ...] | None = None,
 ) -> None:
     """Write violations that only exist after a control was operated.
 
@@ -1521,7 +1530,31 @@ def _persist_interaction(
     hits ``ON CONFLICT``, and updates instead of inserting a second row.
     The probe filters those out before they ever reach this function, so
     the constraint is a backstop rather than the primary mechanism.
+
+    ``captures`` is the markup of the states these findings were first seen
+    in. ``None`` means this caller does not capture states at all (the
+    configured-search pass) and must leave whatever is stored alone; a tuple,
+    including an empty one, is the complete set for the page and replaces it.
+    That distinction matters on a re-fetch: ``upsert_page`` has just overwritten
+    the load-state HTML, so states held against the previous document would
+    otherwise survive it.
     """
+    if captures is not None:
+        try:
+            repo.replace_page_dom_states(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                page_id=page_id,
+                states=captures,
+            )
+        except (sqlite3.Error, ValueError) as exc:
+            # Evidence the report can do without. The findings below are not.
+            log.warning(
+                "interaction.states_persist_failed",
+                page_id=page_id,
+                error_type=type(exc).__name__,
+            )
+
     for revealed in findings:
         v = revealed.violation
         try:
@@ -1542,6 +1575,7 @@ def _persist_interaction(
                 target_hash=v.target_hash,
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
                 revealed_by=revealed.revealed_by,
+                revealed_state_key=revealed.state_key or None,
             )
         except sqlite3.Error as exc:
             log.warning(

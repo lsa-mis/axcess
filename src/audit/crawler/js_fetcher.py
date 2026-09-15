@@ -426,6 +426,7 @@ class JsFetcher:
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
+                interaction_captures=interaction.captures,
                 interaction_evaluated=interaction_evaluated,
                 interaction_controls=interaction.controls_discovered,
                 interaction_clicks_attempted=interaction.clicks_attempted,
