@@ -137,9 +137,14 @@ Every push to `main` runs `desktop-build.yml`, which stamps the build as
 version `0.1.<run number>` (the git commit is recorded in the package's
 `config.buildCommit`) and publishes the macOS DMG and zip, the Windows
 `-Setup.exe`, and the Squirrel `RELEASES` and `.nupkg` files as GitHub Release
-`desktop-v0.1.<run number>`. The ten newest preview releases are kept;
-`https://github.com/lsa-mis/axcess/releases/latest` always points at the most
-recent one and needs no GitHub sign-in.
+`desktop-v0.1.<run number>`. Each release also carries version-less copies,
+`Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`, so the
+public site's download buttons can use the permanent links
+`https://github.com/lsa-mis/axcess/releases/latest/download/<name>`. The ten
+newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`
+always points at the most recent one and needs no GitHub sign-in. Workflow
+artifacts are not a public download channel: GitHub requires a signed-in user
+to fetch them and deletes them after 14 days.
 
 A packaged Axcess asks the GitHub API for the latest release once, after the
 workbench has loaded, and compares it with its own version. Nothing happens
