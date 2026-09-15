@@ -496,11 +496,18 @@ export default function InspectorRoute() {
                 <mark> so it is visible in the source, matching the page view. */}
             <pre
               ref={domPreRef}
+              role="region"
+              aria-label="Loaded DOM source"
+              // Keyboard users need focus on the overflow region to scroll the
+              // source. The panel wrapper is not the scroll container — this
+              // is — so the tabIndex has to sit here to satisfy SC 2.1.1.
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+              tabIndex={0}
               // A serialized DOM is one enormous line, so an unwrapped <pre>
               // shows a mostly empty box with everything scrolled off to the
               // right. Wrapping (breaking inside long attribute values) keeps
               // the marked markup readable in place.
-              className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface-muted p-3 text-2xs leading-relaxed text-fg"
+              className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface-muted p-3 text-2xs leading-relaxed text-fg focus-visible:shadow-focus"
             >
               <code>
                 {domParts
