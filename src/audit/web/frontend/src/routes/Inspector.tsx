@@ -5,7 +5,7 @@ import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
-import { Card, EmptyState, ExternalLinkButton, LinkButton } from "../components/ui";
+import { Card, EmptyState, ExternalLinkButton, LinkButton, Select } from "../components/ui";
 
 type TabId = "page" | "dom";
 
@@ -493,26 +493,24 @@ export default function InspectorRoute() {
           states and chips would wrap into a block. */}
       {states.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <label htmlFor="inspect-state" className="text-sm font-semibold text-fg">
-            Page state
-          </label>
-          <select
-            id="inspect-state"
-            className="min-h-target rounded-xs border border-border bg-surface px-3 py-1.5 text-sm text-fg"
+          <Select
+            label="Page state"
             value={activeStateKey ?? ""}
-            onChange={(event) => navigate(stateHref(event.target.value || null), { replace: true })}
-          >
-            <option value="">At page load</option>
-            {states.map((state) => (
-              <option key={state.state_key} value={state.state_key}>
-                {/* The whole chain, not just the last control: reaching a
-                    nested state by hand means repeating every step. */}
-                {`After clicking ${state.path_labels.length > 0
-                  ? state.path_labels.map((label) => `“${label}”`).join(" → ")
-                  : `“${state.revealed_by}”`}`}
-              </option>
-            ))}
-          </select>
+            onChange={(next) => navigate(stateHref(next || null), { replace: true })}
+            options={[
+              { value: "", label: "At page load" },
+              ...states.map((state) => ({
+                value: state.state_key,
+                // The whole chain, not just the last control: reaching a
+                // nested state by hand means repeating every step.
+                label: `After clicking ${
+                  state.path_labels.length > 0
+                    ? state.path_labels.map((name) => `“${name}”`).join(" → ")
+                    : `“${state.revealed_by}”`
+                }`,
+              })),
+            ]}
+          />
           {activeStateKey && (
             <span className="text-xs text-fg-muted">
               Captured during the scan, after the control was operated.

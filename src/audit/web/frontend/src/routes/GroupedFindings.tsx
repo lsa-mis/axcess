@@ -9,6 +9,7 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Select,
   SeverityChip,
   StatCard,
   StatusChip,
@@ -125,23 +126,16 @@ export default function GroupedFindingsRoute() {
       {/* Status filter, URL-persistent, auto-applies on change. Same
           UX shape as the WCAG drill-down filter. */}
       <Card className="mb-4 p-3">
-        <label className="flex flex-col text-xs font-semibold text-fg-subtle">
-          Status filter
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatusParam(e.target.value as FindingStatus | "")
-            }
-            className="mt-1 min-h-target rounded-xs border border-border bg-surface px-2 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
-          >
-            <option value="">all statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          stacked
+          label="Status filter"
+          value={status}
+          onChange={(next) => setStatusParam(next as FindingStatus | "")}
+          options={[
+            { value: "", label: "all statuses" },
+            ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+          ]}
+        />
       </Card>
 
       {groups.length === 0 ? (
@@ -320,25 +314,14 @@ function BulkStatusBar({
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xs border border-border bg-surface-muted/40 px-3 py-2 text-sm">
-      <label
-        htmlFor={`bulk-status-${findingIds[0] ?? "empty"}`}
-        className="font-semibold text-fg"
-      >
-        Bulk status:
-      </label>
-      <select
+      <Select
         id={`bulk-status-${findingIds[0] ?? "empty"}`}
+        label="Bulk status:"
         value={target}
-        onChange={(e) => setTarget(e.target.value as FindingStatus)}
+        onChange={(next) => setTarget(next as FindingStatus)}
         disabled={mutation.isPending || findingIds.length === 0}
-        className="min-h-target rounded-xs border border-border bg-surface px-2 py-1 text-base text-fg focus:border-umich-blue focus:outline-none disabled:opacity-60"
-      >
-        {STATUS_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {s.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+      />
       <Button
         type="button"
         variant="primary"

@@ -11,6 +11,7 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  Select,
   SeverityChip,
   StatusChip,
 } from "../components/ui";
@@ -212,27 +213,16 @@ function FilterSelect({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="flex flex-col text-xs font-semibold text-fg-subtle">
-      {label}
-      {/* min-h-target + text-base so each filter clears the 44×44
-          SC 2.5.5 floor and the option list is comfortable to read.
-          The label class is text-only, the
-          `font-normal normal-case tracking-normal` resets it on the
-          interactive control so the value renders as natural sentence
-          case, not THE LIKE. */}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 min-h-target rounded-xs border border-border bg-surface px-2 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
-      >
-        <option value="">any</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Select
+      stacked
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: "", label: "any" },
+        ...options.map((option) => ({ value: option, label: option.replace(/_/g, " ") })),
+      ]}
+    />
   );
 }
 

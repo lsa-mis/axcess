@@ -16,7 +16,7 @@ import { api } from "../api/client";
 import type { LocalLoginScanPayload, LocalLoginScanStatus } from "../api/types";
 import EngineChoice from "../routes/EngineChoice";
 import SearchSettings from "./SearchSettings";
-import { Button, Card, Checkbox, Disclosure } from "./ui";
+import { Button, Card, Checkbox, Disclosure, Select } from "./ui";
 import ProtectedScanSteps from "./ProtectedScanSteps";
 import { formatScanEta } from "../lib/scanProgress";
 import { WHOLE_HOST_HINT_LOGIN } from "../lib/scanCopy";
@@ -376,40 +376,22 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                   Options
                 </legend>
                 <div className="mb-3 mt-1">
-                  <label
-                    htmlFor="local-login-axe-level"
-                    className="block text-sm font-medium text-fg"
-                  >
-                    Conformance target
-                  </label>
-                  <p
-                    id="local-login-axe-level-hint"
-                    className="mb-1.5 text-xs text-fg-muted"
-                  >
-                    Choose the WCAG 2.2 level applied by the selected DOM
-                    engines. AA is recommended.
-                  </p>
-                  <select
+                  <Select
+                    stacked
                     id="local-login-axe-level"
-                    aria-describedby="local-login-axe-level-hint"
+                    className="w-full"
+                    label="Conformance target"
+                    hint="Choose the WCAG 2.2 level applied by the selected DOM engines. AA is recommended."
                     value={form.axe_level}
-                    onChange={(event) =>
-                      update(
-                        "axe_level",
-                        event.target
-                          .value as LocalLoginScanPayload["axe_level"],
-                      )
+                    onChange={(next) =>
+                      update("axe_level", next as LocalLoginScanPayload["axe_level"])
                     }
-                    className="min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg"
-                  >
-                    <option value="A">WCAG 2.2, Level A (minimum)</option>
-                    <option value="AA">
-                      WCAG 2.2, Level AA (recommended)
-                    </option>
-                    <option value="AAA">
-                      WCAG 2.2, Level AAA (strictest)
-                    </option>
-                  </select>
+                    options={[
+                      { value: "A", label: "WCAG 2.2, Level A (minimum)" },
+                      { value: "AA", label: "WCAG 2.2, Level AA (recommended)" },
+                      { value: "AAA", label: "WCAG 2.2, Level AAA (strictest)" },
+                    ]}
+                  />
                 </div>
 
                 <fieldset className="mb-3 border-0 p-0">

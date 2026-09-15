@@ -10,6 +10,7 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  Select,
   SeverityChip,
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
@@ -241,24 +242,13 @@ export default function FindingDetailRoute() {
                 font-size for legibility, and Save uses `size="lg"` to
                 read as the page's primary CTA. */}
             <div className="flex flex-wrap items-center gap-3">
-              <label
-                htmlFor="status-select"
-                className="flex min-h-target items-center text-base font-semibold text-fg"
-              >
-                Status:
-              </label>
-              <select
+              <Select
                 id="status-select"
+                label="Status:"
                 value={status ?? data.status}
-                onChange={(e) => setStatus(e.target.value as FindingStatus)}
-                className="min-h-target rounded-xs border border-border bg-surface px-3 py-2 text-base text-fg focus:border-umich-blue focus:outline-none"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
+                onChange={(next) => setStatus(next as FindingStatus)}
+                options={STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+              />
               <Button
                 variant="primary"
                 size="lg"

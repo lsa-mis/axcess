@@ -15,6 +15,7 @@ import {
   Checkbox,
   Disclosure,
   PageHeader,
+  Select,
 } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
 import SearchSettings from "../components/SearchSettings";
@@ -430,40 +431,22 @@ export default function NewScanRoute() {
                 default because it's the near-universal legal/compliance
                 target (Section 508, EN 301 549, ADA all map to WCAG AA). */}
                     <div className="mb-3 mt-1">
-                      <label
-                        htmlFor="axe-level"
-                        className="block text-sm font-medium text-fg"
-                      >
-                        Conformance target
-                      </label>
-                      <p
-                        id="axe-level-hint"
-                        className="mb-1.5 text-xs text-fg-muted"
-                      >
-                        The WCAG 2.2 level to check against. AA is the standard
-                        legal/compliance target; AAA adds the strictest rules
-                        (e.g. enhanced 7:1 contrast).
-                      </p>
-                      <select
+                      <Select
+                        stacked
                         id="axe-level"
-                        aria-describedby="axe-level-hint"
+                        className="w-full"
+                        label="Conformance target"
+                        hint="The WCAG 2.2 level to check against. AA is the standard legal/compliance target; AAA adds the strictest rules (e.g. enhanced 7:1 contrast)."
                         value={form.axe_level}
-                        onChange={(e) =>
-                          update(
-                            "axe_level",
-                            e.target.value as NewScanPayload["axe_level"],
-                          )
+                        onChange={(next) =>
+                          update("axe_level", next as NewScanPayload["axe_level"])
                         }
-                        className="min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg"
-                      >
-                        <option value="A">WCAG 2.2, Level A (minimum)</option>
-                        <option value="AA">
-                          WCAG 2.2, Level AA (recommended)
-                        </option>
-                        <option value="AAA">
-                          WCAG 2.2, Level AAA (strictest)
-                        </option>
-                      </select>
+                        options={[
+                          { value: "A", label: "WCAG 2.2, Level A (minimum)" },
+                          { value: "AA", label: "WCAG 2.2, Level AA (recommended)" },
+                          { value: "AAA", label: "WCAG 2.2, Level AAA (strictest)" },
+                        ]}
+                      />
                     </div>
 
                     <fieldset className="mb-3 border-0 p-0">

@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Info, Search } from "lucide-react";
 import { api } from "../api/client";
-import { Card } from "../components/ui";
+import { Card, Select, type SelectOption } from "../components/ui";
 import ExportMenu from "../components/ExportMenu";
 import IssueEvidence from "../components/IssueEvidence";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -196,7 +196,6 @@ function IssueListPane({
         <div className="mt-2 flex flex-wrap gap-2">
           <FilterSelect
             caption="Level"
-            label="WCAG level"
             value={conformance}
             options={[
               { value: "", label: `All (${totalUnfiltered})` },
@@ -209,7 +208,6 @@ function IssueListPane({
           />
           <FilterSelect
             caption="Sort"
-            label="Order"
             value={sort}
             options={[
               { value: "priority_desc", label: "Highest priority" },
@@ -422,31 +420,28 @@ function occurrenceSummary(row: IssueRow): string {
  * speech-input users can say either "Level" or "WCAG level" and hit the same
  * control, while the toolbar stays compact enough for the list column.
  */
+/** A filter in the issue toolbar. The caption is the control's name, so it
+ *  carries no second aria-label: a visible label and a different accessible
+ *  one are two names for one control (WCAG 2.5.3). */
 function FilterSelect({
   caption,
-  label,
   value,
   options,
   onChange,
 }: {
   caption: string;
-  label: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: SelectOption[];
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="inline-flex min-h-target shrink-0 items-center gap-2 rounded-xs border border-border-strong bg-surface pl-3 pr-1 focus-within:border-umich-blue">
-      <span className="text-xs font-medium text-fg-subtle">{caption}</span>
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-h-target min-w-0 max-w-[9rem] border-0 bg-transparent py-2 pr-1 text-sm font-semibold text-fg focus:outline-none"
-      >
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
+    <Select
+      label={caption}
+      value={value}
+      options={options}
+      onChange={onChange}
+      className="shrink-0"
+    />
   );
 }
 
