@@ -464,3 +464,32 @@ def test_a_state_that_was_never_captured_is_not_faked_with_a_live_render(
     assert payload["render"]["source"] == "state"
     assert "not captured" in payload["render"]["error"]
     assert "dom_html" not in payload["render"]
+
+
+def test_state_list_carries_the_whole_reproduction_path(
+    seeded_db: tuple[Path, Path, int],
+    client: TestClient,
+) -> None:
+    """A nested state takes more than one click to reach.
+
+    The picker labels each state with the chain, so an auditor reproducing it
+    by hand repeats every step rather than only the last one.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id = _first_page_id(db_path, scan_id)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+            "path_labels, encoding, dom) VALUES (?, ?, 'k|#deep|Level two', 'Level two', "
+            '\'["Level one","Level two"]\', \'gzip\', ?)',
+            (page_id, scan_id, gzip.compress(b"<!doctype html><html></html>")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    payload = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect").json()
+
+    assert payload["states"][0]["path_labels"] == ["Level one", "Level two"]
+    assert payload["states"][0]["revealed_by"] == "Level two"

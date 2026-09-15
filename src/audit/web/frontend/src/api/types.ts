@@ -1000,6 +1000,11 @@ export interface PageEvidence {
     /** The control operated before this markup existed; null when the
      *  finding was present at page load. */
     revealed_by: string | null;
+    /** Which captured DOM state shows this finding, matching
+     *  `PageDomState.state_key`. Null for load-state findings and for reports
+     *  made before state capture. The label above cannot stand in for it:
+     *  several controls on a page can share an accessible name. */
+    revealed_state_key: string | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;

@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import { api } from "../api/client";
@@ -23,6 +23,8 @@ type Target = {
   selector: string | null;
   snippet: string | null;
   revealedBy: string | null;
+  /** The captured state this finding is visible in, when one was stored. */
+  stateKey: string | null;
 };
 
 /**
@@ -49,6 +51,7 @@ type Target = {
 export default function InspectorRoute() {
   const { scanId, pageId } = useParams<{ scanId: string; pageId: string }>();
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const scan = Number(scanId);
   const page = Number(pageId);
   const issueKey = params.get("issue");
@@ -108,7 +111,12 @@ export default function InspectorRoute() {
       const key = snippet ? normalizeWhitespace(snippet) : (selector ?? "");
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ selector, snippet, revealedBy: f.revealed_by || null });
+      out.push({
+        selector,
+        snippet,
+        revealedBy: f.revealed_by || null,
+        stateKey: f.revealed_state_key || null,
+      });
     }
     return out;
   }, [currentFindings]);
@@ -129,6 +137,109 @@ export default function InspectorRoute() {
   const allTargetsRevealed =
     hasTarget && targets.every((target) => target.revealedBy !== null);
 
+
+  // Toggle to show/hide the highlight, persisted so a reload keeps the view.
+  const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
+  const toggleHighlights = () => {
+    setShowHighlights((was) => {
+      const next = !was;
+      try {
+        localStorage.setItem("axcess.inspect.showHighlights", next ? "1" : "0");
+      } catch {
+        // storage unavailable, the toggle still works for the session
+      }
+      return next;
+    });
+  };
+
+  // Don't fire the (expensive) live render until the issue key is resolved,
+  // avoids a wasted capture-plus-refetch on every open. When the evidence
+  // lookup fails, proceed without a marker rather than hanging.
+  const inspectEnabled =
+    Number.isFinite(scan) &&
+    Number.isFinite(page) &&
+    (!issueKey || !!pageEvidence || evidenceError);
+
+  // Which state is on screen. In the URL like the view above it, so a link to
+  // "the dialog on page 12" survives being sent to someone.
+  //
+  // The default is the finding's own state rather than the page as it loaded:
+  // arriving here from a revealed finding and being shown a document that
+  // cannot contain it is the whole complaint. Only when every target agrees on
+  // one state, though -- an issue spanning several states has no single
+  // correct answer, so it opens on the load capture and the picker offers the
+  // rest.
+  const findingStateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const target of targets) if (target.stateKey) keys.add(target.stateKey);
+    return keys;
+  }, [targets]);
+  const defaultStateKey =
+    findingStateKeys.size === 1 && allTargetsRevealed
+      ? [...findingStateKeys][0]
+      : null;
+  const requestedState = params.get("state");
+  const stateKey = requestedState ?? defaultStateKey;
+
+  const { data, isLoading, error } = useQuery({
+    // The state belongs in the key: without it every finding on the page
+    // would share one cached document and the picker would appear to do
+    // nothing.
+    queryKey: ["page-inspection", scan, page, stateKey],
+    queryFn: () => api.getPageInspection(scan, page, stateKey),
+    enabled: inspectEnabled,
+    retry: false,
+  });
+
+  const states = data?.states ?? [];
+  const activeStateKey = data?.render.state_key ?? null;
+  const stateHref = (key: string | null) => {
+    const next = new URLSearchParams(params);
+    if (key) next.set("state", key);
+    else next.set("state", "");
+    const qs = next.toString();
+    return `/scans/${scan}/pages/${page}/inspect${qs ? `?${qs}` : ""}`;
+  };
+
+  // Which rendering is on screen. In the URL rather than in state so the row
+  // below can be links — and so "the Loaded DOM of page 12" is something you
+  // can send someone. "page" is the default and stays out of the query string.
+  const tab: TabId = params.get("view") === "dom" ? "dom" : "page";
+  const viewHref = (view: TabId) => {
+    const next = new URLSearchParams(params);
+    if (view === "page") next.delete("view");
+    else next.set("view", view);
+    const qs = next.toString();
+    return `/scans/${scan}/pages/${page}/inspect${qs ? `?${qs}` : ""}`;
+  };
+
+  /**
+   * The findings that could be in the document on screen.
+   *
+   * One issue can span several states — the same rule failing in two different
+   * dialogs — and a finding from another state is not *missing* from this one,
+   * it was never going to be here. Counting it would report a miss the reviewer
+   * cannot act on, and would keep the "not found" warning permanently lit no
+   * matter which state they chose.
+   *
+   * Load-state findings stay in scope while viewing a state: a revealed state
+   * is the page plus whatever the click added, so they are usually still there.
+   * The load view keeps every target, because explaining why the revealed ones
+   * are absent is the whole point of that screen.
+   */
+  const scopedTargets = useMemo(
+    () =>
+      activeStateKey
+        ? targets.filter(
+            (target) => !target.stateKey || target.stateKey === activeStateKey,
+          )
+        : targets,
+    [targets, activeStateKey],
+  );
+  const offStateCount = targets.length - scopedTargets.length;
+  // What the status lines below are actually talking about.
+  const hasScopedTarget = scopedTargets.length > 0;
+
   /**
    * Why a target is missing from this capture, or null when drift is still the
    * only explanation.
@@ -148,6 +259,10 @@ export default function InspectorRoute() {
    * overstatement for another.
    */
   const missingReason = useMemo(() => {
+    // Viewing a captured state, the document on screen is the one the finding
+    // was flagged in, so "it is not here because this is the load state" is no
+    // longer the explanation for anything.
+    if (activeStateKey) return null;
     if (revealingControls.length === 0) return null;
     if (!allTargetsRevealed) {
       return {
@@ -175,48 +290,7 @@ export default function InspectorRoute() {
       whenSomeFound: `the rest were first flagged after activating ${list}, so they may not be in this capture.`,
       certain: true,
     };
-  }, [allTargetsRevealed, revealingControls, targets.length]);
-
-  // Toggle to show/hide the highlight, persisted so a reload keeps the view.
-  const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
-  const toggleHighlights = () => {
-    setShowHighlights((was) => {
-      const next = !was;
-      try {
-        localStorage.setItem("axcess.inspect.showHighlights", next ? "1" : "0");
-      } catch {
-        // storage unavailable, the toggle still works for the session
-      }
-      return next;
-    });
-  };
-
-  // Don't fire the (expensive) live render until the issue key is resolved,
-  // avoids a wasted capture-plus-refetch on every open. When the evidence
-  // lookup fails, proceed without a marker rather than hanging.
-  const inspectEnabled =
-    Number.isFinite(scan) &&
-    Number.isFinite(page) &&
-    (!issueKey || !!pageEvidence || evidenceError);
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["page-inspection", scan, page],
-    queryFn: () => api.getPageInspection(scan, page),
-    enabled: inspectEnabled,
-    retry: false,
-  });
-
-  // Which rendering is on screen. In the URL rather than in state so the row
-  // below can be links — and so "the Loaded DOM of page 12" is something you
-  // can send someone. "page" is the default and stays out of the query string.
-  const tab: TabId = params.get("view") === "dom" ? "dom" : "page";
-  const viewHref = (view: TabId) => {
-    const next = new URLSearchParams(params);
-    if (view === "page") next.delete("view");
-    else next.set("view", view);
-    const qs = next.toString();
-    return `/scans/${scan}/pages/${page}/inspect${qs ? `?${qs}` : ""}`;
-  };
+  }, [allTargetsRevealed, revealingControls, targets.length, activeStateKey]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -249,16 +323,16 @@ export default function InspectorRoute() {
     highlightRequest.current += 1;
     const request = highlightRequest.current;
     const html = documentHtml;
-    if (!showHighlights || !html || targets.length === 0) {
+    if (!showHighlights || !html || scopedTargets.length === 0) {
       setHighlight(null);
       return;
     }
     setHighlight(null); // the raw capture shows while the outline is baked
     scheduleIdle(() => {
       if (request !== highlightRequest.current) return; // superseded
-      setHighlight(buildHighlightedHtml(html, targets));
+      setHighlight(buildHighlightedHtml(html, scopedTargets));
     });
-  }, [showHighlights, documentHtml, targets]);
+  }, [showHighlights, documentHtml, scopedTargets]);
 
   const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
@@ -267,14 +341,14 @@ export default function InspectorRoute() {
   // Best-effort: if the sandbox permits contentDocument access, bring the
   // highlighted element into view. Never required, the outline is baked in.
   const scrollToElement = useCallback(() => {
-    if (targets.length === 0) return;
+    if (scopedTargets.length === 0) return;
     let attempt = 0;
     const tryScroll = () => {
       try {
         const doc = frameRef.current?.contentDocument;
         if (doc) {
           let el: Element | null = null;
-          for (const t of targets) {
+          for (const t of scopedTargets) {
             el = findTargetElement(doc, t);
             if (el) break;
           }
@@ -290,15 +364,15 @@ export default function InspectorRoute() {
       if (attempt < 10) window.setTimeout(tryScroll, 60);
     };
     tryScroll();
-  }, [targets]);
+  }, [scopedTargets]);
 
   // The flagged element's markup, split out of the source so the Loaded DOM tab
   // can wrap it in a <mark>. Null when there is no target or the element is not
   // present in the captured markup. Computed lazily, only when the DOM tab is
   // actually open, because it needs its own unmarked parse of the document.
   const domParts = useMemo(
-    () => (tab === "dom" ? highlightInDom(data?.render.dom_html ?? null, targets) : null),
-    [tab, data?.render.dom_html, targets],
+    () => (tab === "dom" ? highlightInDom(data?.render.dom_html ?? null, scopedTargets) : null),
+    [tab, data?.render.dom_html, scopedTargets],
   );
   const domMarkCount = domParts?.filter((s) => s.marked).length ?? 0;
 
@@ -352,7 +426,13 @@ export default function InspectorRoute() {
           <ReportMeta
             counts={
               render.ok
-                ? `${render.source === "stored" ? "Stored render" : "Live render"} (${render.status_code})`
+                ? `${
+                    render.source === "stored"
+                      ? "Stored render"
+                      : render.source === "state"
+                        ? "Captured state"
+                        : "Live render"
+                  } (${render.status_code})`
                 : "Could not render live"
             }
             note={
@@ -376,14 +456,69 @@ export default function InspectorRoute() {
 
       {!render.ok && (
         <Card className="mb-4 border-sev-major/40 bg-sev-major-bg p-4" role="alert">
-          <p className="text-sm font-semibold text-fg">This page could not be re-rendered</p>
-          <p className="mt-1 text-sm text-fg">{render.error}</p>
-          <p className="mt-2 text-2xs text-fg-muted">
-            The stored scan evidence for this page is still available, use{" "}
-            <span className="font-semibold">Open live page</span> to view it
-            yourself, or return to the stored page evidence.
-          </p>
+          {render.source === "state" ? (
+            <>
+              {/* A missing state is not a failed render, and must not offer
+                  the live page as a substitute: loading the site now shows it
+                  at page load, which is the one state the reviewer has just
+                  said they do not want. */}
+              <p className="text-sm font-semibold text-fg">
+                This interaction state was not captured
+              </p>
+              <p className="mt-1 text-sm text-fg">{render.error}</p>
+              <p className="mt-2 text-2xs text-fg-muted">
+                To reach it by hand, open the live page and follow the steps in
+                the state list above. Switch back to{" "}
+                <span className="font-semibold">At page load</span> for the
+                markup this report does hold.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-fg">This page could not be re-rendered</p>
+              <p className="mt-1 text-sm text-fg">{render.error}</p>
+              <p className="mt-2 text-2xs text-fg-muted">
+                The stored scan evidence for this page is still available, use{" "}
+                <span className="font-semibold">Open live page</span> to view it
+                yourself, or return to the stored page evidence.
+              </p>
+            </>
+          )}
         </Card>
+      )}
+
+      {/* Which state, then which view of it. Two separate choices, so they
+          are two separate controls rather than one row mixing both axes. A
+          select, not the segmented row below: a busy page can reach a dozen
+          states and chips would wrap into a block. */}
+      {states.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <label htmlFor="inspect-state" className="text-sm font-semibold text-fg">
+            Page state
+          </label>
+          <select
+            id="inspect-state"
+            className="min-h-target rounded-xs border border-border bg-surface px-3 py-1.5 text-sm text-fg"
+            value={activeStateKey ?? ""}
+            onChange={(event) => navigate(stateHref(event.target.value || null), { replace: true })}
+          >
+            <option value="">At page load</option>
+            {states.map((state) => (
+              <option key={state.state_key} value={state.state_key}>
+                {/* The whole chain, not just the last control: reaching a
+                    nested state by hand means repeating every step. */}
+                {`After clicking ${state.path_labels.length > 0
+                  ? state.path_labels.map((label) => `“${label}”`).join(" → ")
+                  : `“${state.revealed_by}”`}`}
+              </option>
+            ))}
+          </select>
+          {activeStateKey && (
+            <span className="text-xs text-fg-muted">
+              Captured during the scan, after the control was operated.
+            </span>
+          )}
+        </div>
       )}
 
       <Tabs
@@ -398,7 +533,10 @@ export default function InspectorRoute() {
             label: render.ok ? "Rendered page" : "Page",
             to: viewHref("page"),
           },
-          { key: "dom", label: "Loaded DOM", to: viewHref("dom") },
+          // "Loaded DOM" was accurate while the only document was the page as
+          // it loaded. It can now be a state captured after a click, so the
+          // name says what it shows rather than when it was taken.
+          { key: "dom", label: "DOM source", to: viewHref("dom") },
         ]}
       />
 
@@ -499,7 +637,7 @@ export default function InspectorRoute() {
                       "the rest may have changed since the scan."}
                   </span>
                 )}
-              {!highlightPending && showHighlights && hasTarget && highlightedCount === 0 && (
+              {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
                 // Only drops the error styling when interaction accounts for
                 // every miss. Then "not found" is the expected result and
                 // flagging it warns about a fact of how the scan works; with a
@@ -509,7 +647,15 @@ export default function InspectorRoute() {
                     "The flagged element was not found in this capture, it may have changed since the scan."}
                 </span>
               )}
-              {!showHighlights && hasTarget && (
+              {offStateCount > 0 && (
+                // Without this the issue looks smaller in a state view than it
+                // is: the picker is the only way to the rest of it.
+                <span>
+                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
+                  this issue {offStateCount === 1 ? "is" : "are"} in another state.
+                </span>
+              )}
+              {!showHighlights && hasScopedTarget && (
                 <span>Highlights are hidden for this page.</span>
               )}
               {!hasTarget && (
@@ -559,7 +705,7 @@ export default function InspectorRoute() {
                 Loaded DOM, captured at render time
               </p>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {hasTarget && (
+                {hasScopedTarget && (
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
                       ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
