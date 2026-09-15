@@ -130,7 +130,17 @@ export default function InspectorRoute() {
     retry: false,
   });
 
-  const [tab, setTab] = useState<TabId>("page");
+  // Which rendering is on screen. In the URL rather than in state so the row
+  // below can be links — and so "the Loaded DOM of page 12" is something you
+  // can send someone. "page" is the default and stays out of the query string.
+  const tab: TabId = params.get("view") === "dom" ? "dom" : "page";
+  const viewHref = (view: TabId) => {
+    const next = new URLSearchParams(params);
+    if (view === "page") next.delete("view");
+    else next.set("view", view);
+    const qs = next.toString();
+    return `/scans/${scan}/pages/${page}/inspect${qs ? `?${qs}` : ""}`;
+  };
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -205,12 +215,6 @@ export default function InspectorRoute() {
     };
     tryScroll();
   }, [targets]);
-
-  // Fresh render on mount (and when the scan/page/target changes) is the point
-  // of the route, reset to the Page tab.
-  useEffect(() => {
-    setTab("page");
-  }, [scan, page, targets]);
 
   // The flagged element's markup, split out of the source so the Loaded DOM tab
   // can wrap it in a <mark>. Null when there is no target or the element is not
@@ -307,23 +311,25 @@ export default function InspectorRoute() {
       )}
 
       <Tabs
-        mode="tabs"
+        mode="nav"
         label="How this page was rendered"
-        idPrefix="inspect"
         className="mb-4"
+        replace
         value={tab}
-        onChange={(key) => setTab(key as TabId)}
         items={[
-          { key: "page", label: render.ok ? "Rendered page" : "Page" },
-          { key: "dom", label: "Loaded DOM" },
+          {
+            key: "page",
+            label: render.ok ? "Rendered page" : "Page",
+            to: viewHref("page"),
+          },
+          { key: "dom", label: "Loaded DOM", to: viewHref("dom") },
         ]}
       />
 
       <div
         id="inspect-panel-page"
-        role="tabpanel"
-        aria-labelledby="inspect-tab-page"
-        tabIndex={0}
+        role="region"
+        aria-label="Rendered page"
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "page"}
       >
@@ -458,9 +464,8 @@ export default function InspectorRoute() {
 
       <div
         id="inspect-panel-dom"
-        role="tabpanel"
-        aria-labelledby="inspect-tab-dom"
-        tabIndex={0}
+        role="region"
+        aria-label="Loaded DOM"
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "dom"}
       >

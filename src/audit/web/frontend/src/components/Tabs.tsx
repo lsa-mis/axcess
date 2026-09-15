@@ -1,5 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
-import { useRef } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 
@@ -10,27 +9,34 @@ import { cn } from "../lib/cn";
  * Three of these rows used to exist as three unrelated implementations — the
  * report's underline tabs, the inspector's white-chip tablist, and the
  * tracker's navy-chip button group — so the same control looked like three
- * different controls depending on which page you were on. They share this
- * file now; `mode` picks the semantics, never the styling.
+ * different controls depending on which page you were on.
  *
- * **Why `mode` exists at all.** These rows look alike but are not the same
- * widget, and giving them identical markup would break them:
+ * **One keyboard model: Tab moves, Enter/Space activates.** Every chip here is
+ * separately Tab-reachable, whichever mode it is in. The inspector's row used
+ * to be a real ARIA `tablist`, which meant arrow keys moved between its chips
+ * and Tab skipped past the row entirely — correct for that pattern, but once
+ * all three rows looked identical, two of them answered the arrow keys and one
+ * did not. Identical controls that take different keys are worse than either
+ * convention on its own (WCAG 3.2.4, Consistent Identification), so the
+ * tablist went and its two views became links like the rest.
  *
- * - `nav` — each chip is a different URL. They stay real links, marked with
- *   `aria-current="page"`. Links must not carry `role="tab"`: that role takes
- *   over the arrow keys and promises a panel in this document, neither of
- *   which is true of a link that navigates away.
- * - `tabs` — a genuine ARIA tablist over panels in the same document. Follows
- *   the APG: arrow keys move selection, and only the selected tab is in the
- *   tab sequence, so Tab steps out of the row into the panel rather than
- *   through every chip.
- * - `filter` — toggle buttons that narrow a list. There is no panel per chip,
+ * Losing `tablist` cost nothing: it buys arrow-key roving and a tab/panel
+ * relationship, and the inspector's views are better off as URLs anyway —
+ * they can be linked to and bookmarked, which a `useState` tab never could.
+ * If a future row genuinely needs the APG tab pattern, give it its own
+ * component and its own look; do not add a third keyboard model to this one.
+ *
+ * `mode` picks the semantics, never the styling:
+ *
+ * - `nav` — each chip is a URL, so they are real links marked with
+ *   `aria-current="page"`.
+ * - `filter` — toggle buttons that narrow a list in place. No panel per chip,
  *   so these are `aria-pressed`, not tabs.
  *
  * The active chip is never signalled by colour alone: it also gains a filled
- * shape and the appropriate ARIA state.
+ * shape and the matching ARIA state.
  */
-type Mode = "nav" | "tabs" | "filter";
+type Mode = "nav" | "filter";
 
 export type TabItem = {
   /** Identity of the chip, and the value reported to `onChange`. */
@@ -61,7 +67,7 @@ export default function Tabs({
   value,
   onChange,
   controls,
-  idPrefix,
+  replace = false,
   className,
 }: {
   mode: Mode;
@@ -70,17 +76,16 @@ export default function Tabs({
   items: TabItem[];
   /** `key` of the active chip. */
   value: string;
-  /** Required for `tabs` and `filter`; ignored in `nav`. */
+  /** Required for `filter`; ignored in `nav`. */
   onChange?: (key: string) => void;
   /** `filter` mode — the region these chips narrow. */
   controls?: string;
-  /** `tabs` mode — chip i gets `${idPrefix}-tab-${key}` and points at
-   *  `${idPrefix}-panel-${key}`, so panels can name their tab back. */
-  idPrefix?: string;
+  /** `nav` mode — swap the history entry instead of pushing one. For a row
+   *  that switches views of the page you are already on, so that Back still
+   *  leaves the page rather than stepping through every chip you tried. */
+  replace?: boolean;
   className?: string;
 }) {
-  const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
   if (mode === "nav") {
     return (
       <nav aria-label={label} className={className}>
@@ -89,6 +94,7 @@ export default function Tabs({
             <li key={item.key}>
               <Link
                 to={item.to ?? "#"}
+                replace={replace}
                 aria-current={item.key === value ? "page" : undefined}
                 className={chipClass(item.key === value)}
               >
@@ -101,48 +107,17 @@ export default function Tabs({
     );
   }
 
-  const isTabs = mode === "tabs";
-
-  // APG roving tabindex: arrows move selection and focus together, wrapping at
-  // both ends. Only wired for `tabs` — `filter` chips are independent toggles,
-  // so each one stays in the tab sequence and the arrows keep their default.
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const step =
-      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
-    const next = items[(index + step + items.length) % items.length];
-    onChange?.(next.key);
-    chipRefs.current[next.key]?.focus();
-  };
-
   return (
-    <div
-      role={isTabs ? "tablist" : "group"}
-      aria-label={label}
-      className={cn(TRACK, className)}
-    >
-      {items.map((item, index) => {
+    <div role="group" aria-label={label} className={cn(TRACK, className)}>
+      {items.map((item) => {
         const active = item.key === value;
         return (
           <button
             key={item.key}
             type="button"
-            ref={(el) => {
-              chipRefs.current[item.key] = el;
-            }}
-            id={isTabs && idPrefix ? `${idPrefix}-tab-${item.key}` : undefined}
-            role={isTabs ? "tab" : undefined}
-            aria-selected={isTabs ? active : undefined}
-            aria-pressed={isTabs ? undefined : active}
-            aria-controls={
-              isTabs
-                ? idPrefix && `${idPrefix}-panel-${item.key}`
-                : controls
-            }
-            tabIndex={isTabs ? (active ? 0 : -1) : undefined}
+            aria-pressed={active}
+            aria-controls={controls}
             onClick={() => onChange?.(item.key)}
-            onKeyDown={isTabs ? (e) => onKeyDown(e, index) : undefined}
             className={chipClass(active)}
           >
             {item.label}
