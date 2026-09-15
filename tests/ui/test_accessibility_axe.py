@@ -284,7 +284,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
             await _mock_repeated_review_leads(page, base=base, scan_id=scan_id, copies=3)
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
-            await issues.locator("summary").filter(has_text="Needs manual review").click()
+            await issues.get_by_role("button", name="Needs manual review").click()
             rows = issues.get_by_role("link")
 
             # The first issue is selected on load, so the shape of an issue is
@@ -329,7 +329,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
             page = await browser.new_page(viewport={"width": 320, "height": 800})
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
             issues = page.get_by_role("list", name="Accessibility issue groups")
-            await issues.locator("summary").filter(has_text="Needs manual review").click()
+            await issues.get_by_role("button", name="Needs manual review").click()
             await playwright_async.expect(issues).to_be_visible()
 
             widths = await page.evaluate(

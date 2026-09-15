@@ -123,12 +123,42 @@ The build produces local, unsigned installers. Before institutional rollout:
 - configure Windows Authenticode signing;
 - bundle and verify an equivalent OCR runtime before enabling a Linux release
   job;
-- add a signed update channel or document managed-software deployment;
+- sign the update channel so macOS can install updates in place (see
+  below), or document managed-software deployment;
 - run U-M security and privacy review on the packaged binaries;
 - test installation, upgrade, rollback, database retention, and uninstall on
   each supported operating-system version.
 
 Do not distribute unsigned builds as a production U-M application.
+
+## Update channel
+
+Every push to `main` runs `desktop-build.yml`, which stamps the build as
+version `0.1.<run number>` (the git commit is recorded in the package's
+`config.buildCommit`) and publishes the macOS DMG and zip, the Windows
+`-Setup.exe`, and the Squirrel `RELEASES` and `.nupkg` files as GitHub Release
+`desktop-v0.1.<run number>`. The ten newest preview releases are kept;
+`https://github.com/lsa-mis/axcess/releases/latest` always points at the most
+recent one and needs no GitHub sign-in.
+
+A packaged Axcess asks the GitHub API for the latest release once, after the
+workbench has loaded, and compares it with its own version. Nothing happens
+offline, on a rate-limited response, or when the build is current. When a newer
+build exists:
+
+- **Windows** offers *Update now*. Electron's Squirrel updater downloads the
+  new package from the release's asset directory and installs it in place; the
+  app only restarts when the user chooses *Restart now* (or on its next
+  launch).
+- **macOS** offers *Download*, which opens the new DMG in the browser. Apple's
+  Squirrel.Mac updater refuses to update an app that is not Developer ID
+  signed, so in-place installation on macOS waits for signing and
+  notarization; once those are configured the same release assets serve it.
+
+The check is skipped for unpackaged development runs and whenever
+`AXCESS_DISABLE_UPDATE_CHECK=1` is set, which local packaged builds (always
+version `0.1.0`) may want. Only HTTPS asset downloads under this repository's
+releases are ever handed to the system browser.
 
 For a release build on macOS, set `AXCESS_MAC_SIGN_IDENTITY` to the exact
 Developer ID Application identity available in the build keychain. Without
