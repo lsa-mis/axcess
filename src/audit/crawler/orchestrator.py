@@ -1048,8 +1048,20 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             try:
                 result = await (await ctx.js.get()).fetch(url)
                 render_mode = "js"
-            except FetchError:
-                log.warning("crawl.js_fetch_failed", protected_context=True)
+            except FetchError as exc:
+                # The class only, never the message or the URL. A protected
+                # target's address and a failure string can both carry session
+                # detail, which is why this branch stays quiet where its public
+                # sibling logs ``error=str(exc)``. Dropping the type as well
+                # overcorrected: every cause -- DNS, a navigation timeout, a
+                # closed context, the rendered-size cap -- arrived as one
+                # indistinguishable line, and the UI could only tell the
+                # operator to read a log that said nothing.
+                log.warning(
+                    "crawl.js_fetch_failed",
+                    protected_context=True,
+                    error_type=type(exc).__name__,
+                )
                 ctx.summary.errors += 1
                 _record_page(ctx, url, status_code=None, result=None, render_mode="js")
                 return
