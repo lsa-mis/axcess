@@ -25,8 +25,12 @@ MISSING_SELECTOR = "#never-present-at-load"
 REVEALING_CONTROL = "Open booking dialog"
 
 
-def _seed_finding(db_path: Path, scan_id: int, revealed_by: str | None) -> int:
-    """Add one a11y finding whose target is absent from the capture."""
+def _seed_findings(db_path: Path, scan_id: int, *revealed_by: str | None) -> int:
+    """Add a11y findings whose targets are all absent from the capture.
+
+    One per ``revealed_by``, sharing a rule so the ``?issue=`` path gathers
+    them together the way a real multi-occurrence issue does.
+    """
     conn = connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
@@ -34,15 +38,23 @@ def _seed_finding(db_path: Path, scan_id: int, revealed_by: str | None) -> int:
             "SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)
         ).fetchone()
         assert page is not None, "seeded scan has no pages"
-        conn.execute(
-            "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
-            "wcag_level, impact, help, target_selector, failure_summary, "
-            "html_snippet, target_hash, revealed_by) "
-            "VALUES (?, ?, 'aria-dialog-name', '4.1.2', 'A', 'serious', "
-            "'ARIA dialog nodes should have an accessible name', ?, 'no name', "
-            "'<div role=\"dialog\"></div>', 'hash-revealed', ?)",
-            (page["id"], scan_id, MISSING_SELECTOR, revealed_by),
-        )
+        for index, control in enumerate(revealed_by):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by) "
+                "VALUES (?, ?, 'aria-dialog-name', '4.1.2', 'A', 'serious', "
+                "'ARIA dialog nodes should have an accessible name', ?, 'no name', "
+                "?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    MISSING_SELECTOR,
+                    f'<div role="dialog" data-n="{index}"></div>',
+                    f"hash-{index}",
+                    control,
+                ),
+            )
         conn.commit()
         return int(page["id"])
     finally:
@@ -50,10 +62,10 @@ def _seed_finding(db_path: Path, scan_id: int, revealed_by: str | None) -> int:
 
 
 async def _inspector_text(base: str, scan_id: int, page_id: int) -> str:
-    """Open the inspector on the unmatchable finding and return its text."""
+    """Open the inspector on the unmatchable findings and return its text."""
     url = (
         f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect"
-        f"?selector={MISSING_SELECTOR.replace('#', '%23')}"
+        f"?issue=axe:aria-dialog-name"
     )
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
@@ -74,12 +86,15 @@ async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
     live_server: tuple[str, int],
 ) -> None:
     db_path, _, scan_id = seeded_db
-    page_id = _seed_finding(db_path, scan_id, REVEALING_CONTROL)
+    page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL)
 
     text = await _inspector_text(live_server[0], scan_id, page_id)
 
     assert REVEALING_CONTROL in text
     assert "the page as it loaded" in text
+    # Stops at "flagged": the probe records that a violation was first reported
+    # after the control was operated, not that the element was absent before.
+    assert "first flagged after activating" in text
     # The load capture is not stale, and saying so blames the site for a fact
     # about how the scan works.
     assert "changed since the scan" not in text
@@ -91,7 +106,7 @@ async def test_load_state_finding_still_reports_a_possible_change(
     live_server: tuple[str, int],
 ) -> None:
     db_path, _, scan_id = seeded_db
-    page_id = _seed_finding(db_path, scan_id, None)
+    page_id = _seed_findings(db_path, scan_id, None)
 
     text = await _inspector_text(live_server[0], scan_id, page_id)
 
@@ -99,3 +114,26 @@ async def test_load_state_finding_still_reports_a_possible_change(
     # capture and drift is the honest explanation.
     assert "changed since the scan" in text
     assert "the page as it loaded" not in text
+
+
+@pytest.mark.asyncio
+async def test_a_mixed_issue_keeps_both_explanations_open(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+) -> None:
+    """One issue can span load-state and interaction-revealed occurrences.
+
+    Neither explanation covers the whole set then: the load-state occurrence
+    genuinely should have been matched, and the revealed one was never going to
+    be. Committing to either would misreport half the findings.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL, None)
+
+    text = await _inspector_text(live_server[0], scan_id, page_id)
+
+    assert "a control was operated" in text
+    assert "changed since the scan" in text
+    # With drift still in play this is not the settled case, so it must not
+    # claim a specific control accounts for the miss.
+    assert "first flagged after activating" not in text

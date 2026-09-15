@@ -114,8 +114,9 @@ export default function InspectorRoute() {
   }, [currentFindings]);
   const hasTarget = targets.length > 0;
 
-  // The controls that have to be operated before these elements exist, in the
-  // order the probe reached them. Empty when every target was present at load.
+  // The controls that were operated before these findings were first flagged,
+  // in the order the probe reached them. Empty when every target was already
+  // flagged at page load.
   const revealingControls = useMemo(() => {
     const out: string[] = [];
     for (const target of targets) {
@@ -125,26 +126,56 @@ export default function InspectorRoute() {
     }
     return out;
   }, [targets]);
-  // Only when *every* target is interaction-revealed can a miss be explained
-  // entirely by the capture being the load state. With a mix, some genuinely
-  // should have been found, so the existing wording still applies.
   const allTargetsRevealed =
     hasTarget && targets.every((target) => target.revealedBy !== null);
 
-  // One sentence, shared by all three "not found" sites, so the page cannot
-  // explain the same absence two different ways.
-  const revealedExplanation = useMemo(() => {
-    if (!allTargetsRevealed || revealingControls.length === 0) return null;
-    const controls = revealingControls.map((name) => `“${name}”`);
+  /**
+   * Why a target is missing from this capture, or null when drift is still the
+   * only explanation.
+   *
+   * Three cases, because two explanations are in play and the page must not
+   * assert one when both are open:
+   *
+   * - every target interaction-revealed — the capture being the load state
+   *   accounts for all of it, and nothing here is evidence the site changed.
+   * - a mix — the load-state findings genuinely should have been matched, so
+   *   drift stays on the table alongside interaction.
+   * - none — unchanged.
+   *
+   * The wording stops at *flagged*. `revealed_by` records that a violation was
+   * first reported after a control was operated; the probe never establishes
+   * that the element itself was absent before, and saying so would trade one
+   * overstatement for another.
+   */
+  const missingReason = useMemo(() => {
+    if (revealingControls.length === 0) return null;
+    if (!allTargetsRevealed) {
+      return {
+        whenNoneFound:
+          "Some of these were first flagged after a control was operated, so they " +
+          "may not be in this capture of the page as it loaded; the rest may have " +
+          "changed since the scan.",
+        whenSomeFound:
+          "the rest were either first flagged after a control was operated, or may " +
+          "have changed since the scan.",
+        certain: false,
+      };
+    }
+    const quoted = revealingControls.map((name) => `“${name}”`);
     const list =
-      controls.length === 1
-        ? controls[0]
-        : `${controls.slice(0, -1).join(", ")} and ${controls[controls.length - 1]}`;
-    const subject = revealingControls.length === 1 ? "this element" : "these elements";
-    return `The capture is the page as it loaded, and ${subject} only ${
-      revealingControls.length === 1 ? "appears" : "appear"
-    } after activating ${list}.`;
-  }, [allTargetsRevealed, revealingControls]);
+      quoted.length === 1
+        ? quoted[0]
+        : `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+    const one = revealingControls.length === 1 && targets.length === 1;
+    return {
+      whenNoneFound:
+        `${one ? "This element was" : "These elements were"} first flagged after ` +
+        `activating ${list}. This capture is the page as it loaded, so ` +
+        `${one ? "it may not appear" : "they may not appear"} here.`,
+      whenSomeFound: `the rest were first flagged after activating ${list}, so they may not be in this capture.`,
+      certain: true,
+    };
+  }, [allTargetsRevealed, revealingControls, targets.length]);
 
   // Toggle to show/hide the highlight, persisted so a reload keeps the view.
   const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
@@ -464,18 +495,17 @@ export default function InspectorRoute() {
                   <span className="text-sev-major">
                     {highlightedCount} of {highlight.total} flagged elements were
                     found,{" "}
-                    {revealedExplanation
-                      ? "the rest only appear after operating a control."
-                      : "the rest may have changed since the scan."}
+                    {missingReason?.whenSomeFound ??
+                      "the rest may have changed since the scan."}
                   </span>
                 )}
               {!highlightPending && showHighlights && hasTarget && highlightedCount === 0 && (
-                // Not an error when the element is interaction-revealed: it was
-                // never in this capture, so "not found" is the expected result
-                // and saying it "may have changed" blames the site for a fact
-                // about how the scan works.
-                <span className={revealedExplanation ? undefined : "text-sev-major"}>
-                  {revealedExplanation ??
+                // Only drops the error styling when interaction accounts for
+                // every miss. Then "not found" is the expected result and
+                // flagging it warns about a fact of how the scan works; with a
+                // mix, something genuinely should have been matched.
+                <span className={missingReason?.certain ? undefined : "text-sev-major"}>
+                  {missingReason?.whenNoneFound ??
                     "The flagged element was not found in this capture, it may have changed since the scan."}
                 </span>
               )}
@@ -533,7 +563,7 @@ export default function InspectorRoute() {
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
                       ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
-                      : (revealedExplanation ??
+                      : (missingReason?.whenNoneFound ??
                         "The flagged markup was not found in this capture.")}
                   </span>
                 )}
