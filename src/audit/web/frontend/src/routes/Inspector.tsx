@@ -227,13 +227,32 @@ export default function InspectorRoute() {
    * The load view keeps every target, because explaining why the revealed ones
    * are absent is the whole point of that screen.
    */
+  /**
+   * The occurrences that belong to the document on screen.
+   *
+   * An issue can span several states, and the evidence list was showing all of
+   * them whichever state was selected: "At page load" listed markup that only
+   * exists after a click, and a revealed state listed occurrences belonging to
+   * a different control. Both are the same mistake this view exists to stop —
+   * attaching evidence to a state that does not contain it.
+   */
+  const scopedFindings = useMemo(
+    () =>
+      activeStateKey
+        ? currentFindings.filter(
+            (f) => !f.revealed_state_key || f.revealed_state_key === activeStateKey,
+          )
+        : currentFindings.filter((f) => !f.revealed_state_key),
+    [currentFindings, activeStateKey],
+  );
+
   const scopedTargets = useMemo(
     () =>
       activeStateKey
         ? targets.filter(
             (target) => !target.stateKey || target.stateKey === activeStateKey,
           )
-        : targets,
+        : targets.filter((target) => !target.stateKey),
     [targets, activeStateKey],
   );
   const offStateCount = targets.length - scopedTargets.length;
@@ -494,6 +513,7 @@ export default function InspectorRoute() {
       {states.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
+            id="inspect-state"
             label="Page state"
             value={activeStateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
@@ -547,13 +567,13 @@ export default function InspectorRoute() {
       >
         {render.ok && render.dom_html ? (
           <div>
-            {currentFindings.length > 0 && (
+            {scopedFindings.length > 0 && (
               <div className="border-b border-border bg-surface-muted/40 px-3 py-2">
                 <p className="text-2xs font-semibold text-fg-subtle">
                   Stored evidence
                 </p>
                 <ul className="mt-1.5 space-y-2">
-                  {currentFindings.slice(0, 3).map((f) => (
+                  {scopedFindings.slice(0, 3).map((f) => (
                     <li key={f.id} className="text-xs">
                       <p className="font-semibold text-fg">
                         {f.help}
@@ -572,9 +592,9 @@ export default function InspectorRoute() {
                     </li>
                   ))}
                 </ul>
-                {currentFindings.length > 3 && (
+                {scopedFindings.length > 3 && (
                   <p className="mt-1 text-2xs text-fg-muted">
-                    + {currentFindings.length - 3} more occurrence{currentFindings.length - 3 === 1 ? "" : "s"} on this page.
+                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this state.
                   </p>
                 )}
               </div>

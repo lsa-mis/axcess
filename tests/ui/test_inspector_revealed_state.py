@@ -9,8 +9,10 @@ the whole point.
 
 from __future__ import annotations
 
+import gzip
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 from playwright import async_api as playwright_async
@@ -137,3 +139,90 @@ async def test_a_mixed_issue_keeps_both_explanations_open(
     # With drift still in play this is not the settled case, so it must not
     # claim a specific control accounts for the miss.
     assert "first flagged after activating" not in text
+
+
+def _seed_two_state_issue(db_path: Path, scan_id: int) -> tuple[int, str]:
+    """One rule failing both at load and behind a control, on one page."""
+    state_key = "https://x.test/|#menu|Filter"
+    conn = connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        page = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+            "path_labels, encoding, dom) VALUES (?, ?, ?, 'Filter', '[\"Filter\"]', "
+            "'gzip', ?)",
+            (page["id"], scan_id, state_key, gzip.compress(b"<!doctype html><html></html>")),
+        )
+        for target, revealed_by, key in (
+            ("#at-load", None, None),
+            ("#after-click", "Filter", state_key),
+        ):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by, revealed_state_key) "
+                "VALUES (?, ?, 'aria-required-parent', '1.3.1', 'A', 'serious', "
+                "'Certain ARIA roles must be contained by particular parents', ?, "
+                "'bad parent', ?, ?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    target,
+                    '<a role="menuitem">' + target + "</a>",
+                    "hash" + target,
+                    revealed_by,
+                    key,
+                ),
+            )
+        conn.commit()
+        return int(page["id"]), state_key
+    finally:
+        conn.close()
+
+
+async def _evidence_text(base: str, scan_id: int, page_id: int, state: str) -> str:
+    url = (
+        base + "/app/scans/" + str(scan_id) + "/pages/" + str(page_id) + "/inspect"
+        "?issue=axe:aria-required-parent&state=" + state
+    )
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.goto(url, wait_until="domcontentloaded")
+            await page.wait_for_timeout(2500)
+            return await page.locator("body").inner_text()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_each_state_shows_only_the_occurrences_it_contains(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+) -> None:
+    """One issue can fail both at load and behind a control.
+
+    The evidence list used to show every occurrence whichever state was
+    selected, so "At page load" listed markup that only exists after a click,
+    and a revealed state listed occurrences belonging to a different control.
+    That is the same mistake as the message this view was built to remove,
+    made by the panel underneath it.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    base = live_server[0]
+
+    at_load = await _evidence_text(base, scan_id, page_id, "")
+    assert "#at-load" in at_load
+    assert "#after-click" not in at_load
+    assert "in another state" in at_load
+
+    revealed = await _evidence_text(base, scan_id, page_id, quote(state_key, safe=""))
+    assert "#after-click" in revealed
+    # The load-state occurrence is still there: the click added markup, it did
+    # not remove the page underneath.
+    assert "#at-load" in revealed
