@@ -180,10 +180,13 @@ export const api = {
    * Refuses running/failed/interrupted scans, protected reports, and targets
    * outside the scan's scope. Nothing is stored by this call.
    */
-  getPageInspection: (scanId: number, pageId: number) =>
-    request<PageInspection>(`/api/scans/${scanId}/pages/${pageId}/inspect`, {
-      cache: "no-store",
-    }),
+  getPageInspection: (scanId: number, pageId: number, stateKey?: string | null) =>
+    request<PageInspection>(
+      `/api/scans/${scanId}/pages/${pageId}/inspect${
+        stateKey ? `?state=${encodeURIComponent(stateKey)}` : ""
+      }`,
+      { cache: "no-store" },
+    ),
   scopePreview: (url: string, wholeHost: boolean) => {
     const params = new URLSearchParams({ url });
     if (wholeHost) params.set("whole_host", "1");

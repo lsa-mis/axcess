@@ -1643,6 +1643,7 @@ def create_app(
         request: Request,
         scan_id: int,
         page_id: int,
+        state: str | None = None,
     ) -> JSONResponse:
         """Rendered page + DOM for the Page/DOM inspector.
 
@@ -1656,6 +1657,10 @@ def create_app(
         client-side as a CSS outline. The only live fetch is of a URL the scan
         already recorded, and this route sits behind the existing
         access-token gate.
+
+        ``?state=`` asks for one of the DOM states the interaction probe
+        captured rather than the page as it loaded. It is bounded to the
+        probe's own label cap, since anything longer cannot be a key it wrote.
         """
         from audit.web.page_inspector import InspectionUnavailableError, inspect_page
 
@@ -1666,6 +1671,7 @@ def create_app(
                     scan_id=scan_id,
                     page_id=page_id,
                     user_agent=settings.user_agent,
+                    state_key=(state or "")[:700] or None,
                 )
             except InspectionUnavailableError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

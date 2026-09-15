@@ -367,3 +367,100 @@ def test_inspect_small_payload_is_not_gzipped(
     assert resp.status_code == 200
     assert resp.headers.get("content-encoding") is None
     assert resp.json()["render"]["dom_html"] == "<p>tiny</p>"
+
+
+def _first_page_id(db_path: Path, scan_id: int) -> int:
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        assert row is not None
+        return int(row[0])
+    finally:
+        conn.close()
+
+
+def _store_state(
+    db_path: Path, page_id: int, scan_id: int, key: str, body: str = "<p>revealed</p>"
+) -> None:
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+            "path_labels, encoding, dom) VALUES (?, ?, ?, 'Open dialog', "
+            '\'["Menu","Open dialog"]\', \'gzip\', ?)',
+            (
+                page_id,
+                scan_id,
+                key,
+                gzip.compress(f"<!doctype html><html>{body}</html>".encode()),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_inspect_lists_the_states_a_click_revealed(
+    seeded_db: tuple[Path, Path, int],
+    client: TestClient,
+) -> None:
+    """The picker needs to know what exists before it can offer it."""
+    db_path, _, scan_id = seeded_db
+    page_id = _first_page_id(db_path, scan_id)
+    _store_state(db_path, page_id, scan_id, "s|#a|Open dialog")
+
+    payload = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect").json()
+
+    assert [state["state_key"] for state in payload["states"]] == ["s|#a|Open dialog"]
+    assert payload["states"][0]["path_labels"] == ["Menu", "Open dialog"]
+    # Metadata only: one reviewer reads one state at a time, and the documents
+    # are far too large to ship together.
+    assert "dom" not in payload["states"][0]
+    # Without ?state= this is still the page as it loaded.
+    assert payload["render"]["source"] in {"stored", "live"}
+
+
+def test_inspect_serves_a_requested_state_instead_of_the_load_capture(
+    seeded_db: tuple[Path, Path, int],
+    client: TestClient,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id = _first_page_id(db_path, scan_id)
+    _store_state(db_path, page_id, scan_id, "s|#a|Open dialog", "<dialog>hi</dialog>")
+
+    payload = client.get(
+        f"/api/scans/{scan_id}/pages/{page_id}/inspect",
+        params={"state": "s|#a|Open dialog"},
+    ).json()
+
+    assert payload["render"]["ok"] is True
+    assert payload["render"]["source"] == "state"
+    assert payload["render"]["state_key"] == "s|#a|Open dialog"
+    assert "<dialog>hi</dialog>" in payload["render"]["dom_html"]
+
+
+def test_a_state_that_was_never_captured_is_not_faked_with_a_live_render(
+    seeded_db: tuple[Path, Path, int],
+    client: TestClient,
+) -> None:
+    """Older reports cannot recover historical interaction DOM.
+
+    A live render is the page loading *now*, which is exactly the state the
+    reviewer said they did not want. Offering it as the dialog they asked for
+    would be a more convincing version of the bug this all exists to fix, so
+    the absence is reported instead.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id = _first_page_id(db_path, scan_id)
+
+    payload = client.get(
+        f"/api/scans/{scan_id}/pages/{page_id}/inspect",
+        params={"state": "s|#missing|Gone"},
+    ).json()
+
+    assert payload["render"]["ok"] is False
+    assert payload["render"]["source"] == "state"
+    assert "not captured" in payload["render"]["error"]
+    assert "dom_html" not in payload["render"]
