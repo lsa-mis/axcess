@@ -67,7 +67,7 @@ export default function Loading({
       )}
     >
       <SpinningMark className="h-20 w-20 text-umich-blue" />
-      <p className="text-sm font-medium text-fg-muted">{label}</p>
+      <p className="text-base font-medium text-fg-muted">{label}</p>
     </div>
   );
 }
