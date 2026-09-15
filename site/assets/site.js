@@ -35,6 +35,34 @@
     sync();
   }
 
+  /* ---- Latest desktop release (get-started page) ----
+     The download buttons already point at the newest build; this only
+     adds its version and date when the GitHub API is reachable. */
+  var latest = document.getElementById("latest-release");
+  if (latest && window.fetch) {
+    fetch("https://api.github.com/repos/lsa-mis/axcess/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rel) {
+        if (!rel || !rel.tag_name) { return; }
+        var version = String(rel.tag_name).replace(/^desktop-v/, "");
+        var when = rel.published_at ? new Date(rel.published_at) : null;
+        var date = when && !isNaN(when) ? when.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+        var link = document.createElement("a");
+        link.href = rel.html_url || latest.getAttribute("data-latest-release");
+        link.textContent = "version " + version;
+        latest.textContent = "";
+        latest.appendChild(document.createTextNode("Current build: "));
+        latest.appendChild(link);
+        latest.appendChild(document.createTextNode((date ? ", published " + date : "") + ". Release notes and earlier builds are on the "));
+        var all = document.createElement("a");
+        all.href = "https://github.com/lsa-mis/axcess/releases";
+        all.textContent = "releases page";
+        latest.appendChild(all);
+        latest.appendChild(document.createTextNode("."));
+      })
+      .catch(function () {});
+  }
+
   /* ---- Coverage explorer ---- */
   var explorer = document.getElementById("explorer");
   if (!explorer) { return; }

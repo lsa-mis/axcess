@@ -144,7 +144,7 @@ jobs:
   publish:
     name: Publish preview release
     needs: [build-macos, build-windows]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/desktop-auto-update'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -166,6 +166,12 @@ jobs:
           for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" RELEASES; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
+          # Version-less copies give the public site permanent download links:
+          # https://github.com/lsa-mis/axcess/releases/latest/download/<name>
+          # always resolves to the newest release's asset of that name.
+          cp "release/Axcess-$VERSION-arm64.dmg" release/Axcess-macOS-AppleSilicon.dmg
+          cp "release/Axcess-$VERSION-Setup.exe" release/Axcess-Windows-x64-Setup.exe
+          ls -l release
       - name: Create or update the release
         shell: bash
         run: |
