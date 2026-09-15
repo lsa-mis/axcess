@@ -109,6 +109,20 @@ const config: Config = {
         focus: "0 0 0 3px #00274C",
         "focus-inverse": "0 0 0 3px #FFCB05",
       },
+      // The loading mark's crawl ring turns on its own axis. Spelled out here
+      // rather than reusing Tailwind's `animate-spin` + an arbitrary
+      // `[animation-duration:...]`, because `animate-spin` emits the
+      // `animation` shorthand and would reset the duration depending on which
+      // utility the sort happens to place last. 1.6s reads as patient rather
+      // than urgent; the wait is usually a few seconds of backend boot.
+      keyframes: {
+        "spin-ring": {
+          to: { transform: "rotate(360deg)" },
+        },
+      },
+      animation: {
+        "spin-ring": "spin-ring 1.6s linear infinite",
+      },
       minHeight: {
         // WCAG 2.2 SC 2.5.5 AAA — every interactive target must be ≥44×44px.
         target: "44px",
