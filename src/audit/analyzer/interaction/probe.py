@@ -25,13 +25,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
-from audit.analyzer.interaction.base import InteractionResult, RevealedViolation
+from audit.analyzer.interaction.base import (
+    InteractionResult,
+    RevealedViolation,
+    StateCapture,
+)
 from audit.analyzer.interaction.safety import exploration_guard, safe_url
 from audit.logging import get_logger
 
@@ -289,6 +294,23 @@ DEFAULT_MAX_REPEATED = 20
 DEFAULT_MAX_DEPTH = 5
 DEFAULT_TIMEOUT_S = 120.0
 
+# Bounds on capturing revealed-state markup. The probe is shared by every
+# crawl worker and captures are held until the page is persisted, so these cap
+# memory, not just the database.
+#
+# ``_CAPTURE_TIMEOUT_S`` is small on purpose: a capture is a nice-to-have for
+# the inspector, while the exploration it would steal time from is the point of
+# the pass. ``_MAX_CAPTURE_BYTES`` mirrors ``_MAX_STORED_HTML_BYTES`` in the
+# orchestrator, since a document too large to store is not worth carrying.
+DEFAULT_MAX_STATE_CAPTURES = 25
+_MAX_CAPTURE_BYTES = 2_000_000
+_MAX_CAPTURE_TOTAL_BYTES = 8_000_000
+_CAPTURE_TIMEOUT_S = 3.0
+
+# Length of the serialized document, asked for before the bytes themselves so
+# an enormous DOM is refused without ever crossing the CDP boundary.
+_DOM_LENGTH_JS = "() => document.documentElement.outerHTML.length"
+
 # Cheap 32-bit rolling hash of the rendered body. Only ever compared against
 # another hash taken the same way moments earlier on the same page, so
 # collision resistance is irrelevant and speed is not.
@@ -351,6 +373,13 @@ class _Budget:
     # which is what makes "operated N of M" a ratio rather than two
     # unrelated numbers.
     discovered_keys: set[str] = field(default_factory=set)
+    #: Markup of the states that held a new defect, keyed by state so a control
+    #: reopened to reach its siblings does not store its state twice. First
+    #: write wins, matching ``page_a11y_findings.revealed_by``: the pass that
+    #: first observes a finding is the one whose state explains it.
+    captures: dict[str, StateCapture] = field(default_factory=dict)
+    #: Running total of compressed capture bytes held for this page.
+    capture_bytes: int = 0
 
 
 @dataclass
@@ -376,6 +405,11 @@ class InteractionProbe:
     # Time for a revealed state to settle (animations, async content).
     settle_ms: int = 400
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
+    # Store the markup of states that held a new defect, so the inspector can
+    # show the element in the state it exists in. Off leaves the probe's
+    # behaviour exactly as it was.
+    capture_states: bool = True
+    max_state_captures: int = DEFAULT_MAX_STATE_CAPTURES
 
     async def run(self, page: Page, *, baseline: Sequence[AxeViolation] = ()) -> InteractionResult:
         """Return violations reachable only by operating the page.
@@ -430,6 +464,7 @@ class InteractionProbe:
         return InteractionResult(
             findings=tuple(found),
             states=budget.states_found,
+            captures=tuple(budget.captures.values()),
             urls=tuple(sorted(budget.urls)),
             evaluated=evaluated,
             controls_discovered=len(budget.discovered_keys),
@@ -697,7 +732,21 @@ class InteractionProbe:
                 ):
                     budget.urls.add(url)
             before_found = len(found)
-            await self._collect(page, budget, found, label)
+            state_key = self._interaction_key(control, pinned)
+            await self._collect(page, budget, found, label, state_key)
+            # Only states that held something new are worth keeping: a state
+            # nothing was found in is real coverage, but no finding points at
+            # it, so nothing would ever ask the inspector to show it.
+            if len(found) > before_found:
+                await self._capture_state(
+                    page,
+                    budget,
+                    state_key=state_key,
+                    label=label,
+                    path_labels=tuple(
+                        item["label"] or f"<{item['tag']}>" for item in (*path, control)
+                    ),
+                )
             log.info(
                 "interaction.clicked",
                 control=label[:60],
@@ -824,6 +873,7 @@ class InteractionProbe:
         budget: _Budget,
         found: list[RevealedViolation],
         label: str,
+        state_key: str = "",
     ) -> None:
         """Run axe on the current state and keep only unseen violations."""
         try:
@@ -836,7 +886,69 @@ class InteractionProbe:
             if digest in budget.seen_hashes:
                 continue
             budget.seen_hashes.add(digest)
-            found.append(RevealedViolation(violation=violation, revealed_by=label))
+            found.append(
+                RevealedViolation(
+                    violation=violation, revealed_by=label, state_key=state_key
+                )
+            )
+
+    async def _capture_state(
+        self,
+        page: Page,
+        budget: _Budget,
+        *,
+        state_key: str,
+        label: str,
+        path_labels: tuple[str, ...],
+    ) -> None:
+        """Store this state's markup, or store nothing. Never raises.
+
+        The caller sits inside ``_operate``'s ``try``, whose ``except`` covers
+        the nested sweep, the dialog-dismissal loop and the Escape unwind. A
+        capture that raised there would skip dismissing a dialog this click
+        opened, and every later click would land on that dialog's overlay while
+        the ledger recorded them as coverage. Losing a capture is a cosmetic
+        loss; letting one escape corrupts the numbers the pass exists to
+        produce, so every failure here is swallowed.
+
+        ``page.content()`` takes no timeout of its own and genuinely throws in
+        normal operation ("page is navigating and changing the content"), so it
+        gets one. ``asyncio.timeout`` is deliberate: it raises ``CancelledError``
+        rather than the builtin ``TimeoutError`` that ``wait_for`` raises, and
+        only the former is safe to let past ``except Exception``. It is caught
+        here regardless.
+        """
+        if not self.capture_states or state_key in budget.captures:
+            return
+        if len(budget.captures) >= self.max_state_captures:
+            budget.limits.add("state_captures")
+            return
+        try:
+            async with asyncio.timeout(_CAPTURE_TIMEOUT_S):
+                # Ask for the size before the bytes, so a document too large to
+                # keep is refused without serializing it across CDP.
+                length = int(await page.evaluate(_DOM_LENGTH_JS))
+                if length <= 0 or length > _MAX_CAPTURE_BYTES:
+                    return
+                html = await page.content()
+            blob = gzip.compress(html.encode("utf-8", "replace"), compresslevel=1, mtime=0)
+        except Exception as exc:
+            log.debug(
+                "interaction.capture_failed",
+                control=label[:60],
+                error_type=type(exc).__name__,
+            )
+            return
+        if budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
+            budget.limits.add("state_captures")
+            return
+        budget.capture_bytes += len(blob)
+        budget.captures[state_key] = StateCapture(
+            state_key=state_key,
+            revealed_by=label,
+            path_labels=path_labels,
+            html=blob,
+        )
 
     async def _restore(self, page: Page, pinned: str) -> None:
         """Return the browser to the page we are probing.

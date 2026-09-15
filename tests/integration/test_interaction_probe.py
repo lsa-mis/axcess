@@ -18,6 +18,7 @@ The fixture is built so each guarantee fails loudly rather than silently:
 from __future__ import annotations
 
 import asyncio
+import gzip
 import re
 from pathlib import Path
 
@@ -663,3 +664,62 @@ async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # ty
     assert await page.evaluate("() => document.getElementById('m-plain').hasAttribute('data-open')")
     clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
     assert int(clicks) == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_capture_records_the_state_a_finding_was_revealed_in(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Every revealed finding must be able to reach the markup it was found in.
+
+    The stored page HTML is the load state, so a click-revealed element is not
+    in it. A capture is what lets the inspector show that element at all, and
+    it is only useful if the finding can be matched back to one.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.findings, "fixture should reveal at least one violation"
+    assert result.captures, "a revealed finding must come with its state"
+    # Captures are the subset of states that held something new, never all of
+    # them, and never more than the caller asked to keep.
+    assert len(result.captures) <= result.states
+    by_key = {capture.state_key: capture for capture in result.captures}
+    for finding in result.findings:
+        assert finding.state_key in by_key, finding.revealed_by
+    for capture in result.captures:
+        assert gzip.decompress(capture.html).lstrip().lower().startswith(b"<!doctype")
+        # The chain ends with the control that produced this state, so the
+        # last entry always matches the label shown beside it.
+        assert capture.path_labels[-1] == capture.revealed_by
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_failed_capture_costs_nothing_but_the_capture(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A capture that throws must not take the sweep down with it.
+
+    ``_operate`` runs the nested sweep, the dialog-dismissal loop and the
+    Escape unwind inside one ``try``. An exception escaping the capture would
+    skip dismissing a dialog the click just opened, and every later click would
+    land on that dialog's overlay while the ledger counted them as coverage.
+    ``page.content()`` throws in normal operation, so this is not hypothetical.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate("() => document.getElementById('stuck').remove()")
+
+    async def explode() -> str:
+        raise RuntimeError("page is navigating and changing the content")
+
+    page.content = explode  # type: ignore[method-assign]
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.captures == (), "the capture should have been abandoned"
+    # Everything the capture sits in front of still happened.
+    assert result.findings, "detection must be unaffected by a capture failure"
+    assert result.dialogs_opened == 2, "dialog cleanup ran"
+    assert result.dialogs_stuck == 0
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 1, "the sweep reached the control past the dialogs"

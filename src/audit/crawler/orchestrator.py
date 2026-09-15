@@ -471,6 +471,12 @@ async def run_crawl(
             max_clicks=config.interaction_max_clicks,
             max_repeated=config.interaction_max_repeated,
             max_depth=config.interaction_max_depth,
+            # A scan that opted out of storing rendered pages has opted out of
+            # storing revealed states too: they are the same documents, from
+            # the same site, and on the protected path they are captured after
+            # authentication. Refusing at the probe means the bytes are never
+            # held either, rather than being gathered and dropped at write.
+            capture_states=config.store_rendered_html,
             # a11y-crawler matches one list against both URLs and control
             # labels, so an operator who blocks "Sign out" is protected from
             # the link and the button alike. The probe's own label list stays
