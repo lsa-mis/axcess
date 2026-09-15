@@ -165,3 +165,40 @@ async def test_unguarded_service_worker_context_is_not_reported_as_checked() -> 
     assert not result.evaluated
     assert result.states == 0
     assert result.findings == ()
+
+
+def test_every_probe_is_built_with_an_explicit_capture_decision() -> None:
+    """Storing revealed-state markup must never be decided by the default.
+
+    The probe is constructed in more than one place, and the authenticated
+    scan builds its own rather than going through the orchestrator. When the
+    storage opt-out was first wired it reached only the orchestrator's, so a
+    login scan that had declined to store rendered pages still captured the
+    states behind its controls -- post-authentication documents, from the one
+    kind of scan where that matters most.
+
+    Defaults cannot enforce that, because the default has to stay ``True`` for
+    an ordinary scan. Naming the argument at every call site can, and this is
+    the check that says so.
+    """
+    import ast
+    from pathlib import Path
+
+    source_root = Path(__file__).resolve().parents[2] / "src"
+    missing: list[str] = []
+    for path in source_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+            if name != "InteractionProbe":
+                continue
+            if not any(kw.arg == "capture_states" for kw in node.keywords):
+                missing.append(f"{path.relative_to(source_root)}:{node.lineno}")
+
+    assert not missing, (
+        "InteractionProbe built without an explicit capture_states decision at: "
+        + ", ".join(missing)
+    )

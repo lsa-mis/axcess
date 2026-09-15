@@ -2994,6 +2994,13 @@ async def _run_local_login_background(
                     max_repeated=config.interaction_max_repeated,
                     max_depth=config.interaction_max_depth,
                     blocked_labels=DEFAULT_BLOCKED_LABELS + tuple(config.blocked_url_patterns),
+                    # An authenticated scan that declined to store rendered
+                    # pages has declined to store the states behind their
+                    # controls too: same documents, same session, and every
+                    # one of them captured after sign-in. This probe is built
+                    # here rather than by the orchestrator, so it does not
+                    # inherit that gate and has to carry it itself.
+                    capture_states=config.store_rendered_html,
                 )
         fetcher = run.session.create_shared_js_fetcher(
             axe_analyzer=login_axe,
