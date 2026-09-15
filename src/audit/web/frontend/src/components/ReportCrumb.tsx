@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { api } from "../api/client";
@@ -10,8 +10,8 @@ import { api } from "../api/client";
  * which site's evidence you are reading, and which view of it. The last
  * segment tracks the tab, so the trail and the tabs never disagree.
  *
- * Everything here is derived from the pathname, so the trail is complete on
- * the first paint of a route rather than appearing once data lands. The scan
+ * Everything here is derived from the URL, so the trail is complete on the
+ * first paint of a route rather than appearing once data lands. The scan
  * query only upgrades the middle crumb from "Report #46" to the site itself,
  * and it shares ``["scan", id]`` with the routes below, a cache hit, not a
  * second request.
@@ -32,6 +32,28 @@ const VIEWS: Array<[RegExp, string]> = [
 /** Strip the scheme and trailing slash, the host and path are the identity. */
 export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
+/**
+ * The view a drill-down was opened from, read off `?origin=&back=`.
+ *
+ * The inspector is reachable from Issues, DOM-engine rules, DOM-engine
+ * findings and a single finding, so its parent is not a constant and cannot be
+ * derived from the path — the opening link is the only thing that knows. That
+ * link already carried both values for the inspector's own in-page breadcrumb;
+ * the trail consumes them now, so the orientation is in one place instead of
+ * two stacked ones.
+ *
+ * `back` arrives from the query string, so only in-app absolute paths are
+ * honoured. `<Link to>` follows a full URL off-site, which would let a crafted
+ * link put an attacker's destination inside the app's own breadcrumb.
+ */
+function parentCrumb(params: URLSearchParams): { label: string; to: string } | null {
+  const label = params.get("origin");
+  const to = params.get("back");
+  if (!label || !to) return null;
+  if (!to.startsWith("/") || to.startsWith("//")) return null;
+  return { label, to };
 }
 
 /** Routes that belong in the trail but have no report behind them yet. */
@@ -56,7 +78,9 @@ export function reportRouteMatch(
 
 export default function ReportCrumb() {
   const { pathname } = useLocation();
+  const [params] = useSearchParams();
   const match = reportRouteMatch(pathname);
+  const parent = parentCrumb(params);
   const scanQuery = useQuery({
     queryKey: ["scan", match?.scanId],
     queryFn: () => api.getScan(match!.scanId as number),
@@ -79,6 +103,14 @@ export default function ReportCrumb() {
           <>
             <Crumb to={`/scans/${match.scanId}`} className="max-w-[18rem] truncate">
               {middle}
+            </Crumb>
+            <Separator />
+          </>
+        )}
+        {parent && (
+          <>
+            <Crumb to={parent.to} className="max-w-[12rem] truncate">
+              {parent.label}
             </Crumb>
             <Separator />
           </>

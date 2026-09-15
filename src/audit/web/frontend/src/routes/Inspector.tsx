@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, ExternalLink, FileCode2, Loader2 } from "lucide-react";
+import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
@@ -41,10 +41,6 @@ export default function InspectorRoute() {
   const issueKey = params.get("issue");
   const directSelector = params.get("selector");
   const directSnippet = params.get("snippet");
-  const origin = params.get("origin");
-  const context = params.get("context");
-  const contextTo = params.get("contextTo");
-  const backTo = params.get("back");
 
   const { data: scanData } = useQuery({
     queryKey: ["scan", scan],
@@ -104,13 +100,6 @@ export default function InspectorRoute() {
     return out;
   }, [currentFindings]);
   const hasTarget = targets.length > 0;
-
-  // Human-readable breadcrumb label, e.g. "WCAG 1.4.3: Contrast (Minimum)"
-  // instead of the cryptic `alfa:sia-r69:failed` issue key.
-  const contextLabel = useMemo(
-    () => currentFindings[0]?.help || context,
-    [currentFindings, context],
-  );
 
   // Toggle to show/hide the highlight, persisted so a reload keeps the view.
   const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
@@ -274,47 +263,10 @@ export default function InspectorRoute() {
 
   return (
     <>
-      {(origin || context) && (
-        <nav aria-label="Breadcrumb" className="mb-3">
-          <ol className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-            {origin && backTo && (
-              <>
-                <li>
-                  <Link
-                    to={backTo}
-                    className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2"
-                  >
-                    {origin}
-                  </Link>
-                </li>
-                <li aria-hidden className="text-border-strong">
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                </li>
-              </>
-            )}
-            {context && (
-              <li>
-                {contextTo ? (
-                  <Link
-                    to={contextTo}
-                    className="inline-flex min-h-target items-center text-fg font-semibold text-umich-blue underline underline-offset-2"
-                  >
-                    {contextLabel}
-                  </Link>
-                ) : (
-                  <span className="rounded-xs border border-border bg-surface-muted px-1.5 py-0.5 text-fg-muted">
-                    {contextLabel}
-                  </span>
-                )}
-              </li>
-            )}
-          </ol>
-        </nav>
-      )}
-
       <ReportHeader
         scanId={scan}
         previousScanId={scanData?.previous_scan_id ?? null}
+        tabs={false}
         title={displayTitle}
         meta={
           <ReportMeta
