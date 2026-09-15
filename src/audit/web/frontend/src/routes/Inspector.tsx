@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import Tabs from "../components/Tabs";
 import { Card, EmptyState, ExternalLinkButton, LinkButton } from "../components/ui";
-import { cn } from "../lib/cn";
 
 type TabId = "page" | "dom";
 
@@ -142,10 +142,6 @@ export default function InspectorRoute() {
   });
 
   const [tab, setTab] = useState<TabId>("page");
-  const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
-    page: null,
-    dom: null,
-  });
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
@@ -245,17 +241,6 @@ export default function InspectorRoute() {
     const mark = domPreRef.current?.querySelector("mark");
     mark?.scrollIntoView({ block: "center" });
   }, [tab, domMarkCount, domParts]);
-
-  const onTabKeyDown = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    id: TabId,
-  ) => {
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
-    event.preventDefault();
-    const next: TabId = id === "page" ? "dom" : "page";
-    setTab(next);
-    tabRefs.current[next]?.focus();
-  };
 
   if (error) {
     return (
@@ -369,36 +354,18 @@ export default function InspectorRoute() {
         </Card>
       )}
 
-      <div
-        role="tablist"
-        aria-label="How this page was rendered"
-        className="mb-4 inline-flex gap-1 rounded-xs border border-border bg-surface-muted p-1"
-      >
-        <TabButton
-          id="inspect-tab-page"
-          panelId="inspect-panel-page"
-          tab="page"
-          label={render.ok ? "Rendered page" : "Page"}
-          active={tab === "page"}
-          onSelect={() => setTab("page")}
-          onKeyDown={onTabKeyDown}
-          ref={(el) => {
-            tabRefs.current.page = el;
-          }}
-        />
-        <TabButton
-          id="inspect-tab-dom"
-          panelId="inspect-panel-dom"
-          tab="dom"
-          label="Loaded DOM"
-          active={tab === "dom"}
-          onSelect={() => setTab("dom")}
-          onKeyDown={onTabKeyDown}
-          ref={(el) => {
-            tabRefs.current.dom = el;
-          }}
-        />
-      </div>
+      <Tabs
+        mode="tabs"
+        label="How this page was rendered"
+        idPrefix="inspect"
+        className="mb-4"
+        value={tab}
+        onChange={(key) => setTab(key as TabId)}
+        items={[
+          { key: "page", label: render.ok ? "Rendered page" : "Page" },
+          { key: "dom", label: "Loaded DOM" },
+        ]}
+      />
 
       <div
         id="inspect-panel-page"
@@ -605,47 +572,6 @@ export default function InspectorRoute() {
         )}
       </div>
     </>
-  );
-}
-
-function TabButton({
-  id,
-  panelId,
-  tab,
-  label,
-  active,
-  onSelect,
-  onKeyDown,
-  ref,
-}: {
-  id: string;
-  panelId: string;
-  tab: TabId;
-  label: string;
-  active: boolean;
-  onSelect: () => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, id: TabId) => void;
-  ref: (el: HTMLButtonElement | null) => void;
-}) {
-  return (
-    <button
-      type="button"
-      id={id}
-      ref={ref}
-      role="tab"
-      aria-selected={active}
-      aria-controls={panelId}
-      onClick={onSelect}
-      onKeyDown={(event) => onKeyDown(event, tab)}
-      className={cn(
-        "min-h-target rounded-[3px] px-3.5 py-1.5 text-sm font-semibold",
-        active
-          ? "bg-surface text-fg shadow-card"
-          : "text-fg-muted hover:bg-surface/60 hover:text-fg",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 

@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
+import Tabs from "../components/Tabs";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
 import { cn } from "../lib/cn";
-import { Button, Card, EmptyState, PageHeader } from "../components/ui";
+import { Card, EmptyState, PageHeader } from "../components/ui";
 import type {
   CoverageCriterion,
   CoverageData,
@@ -56,18 +57,20 @@ export default function TrackingRoute() {
         </Card>
       )}
 
-      <div role="group" aria-label="Tracker sections" className="mb-5 flex flex-wrap gap-2 rounded-lg border border-border bg-surface-muted p-2">
-        {([
-          ["coverage", "Current coverage"],
-          ["uncovered", "Not covered yet"],
-          ["roadmap", "AI roadmap"],
-          ["pipelines", "Shipped pipelines"],
-        ] as const).map(([key, label]) => (
-          <Button key={key} variant={view === key ? "primary" : "ghost"} aria-pressed={view === key} aria-controls="tracker-content" onClick={() => select("view", key)} className="rounded-lg transition-none">
-            {label}
-          </Button>
-        ))}
-      </div>
+      <Tabs
+        mode="filter"
+        label="Tracker sections"
+        className="mb-5"
+        controls="tracker-content"
+        value={view}
+        onChange={(key) => select("view", key)}
+        items={[
+          { key: "coverage", label: "Current coverage" },
+          { key: "uncovered", label: "Not covered yet" },
+          { key: "roadmap", label: "AI roadmap" },
+          { key: "pipelines", label: "Shipped pipelines" },
+        ]}
+      />
       <p role="status" className="sr-only">Showing {view === "coverage" ? "current coverage" : view === "roadmap" ? "AI roadmap" : view === "uncovered" ? "criteria not covered yet" : "shipped pipelines"}</p>
       {isLoading && <p role="status">Loading tracker…</p>}
       <div id="tracker-content">
@@ -83,14 +86,20 @@ export default function TrackingRoute() {
           skipped at runtime, those read “planned,” not “shipped.”
         </p>
         {counts && (
-          <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filter roadmap by status">
-            <Button className="transition-none" variant={roadmapStatus ? "ghost" : "primary"} aria-pressed={!roadmapStatus} onClick={() => select("status", "")}>All</Button>
-            {(["shipped", "in_progress", "planned"] as const).map((key) => (
-              <Button className="transition-none" key={key} variant={roadmapStatus === key ? "primary" : "ghost"} aria-pressed={roadmapStatus === key} onClick={() => select("status", key)}>
-                {STATUS_LABEL[key]} ({counts[key]})
-              </Button>
-            ))}
-          </div>
+          <Tabs
+            mode="filter"
+            label="Filter roadmap by status"
+            className="mb-3"
+            value={roadmapStatus || "all"}
+            onChange={(key) => select("status", key === "all" ? "" : key)}
+            items={[
+              { key: "all", label: "All" },
+              ...(["shipped", "in_progress", "planned"] as const).map((key) => ({
+                key,
+                label: `${STATUS_LABEL[key]} (${counts[key]})`,
+              })),
+            ]}
+          />
         )}
         <p role="status" className="mb-2 text-xs text-fg-muted">Showing {data?.roadmap.filter((item) => !roadmapStatus || item.status === roadmapStatus).length ?? 0} roadmap items{roadmapStatus ? ` · ${STATUS_LABEL[roadmapStatus]}` : ""}</p>
         <Card className="overflow-x-auto">
