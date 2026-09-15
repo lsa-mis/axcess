@@ -12,6 +12,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Literal
 
+from audit.analyzer.interaction.base import StateCapture
 from audit.crawler.search import SearchOutcome
 from audit.protected.redaction import redact_text
 
@@ -38,6 +39,57 @@ def record_search_run(
             "discovered=excluded.discovered, detail=excluded.detail",
             (scan_id, page_id, outcome.status, outcome.states, outcome.discovered, outcome.detail),
         )
+
+
+def replace_page_dom_states(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    states: Sequence[StateCapture] = (),
+) -> int:
+    """Make ``states`` the complete set of captured DOM states for a page.
+
+    Replace, not merge, and the distinction is the point. ``upsert_page``
+    overwrites ``rendered_html`` when a page is fetched again, so states
+    captured during an earlier pass describe markup the report no longer holds:
+    left in place they would show a reviewer a dialog from a document that has
+    since been replaced. Passing an empty sequence is meaningful — it says this
+    pass captured nothing, and clears whatever the last one left.
+
+    Returns the number of rows written. The scan-belongs check mirrors
+    ``record_interaction_run``: states written against a page from another scan
+    would leak one report's markup into another.
+    """
+    if (
+        conn.execute(
+            "SELECT 1 FROM pages WHERE id = ? AND scan_id = ?", (page_id, scan_id)
+        ).fetchone()
+        is None
+    ):
+        raise ValueError("DOM state page does not belong to scan")
+    with _status_transaction(conn):
+        conn.execute("DELETE FROM page_dom_states WHERE page_id = ?", (page_id,))
+        for state in states:
+            if not state.state_key or not state.html:
+                continue
+            conn.execute(
+                "INSERT INTO page_dom_states (page_id, scan_id, state_key, "
+                "revealed_by, path_labels, encoding, dom) "
+                "VALUES (?, ?, ?, ?, ?, 'gzip', ?)",
+                (
+                    page_id,
+                    scan_id,
+                    state.state_key,
+                    state.revealed_by[:300],
+                    json.dumps(
+                        [label[:300] for label in state.path_labels],
+                        separators=(",", ":"),
+                    ),
+                    state.html,
+                ),
+            )
+    return sum(1 for state in states if state.state_key and state.html)
 
 
 def record_interaction_run(
@@ -506,6 +558,7 @@ def upsert_axe_violation(
     target_hash: str,
     screenshot_hash: str | None = None,
     revealed_by: str | None = None,
+    revealed_state_key: str | None = None,
 ) -> int:
     """Idempotent upsert on ``(page_id, rule_id, target_hash)``.
 
@@ -520,9 +573,10 @@ def upsert_axe_violation(
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, screenshot_hash, revealed_by
+            html_snippet, target_hash, screenshot_hash, revealed_by,
+            revealed_state_key
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -539,6 +593,9 @@ def upsert_axe_violation(
             -- pass runs first, so a finding visible without any
             -- interaction keeps its NULL and is never relabelled as
             -- click-only by a later state that merely still shows it.
+            -- revealed_state_key follows it for the same reason: it points at
+            -- the state this finding was *first* seen in, and a later state
+            -- that merely still shows the same markup does not re-explain it.
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -557,6 +614,7 @@ def upsert_axe_violation(
             target_hash,
             screenshot_hash,
             revealed_by,
+            revealed_state_key,
         ),
     )
     row = conn.execute(
