@@ -1,0 +1,693 @@
+{
+  "controls": {
+    "P1_full_corpus_reproduces_published": true,
+    "P1_published": {
+      "TP": 36,
+      "FP": 3,
+      "FN": 0,
+      "TN": 21
+    },
+    "P1_observed": {
+      "TP": 36,
+      "FP": 3,
+      "FN": 0,
+      "TN": 21
+    },
+    "P2_exclusions_account_for_difference": true,
+    "valid": true
+  },
+  "full_corpus": {
+    "TP": 36,
+    "FP": 3,
+    "FN": 0,
+    "TN": 21,
+    "n": 60,
+    "precision": "36/39",
+    "recall": "36/36"
+  },
+  "replayable_subset": {
+    "TP": 31,
+    "FP": 2,
+    "FN": 0,
+    "TN": 20,
+    "n": 53,
+    "precision": "31/33",
+    "recall": "31/31"
+  },
+  "counts": {
+    "published_subjects": 60,
+    "replayable": 53,
+    "excluded": 7,
+    "replayable_positive": 31,
+    "replayable_negative": 22,
+    "replayable_label_unknown": 0,
+    "excluded_positive": 5,
+    "excluded_negative": 2
+  },
+  "kafe_false_positives_in_subset": [
+    "bowiestate",
+    "dell"
+  ],
+  "partial_read_subjects": [
+    "godaddy"
+  ],
+  "excluded_subjects": [
+    {
+      "subject": "4shared",
+      "reason": "capture parses to no HTML entry document",
+      "y": true
+    },
+    {
+      "subject": "battlenet",
+      "reason": "folder-form on Drive; no flow dump fetched",
+      "y": true
+    },
+    {
+      "subject": "canon",
+      "reason": "folder-form on Drive; no flow dump fetched",
+      "y": true
+    },
+    {
+      "subject": "dmv_fl",
+      "reason": "capture parses to no HTML entry document",
+      "y": false
+    },
+    {
+      "subject": "dmv_wc",
+      "reason": "folder-form on Drive; no flow dump fetched",
+      "y": false
+    },
+    {
+      "subject": "gizmodo",
+      "reason": "folder-form on Drive; no flow dump fetched",
+      "y": true
+    },
+    {
+      "subject": "speedway",
+      "reason": "folder-form on Drive; no flow dump fetched",
+      "y": true
+    }
+  ],
+  "subjects": [
+    {
+      "subject": "4shared",
+      "status": "excluded",
+      "exclusion_reason": "capture parses to no HTML entry document",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 0,
+      "unreadable_flows": 1,
+      "entry": null
+    },
+    {
+      "subject": "adorama",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 52,
+      "unreadable_flows": 0,
+      "entry": "https://www.adorama.com/MyAccount/Login"
+    },
+    {
+      "subject": "alexa",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 50,
+      "unreadable_flows": 0,
+      "entry": "https://www.alexa.com/login"
+    },
+    {
+      "subject": "ancestry",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 253,
+      "unreadable_flows": 0,
+      "entry": "https://www.ancestry.com/"
+    },
+    {
+      "subject": "ask",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 38,
+      "unreadable_flows": 0,
+      "entry": "https://www.ask.com/about"
+    },
+    {
+      "subject": "battlenet",
+      "status": "excluded",
+      "exclusion_reason": "folder-form on Drive; no flow dump fetched",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": null,
+      "unreadable_flows": null,
+      "entry": null
+    },
+    {
+      "subject": "bbc",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 24,
+      "unreadable_flows": 0,
+      "entry": "https://account.bbc.com/signin?realm=&isCasso=false&action=sign-in&redirectUri=https%3A%2F%2Fsession.bbc.co.uk%2Fsession%2Fcallback&service=IdSignInService&nonce=2dtZJJBz-oN3RP2skBzhVq5oxbBU2YurmGzQ"
+    },
+    {
+      "subject": "boostmobile",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 117,
+      "unreadable_flows": 0,
+      "entry": "https://myaccount.boostmobile.com/sign-in.html"
+    },
+    {
+      "subject": "bowiestate",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": true,
+      "flows": 72,
+      "unreadable_flows": 0,
+      "entry": "https://www.bowiestategrad.org/apply/index.cfm?isndsl"
+    },
+    {
+      "subject": "canon",
+      "status": "excluded",
+      "exclusion_reason": "folder-form on Drive; no flow dump fetched",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": null,
+      "unreadable_flows": null,
+      "entry": null
+    },
+    {
+      "subject": "capitalone",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 42,
+      "unreadable_flows": 0,
+      "entry": "https://verified.capitalone.com/auth/signin"
+    },
+    {
+      "subject": "carlsjr",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 51,
+      "unreadable_flows": 0,
+      "entry": "https://www.carlsjr.com/email-signup"
+    },
+    {
+      "subject": "citiprogram",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 21,
+      "unreadable_flows": 0,
+      "entry": "https://www.citiprogram.org/index.cfm?pageID=14"
+    },
+    {
+      "subject": "cloudflare",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 34,
+      "unreadable_flows": 0,
+      "entry": "https://dash.cloudflare.com/login"
+    },
+    {
+      "subject": "cnn",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 147,
+      "unreadable_flows": 0,
+      "entry": "https://www.cnn.com/search/"
+    },
+    {
+      "subject": "coinbase",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 67,
+      "unreadable_flows": 0,
+      "entry": "https://www.coinbase.com/signup"
+    },
+    {
+      "subject": "coronavirus",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 24,
+      "unreadable_flows": 0,
+      "entry": "https://www.coronavirus.gov/"
+    },
+    {
+      "subject": "costco",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 31,
+      "unreadable_flows": 0,
+      "entry": "https://customerservice.costco.com/"
+    },
+    {
+      "subject": "craigslist",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 13,
+      "unreadable_flows": 0,
+      "entry": "https://losangeles.craigslist.org/"
+    },
+    {
+      "subject": "dell",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": true,
+      "flows": 60,
+      "unreadable_flows": 0,
+      "entry": "https://www.dell.com/support/Assets-Online/us/en/19/registration"
+    },
+    {
+      "subject": "discordapp",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 81,
+      "unreadable_flows": 0,
+      "entry": "https://discordapp.com/"
+    },
+    {
+      "subject": "dmv_ca",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 38,
+      "unreadable_flows": 0,
+      "entry": "https://www.dmv.ca.gov/wasapp/foa/officeVisit.do"
+    },
+    {
+      "subject": "dmv_fl",
+      "status": "excluded",
+      "exclusion_reason": "capture parses to no HTML entry document",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 0,
+      "unreadable_flows": 1,
+      "entry": null
+    },
+    {
+      "subject": "dmv_wc",
+      "status": "excluded",
+      "exclusion_reason": "folder-form on Drive; no flow dump fetched",
+      "y": false,
+      "kafe_yhat": true,
+      "flows": null,
+      "unreadable_flows": null,
+      "entry": null
+    },
+    {
+      "subject": "dpreview",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 76,
+      "unreadable_flows": 0,
+      "entry": "https://www.dpreview.com/about"
+    },
+    {
+      "subject": "ed",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 49,
+      "unreadable_flows": 0,
+      "entry": "https://www.ed.gov/"
+    },
+    {
+      "subject": "fandango",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 144,
+      "unreadable_flows": 0,
+      "entry": "https://www.fandango.com/account/signin"
+    },
+    {
+      "subject": "flickr",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 65,
+      "unreadable_flows": 0,
+      "entry": "https://identity.flickr.com/sign-up"
+    },
+    {
+      "subject": "gizmodo",
+      "status": "excluded",
+      "exclusion_reason": "folder-form on Drive; no flow dump fetched",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": null,
+      "unreadable_flows": null,
+      "entry": null
+    },
+    {
+      "subject": "godaddy",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 3,
+      "unreadable_flows": 1,
+      "entry": "https://sso.godaddy.com/"
+    },
+    {
+      "subject": "groupon",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 51,
+      "unreadable_flows": 0,
+      "entry": "https://www.groupon.com/login"
+    },
+    {
+      "subject": "indiegogo",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 90,
+      "unreadable_flows": 0,
+      "entry": "https://support.indiegogo.com/hc/en-us/requests/new"
+    },
+    {
+      "subject": "instagram",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 33,
+      "unreadable_flows": 0,
+      "entry": "https://www.instagram.com/"
+    },
+    {
+      "subject": "live",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 19,
+      "unreadable_flows": 0,
+      "entry": "https://signup.live.com/?lic=1"
+    },
+    {
+      "subject": "mozilla",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 34,
+      "unreadable_flows": 0,
+      "entry": "https://www.mozilla.org/en-US/contact/"
+    },
+    {
+      "subject": "raise",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 120,
+      "unreadable_flows": 0,
+      "entry": "https://www.raise.com/user/sign_in"
+    },
+    {
+      "subject": "resellerratings",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 56,
+      "unreadable_flows": 0,
+      "entry": "https://www.resellerratings.com/signup"
+    },
+    {
+      "subject": "roblox",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 67,
+      "unreadable_flows": 0,
+      "entry": "https://www.roblox.com/"
+    },
+    {
+      "subject": "salesforce",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 77,
+      "unreadable_flows": 0,
+      "entry": "https://login.salesforce.com/"
+    },
+    {
+      "subject": "sciencedirect",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 24,
+      "unreadable_flows": 0,
+      "entry": "https://www.sciencedirect.com/"
+    },
+    {
+      "subject": "snapchat",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 48,
+      "unreadable_flows": 0,
+      "entry": "https://www.snapchat.com/add/tacobell"
+    },
+    {
+      "subject": "speedway",
+      "status": "excluded",
+      "exclusion_reason": "folder-form on Drive; no flow dump fetched",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": null,
+      "unreadable_flows": null,
+      "entry": null
+    },
+    {
+      "subject": "spotify",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 24,
+      "unreadable_flows": 0,
+      "entry": "https://accounts.spotify.com/en/login"
+    },
+    {
+      "subject": "ssa",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 55,
+      "unreadable_flows": 0,
+      "entry": "https://www.ssa.gov/"
+    },
+    {
+      "subject": "stacksocial",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 104,
+      "unreadable_flows": 0,
+      "entry": "https://stacksocial.com/sign_in"
+    },
+    {
+      "subject": "steam",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 47,
+      "unreadable_flows": 0,
+      "entry": "https://store.steampowered.com/login/"
+    },
+    {
+      "subject": "stickermule",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 106,
+      "unreadable_flows": 0,
+      "entry": "https://www.stickermule.com/signup"
+    },
+    {
+      "subject": "telegram",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 36,
+      "unreadable_flows": 0,
+      "entry": "https://telegram.org/"
+    },
+    {
+      "subject": "tesla",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 11,
+      "unreadable_flows": 0,
+      "entry": "https://auth.tesla.com/login"
+    },
+    {
+      "subject": "thefreedictionary",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 26,
+      "unreadable_flows": 0,
+      "entry": "https://www.thefreedictionary.com/about.htm"
+    },
+    {
+      "subject": "tinyurl",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 164,
+      "unreadable_flows": 0,
+      "entry": "https://tinyurl.com/"
+    },
+    {
+      "subject": "ubersignup",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 71,
+      "unreadable_flows": 0,
+      "entry": "https://auth.uber.com/login/?uber_client_name=riderSignUp"
+    },
+    {
+      "subject": "usgsgov",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 50,
+      "unreadable_flows": 0,
+      "entry": "https://www.usgs.gov/natural-hazards/earthquake-hazards"
+    },
+    {
+      "subject": "venmo",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 29,
+      "unreadable_flows": 0,
+      "entry": "https://venmo.com/"
+    },
+    {
+      "subject": "vk",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 51,
+      "unreadable_flows": 0,
+      "entry": "https://vk.com/"
+    },
+    {
+      "subject": "walmart",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 66,
+      "unreadable_flows": 0,
+      "entry": "https://www.walmart.com/account/login"
+    },
+    {
+      "subject": "waze",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 23,
+      "unreadable_flows": 0,
+      "entry": "https://www.waze.com/carpool/go"
+    },
+    {
+      "subject": "wendys",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": true,
+      "kafe_yhat": true,
+      "flows": 78,
+      "unreadable_flows": 0,
+      "entry": "https://www.wendys.com/offers-coupons"
+    },
+    {
+      "subject": "whitepages",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 43,
+      "unreadable_flows": 0,
+      "entry": "https://about.whitepages.com/"
+    },
+    {
+      "subject": "wiktionary",
+      "status": "replayable",
+      "exclusion_reason": "",
+      "y": false,
+      "kafe_yhat": false,
+      "flows": 23,
+      "unreadable_flows": 0,
+      "entry": "https://www.wiktionary.org/"
+    }
+  ]
+}

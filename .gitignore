@@ -58,3 +58,9 @@ LLMTalk
 # Vite build output is already ignored by the global "dist/" rule above.
 node_modules/
 *.tsbuildinfo
+
+# Third-party research papers, read locally for the tabbing literature
+# replication. Published under ACM's author-retained licence, not ours to
+# redistribute, so they stay out of the repository.
+3468264.3468581*.pdf
+3544548.3580749.pdf

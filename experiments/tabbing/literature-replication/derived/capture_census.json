@@ -1,0 +1,118 @@
+[
+  {
+    "subject": "citiprogram",
+    "capture_bytes": 355234,
+    "flows": 21,
+    "exchanges": 21,
+    "unique_urls": 21,
+    "responseless_flows": 0,
+    "unreadable_tail": 0,
+    "body_bytes_total": 209450,
+    "statuses": {
+      "200": 21
+    },
+    "content_families": {
+      "image": 7,
+      "font": 5,
+      "script/json": 4,
+      "css": 3,
+      "html": 1,
+      "text/proto": 1
+    },
+    "distinct_hosts": 6,
+    "top_hosts": {
+      "www.citiprogram.org": 11,
+      "fonts.gstatic.com": 5,
+      "www.google-analytics.com": 2,
+      "www.google.com": 1,
+      "fonts.googleapis.com": 1
+    },
+    "html_200_count": 1,
+    "largest_html": "https://www.citiprogram.org/index.cfm?pageID=14",
+    "largest_html_bytes": 3677,
+    "appendix": {
+      "total": 57,
+      "visible": 43,
+      "ctrl": 13,
+      "iaf": 3,
+      "ktf": 0
+    }
+  },
+  {
+    "subject": "coronavirus",
+    "capture_bytes": 1054751,
+    "flows": 24,
+    "exchanges": 24,
+    "unique_urls": 24,
+    "responseless_flows": 0,
+    "unreadable_tail": 0,
+    "body_bytes_total": 879352,
+    "statuses": {
+      "200": 24
+    },
+    "content_families": {
+      "image": 11,
+      "script/json": 7,
+      "font": 3,
+      "css": 2,
+      "html": 1
+    },
+    "distinct_hosts": 8,
+    "top_hosts": {
+      "www.coronavirus.gov": 14,
+      "fonts.gstatic.com": 3,
+      "www.google-analytics.com": 2,
+      "www.googletagmanager.com": 1,
+      "fonts.googleapis.com": 1
+    },
+    "html_200_count": 1,
+    "largest_html": "https://www.coronavirus.gov/",
+    "largest_html_bytes": 4828,
+    "appendix": {
+      "total": 121,
+      "visible": 118,
+      "ctrl": 34,
+      "iaf": 0,
+      "ktf": 0
+    }
+  },
+  {
+    "subject": "craigslist",
+    "capture_bytes": 290887,
+    "flows": 13,
+    "exchanges": 13,
+    "unique_urls": 13,
+    "responseless_flows": 0,
+    "unreadable_tail": 0,
+    "body_bytes_total": 158427,
+    "statuses": {
+      "200": 12,
+      "302": 1
+    },
+    "content_families": {
+      "script/json": 4,
+      "css": 3,
+      "html": 2,
+      "image": 2,
+      "(none)": 1,
+      "text/proto": 1
+    },
+    "distinct_hosts": 4,
+    "top_hosts": {
+      "www.craigslist.org": 8,
+      "losangeles.craigslist.org": 3,
+      "www.google.com": 1,
+      "clients1.google.com": 1
+    },
+    "html_200_count": 2,
+    "largest_html": "https://losangeles.craigslist.org/",
+    "largest_html_bytes": 11406,
+    "appendix": {
+      "total": 1522,
+      "visible": 851,
+      "ctrl": 288,
+      "iaf": 11,
+      "ktf": 0
+    }
+  }
+]

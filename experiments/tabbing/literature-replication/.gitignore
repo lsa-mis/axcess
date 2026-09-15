@@ -1,0 +1,8 @@
+# Confined to this experiment. Does not alter root ignore rules.
+#
+# Third-party captured website bytes and any raw fetched artifact must never be
+# committed. Compact derived metadata (hashes, parsed labels, counts) is written
+# outside artifacts/ and IS committed.
+artifacts/
+__pycache__/
+*.pyc

@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": 1,
+      "url": "https://doi.org/10.1145/3468264.3468581",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 2,
+      "url": "https://doi.org/10.1145/3544548.3580749",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 3,
+      "url": "https://sites.google.com/usc.edu/kafe/home",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 4,
+      "url": "https://sites.google.com/usc.edu/bagel/home",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 5,
+      "url": "https://www.scitepress.org/Papers/2026/150457/150457.pdf",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 6,
+      "url": "https://github.com/jaf107/NavA11y",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 7,
+      "url": "https://arxiv.org/html/2411.19727v1",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 8,
+      "url": "https://doi.org/10.1145/3800424.3800426",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 9,
+      "url": "https://arxiv.org/html/2609.09379v2",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 10,
+      "url": "https://sites.google.com/usc.edu/kafe/evaluation",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 11,
+      "url": "https://sites.google.com/usc.edu/bagel/evaluation",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 12,
+      "url": "https://docs.google.com/folderview?id=1sDUBp12YmFuz-KU4ExJvhFAlkt5LRZmW",
+      "title": "",
+      "accessed": "2026-09-14"
+    },
+    {
+      "id": 13,
+      "url": "https://docs.google.com/folderview?id=1wogk0wcNb4eNJXxdSSGhOGPVM6bgMpDm",
+      "title": "",
+      "accessed": "2026-09-14"
+    }
+  ]
+}

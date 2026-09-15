@@ -1,0 +1,124 @@
+{
+  "citiprogram": {
+    "appendix": {
+      "total": 57,
+      "visible": 43,
+      "ctrl": 13,
+      "iaf": 3,
+      "ktf": 0
+    },
+    "observed_total": 80,
+    "observed_visible": 35,
+    "ratio_total": 1.4035,
+    "ratio_visible": 0.814,
+    "total_spread": 0,
+    "visible_spread": 0,
+    "runs_ok": 4,
+    "runs": 4,
+    "served": [
+      10
+    ],
+    "denied": [
+      1
+    ],
+    "essential_missing": [
+      0
+    ],
+    "denied_urls": [
+      "https://www.google-analytics.com/r/collect?v=1&_v=j77&a=1401251552&t=pageview&_s=1&dl=https%3A%2F%2Fwww.citiprogram.org%2Findex.cfm%3FpageID%3D14&ul=en-us&de=UTF-8&dt=CITI%20-%20Collaborative%20Institutional%20Training%20Initiative&sd=24-bit&sr=1920x1080&vp=1920x1080&je=0&_u=IGBACEABB~&jid=2143836473&gjid=1986975084&cid=394481142.1789393496&tid=UA-33803854-1&_gid=1887210049.1789393496&_r=1&z=1546018669",
+      "https://www.google-analytics.com/r/collect?v=1&_v=j77&a=1662603859&t=pageview&_s=1&dl=https%3A%2F%2Fwww.citiprogram.org%2Findex.cfm%3FpageID%3D14&ul=en-us&de=UTF-8&dt=CITI%20-%20Collaborative%20Institutional%20Training%20Initiative&sd=24-bit&sr=1920x1080&vp=1920x1080&je=0&_u=IGBACEABB~&jid=25211348&gjid=464967709&cid=1056022411.1789393493&tid=UA-33803854-1&_gid=859787090.1789393493&_r=1&z=1588969255",
+      "https://www.google-analytics.com/r/collect?v=1&_v=j77&a=307486477&t=pageview&_s=1&dl=https%3A%2F%2Fwww.citiprogram.org%2Findex.cfm%3FpageID%3D14&ul=en-us&de=UTF-8&dt=CITI%20-%20Collaborative%20Institutional%20Training%20Initiative&sd=24-bit&sr=1920x1080&vp=1920x1080&je=0&_u=IGBACEABB~&jid=1054123803&gjid=1959672688&cid=1092080005.1789393487&tid=UA-33803854-1&_gid=1721635159.1789393487&_r=1&z=2010754934",
+      "https://www.google-analytics.com/r/collect?v=1&_v=j77&a=856775617&t=pageview&_s=1&dl=https%3A%2F%2Fwww.citiprogram.org%2Findex.cfm%3FpageID%3D14&ul=en-us&de=UTF-8&dt=CITI%20-%20Collaborative%20Institutional%20Training%20Initiative&sd=24-bit&sr=1920x1080&vp=1920x1080&je=0&_u=IGBACEABB~&jid=954443757&gjid=162096382&cid=1806992614.1789393490&tid=UA-33803854-1&_gid=100194765.1789393490&_r=1&z=1206868455"
+    ],
+    "tagged_elements": [
+      80
+    ],
+    "census_ids_stable_across_contexts": true,
+    "tagging_is_dom_inert": true,
+    "distinct_focus_stops_tagged": [
+      11
+    ],
+    "page_errors": [],
+    "console_errors": [
+      "error:Failed to load resource: net::ERR_FAILED"
+    ]
+  },
+  "coronavirus": {
+    "appendix": {
+      "total": 121,
+      "visible": 118,
+      "ctrl": 34,
+      "iaf": 0,
+      "ktf": 0
+    },
+    "observed_total": 164,
+    "observed_visible": 119,
+    "ratio_total": 1.3554,
+    "ratio_visible": 1.0085,
+    "total_spread": 0,
+    "visible_spread": 0,
+    "runs_ok": 4,
+    "runs": 4,
+    "served": [
+      17
+    ],
+    "denied": [
+      0
+    ],
+    "essential_missing": [
+      0
+    ],
+    "denied_urls": [],
+    "tagged_elements": [
+      164
+    ],
+    "census_ids_stable_across_contexts": true,
+    "tagging_is_dom_inert": true,
+    "distinct_focus_stops_tagged": [
+      15
+    ],
+    "page_errors": [
+      "Invalid or unexpected token"
+    ],
+    "console_errors": []
+  },
+  "craigslist": {
+    "appendix": {
+      "total": 1522,
+      "visible": 851,
+      "ctrl": 288,
+      "iaf": 11,
+      "ktf": 0
+    },
+    "observed_total": 1540,
+    "observed_visible": 829,
+    "ratio_total": 1.0118,
+    "ratio_visible": 0.9741,
+    "total_spread": 0,
+    "visible_spread": 0,
+    "runs_ok": 4,
+    "runs": 4,
+    "served": [
+      8
+    ],
+    "denied": [
+      0
+    ],
+    "essential_missing": [
+      0
+    ],
+    "denied_urls": [],
+    "tagged_elements": [
+      1540
+    ],
+    "census_ids_stable_across_contexts": true,
+    "tagging_is_dom_inert": true,
+    "distinct_focus_stops_tagged": [
+      15
+    ],
+    "page_errors": [
+      "Failed to read a named property 'CL' from 'Window': Blocked a frame with origin \"https://www.craigslist.org\" from accessing a cross-origin frame."
+    ],
+    "console_errors": []
+  }
+}
