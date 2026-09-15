@@ -999,13 +999,21 @@ function findPrecise(doc: Document, target: Target): Element | null {
  * Iterations are capped so an adversarial document cannot pin the tab.
  */
 function locateByWalk(doc: Document, targets: Target[], found: Set<Element>): void {
-  const buckets = new Map<string, { raw: string; needle: string; head: string }[]>();
+  const buckets = new Map<
+    string,
+    { raw: string; needle: string; head: string; startTag: boolean }[]
+  >();
   for (const t of targets) {
     if (!t.snippet) continue;
     const needle = normalizeWhitespace(t.snippet);
     if (!needle) continue;
     const tag = firstTagName(t.snippet) ?? "";
-    const entry = { raw: t.snippet, needle, head: t.snippet.slice(0, SNIPPET_HEAD) };
+    const entry = {
+      raw: t.snippet,
+      needle,
+      head: t.snippet.slice(0, SNIPPET_HEAD),
+      startTag: isStartTagOnly(t.snippet),
+    };
     const bucket = buckets.get(tag);
     if (bucket) bucket.push(entry);
     else buckets.set(tag, [entry]);
@@ -1027,6 +1035,8 @@ function locateByWalk(doc: Document, targets: Target[], found: Set<Element>): vo
           raw === entry.raw ||
           (raw.startsWith(entry.head) &&
             (normalizeWhitespace(raw) === entry.needle ||
+              (entry.startTag &&
+                normalizeWhitespace(raw).startsWith(entry.needle)) ||
               truncatedSnippetMatches(raw, entry.needle)))
         ) {
           found.add(el);
@@ -1049,8 +1059,39 @@ function snippetMatches(el: Element, snippet: string): boolean {
   return (
     raw === snippet ||
     normalizeWhitespace(raw) === needle ||
+    startTagMatches(raw, needle, snippet) ||
     truncatedSnippetMatches(raw, needle)
   );
+}
+
+/**
+ * True when `snippet` is a bare start tag: one tag, nothing inside it, no
+ * closing tag.
+ *
+ * axe reports a container element as its start tag alone — `<div id="portal-1"
+ * class="category-menu" role="listbox">` — rather than the element with its
+ * subtree. No non-empty element's `outerHTML` can equal that, so equality is
+ * simply the wrong test, and every container finding failed to highlight:
+ * the page said the element "was not found in this capture" while the element
+ * sat in the document being searched.
+ *
+ * Matching one is therefore a prefix test. A complete start tag carries the
+ * element's whole attribute list, which is specific enough to identify it; two
+ * elements that agree on every attribute are the identical siblings this
+ * inspector already treats as one location.
+ */
+function isStartTagOnly(snippet: string): boolean {
+  const trimmed = snippet.trim();
+  return (
+    trimmed.length > 2 &&
+    trimmed.startsWith("<") &&
+    trimmed.endsWith(">") &&
+    trimmed.indexOf("<", 1) === -1
+  );
+}
+
+function startTagMatches(raw: string, needle: string, snippet: string): boolean {
+  return isStartTagOnly(snippet) && normalizeWhitespace(raw).startsWith(needle);
 }
 
 function truncatedSnippetMatches(raw: string, needle: string): boolean {
