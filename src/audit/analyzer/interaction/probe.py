@@ -292,6 +292,7 @@ _CLOSE_CONTROL_JS = (
 DEFAULT_MAX_CLICKS = 100
 DEFAULT_MAX_REPEATED = 20
 DEFAULT_MAX_DEPTH = 5
+DEFAULT_MAX_INERT_REPEATS = 3
 DEFAULT_TIMEOUT_S = 120.0
 
 # Bounds on capturing revealed-state markup. The probe is shared by every
@@ -380,6 +381,12 @@ class _Budget:
     captures: dict[str, StateCapture] = field(default_factory=dict)
     #: Running total of compressed capture bytes held for this page.
     capture_bytes: int = 0
+    #: Consecutive clicks per shape that changed nothing. A date grid answers
+    #: every cell the same way, so once a few have done nothing the rest will
+    #: too, and the page's remaining budget is better spent elsewhere. Reset
+    #: when a member of the shape does change something, because then the shape
+    #: is not inert and the run of duds was incidental.
+    inert_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -410,6 +417,10 @@ class InteractionProbe:
     # behaviour exactly as it was.
     capture_states: bool = True
     max_state_captures: int = DEFAULT_MAX_STATE_CAPTURES
+    # How many same-shaped controls may change nothing before the rest of that
+    # shape is left alone. Far below ``max_repeated``: proving a date grid
+    # inert takes three clicks, not twenty.
+    max_inert_repeats: int = DEFAULT_MAX_INERT_REPEATS
 
     async def run(self, page: Page, *, baseline: Sequence[AxeViolation] = ()) -> InteractionResult:
         """Return violations reachable only by operating the page.
@@ -553,6 +564,11 @@ class InteractionProbe:
             if budget.signature_counts.get(shape, 0) >= self.max_repeated:
                 budget.limits.add("repeated_controls")
                 continue
+            if budget.inert_counts.get(shape, 0) >= self.max_inert_repeats:
+                # Still counted as discovered above, so coverage reports the
+                # control the page has rather than hiding what was skipped.
+                budget.limits.add("inert_controls")
+                continue
 
             # Claim the control BEFORE operating it. _operate recurses into a
             # nested sweep of whatever the click reveals; if the claim landed
@@ -563,7 +579,9 @@ class InteractionProbe:
             budget.seen_keys.add(key)
             budget.signature_counts[shape] = budget.signature_counts.get(shape, 0) + 1
 
-            await self._operate(page, budget, found, control, pinned=pinned, depth=depth, path=path)
+            await self._operate(
+                page, budget, found, control, pinned=pinned, depth=depth, path=path, shape=shape
+            )
 
     async def _resolve_control(self, page: Page, control: dict[str, Any]) -> Locator | None:
         """Resolve the same action again after a framework replaces its menu.
@@ -650,6 +668,7 @@ class InteractionProbe:
         pinned: str,
         depth: int,
         path: tuple[dict[str, Any], ...] = (),
+        shape: str = "",
     ) -> bool:
         """Click one control; record anything new it revealed.
 
@@ -709,9 +728,13 @@ class InteractionProbe:
                     depth=depth,
                     outcome="no_dom_change",
                 )
+                if shape:
+                    budget.inert_counts[shape] = budget.inert_counts.get(shape, 0) + 1
                 return True  # inert control; spent, but nothing to scan
 
             budget.states_found += 1
+            # This shape does something after all.
+            budget.inert_counts.pop(shape, None)
             # Recorded here rather than after the nested sweep: exploring a
             # dialog can click its own close control, and a dialog that
             # closed itself is still a dialog this click opened.

@@ -319,7 +319,15 @@ async def test_distinct_equal_named_controls_and_fixed_controls_are_clicked(page
           for (let i=0; i<8; i++) {
             const button = document.createElement('button');
             button.className = 'card'; button.textContent = 'Details';
-            button.onclick = () => window.clicked.push(i);
+            // Each card opens its own detail, so the cards are a shape that
+            // does something. A control that changes nothing is sampled a few
+            // times and then left alone, which is a different guarantee and
+            // has its own test; this one is about equal names at distinct
+            // locations being distinct controls.
+            button.onclick = () => {
+              window.clicked.push(i);
+              button.insertAdjacentHTML('afterend', '<p>Detail ' + i + '</p>');
+            };
             document.getElementById('cards').append(button);
           }
         </script>
@@ -723,3 +731,27 @@ async def test_a_failed_capture_costs_nothing_but_the_capture(page, axe) -> None
     assert result.dialogs_stuck == 0
     clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
     assert int(clicks) == 1, "the sweep reached the control past the dialogs"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_grid_of_inert_controls_does_not_consume_the_page_budget(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A date picker must not cost a page its whole sweep.
+
+    Its cells share one shape and answer a click by changing nothing, so the
+    repeat cap alone lets a page spend twenty clicks proving the same thing
+    twenty times. On a real authenticated scan that was most of the run: 40% of
+    every click produced no DOM change, weekday cells were clicked over a
+    hundred times each, and the controls that did hold defects came last.
+    """
+    await page.goto(_file_url("inert_grid.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe, max_clicks=30).run(page, baseline=baseline)
+
+    clicks = await page.evaluate("() => window.cellClicks")
+    assert clicks <= 4, f"kept clicking an inert grid ({clicks} times)"
+    # The point of stopping early: the budget reaches the control that matters.
+    assert any(finding.revealed_by == "Open options" for finding in result.findings), (
+        "the inert grid crowded out the control that reveals a defect"
+    )
