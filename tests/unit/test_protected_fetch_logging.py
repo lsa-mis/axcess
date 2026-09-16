@@ -27,7 +27,9 @@ from audit.crawler.orchestrator import CrawlConfig, _process_job, _WorkerContext
 from audit.crawler.url_policy import build_scope
 from audit.db import queue
 
-SECRET_URL = "https://app.example.test/course/dashboard?session=abc123"
+# The query string carries a fake session token on purpose: these tests
+# assert it never reaches the log.
+SECRET_URL = "https://app.example.test/course/dashboard?session=abc123"  # noqa: S105
 
 
 def _scan(conn: sqlite3.Connection) -> int:

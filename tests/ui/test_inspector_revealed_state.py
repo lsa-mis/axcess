@@ -36,9 +36,7 @@ def _seed_findings(db_path: Path, scan_id: int, *revealed_by: str | None) -> int
     conn = connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        page = conn.execute(
-            "SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)
-        ).fetchone()
+        page = conn.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
         assert page is not None, "seeded scan has no pages"
         for index, control in enumerate(revealed_by):
             conn.execute(
@@ -65,10 +63,7 @@ def _seed_findings(db_path: Path, scan_id: int, *revealed_by: str | None) -> int
 
 async def _inspector_text(base: str, scan_id: int, page_id: int) -> str:
     """Open the inspector on the unmatchable findings and return its text."""
-    url = (
-        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect"
-        f"?issue=axe:aria-dialog-name"
-    )
+    url = f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-dialog-name"
     async with playwright_async.async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:

@@ -389,7 +389,7 @@ def _store_state(
         conn.execute(
             "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
             "path_labels, encoding, dom) VALUES (?, ?, ?, 'Open dialog', "
-            '\'["Menu","Open dialog"]\', \'gzip\', ?)',
+            "'[\"Menu\",\"Open dialog\"]', 'gzip', ?)",
             (
                 page_id,
                 scan_id,
@@ -482,7 +482,7 @@ def test_state_list_carries_the_whole_reproduction_path(
         conn.execute(
             "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
             "path_labels, encoding, dom) VALUES (?, ?, 'k|#deep|Level two', 'Level two', "
-            '\'["Level one","Level two"]\', \'gzip\', ?)',
+            "'[\"Level one\",\"Level two\"]', 'gzip', ?)",
             (page_id, scan_id, gzip.compress(b"<!doctype html><html></html>")),
         )
         conn.commit()

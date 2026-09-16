@@ -126,10 +126,7 @@ def test_two_controls_sharing_a_name_keep_separate_states(
         ],
     )
 
-    bodies = {
-        gzip.decompress(r["dom"])
-        for r in tmp_db.execute("SELECT dom FROM page_dom_states")
-    }
+    bodies = {gzip.decompress(r["dom"]) for r in tmp_db.execute("SELECT dom FROM page_dom_states")}
     assert len(bodies) == 2
 
 

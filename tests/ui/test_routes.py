@@ -1925,8 +1925,7 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
         assert left == 0, "a stopped scan must leave no work for a later crawl to adopt"
         # What it did collect is untouched.
         assert (
-            conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
-            == 5
+            conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0] == 5
         )
     finally:
         conn.close()

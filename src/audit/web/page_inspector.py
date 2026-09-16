@@ -131,9 +131,7 @@ def _dom_states(conn: sqlite3.Connection, page_id: int) -> list[dict[str, Any]]:
     return states
 
 
-def _decode_state_html(
-    conn: sqlite3.Connection, page_id: int, state_key: str
-) -> str | None:
+def _decode_state_html(conn: sqlite3.Connection, page_id: int, state_key: str) -> str | None:
     """The captured markup for one state, or None when it was never stored."""
     if not _table_exists(conn, "page_dom_states"):
         return None
@@ -157,8 +155,7 @@ def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
     knows how to fall back.
     """
     return any(
-        row["name"] == column
-        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        row["name"] == column for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
     )
 
 
@@ -212,11 +209,12 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
             "This is a login-protected report and cannot be re-rendered on demand.",
             status_code=409,
         )
-    stored_column = (
-        "rendered_html" if _has_column(conn, "pages", "rendered_html") else "NULL"
-    )
+    stored_column = "rendered_html" if _has_column(conn, "pages", "rendered_html") else "NULL"
     page = conn.execute(
-        "SELECT id, url_normalized, title, status_code, render_mode, "
+        # ``stored_column`` is one of two literals chosen above, never input:
+        # a column name cannot be a bound parameter, so the alternative is two
+        # copies of the same query.
+        "SELECT id, url_normalized, title, status_code, render_mode, "  # noqa: S608
         f"{stored_column} AS rendered_html, fetched_at "
         "FROM pages WHERE id = ? AND scan_id = ?",
         (page_id, scan_id),

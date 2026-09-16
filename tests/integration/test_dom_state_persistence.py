@@ -113,13 +113,19 @@ def test_declining_to_store_pages_declines_to_store_states(
     with _serve() as base:
         summary = asyncio.run(run_crawl(tmp_db, _config(base, store_rendered_html=False)))
 
-    assert tmp_db.execute(
-        "SELECT COUNT(*) AS c FROM page_dom_states WHERE scan_id = ?",
-        (summary.scan_id,),
-    ).fetchone()["c"] == 0
+    assert (
+        tmp_db.execute(
+            "SELECT COUNT(*) AS c FROM page_dom_states WHERE scan_id = ?",
+            (summary.scan_id,),
+        ).fetchone()["c"]
+        == 0
+    )
     # The findings themselves are unaffected; only their markup is withheld.
-    assert tmp_db.execute(
-        "SELECT COUNT(*) AS c FROM page_a11y_findings f JOIN pages p ON p.id = f.page_id "
-        "WHERE p.scan_id = ? AND f.revealed_by IS NOT NULL",
-        (summary.scan_id,),
-    ).fetchone()["c"] > 0
+    assert (
+        tmp_db.execute(
+            "SELECT COUNT(*) AS c FROM page_a11y_findings f JOIN pages p ON p.id = f.page_id "
+            "WHERE p.scan_id = ? AND f.revealed_by IS NOT NULL",
+            (summary.scan_id,),
+        ).fetchone()["c"]
+        > 0
+    )

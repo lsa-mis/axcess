@@ -1175,7 +1175,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # Persist axe-core violations attached by JsFetcher. Static fetches
         # never carry violations (axe needs a browser); we count an axe-page
         # only when violations is a real attached tuple, even an empty one
-        #, that distinguishes "we scanned and found nothing" from "we
+        # , that distinguishes "we scanned and found nothing" from "we
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.

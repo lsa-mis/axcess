@@ -66,9 +66,7 @@ def test_a_stopped_scan_is_not_taken_over_by_the_next_crawl(
     resumed = _ensure_scan(tmp_db, SEED, _config())
 
     assert resumed != stopped, "a stopped scan must not be resumed"
-    remaining = tmp_db.execute(
-        "SELECT status FROM scans WHERE id = ?", (stopped,)
-    ).fetchone()
+    remaining = tmp_db.execute("SELECT status FROM scans WHERE id = ?", (stopped,)).fetchone()
     assert remaining["status"] == "interrupted", "the stopped scan keeps its own record"
 
 

@@ -29,9 +29,7 @@ CAPTURE = (
 )
 
 
-def _seed(
-    db_path: Path, scan_id: int, *, selector: str, snippet: str
-) -> int:
+def _seed(db_path: Path, scan_id: int, *, selector: str, snippet: str) -> int:
     """Give a page a known capture and one finding pointing into it."""
     conn = connect(db_path)
     conn.row_factory = sqlite3.Row

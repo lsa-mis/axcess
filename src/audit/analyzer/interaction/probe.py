@@ -930,9 +930,7 @@ class InteractionProbe:
                 continue
             budget.seen_hashes.add(digest)
             found.append(
-                RevealedViolation(
-                    violation=violation, revealed_by=label, state_key=state_key
-                )
+                RevealedViolation(violation=violation, revealed_by=label, state_key=state_key)
             )
 
     async def _capture_state(
