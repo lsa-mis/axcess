@@ -450,7 +450,13 @@ class ManualAuthenticationSession:
                 self._profile_dir,
                 headless=False,
                 args=[
-                    "--incognito",
+                    # No --incognito. With a persistent context that flag adds
+                    # a second, off-to-the-side incognito window while the
+                    # sign-in page created below lives in the ordinary profile
+                    # -- so it never protected the session, it only doubled the
+                    # windows the auditor has to find. Isolation here is the
+                    # ephemeral mode-0700 profile directory, which is removed
+                    # on close (see _create_ephemeral_profile_dir).
                     "--disable-background-timer-throttling",
                     "--disable-quic",
                     "--disable-background-networking",
@@ -480,6 +486,16 @@ class ManualAuthenticationSession:
             # would survive removal from the sign-in list when the scanner
             # retains this tab, so sign-in cleanup would close the scan tab.
             self._adopt_auth_page(self._page)
+            # Chromium always opens a blank startup tab, which left the
+            # auditor two windows to choose between and no way to tell which
+            # one Axcess was watching. Closed after the sign-in page exists,
+            # never before: closing a context's last page can take the browser
+            # with it. Only the startup leftovers go -- an SSO popup arrives
+            # later, through the page event, and is adopted rather than closed.
+            for startup_page in list(self._context.pages):
+                if startup_page is not self._page:
+                    with contextlib.suppress(Exception):
+                        await startup_page.close(run_before_unload=False)
             self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
             await self._page.goto(
                 self._seed_url,

@@ -298,6 +298,16 @@ class _FakeContext:
     additional_pages: list[_FakePage] = field(default_factory=list)
     new_page_calls: int = 0
     closed: bool = False
+    #: Chromium opens one blank tab before Playwright asks for anything.
+    #: Omitting it from the double hid a second window from every test.
+    startup_pages: list[_FakePage] = field(default_factory=lambda: [_FakePage()])
+
+    @property
+    def pages(self) -> list[_FakePage]:
+        live = [*self.startup_pages, *self.additional_pages]
+        if self.new_page_calls:
+            live.insert(len(self.startup_pages), self.page)
+        return [p for p in live if not p.closed]
 
     async def route(self, pattern: str, handler: object) -> None:
         self.route_calls.append((pattern, handler))
@@ -326,7 +336,7 @@ class _FakeContext:
         return page
 
     async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
-        assert page is self.page or page in self.additional_pages
+        assert page is self.page or page in self.additional_pages or page in self.startup_pages
         return self.cdp_session
 
     async def close(self) -> None:
@@ -736,3 +746,42 @@ async def test_the_shared_fetcher_carries_an_interaction_probe() -> None:
         "the authenticated fetcher cannot operate controls, so interaction "
         "silently does nothing on every login scan"
     )
+
+
+@pytest.mark.asyncio
+async def test_opening_the_sign_in_browser_leaves_exactly_one_tab() -> None:
+    """Chromium opens a blank startup tab before Playwright asks for anything.
+
+    With ``--incognito`` that tab was a whole second window, and the sign-in
+    page created afterwards lived in the ordinary profile -- so the auditor got
+    two windows and no way to tell which one Axcess was watching, while the
+    flag protected nothing. Isolation is the ephemeral profile directory, which
+    is removed on close.
+    """
+    session, _, _, context, page = _session_with_fake_browser()
+    startup = context.startup_pages[0]
+
+    await session.start()
+
+    assert context.pages == [page], "the startup tab outlived sign-in"
+    assert startup.closed, "the blank startup tab was left open"
+    assert not page.closed, "the sign-in tab must survive"
+    assert session.page is page
+
+
+@pytest.mark.asyncio
+async def test_a_popup_opened_during_sign_in_is_kept() -> None:
+    """Only the startup leftovers are closed.
+
+    An SSO handoff window arrives later, through the context's page event, and
+    is adopted as the tab the session speaks for. Closing those would break
+    every identity provider that completes sign-in in a second window.
+    """
+    session, _, _, context, page = _session_with_fake_browser()
+    await session.start()
+
+    popup = _FakePopup(opener_page=page)
+    await context.event_handlers["page"](popup)  # type: ignore[operator]
+
+    assert not popup.closed
+    assert session.page is popup, "the handoff window should become the live tab"
