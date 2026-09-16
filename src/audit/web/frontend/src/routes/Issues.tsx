@@ -4,6 +4,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card, Select, type SelectOption } from "../components/ui";
+// The same helper the topbar trail and the overview use.
+import { siteLabel } from "../components/ReportCrumb";
 import ExportMenu from "../components/ExportMenu";
 import IssueEvidence from "../components/IssueEvidence";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -95,6 +97,13 @@ export default function IssuesRoute() {
           <ReportMeta
             counts={
               <>
+                {/* The site leads, as on the overview. This tab is reachable
+                    by its own URL, and like every other view it loses the
+                    topbar trail the moment it becomes a screenshot or a
+                    print -- which is most of how a finding gets quoted to
+                    the team that has to fix it. */}
+                {siteLabel(scan.seed_url)}
+                {" · "}
                 {rows.length === data.total_unfiltered
                   ? `${data.total_unfiltered} issue groups`
                   : `${rows.length} of ${data.total_unfiltered} issue groups`}

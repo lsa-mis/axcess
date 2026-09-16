@@ -23,6 +23,8 @@ import type {
   ScanProgress,
 } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+// The same helper the topbar trail uses, so the two can never disagree.
+import { siteLabel } from "../components/ReportCrumb";
 import ExportMenu from "../components/ExportMenu";
 import MethodCoverageLedger from "../components/MethodCoverageLedger";
 import {
@@ -179,9 +181,19 @@ export default function ScanDetailRoute() {
               // the audit: how many pages were fetched says nothing about what
               // was found, and it was the first thing under the title. The
               // page-level numbers below carry the findings instead.
-              counts={
-                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : ""
-              }
+              // The site joins the completion time on the line already here
+              // rather than taking a row of its own. The topbar trail names it
+              // too, but the trail truncates, and it is absent from a
+              // screenshot, a print, or anything pasted into a ticket -- which
+              // is most of how this page leaves the app. The in-progress and
+              // failed headers below already show it, so a completed report
+              // was the one state that dropped it.
+              counts={[
+                siteLabel(data.seed_url),
+                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             />
           }
           actions={
