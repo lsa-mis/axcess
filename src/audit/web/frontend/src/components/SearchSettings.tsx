@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { SearchConfig, SearchField, SearchTarget } from "../api/types";
-import { Button, Checkbox } from "./ui";
+import { Button, Checkbox, Select } from "./ui";
 
 const control = "min-h-target w-full rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg";
 const defaults: SearchConfig = {
@@ -22,11 +22,12 @@ function Text({ label, value, onChange, required = false, maxLength = 300, type 
 
 function Target({ label, value, onChange }: { label: string; value: SearchTarget; onChange: (value: SearchTarget) => void }) {
   return <div className="grid gap-2 sm:grid-cols-2">
-    <label className="text-sm">{label} match by
-      <select className={control} value={value.by} onChange={e => onChange({ ...value, by: e.target.value as SearchTarget["by"] })}>
-        <option value="label">Accessible label</option><option value="selector">CSS selector</option>
-      </select>
-    </label>
+    <Select stacked label={`${label} match by`} value={value.by}
+      onChange={next => onChange({ ...value, by: next as SearchTarget["by"] })}
+      options={[
+        { value: "label", label: "Accessible label" },
+        { value: "selector", label: "CSS selector" },
+      ]} />
     <Text label={`${label} ${value.by === "label" ? "label" : "selector"}`} value={value.target} required onChange={target => onChange({ ...value, target })} />
   </div>;
 }
@@ -47,11 +48,12 @@ export default function SearchSettings({ value, onChange, disabled = false }: {
       {value.fields.map((item, index) => <fieldset key={index} className="space-y-2 border-t border-border pt-3">
         <legend className="text-sm font-semibold">Search field {index + 1}</legend>
         <Target label={`Field ${index + 1}`} value={item} onChange={patch => field(index, patch)} />
-        <label className="block text-sm">Field {index + 1} type
-          <select className={control} value={item.kind} onChange={e => field(index, { kind: e.target.value as SearchField["kind"] })}>
-            <option value="text">Text input</option><option value="select">Select option by label</option>
-          </select>
-        </label>
+        <Select stacked label={`Field ${index + 1} type`} value={item.kind}
+          onChange={next => field(index, { kind: next as SearchField["kind"] })}
+          options={[
+            { value: "text", label: "Text input" },
+            { value: "select", label: "Select option by label" },
+          ]} />
         <Text label={`Field ${index + 1} value`} hint={item.kind === "text" ? "The words to search for, for example LSA." : "The visible option label to select."} value={item.value} maxLength={200} onChange={text => field(index, { value: text })} />
         {value.fields.length > 1 && <Button type="button" onClick={() => update({ fields: value.fields.filter((_, i) => i !== index) })}>Remove field {index + 1}</Button>}
       </fieldset>)}

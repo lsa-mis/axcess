@@ -113,9 +113,9 @@ async def test_issue_table_filters_are_keyboard_operable(
                 page.get_by_role("link", name="Logo image, adequate alt")
             ).to_be_visible()
             await search.press("Tab")
-            await playwright_async.expect(
-                page.get_by_label("WCAG level", exact=True)
-            ).to_be_focused()
+            # The filter's visible caption is its accessible name; it no longer
+            # carries a second, different one via aria-label.
+            await playwright_async.expect(page.get_by_label("Level", exact=True)).to_be_focused()
         finally:
             await browser.close()
 

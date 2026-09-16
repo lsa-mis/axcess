@@ -12,7 +12,7 @@ import { useParams, useSearchParams } from "react-router";
 import { api } from "../api/client";
 import type { EvaluationRecord, ManualCheck, ManualOutcome } from "../api/types";
 import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
-import { Button, Card, EmptyState, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, PageHeader, Select, type SelectOption } from "../components/ui";
 
 const OUTCOME_LABELS: Record<ManualOutcome, string> = {
   not_started: "Not started",
@@ -245,17 +245,24 @@ export default function ManualChecksRoute() {
             Target: WCAG 2.2 AA. U-M&rsquo;s published WCAG 2.1 AA baseline is institutional context; this report does not claim a scan alone establishes conformance.
           </p>
           <Field label="Reviewer"><input name="reviewer" defaultValue={data.evaluation.reviewer} className="field" /></Field>
-          <Field label="Evaluation status">
-            <select name="status" defaultValue={data.evaluation.status} className="field">
-              <option value="draft">Draft</option>
-              <option value="in_progress">In progress</option>
-              <option value="completed" disabled={!evaluationCanComplete}>
-                Completed{!evaluationCanComplete ? ` (${counts.not_started} not started, ${counts.needs_follow_up} follow-up, ${missingRationale} missing rationale)` : ""}
-              </option>
-            </select>
-          </Field>
+          <Select
+            stacked
+            name="status"
+            label="Evaluation status"
+            defaultValue={data.evaluation.status}
+            options={[
+              { value: "draft", label: "Draft" },
+              { value: "in_progress", label: "In progress" },
+              {
+                value: "completed",
+                disabled: !evaluationCanComplete,
+                label: `Completed${!evaluationCanComplete ? ` (${counts.not_started} not started, ${counts.needs_follow_up} follow-up, ${missingRationale} missing rationale)` : ""}`,
+              },
+            ]}
+          />
           <Field label="Target standard"><input name="target_standard" defaultValue={data.evaluation.target_standard} className="field" /></Field>
-          <Field label="Target level"><select name="target_level" defaultValue={data.evaluation.target_level} className="field"><option>A</option><option>AA</option><option>AAA</option></select></Field>
+          <Select stacked name="target_level" label="Target level" defaultValue={data.evaluation.target_level}
+            options={[{ value: "A", label: "A" }, { value: "AA", label: "AA" }, { value: "AAA", label: "AAA" }]} />
           <Field label="Purpose" wide><textarea name="purpose" defaultValue={data.evaluation.purpose} className="field min-h-20" /></Field>
           <Field label="Included scope" wide><textarea name="scope_included" defaultValue={data.evaluation.scope_included} className="field min-h-20" /></Field>
           <Field label="Excluded scope" wide><textarea name="scope_excluded" defaultValue={data.evaluation.scope_excluded} className="field min-h-20" /></Field>
@@ -290,12 +297,12 @@ export default function ManualChecksRoute() {
           <EmptyState title="No criteria match" message="Clear a filter to continue the review." />
         ) : (
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(17rem,0.75fr)_minmax(26rem,1.4fr)]">
-            <label className="lg:hidden">
-              <span className="mb-1 block text-sm font-semibold">Selected criterion</span>
-              <select value={selected?.criterion.sc ?? ""} onChange={(event) => selectCriterion(event.target.value)} className="field">
-                {filtered.map((check) => <option key={check.criterion.sc} value={check.criterion.sc}>{check.criterion.sc} · {check.criterion.name}, {OUTCOME_LABELS[check.outcome]}</option>)}
-              </select>
-            </label>
+            <Select stacked className="lg:hidden" label="Selected criterion"
+              value={selected?.criterion.sc ?? ""} onChange={selectCriterion}
+              options={filtered.map((check) => ({
+                value: check.criterion.sc,
+                label: `${check.criterion.sc} · ${check.criterion.name}, ${OUTCOME_LABELS[check.outcome]}`,
+              }))} />
             <nav aria-label="Manual check criteria" className="hidden min-w-0 max-h-[68vh] overflow-y-auto pr-1 lg:block">
               <p className="mb-2 text-sm text-fg-muted">{filtered.length} criteria in this view</p>
               <ol className="space-y-2" role="listbox" aria-label="WCAG criteria. Use arrow keys to move and Enter to open.">
@@ -346,8 +353,8 @@ function Field({ label, wide, children }: { label: string; wide?: boolean; child
   return <label className={wide ? "md:col-span-2" : ""}><span className="mb-1 block text-sm font-semibold text-fg">{label}</span>{children}</label>;
 }
 
-function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
-  return <label><span className="mb-1 block text-xs font-semibold text-fg-subtle">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="field">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: SelectOption[] }) {
+  return <Select stacked label={label} value={value} onChange={onChange} options={options} />;
 }
 
 function OutcomeMark({ outcome }: { outcome: ManualOutcome }) {
@@ -422,7 +429,9 @@ function ManualCheckEditor({
             </section>
           )}
           <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
-            <label><span className="mb-1 block text-sm font-semibold">Outcome</span><select value={draft.outcome} onChange={(event) => onDraftChange({ ...draft, outcome: event.target.value as ManualOutcome })} className="field">{Object.entries(OUTCOME_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <Select stacked label="Outcome" value={draft.outcome}
+              onChange={(next) => onDraftChange({ ...draft, outcome: next as ManualOutcome })}
+              options={Object.entries(OUTCOME_LABELS).map(([value, label]) => ({ value, label }))} />
             <label><span className="mb-1 block text-sm font-semibold">Rationale</span><textarea value={draft.rationale} onChange={(event) => onDraftChange({ ...draft, rationale: event.target.value })} aria-describedby={rationaleRequired ? "rationale-required" : undefined} placeholder="What you tested, what happened, and why this outcome is justified" className="field min-h-24" /></label>
           </div>
           {rationaleRequired && (

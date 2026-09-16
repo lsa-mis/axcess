@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { createElement, forwardRef, useState } from "react";
+import { createElement, forwardRef, useId, useState } from "react";
 import { ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
@@ -623,6 +623,126 @@ export function Checkbox({
  * Centralizing this is what makes the link-sweep durable, every route that
  * shows a page URL uses <PageLink> and inherits the contract.
  */
+/** One option in a {@link Select}. */
+export type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+/**
+ * The app's dropdown for choosing a value.
+ *
+ * A native `<select>` wearing the same trigger as the Export disclosure, so
+ * the two read as one family without pretending to be the same widget: Export
+ * is four links that each do something, this holds a value that stays chosen
+ * and drives the page.
+ *
+ * Native on purpose. A hand-built listbox would let the open list match Export
+ * too — it is OS-drawn here and cannot be styled — but that list is the part
+ * you see for a moment, and the price is owning arrow keys, typeahead, focus
+ * return, `aria-activedescendant`, and the touch picker, every one of which
+ * the platform already does correctly. Custom listboxes are a routine source
+ * of the defects this tool exists to find.
+ *
+ * `label` is always rendered and always associated. Pass `hideLabel` for a
+ * control whose meaning is already obvious from its surroundings; the name
+ * stays available to a screen reader rather than being dropped.
+ *
+ * `stacked` puts the label above rather than beside it, for a filter bar of
+ * several controls where inline captions would eat the width the values need.
+ *
+ * `hint` sits between the label and the control and is wired to
+ * `aria-describedby`, so the explanation a sighted user reads before choosing
+ * is announced to everyone else as part of the same control.
+ *
+ * Omit `value`/`onChange` for an uncontrolled select inside a `<form>`, where
+ * `name` and `defaultValue` carry the value to submit. Forcing those to be
+ * controlled would mean holding state the form already holds.
+ */
+export function Select({
+  label,
+  hideLabel = false,
+  stacked = false,
+  hint,
+  value,
+  onChange,
+  options,
+  children,
+  id,
+  className,
+  ...rest
+}: Omit<ComponentPropsWithoutRef<"select">, "onChange" | "children"> & {
+  label: string;
+  hideLabel?: boolean;
+  stacked?: boolean;
+  hint?: ReactNode;
+  /** Omit for an uncontrolled select; pair with `name`/`defaultValue`. */
+  value?: string;
+  onChange?: (value: string) => void;
+  /** Options as data. Ignored when `children` is given. */
+  options?: SelectOption[];
+  /** Raw `<option>`/`<optgroup>` markup, for lists data cannot express. */
+  children?: ReactNode;
+}) {
+  const generated = useId();
+  const selectId = id ?? generated;
+  const hintId = `${selectId}-hint`;
+  const describedBy = [hint ? hintId : null, rest["aria-describedby"]]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <div
+      className={cn(
+        "min-w-0",
+        stacked ? "flex flex-col gap-1" : "inline-flex items-center gap-2",
+        className,
+      )}
+    >
+      <label
+        htmlFor={selectId}
+        className={cn(
+          "shrink-0 font-semibold text-fg",
+          stacked ? "text-xs text-fg-subtle" : "text-sm",
+          hideLabel && "sr-only",
+        )}
+      >
+        {label}
+      </label>
+      {hint && (
+        <p id={hintId} className="text-xs text-fg-muted">
+          {hint}
+        </p>
+      )}
+      {/* The chevron is drawn rather than left to the platform: `appearance:
+          none` is what lets the trigger match the Export button, and it takes
+          the native arrow with it. `pointer-events-none` keeps clicks on the
+          icon falling through to the select underneath. */}
+      <div className="relative min-w-0">
+        <select
+          id={selectId}
+          value={value}
+          onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+          aria-describedby={describedBy || undefined}
+          className="min-h-target w-full appearance-none truncate rounded-xs border border-border-strong bg-surface py-2.5 pl-3 pr-9 text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+          {...rest}
+        >
+          {children ??
+            options?.map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+          aria-hidden
+        />
+      </div>
+    </div>
+  );
+}
+
 export function PageLink({
   pageId,
   scanId,

@@ -23,7 +23,7 @@ issue table, and export a defensible report with source-level evidence.
 > AI-assisted results do not prove WCAG conformance, legal compliance, or the
 > accessibility of an entire website.
 
-![Axcess accessibility workbench dashboard with recent scan details blurred](./docs/images/axcess-dashboard-redacted.png)
+![Axcess accessibility screenshot showing Issues Page](./docs/images/axcess-screenshot.png)
 
 ## Desktop preview
 

@@ -75,12 +75,37 @@ test("every desktop packaging target uses the Axcess assets", () => {
   }
 });
 
-test("startup screens reference the bundled logo without redundant accessible text", () => {
-  for (const screen of ["loading", "error"]) {
-    const html = fs.readFileSync(path.join(root, "static", `${screen}.html`), "utf8");
-    assert.match(html, /img-src 'self'/);
-    assert.match(html, /<img[^>]+src="\.\.\/assets\/axcess.svg"[^>]+alt=""/);
-  }
+const startupScreen = (screen) =>
+  fs.readFileSync(path.join(root, "static", `${screen}.html`), "utf8");
+
+test("the error screen references the bundled logo without redundant accessible text", () => {
+  const html = startupScreen("error");
+  assert.match(html, /img-src 'self'/);
+  assert.match(html, /<img[^>]+src="\.\.\/assets\/axcess.svg"[^>]+alt=""/);
+});
+
+// The loading screen draws the mark inline instead, because only part of it
+// moves: an <img> is an opaque document, so the ring inside it cannot be
+// animated on its own. Inline markup is not a fetch, so the screen needs no
+// img-src at all and keeps 'none' as its default.
+test("the loading screen inlines the mark and fetches nothing", () => {
+  const html = startupScreen("loading");
+  assert.doesNotMatch(html, /<img\b/);
+  assert.doesNotMatch(html, /img-src/);
+  assert.match(html, /<svg[^>]+aria-hidden="true"/);
+  // The ring and its node spin; the 'a' must stay out of the rotating group.
+  const ring = html.match(/<g class="ring">([\s\S]*?)<\/g>/);
+  assert.ok(ring, "expected a .ring group to rotate");
+  assert.match(ring[1], /A 12\.6 12\.6/);
+  assert.match(ring[1], /<circle/);
+  assert.doesNotMatch(ring[1], /C 16\.989/);
+  // Rotating about the viewBox centre (16,16) rather than the group's own
+  // bounding box is what keeps the ring on-axis.
+  assert.match(html, /transform-box: view-box/);
+  assert.match(html, /prefers-reduced-motion/);
+});
+
+test("the bundled logo carries no text, raster, script, or remote import", () => {
   const svg = fs.readFileSync(asset("svg"), "utf8");
   assert.doesNotMatch(svg, /<text\b|<image\b|<script\b|@import/);
 });

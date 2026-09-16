@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import { Card, PageLink } from "./ui";
+import { Card, PageLink, Select } from "./ui";
 import ConformanceBadge from "./ConformanceBadge";
 import type { AbilityLabel, IssueRow } from "../api/types";
 
@@ -214,19 +214,19 @@ export default function IssueEvidence({
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>
           </h3>
-          <label className="flex items-center gap-2 text-xs font-semibold text-fg-subtle">
-            Sort by
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              className="min-h-target rounded-xs border border-border bg-surface px-2 py-1 text-sm font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
-            >
-              <option value="occurrences_desc">Occurrences (most first)</option>
-              <option value="occurrences_asc">Occurrences (least first)</option>
-              <option value="url">Page URL (A–Z)</option>
-              {!isInformational && <option value="status">Status (un-triaged first)</option>}
-            </select>
-          </label>
+          <Select
+            label="Sort by"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "occurrences_desc", label: "Occurrences (most first)" },
+              { value: "occurrences_asc", label: "Occurrences (least first)" },
+              { value: "url", label: "Page URL (A–Z)" },
+              ...(isInformational
+                ? []
+                : [{ value: "status", label: "Status (un-triaged first)" }]),
+            ]}
+          />
         </div>
         {pages.length === 0 ? (
           <div className="p-4 text-sm text-fg-muted">

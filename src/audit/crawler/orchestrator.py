@@ -19,7 +19,7 @@ import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 import structlog
@@ -36,7 +36,12 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
-from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import (
+    DEFAULT_BLOCKED_LABELS,
+    InteractionProbe,
+    RevealedViolation,
+    StateCapture,
+)
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -248,6 +253,20 @@ class CrawlConfig:
     # inspector then always re-renders on demand. Finding evidence,
     # screenshots, and image blobs are unaffected.
     store_rendered_html: bool = True
+    # The row this crawl must write into, when the caller already created it.
+    # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
+    # this crawl" from the seed URL, and they do not work it out the same way.
+    # A caller that owns a row names it here instead of letting the second
+    # guess disagree with the first.
+    scan_id: int | None = None
+    # May a later crawl of the same seed adopt this row and keep writing into
+    # it? True for an ordinary crawl: its frontier lives in the database and is
+    # meant to survive a restart. False when the session behind the scan cannot
+    # be rebuilt. A manual sign-in holds its credentials in memory only, so a
+    # later anonymous run that adopted the row would append signed-out evidence
+    # to a signed-in report and overwrite the stored config that said it was
+    # one, leaving nothing in the record to show the two had been mixed.
+    resumable: bool = True
     search: SearchConfig | None = None
 
 
@@ -345,7 +364,7 @@ async def run_crawl(
     # problem, the configured scope does not cover where sign-in landed.
     entry_url = normalized_seed
     if config.start_url is not None:
-        candidate = url_policy.normalize(config.start_url)
+        candidate = _signed_in_entry_url(config.start_url)
         if candidate == normalized_seed:
             pass
         elif url_policy.is_in_scope(candidate, scope, allow_subdomains=config.allow_subdomains):
@@ -471,6 +490,12 @@ async def run_crawl(
             max_clicks=config.interaction_max_clicks,
             max_repeated=config.interaction_max_repeated,
             max_depth=config.interaction_max_depth,
+            # A scan that opted out of storing rendered pages has opted out of
+            # storing revealed states too: they are the same documents, from
+            # the same site, and on the protected path they are captured after
+            # authentication. Refusing at the probe means the bytes are never
+            # held either, rather than being gathered and dropped at write.
+            capture_states=config.store_rendered_html,
             # a11y-crawler matches one list against both URLs and control
             # labels, so an operator who blocks "Sign out" is protected from
             # the link and the button alike. The probe's own label list stays
@@ -570,6 +595,29 @@ async def run_crawl(
     return summary
 
 
+def _signed_in_entry_url(start_url: str) -> str:
+    """Canonicalize where sign-in landed, without discarding its fragment.
+
+    ``normalize`` keeps a fragment only when it looks like a hash route,
+    ``#/route`` or ``#!/route``, because on an ordinary page ``#section`` is the
+    same document and has to dedupe with it. That rule is right for every link
+    the crawler discovers and wrong for this one URL: a sign-in that ended on
+    ``/#my-courses`` was rewritten to ``/``, which was the application's boot
+    screen. It carried no links, so the crawl finished after a single page and
+    never reached the signed-in area the auditor was standing in.
+
+    This URL is the one a human chose by being there when they confirmed
+    sign-in, so its exact route is evidence rather than a guess about what the
+    fragment means. Only the entry point is read this way; links found from it
+    normalize as usual, so ``#section`` anchors still dedupe.
+    """
+    canonical = url_policy.normalize(start_url)
+    fragment = urlsplit(start_url.strip()).fragment
+    if not fragment or urlsplit(canonical).fragment:
+        return canonical
+    return urlunsplit(urlsplit(canonical)._replace(fragment=fragment))
+
+
 def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=config.request_timeout_s,
@@ -579,18 +627,65 @@ def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
     )
 
 
+# True for a scan row a later crawl of the same seed is allowed to adopt. Both
+# row-discovery paths must agree, so the predicate is written once here and
+# imported by the web layer's ``_prepare_scan_row``. A row written before the
+# flag existed, or one whose config is not valid JSON, stays adoptable: the
+# absence of a refusal is not a refusal. Written as CASE rather than a guarded
+# AND because ``json_extract`` raises on malformed JSON and SQLite does not
+# promise to short-circuit AND, which would make one unreadable row fail every
+# later crawl's row discovery.
+RESUMABLE_SCAN_SQL = (
+    "CASE WHEN json_valid(config_json) "
+    "THEN COALESCE(json_extract(config_json, '$.resumable'), 1) ELSE 1 END != 0"
+)
+
+
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
+    # A caller that already owns a row names it, and no discovery runs at all.
+    if config.scan_id is not None:
+        owned = conn.execute("SELECT id FROM scans WHERE id = ?", (config.scan_id,)).fetchone()
+        if owned is None:
+            raise ValueError(f"scan row {config.scan_id} does not exist")
+        conn.execute(
+            "UPDATE scans SET status = 'running', finished_at = NULL, "
+            "failure_reason = NULL, config_json = ? WHERE id = ?",
+            (config_json_for_scan(config), config.scan_id),
+        )
+        return config.scan_id
+    # ``running`` is always adopted: it is either the row the web layer just
+    # prepared for the progress view (which has no queued work yet) or a crawl
+    # whose process died without getting to write a status.
+    #
+    # ``interrupted`` is adopted only while work is still queued. That status
+    # covers two different events -- a crawl cancelled mid-flight, and a scan
+    # the operator stopped -- and the queue is what tells them apart, because
+    # stopping clears it. Without the distinction a stopped report that had
+    # already collected hundreds of pages was quietly adopted and flipped to
+    # completed by a run the operator thought was starting fresh.
     row = conn.execute(
-        """
+        f"""
         SELECT id FROM scans
-         WHERE seed_url = ? AND status IN ('running', 'interrupted')
+         WHERE seed_url = ?
            AND NOT EXISTS (
                SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id
            )
+           AND {RESUMABLE_SCAN_SQL}
+           AND (
+               status = 'running'
+               OR (
+                   status = 'interrupted'
+                   AND EXISTS (
+                       SELECT 1 FROM jobs
+                        WHERE jobs.state IN ('pending', 'leased')
+                          AND json_extract(jobs.payload_json, '$.scan_id') = scans.id
+                   )
+               )
+           )
          ORDER BY id DESC
          LIMIT 1
-        """,
+        """,  # noqa: S608, module constant only
         (seed_url,),
     ).fetchone()
     if row is not None:
@@ -665,7 +760,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
             "interaction_max_depth": config.interaction_max_depth,
+            # Whether per-finding element screenshots were taken. Absent from
+            # older reports, whose screenshot state can only be inferred by
+            # looking for blobs. A report that cannot say which evidence it
+            # was allowed to collect cannot explain the evidence it lacks.
+            "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
+            # Read back by the row-discovery predicate, not just by the UI.
+            "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older
@@ -1037,8 +1139,20 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             try:
                 result = await (await ctx.js.get()).fetch(url)
                 render_mode = "js"
-            except FetchError:
-                log.warning("crawl.js_fetch_failed", protected_context=True)
+            except FetchError as exc:
+                # The class only, never the message or the URL. A protected
+                # target's address and a failure string can both carry session
+                # detail, which is why this branch stays quiet where its public
+                # sibling logs ``error=str(exc)``. Dropping the type as well
+                # overcorrected: every cause -- DNS, a navigation timeout, a
+                # closed context, the rendered-size cap -- arrived as one
+                # indistinguishable line, and the UI could only tell the
+                # operator to read a log that said nothing.
+                log.warning(
+                    "crawl.js_fetch_failed",
+                    protected_context=True,
+                    error_type=type(exc).__name__,
+                )
                 ctx.summary.errors += 1
                 _record_page(ctx, url, status_code=None, result=None, render_mode="js")
                 return
@@ -1131,7 +1245,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # Persist axe-core violations attached by JsFetcher. Static fetches
         # never carry violations (axe needs a browser); we count an axe-page
         # only when violations is a real attached tuple, even an empty one
-        #, that distinguishes "we scanned and found nothing" from "we
+        # , that distinguishes "we scanned and found nothing" from "we
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
@@ -1230,6 +1344,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 findings=result.interaction_findings,
                 states=result.interaction_states,
                 screenshots=result.screenshots,
+                # A tuple, never None: this pass owns the page's states, and an
+                # empty one legitimately means it captured none this time.
+                captures=result.interaction_captures,
             )
             # The per-page ledger is written even when the sweep produced no
             # findings: "37 of 52 controls operated, stopped by the click
@@ -1506,6 +1623,7 @@ def _persist_interaction(
     states: int,
     screenshots: Mapping[str, bytes],
     count_page: bool = True,
+    captures: tuple[StateCapture, ...] | None = None,
 ) -> None:
     """Write violations that only exist after a control was operated.
 
@@ -1515,7 +1633,31 @@ def _persist_interaction(
     hits ``ON CONFLICT``, and updates instead of inserting a second row.
     The probe filters those out before they ever reach this function, so
     the constraint is a backstop rather than the primary mechanism.
+
+    ``captures`` is the markup of the states these findings were first seen
+    in. ``None`` means this caller does not capture states at all (the
+    configured-search pass) and must leave whatever is stored alone; a tuple,
+    including an empty one, is the complete set for the page and replaces it.
+    That distinction matters on a re-fetch: ``upsert_page`` has just overwritten
+    the load-state HTML, so states held against the previous document would
+    otherwise survive it.
     """
+    if captures is not None:
+        try:
+            repo.replace_page_dom_states(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                page_id=page_id,
+                states=captures,
+            )
+        except (sqlite3.Error, ValueError) as exc:
+            # Evidence the report can do without. The findings below are not.
+            log.warning(
+                "interaction.states_persist_failed",
+                page_id=page_id,
+                error_type=type(exc).__name__,
+            )
+
     for revealed in findings:
         v = revealed.violation
         try:
@@ -1536,6 +1678,7 @@ def _persist_interaction(
                 target_hash=v.target_hash,
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
                 revealed_by=revealed.revealed_by,
+                revealed_state_key=revealed.state_key or None,
             )
         except sqlite3.Error as exc:
             log.warning(

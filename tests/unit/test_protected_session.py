@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import io
 import os
 from dataclasses import dataclass, field
@@ -19,7 +18,6 @@ from audit.protected.session import (
     ManualAuthState,
     build_manual_auth_policies,
     validate_protected_seed_url,
-    verify_authenticated_target_url,
 )
 
 
@@ -153,33 +151,15 @@ def test_local_manual_login_allows_a_dynamic_public_mfa_origin() -> None:
         ).origin.value
         == "https://api-12345.duosecurity.com"
     )
-    # Verification is the gate that matters, and it is unchanged: sign-in
-    # has to come back to an approved target page before scanning starts.
-    assert (
-        verify_authenticated_target_url("https://app.example.edu/dashboard", policies).origin.value
-        == "https://app.example.edu"
-    )
-    with pytest.raises(ManualAuthenticationError):
-        verify_authenticated_target_url("https://api-12345.duosecurity.com/frame/v4/auth", policies)
 
 
-def test_seed_and_authenticated_verification_require_target_not_identity_provider() -> None:
+def test_the_seed_must_be_the_application_not_its_identity_provider() -> None:
+    """The one URL the auditor types is still checked. Where sign-in *lands* is not."""
     policies = _policies()
 
     assert validate_protected_seed_url("https://app.example.edu/start", policies).url.endswith(
         "/start"
     )
-    assert verify_authenticated_target_url(
-        "https://app.example.edu/dashboard", policies
-    ).url.endswith("/dashboard")
-
-    for value in (
-        "https://login.example.edu/authorize",
-        "https://cdn.example.edu/app.css",
-        "https://app.example.edu/callback?code=temporary",
-    ):
-        with pytest.raises(ManualAuthenticationError):
-            verify_authenticated_target_url(value, policies)
     with pytest.raises(ManualAuthenticationError):
         validate_protected_seed_url("https://login.example.edu/authorize", policies)
 
@@ -243,7 +223,12 @@ class _FakePage:
 
     async def close(self, *, run_before_unload: bool) -> None:
         assert not run_before_unload
+        if self.closed:
+            return
         self.closed = True
+        handler = self.event_handlers.get("close")
+        if handler is not None:
+            handler(self)  # type: ignore[operator]
 
     def on(self, event: str, handler: object) -> None:
         self.event_handlers[event] = handler
@@ -293,6 +278,16 @@ class _FakeContext:
     additional_pages: list[_FakePage] = field(default_factory=list)
     new_page_calls: int = 0
     closed: bool = False
+    #: Chromium opens one blank tab before Playwright asks for anything.
+    #: Omitting it from the double hid a second window from every test.
+    startup_pages: list[_FakePage] = field(default_factory=lambda: [_FakePage()])
+
+    @property
+    def pages(self) -> list[_FakePage]:
+        live = [*self.startup_pages, *self.additional_pages]
+        if self.new_page_calls:
+            live.insert(len(self.startup_pages), self.page)
+        return [p for p in live if not p.closed]
 
     async def route(self, pattern: str, handler: object) -> None:
         self.route_calls.append((pattern, handler))
@@ -309,13 +304,19 @@ class _FakeContext:
     async def new_page(self) -> _FakePage:
         self.new_page_calls += 1
         if self.new_page_calls == 1:
-            return self.page
-        page = _FakePage()
-        self.additional_pages.append(page)
+            page = self.page
+        else:
+            page = _FakePage()
+            self.additional_pages.append(page)
+        # Playwright emits the context's page event before new_page returns.
+        # Omitting it hid duplicate registration of the initial sign-in tab.
+        handler = self.event_handlers.get("page")
+        if handler is not None:
+            await handler(page)  # type: ignore[operator]
         return page
 
     async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
-        assert page is self.page or page in self.additional_pages
+        assert page is self.page or page in self.additional_pages or page in self.startup_pages
         return self.cdp_session
 
     async def close(self) -> None:
@@ -379,7 +380,7 @@ async def test_tab_scoped_session_survives_login_handoff() -> None:
     await session.start()
     page.url = "https://app.example.edu/#/dashboard"
     page.has_session_storage = True
-    assert session.verify_authenticated_target().url == page.url
+    assert session.enter_scan_mode() == page.url
     scan_pages = await session.prepare_background_scan_pages(4)
     await session.discard_manual_auth_page()
     assert scan_pages == (page,)
@@ -429,8 +430,6 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
 
     with pytest.raises(ManualAuthenticationError):
         session.create_shared_js_fetcher()
-    with pytest.raises(ManualAuthenticationError):
-        session.verify_authenticated_target("https://login.example.edu/authorize")
 
     setup_callback = _FakeRoute(
         _FakeRequest("GET", "https://login.example.edu/authorize?code=temporary&state=opaque")
@@ -446,8 +445,7 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert secret_cdn.actions == [("abort", "blockedbyclient")]
 
     page.url = "https://app.example.edu/dashboard"
-    verified = session.verify_authenticated_target()
-    assert verified.url == "https://app.example.edu/dashboard"
+    assert session.enter_scan_mode() == "https://app.example.edu/dashboard"
     assert session.state is ManualAuthState.AUTHENTICATED
 
     scan_pages = await session.prepare_background_scan_pages(2)
@@ -534,37 +532,6 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert playwright.stopped
 
 
-@pytest.mark.asyncio
-async def test_wait_for_authenticated_target_polls_without_reading_browser_storage() -> None:
-    session, _playwright, _browser, _context, page = _session_with_fake_browser()
-    await session.start()
-    page.url = "https://login.example.edu/authorize"
-
-    async def complete_manually() -> None:
-        await asyncio.sleep(0.01)
-        page.url = "https://app.example.edu/after-sign-in"
-
-    task = asyncio.create_task(complete_manually())
-    verified = await session.wait_for_authenticated_target(timeout_ms=500, poll_interval_s=0.001)
-    await task
-
-    assert verified.url.endswith("/after-sign-in")
-    assert session.state is ManualAuthState.AUTHENTICATED
-    await session.close()
-
-
-@pytest.mark.asyncio
-async def test_wait_times_out_at_identity_provider_without_claiming_authenticated() -> None:
-    session, _playwright, _browser, _context, page = _session_with_fake_browser()
-    await session.start()
-    page.url = "https://login.example.edu/authorize"
-
-    with pytest.raises(ManualAuthenticationError, match="Timed out"):
-        await session.wait_for_authenticated_target(timeout_ms=5, poll_interval_s=0.001)
-    assert session.state is ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
-    await session.close()
-
-
 @dataclass
 class _FakePopup(_FakePage):
     """A tab another page opened — what an SSO/LTI handoff produces."""
@@ -594,10 +561,10 @@ async def test_sign_in_tab_opened_by_sso_is_kept_and_becomes_the_session_page() 
     await on_page(popup)  # type: ignore[operator]
 
     assert not popup.closed, "the tab SSO opened was closed and sign-in could not continue"
-    # Verification reads session.page; leaving it on the original tab would
-    # verify a stale sign-in URL and then start the crawl from it.
+    # The entry point reads session.page; leaving it on the original tab would
+    # report a stale sign-in URL and then start the crawl from it.
     assert session.page is popup
-    assert session.verify_authenticated_target().url == "https://app.example.edu/dashboard"
+    assert session.enter_scan_mode() == "https://app.example.edu/dashboard"
 
 
 @pytest.mark.asyncio
@@ -610,7 +577,7 @@ async def test_auxiliary_tab_is_still_closed_once_scanning_starts() -> None:
     session, _playwright, _chromium, context, page = _session_with_fake_browser()
     await session.start()
     page.url = "https://app.example.edu/dashboard"
-    session.verify_authenticated_target()  # activates scan mode
+    session.enter_scan_mode()
 
     on_page = context.event_handlers["page"]
     popup = _FakePopup(opener_page=page)
@@ -639,6 +606,43 @@ async def test_a_handoff_tab_that_closes_itself_falls_back_to_the_previous_tab()
 
 
 @pytest.mark.asyncio
+async def test_closing_extra_login_tabs_preserves_the_original_for_scanning() -> None:
+    session, _, _, context, page = _session_with_fake_browser()
+    try:
+        await session.start()
+        page.url = "https://app.example.edu/dashboard"
+        page.has_session_storage = True
+        on_page = context.event_handlers["page"]
+        popups = [_FakePopup(opener_page=page), _FakePopup(opener_page=page)]
+        for popup in popups:
+            await on_page(popup)  # type: ignore[operator]
+        for popup in reversed(popups):
+            await popup.close(run_before_unload=False)
+
+        assert session.page is page
+        session.enter_scan_mode()
+        scan_pages = await session.prepare_background_scan_pages(2)
+        await session.discard_manual_auth_page()
+
+        assert scan_pages == (page,)
+        assert not page.closed, "sign-in cleanup closed the retained scan tab"
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_closing_the_only_login_tab_clears_the_session_page() -> None:
+    session, _, _, _, page = _session_with_fake_browser()
+    try:
+        await session.start()
+        await page.close(run_before_unload=False)
+        with pytest.raises(ManualAuthenticationError, match="not running"):
+            session.enter_scan_mode()
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
 async def test_discarding_sign_in_closes_every_tab_it_used() -> None:
     """A handoff tab can hold a live callback or event stream of its own."""
     session, _playwright, _chromium, context, page = _session_with_fake_browser()
@@ -648,7 +652,7 @@ async def test_discarding_sign_in_closes_every_tab_it_used() -> None:
     popup = _FakePopup(opener_page=page)
     popup.url = "https://app.example.edu/dashboard"
     await on_page(popup)  # type: ignore[operator]
-    session.verify_authenticated_target()
+    session.enter_scan_mode()
 
     await session.discard_manual_auth_page()
 
@@ -676,7 +680,7 @@ async def test_the_shared_fetcher_carries_an_interaction_probe() -> None:
     session, _playwright, _chromium, _context, page = _session_with_fake_browser()
     await session.start()
     page.url = "https://app.example.edu/dashboard"
-    session.verify_authenticated_target()
+    session.enter_scan_mode()
 
     axe = AxeAnalyzer(axe_source="/* stub */")
     fetcher = session.create_shared_js_fetcher(
@@ -688,3 +692,42 @@ async def test_the_shared_fetcher_carries_an_interaction_probe() -> None:
         "the authenticated fetcher cannot operate controls, so interaction "
         "silently does nothing on every login scan"
     )
+
+
+@pytest.mark.asyncio
+async def test_opening_the_sign_in_browser_leaves_exactly_one_tab() -> None:
+    """Chromium opens a blank startup tab before Playwright asks for anything.
+
+    With ``--incognito`` that tab was a whole second window, and the sign-in
+    page created afterwards lived in the ordinary profile -- so the auditor got
+    two windows and no way to tell which one Axcess was watching, while the
+    flag protected nothing. Isolation is the ephemeral profile directory, which
+    is removed on close.
+    """
+    session, _, _, context, page = _session_with_fake_browser()
+    startup = context.startup_pages[0]
+
+    await session.start()
+
+    assert context.pages == [page], "the startup tab outlived sign-in"
+    assert startup.closed, "the blank startup tab was left open"
+    assert not page.closed, "the sign-in tab must survive"
+    assert session.page is page
+
+
+@pytest.mark.asyncio
+async def test_a_popup_opened_during_sign_in_is_kept() -> None:
+    """Only the startup leftovers are closed.
+
+    An SSO handoff window arrives later, through the context's page event, and
+    is adopted as the tab the session speaks for. Closing those would break
+    every identity provider that completes sign-in in a second window.
+    """
+    session, _, _, context, page = _session_with_fake_browser()
+    await session.start()
+
+    popup = _FakePopup(opener_page=page)
+    await context.event_handlers["page"](popup)  # type: ignore[operator]
+
+    assert not popup.closed
+    assert session.page is popup, "the handoff window should become the live tab"

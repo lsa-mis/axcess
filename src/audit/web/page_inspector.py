@@ -19,12 +19,17 @@ This module is deliberately narrow and defensive:
 * It re-fetches **one URL the scan already recorded**, never an arbitrary
   URL, never a cross-scan target. The endpoint is keyed by ``scan_id`` +
   ``page_id``, and the page must belong to that scan.
-* It refuses anything that would not be a faithful, safe re-render: scans
-  that are not ``completed`` (running/failed/interrupted would show a stale
-  or partial page), records that belong to a login-protected report (whose
-  session cannot be re-created here), and any target URL that falls outside
-  the scan's recorded scope (host + registrable domain, honoring the scan's
-  ``allow_subdomains`` setting).
+* It refuses anything that would not be a faithful, safe re-render: records
+  that belong to a login-protected report (whose session cannot be re-created
+  here), and any target URL that falls outside the scan's recorded scope
+  (host + registrable domain, honoring the scan's ``allow_subdomains``
+  setting).
+* The *on-demand render* additionally needs a ``completed`` report, because it
+  leaves this machine to fetch a page a partial report cannot vouch for.
+  Serving a capture the scan already stored carries no such risk and is
+  allowed whatever the status: a stopped scan's evidence is still its
+  evidence, and refusing to show it was a rule about re-rendering applied to
+  reading.
 * It bounds the work: a navigation/idle timeout and a cap on the serialized
   DOM length (truncated with an honest flag).
 
@@ -92,6 +97,73 @@ def _is_protected_report(conn: sqlite3.Connection, scan_id: int) -> bool:
     )
 
 
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    """True when ``table`` is present, for schemas that predate it."""
+    return (
+        conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?", (table,)
+        ).fetchone()
+        is not None
+    )
+
+
+def _dom_states(conn: sqlite3.Connection, page_id: int) -> list[dict[str, Any]]:
+    """The states captured on this page, in the order the probe reached them.
+
+    Metadata only. The documents are megabytes each and a reviewer looks at one
+    at a time, so they are fetched per state rather than shipped together.
+    """
+    if not _table_exists(conn, "page_dom_states"):
+        return []
+    rows = conn.execute(
+        "SELECT state_key, revealed_by, path_labels FROM page_dom_states "
+        "WHERE page_id = ? ORDER BY rowid",
+        (page_id,),
+    ).fetchall()
+    states: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            path = json.loads(row["path_labels"] or "[]")
+        except (ValueError, TypeError):
+            path = []
+        states.append(
+            {
+                "state_key": row["state_key"],
+                "revealed_by": row["revealed_by"],
+                "path_labels": [str(item) for item in path] if isinstance(path, list) else [],
+            }
+        )
+    return states
+
+
+def _decode_state_html(conn: sqlite3.Connection, page_id: int, state_key: str) -> str | None:
+    """The captured markup for one state, or None when it was never stored."""
+    if not _table_exists(conn, "page_dom_states"):
+        return None
+    row = conn.execute(
+        "SELECT dom, encoding FROM page_dom_states WHERE page_id = ? AND state_key = ?",
+        (page_id, state_key),
+    ).fetchone()
+    if row is None or row["encoding"] != "gzip":
+        return None
+    return _decode_stored_html(row["dom"])
+
+
+def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    """True when ``table`` already carries ``column``.
+
+    ``pages.rendered_html`` arrived in migration 0027, and this module is
+    reachable from a server running against a database that stopped earlier —
+    naming the column unconditionally raised ``OperationalError`` out of the
+    route as a 500. A missing column means nothing was stored, which is the
+    same state as a scan that opted out of storing, so the caller already
+    knows how to fall back.
+    """
+    return any(
+        row["name"] == column for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    )
+
+
 def _assert_in_scope(target_url: str, seed_url: str, allow_subdomains: bool) -> None:
     """Refuse a target URL that is not within the scan's recorded scope.
 
@@ -131,20 +203,18 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
     ).fetchone()
     if scan is None:
         raise InspectionUnavailableError("Scan not found.", status_code=404)
-    if scan["status"] != "completed":
-        raise InspectionUnavailableError(
-            "Only a completed report can be inspected on demand. "
-            "This scan is still running or did not finish.",
-            status_code=409,
-        )
     if _is_protected_report(conn, scan_id):
         raise InspectionUnavailableError(
             "This is a login-protected report and cannot be re-rendered on demand.",
             status_code=409,
         )
+    stored_column = "rendered_html" if _has_column(conn, "pages", "rendered_html") else "NULL"
     page = conn.execute(
-        "SELECT id, url_normalized, title, status_code, render_mode, "
-        "rendered_html, fetched_at "
+        # ``stored_column`` is one of two literals chosen above, never input:
+        # a column name cannot be a bound parameter, so the alternative is two
+        # copies of the same query.
+        "SELECT id, url_normalized, title, status_code, render_mode, "  # noqa: S608
+        f"{stored_column} AS rendered_html, fetched_at "
         "FROM pages WHERE id = ? AND scan_id = ?",
         (page_id, scan_id),
     ).fetchone()
@@ -162,11 +232,29 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
     target_url = page["url_normalized"]
     _assert_in_scope(target_url, seed_url, allow_subdomains)
 
+    # Only the *on-demand render* needs a finished report: it leaves this
+    # machine to fetch a page the scan may never have reached, and a partial
+    # report cannot vouch for it. Reading back a capture the scan already took
+    # asks nothing of the site and claims nothing about coverage, so it is
+    # allowed whatever the scan's status -- a stopped scan's evidence is still
+    # its evidence. The refusal used to sit before the page row was even
+    # loaded, so it could not tell the two apart, and a stopped scan's stored
+    # pages were unreadable for a reason that only applied to re-rendering.
+    completed = scan["status"] == "completed"
+    stored_available = page["rendered_html"] is not None
+    if not completed and not stored_available:
+        raise InspectionUnavailableError(
+            "This page has no stored capture, and only a completed report can "
+            f"be re-rendered on demand. This scan ended as {scan['status']}.",
+            status_code=409,
+        )
+
     return {
         "scan": scan,
         "page": page,
         "target_url": target_url,
         "store_rendered_html": store_rendered_html,
+        "allow_live_render": completed,
     }
 
 
@@ -279,6 +367,7 @@ async def inspect_page(
     nav_timeout_ms: int = _NAV_TIMEOUT_MS,
     idle_timeout_ms: int = _IDLE_TIMEOUT_MS,
     max_dom_chars: int = MAX_INSPECT_DOM_CHARS,
+    state_key: str | None = None,
 ) -> dict[str, Any]:
     """Serve one scan-scoped page for the Page/DOM inspector.
 
@@ -288,15 +377,54 @@ async def inspect_page(
     HTML can't be produced returns a ``render.ok: False`` payload (HTTP 200);
     an invalid/non-inspectable request raises
     :class:`InspectionUnavailableError`. Nothing is persisted.
+
+    ``state_key`` asks for one of the DOM states the interaction probe
+    captured instead of the page as it loaded. A state that was never captured
+    is reported as missing and **never** substituted with a live render: that
+    render is the page loading now, which is precisely the state the reviewer
+    said they did not want, and passing it off as the dialog they asked for
+    would be a more convincing version of the bug this all exists to fix.
     """
     validated = _validate(conn, scan_id, page_id)
     page = validated["page"]
+    states = _dom_states(conn, page_id)
+
+    if state_key:
+        captured = _decode_state_html(conn, page_id, state_key)
+        return {
+            "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
+            "store_rendered_html": validated["store_rendered_html"],
+            "states": states,
+            "render": (
+                _render_payload(
+                    ok=True,
+                    source="state",
+                    final_url=page["url_normalized"],
+                    status_code=page["status_code"],
+                    dom_html=captured,
+                    max_dom_chars=max_dom_chars,
+                )
+                | {"state_key": state_key}
+                if captured is not None
+                else {
+                    "ok": False,
+                    "source": "state",
+                    "state_key": state_key,
+                    "error": (
+                        "This interaction state was not captured. Reports made "
+                        "before state capture, and scans that declined to store "
+                        "rendered pages, keep no markup for it."
+                    ),
+                }
+            ),
+        }
 
     stored = _decode_stored_html(page["rendered_html"])
     if stored is not None:
         return {
             "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
             "store_rendered_html": validated["store_rendered_html"],
+            "states": states,
             "render": _render_payload(
                 ok=True,
                 source="stored",
@@ -310,6 +438,24 @@ async def inspect_page(
     # ``timezone.utc`` is used over the ``datetime.UTC`` alias because mypy's
     # bundled 3.11 typeshed here does not expose the alias yet.
     captured_at = datetime.now(timezone.utc).isoformat()  # noqa: UP017
+
+    if not validated["allow_live_render"]:
+        # Reached when a capture exists but will not decode. _validate already
+        # refused the no-capture case; falling through to the live render here
+        # would fetch a page an unfinished report never promised to have seen.
+        return {
+            "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
+            "store_rendered_html": validated["store_rendered_html"],
+            "states": states,
+            "render": {
+                "ok": False,
+                "source": "stored",
+                "error": (
+                    "This page's stored capture could not be read, and only a "
+                    "completed report can be re-rendered on demand."
+                ),
+            },
+        }
     outcome, error = await _render_page(
         validated["target_url"],
         user_agent=user_agent,
@@ -322,6 +468,7 @@ async def inspect_page(
         return {
             "page": _page_payload(page, captured_at=captured_at),
             "store_rendered_html": validated["store_rendered_html"],
+            "states": states,
             "render": {
                 "ok": False,
                 "source": "live",
@@ -332,6 +479,7 @@ async def inspect_page(
     return {
         "page": _page_payload(page, captured_at=captured_at),
         "store_rendered_html": validated["store_rendered_html"],
+        "states": states,
         "render": _render_payload(
             ok=True,
             source="live",

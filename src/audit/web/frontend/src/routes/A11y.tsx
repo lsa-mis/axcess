@@ -9,6 +9,7 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  Select,
   StatCard,
 } from "../components/ui";
 import type {
@@ -334,23 +335,19 @@ function DrillDownView({
           option labels carry the count so the triager can see at a
           glance how many findings sit in each bucket before clicking. */}
       <Card className="mb-3 p-3">
-        <label className="flex flex-col text-xs font-semibold text-fg-subtle">
-          Status filter
-          <select
-            value={status}
-            onChange={(e) =>
-              onStatusFilterChange(e.target.value as FindingStatus | "")
-            }
-            className="mt-1 min-h-target rounded-xs border border-border bg-surface px-2 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
-          >
-            <option value="">all statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, " ")} ({statusCounts[s] ?? 0})
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          stacked
+          label="Status filter"
+          value={status}
+          onChange={(next) => onStatusFilterChange(next as FindingStatus | "")}
+          options={[
+            { value: "", label: "all statuses" },
+            ...STATUS_OPTIONS.map((s) => ({
+              value: s,
+              label: `${s.replace(/_/g, " ")} (${statusCounts[s] ?? 0})`,
+            })),
+          ]}
+        />
       </Card>
 
       {loading ? (
@@ -512,30 +509,25 @@ function StatusCell({
   });
   return (
     <div className="flex flex-col gap-1">
-      <label className="sr-only" htmlFor={`status-${findingId}`}>
-        Triage status for finding {findingId}
-      </label>
-      <select
+      <Select
+        hideLabel
         id={`status-${findingId}`}
+        label={`Triage status for finding ${findingId}`}
         value={current}
-        onChange={(e) => {
-          const next = e.target.value as FindingStatus;
-          const rationale = requestStatusRationale(next, `finding #${findingId}`);
-          if (rationale === null) {
-            e.currentTarget.value = current;
-            return;
-          }
-          mutation.mutate({ next, rationale });
+        onChange={(next) => {
+          const rationale = requestStatusRationale(
+            next as FindingStatus,
+            `finding #${findingId}`,
+          );
+          // Declining the rationale leaves the value where it was. The select
+          // is controlled, so React restores it on the next render without the
+          // manual reset the uncontrolled version needed.
+          if (rationale === null) return;
+          mutation.mutate({ next: next as FindingStatus, rationale });
         }}
         disabled={mutation.isPending}
-        className="min-h-target rounded-xs border border-border bg-surface px-2 py-1 text-sm text-fg focus:border-umich-blue focus:outline-none disabled:opacity-60"
-      >
-        {STATUS_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {s.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+      />
       {mutation.isError ? (
         <span className="text-2xs text-sev-critical" role="alert">
           Save failed

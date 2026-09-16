@@ -16,6 +16,8 @@ const {
   desktopEnvironment,
   isAxcessUrl,
   isSafeExternalUrl,
+  nextZoomLevel,
+  zoomActionFor,
   startupFailureDetails,
 } = require("./runtime.cjs");
 const {
@@ -250,6 +252,19 @@ function createWindow() {
     },
   });
   configureWindowSecurity(window);
+  // The View menu binds Zoom In to `CommandOrControl+Plus`, which matches only
+  // a literal "+" -- Shift+= on most layouts -- while Zoom Out binds a key
+  // that exists on its own. The app zoomed out but never in. Handling the
+  // keystroke here catches every way a keyboard produces it, and
+  // `preventDefault` also suppresses the menu's own accelerator, so the
+  // remaining shortcuts cannot fire twice.
+  window.webContents.on("before-input-event", (event, input) => {
+    const action = zoomActionFor(input);
+    if (!action) return;
+    event.preventDefault();
+    const contents = window.webContents;
+    contents.setZoomLevel(nextZoomLevel(contents.getZoomLevel(), action));
+  });
   window.once("ready-to-show", () => window.show());
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;

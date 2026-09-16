@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Button, Card } from "../components/ui";
+import { Button, Card, Select } from "../components/ui";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import type { ComparisonCategory, ComparisonCoverageState, ComparisonLink, ComparisonRow, ComparisonSnapshot } from "../api/types";
 
@@ -111,18 +111,32 @@ export default function DiffRoute() {
           </section>
           <h2 className="mb-3 text-lg font-semibold">Review the issues</h2>
           <div className="mb-4 flex flex-wrap items-end gap-3">
-            <label className="min-w-0 text-sm font-semibold">Change category
-              <select value={category} onChange={(event) => setParam("category", event.target.value)} className="field mt-1 text-base focus-visible:outline-none focus-visible:shadow-focus">
-                <option value="">All categories</option>
-                {Object.entries(CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label} ({data.counts[key as ComparisonCategory]})</option>)}
-              </select>
-            </label>
-            <label className="min-w-0 text-sm font-semibold">Detection method
-              <select value={pipeline} onChange={(event) => setParam("pipeline", event.target.value)} className="field mt-1 text-base focus-visible:outline-none focus-visible:shadow-focus">
-                <option value="">All methods</option>
-                {Object.entries(PIPELINES).map(([key, label]) => <option key={key} value={key}>{label} ({data.pipeline_counts[key] ?? 0})</option>)}
-              </select>
-            </label>
+            <Select
+              stacked
+              label="Change category"
+              value={category}
+              onChange={(next) => setParam("category", next)}
+              options={[
+                { value: "", label: "All categories" },
+                ...Object.entries(CATEGORIES).map(([key, label]) => ({
+                  value: key,
+                  label: `${label} (${data.counts[key as ComparisonCategory]})`,
+                })),
+              ]}
+            />
+            <Select
+              stacked
+              label="Detection method"
+              value={pipeline}
+              onChange={(next) => setParam("pipeline", next)}
+              options={[
+                { value: "", label: "All methods" },
+                ...Object.entries(PIPELINES).map(([key, label]) => ({
+                  value: key,
+                  label: `${label} (${data.pipeline_counts[key] ?? 0})`,
+                })),
+              ]}
+            />
           </div>
           <p role="status" className="mb-3 text-sm text-fg-muted">{query.isFetching ? "Updating comparison…" : `${data.total} issue groups · Page ${data.page} of ${Math.max(1, Math.ceil(data.total / data.page_size))}`}</p>
           <section aria-label="Compared issue groups" aria-busy={query.isFetching} className="space-y-4">

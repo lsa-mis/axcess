@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import hashlib
+import json
 import sqlite3
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -433,6 +434,59 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.alfa_enabled is True
     assert config.browser_only is True
     assert config.image_extraction_enabled is False
+    # Signed-in findings are the hardest to review a second time: reproducing
+    # one means repeating the sign-in by hand. Capture their evidence by
+    # default, exactly as an anonymous scan does.
+    assert config.capture_screenshots is True
+
+
+def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declining to store rendered pages declines their screenshots too.
+
+    A circled element screenshot is a crop of the post-sign-in page it came
+    from. An auditor who asked Axcess not to keep those pages has asked not to
+    keep the crops either, so one opt-out governs both.
+    """
+
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "skip_rendered_storage": True,
+            },
+        )
+
+    assert response.status_code == 201
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.store_rendered_html is False
+    assert config.capture_screenshots is False
 
 
 def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
@@ -659,6 +713,34 @@ def test_prepare_scan_row_uses_crawler_seed_identity(
     assert crawler_id == prepared_id
     assert count is not None
     assert count["n"] == 1
+
+
+def test_prepare_scan_row_leaves_a_signed_in_scan_alone(
+    seeded_db: tuple[Path, Path, int],
+) -> None:
+    """An ordinary scan must start its own report, not continue a signed-in one.
+
+    The other half of the same rule the crawler's ``_ensure_scan`` enforces.
+    Both paths hunt for a row to continue, so a scan that may not be continued
+    has to be invisible to both: whichever one still saw it would win the race
+    and merge signed-out pages into a signed-in report.
+    """
+
+    from audit.crawler.orchestrator import config_json_for_scan
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+    seed = "https://app.example.test/secure/"
+    signed_in_config = server.CrawlConfig(seed_url=seed, resumable=False)
+    signed_in_id = server._prepare_scan_row(db_path, signed_in_config, resume_interrupted=False)
+
+    anonymous_id = server._prepare_scan_row(db_path, server.CrawlConfig(seed_url=seed))
+
+    assert anonymous_id != signed_in_id
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (signed_in_id,)).fetchone()
+    assert row is not None
+    assert json.loads(row["config_json"]) == json.loads(config_json_for_scan(signed_in_config))
 
 
 def test_api_create_scan_respects_whole_host(
@@ -1601,10 +1683,10 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
 ) -> None:
     """The verified landing URL must reach the crawl as ``start_url``.
 
-    ``verify_authenticated_target`` already validated where sign-in ended and
-    returned it; the handoff used to throw that value away and crawl the
-    pre-login seed, which for a login handoff is often the sign-in page
-    itself. This pins the wiring: the browser half is faked, because the real
+    ``enter_scan_mode`` reports where sign-in ended; the handoff used to throw
+    that value away and crawl the pre-login seed, which for a login handoff is
+    often the sign-in page itself. This pins the wiring: the browser half is
+    faked, because the real
     path needs Chromium and a human at the keyboard, but the config handed to
     ``run_crawl`` is the thing that was wrong.
     """
@@ -1637,8 +1719,8 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url=landed)
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return landed
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
@@ -1763,8 +1845,8 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
@@ -1835,8 +1917,8 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
@@ -1874,3 +1956,57 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
     # No analyzer, so no probe — and the log carries the reason.
     assert captured.get("interaction_probe") is None
     assert captured.get("axe_analyzer") is None
+
+
+def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Stopping is not pausing.
+
+    A stopped scan used to keep its leased jobs, so the next crawl of the same
+    seed saw outstanding work, adopted the row, and flipped a report the
+    operator had deliberately ended to completed. Emptying the queue is what
+    makes the two tellable apart.
+    """
+    db_path, _, _ = seeded_db
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://stop.example.test/', 'running', 5, 0, '{}')"
+        )
+        scan_id = int(cur.lastrowid or 0)
+        for state in ("pending", "leased"):
+            conn.execute(
+                "INSERT INTO jobs (kind, payload_json, state, dedupe_key) VALUES "
+                "('fetch', ?, ?, ?)",
+                (
+                    json.dumps({"scan_id": scan_id, "url": "https://stop.example.test/x"}),
+                    state,
+                    f"{scan_id}:{state}",
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert client.post(f"/api/scans/{scan_id}/cancel").status_code == 200
+
+    conn = connect(db_path)
+    try:
+        assert (
+            conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+            == "interrupted"
+        )
+        left = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
+            "AND state IN ('pending', 'leased')",
+            (scan_id,),
+        ).fetchone()[0]
+        assert left == 0, "a stopped scan must leave no work for a later crawl to adopt"
+        # What it did collect is untouched.
+        assert (
+            conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0] == 5
+        )
+    finally:
+        conn.close()

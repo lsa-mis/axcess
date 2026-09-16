@@ -82,7 +82,7 @@ from audit.protected.repository import (
     purge_expired_protected_data,
     recover_stale_protected_run_leases,
 )
-from audit.protected.session import ManualAuthenticationError, ManualAuthenticationSession
+from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
 from audit.synthesizer.diff import compute_diff
 from audit.web.comparison import (
@@ -1181,14 +1181,33 @@ def create_app(
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
             visual_checks_enabled=False,
-            capture_screenshots=False,
+            # A circled element screenshot is what makes a finding reviewable
+            # without re-running the sign-in, so an authenticated scan needs
+            # them at least as much as an anonymous one. It is also the same
+            # class of evidence as the rendered page it is cropped from: both
+            # are post-sign-in content. Capture by default and let the one
+            # "do not store rendered pages" opt-out govern both, the way the
+            # interaction probe's capture_states gate does below. The
+            # protected-agent pipeline is separate and stays off, see
+            # docs/protected-scans.md.
+            capture_screenshots=not body.skip_rendered_storage,
             store_rendered_html=not body.skip_rendered_storage,
             ignore_robots=True,
+            # The signed-in context lives in this process's memory and dies
+            # with it, so nothing can continue this scan later. Say so on the
+            # row: an ordinary crawl of the same seed used to adopt it while
+            # it was still running, mixing signed-out pages into a signed-in
+            # report and rewriting the config that identified it as one.
+            resumable=False,
         )
         # A manual-login session is deliberately memory-only and cannot be
         # resumed after interruption. Always allocate a fresh report and job
         # frontier even when the auditor scans the same URL again.
         scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
+        # Hand the crawler the row rather than letting it search: an
+        # unresumable row is invisible to seed-based discovery, including its
+        # own run's.
+        config = replace(config, scan_id=scan_id)
         session = ManualAuthenticationSession(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
@@ -1394,7 +1413,6 @@ def create_app(
     async def api_cancel_scan(scan_id: int) -> JSONResponse:
         task = crawl_state.get("task")
         active_scan_id = crawl_state.get("scan_id")
-        is_local_login = scan_id in local_login_runs
         if isinstance(task, asyncio.Task) and not task.done() and active_scan_id == scan_id:
             task.cancel()
         with get_conn() as conn:
@@ -1413,20 +1431,18 @@ def create_app(
                     "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (scan_id,),
                 )
-                if is_local_login:
-                    conn.execute(
-                        "DELETE FROM jobs "
-                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
-                        "AND state IN ('pending', 'leased')",
-                        (scan_id,),
-                    )
-                else:
-                    conn.execute(
-                        "DELETE FROM jobs "
-                        "WHERE json_extract(payload_json, '$.scan_id') = ? "
-                        "AND state = 'pending'",
-                        (scan_id,),
-                    )
+                # Both states, for every scan. A leased job is one a worker
+                # had checked out when the stop arrived; leaving it behind
+                # meant the lease expired, the work became available again,
+                # and the next crawl of this seed treated the scan as merely
+                # interrupted and resumed it. Stopping is not pausing, so the
+                # queue is emptied and what was collected stays as it is.
+                conn.execute(
+                    "DELETE FROM jobs "
+                    "WHERE json_extract(payload_json, '$.scan_id') = ? "
+                    "AND state IN ('pending', 'leased')",
+                    (scan_id,),
+                )
         return JSONResponse({"ok": True})
 
     @app.delete("/api/scans/{scan_id:int}")
@@ -1643,6 +1659,7 @@ def create_app(
         request: Request,
         scan_id: int,
         page_id: int,
+        state: str | None = None,
     ) -> JSONResponse:
         """Rendered page + DOM for the Page/DOM inspector.
 
@@ -1656,6 +1673,10 @@ def create_app(
         client-side as a CSS outline. The only live fetch is of a URL the scan
         already recorded, and this route sits behind the existing
         access-token gate.
+
+        ``?state=`` asks for one of the DOM states the interaction probe
+        captured rather than the page as it loaded. It is bounded to the
+        probe's own label cap, since anything longer cannot be a key it wrote.
         """
         from audit.web.page_inspector import InspectionUnavailableError, inspect_page
 
@@ -1666,6 +1687,7 @@ def create_app(
                     scan_id=scan_id,
                     page_id=page_id,
                     user_agent=settings.user_agent,
+                    state_key=(state or "")[:700] or None,
                 )
             except InspectionUnavailableError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
@@ -2845,17 +2867,21 @@ def _prepare_scan_row(
     crawl under a second scan ID while the progress screen remains attached
     to the original, permanently ``running`` row.
     """
-    from audit.crawler.orchestrator import config_json_for_scan
+    from audit.crawler.orchestrator import RESUMABLE_SCAN_SQL, config_json_for_scan
 
     seed_url = _canonical_scan_seed(config.seed_url)
     conn = connect(db_path)
     try:
+        # Same refusal the crawler's own row discovery honours. Both paths look
+        # for a row to continue, so a scan that may not be continued has to be
+        # invisible to both or the one that ignores it wins the race.
         if not resume_interrupted:
             existing = None
         elif _protected_scan_table_exists(conn):
             existing = conn.execute(
-                "SELECT id FROM scans "
+                "SELECT id FROM scans "  # noqa: S608, module constant only
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
+                f"AND {RESUMABLE_SCAN_SQL} "
                 "AND NOT EXISTS ("
                 "SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id"
                 ") ORDER BY id DESC LIMIT 1",
@@ -2863,8 +2889,9 @@ def _prepare_scan_row(
             ).fetchone()
         else:
             existing = conn.execute(
-                "SELECT id FROM scans "
+                "SELECT id FROM scans "  # noqa: S608, module constant only
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
+                f"AND {RESUMABLE_SCAN_SQL} "
                 "ORDER BY id DESC LIMIT 1",
                 (seed_url,),
             ).fetchone()
@@ -2941,13 +2968,11 @@ async def _run_local_login_background(
         # SSO round trip, then a dashboard or landing page. Start the crawl
         # from where the auditor actually is rather than from the pre-login
         # URL, which for a login handoff is frequently the sign-in page
-        # itself, re-fetching it produced a scan of the login form. The
-        # verified URL has already passed the approved-target-origin check
-        # inside verify_authenticated_target, so an IdP or OAuth-callback URL
-        # can never become the entry point. Scope still derives from the
-        # configured seed; only the entry point moves (see CrawlConfig).
-        landed = run.session.verify_authenticated_target()
-        config = replace(config, start_url=landed.url)
+        # itself, re-fetching it produced a scan of the login form. Scope
+        # still derives from the configured seed, and run_crawl falls back to
+        # that seed when the landing page sits outside it, so a landing page
+        # Axcess cannot use costs the crawl nothing.
+        config = replace(config, start_url=run.session.enter_scan_mode())
         # Chromium on macOS restores a minimized window whenever a new page is
         # created. Prepare reusable scan tabs before minimizing so
         # the authenticated crawl stays out of the auditor's way throughout.
@@ -2988,6 +3013,13 @@ async def _run_local_login_background(
                     max_repeated=config.interaction_max_repeated,
                     max_depth=config.interaction_max_depth,
                     blocked_labels=DEFAULT_BLOCKED_LABELS + tuple(config.blocked_url_patterns),
+                    # An authenticated scan that declined to store rendered
+                    # pages has declined to store the states behind their
+                    # controls too: same documents, same session, and every
+                    # one of them captured after sign-in. This probe is built
+                    # here rather than by the orchestrator, so it does not
+                    # inherit that gate and has to carry it itself.
+                    capture_states=config.store_rendered_html,
                 )
         fetcher = run.session.create_shared_js_fetcher(
             axe_analyzer=login_axe,
@@ -3002,7 +3034,11 @@ async def _run_local_login_background(
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
             interaction_probe=login_interaction,
-            capture_screenshots=False,
+            # Follow the scan's own setting rather than hardcoding it off.
+            # This fetcher is built here instead of by the orchestrator, so
+            # it does not inherit the config the way an anonymous crawl's
+            # does and has to be handed the value explicitly.
+            capture_screenshots=config.capture_screenshots,
             shared_pages=scan_pages,
             search_explorer=build_search_explorer(config, login_axe),
         )
@@ -3047,13 +3083,6 @@ async def _run_local_login_background(
         run.status = "interrupted"
         _finish_local_login_scan(db_path, run.scan_id, "interrupted")
         raise
-    except ManualAuthenticationError:
-        run.status = "authentication_required"
-        run.error = (
-            "Sign-in did not finish on the approved website. Return to the visible "
-            "browser, or add every exact sign-in origin and start again."
-        )
-        _finish_local_login_scan(db_path, run.scan_id, "interrupted")
     except Exception:
         # Do not surface a browser/target exception: it can contain a private
         # URL, response detail, or text from the authenticated application.

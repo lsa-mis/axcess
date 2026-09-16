@@ -12,7 +12,6 @@ boundary between manual sign-in and a shared-context accessibility fetcher.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import os
 import shutil
@@ -20,7 +19,6 @@ import tempfile
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from time import monotonic
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlsplit
@@ -55,8 +53,6 @@ _DEFAULT_USER_AGENT = "axcess/0.1 (+authorized protected accessibility audit)"
 _DEFAULT_NAV_TIMEOUT_MS = 30_000
 log = get_logger(__name__)
 
-_DEFAULT_AUTH_WAIT_MS = 5 * 60 * 1000
-_AUTH_POLL_INTERVAL_S = 0.25
 _SETUP_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "POST"})
 _EPHEMERAL_PROFILE_PREFIX = "axcess-protected-browser-"
 _WEBRTC_BLOCK_INIT_SCRIPT = """
@@ -176,22 +172,6 @@ def _origin_only(url: str) -> str:
     if not parts.scheme or not parts.hostname:
         return "(opaque)"
     return f"{parts.scheme}://{parts.hostname}"
-
-
-def verify_authenticated_target_url(url: str, policies: ManualAuthPolicies) -> ValidatedUrl:
-    """Accept only a clean page at an approved *target* origin.
-
-    This is deliberately not a claim that a browser session has been proven
-    authenticated. It verifies the minimum safe boundary: the auditor has
-    returned from an IdP page to an approved application URL with no
-    credential-bearing query or fragment suitable for stored evidence.
-    """
-    try:
-        return policies.target.validate_page_url(url)
-    except EgressViolation as exc:
-        raise ManualAuthenticationError(
-            "Manual sign-in has not returned to an approved target page."
-        ) from exc
 
 
 class _SessionRouteGuard:
@@ -366,8 +346,8 @@ class ManualAuthenticationSession:
     """A headed, ephemeral browser session for auditor-completed sign-in.
 
     Call :meth:`start`, let the auditor perform sign-in in the visible browser,
-    then call :meth:`wait_for_authenticated_target` after explicit human
-    confirmation. Only then may :meth:`create_shared_js_fetcher` be used.
+    then call :meth:`enter_scan_mode` after explicit human confirmation. Only
+    then may :meth:`create_shared_js_fetcher` be used.
     """
 
     def __init__(
@@ -450,7 +430,13 @@ class ManualAuthenticationSession:
                 self._profile_dir,
                 headless=False,
                 args=[
-                    "--incognito",
+                    # No --incognito. With a persistent context that flag adds
+                    # a second, off-to-the-side incognito window while the
+                    # sign-in page created below lives in the ordinary profile
+                    # -- so it never protected the session, it only doubled the
+                    # windows the auditor has to find. Isolation here is the
+                    # ephemeral mode-0700 profile directory, which is removed
+                    # on close (see _create_ephemeral_profile_dir).
                     "--disable-background-timer-throttling",
                     "--disable-quic",
                     "--disable-background-networking",
@@ -475,7 +461,21 @@ class ManualAuthenticationSession:
             self._route_guard.observe_auth_pages(self._adopt_auth_page)
             await self._route_guard.install_on_context(self._context)
             self._page = await self._context.new_page()
-            self._auth_pages.append(self._page)
+            # The context's page event can already have adopted this tab
+            # before new_page returns. Register it idempotently: a duplicate
+            # would survive removal from the sign-in list when the scanner
+            # retains this tab, so sign-in cleanup would close the scan tab.
+            self._adopt_auth_page(self._page)
+            # Chromium always opens a blank startup tab, which left the
+            # auditor two windows to choose between and no way to tell which
+            # one Axcess was watching. Closed after the sign-in page exists,
+            # never before: closing a context's last page can take the browser
+            # with it. Only the startup leftovers go -- an SSO popup arrives
+            # later, through the page event, and is adopted rather than closed.
+            for startup_page in list(self._context.pages):
+                if startup_page is not self._page:
+                    with contextlib.suppress(Exception):
+                        await startup_page.close(run_before_unload=False)
             self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
             await self._page.goto(
                 self._seed_url,
@@ -517,21 +517,21 @@ class ManualAuthenticationSession:
         if self._page is page:
             self._page = self._auth_pages[-1] if self._auth_pages else None
 
-    def verify_authenticated_target(self, url: str | None = None) -> ValidatedUrl:
-        """Verify a manually confirmed return to an approved target page.
+    def enter_scan_mode(self) -> str:
+        """Switch the session from sign-in to scanning. Returns where it landed.
 
-        A target-origin check is deliberately not a substitute for the human
-        auditor's confirmation that sign-in completed. It does, however,
-        prevent an IdP URL, a CDN URL, or a callback containing OAuth/SAML
-        parameters from transitioning into scan mode.
+        The auditor's confirmation is the only signal that sign-in finished.
+        Axcess used to second-guess it by requiring the landed URL to sit on an
+        approved target origin, and refused to scan otherwise. Real sign-ins
+        land wherever the application sends them -- a different subdomain, a
+        tenant host, a marketing shell -- so the check rejected sessions that
+        were signed in perfectly well and there was no way past it.
         """
         self._require_started()
-        candidate = url if url is not None else self.page.url
-        verified = verify_authenticated_target_url(candidate, self._policies)
         self._route_guard.activate_scan_mode()
         self._egress_proxy.set_policy(self._policies.scan)
         self._state = ManualAuthState.AUTHENTICATED
-        return verified
+        return self.page.url
 
     async def prepare_background_scan_pages(self, count: int) -> tuple[Page, ...]:
         """Prepare up to ``count`` authenticated tabs before hiding Chromium.
@@ -659,33 +659,6 @@ class ManualAuthenticationSession:
         for page in pages:
             with contextlib.suppress(Exception):
                 await page.close(run_before_unload=False)
-
-    async def wait_for_authenticated_target(
-        self,
-        *,
-        timeout_ms: int = _DEFAULT_AUTH_WAIT_MS,
-        poll_interval_s: float = _AUTH_POLL_INTERVAL_S,
-    ) -> ValidatedUrl:
-        """Wait for the headed browser to return to an approved target URL.
-
-        Invoke this only after the auditor has chosen to complete manual
-        sign-in. It polls the current page URL; it never reads form fields,
-        cookies, local storage, passwords, OTPs, or passkey material.
-        """
-        self._require_started()
-        if timeout_ms <= 0 or poll_interval_s <= 0:
-            raise ValueError("Authentication wait timeout and poll interval must be positive.")
-        deadline = monotonic() + timeout_ms / 1000
-        last_error: ManualAuthenticationError | None = None
-        while monotonic() < deadline:
-            try:
-                return self.verify_authenticated_target()
-            except ManualAuthenticationError as exc:
-                last_error = exc
-            await asyncio.sleep(poll_interval_s)
-        raise ManualAuthenticationError(
-            "Timed out waiting for manual sign-in to return to an approved target page."
-        ) from last_error
 
     def create_shared_js_fetcher(
         self,

@@ -354,7 +354,18 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                interaction = await self._interaction_probe.run(page, baseline=axe_violations)
+                interaction = await self._interaction_probe.run(
+                    page,
+                    baseline=axe_violations,
+                    # The probe photographs a revealed element while its state
+                    # is still open; the pass below runs after the sweep has
+                    # closed everything it opened. Passing the capture function
+                    # per call keeps the shared probe free of crawler details
+                    # and of per-page state.
+                    capture_screenshot=(
+                        self._capture_element if self._capture_screenshots else None
+                    ),
+                )
                 interaction_evaluated = interaction.evaluated
 
             responsive_findings: list[ResponsiveFinding] = []
@@ -370,7 +381,10 @@ class JsFetcher:
             # (the page is still live). One bad selector or a screenshot
             # failure must never break the crawl, so the whole loop is
             # wrapped: on any error we log and ship whatever we captured.
-            screenshots: dict[str, bytes] = {}
+            # Seeded with the probe's, which were taken in the states that
+            # revealed them. The loop below cannot retake these and must not
+            # overwrite them.
+            screenshots: dict[str, bytes] = dict(interaction.screenshots)
             if self._capture_screenshots:
                 try:
                     all_findings: list[Any] = [
@@ -379,6 +393,11 @@ class JsFetcher:
                         *focus_findings,
                         *visual_findings,
                         *responsive_findings,
+                        # Revealed findings whose element outlived the sweep --
+                        # content appended to the page rather than shown in a
+                        # dialog. Skipped by the `th in screenshots` guard when
+                        # the probe already photographed them.
+                        *interaction.findings,
                     ]
                     for finding in all_findings:
                         if len(screenshots) >= MAX_SHOTS_PER_PAGE:
@@ -426,6 +445,7 @@ class JsFetcher:
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
+                interaction_captures=interaction.captures,
                 interaction_evaluated=interaction_evaluated,
                 interaction_controls=interaction.controls_discovered,
                 interaction_clicks_attempted=interaction.clicks_attempted,

@@ -1,5 +1,12 @@
 const path = require("node:path");
 
+// Chromium renders at 1.2^level, so half-steps are about 10% a press, close
+// to a browser's own zoom ladder. The bounds are Chromium's usable range
+// rather than arbitrary: past them the page stops reflowing usefully.
+const ZOOM_STEP = 0.5;
+const MIN_ZOOM_LEVEL = -6;
+const MAX_ZOOM_LEVEL = 9;
+
 function isAxcessUrl(candidate, origin) {
   try {
     const parsed = new URL(candidate);
@@ -86,6 +93,42 @@ function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, p
 }
 
 /**
+ * Which zoom action a keystroke asks for, or null when it asks for none.
+ *
+ * Electron's built-in View menu binds Zoom In to `CommandOrControl+Plus`,
+ * which matches only the literal "+" character -- on most layouts Shift+=.
+ * Zoom Out binds `CommandOrControl+-`, a key that exists on its own. So the
+ * app zoomed out but never in, and `Ctrl+=`, which every browser accepts and
+ * which is what the key is actually labelled on the keyboard, did nothing.
+ *
+ * Zoom is not a convenience here: WCAG 2.2 expects content to survive 200%
+ * (SC 1.4.4), and an accessibility tool that cannot be enlarged is failing the
+ * thing it measures.
+ *
+ * Matching is on the character rather than the accelerator, so every way a
+ * keyboard can produce it counts: "=", "+", Shift+= and the numpad's own keys.
+ */
+function zoomActionFor(input) {
+  if (!input || input.type !== "keyDown") return null;
+  // Alt is left alone: Alt reveals the hidden menu bar, and Alt+key belongs
+  // to it. Either Control or Command, so one rule covers every platform.
+  if (input.alt || !(input.control || input.meta)) return null;
+  const key = String(input.key ?? "");
+  if (key === "=" || key === "+" || key === "Add") return "in";
+  if (key === "-" || key === "_" || key === "Subtract") return "out";
+  if (key === "0" || key === "Insert") return "reset";
+  return null;
+}
+
+/** Zoom level after applying `action`, clamped to roughly 30%-500%. */
+function nextZoomLevel(current, action) {
+  if (action === "reset") return 0;
+  const step = action === "in" ? ZOOM_STEP : -ZOOM_STEP;
+  const level = (Number.isFinite(current) ? current : 0) + step;
+  return Math.max(MIN_ZOOM_LEVEL, Math.min(MAX_ZOOM_LEVEL, level));
+}
+
+/**
  * Keeps the most recent lines of the backend's output so a startup failure
  * can show what the sidecar actually said instead of a generic message.
  * Packaged builds have no terminal, so without this the reason is lost.
@@ -136,10 +179,15 @@ function startupFailureDetails({ error, backendOutput, exitCode, logPath, packag
 }
 
 module.exports = {
+  MAX_ZOOM_LEVEL,
+  MIN_ZOOM_LEVEL,
+  ZOOM_STEP,
   OutputTail,
   contentSecurityPolicy,
   desktopEnvironment,
   isAxcessUrl,
   isSafeExternalUrl,
+  nextZoomLevel,
+  zoomActionFor,
   startupFailureDetails,
 };

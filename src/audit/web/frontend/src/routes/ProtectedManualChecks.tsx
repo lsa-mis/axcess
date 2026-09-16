@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/client";
-import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { Button, Card, LinkButton, PageHeader, Select } from "../components/ui";
 import {
   protectedMutationKey,
   protectedQueryKey,
@@ -259,20 +259,19 @@ function ProtectedManualCheckCard({
           save.mutate();
         }}
       >
-        <label className="min-w-52 flex-1" htmlFor={selectId}>
-          <span className="mb-1 block text-sm font-semibold text-fg">Outcome</span>
-          <select
-            id={selectId}
-            value={outcome}
-            onChange={(event) => setOutcome(event.target.value as ManualOutcome)}
-            aria-describedby={statusId}
-            className="field"
-          >
-            {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
+        <Select
+          stacked
+          className="min-w-52 flex-1"
+          id={selectId}
+          label="Outcome"
+          value={outcome}
+          onChange={(next) => setOutcome(next as ManualOutcome)}
+          aria-describedby={statusId}
+          options={Object.entries(OUTCOME_LABELS).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+        />
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? "Saving…" : "Save outcome"}
         </Button>

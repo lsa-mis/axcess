@@ -12,6 +12,12 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  *
  * The breadcrumb is deliberately absent: it lives in the topbar
  * (see ``ReportCrumb``) where it stays put while this content scrolls.
+ *
+ * Drill-downs below those three views pass ``tabs={false}``. The tabs mark a
+ * current view, and on a page that is none of them the marker has to land
+ * somewhere — it fell on "Overview", so the inspector claimed to be the
+ * overview while showing a single page. Their trail crumb carries the
+ * orientation on those routes instead.
  */
 export default function ReportHeader({
   scanId,
@@ -19,12 +25,15 @@ export default function ReportHeader({
   title,
   meta,
   actions,
+  tabs = true,
 }: {
   scanId: number;
   previousScanId: number | null;
   title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  /** Show the report's view tabs. Off on drill-downs (see above). */
+  tabs?: boolean;
 }) {
   return (
     <header className="mb-5">
@@ -39,7 +48,9 @@ export default function ReportHeader({
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
+      {tabs && (
+        <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
+      )}
     </header>
   );
 }

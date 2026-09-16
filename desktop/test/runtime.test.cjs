@@ -6,6 +6,11 @@ const {
   desktopEnvironment,
   isAxcessUrl,
   isSafeExternalUrl,
+  nextZoomLevel,
+  zoomActionFor,
+  MAX_ZOOM_LEVEL,
+  MIN_ZOOM_LEVEL,
+  ZOOM_STEP,
 } = require("../src/runtime.cjs");
 
 /** Read one directive's source list out of the policy string. */
@@ -94,6 +99,39 @@ test("desktop evidence uses the operating system application-data directory", ()
       path.join("Applications", "Axcess Resources", "ocr-runtime", "bin") + path.delimiter,
     ),
   );
+});
+
+test("Ctrl+= zooms in, which the View menu's accelerator never matched", () => {
+  // `CommandOrControl+Plus` matches a literal "+", so the key labelled "+" on
+  // the keyboard -- which reports as "=" until Shift is held -- did nothing,
+  // while Ctrl+- worked because "-" is a key in its own right.
+  for (const key of ["=", "+", "Add"]) {
+    assert.equal(zoomActionFor({ type: "keyDown", control: true, key }), "in", key);
+  }
+  for (const key of ["-", "_", "Subtract"]) {
+    assert.equal(zoomActionFor({ type: "keyDown", control: true, key }), "out", key);
+  }
+  assert.equal(zoomActionFor({ type: "keyDown", control: true, key: "0" }), "reset");
+});
+
+test("zoom follows Command on macOS and ignores Alt", () => {
+  assert.equal(zoomActionFor({ type: "keyDown", meta: true, key: "=" }), "in");
+  // Alt opens the hidden menu bar; Alt+key belongs to it, not to zoom.
+  assert.equal(zoomActionFor({ type: "keyDown", control: true, alt: true, key: "=" }), null);
+  // A bare keystroke must reach the page: "-" is ordinary typing.
+  assert.equal(zoomActionFor({ type: "keyDown", key: "-" }), null);
+  // Only the press, or one tap would zoom twice.
+  assert.equal(zoomActionFor({ type: "keyUp", control: true, key: "=" }), null);
+});
+
+test("zoom steps stay inside a range the page can still reflow in", () => {
+  assert.equal(nextZoomLevel(0, "in"), ZOOM_STEP);
+  assert.equal(nextZoomLevel(0, "out"), -ZOOM_STEP);
+  assert.equal(nextZoomLevel(4.5, "reset"), 0);
+  assert.equal(nextZoomLevel(MAX_ZOOM_LEVEL, "in"), MAX_ZOOM_LEVEL, "clamped at the top");
+  assert.equal(nextZoomLevel(MIN_ZOOM_LEVEL, "out"), MIN_ZOOM_LEVEL, "clamped at the bottom");
+  // Chromium hands back NaN for a window that has gone away.
+  assert.equal(nextZoomLevel(Number.NaN, "in"), ZOOM_STEP);
 });
 
 const { OutputTail, startupFailureDetails } = require("../src/runtime.cjs");

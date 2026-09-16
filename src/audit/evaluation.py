@@ -464,7 +464,11 @@ def get_page_evidence(
                    -- it the evidence page lists a dialog that does not exist
                    -- until something is clicked, alongside findings that are
                    -- present on load, with nothing to tell them apart.
-                   revealed_by
+                   revealed_by,
+                   -- Which captured state to open in the inspector. The label
+                   -- above cannot decide that on its own: several controls on
+                   -- a page can answer to the same name.
+                   revealed_state_key
               FROM page_a11y_findings
              WHERE page_id = ? AND scan_id = ?
              ORDER BY CASE impact WHEN 'critical' THEN 0 WHEN 'serious' THEN 1

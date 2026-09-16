@@ -11,6 +11,7 @@ import {
   Checkbox,
   LinkButton,
   PageHeader,
+  Select,
 } from "../components/ui";
 import ProtectedScanSteps from "../components/ProtectedScanSteps";
 import LocalLoginScan from "../components/LocalLoginScan";
@@ -782,17 +783,9 @@ function SelectField({
   children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-fg">{label}</span>
-      <select
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="min-h-target rounded-xs border border-border bg-surface px-3 py-2 text-base text-fg focus:border-umich-blue focus:outline-none"
-      >
-        {children}
-      </select>
-    </label>
+    <Select stacked id={id} label={label} value={value} onChange={onChange}>
+      {children}
+    </Select>
   );
 }
 

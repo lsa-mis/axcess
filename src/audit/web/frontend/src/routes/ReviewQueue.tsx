@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, CheckCircle2, Filter, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, Search, ShieldCheck, Sparkles } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -12,7 +12,7 @@ import { useParams, useSearchParams } from "react-router";
 import { api } from "../api/client";
 import type { FindingStatus, IssueRow, ReviewLane } from "../api/types";
 import ReportWorkspaceNav from "../components/ReportWorkspaceNav";
-import { Button, Card, EmptyState, LinkButton, PageHeader } from "../components/ui";
+import { Button, Card, EmptyState, LinkButton, PageHeader, Select } from "../components/ui";
 
 const PIPELINE_LABEL: Record<string, string> = {
   axe: "axe-core",
@@ -237,17 +237,16 @@ export default function ReviewQueueRoute() {
               className="field"
             />
           </label>
-          <label>
-            <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-fg-subtle">
-              <Filter className="h-3.5 w-3.5" aria-hidden /> Evidence source
-            </span>
-            <select value={source} onChange={(event) => setParam("source", event.target.value)} className="field">
-              <option value="">All sources</option>
-              {sources.map((item) => (
-                <option key={item} value={item}>{PIPELINE_LABEL[item] ?? item}</option>
-              ))}
-            </select>
-          </label>
+          <Select
+            stacked
+            label="Evidence source"
+            value={source}
+            onChange={(next) => setParam("source", next)}
+            options={[
+              { value: "", label: "All sources" },
+              ...sources.map((item) => ({ value: item, label: PIPELINE_LABEL[item] ?? item })),
+            ]}
+          />
         </div>
       </Card>
 
@@ -434,13 +433,20 @@ function IssuePreview({
                 {issue.finding_ids.length <= 500 ? (
                   <div className="mt-2 space-y-2">
                     <div className="flex flex-wrap gap-2">
-                      <label className="min-w-52 flex-1">
-                        <span className="sr-only">New status for {issue.title}</span>
-                        <select value={nextStatus} onChange={(event) => setNextStatus(event.target.value as FindingStatus)} className="field">
-                          <option value="">Choose a group decision…</option>
-                          {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{statusLabel(issue.review_lane, status)}</option>)}
-                        </select>
-                      </label>
+                      <Select
+                        hideLabel
+                        className="min-w-52 flex-1"
+                        label={`New status for ${issue.title}`}
+                        value={nextStatus}
+                        onChange={(next) => setNextStatus(next as FindingStatus)}
+                        options={[
+                          { value: "", label: "Choose a group decision…" },
+                          ...STATUS_OPTIONS.map((status) => ({
+                            value: status,
+                            label: statusLabel(issue.review_lane, status),
+                          })),
+                        ]}
+                      />
                       <Button
                         type="button"
                         disabled={!nextStatus || nextStatus === singleStatus || (rationaleRequired && !rationale.trim()) || update.isPending}

@@ -365,7 +365,6 @@ export type LocalLoginScanStatus =
   | "awaiting_authentication"
   | "verifying_authentication"
   | "scanning"
-  | "authentication_required"
   | "completed"
   | "failed"
   | "interrupted";
@@ -1000,6 +999,11 @@ export interface PageEvidence {
     /** The control operated before this markup existed; null when the
      *  finding was present at page load. */
     revealed_by: string | null;
+    /** Which captured DOM state shows this finding, matching
+     *  `PageDomState.state_key`. Null for load-state findings and for reports
+     *  made before state capture. The label above cannot stand in for it:
+     *  several controls on a page can share an accessible name. */
+    revealed_state_key: string | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1040,18 +1044,43 @@ export interface PageInspection {
    * says so instead of implying a missing capture.
    */
   store_rendered_html: boolean;
+  /**
+   * DOM states the interaction probe captured for this page, in the order it
+   * reached them. Metadata only — ask for one by `state_key` to get its
+   * markup, because the documents are large and a reviewer reads one at a
+   * time. Empty for pages where no click revealed a new finding, and for
+   * reports made before state capture.
+   */
+  states: PageDomState[];
   render: {
     ok: boolean;
-    /** "stored" = rendered HTML persisted at scan time; "live" = re-rendered now. */
-    source?: "stored" | "live";
-    /** Present when `ok` is false, why the live page could not be captured. */
+    /**
+     * "stored" = the page as it loaded, persisted at scan time;
+     * "live" = re-rendered now; "state" = markup captured after a control was
+     * operated.
+     */
+    source?: "stored" | "live" | "state";
+    /** Present when `ok` is false, why this document could not be served. */
     error?: string;
+    /** Echoed back when a specific state was requested, found or not. */
+    state_key?: string;
     final_url?: string;
     status_code?: number;
     dom_html?: string;
     dom_chars?: number;
     dom_truncated?: boolean;
   };
+}
+
+export interface PageDomState {
+  /** Identifies the control's DOM location, not just its name: several
+   *  controls on a page can share an accessible name. */
+  state_key: string;
+  /** Accessible name of the control that was operated, for display. */
+  revealed_by: string;
+  /** Controls operated to arrive here, ending with this state's own. The
+   *  reproduction recipe for a reviewer working by hand. */
+  path_labels: string[];
 }
 
 

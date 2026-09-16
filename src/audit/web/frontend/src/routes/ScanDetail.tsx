@@ -23,6 +23,8 @@ import type {
   ScanProgress,
 } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+// The same helper the topbar trail uses, so the two can never disagree.
+import { siteLabel } from "../components/ReportCrumb";
 import ExportMenu from "../components/ExportMenu";
 import MethodCoverageLedger from "../components/MethodCoverageLedger";
 import {
@@ -179,9 +181,19 @@ export default function ScanDetailRoute() {
               // the audit: how many pages were fetched says nothing about what
               // was found, and it was the first thing under the title. The
               // page-level numbers below carry the findings instead.
-              counts={
-                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : ""
-              }
+              // The site joins the completion time on the line already here
+              // rather than taking a row of its own. The topbar trail names it
+              // too, but the trail truncates, and it is absent from a
+              // screenshot, a print, or anything pasted into a ticket -- which
+              // is most of how this page leaves the app. The in-progress and
+              // failed headers below already show it, so a completed report
+              // was the one state that dropped it.
+              counts={[
+                siteLabel(data.seed_url),
+                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             />
           }
           actions={
@@ -218,14 +230,23 @@ export default function ScanDetailRoute() {
 
       {!isComplete ? (
         <Card className="p-5">
-          <h2 className="font-semibold text-fg">No report was produced</h2>
+          {/* "No report was produced" was told to scans that had produced
+              thousands of findings across hundreds of pages, because it keyed
+              on the status rather than on whether anything was collected. A
+              stopped scan keeps everything it reached; what it cannot claim is
+              that the site was covered. Say that, and leave the evidence
+              reachable. */}
+          <h2 className="font-semibold text-fg">
+            {data.page_count > 0 ? "Partial report" : "No report was produced"}
+          </h2>
           <p className="mt-1 text-sm text-fg-muted">
             {data.page_count > 0 ? (
               <>
-                This scan ended as <strong>{data.status}</strong> after completing{" "}
+                This scan ended as <strong>{data.status}</strong> after{" "}
                 {data.page_count.toLocaleString()} page
-                {data.page_count === 1 ? "" : "s"}. Partial evidence remains
-                available, but it is not a completed report.
+                {data.page_count === 1 ? "" : "s"}. Everything it reached is
+                saved and can be reviewed below; the rest of the site was not
+                visited, so this is not evidence of full coverage.
               </>
             ) : (
               <>
@@ -261,6 +282,14 @@ export default function ScanDetailRoute() {
             >
               Review settings first
             </LinkButton>
+            {/* Without this the page said evidence "remains available" and
+                then offered no way to reach it, so the only route onward was
+                to run the scan again. */}
+            {data.page_count > 0 && (
+              <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
+                Review what was collected
+              </LinkButton>
+            )}
           </div>
         </Card>
       ) : (
