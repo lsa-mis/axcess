@@ -434,6 +434,59 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.alfa_enabled is True
     assert config.browser_only is True
     assert config.image_extraction_enabled is False
+    # Signed-in findings are the hardest to review a second time: reproducing
+    # one means repeating the sign-in by hand. Capture their evidence by
+    # default, exactly as an anonymous scan does.
+    assert config.capture_screenshots is True
+
+
+def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declining to store rendered pages declines their screenshots too.
+
+    A circled element screenshot is a crop of the post-sign-in page it came
+    from. An auditor who asked Axcess not to keep those pages has asked not to
+    keep the crops either, so one opt-out governs both.
+    """
+
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "skip_rendered_storage": True,
+            },
+        )
+
+    assert response.status_code == 201
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.store_rendered_html is False
+    assert config.capture_screenshots is False
 
 
 def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:

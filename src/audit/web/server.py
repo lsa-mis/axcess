@@ -1181,7 +1181,16 @@ def create_app(
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
             visual_checks_enabled=False,
-            capture_screenshots=False,
+            # A circled element screenshot is what makes a finding reviewable
+            # without re-running the sign-in, so an authenticated scan needs
+            # them at least as much as an anonymous one. It is also the same
+            # class of evidence as the rendered page it is cropped from: both
+            # are post-sign-in content. Capture by default and let the one
+            # "do not store rendered pages" opt-out govern both, the way the
+            # interaction probe's capture_states gate does below. The
+            # protected-agent pipeline is separate and stays off, see
+            # docs/protected-scans.md.
+            capture_screenshots=not body.skip_rendered_storage,
             store_rendered_html=not body.skip_rendered_storage,
             ignore_robots=True,
         )
@@ -3012,7 +3021,11 @@ async def _run_local_login_background(
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
             interaction_probe=login_interaction,
-            capture_screenshots=False,
+            # Follow the scan's own setting rather than hardcoding it off.
+            # This fetcher is built here instead of by the orchestrator, so
+            # it does not inherit the config the way an anonymous crawl's
+            # does and has to be handed the value explicitly.
+            capture_screenshots=config.capture_screenshots,
             shared_pages=scan_pages,
             search_explorer=build_search_explorer(config, login_axe),
         )

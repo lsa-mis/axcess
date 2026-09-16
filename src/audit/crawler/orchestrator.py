@@ -697,6 +697,11 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
             "interaction_max_depth": config.interaction_max_depth,
+            # Whether per-finding element screenshots were taken. Absent from
+            # older reports, whose screenshot state can only be inferred by
+            # looking for blobs. A report that cannot say which evidence it
+            # was allowed to collect cannot explain the evidence it lacks.
+            "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
             "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
