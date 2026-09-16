@@ -95,3 +95,45 @@ test("desktop evidence uses the operating system application-data directory", ()
     ),
   );
 });
+
+const { OutputTail, startupFailureDetails } = require("../src/runtime.cjs");
+
+test("the output tail keeps the backend's last lines across chunk boundaries", () => {
+  const tail = new OutputTail(3);
+  tail.push("first\nsec");
+  tail.push("ond\nthird\n");
+  assert.equal(tail.text(), "first\nsecond\nthird");
+  tail.push("fourth\n\n");
+  assert.equal(tail.text(), "second\nthird\nfourth");
+  tail.push("Traceback (most recent");
+  assert.equal(tail.text(), "second\nthird\nfourth\nTraceback (most recent");
+});
+
+test("a startup failure reports the launcher's reason and the backend's output", () => {
+  const details = startupFailureDetails({
+    error: new Error("Axcess backend stopped unexpectedly."),
+    backendOutput: "ModuleNotFoundError: No module named 'audit.analyzer'\n",
+    exitCode: 1,
+    logPath: "/tmp/launcher.log",
+    packaged: true,
+  });
+  assert.equal(
+    details.reason,
+    "Axcess backend stopped unexpectedly. The local service exited with code 1.",
+  );
+  assert.equal(details.output, "ModuleNotFoundError: No module named 'audit.analyzer'");
+  assert.equal(details.logPath, "/tmp/launcher.log");
+  assert.equal(details.packaged, true);
+});
+
+test("a startup failure without detail keeps the generic message", () => {
+  const details = startupFailureDetails({ backendOutput: "", exitCode: null });
+  assert.equal(details.reason, "The local service did not become ready.");
+  assert.equal(details.output, "");
+  assert.equal(details.packaged, false);
+});
+
+test("a signal-killed backend is named as such", () => {
+  const details = startupFailureDetails({ exitCode: "SIGKILL" });
+  assert.equal(details.reason, "The local service was stopped by signal SIGKILL.");
+});
