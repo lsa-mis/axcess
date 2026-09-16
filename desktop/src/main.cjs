@@ -11,10 +11,12 @@ const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 const {
+  OutputTail,
   contentSecurityPolicy,
   desktopEnvironment,
   isAxcessUrl,
   isSafeExternalUrl,
+  startupFailureDetails,
 } = require("./runtime.cjs");
 const {
   RELEASES_API_URL,
@@ -32,8 +34,32 @@ const appIcon = path.join(__dirname, "../assets/axcess.png");
 let mainWindow = null;
 let backendProcess = null;
 let backendOrigin = null;
+let backendOutput = new OutputTail();
+let backendExitCode = null;
+// Backend output is copied into the launcher log only until /health answers;
+// after that the service writes its own log and this one would just repeat it.
+let backendReady = false;
+const LAUNCHER_LOG_LIMIT = 1024 * 1024;
 let quitting = false;
 let updateOffered = false;
+let failureShown = false;
+
+// Packaged builds have no terminal, so the launcher keeps its own log next to
+// the backend's. This is the first place to look when Axcess "could not start".
+function launcherLogPath() {
+  return path.join(app.getPath("userData"), "data", "logs", "launcher.log");
+}
+
+function logLauncher(line) {
+  const entry = `${new Date().toISOString()} ${line}\n`;
+  if (!app.isPackaged) process.stderr.write(`[Axcess launcher] ${entry}`);
+  try {
+    fs.mkdirSync(path.dirname(launcherLogPath()), { recursive: true });
+    fs.appendFileSync(launcherLogPath(), entry);
+  } catch {
+    // Logging must never be the reason startup fails.
+  }
+}
 
 function findOpenPort() {
   return new Promise((resolve, reject) => {
@@ -80,7 +106,7 @@ function backendLaunch(port) {
 function startBackend(port) {
   const launch = backendLaunch(port);
   if (app.isPackaged && !fs.existsSync(launch.command)) {
-    throw new Error("The packaged Axcess backend is missing.");
+    throw new Error(`The packaged Axcess backend is missing: ${launch.command}`);
   }
   const env = {
     ...process.env,
@@ -91,6 +117,20 @@ function startBackend(port) {
       packaged: app.isPackaged,
     }),
   };
+  backendOutput = new OutputTail();
+  backendExitCode = null;
+  backendReady = false;
+  try {
+    if (fs.statSync(launcherLogPath()).size > LAUNCHER_LOG_LIMIT) {
+      fs.renameSync(launcherLogPath(), `${launcherLogPath()}.1`);
+    }
+  } catch {
+    // No log yet, or it cannot be rotated; appending still works or is skipped.
+  }
+  logLauncher(
+    `starting backend: ${launch.command} ${launch.args.join(" ")} (cwd ${launch.cwd}, ` +
+      `version ${buildLabel()}, packaged ${app.isPackaged})`,
+  );
   backendProcess = spawn(launch.command, launch.args, {
     cwd: launch.cwd,
     env,
@@ -98,17 +138,30 @@ function startBackend(port) {
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  backendProcess.stdout.on("data", (chunk) => {
-    if (!app.isPackaged) process.stdout.write(`[Axcess backend] ${chunk}`);
-  });
-  backendProcess.stderr.on("data", (chunk) => {
+  const relay = (chunk) => {
+    backendOutput.push(chunk);
     if (!app.isPackaged) process.stderr.write(`[Axcess backend] ${chunk}`);
-  });
-  backendProcess.once("exit", (code) => {
+    if (backendReady) return;
+    try {
+      fs.appendFileSync(launcherLogPath(), String(chunk));
+    } catch {
+      // Best effort; the in-memory tail still feeds the error page.
+    }
+  };
+  backendProcess.stdout.on("data", relay);
+  backendProcess.stderr.on("data", relay);
+  backendProcess.once("exit", (code, signal) => {
     backendProcess = null;
-    if (!quitting && code !== 0) showStartupFailure();
+    backendExitCode = code === null ? signal : code;
+    logLauncher(`backend exited: code ${code} signal ${signal}`);
+    if (!quitting && code !== 0) {
+      showStartupFailure(new Error("Axcess backend stopped unexpectedly."));
+    }
   });
-  backendProcess.once("error", () => showStartupFailure());
+  backendProcess.once("error", (error) => {
+    logLauncher(`backend could not be spawned: ${error.message}`);
+    showStartupFailure(error);
+  });
 }
 
 function healthCheck(origin) {
@@ -129,10 +182,17 @@ async function waitForBackend(origin) {
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (!backendProcess) throw new Error("Axcess backend stopped during startup.");
-    if (await healthCheck(origin)) return;
+    if (await healthCheck(origin)) {
+      backendReady = true;
+      logLauncher(`backend ready at ${origin}`);
+      return;
+    }
     await new Promise((resolve) => setTimeout(resolve, HEALTH_POLL_MS));
   }
-  throw new Error("Axcess took too long to start.");
+  throw new Error(
+    `Axcess took too long to start: ${origin}/health did not answer within ` +
+      `${STARTUP_TIMEOUT_MS / 1000} seconds.`,
+  );
 }
 
 function configureWindowSecurity(window) {
@@ -198,9 +258,28 @@ function createWindow() {
   return window;
 }
 
-function showStartupFailure() {
+function showStartupFailure(error) {
+  const details = startupFailureDetails({
+    error,
+    backendOutput: backendOutput.text(),
+    exitCode: backendExitCode,
+    logPath: launcherLogPath(),
+    packaged: app.isPackaged,
+  });
+  logLauncher(`startup failed: ${details.reason}`);
+  // The backend's exit and the health-check timeout can both report the same
+  // failure; the first one carries the useful detail, so keep it on screen.
+  if (failureShown) return;
+  failureShown = true;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    void mainWindow.loadFile(path.join(__dirname, "../static/error.html"));
+    void mainWindow.loadFile(path.join(__dirname, "../static/error.html"), {
+      query: {
+        reason: details.reason,
+        output: details.output,
+        log: details.logPath,
+        packaged: details.packaged ? "1" : "0",
+      },
+    });
   }
 }
 
@@ -319,6 +398,7 @@ async function checkForUpdates() {
 }
 
 async function launch() {
+  failureShown = false;
   mainWindow = createWindow();
   if (!backendProcess || !backendOrigin) {
     const port = await findOpenPort();
@@ -333,6 +413,7 @@ async function launch() {
 }
 
 if (!app.requestSingleInstanceLock()) {
+  logLauncher("another Axcess is already running; handing this launch to it");
   app.quit();
 } else {
   app.on("second-instance", () => {
@@ -345,10 +426,10 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     // Packaged macOS apps use the bundle's ICNS; brand the development Dock too.
     if (process.platform === "darwin" && !app.isPackaged) app.dock.setIcon(appIcon);
-    return launch().catch(() => showStartupFailure());
+    return launch().catch((error) => showStartupFailure(error));
   });
   app.on("activate", () => {
-    if (!mainWindow) void launch().catch(() => showStartupFailure());
+    if (!mainWindow) void launch().catch((error) => showStartupFailure(error));
   });
   app.on("before-quit", () => {
     quitting = true;
