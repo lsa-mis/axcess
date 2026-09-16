@@ -41,7 +41,14 @@ from audit.analyzer.interaction.safety import exploration_guard, safe_url
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from playwright.async_api import Locator, Page
+
+    #: Takes an element screenshot for a CSS selector, or returns None. Supplied
+    #: per call rather than held on the probe: the probe is shared by every
+    #: crawl worker, and it must not learn how the crawler makes a PNG.
+    ShotFn = Callable[[Page, str], Awaitable[bytes | None]]
 
 log = get_logger(__name__)
 
@@ -298,6 +305,14 @@ DEFAULT_MAX_INERT_REPEATS = 3
 # real defect; three out of thirty-one is a date grid. Sampling is an
 # inference about a population, so it needs a population to infer from.
 DEFAULT_MIN_INERT_POPULATION = 8
+# Element screenshots kept per page, and the bytes they may hold. Lower than
+# the load-state pass's cap: these are taken mid-sweep, so they compete with
+# exploration for the page's time budget rather than running after it.
+DEFAULT_MAX_STATE_SHOTS = 25
+_MAX_SHOT_TOTAL_BYTES = 12_000_000
+_SHOT_TIMEOUT_S = 5.0
+# A selector that names the whole document is not evidence of anything.
+_UNUSABLE_SELECTORS = frozenset({"", "body", "html", "(unknown)", "(none)"})
 DEFAULT_TIMEOUT_S = 120.0
 
 # Bounds on capturing revealed-state markup. The probe is shared by every
@@ -392,6 +407,9 @@ class _Budget:
     captures: dict[str, StateCapture] = field(default_factory=dict)
     #: Running total of compressed capture bytes held for this page.
     capture_bytes: int = 0
+    #: ``target_hash`` -> element PNG, taken while the state is still open.
+    screenshots: dict[str, bytes] = field(default_factory=dict)
+    shot_bytes: int = 0
     #: Consecutive clicks per shape that changed nothing. A date grid answers
     #: every cell the same way, so once a few have done nothing the rest will
     #: too, and the page's remaining budget is better spent elsewhere. Reset
@@ -433,8 +451,15 @@ class InteractionProbe:
     # inert takes three clicks, not twenty.
     max_inert_repeats: int = DEFAULT_MAX_INERT_REPEATS
     min_inert_population: int = DEFAULT_MIN_INERT_POPULATION
+    max_state_shots: int = DEFAULT_MAX_STATE_SHOTS
 
-    async def run(self, page: Page, *, baseline: Sequence[AxeViolation] = ()) -> InteractionResult:
+    async def run(
+        self,
+        page: Page,
+        *,
+        baseline: Sequence[AxeViolation] = (),
+        capture_screenshot: ShotFn | None = None,
+    ) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
         ``baseline`` is the load-state axe result for this page. Anything in
@@ -455,7 +480,13 @@ class InteractionProbe:
                     await page.evaluate(_RESET_MARKS_JS, _CANDIDATE_SELECTOR)
                     evaluated = True
                     await self._explore(
-                        page, budget, found, pinned=page.url, depth=0, fresh_only=False
+                        page,
+                        budget,
+                        found,
+                        pinned=page.url,
+                        depth=0,
+                        fresh_only=False,
+                        shot=capture_screenshot,
                     )
         except TimeoutError:
             budget.limits.add("time")
@@ -487,6 +518,7 @@ class InteractionProbe:
         return InteractionResult(
             findings=tuple(found),
             states=budget.states_found,
+            screenshots=dict(budget.screenshots),
             captures=tuple(budget.captures.values()),
             urls=tuple(sorted(budget.urls)),
             evaluated=evaluated,
@@ -511,6 +543,7 @@ class InteractionProbe:
         depth: int,
         fresh_only: bool,
         path: tuple[dict[str, Any], ...] = (),
+        shot: ShotFn | None = None,
     ) -> None:
         """Sweep controls and operate the ones this probe has not touched.
 
@@ -600,7 +633,15 @@ class InteractionProbe:
             budget.signature_counts[shape] = budget.signature_counts.get(shape, 0) + 1
 
             await self._operate(
-                page, budget, found, control, pinned=pinned, depth=depth, path=path, shape=shape
+                page,
+                budget,
+                found,
+                control,
+                pinned=pinned,
+                depth=depth,
+                path=path,
+                shape=shape,
+                shot=shot,
             )
 
     async def _resolve_control(self, page: Page, control: dict[str, Any]) -> Locator | None:
@@ -689,6 +730,7 @@ class InteractionProbe:
         depth: int,
         path: tuple[dict[str, Any], ...] = (),
         shape: str = "",
+        shot: ShotFn | None = None,
     ) -> bool:
         """Click one control; record anything new it revealed.
 
@@ -781,6 +823,9 @@ class InteractionProbe:
             # nothing was found in is real coverage, but no finding points at
             # it, so nothing would ever ask the inspector to show it.
             if len(found) > before_found:
+                # Before the nested sweep and before any dialog is dismissed:
+                # this is the only moment the revealed element is on screen.
+                await self._capture_shots(page, budget, found[before_found:], shot)
                 await self._capture_state(
                     page,
                     budget,
@@ -809,6 +854,7 @@ class InteractionProbe:
                 depth=depth + 1,
                 fresh_only=True,
                 path=(*path, control),
+                shot=shot,
             )
 
             # A dialog is not a menu. Whatever depth opened it, it has to be
@@ -932,6 +978,53 @@ class InteractionProbe:
             found.append(
                 RevealedViolation(violation=violation, revealed_by=label, state_key=state_key)
             )
+
+    async def _capture_shots(
+        self,
+        page: Page,
+        budget: _Budget,
+        revealed: Sequence[RevealedViolation],
+        shot: ShotFn | None,
+    ) -> None:
+        """Photograph the elements this state just revealed. Never raises.
+
+        The load-state pass runs after exploration finishes, by which point the
+        sweep has closed the menus and dismissed the dialogs it opened, so a
+        revealed element is gone or hidden and every one of these findings went
+        to the report with no screenshot at all. Here the state is still open.
+
+        Bounded and swallowed for the same reason as the DOM capture: this sits
+        inside ``_operate``'s ``try``, ahead of the dialog-dismissal loop, so an
+        exception escaping would leave a modal open and every later click would
+        land on its overlay while the ledger counted them as coverage.
+        """
+
+        if shot is None:
+            return
+        for revealed_violation in revealed:
+            if len(budget.screenshots) >= self.max_state_shots:
+                budget.limits.add("state_shots")
+                return
+            if budget.shot_bytes >= _MAX_SHOT_TOTAL_BYTES:
+                budget.limits.add("state_shots")
+                return
+            digest = revealed_violation.target_hash
+            selector = revealed_violation.target_selector
+            if digest in budget.screenshots or selector in _UNUSABLE_SELECTORS:
+                continue
+            try:
+                async with asyncio.timeout(_SHOT_TIMEOUT_S):
+                    png = await shot(page, selector)
+            except Exception as exc:
+                log.debug(
+                    "interaction.shot_failed",
+                    selector=selector[:80],
+                    error_type=type(exc).__name__,
+                )
+                continue
+            if png:
+                budget.screenshots[digest] = png
+                budget.shot_bytes += len(png)
 
     async def _capture_state(
         self,

@@ -23,7 +23,7 @@ prevents.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from audit.analyzer.axe import AxeViolation
 
@@ -106,6 +106,12 @@ class InteractionResult:
     #: Clicks that actually changed the DOM, states a load-time pass cannot
     #: reach, counted whether or not they held a defect.
     states: int = 0
+    #: ``target_hash`` -> element PNG, taken in the state the finding was
+    #: first seen in. The load-state pass cannot produce these: by the time it
+    #: runs the sweep has dismissed the dialogs and menus it opened, so the
+    #: element is gone or hidden. Empty when the scan does not capture
+    #: screenshots.
+    screenshots: dict[str, bytes] = field(default_factory=dict)
     #: Markup for the subset of those states that held a *new* defect. Never
     #: the same number as ``states`` and not interchangeable with it: a state
     #: nothing was found in is real coverage but nothing needs to inspect it,

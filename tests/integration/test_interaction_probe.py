@@ -790,3 +790,59 @@ async def test_a_small_group_of_controls_is_never_sampled(page, axe) -> None:  #
     assert any(f.violation.rule_id == "label" for f in result.findings), (
         "the fourth control was skipped and its defect lost"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_revealed_element_is_photographed_while_its_state_is_open(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """The only moment the element is on screen.
+
+    The load-state screenshot pass runs after exploration, by which point the
+    sweep has closed the menus and dismissed the dialogs it opened. Every
+    interaction-revealed finding therefore reached the report with no
+    screenshot at all -- 1,128 of them on one real scan.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    seen: list[str] = []
+
+    async def shot(target_page, selector: str) -> bytes:  # type: ignore[no-untyped-def]
+        # Proves the element is actually present when the probe asks for it,
+        # rather than merely that a callback was invoked.
+        assert await target_page.locator(selector).first.count() == 1, selector
+        seen.append(selector)
+        return b"PNG:" + selector.encode()
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline, capture_screenshot=shot)
+
+    assert result.findings, "fixture should reveal a violation"
+    assert seen, "no revealed element was offered to the screenshot pass"
+    # Keyed by target_hash, which is what the repo layer looks them up by.
+    for finding in result.findings:
+        if finding.target_selector not in ("", "body", "html"):
+            assert finding.target_hash in result.screenshots, finding.revealed_by
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_screenshot_failure_costs_nothing_but_the_screenshot(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """It sits ahead of the dialog-dismissal loop, like the DOM capture.
+
+    An exception escaping here would leave a modal open, and every later click
+    would land on its overlay while the ledger counted them as coverage.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate("() => document.getElementById('stuck').remove()")
+
+    async def explode(_page, _selector: str) -> bytes:  # type: ignore[no-untyped-def]
+        raise RuntimeError("screenshot timeout")
+
+    result = await InteractionProbe(axe=axe).run(
+        page, baseline=baseline, capture_screenshot=explode
+    )
+
+    assert result.screenshots == {}
+    assert result.findings, "detection must be unaffected"
+    assert result.dialogs_opened == 2, "dialog cleanup still ran"
+    assert result.dialogs_stuck == 0
