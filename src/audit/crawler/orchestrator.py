@@ -19,7 +19,7 @@ import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 import structlog
@@ -364,7 +364,7 @@ async def run_crawl(
     # problem, the configured scope does not cover where sign-in landed.
     entry_url = normalized_seed
     if config.start_url is not None:
-        candidate = url_policy.normalize(config.start_url)
+        candidate = _signed_in_entry_url(config.start_url)
         if candidate == normalized_seed:
             pass
         elif url_policy.is_in_scope(candidate, scope, allow_subdomains=config.allow_subdomains):
@@ -593,6 +593,29 @@ async def run_crawl(
                 await client.aclose()
 
     return summary
+
+
+def _signed_in_entry_url(start_url: str) -> str:
+    """Canonicalize where sign-in landed, without discarding its fragment.
+
+    ``normalize`` keeps a fragment only when it looks like a hash route,
+    ``#/route`` or ``#!/route``, because on an ordinary page ``#section`` is the
+    same document and has to dedupe with it. That rule is right for every link
+    the crawler discovers and wrong for this one URL: a sign-in that ended on
+    ``/#my-courses`` was rewritten to ``/``, which was the application's boot
+    screen. It carried no links, so the crawl finished after a single page and
+    never reached the signed-in area the auditor was standing in.
+
+    This URL is the one a human chose by being there when they confirmed
+    sign-in, so its exact route is evidence rather than a guess about what the
+    fragment means. Only the entry point is read this way; links found from it
+    normalize as usual, so ``#section`` anchors still dedupe.
+    """
+    canonical = url_policy.normalize(start_url)
+    fragment = urlsplit(start_url.strip()).fragment
+    if not fragment or urlsplit(canonical).fragment:
+        return canonical
+    return urlunsplit(urlsplit(canonical)._replace(fragment=fragment))
 
 
 def _default_client(config: CrawlConfig) -> httpx.AsyncClient:

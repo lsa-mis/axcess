@@ -491,6 +491,38 @@ def test_start_url_is_where_the_crawl_actually_begins(tmp_db: sqlite3.Connection
     )
 
 
+def test_start_url_keeps_the_fragment_sign_in_landed_on(tmp_db: sqlite3.Connection) -> None:
+    """Reproduces scan 35: a one-page report of an application's boot screen.
+
+    Sign-in ended on ``/#my-courses``. ``normalize`` drops a fragment that does
+    not look like a hash route, so the entry became ``/`` -- identical to the
+    seed, and in that application the pre-render splash. It carried no links,
+    so the crawl finished having captured a single page titled "Opening" and
+    never reached the signed-in area. Landing one directory deeper, as scan 36
+    did, produced nine pages from the same session and the same config.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            start_url=f"{base}/#my-courses",
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/#my-courses" in urls, (
+        "the crawl threw away the route sign-in landed on and began at the bare seed"
+    )
+    # Only the entry point is read this way. Links discovered from it still
+    # normalize, so an in-page anchor does not become a second page.
+    assert not [url for url in urls if "#" in url and url != f"{base}/#my-courses"]
+
+
 def test_start_url_does_not_narrow_the_configured_scope(tmp_db: sqlite3.Connection) -> None:
     """Scope stays anchored to the seed even though the entry point moved.
 
