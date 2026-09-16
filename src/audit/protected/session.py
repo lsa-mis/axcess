@@ -475,7 +475,11 @@ class ManualAuthenticationSession:
             self._route_guard.observe_auth_pages(self._adopt_auth_page)
             await self._route_guard.install_on_context(self._context)
             self._page = await self._context.new_page()
-            self._auth_pages.append(self._page)
+            # The context's page event can already have adopted this tab
+            # before new_page returns. Register it idempotently: a duplicate
+            # would survive removal from the sign-in list when the scanner
+            # retains this tab, so sign-in cleanup would close the scan tab.
+            self._adopt_auth_page(self._page)
             self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
             await self._page.goto(
                 self._seed_url,

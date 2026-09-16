@@ -243,7 +243,12 @@ class _FakePage:
 
     async def close(self, *, run_before_unload: bool) -> None:
         assert not run_before_unload
+        if self.closed:
+            return
         self.closed = True
+        handler = self.event_handlers.get("close")
+        if handler is not None:
+            handler(self)  # type: ignore[operator]
 
     def on(self, event: str, handler: object) -> None:
         self.event_handlers[event] = handler
@@ -309,9 +314,15 @@ class _FakeContext:
     async def new_page(self) -> _FakePage:
         self.new_page_calls += 1
         if self.new_page_calls == 1:
-            return self.page
-        page = _FakePage()
-        self.additional_pages.append(page)
+            page = self.page
+        else:
+            page = _FakePage()
+            self.additional_pages.append(page)
+        # Playwright emits the context's page event before new_page returns.
+        # Omitting it hid duplicate registration of the initial sign-in tab.
+        handler = self.event_handlers.get("page")
+        if handler is not None:
+            await handler(page)  # type: ignore[operator]
         return page
 
     async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
@@ -636,6 +647,43 @@ async def test_a_handoff_tab_that_closes_itself_falls_back_to_the_previous_tab()
     close_handler(popup)  # type: ignore[operator]
 
     assert session.page is page, "the session kept pointing at a closed tab"
+
+
+@pytest.mark.asyncio
+async def test_closing_extra_login_tabs_preserves_the_original_for_scanning() -> None:
+    session, _, _, context, page = _session_with_fake_browser()
+    try:
+        await session.start()
+        page.url = "https://app.example.edu/dashboard"
+        page.has_session_storage = True
+        on_page = context.event_handlers["page"]
+        popups = [_FakePopup(opener_page=page), _FakePopup(opener_page=page)]
+        for popup in popups:
+            await on_page(popup)  # type: ignore[operator]
+        for popup in reversed(popups):
+            await popup.close(run_before_unload=False)
+
+        assert session.page is page
+        session.verify_authenticated_target()
+        scan_pages = await session.prepare_background_scan_pages(2)
+        await session.discard_manual_auth_page()
+
+        assert scan_pages == (page,)
+        assert not page.closed, "sign-in cleanup closed the retained scan tab"
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_closing_the_only_login_tab_clears_the_session_page() -> None:
+    session, _, _, _, page = _session_with_fake_browser()
+    try:
+        await session.start()
+        await page.close(run_before_unload=False)
+        with pytest.raises(ManualAuthenticationError, match="not running"):
+            session.verify_authenticated_target()
+    finally:
+        await session.close()
 
 
 @pytest.mark.asyncio
