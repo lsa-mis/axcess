@@ -1,0 +1,77 @@
+{
+  "tab_order_ms_once_per_page": 2172.9,
+  "keys_per_probe": [
+    "Enter",
+    "Space",
+    "ArrowDown"
+  ],
+  "cap_ms": 300,
+  "runs": [
+    {
+      "probe": "t-fake-button",
+      "repeat": 0,
+      "ms": 1500.4,
+      "verdict": "no_lead",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    },
+    {
+      "probe": "t-real-button",
+      "repeat": 0,
+      "ms": 6908.7,
+      "verdict": "no_lead",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    },
+    {
+      "probe": "t-tooltip",
+      "repeat": 0,
+      "ms": 1308.7,
+      "verdict": "violation",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    },
+    {
+      "probe": "t-tooltip",
+      "repeat": 1,
+      "ms": 1458.3,
+      "verdict": "violation",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    },
+    {
+      "probe": "t-real-button",
+      "repeat": 1,
+      "ms": 6725.6,
+      "verdict": "no_lead",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    },
+    {
+      "probe": "t-fake-button",
+      "repeat": 1,
+      "ms": 1282.1,
+      "verdict": "no_lead",
+      "keys": [
+        "Enter",
+        "Space",
+        "ArrowDown"
+      ]
+    }
+  ]
+}
