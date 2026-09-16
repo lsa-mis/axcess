@@ -25,7 +25,6 @@ const TERMINAL = new Set<LocalLoginScanStatus>([
   "completed",
   "failed",
   "interrupted",
-  "authentication_required",
 ]);
 
 export default function LocalLoginScan({
@@ -697,21 +696,15 @@ function LocalLoginHandoff({
         detail: "Complete the full login and 2FA flow, then return here.",
       },
       verifying_authentication: {
-        title: "Checking the signed-in page",
+        title: "Preparing the signed-in session",
         detail:
-          "Axcess is confirming that the browser returned to the approved application.",
+          "Axcess is setting up the background tabs that will reuse your signed-in browser.",
       },
       scanning: {
         title: "Scanning in the background",
         detail: status.data?.browser_backgrounded
           ? "The signed-in Chromium window has been moved out of the way while Axcess reuses its in-memory session. You can keep working, but quitting Chromium will stop the scan."
           : "Axcess is reusing the signed-in browser session in the background. You can keep working, but closing Chromium will stop the scan.",
-      },
-      authentication_required: {
-        title: "Sign-in could not be confirmed",
-        detail:
-          status.data?.error ??
-          "Start again and include every exact sign-in origin.",
       },
       completed: {
         title: "Report ready",

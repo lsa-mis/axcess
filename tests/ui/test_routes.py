@@ -1683,10 +1683,10 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
 ) -> None:
     """The verified landing URL must reach the crawl as ``start_url``.
 
-    ``verify_authenticated_target`` already validated where sign-in ended and
-    returned it; the handoff used to throw that value away and crawl the
-    pre-login seed, which for a login handoff is often the sign-in page
-    itself. This pins the wiring: the browser half is faked, because the real
+    ``enter_scan_mode`` reports where sign-in ended; the handoff used to throw
+    that value away and crawl the pre-login seed, which for a login handoff is
+    often the sign-in page itself. This pins the wiring: the browser half is
+    faked, because the real
     path needs Chromium and a human at the keyboard, but the config handed to
     ``run_crawl`` is the thing that was wrong.
     """
@@ -1719,8 +1719,8 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url=landed)
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return landed
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
@@ -1845,8 +1845,8 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
@@ -1917,8 +1917,8 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))

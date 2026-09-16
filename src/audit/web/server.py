@@ -82,7 +82,7 @@ from audit.protected.repository import (
     purge_expired_protected_data,
     recover_stale_protected_run_leases,
 )
-from audit.protected.session import ManualAuthenticationError, ManualAuthenticationSession
+from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
 from audit.synthesizer.diff import compute_diff
 from audit.web.comparison import (
@@ -2968,13 +2968,11 @@ async def _run_local_login_background(
         # SSO round trip, then a dashboard or landing page. Start the crawl
         # from where the auditor actually is rather than from the pre-login
         # URL, which for a login handoff is frequently the sign-in page
-        # itself, re-fetching it produced a scan of the login form. The
-        # verified URL has already passed the approved-target-origin check
-        # inside verify_authenticated_target, so an IdP or OAuth-callback URL
-        # can never become the entry point. Scope still derives from the
-        # configured seed; only the entry point moves (see CrawlConfig).
-        landed = run.session.verify_authenticated_target()
-        config = replace(config, start_url=landed.url)
+        # itself, re-fetching it produced a scan of the login form. Scope
+        # still derives from the configured seed, and run_crawl falls back to
+        # that seed when the landing page sits outside it, so a landing page
+        # Axcess cannot use costs the crawl nothing.
+        config = replace(config, start_url=run.session.enter_scan_mode())
         # Chromium on macOS restores a minimized window whenever a new page is
         # created. Prepare reusable scan tabs before minimizing so
         # the authenticated crawl stays out of the auditor's way throughout.
@@ -3085,13 +3083,6 @@ async def _run_local_login_background(
         run.status = "interrupted"
         _finish_local_login_scan(db_path, run.scan_id, "interrupted")
         raise
-    except ManualAuthenticationError:
-        run.status = "authentication_required"
-        run.error = (
-            "Sign-in did not finish on the approved website. Return to the visible "
-            "browser, or add every exact sign-in origin and start again."
-        )
-        _finish_local_login_scan(db_path, run.scan_id, "interrupted")
     except Exception:
         # Do not surface a browser/target exception: it can contain a private
         # URL, response detail, or text from the authenticated application.

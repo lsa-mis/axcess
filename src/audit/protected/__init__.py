@@ -43,7 +43,6 @@ from audit.protected.session import (
     ManualAuthState,
     build_manual_auth_policies,
     validate_protected_seed_url,
-    verify_authenticated_target_url,
 )
 
 __all__ = [
@@ -83,5 +82,4 @@ __all__ = [
     "set_protected_scan_status",
     "store_protected_artifact",
     "validate_protected_seed_url",
-    "verify_authenticated_target_url",
 ]

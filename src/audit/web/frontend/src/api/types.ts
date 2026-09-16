@@ -365,7 +365,6 @@ export type LocalLoginScanStatus =
   | "awaiting_authentication"
   | "verifying_authentication"
   | "scanning"
-  | "authentication_required"
   | "completed"
   | "failed"
   | "interrupted";

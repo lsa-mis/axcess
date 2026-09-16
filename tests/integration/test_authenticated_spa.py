@@ -82,7 +82,7 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
         session._auth_pages = [page]
         session._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
         try:
-            landed = session.verify_authenticated_target()
+            landed_url = session.enter_scan_mode()
             pages = await session.prepare_background_scan_pages(2)
             await session.discard_manual_auth_page()
             axe = AxeAnalyzer.from_bundled()
@@ -95,7 +95,7 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
                 tmp_db,
                 CrawlConfig(
                     seed_url=origin,
-                    start_url=landed.url,
+                    start_url=landed_url,
                     browser_only=True,
                     whole_host=True,
                     max_pages=10,
@@ -206,7 +206,7 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
                 expected = popups[-1]
 
             assert session.page is expected
-            landed = session.verify_authenticated_target()
+            landed_url = session.enter_scan_mode()
             pages = await session.prepare_background_scan_pages(2)
             await session.discard_manual_auth_page()
             assert pages == (expected,)
@@ -217,7 +217,7 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
                 tmp_db,
                 CrawlConfig(
                     seed_url=origin,
-                    start_url=landed.url,
+                    start_url=landed_url,
                     browser_only=True,
                     whole_host=True,
                     max_pages=1,
