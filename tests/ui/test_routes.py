@@ -715,6 +715,34 @@ def test_prepare_scan_row_uses_crawler_seed_identity(
     assert count["n"] == 1
 
 
+def test_prepare_scan_row_leaves_a_signed_in_scan_alone(
+    seeded_db: tuple[Path, Path, int],
+) -> None:
+    """An ordinary scan must start its own report, not continue a signed-in one.
+
+    The other half of the same rule the crawler's ``_ensure_scan`` enforces.
+    Both paths hunt for a row to continue, so a scan that may not be continued
+    has to be invisible to both: whichever one still saw it would win the race
+    and merge signed-out pages into a signed-in report.
+    """
+
+    from audit.crawler.orchestrator import config_json_for_scan
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+    seed = "https://app.example.test/secure/"
+    signed_in_config = server.CrawlConfig(seed_url=seed, resumable=False)
+    signed_in_id = server._prepare_scan_row(db_path, signed_in_config, resume_interrupted=False)
+
+    anonymous_id = server._prepare_scan_row(db_path, server.CrawlConfig(seed_url=seed))
+
+    assert anonymous_id != signed_in_id
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (signed_in_id,)).fetchone()
+    assert row is not None
+    assert json.loads(row["config_json"]) == json.loads(config_json_for_scan(signed_in_config))
+
+
 def test_api_create_scan_respects_whole_host(
     client: TestClient,
     seeded_db: tuple[object, object, int],

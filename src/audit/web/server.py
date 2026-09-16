@@ -1193,11 +1193,21 @@ def create_app(
             capture_screenshots=not body.skip_rendered_storage,
             store_rendered_html=not body.skip_rendered_storage,
             ignore_robots=True,
+            # The signed-in context lives in this process's memory and dies
+            # with it, so nothing can continue this scan later. Say so on the
+            # row: an ordinary crawl of the same seed used to adopt it while
+            # it was still running, mixing signed-out pages into a signed-in
+            # report and rewriting the config that identified it as one.
+            resumable=False,
         )
         # A manual-login session is deliberately memory-only and cannot be
         # resumed after interruption. Always allocate a fresh report and job
         # frontier even when the auditor scans the same URL again.
         scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
+        # Hand the crawler the row rather than letting it search: an
+        # unresumable row is invisible to seed-based discovery, including its
+        # own run's.
+        config = replace(config, scan_id=scan_id)
         session = ManualAuthenticationSession(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
@@ -2857,17 +2867,21 @@ def _prepare_scan_row(
     crawl under a second scan ID while the progress screen remains attached
     to the original, permanently ``running`` row.
     """
-    from audit.crawler.orchestrator import config_json_for_scan
+    from audit.crawler.orchestrator import RESUMABLE_SCAN_SQL, config_json_for_scan
 
     seed_url = _canonical_scan_seed(config.seed_url)
     conn = connect(db_path)
     try:
+        # Same refusal the crawler's own row discovery honours. Both paths look
+        # for a row to continue, so a scan that may not be continued has to be
+        # invisible to both or the one that ignores it wins the race.
         if not resume_interrupted:
             existing = None
         elif _protected_scan_table_exists(conn):
             existing = conn.execute(
-                "SELECT id FROM scans "
+                "SELECT id FROM scans "  # noqa: S608, module constant only
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
+                f"AND {RESUMABLE_SCAN_SQL} "
                 "AND NOT EXISTS ("
                 "SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id"
                 ") ORDER BY id DESC LIMIT 1",
@@ -2875,8 +2889,9 @@ def _prepare_scan_row(
             ).fetchone()
         else:
             existing = conn.execute(
-                "SELECT id FROM scans "
+                "SELECT id FROM scans "  # noqa: S608, module constant only
                 "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
+                f"AND {RESUMABLE_SCAN_SQL} "
                 "ORDER BY id DESC LIMIT 1",
                 (seed_url,),
             ).fetchone()

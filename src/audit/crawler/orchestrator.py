@@ -253,6 +253,20 @@ class CrawlConfig:
     # inspector then always re-renders on demand. Finding evidence,
     # screenshots, and image blobs are unaffected.
     store_rendered_html: bool = True
+    # The row this crawl must write into, when the caller already created it.
+    # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
+    # this crawl" from the seed URL, and they do not work it out the same way.
+    # A caller that owns a row names it here instead of letting the second
+    # guess disagree with the first.
+    scan_id: int | None = None
+    # May a later crawl of the same seed adopt this row and keep writing into
+    # it? True for an ordinary crawl: its frontier lives in the database and is
+    # meant to survive a restart. False when the session behind the scan cannot
+    # be rebuilt. A manual sign-in holds its credentials in memory only, so a
+    # later anonymous run that adopted the row would append signed-out evidence
+    # to a signed-in report and overwrite the stored config that said it was
+    # one, leaving nothing in the record to show the two had been mixed.
+    resumable: bool = True
     search: SearchConfig | None = None
 
 
@@ -590,8 +604,33 @@ def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
     )
 
 
+# True for a scan row a later crawl of the same seed is allowed to adopt. Both
+# row-discovery paths must agree, so the predicate is written once here and
+# imported by the web layer's ``_prepare_scan_row``. A row written before the
+# flag existed, or one whose config is not valid JSON, stays adoptable: the
+# absence of a refusal is not a refusal. Written as CASE rather than a guarded
+# AND because ``json_extract`` raises on malformed JSON and SQLite does not
+# promise to short-circuit AND, which would make one unreadable row fail every
+# later crawl's row discovery.
+RESUMABLE_SCAN_SQL = (
+    "CASE WHEN json_valid(config_json) "
+    "THEN COALESCE(json_extract(config_json, '$.resumable'), 1) ELSE 1 END != 0"
+)
+
+
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
+    # A caller that already owns a row names it, and no discovery runs at all.
+    if config.scan_id is not None:
+        owned = conn.execute("SELECT id FROM scans WHERE id = ?", (config.scan_id,)).fetchone()
+        if owned is None:
+            raise ValueError(f"scan row {config.scan_id} does not exist")
+        conn.execute(
+            "UPDATE scans SET status = 'running', finished_at = NULL, "
+            "failure_reason = NULL, config_json = ? WHERE id = ?",
+            (config_json_for_scan(config), config.scan_id),
+        )
+        return config.scan_id
     # ``running`` is always adopted: it is either the row the web layer just
     # prepared for the progress view (which has no queued work yet) or a crawl
     # whose process died without getting to write a status.
@@ -603,12 +642,13 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
     # already collected hundreds of pages was quietly adopted and flipped to
     # completed by a run the operator thought was starting fresh.
     row = conn.execute(
-        """
+        f"""
         SELECT id FROM scans
          WHERE seed_url = ?
            AND NOT EXISTS (
                SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id
            )
+           AND {RESUMABLE_SCAN_SQL}
            AND (
                status = 'running'
                OR (
@@ -622,7 +662,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
            )
          ORDER BY id DESC
          LIMIT 1
-        """,
+        """,  # noqa: S608, module constant only
         (seed_url,),
     ).fetchone()
     if row is not None:
@@ -703,6 +743,8 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # was allowed to collect cannot explain the evidence it lacks.
             "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
+            # Read back by the row-discovery predicate, not just by the UI.
+            "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older

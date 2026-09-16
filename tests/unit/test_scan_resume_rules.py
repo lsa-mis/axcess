@@ -5,6 +5,13 @@ leaves its work in ``jobs``, and the next run of the same seed picks it up
 rather than starting the site again. A scan the operator *stopped* is a
 different thing wearing the same status, and taking that one over silently
 folds a finished-with reportinto whatever runs next.
+
+A signed-in scan is a third case. Its browser context lives in one process's
+memory, so there is no session for a later crawl to resume with -- only the row
+and the queue, which an anonymous crawl would happily continue under its own
+identity. Those rows say ``resumable: false`` in their stored config and are
+invisible to seed-based discovery, including their own run's, which is why
+``CrawlConfig.scan_id`` exists.
 """
 
 from __future__ import annotations
@@ -12,7 +19,9 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from audit.crawler.orchestrator import CrawlConfig, _ensure_scan
+import pytest
+
+from audit.crawler.orchestrator import CrawlConfig, _ensure_scan, config_json_for_scan
 from audit.db import queue
 
 SEED = "https://app.example.test/"
@@ -38,6 +47,16 @@ def _queue_work(conn: sqlite3.Connection, scan_id: int, *, url: str = SEED) -> N
 
 def _config() -> CrawlConfig:
     return CrawlConfig(seed_url=SEED)
+
+
+def _signed_in_scan(conn: sqlite3.Connection, status: str) -> int:
+    """A row written by the manual-login path: real work, unrepeatable session."""
+    scan_id = _scan(conn, status)
+    conn.execute(
+        "UPDATE scans SET config_json = ? WHERE id = ?",
+        (config_json_for_scan(CrawlConfig(seed_url=SEED, resumable=False)), scan_id),
+    )
+    return scan_id
 
 
 def test_a_crawl_killed_mid_flight_is_resumed(tmp_db: sqlite3.Connection) -> None:
@@ -123,3 +142,75 @@ def test_a_crawl_whose_process_died_is_still_adopted(
     _queue_work(tmp_db, crashed)
 
     assert _ensure_scan(tmp_db, SEED, _config()) == crashed
+
+
+def test_an_anonymous_crawl_does_not_take_over_a_running_signed_in_scan(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """The reported bug: two scans' evidence merged into one report.
+
+    An authenticated scan was still crawling when an ordinary scan of the same
+    seed started. The ordinary run adopted the signed-in row, appended pages
+    fetched with no session to it, and overwrote the stored config -- erasing
+    the ``browser_only`` and ``start_url`` values that were the only record the
+    scan had ever been authenticated.
+    """
+    signed_in = _signed_in_scan(tmp_db, "running")
+    _queue_work(tmp_db, signed_in)
+
+    adopted = _ensure_scan(tmp_db, SEED, _config())
+
+    assert adopted != signed_in, "an anonymous crawl must not continue a signed-in scan"
+    row = tmp_db.execute(
+        "SELECT status, config_json FROM scans WHERE id = ?", (signed_in,)
+    ).fetchone()
+    assert row["status"] == "running", "the signed-in scan keeps its own status"
+    assert json.loads(row["config_json"])["resumable"] is False, "and its own config"
+
+
+def test_an_anonymous_crawl_does_not_resume_an_interrupted_signed_in_scan(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Queued work is not an invitation when the session behind it is gone."""
+    signed_in = _signed_in_scan(tmp_db, "interrupted")
+    _queue_work(tmp_db, signed_in)
+
+    assert _ensure_scan(tmp_db, SEED, _config()) != signed_in
+
+
+def test_a_signed_in_scan_crawls_the_row_it_was_given(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Its own run must still reach it, and discovery can no longer find it."""
+    signed_in = _signed_in_scan(tmp_db, "running")
+    config = CrawlConfig(seed_url=SEED, resumable=False, scan_id=signed_in)
+
+    assert _ensure_scan(tmp_db, SEED, config) == signed_in
+    assert tmp_db.execute("SELECT COUNT(*) c FROM scans").fetchone()["c"] == 1
+
+
+def test_naming_a_row_that_does_not_exist_is_refused(tmp_db: sqlite3.Connection) -> None:
+    """Better to fail the scan than to write findings against no report."""
+    config = CrawlConfig(seed_url=SEED, scan_id=4321)
+
+    with pytest.raises(ValueError, match="4321"):
+        _ensure_scan(tmp_db, SEED, config)
+
+
+def test_a_row_predating_the_flag_is_still_resumable(tmp_db: sqlite3.Connection) -> None:
+    """Config written before ``resumable`` existed omits the key entirely."""
+    legacy = _scan(tmp_db, "interrupted")  # config_json is '{}'
+    _queue_work(tmp_db, legacy)
+
+    assert _ensure_scan(tmp_db, SEED, _config()) == legacy
+
+
+def test_an_unreadable_config_does_not_break_row_discovery(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A row nobody can parse must not make every later crawl fail."""
+    broken = _scan(tmp_db, "interrupted")
+    tmp_db.execute("UPDATE scans SET config_json = 'not json' WHERE id = ?", (broken,))
+    _queue_work(tmp_db, broken)
+
+    assert _ensure_scan(tmp_db, SEED, _config()) == broken
