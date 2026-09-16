@@ -49,6 +49,28 @@ make desktop-run
 Electron chooses an available loopback port. It does not use or expose port
 8765, and it does not enable the LAN-hosting access-token mode.
 
+Only one Axcess may run per user data folder. If an installed copy is already
+open, `make desktop-run` (or a second installed copy) exits at once and brings
+the running window forward instead of starting.
+
+### "Axcess could not start"
+
+The window shows this page when the local service exits, cannot be spawned,
+or never answers `/health` within 60 seconds. The page prints the launcher's
+reason and the service's last lines of output. The full record is in the
+launcher log, next to the service's own log:
+
+| Platform | Log file |
+| --- | --- |
+| macOS | `~/Library/Application Support/Axcess/data/logs/launcher.log` |
+| Windows | `%APPDATA%\Axcess\data\logs\launcher.log` |
+| Linux | `~/.config/Axcess/data/logs/launcher.log` |
+
+Every launch appends the exact backend command, the version, its output, and
+its exit code, so the file also shows which build failed. A development
+checkout usually fails because dependencies are missing; run
+`make desktop-setup` and retry.
+
 ## Build a local installer
 
 The release build has five layers:

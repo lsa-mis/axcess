@@ -128,14 +128,66 @@ function nextZoomLevel(current, action) {
   return Math.max(MIN_ZOOM_LEVEL, Math.min(MAX_ZOOM_LEVEL, level));
 }
 
+/**
+ * Keeps the most recent lines of the backend's output so a startup failure
+ * can show what the sidecar actually said instead of a generic message.
+ * Packaged builds have no terminal, so without this the reason is lost.
+ */
+class OutputTail {
+  constructor(limit = 40) {
+    this.limit = limit;
+    this.lines = [];
+    this.partial = "";
+  }
+
+  push(chunk) {
+    const text = this.partial + String(chunk);
+    const parts = text.split(/\r?\n/);
+    this.partial = parts.pop() || "";
+    for (const line of parts) {
+      if (line.trim() === "") continue;
+      this.lines.push(line);
+      if (this.lines.length > this.limit) this.lines.shift();
+    }
+  }
+
+  text() {
+    const lines = this.partial.trim() ? [...this.lines, this.partial] : this.lines;
+    return lines.join("\n");
+  }
+}
+
+/**
+ * The details shown on the "could not start" page. The message is the
+ * launcher's own diagnosis; the output is the backend's last lines, which is
+ * where an import error, a missing bundled file, or a migration failure
+ * actually appears.
+ */
+function startupFailureDetails({ error, backendOutput, exitCode, logPath, packaged }) {
+  const parts = [];
+  if (error && error.message) parts.push(error.message);
+  if (typeof exitCode === "number") parts.push(`The local service exited with code ${exitCode}.`);
+  else if (exitCode !== undefined && exitCode !== null) {
+    parts.push(`The local service was stopped by signal ${exitCode}.`);
+  }
+  return {
+    reason: parts.join(" ") || "The local service did not become ready.",
+    output: backendOutput ? String(backendOutput).trim() : "",
+    logPath: logPath || "",
+    packaged: Boolean(packaged),
+  };
+}
+
 module.exports = {
   MAX_ZOOM_LEVEL,
   MIN_ZOOM_LEVEL,
   ZOOM_STEP,
+  OutputTail,
   contentSecurityPolicy,
   desktopEnvironment,
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
   zoomActionFor,
+  startupFailureDetails,
 };
