@@ -30,10 +30,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 BASE_URL = "https://lsa-mis.github.io/axcess/"
 REPO = "https://github.com/lsa-mis/axcess"
-DESKTOP_BUILDS = (
-    "https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml"
-    "?query=branch%3Afeature%2Felectron-desktop"
-)
+RELEASES = f"{REPO}/releases"
+LATEST_RELEASE = f"{RELEASES}/latest"
+# Version-less asset names are uploaded by .github/workflows/desktop-build.yml
+# so these links always fetch the newest build without a GitHub sign-in.
+DOWNLOAD_MACOS = f"{LATEST_RELEASE}/download/Axcess-macOS-AppleSilicon.dmg"
+DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-Setup.exe"
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
@@ -276,7 +278,7 @@ def shell(page: Page, body: str) -> str:
         <ul>
           <li><a href="{href("get-started")}">Get started</a></li>
           <li><a href="{href("privacy")}">Privacy and trust</a></li>
-          <li><a href="{DESKTOP_BUILDS}">Desktop preview builds</a></li>
+          <li><a href="{RELEASES}">Desktop releases</a></li>
           <li><a href="{DOCS}">Documentation</a></li>
         </ul>
       </div>
@@ -1188,14 +1190,15 @@ def get_started() -> str:
       <article class="card card-accent">
         {icon("download")}
         <h3>Desktop app (recommended)</h3>
-        <p>One macOS app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
+        <p>One app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
-          <li>Apple Silicon Macs (M1 and later)</li>
-          <li>Development preview, updated from the project's build system</li>
-          <li>Free; requires a GitHub sign-in to download</li>
+          <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
+          <li>Development preview, published automatically from every change to the project</li>
+          <li>Free; no account or sign-in needed to download</li>
         </ul>
-        <p><a class="btn btn-primary" href="{DESKTOP_BUILDS}">Open the desktop builds</a></p>
-        <p class="small" style="margin-top:1rem">On the builds page, open the most recent successful run and download <strong>axcess-macos-apple-silicon</strong>. Each build is kept for 14 days. The preview is not yet Apple-notarized, so on first launch right-click <strong>Axcess</strong> and choose <strong>Open</strong>. An Intel Mac build is not available yet.</p>
+        <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a></p>
+        <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
+        <p class="small" style="margin-top:1rem">The downloads are about 550 MB each. The preview is not yet Apple-notarized or Windows code-signed, so on first launch right-click <strong>Axcess</strong> and choose <strong>Open</strong> on a Mac, or choose <strong>More info</strong> and <strong>Run anyway</strong> on Windows. Installed copies check for a newer build on launch. An Intel Mac build is not available yet.</p>
       </article>
       <article class="card">
         {icon("cpu")}
@@ -1320,7 +1323,7 @@ def faq() -> str:
             ),
             q(
                 "Which platforms are supported?",
-                "<p>The desktop preview is for Apple Silicon Macs. From source, Axcess runs on macOS, Linux, and Windows with WSL. Windows and Linux desktop installers are part of the build system but are not yet released as previews.</p>",
+                "<p>The desktop preview is available for Apple Silicon Macs and 64-bit Windows. From source, Axcess runs on macOS, Linux, and Windows with WSL. A Linux desktop installer is part of the build system but is not yet released as a preview.</p>",
             ),
         ]
     )

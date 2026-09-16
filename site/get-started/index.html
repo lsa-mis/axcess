@@ -60,14 +60,15 @@
       <article class="card card-accent">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
         <h3>Desktop app (recommended)</h3>
-        <p>One macOS app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
+        <p>One app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
-          <li>Apple Silicon Macs (M1 and later)</li>
-          <li>Development preview, updated from the project's build system</li>
-          <li>Free; requires a GitHub sign-in to download</li>
+          <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
+          <li>Development preview, published automatically from every change to the project</li>
+          <li>Free; no account or sign-in needed to download</li>
         </ul>
-        <p><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Open the desktop builds</a></p>
-        <p class="small" style="margin-top:1rem">On the builds page, open the most recent successful run and download <strong>axcess-macos-apple-silicon</strong>. Each build is kept for 14 days. The preview is not yet Apple-notarized, so on first launch right-click <strong>Axcess</strong> and choose <strong>Open</strong>. An Intel Mac build is not available yet.</p>
+        <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-macOS-AppleSilicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-x64-Setup.exe">Download for Windows</a></p>
+        <p class="small" id="latest-release" data-latest-release="https://github.com/lsa-mis/axcess/releases/latest">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="https://github.com/lsa-mis/axcess/releases">the releases page</a>.</p>
+        <p class="small" style="margin-top:1rem">The downloads are about 550 MB each. The preview is not yet Apple-notarized or Windows code-signed, so on first launch right-click <strong>Axcess</strong> and choose <strong>Open</strong> on a Mac, or choose <strong>More info</strong> and <strong>Run anyway</strong> on Windows. Installed copies check for a newer build on launch. An Intel Mac build is not available yet.</p>
       </article>
       <article class="card">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>
@@ -163,7 +164,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <ul>
           <li><a href="../get-started/">Get started</a></li>
           <li><a href="../privacy/">Privacy and trust</a></li>
-          <li><a href="https://github.com/lsa-mis/axcess/actions/workflows/desktop-build.yml?query=branch%3Afeature%2Felectron-desktop">Desktop preview builds</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>
       </div>
