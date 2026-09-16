@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -181,7 +181,7 @@ export default function InspectorRoute() {
   const requestedState = params.get("state");
   const stateKey = requestedState ?? defaultStateKey;
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error } = useQuery({
     // The state belongs in the key: without it every finding on the page
     // would share one cached document and the picker would appear to do
     // nothing.
@@ -189,9 +189,14 @@ export default function InspectorRoute() {
     queryFn: () => api.getPageInspection(scan, page, stateKey),
     enabled: inspectEnabled,
     retry: false,
+    // Hold the document already on screen while the next one is fetched.
+    // Without it a state the cache has not seen makes `isLoading` true, the
+    // route returns its spinner, and the picker the reviewer just operated is
+    // unmounted mid-interaction: focus falls to <body> and the keyboard path
+    // is lost. Keeping the previous data keeps the control mounted.
+    placeholderData: keepPreviousData,
   });
 
-  const states = data?.states ?? [];
   const activeStateKey = data?.render.state_key ?? null;
   const stateHref = (key: string | null) => {
     const next = new URLSearchParams(params);
@@ -245,6 +250,40 @@ export default function InspectorRoute() {
         : currentFindings.filter((f) => !f.revealed_state_key),
     [currentFindings, activeStateKey],
   );
+
+  /**
+   * The states worth offering for the issue being reviewed.
+   *
+   * A page keeps a capture for every state that revealed *any* new defect, so
+   * an assignment dashboard has six. Opening one issue and being offered all
+   * six says nothing about which of them holds it — five are about other
+   * rules entirely. Only the states carrying an occurrence of this issue are
+   * listed, with their counts, and "At page load" stays as the baseline the
+   * others are read against.
+   *
+   * With nothing specific under review (no `?issue=` or `?selector=`), every
+   * state is offered: then the picker is for exploring, not for locating.
+   */
+  const offeredStates = useMemo(() => {
+    const all = data?.states ?? [];
+    if (findingStateKeys.size === 0) return all;
+    return all.filter((state) => findingStateKeys.has(state.state_key));
+  }, [data?.states, findingStateKeys]);
+
+  /** Occurrences of this issue that were already present at page load. */
+  const loadStateCount = useMemo(
+    () => currentFindings.filter((f) => !f.revealed_state_key).length,
+    [currentFindings],
+  );
+
+  const occurrencesByState = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const finding of currentFindings) {
+      const key = finding.revealed_state_key;
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [currentFindings]);
 
   const scopedTargets = useMemo(
     () =>
@@ -510,31 +549,51 @@ export default function InspectorRoute() {
           are two separate controls rather than one row mixing both axes. A
           select, not the segmented row below: a busy page can reach a dozen
           states and chips would wrap into a block. */}
-      {states.length > 0 && (
+      {offeredStates.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
             id="inspect-state"
             label="Page state"
-            value={activeStateKey ?? ""}
+            value={stateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
             options={[
-              { value: "", label: "At page load" },
-              ...states.map((state) => ({
-                value: state.state_key,
+              {
+                value: "",
+                label: `At page load${
+                  loadStateCount > 0 ? ` (${loadStateCount})` : ""
+                }`,
+              },
+              ...offeredStates.map((state) => {
+                const count = occurrencesByState.get(state.state_key) ?? 0;
                 // The whole chain, not just the last control: reaching a
-                // nested state by hand means repeating every step.
-                label: `After clicking ${
+                // nested state by hand means repeating every step. The count
+                // says where this issue actually is, so the reviewer picks a
+                // state instead of trying them.
+                const chain =
                   state.path_labels.length > 0
                     ? state.path_labels.map((name) => `“${name}”`).join(" → ")
-                    : `“${state.revealed_by}”`
-                }`,
-              })),
+                    : `“${state.revealed_by}”`;
+                return {
+                  value: state.state_key,
+                  label: `After clicking ${chain}${count > 0 ? ` (${count})` : ""}`,
+                };
+              }),
             ]}
           />
-          {activeStateKey && (
-            <span className="text-xs text-fg-muted">
-              Captured during the scan, after the control was operated.
+          {/* The previous document stays on screen while the next one loads,
+              so say which is which rather than letting the reviewer read the
+              old state under the new label. */}
+          {isFetching ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              Loading this state; the previous one is still shown.
             </span>
+          ) : (
+            activeStateKey && (
+              <span className="text-xs text-fg-muted">
+                Captured during the scan, after the control was operated.
+              </span>
+            )
           )}
         </div>
       )}

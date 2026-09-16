@@ -293,6 +293,11 @@ DEFAULT_MAX_CLICKS = 100
 DEFAULT_MAX_REPEATED = 20
 DEFAULT_MAX_DEPTH = 5
 DEFAULT_MAX_INERT_REPEATS = 3
+# ...but only for a shape with at least this many members. Three duds out of
+# four controls is not evidence the fourth is a dud, and skipping it loses a
+# real defect; three out of thirty-one is a date grid. Sampling is an
+# inference about a population, so it needs a population to infer from.
+DEFAULT_MIN_INERT_POPULATION = 8
 DEFAULT_TIMEOUT_S = 120.0
 
 # Bounds on capturing revealed-state markup. The probe is shared by every
@@ -325,6 +330,12 @@ _DOM_HASH_JS = """
 """
 
 _DIGITS = re.compile(r"\d+")
+
+
+def _shape_of(control: dict[str, Any], pinned: str) -> str:
+    """Group key for repeat sampling: one calendar is one shape."""
+    signature = _signature(control.get("shape", control["selector"]))
+    return f"{'GLOBAL' if control['isGlobal'] else pinned}|{signature}"
 
 
 def _signature(selector: str) -> str:
@@ -421,6 +432,7 @@ class InteractionProbe:
     # shape is left alone. Far below ``max_repeated``: proving a date grid
     # inert takes three clicks, not twenty.
     max_inert_repeats: int = DEFAULT_MAX_INERT_REPEATS
+    min_inert_population: int = DEFAULT_MIN_INERT_POPULATION
 
     async def run(self, page: Page, *, baseline: Sequence[AxeViolation] = ()) -> InteractionResult:
         """Return violations reachable only by operating the page.
@@ -536,8 +548,14 @@ class InteractionProbe:
         # control that the depth cap, the repeat cap or the label filter
         # stops us reaching is still a control the page has and this scan
         # did not exercise; hiding it would make coverage look complete.
+        # How many controls at this level share each shape. The inert rule is
+        # a sample-and-generalise, so it only applies where there is a
+        # population to generalise over.
+        shape_population: dict[str, int] = {}
         for control in controls:
             budget.discovered_keys.add(self._interaction_key(control, pinned))
+            member = _shape_of(control, pinned)
+            shape_population[member] = shape_population.get(member, 0) + 1
         if depth >= self.max_depth:
             if controls:
                 budget.limits.add("depth")
@@ -559,12 +577,14 @@ class InteractionProbe:
             if key in budget.seen_keys:
                 continue
 
-            signature = _signature(control.get("shape", control["selector"]))
-            shape = f"{'GLOBAL' if control['isGlobal'] else pinned}|{signature}"
+            shape = _shape_of(control, pinned)
             if budget.signature_counts.get(shape, 0) >= self.max_repeated:
                 budget.limits.add("repeated_controls")
                 continue
-            if budget.inert_counts.get(shape, 0) >= self.max_inert_repeats:
+            if (
+                shape_population.get(shape, 0) >= self.min_inert_population
+                and budget.inert_counts.get(shape, 0) >= self.max_inert_repeats
+            ):
                 # Still counted as discovered above, so coverage reports the
                 # control the page has rather than hiding what was skipped.
                 budget.limits.add("inert_controls")

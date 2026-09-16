@@ -751,7 +751,42 @@ async def test_a_grid_of_inert_controls_does_not_consume_the_page_budget(page, a
 
     clicks = await page.evaluate("() => window.cellClicks")
     assert clicks <= 4, f"kept clicking an inert grid ({clicks} times)"
+    assert "inert_controls" in result.limits, "the skip must be reported as a bound"
     # The point of stopping early: the budget reaches the control that matters.
     assert any(finding.revealed_by == "Open options" for finding in result.findings), (
         "the inert grid crowded out the control that reveals a defect"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_a_small_group_of_controls_is_never_sampled(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Three duds out of four is not evidence about the fourth.
+
+    Counterexample from review: giving up on a shape after three no-change
+    clicks lost a real defect when the shape had only four members and the
+    last one opened a panel. Sampling is an inference about a population, so
+    it must not run without one -- below the population floor every control is
+    tried, whatever the inert cutoff says.
+    """
+    await page.set_content(
+        """
+        <button class="op" id="a" onclick="void 0">Option A</button>
+        <button class="op" id="b" onclick="void 0">Option B</button>
+        <button class="op" id="c" onclick="void 0">Option C</button>
+        <button class="op" id="d">Option D</button>
+        <div id="panel" hidden><input id="unlabelled"></div>
+        <script>
+          document.getElementById('d').onclick = () => { panel.hidden = false; };
+        </script>
+        """
+    )
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe, settle_ms=0, max_inert_repeats=3).run(
+        page, baseline=baseline
+    )
+
+    assert any(f.violation.rule_id == "label" for f in result.findings), (
+        "the fourth control was skipped and its defect lost"
     )
