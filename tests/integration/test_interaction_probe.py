@@ -419,10 +419,48 @@ async def test_network_writes_and_popups_are_blocked_without_affecting_other_tab
             for _, url in requests
         )
         assert "https://fixture.test/results" in result.urls
+        # "payment" is a blocked label, so this one is refused twice over.
         assert not any("/payment" in url for url in result.urls)
         # The temporary guard must not leak into later page work.
         await page.evaluate("fetch('/after', {method:'POST'})")
         assert ("POST", "https://fixture.test/after") in requests
+    finally:
+        await context.close()
+
+
+async def test_a_button_that_opens_a_tab_reports_where_it_pointed(browser) -> None:  # type: ignore[no-untyped-def]
+    """A new-tab control is the one link the DOM cannot tell the crawler about.
+
+    ``window.open`` and ``target="_blank"`` both reach the guard before their
+    popup has a frame, so they take its unattributable-request path. That path
+    correctly refuses to let the request through, and used to forget the URL
+    with it, which left pages reachable only from such a button invisible to
+    the crawl even when they sat inside its own scope.
+
+    Refusing the request and remembering the destination are separate things.
+    The frontier still applies scope, the blocklist, and its own dedupe before
+    fetching anything.
+    """
+    context = await browser.new_context(service_workers="block")
+    fetched: list[str] = []
+    html = """
+        <button id="open" onclick="window.open('/reports/summary')">Open summary</button>
+    """
+
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        fetched.append(route.request.url)
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    await context.route("**/*", fixture)
+    page = await context.new_page()
+    try:
+        await page.goto("https://fixture.test/")
+        fetched.clear()
+        result = await InteractionProbe(axe=_NoopAxe(), settle_ms=10).run(page)  # type: ignore[arg-type]
+        assert "https://fixture.test/reports/summary" in result.urls
+        assert not any("/reports/summary" in url for url in fetched), (
+            "the popup must still be blocked from loading"
+        )
     finally:
         await context.close()
 
