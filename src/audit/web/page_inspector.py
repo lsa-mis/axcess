@@ -19,12 +19,17 @@ This module is deliberately narrow and defensive:
 * It re-fetches **one URL the scan already recorded**, never an arbitrary
   URL, never a cross-scan target. The endpoint is keyed by ``scan_id`` +
   ``page_id``, and the page must belong to that scan.
-* It refuses anything that would not be a faithful, safe re-render: scans
-  that are not ``completed`` (running/failed/interrupted would show a stale
-  or partial page), records that belong to a login-protected report (whose
-  session cannot be re-created here), and any target URL that falls outside
-  the scan's recorded scope (host + registrable domain, honoring the scan's
-  ``allow_subdomains`` setting).
+* It refuses anything that would not be a faithful, safe re-render: records
+  that belong to a login-protected report (whose session cannot be re-created
+  here), and any target URL that falls outside the scan's recorded scope
+  (host + registrable domain, honoring the scan's ``allow_subdomains``
+  setting).
+* The *on-demand render* additionally needs a ``completed`` report, because it
+  leaves this machine to fetch a page a partial report cannot vouch for.
+  Serving a capture the scan already stored carries no such risk and is
+  allowed whatever the status: a stopped scan's evidence is still its
+  evidence, and refusing to show it was a rule about re-rendering applied to
+  reading.
 * It bounds the work: a navigation/idle timeout and a cap on the serialized
   DOM length (truncated with an honest flag).
 
@@ -198,12 +203,6 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
     ).fetchone()
     if scan is None:
         raise InspectionUnavailableError("Scan not found.", status_code=404)
-    if scan["status"] != "completed":
-        raise InspectionUnavailableError(
-            "Only a completed report can be inspected on demand. "
-            "This scan is still running or did not finish.",
-            status_code=409,
-        )
     if _is_protected_report(conn, scan_id):
         raise InspectionUnavailableError(
             "This is a login-protected report and cannot be re-rendered on demand.",
@@ -233,11 +232,29 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
     target_url = page["url_normalized"]
     _assert_in_scope(target_url, seed_url, allow_subdomains)
 
+    # Only the *on-demand render* needs a finished report: it leaves this
+    # machine to fetch a page the scan may never have reached, and a partial
+    # report cannot vouch for it. Reading back a capture the scan already took
+    # asks nothing of the site and claims nothing about coverage, so it is
+    # allowed whatever the scan's status -- a stopped scan's evidence is still
+    # its evidence. The refusal used to sit before the page row was even
+    # loaded, so it could not tell the two apart, and a stopped scan's stored
+    # pages were unreadable for a reason that only applied to re-rendering.
+    completed = scan["status"] == "completed"
+    stored_available = page["rendered_html"] is not None
+    if not completed and not stored_available:
+        raise InspectionUnavailableError(
+            "This page has no stored capture, and only a completed report can "
+            f"be re-rendered on demand. This scan ended as {scan['status']}.",
+            status_code=409,
+        )
+
     return {
         "scan": scan,
         "page": page,
         "target_url": target_url,
         "store_rendered_html": store_rendered_html,
+        "allow_live_render": completed,
     }
 
 
@@ -421,6 +438,24 @@ async def inspect_page(
     # ``timezone.utc`` is used over the ``datetime.UTC`` alias because mypy's
     # bundled 3.11 typeshed here does not expose the alias yet.
     captured_at = datetime.now(timezone.utc).isoformat()  # noqa: UP017
+
+    if not validated["allow_live_render"]:
+        # Reached when a capture exists but will not decode. _validate already
+        # refused the no-capture case; falling through to the live render here
+        # would fetch a page an unfinished report never promised to have seen.
+        return {
+            "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
+            "store_rendered_html": validated["store_rendered_html"],
+            "states": states,
+            "render": {
+                "ok": False,
+                "source": "stored",
+                "error": (
+                    "This page's stored capture could not be read, and only a "
+                    "completed report can be re-rendered on demand."
+                ),
+            },
+        }
     outcome, error = await _render_page(
         validated["target_url"],
         user_agent=user_agent,

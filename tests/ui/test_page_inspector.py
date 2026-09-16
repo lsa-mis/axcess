@@ -45,21 +45,68 @@ def test_inspect_refuses_page_not_in_scan(
     assert resp.status_code == 404
 
 
-def test_inspect_refuses_running_scan(
-    client: TestClient, seeded_db: tuple[Path, Path, int]
-) -> None:
-    db, _, _ = seeded_db
-    conn = connect(db)
+def _unfinished_scan_with_page(
+    db_path: Path, status: str, *, stored: bytes | None
+) -> tuple[int, int]:
+    """A scan that did not complete, holding one page with or without a capture."""
+    conn = connect(db_path)
     try:
         cur = conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) "
-            "VALUES ('http://example.com/', 'running', '{}')"
+            "VALUES ('http://example.com/', ?, '{}')",
+            (status,),
         )
-        running_id = int(cur.lastrowid or 0)
+        scan_id = int(cur.lastrowid or 0)
+        cur = conn.execute(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, title, "
+            "render_mode, html_hash, rendered_html) "
+            "VALUES (?, 'http://example.com/', 200, 'Home', 'js', ?, ?)",
+            (scan_id, "0" * 64, stored),
+        )
+        page_id = int(cur.lastrowid or 0)
+        conn.commit()
+        return scan_id, page_id
     finally:
         conn.close()
-    resp = client.get(f"/api/scans/{running_id}/pages/1/inspect")
+
+
+def test_inspect_refuses_to_render_a_page_an_unfinished_scan_never_stored(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """The on-demand render is what needs a finished report.
+
+    It leaves this machine to fetch a page a partial report cannot vouch for,
+    so with nothing stored there is nothing to show and nothing safe to fetch.
+    """
+    db, _, _ = seeded_db
+    scan_id, page_id = _unfinished_scan_with_page(db, "running", stored=None)
+
+    resp = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect")
+
     assert resp.status_code == 409
+    assert "no stored capture" in resp.json()["detail"]
+
+
+def test_a_stopped_scan_can_still_show_what_it_captured(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """A stopped scan's evidence is still its evidence.
+
+    Refusing it applied a rule about re-rendering to reading: the status check
+    ran before the page row was even loaded, so a capture the scan had already
+    taken was unreadable for a reason that never applied to it.
+    """
+    db, _, _ = seeded_db
+    html = "<!doctype html><html><body>partial evidence</body></html>"
+    scan_id, page_id = _unfinished_scan_with_page(
+        db, "interrupted", stored=gzip.compress(html.encode())
+    )
+
+    payload = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect").json()
+
+    assert payload["render"]["ok"] is True
+    assert payload["render"]["source"] == "stored"
+    assert "partial evidence" in payload["render"]["dom_html"]
 
 
 def test_inspect_returns_render_payload_without_storing(
