@@ -360,7 +360,7 @@ export default function InspectorRoute() {
   // the untouched capture.
   const documentHtml = useMemo(
     () =>
-      withBaseHref(
+      prepareCapture(
         data?.render.dom_html ?? null,
         data?.render.final_url || data?.page.url || null,
       ),
@@ -858,6 +858,40 @@ export default function InspectorRoute() {
  * first one in the document wins, and the page's own is the authoritative one)
  * or when the URL is not an http(s) address we should point a browser at.
  */
+/**
+ * Make a stored capture renderable in the inspector's frame.
+ *
+ * Three things are wrong with a capture the moment it leaves the site it came
+ * from, and all three make a correct page look broken:
+ *
+ * 1. Relative subresources resolve against the review UI, so `<base href>` is
+ *    injected (see `withBaseHref`).
+ * 2. `crossorigin` on a stylesheet link was free on the site, where the sheet
+ *    was same-origin. Here the frame's origin is the review UI, so the same
+ *    attribute puts the request in CORS mode and the server -- serving what it
+ *    believes is a same-origin asset -- sends no `Access-Control-Allow-Origin`.
+ *    The stylesheet is refused and a fully styled application renders as
+ *    unstyled serif text. Dropping the attribute makes it an ordinary no-CORS
+ *    stylesheet load, which is what it effectively was. Nothing here checks
+ *    subresource integrity, so nothing is lost.
+ * 3. `<noscript>` content becomes visible because the frame runs with scripts
+ *    disabled, so a single-page app announces "You need to enable JavaScript
+ *    to run this app" over markup that was captured with JavaScript running.
+ *    It is the alternative to a state this document is not in.
+ *
+ * The DOM-source view deliberately does not go through this: that tab shows
+ * the evidence as stored, and these edits exist only to render it.
+ */
+function prepareCapture(html: string | null, url: string | null): string | null {
+  if (!html) return html;
+  const rendered = html
+    .replace(/<link\b[^>]*>/gi, (tag) =>
+      tag.replace(/\s+crossorigin(=("[^"]*"|'[^']*'|[^\s>]*))?/gi, ""),
+    )
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, "");
+  return withBaseHref(rendered, url);
+}
+
 function withBaseHref(html: string | null, url: string | null): string | null {
   if (!html || !url) return html;
   try {
