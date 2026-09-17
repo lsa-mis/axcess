@@ -68,7 +68,7 @@
         </ul>
         <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-macOS-AppleSilicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-x64-Setup.exe">Download for Windows</a></p>
         <p class="small" id="latest-release" data-latest-release="https://github.com/lsa-mis/axcess/releases/latest">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="https://github.com/lsa-mis/axcess/releases">the releases page</a>.</p>
-        <p class="small" style="margin-top:1rem">The downloads are about 550 MB each. The preview is not yet Apple-notarized or Windows code-signed, so on first launch right-click <strong>Axcess</strong> and choose <strong>Open</strong> on a Mac, or choose <strong>More info</strong> and <strong>Run anyway</strong> on Windows. Installed copies check for a newer build on launch. An Intel Mac build is not available yet.</p>
+        <p class="small" style="margin-top:1rem">The downloads are about 550 MB each. The preview is not yet Apple-notarized or Windows code-signed, so the first launch needs one extra approval; the <a href="#first-launch">steps for macOS and Windows</a> are below. Installed copies check for a newer build on launch. An Intel Mac build is not available yet.</p>
       </article>
       <article class="card">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>
@@ -81,6 +81,34 @@ make alfa-install      <span class="c"># optional second engine</span>
 make frontend-build    <span class="c"># build the interface</span>
 make run               <span class="c"># open http://127.0.0.1:8765/app/</span></code></pre>
         <p class="small">Full instructions, hosting for a small team, and troubleshooting are in <a href="https://github.com/lsa-mis/axcess/tree/main/docs">the documentation</a>.</p>
+      </article>
+    </div>
+    <h3 id="first-launch" style="margin:2rem 0 .4rem">Install the desktop app and open it the first time</h3>
+    <p class="small" style="margin-bottom:1rem">Because the preview is not yet notarized or code-signed, macOS and Windows each show a warning the first time. The warning is expected for this build; you approve it once, and later launches open normally.</p>
+    <div class="grid grid-2">
+      <article class="card">
+        <h4>On a Mac (Apple Silicon)</h4>
+        <ol style="margin:.75rem 0 0;padding-left:1.25rem">
+          <li>Select <strong>Download for macOS</strong> and wait for <code>Axcess-macOS-AppleSilicon.dmg</code> to finish downloading.</li>
+          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
+          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
+          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
+          <li>Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>, then confirm with your Mac password or Touch ID.</li>
+          <li>Choose <strong>Open</strong> in the final dialog. Axcess starts, and from now on it opens like any other app.</li>
+        </ol>
+        <p class="small" style="margin-top:.75rem">On macOS 14 (Sonoma) or earlier there is a shortcut: in Applications, right-click <strong>Axcess</strong>, choose <strong>Open</strong>, then choose <strong>Open</strong> again in the dialog.</p>
+      </article>
+      <article class="card">
+        <h4>On Windows 10 or 11</h4>
+        <ol style="margin:.75rem 0 0;padding-left:1.25rem">
+          <li>Select <strong>Download for Windows</strong> and wait for <code>Axcess-Windows-x64-Setup.exe</code> to finish downloading.</li>
+          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
+          <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
+          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
+          <li>Wait while Axcess installs. There are no setup screens and no administrator password is needed; it installs for your account only and opens by itself when it is done.</li>
+          <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
+        </ol>
+        <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
       </article>
     </div>
     <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>Optional AI checks</strong> need a separately installed local Ollama service and downloaded models. Skip this at first; every browser-based check runs without it. <a href='../privacy/'>How the optional AI is kept local.</a></p></div></div>
