@@ -1101,6 +1101,7 @@ def privacy() -> str:
       <li><h3>You sign in directly with the website</h3><p>Password, passkey, push notification, one-time code, whatever the site requires. Nothing is typed into Axcess.</p></li>
       <li><h3>Navigate to the approved page and confirm</h3><p>Select <em>I have signed in</em>. Axcess checks the page is inside the agreed scope.</p></li>
       <li><h3>The scan uses that live session</h3><p>The session exists only in memory and ends with the scan. Login and identity-provider pages are not stored as evidence.</p></li>
+      <li><h3>The browser gets out of your way</h3><p>Axcess minimizes the window and scans in the background, showing its progress as it goes. Leave Chromium running, and bring the window back from Axcess whenever you want to watch.</p></li>
     </ol>
     <div style="margin-top:1.5rem">{callout("<strong>This is not a way around authentication.</strong> Axcess only continues where you have already signed in, with accounts and sites you are explicitly authorized to test.", "callout-maize", "lock")}</div>
   </div>

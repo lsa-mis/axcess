@@ -252,6 +252,12 @@ class JsFetcher:
                 pooled_page = True
             else:
                 page = await ctx.new_page()
+            if page.viewport_size is None:
+                # A signed-in context has no default viewport, so that
+                # Playwright never resizes (and so re-shows) its real window.
+                # Without this the page would render at whatever size that
+                # window happens to be, and findings would vary with it.
+                await page.set_viewport_size(self._viewport)
             try:
                 resp = await page.goto(url, timeout=self._nav_timeout_ms, wait_until="load")
                 if resp is None:

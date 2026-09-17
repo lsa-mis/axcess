@@ -6,6 +6,8 @@ import {
   Check,
   Clock3,
   ExternalLink,
+  Eye,
+  EyeOff,
   Loader2,
   Pause,
   Play,
@@ -267,6 +269,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
               that website and read-only page requests. The login session stays
               in memory and is destroyed when the scan ends. Report evidence is
               stored in your local Axcess database.
+            </p>
+            <p className="mt-2">
+              After you confirm, Axcess minimizes that browser window and scans
+              in the background, so it stays out of your way. Leave Chromium
+              running until the scan finishes. Progress is shown here, and you
+              can bring the browser back at any time to watch.
             </p>
           </div>
 
@@ -663,6 +671,20 @@ function LocalLoginHandoff({
     mutationFn: () => api.confirmLocalLogin(scanId),
     onSuccess: () => void status.refetch(),
   });
+  const browser = useMutation({
+    mutationFn: async (visible: boolean) => {
+      const outcome = await api.setLocalLoginBrowserVisible(scanId, visible);
+      // The request can succeed while the window stays where it was. Hiding
+      // reports its own outcome: the state below says what happened.
+      if (visible && outcome.changed === false) {
+        throw new Error(
+          "Axcess could not bring the Chromium window back. It is still minimized: open it from your Dock or taskbar instead.",
+        );
+      }
+      return outcome;
+    },
+    onSettled: () => void status.refetch(),
+  });
 
   const state = status.data?.status ?? "opening_browser";
   const scanActivity = useQuery({
@@ -685,6 +707,14 @@ function LocalLoginHandoff({
     return "pair" as const;
   }, [state]);
 
+  // Three different situations, and the auditor can only see one of them
+  // from here: the window is away, they asked for it back, or Axcess tried to
+  // put it away and this computer would not let it.
+  const browserHidden = status.data?.browser_backgrounded === true;
+  const browserShownOnRequest =
+    !browserHidden && status.data?.browser_hiding_wanted === false;
+  const browserParked = !browserHidden && status.data?.browser_parked === true;
+
   const copy: Record<LocalLoginScanStatus, { title: string; detail: string }> =
     {
       opening_browser: {
@@ -696,16 +726,33 @@ function LocalLoginHandoff({
         detail: "Complete the full login and 2FA flow, then return here.",
       },
       verifying_authentication: {
-        title: "Preparing the signed-in session",
+        title: "Moving the browser out of your way",
         detail:
-          "Axcess is setting up the background tabs that will reuse your signed-in browser.",
+          "Axcess is opening its scan tabs in your signed-in browser and minimizing the window. This takes a few seconds.",
       },
-      scanning: {
-        title: "Scanning in the background",
-        detail: status.data?.browser_backgrounded
-          ? "The signed-in Chromium window has been moved out of the way while Axcess reuses its in-memory session. You can keep working, but quitting Chromium will stop the scan."
-          : "Axcess is reusing the signed-in browser session in the background. You can keep working, but closing Chromium will stop the scan.",
-      },
+      scanning: browserHidden
+        ? {
+            title: "Scanning in the background",
+            detail:
+              "The Chromium window is minimized and Axcess is scanning in it. Carry on with other work. Quitting Chromium would end the scan.",
+          }
+        : browserShownOnRequest
+          ? {
+              title: "Scanning with the browser showing",
+              detail:
+                "The Chromium window is on your screen because you asked to see it. The scan carries on either way. Closing the window would end the scan.",
+            }
+          : browserParked
+            ? {
+                title: "Scanning, with the browser moved aside",
+                detail:
+                  "The Chromium window would not minimize on this computer, so Axcess moved it to the edge of the screen. A strip of it may still show. The scan is running. Closing the window would end the scan.",
+              }
+            : {
+                title: "Scanning, but the browser is still on screen",
+                detail:
+                  "Axcess has not been able to minimize the Chromium window. The scan is running. Minimize the window yourself if it is in your way; closing it would end the scan.",
+              },
       completed: {
         title: "Report ready",
         detail: "Opening the normal Axcess report now.",
@@ -753,6 +800,16 @@ function LocalLoginHandoff({
               : String(confirm.error)}
           </p>
         )}
+        {browser.error && (
+          <p
+            className="mt-4 rounded-md border border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
+            role="alert"
+          >
+            {browser.error instanceof Error
+              ? browser.error.message
+              : String(browser.error)}
+          </p>
+        )}
 
         {state === "awaiting_authentication" && (
           <div className="mt-6 rounded-md border-2 border-umich-blue bg-umich-blue/5 p-5">
@@ -761,6 +818,26 @@ function LocalLoginHandoff({
               Make sure the visible browser shows the protected application, not
               the U-M or Duo login screen.
             </p>
+            <div className="mt-4 rounded-xs border border-border bg-surface p-3">
+              <h4 className="text-sm font-semibold text-fg">
+                What happens when you start
+              </h4>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-muted">
+                <li>
+                  Axcess minimizes that Chromium window and scans in it in the
+                  background, and keeps it minimized while you work.
+                </li>
+                <li>
+                  Chromium stays in your Dock or taskbar. Leave it running:
+                  quitting it ends the scan.
+                </li>
+                <li>
+                  Progress appears on this page. To watch the scan, use{" "}
+                  <strong>Show browser window</strong> here: a window opened
+                  from the Dock or taskbar is minimized again.
+                </li>
+              </ul>
+            </div>
             <Button
               className="mt-4"
               onClick={() => confirm.mutate()}
@@ -769,6 +846,48 @@ function LocalLoginHandoff({
               {confirm.isPending
                 ? "Checking sign-in…"
                 : "I’m signed in, start scan"}
+            </Button>
+          </div>
+        )}
+
+        {state === "scanning" && (
+          // Not a live region: the heading above already announces each
+          // change of state, and a region holding the button would re-read
+          // itself every time the button's label changed.
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xs border border-border bg-surface p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-fg">
+              <Loader2
+                className="h-4 w-4 shrink-0 animate-spin text-umich-blue motion-reduce:animate-none"
+                aria-hidden
+              />
+              {browserHidden
+                ? "Scan running · browser hidden"
+                : "Scan running · browser on screen"}
+            </p>
+            <Button
+              variant="secondary"
+              // aria-disabled, not disabled: a disabled button drops focus to
+              // the page, and the person who pressed it has to find it again.
+              aria-disabled={browser.isPending}
+              className={
+                browser.isPending ? "cursor-not-allowed opacity-60" : undefined
+              }
+              onClick={() => {
+                if (!browser.isPending) browser.mutate(browserHidden);
+              }}
+            >
+              {browserHidden ? (
+                <Eye className="h-4 w-4" aria-hidden />
+              ) : (
+                <EyeOff className="h-4 w-4" aria-hidden />
+              )}
+              {browser.isPending
+                ? "Working…"
+                : browserHidden
+                  ? "Show browser window"
+                  : browserShownOnRequest
+                    ? "Hide browser window"
+                    : "Try hiding it again"}
             </Button>
           </div>
         )}
@@ -787,8 +906,8 @@ function LocalLoginHandoff({
                   Live page activity
                 </h3>
                 <p className="mt-1 text-xs text-fg-muted">
-                  The visible signed-in browser follows the page being tested.
-                  This panel updates without reloading or scrolling the page.
+                  What the scan is doing right now. Updates every two seconds
+                  without reloading or scrolling the page.
                 </p>
               </div>
               <Button
