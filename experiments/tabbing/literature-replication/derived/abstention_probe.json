@@ -1,0 +1,99 @@
+[
+  {
+    "subject": "walmart",
+    "cap": 332,
+    "focusable": 132,
+    "stops": 99,
+    "presses": 100,
+    "capped": false,
+    "role": "control"
+  },
+  {
+    "subject": "capitalone",
+    "cap": 2000,
+    "focusable": 51,
+    "stops": 1,
+    "presses": 28,
+    "capped": false,
+    "role": "abstained",
+    "original_cap": 251,
+    "original_stops": 1
+  },
+  {
+    "subject": "cnn",
+    "cap": 5660,
+    "focusable": 283,
+    "stops": 133,
+    "presses": 5660,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 483,
+    "original_stops": 133
+  },
+  {
+    "subject": "costco",
+    "cap": 2000,
+    "focusable": 69,
+    "stops": 39,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 269,
+    "original_stops": 39
+  },
+  {
+    "subject": "dell",
+    "cap": 2000,
+    "focusable": 97,
+    "stops": 36,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 297,
+    "original_stops": 36
+  },
+  {
+    "subject": "dpreview",
+    "cap": 2000,
+    "focusable": 94,
+    "stops": 97,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 294,
+    "original_stops": 97
+  },
+  {
+    "subject": "raise",
+    "cap": 2000,
+    "focusable": 62,
+    "stops": 34,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 262,
+    "original_stops": 34
+  },
+  {
+    "subject": "salesforce",
+    "cap": 2000,
+    "focusable": 38,
+    "stops": 9,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 238,
+    "original_stops": 9
+  },
+  {
+    "subject": "spotify",
+    "cap": 2000,
+    "focusable": 12,
+    "stops": 9,
+    "presses": 2000,
+    "capped": true,
+    "role": "abstained",
+    "original_cap": 212,
+    "original_stops": 9
+  }
+]

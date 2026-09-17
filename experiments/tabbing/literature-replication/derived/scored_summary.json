@@ -1,0 +1,62 @@
+{
+  "progress": {
+    "planned": 53,
+    "completed": 53,
+    "scored": 45,
+    "abstained": 8,
+    "remaining": 0
+  },
+  "axcess_frozen_detectors": {
+    "TP": 23,
+    "FP": 12,
+    "FN": 3,
+    "TN": 7,
+    "n": 45,
+    "precision": "23/35 = 0.657",
+    "recall": "23/26 = 0.885",
+    "f1": "46/61 = 0.754"
+  },
+  "kafe_same_common_set": {
+    "TP": 26,
+    "FP": 1,
+    "FN": 0,
+    "TN": 18,
+    "n": 45,
+    "precision": "26/27 = 0.963",
+    "recall": "26/26 = 1.000",
+    "f1": "52/53 = 0.981"
+  },
+  "pessimistic_with_abstentions": {
+    "TP": 23,
+    "FP": 15,
+    "FN": 8,
+    "TN": 7,
+    "precision": "23/38 = 0.605",
+    "recall": "23/31 = 0.742"
+  },
+  "abstentions": {
+    "total": 8,
+    "positive_label": 5,
+    "negative_label": 3,
+    "reasons": [
+      "tab walk capped at 212 with 12 focusable elements",
+      "tab walk capped at 238 with 38 focusable elements",
+      "tab walk capped at 251 with 51 focusable elements",
+      "tab walk capped at 262 with 62 focusable elements",
+      "tab walk capped at 269 with 69 focusable elements",
+      "tab walk capped at 294 with 94 focusable elements",
+      "tab walk capped at 297 with 97 focusable elements",
+      "tab walk capped at 483 with 283 focusable elements"
+    ]
+  },
+  "timing": {
+    "subjects_with_timing": 40,
+    "median_of_per_subject_medians_ms": 518.0,
+    "min_ms": 199.6,
+    "max_probe_ms_observed": 6450.6,
+    "cap_ms": 300,
+    "subjects_whose_median_is_within_cap": 10,
+    "total_probes": 5922,
+    "total_probe_seconds": 7254.9
+  }
+}

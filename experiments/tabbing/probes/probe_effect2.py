@@ -18,7 +18,7 @@ click (`h102`). Three of those need the page to run; one does not.
 Each target gets its own freshly navigated page, so one probe's side effects
 cannot leak into the next. That is the cost of asking what code *does*.
 """
-import asyncio, json, sys, pathlib, time
+import asyncio, json, os, sys, pathlib, time
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -221,7 +221,12 @@ async def observe(factory, page_path, all_ids, probe_ids):
 
 
 async def main(out_path, only_path):
-    root = pathlib.Path("experiments/tabbing/fixtures")
+    # Corpus root is overridable so this probe can observe a corpus other than
+    # the fixtures it was written against. The other three probe scripts
+    # already read PROBE_CORPUS; this one did not, which left C10-C16
+    # unbuildable anywhere else. Default is unchanged, so existing invocations
+    # and the published fixtures numbers are unaffected.
+    root = pathlib.Path(os.environ.get("PROBE_CORPUS", "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     only = set(json.loads(pathlib.Path(only_path).read_text())) if only_path else None
     results, started = {}, time.monotonic()
