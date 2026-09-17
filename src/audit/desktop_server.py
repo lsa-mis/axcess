@@ -12,8 +12,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from yoyo import get_backend, read_migrations
@@ -27,6 +29,54 @@ def bundled_migrations_dir() -> Path:
     return Path(__file__).resolve().parent / "db" / "migrations"
 
 
+def process_is_running(pid: int) -> bool:
+    """Report whether ``pid`` names a live process, erring towards "running"."""
+
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+        if not handle:
+            return bool(kernel32.GetLastError() == 5)  # access denied: exists
+        try:
+            exit_code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                return True
+            return exit_code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def release_abandoned_migration_lock(backend: Any) -> None:
+    """Drop a yoyo lock row left behind by a backend that died mid-migration.
+
+    yoyo records its lock as a database row, so a process that is killed while
+    holding it blocks every later launch until the row is removed.
+    """
+
+    row = backend.execute("SELECT pid FROM yoyo_lock").fetchone()
+    backend.rollback()
+    if row is None or row[0] == os.getpid() or process_is_running(int(row[0])):
+        return
+    print(
+        f"Releasing migration lock left by exited process {row[0]}.",
+        file=sys.stderr,
+        flush=True,
+    )
+    with backend.transaction():
+        backend.execute("DELETE FROM yoyo_lock WHERE pid = :pid", {"pid": row[0]})
+
+
 def apply_desktop_migrations(db_path: Path, migrations_dir: Path | None = None) -> None:
     """Bring a desktop database forward before the web application imports."""
 
@@ -38,6 +88,7 @@ def apply_desktop_migrations(db_path: Path, migrations_dir: Path | None = None) 
     resolved_db.parent.mkdir(parents=True, exist_ok=True)
     backend = get_backend(f"sqlite:///{resolved_db.as_posix()}")
     migrations = read_migrations(str(source))
+    release_abandoned_migration_lock(backend)
     with backend.lock():
         backend.apply_migrations(backend.to_apply(migrations))
 
