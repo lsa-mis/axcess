@@ -71,20 +71,52 @@ def test_desktop_server_releases_lock_left_by_exited_process(tmp_path: Path) -> 
         assert conn.execute("SELECT COUNT(*) FROM yoyo_lock").fetchone()[0] == 0
 
 
-def test_desktop_server_keeps_lock_held_by_running_process(tmp_path: Path) -> None:
-    import os
-
-    from yoyo import get_backend
-
-    from audit.desktop_server import release_abandoned_migration_lock
+def test_desktop_server_waits_for_a_backend_that_is_still_migrating(tmp_path: Path) -> None:
+    from audit.desktop_server import exclusive_migration_lock
 
     db_path = tmp_path / "audit.db"
     apply_desktop_migrations(db_path)
-    _hold_migration_lock(db_path, os.getppid())
 
-    release_abandoned_migration_lock(get_backend(f"sqlite:///{db_path.as_posix()}"))
+    with exclusive_migration_lock(db_path), pytest.raises(RuntimeError, match="still updating"):
+        apply_desktop_migrations(db_path, lock_timeout=0.1)
+
+    apply_desktop_migrations(db_path)
+
+
+def test_desktop_server_releases_lock_when_terminated_during_migration(tmp_path: Path) -> None:
+    import os
+    import signal
+    import subprocess
+    import sys
+
+    if sys.platform == "win32":
+        pytest.skip("SIGTERM cannot be handled on Windows")
+
+    db_path = tmp_path / "audit.db"
+    apply_desktop_migrations(db_path)
+    child = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import os, time\n"
+            "from yoyo import get_backend\n"
+            "from audit.desktop_server import exit_cleanly_on_terminate\n"
+            "exit_cleanly_on_terminate()\n"
+            "backend = get_backend('sqlite:///' + os.environ['LOCK_TEST_DB'])\n"
+            "with backend.lock():\n"
+            "    print('locked', flush=True)\n"
+            "    time.sleep(30)\n",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        env={**os.environ, "LOCK_TEST_DB": db_path.as_posix()},
+    )
+    assert child.stdout is not None
+    assert child.stdout.readline().strip() == "locked"
+    child.send_signal(signal.SIGTERM)
+    assert child.wait(timeout=10) == 143
 
     import sqlite3
 
     with sqlite3.connect(db_path) as conn:
-        assert conn.execute("SELECT pid FROM yoyo_lock").fetchone()[0] == os.getppid()
+        assert conn.execute("SELECT COUNT(*) FROM yoyo_lock").fetchone()[0] == 0
