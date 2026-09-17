@@ -174,6 +174,32 @@ CORPORA = {
         "truth.json",
         "blind-authored and frozen synthetic corpus; results describe this corpus and runner only",
     ),
+    # Added for the literature-replication matrix. Both are gitignored under
+    # artifacts/ because they are built from third-party bytes: GDS is MIT and
+    # redistributable, the Ma11y mutants derive from it, but the build is
+    # reproducible from tools/ so the pages themselves are not committed.
+    "gds": (
+        REPO_ROOT
+        / "experiments"
+        / "tabbing"
+        / "literature-replication"
+        / "artifacts"
+        / "gds-corpus",
+        "truth.json",
+        "GDS Accessibility Tool Audit (MIT, Crown Copyright 2017); 6 IAF cases "
+        "on one page, all 13 audited tools score 0/6",
+    ),
+    "ma11y": (
+        REPO_ROOT
+        / "experiments"
+        / "tabbing"
+        / "literature-replication"
+        / "artifacts"
+        / "ma11y",
+        "truth.json",
+        "Ma11y-generated mutants of the GDS page; ground truth by construction "
+        "and verified behaviourally; only 1 of 4 operators produced a verified fault",
+    ),
 }
 
 
@@ -268,7 +294,20 @@ async def run_page(
         await page.goto(url, wait_until="load")
         await page.wait_for_timeout(150)
         meta["viewport"] = dict(page.viewport_size)
-        order = await compute_tab_order(page)
+        # The tab cap is derived from the page rather than inherited. The
+        # detector's 300 default is correct for the synthetic corpora, but the
+        # GDS page carries 306 focusable elements, so a fixed 300 caps the walk
+        # and turns five real violations into `unknown` -- a budget limit
+        # reported as an absence of evidence. Headroom is added so a complete
+        # walk is provable rather than merely likely; a walk that still caps is
+        # reported as capped and its probes abstain.
+        focusable = await page.evaluate(
+            """() => document.querySelectorAll(
+                'a[href],button,input,select,textarea,[tabindex],[onclick]').length"""
+        )
+        order = await compute_tab_order(page, max_tabs=max(300, focusable * 3 + 200))
+        meta["focusable"] = focusable
+        meta["tab_capped"] = order.capped
         page.require_success()
 
         # One DOM walk feeds six detectors. Upstream ran a separate

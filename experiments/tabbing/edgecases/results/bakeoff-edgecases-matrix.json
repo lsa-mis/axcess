@@ -1,0 +1,5742 @@
+{
+  "run": {
+    "label": "matrix",
+    "started_utc": "2026-09-17T20:17:11.554367+00:00",
+    "finished_utc": "2026-09-17T20:18:03.772212+00:00",
+    "wall_seconds": 52.2,
+    "command": [
+      "experiments/tabbing/runner/bakeoff.py",
+      "--corpus",
+      "edgecases",
+      "--cheap-only",
+      "--candidate-study",
+      "--label",
+      "matrix",
+      "--timeout-seconds",
+      "3600"
+    ],
+    "valid": false,
+    "errors": [
+      "Error: CDPSession.send: Protocol error (DOM.getDocument): Failed to convert response to JSON: CBOR: stack limit exceeded at position 53429"
+    ],
+    "corpus_sha256": "3143b4ca54909dda9f6f5644d3fbeadc56c1a84a6700db38bad12593f081e304",
+    "corpus_sha256_after": "3143b4ca54909dda9f6f5644d3fbeadc56c1a84a6700db38bad12593f081e304",
+    "source_sha256_before": {
+      "detector": {
+        "__init__.py": "b5f36f2b323911788043f1f6b2fdb92aa6e1b97ba30338bb10e9228514c11b42",
+        "candidates.py": "80025d7b3d595b75051f9aac1bced56f16b5ca477dba9a94aec0b85a5add625d",
+        "channels.py": "5315645ccc7051d3cdd0231ecefa6d2a0dafd6107b3d4c775ddb11895b28ee49",
+        "coverage.py": "1a87accc0cce1d892b790fe4fd0805b524057971de3087691c635539fc3c9f84",
+        "detectors.py": "59dd8f9804d2772f88092915118de83dcc9f31d01cda453c3d11bf72b3a0d822",
+        "differential.py": "b83ab078cb65ae56b0ba4619b30fb97c00ea950a8305a61ebca81813dd782067",
+        "equivalence.py": "baebdc95d6064beacfc0efe50cc15debc4ec9531a4fbab8e0ce96f8f1ee0ed85",
+        "model.py": "870d0311802f629f8197f617d260494973900bde76f9d2961ed3142a5c742e9c",
+        "score.py": "690230189bd04bd77bd9acb32c21c2d24db7cce61d963251422dd3e1484ba91c",
+        "taborder.py": "69f08283ae5633b19b6771b7b4a0a9dbc7af0908b20bd4033a07aed7ae511489",
+        "_combined": "1c08b2cace4906a047ae79d925e72ad641269adb033c563430a30fa7d58619a2"
+      },
+      "runner": {
+        "__main__.py": "3382cedc89a81b440803c1617b0f667900fac3fd27d7ddeda24f09cb4b86fc7e",
+        "bakeoff.py": "d44d5c9790e47a5873e4fb4101312c372088a2d0df3168446509999530adfc5d",
+        "candidate_analysis.py": "9e1ee78cc71ba9063de2dbcea89e62cdf2ce6d3f67cf584654a649d3867116a3",
+        "corpus.py": "79a1ad75b2a9827ca05e6e776ef228d78d51f82258f4bc905cebfb6a11c6187c",
+        "main.py": "c43f1ca3a3ba56cad10ee8c57c54bd66ce14de5547d90e6931cd093361c3febf",
+        "provenance.py": "c57f95e6cb89600a5de89d2bbb780abd3357b221fa62d3ad23d35ec522608e5c",
+        "report.py": "053d1d234001fda24d8d1891b1632e83bfec6a935291a1d681a45017b4e8c2b5",
+        "run.py": "afeb63397909045bb9e455ae35faea4c92e452eda35ec613a47ac5176e90ca30",
+        "serve.py": "bcac78045ca0ed3523d0814a96b882f029bd3872cc9d24851fcb2b05aa60ce13",
+        "upstream_candidates.py": "6d52f5607fcdf0cf1eba80ef34bcf9f4b24cf6c10f7a0d0065ac69dc1b7b833b",
+        "upstream_instrument.py": "6995db0f77f75a2576dd72cc8264c85c7c9b662da66d7b6fff8d5757cb46295d",
+        "_combined": "cf1bf7bcf04e3a84dcaafcf2cc2c00db8116672880e4c2fdb6623d05ae7ecfaa"
+      }
+    },
+    "source_sha256_after": {
+      "detector": {
+        "__init__.py": "b5f36f2b323911788043f1f6b2fdb92aa6e1b97ba30338bb10e9228514c11b42",
+        "candidates.py": "80025d7b3d595b75051f9aac1bced56f16b5ca477dba9a94aec0b85a5add625d",
+        "channels.py": "5315645ccc7051d3cdd0231ecefa6d2a0dafd6107b3d4c775ddb11895b28ee49",
+        "coverage.py": "1a87accc0cce1d892b790fe4fd0805b524057971de3087691c635539fc3c9f84",
+        "detectors.py": "59dd8f9804d2772f88092915118de83dcc9f31d01cda453c3d11bf72b3a0d822",
+        "differential.py": "b83ab078cb65ae56b0ba4619b30fb97c00ea950a8305a61ebca81813dd782067",
+        "equivalence.py": "baebdc95d6064beacfc0efe50cc15debc4ec9531a4fbab8e0ce96f8f1ee0ed85",
+        "model.py": "870d0311802f629f8197f617d260494973900bde76f9d2961ed3142a5c742e9c",
+        "score.py": "690230189bd04bd77bd9acb32c21c2d24db7cce61d963251422dd3e1484ba91c",
+        "taborder.py": "69f08283ae5633b19b6771b7b4a0a9dbc7af0908b20bd4033a07aed7ae511489",
+        "_combined": "1c08b2cace4906a047ae79d925e72ad641269adb033c563430a30fa7d58619a2"
+      },
+      "runner": {
+        "__main__.py": "3382cedc89a81b440803c1617b0f667900fac3fd27d7ddeda24f09cb4b86fc7e",
+        "bakeoff.py": "d44d5c9790e47a5873e4fb4101312c372088a2d0df3168446509999530adfc5d",
+        "candidate_analysis.py": "9e1ee78cc71ba9063de2dbcea89e62cdf2ce6d3f67cf584654a649d3867116a3",
+        "corpus.py": "79a1ad75b2a9827ca05e6e776ef228d78d51f82258f4bc905cebfb6a11c6187c",
+        "main.py": "c43f1ca3a3ba56cad10ee8c57c54bd66ce14de5547d90e6931cd093361c3febf",
+        "provenance.py": "c57f95e6cb89600a5de89d2bbb780abd3357b221fa62d3ad23d35ec522608e5c",
+        "report.py": "053d1d234001fda24d8d1891b1632e83bfec6a935291a1d681a45017b4e8c2b5",
+        "run.py": "afeb63397909045bb9e455ae35faea4c92e452eda35ec613a47ac5176e90ca30",
+        "serve.py": "bcac78045ca0ed3523d0814a96b882f029bd3872cc9d24851fcb2b05aa60ce13",
+        "upstream_candidates.py": "6d52f5607fcdf0cf1eba80ef34bcf9f4b24cf6c10f7a0d0065ac69dc1b7b833b",
+        "upstream_instrument.py": "6995db0f77f75a2576dd72cc8264c85c7c9b662da66d7b6fff8d5757cb46295d",
+        "_combined": "cf1bf7bcf04e3a84dcaafcf2cc2c00db8116672880e4c2fdb6623d05ae7ecfaa"
+      }
+    },
+    "source_unchanged": true,
+    "versions": {
+      "python": "3.14.7",
+      "playwright": "1.58.0",
+      "chromium": "145.0.7632.6"
+    },
+    "settings": {
+      "viewport_name": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "headless": true,
+      "cheap_only": true,
+      "candidate_study": true,
+      "timeout_seconds": 3600,
+      "page_timeout_seconds": 300,
+      "probe_timeout_seconds": 60
+    },
+    "actual_viewports": {
+      "pages/binding.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/decoys.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/effects.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/focus-redirect.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/geometry.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/graphical-controls.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/hover.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/iframe-tab-scope.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/keyboard.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/native-proxy.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/pointer-gated.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/roving-tabindex.html": {
+        "width": 1280,
+        "height": 900
+      },
+      "pages/scale.html": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "request_counters": {
+      "served": 76,
+      "ping": 0,
+      "blocked": 0,
+      "missing": 0,
+      "websocket": 0
+    }
+  },
+  "corpus": "edgecases",
+  "caveat": "shared-author development corpus; no unbiased accuracy or ranking claim",
+  "probes": 74,
+  "positives": 40,
+  "wall_seconds": 52.2,
+  "tab_orders": {
+    "pages/binding.html": {
+      "presses": 3,
+      "capped": false,
+      "index": {
+        "e10": 1
+      }
+    },
+    "pages/decoys.html": {
+      "presses": 8,
+      "capped": false,
+      "index": {
+        "e80": 1,
+        "e81": 2,
+        "e82": 3,
+        "e85a": 4,
+        "e86a": 5,
+        "e87b": 6
+      }
+    },
+    "pages/effects.html": {
+      "presses": 3,
+      "capped": false,
+      "index": {
+        "e30": 1
+      }
+    },
+    "pages/focus-redirect.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {}
+    },
+    "pages/geometry.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {
+        "e73": 2
+      }
+    },
+    "pages/graphical-controls.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {}
+    },
+    "pages/hover.html": {
+      "presses": 3,
+      "capped": false,
+      "index": {
+        "e32": 1
+      }
+    },
+    "pages/iframe-tab-scope.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {}
+    },
+    "pages/keyboard.html": {
+      "presses": 10,
+      "capped": false,
+      "index": {
+        "e46": 1,
+        "e40": 2,
+        "e41": 3,
+        "e42": 4,
+        "e43": 5,
+        "e44": 6,
+        "e47": 7,
+        "e48": 8
+      }
+    },
+    "pages/native-proxy.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {}
+    },
+    "pages/pointer-gated.html": {
+      "presses": 4,
+      "capped": false,
+      "index": {}
+    },
+    "pages/roving-tabindex.html": {
+      "presses": 5,
+      "capped": false,
+      "index": {
+        "e160": 2
+      }
+    },
+    "pages/scale.html": {
+      "presses": 122,
+      "capped": false,
+      "index": {}
+    }
+  },
+  "page_timings_ms": {
+    "pages/binding.html": {
+      "survey (shared DOM walk)": 30.7,
+      "D0 axcess collectClickables": 0.021,
+      "D2 inline onclick attribute": 0.011,
+      "D2b onclick property": 0.006,
+      "D3 tabindex / ARIA": 0.007,
+      "D4 CSS + lexical": 0.007,
+      "D7 React fiber props": 0.01,
+      "D5 CDP getEventListeners": 79.2,
+      "D6 addEventListener shim": 4.1,
+      "D8 hover-diff": 1659.3,
+      "D1 axe-core": 299.0,
+      "candidate setup and navigation": 156.642,
+      "candidate Tab traversal": 35.848,
+      "candidate visibility": 6.431,
+      "candidate pierced resolution": 40.381,
+      "U-D0 upstream crawler candidates": 4.695,
+      "U-D2 upstream inline attributes": 4.949,
+      "U-D2b upstream mouse handler properties": 4.697,
+      "U-D3 upstream missing tabindex": 5.348,
+      "U-D4 upstream CSS and class tokens": 5.427,
+      "U-D7 upstream React mouse props": 4.07,
+      "U-D5 upstream direct CDP listeners": 96.032,
+      "U-D6 upstream registration shim": 4.765,
+      "candidate feature evidence": 9.613,
+      "U-D8 upstream pixel hover difference": 2676.919,
+      "U-D1 upstream tagged axe attribution": 251.797,
+      "candidate variant set operations": 0.095,
+      "candidate study whole page": 3312.238
+    },
+    "pages/decoys.html": {
+      "survey (shared DOM walk)": 11.8,
+      "D0 axcess collectClickables": 0.016,
+      "D2 inline onclick attribute": 0.006,
+      "D2b onclick property": 0.004,
+      "D3 tabindex / ARIA": 0.007,
+      "D4 CSS + lexical": 0.007,
+      "D7 React fiber props": 0.01,
+      "D5 CDP getEventListeners": 82.9,
+      "D6 addEventListener shim": 3.3,
+      "D8 hover-diff": 1799.1,
+      "D1 axe-core": 295.4,
+      "candidate setup and navigation": 153.433,
+      "candidate Tab traversal": 86.351,
+      "candidate visibility": 5.814,
+      "candidate pierced resolution": 46.165,
+      "U-D0 upstream crawler candidates": 5.7,
+      "U-D2 upstream inline attributes": 5.569,
+      "U-D2b upstream mouse handler properties": 5.177,
+      "U-D3 upstream missing tabindex": 4.839,
+      "U-D4 upstream CSS and class tokens": 6.107,
+      "U-D7 upstream React mouse props": 4.476,
+      "U-D5 upstream direct CDP listeners": 116.333,
+      "U-D6 upstream registration shim": 3.262,
+      "candidate feature evidence": 6.948,
+      "U-D8 upstream pixel hover difference": 3281.042,
+      "U-D1 upstream tagged axe attribution": 262.288,
+      "candidate variant set operations": 0.132,
+      "candidate study whole page": 3997.25
+    },
+    "pages/effects.html": {
+      "survey (shared DOM walk)": 8.1,
+      "D0 axcess collectClickables": 0.036,
+      "D2 inline onclick attribute": 0.004,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.005,
+      "D4 CSS + lexical": 0.005,
+      "D7 React fiber props": 0.008,
+      "D5 CDP getEventListeners": 61.7,
+      "D6 addEventListener shim": 4.0,
+      "D8 hover-diff": 1659.6,
+      "D1 axe-core": 265.6,
+      "candidate setup and navigation": 167.259,
+      "candidate Tab traversal": 23.8,
+      "candidate visibility": 4.246,
+      "candidate pierced resolution": 29.662,
+      "U-D0 upstream crawler candidates": 3.308,
+      "U-D2 upstream inline attributes": 3.656,
+      "U-D2b upstream mouse handler properties": 2.924,
+      "U-D3 upstream missing tabindex": 3.129,
+      "U-D4 upstream CSS and class tokens": 3.518,
+      "U-D7 upstream React mouse props": 3.164,
+      "U-D5 upstream direct CDP listeners": 74.51,
+      "U-D6 upstream registration shim": 4.439,
+      "candidate feature evidence": 6.706,
+      "U-D8 upstream pixel hover difference": 2929.325,
+      "U-D1 upstream tagged axe attribution": 408.747,
+      "candidate variant set operations": 0.119,
+      "candidate study whole page": 3671.191
+    },
+    "pages/focus-redirect.html": {
+      "survey (shared DOM walk)": 5.4,
+      "D0 axcess collectClickables": 0.008,
+      "D2 inline onclick attribute": 0.003,
+      "D2b onclick property": 0.002,
+      "D3 tabindex / ARIA": 0.002,
+      "D4 CSS + lexical": 0.002,
+      "D7 React fiber props": 0.005,
+      "D5 CDP getEventListeners": 5.4,
+      "D6 addEventListener shim": 3.2,
+      "D8 hover-diff": 233.4,
+      "D1 axe-core": 277.3,
+      "candidate setup and navigation": 165.214,
+      "candidate Tab traversal": 30.36,
+      "candidate visibility": 3.219,
+      "candidate pierced resolution": 6.719,
+      "U-D0 upstream crawler candidates": 3.228,
+      "U-D2 upstream inline attributes": 3.465,
+      "U-D2b upstream mouse handler properties": 3.322,
+      "U-D3 upstream missing tabindex": 2.596,
+      "U-D4 upstream CSS and class tokens": 3.139,
+      "U-D7 upstream React mouse props": 2.501,
+      "U-D5 upstream direct CDP listeners": 9.948,
+      "U-D6 upstream registration shim": 2.911,
+      "candidate feature evidence": 3.986,
+      "U-D8 upstream pixel hover difference": 283.828,
+      "U-D1 upstream tagged axe attribution": 275.919,
+      "candidate variant set operations": 0.076,
+      "candidate study whole page": 802.883
+    },
+    "pages/geometry.html": {
+      "survey (shared DOM walk)": 6.5,
+      "D0 axcess collectClickables": 0.011,
+      "D2 inline onclick attribute": 0.003,
+      "D2b onclick property": 0.002,
+      "D3 tabindex / ARIA": 0.003,
+      "D4 CSS + lexical": 0.004,
+      "D7 React fiber props": 0.007,
+      "D5 CDP getEventListeners": 61.7,
+      "D6 addEventListener shim": 3.9,
+      "D8 hover-diff": 1972.3,
+      "D1 axe-core": 373.6,
+      "candidate setup and navigation": 216.061,
+      "candidate Tab traversal": 73.384,
+      "candidate visibility": 6.5,
+      "candidate pierced resolution": 78.838,
+      "U-D0 upstream crawler candidates": 7.883,
+      "U-D2 upstream inline attributes": 7.754,
+      "U-D2b upstream mouse handler properties": 5.689,
+      "U-D3 upstream missing tabindex": 5.447,
+      "U-D4 upstream CSS and class tokens": 7.868,
+      "U-D7 upstream React mouse props": 6.275,
+      "U-D5 upstream direct CDP listeners": 120.803,
+      "U-D6 upstream registration shim": 9.962,
+      "candidate feature evidence": 11.681,
+      "U-D8 upstream pixel hover difference": 2734.425,
+      "U-D1 upstream tagged axe attribution": 323.482,
+      "candidate variant set operations": 0.137,
+      "candidate study whole page": 3621.007
+    },
+    "pages/graphical-controls.html": {
+      "survey (shared DOM walk)": 8.2,
+      "D0 axcess collectClickables": 0.016,
+      "D2 inline onclick attribute": 0.006,
+      "D2b onclick property": 0.005,
+      "D3 tabindex / ARIA": 0.006,
+      "D4 CSS + lexical": 0.005,
+      "D7 React fiber props": 0.011,
+      "D5 CDP getEventListeners": 16.7,
+      "D6 addEventListener shim": 6.0,
+      "D8 hover-diff": 438.6,
+      "D1 axe-core": 364.9,
+      "candidate setup and navigation": 186.272,
+      "candidate Tab traversal": 43.609,
+      "candidate visibility": 5.282,
+      "candidate pierced resolution": 13.688,
+      "U-D0 upstream crawler candidates": 4.767,
+      "U-D2 upstream inline attributes": 5.619,
+      "U-D2b upstream mouse handler properties": 5.187,
+      "U-D3 upstream missing tabindex": 7.088,
+      "U-D4 upstream CSS and class tokens": 6.026,
+      "U-D7 upstream React mouse props": 3.564,
+      "U-D5 upstream direct CDP listeners": 15.786,
+      "U-D6 upstream registration shim": 3.574,
+      "candidate feature evidence": 6.94,
+      "U-D8 upstream pixel hover difference": 544.317,
+      "U-D1 upstream tagged axe attribution": 333.441,
+      "candidate variant set operations": 0.064,
+      "candidate study whole page": 1189.865
+    },
+    "pages/hover.html": {
+      "survey (shared DOM walk)": 6.3,
+      "D0 axcess collectClickables": 0.01,
+      "D2 inline onclick attribute": 0.004,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.003,
+      "D4 CSS + lexical": 0.003,
+      "D7 React fiber props": 0.006,
+      "D5 CDP getEventListeners": 15.1,
+      "D6 addEventListener shim": 2.5,
+      "D8 hover-diff": 583.8,
+      "D1 axe-core": 280.8,
+      "candidate setup and navigation": 178.728,
+      "candidate Tab traversal": 44.394,
+      "candidate visibility": 5.571,
+      "candidate pierced resolution": 15.848,
+      "U-D0 upstream crawler candidates": 4.56,
+      "U-D2 upstream inline attributes": 5.085,
+      "U-D2b upstream mouse handler properties": 5.803,
+      "U-D3 upstream missing tabindex": 4.361,
+      "U-D4 upstream CSS and class tokens": 5.24,
+      "U-D7 upstream React mouse props": 4.133,
+      "U-D5 upstream direct CDP listeners": 28.846,
+      "U-D6 upstream registration shim": 3.858,
+      "candidate feature evidence": 6.532,
+      "U-D8 upstream pixel hover difference": 868.603,
+      "U-D1 upstream tagged axe attribution": 256.607,
+      "candidate variant set operations": 0.067,
+      "candidate study whole page": 1443.063
+    },
+    "pages/iframe-tab-scope.html": {
+      "survey (shared DOM walk)": 6.1,
+      "D0 axcess collectClickables": 0.01,
+      "D2 inline onclick attribute": 0.004,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.003,
+      "D4 CSS + lexical": 0.003,
+      "D7 React fiber props": 0.007,
+      "D5 CDP getEventListeners": 3.7,
+      "D6 addEventListener shim": 3.9,
+      "D8 hover-diff": 1047.7,
+      "D1 axe-core": 697.3,
+      "candidate setup and navigation": 161.015,
+      "candidate Tab traversal": 26.504,
+      "candidate visibility": 6.512,
+      "candidate pierced resolution": 5.35,
+      "U-D0 upstream crawler candidates": 5.074,
+      "U-D2 upstream inline attributes": 6.849,
+      "U-D2b upstream mouse handler properties": 7.424,
+      "U-D3 upstream missing tabindex": 6.244,
+      "U-D4 upstream CSS and class tokens": 6.756,
+      "U-D7 upstream React mouse props": 9.441,
+      "U-D5 upstream direct CDP listeners": 7.955,
+      "U-D6 upstream registration shim": 6.792,
+      "candidate feature evidence": 9.456,
+      "U-D8 upstream pixel hover difference": 271.868,
+      "U-D1 upstream tagged axe attribution": 375.076,
+      "candidate variant set operations": 0.036,
+      "candidate study whole page": 914.885
+    },
+    "pages/keyboard.html": {
+      "survey (shared DOM walk)": 11.2,
+      "D0 axcess collectClickables": 0.023,
+      "D2 inline onclick attribute": 0.028,
+      "D2b onclick property": 0.006,
+      "D3 tabindex / ARIA": 0.011,
+      "D4 CSS + lexical": 0.009,
+      "D7 React fiber props": 0.014,
+      "D5 CDP getEventListeners": 58.7,
+      "D6 addEventListener shim": 6.1,
+      "D8 hover-diff": 1490.1,
+      "D1 axe-core": 261.2,
+      "candidate setup and navigation": 163.978,
+      "candidate Tab traversal": 89.548,
+      "candidate visibility": 5.354,
+      "candidate pierced resolution": 36.432,
+      "U-D0 upstream crawler candidates": 4.719,
+      "U-D2 upstream inline attributes": 5.071,
+      "U-D2b upstream mouse handler properties": 4.58,
+      "U-D3 upstream missing tabindex": 4.39,
+      "U-D4 upstream CSS and class tokens": 5.196,
+      "U-D7 upstream React mouse props": 4.06,
+      "U-D5 upstream direct CDP listeners": 91.701,
+      "U-D6 upstream registration shim": 5.354,
+      "candidate feature evidence": 8.965,
+      "U-D8 upstream pixel hover difference": 2405.37,
+      "U-D1 upstream tagged axe attribution": 284.968,
+      "candidate variant set operations": 0.072,
+      "candidate study whole page": 3123.509
+    },
+    "pages/native-proxy.html": {
+      "survey (shared DOM walk)": 6.9,
+      "D0 axcess collectClickables": 0.011,
+      "D2 inline onclick attribute": 0.005,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.004,
+      "D4 CSS + lexical": 0.003,
+      "D7 React fiber props": 0.008,
+      "D5 CDP getEventListeners": 7.6,
+      "D6 addEventListener shim": 4.2,
+      "D8 hover-diff": 252.9,
+      "D1 axe-core": 276.9,
+      "candidate setup and navigation": 150.59,
+      "candidate Tab traversal": 29.442,
+      "candidate visibility": 4.492,
+      "candidate pierced resolution": 7.4,
+      "U-D0 upstream crawler candidates": 4.708,
+      "U-D2 upstream inline attributes": 4.101,
+      "U-D2b upstream mouse handler properties": 3.82,
+      "U-D3 upstream missing tabindex": 3.676,
+      "U-D4 upstream CSS and class tokens": 3.504,
+      "U-D7 upstream React mouse props": 3.099,
+      "U-D5 upstream direct CDP listeners": 5.127,
+      "U-D6 upstream registration shim": 2.522,
+      "candidate feature evidence": 3.45,
+      "U-D8 upstream pixel hover difference": 280.732,
+      "U-D1 upstream tagged axe attribution": 265.564,
+      "candidate variant set operations": 0.044,
+      "candidate study whole page": 775.531
+    },
+    "pages/pointer-gated.html": {
+      "survey (shared DOM walk)": 7.9,
+      "D0 axcess collectClickables": 0.012,
+      "D2 inline onclick attribute": 0.005,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.004,
+      "D4 CSS + lexical": 0.004,
+      "D7 React fiber props": 0.008,
+      "D5 CDP getEventListeners": 12.2,
+      "D6 addEventListener shim": 3.2,
+      "D8 hover-diff": 338.6,
+      "D1 axe-core": 257.6,
+      "candidate setup and navigation": 150.256,
+      "candidate Tab traversal": 42.996,
+      "candidate visibility": 5.744,
+      "candidate pierced resolution": 12.498,
+      "U-D0 upstream crawler candidates": 4.731,
+      "U-D2 upstream inline attributes": 5.21,
+      "U-D2b upstream mouse handler properties": 4.079,
+      "U-D3 upstream missing tabindex": 3.94,
+      "U-D4 upstream CSS and class tokens": 3.689,
+      "U-D7 upstream React mouse props": 3.567,
+      "U-D5 upstream direct CDP listeners": 10.066,
+      "U-D6 upstream registration shim": 4.767,
+      "candidate feature evidence": 6.142,
+      "U-D8 upstream pixel hover difference": 542.037,
+      "U-D1 upstream tagged axe attribution": 273.341,
+      "candidate variant set operations": 0.05,
+      "candidate study whole page": 1077.005
+    },
+    "pages/roving-tabindex.html": {
+      "survey (shared DOM walk)": 7.3,
+      "D0 axcess collectClickables": 0.012,
+      "D2 inline onclick attribute": 0.005,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.004,
+      "D4 CSS + lexical": 0.004,
+      "D7 React fiber props": 0.008,
+      "D5 CDP getEventListeners": 27.2,
+      "D6 addEventListener shim": 4.6,
+      "D8 hover-diff": 733.9,
+      "D1 axe-core": 317.4,
+      "candidate setup and navigation": 210.46,
+      "candidate Tab traversal": 51.608,
+      "candidate visibility": 5.761,
+      "candidate pierced resolution": 18.932,
+      "U-D0 upstream crawler candidates": 4.963,
+      "U-D2 upstream inline attributes": 4.941,
+      "U-D2b upstream mouse handler properties": 4.11,
+      "U-D3 upstream missing tabindex": 3.918,
+      "U-D4 upstream CSS and class tokens": 5.247,
+      "U-D7 upstream React mouse props": 3.735,
+      "U-D5 upstream direct CDP listeners": 39.197,
+      "U-D6 upstream registration shim": 5.556,
+      "candidate feature evidence": 7.565,
+      "U-D8 upstream pixel hover difference": 1064.322,
+      "U-D1 upstream tagged axe attribution": 262.651,
+      "candidate variant set operations": 0.057,
+      "candidate study whole page": 1696.998
+    },
+    "pages/scale.html": {
+      "survey (shared DOM walk)": 7.0,
+      "D0 axcess collectClickables": 0.011,
+      "D2 inline onclick attribute": 0.005,
+      "D2b onclick property": 0.003,
+      "D3 tabindex / ARIA": 0.003,
+      "D4 CSS + lexical": 0.004,
+      "D7 React fiber props": 0.007,
+      "D5 CDP getEventListeners": 14.8,
+      "D6 addEventListener shim": 29.7,
+      "D8 hover-diff": 424.3,
+      "D1 axe-core": 2442.7
+    }
+  },
+  "notes": {
+    "D7 React fiber props": "no React on this page",
+    "D6 addEventListener shim": "122 registrations, 0 on document/window",
+    "D1 axe-core (keyboard rules)": "109 violations, 0 keyboard-relevant; rules fired: html-has-lang, landmark-one-main, region, target-size",
+    "D1x axe-core (any rule, unsound)": "credits axe for ANY violation on the element, including colour contrast and landmark structure. Shown to demonstrate the artefact, not as a result."
+  },
+  "reasons": {},
+  "coverage_evidence": {},
+  "upstream_evidence": {},
+  "s4u_dismissals": {},
+  "s4ours_dismissals": {},
+  "upstream_s4_dismissals": {},
+  "coverage_errors": {},
+  "s4_inputs": {},
+  "baseline_evidence": {},
+  "proposed": {
+    "D0 axcess collectClickables": [
+      "e01",
+      "e07",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e46",
+      "e47",
+      "e81",
+      "e82",
+      "e85a"
+    ],
+    "D2 inline onclick attribute": [
+      "e01",
+      "e07"
+    ],
+    "D2b onclick property": [
+      "e01",
+      "e02",
+      "e07"
+    ],
+    "D3 tabindex / ARIA": [
+      "e150",
+      "e151",
+      "e30",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e73",
+      "e82"
+    ],
+    "D4 CSS + lexical": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e150",
+      "e151",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e73",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87",
+      "e90",
+      "e91"
+    ],
+    "D7 React fiber props": [],
+    "D5 CDP getEventListeners": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e67",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e82",
+      "e85",
+      "e90",
+      "e91"
+    ],
+    "D6 addEventListener shim": [
+      "e03",
+      "e04",
+      "e08",
+      "e10",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e67",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e82",
+      "e85",
+      "e90",
+      "e91"
+    ],
+    "D8 hover-diff": [
+      "e121",
+      "e31",
+      "e33"
+    ],
+    "D1 axe-core (keyboard rules)": [
+      "e46",
+      "e73"
+    ],
+    "D1x axe-core (any rule, unsound)": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e32",
+      "e44",
+      "e45",
+      "e46",
+      "e60",
+      "e61",
+      "e65",
+      "e68",
+      "e73",
+      "e81",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e86a",
+      "e90"
+    ],
+    "U-D0 upstream crawler candidates": [
+      "e01",
+      "e07",
+      "e10",
+      "e110",
+      "e120",
+      "e121",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e46",
+      "e47",
+      "e48",
+      "e67",
+      "e80",
+      "e82",
+      "e87b"
+    ],
+    "U-D1 upstream tagged axe attribution": [
+      "e73"
+    ],
+    "U-D2 upstream inline attributes": [
+      "e01",
+      "e07"
+    ],
+    "U-D2b upstream mouse handler properties": [
+      "e01",
+      "e02",
+      "e07"
+    ],
+    "U-D3 upstream missing tabindex": [
+      "e01",
+      "e07",
+      "e150",
+      "e151"
+    ],
+    "U-D4 upstream CSS and class tokens": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ],
+    "U-D5 upstream direct CDP listeners": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e82",
+      "e85"
+    ],
+    "U-D6 upstream registration shim": [
+      "e03",
+      "e04",
+      "e08",
+      "e09",
+      "e10",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e82",
+      "e85"
+    ],
+    "U-D7 upstream React mouse props": [],
+    "U-D8 upstream pixel hover difference": [
+      "e10",
+      "e121",
+      "e140",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e31",
+      "e33",
+      "e48",
+      "e80",
+      "e86a",
+      "e87",
+      "e87b"
+    ],
+    "C1 upstream D4|D5|D6, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ],
+    "C2 upstream D4|D5|D6|D8, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e121",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e33",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e86a",
+      "e87",
+      "e87b"
+    ],
+    "C3 union, reject inert and pointer-events:none": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ],
+    "C4 union, additionally reject blocked center": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e68",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ],
+    "C5 focusable custom mouse control, no observed key handler": [
+      "e30",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e46",
+      "e47",
+      "e73",
+      "e82"
+    ],
+    "C6 visible label for a toggle absent from Tab": [
+      "e86"
+    ],
+    "C7 ancestor mouse listener, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09"
+    ],
+    "C8 union + focusable + label + ancestor leads": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ],
+    "C9 combined leads, additionally reject blocked center": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e10",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e160",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e30",
+      "e31",
+      "e32",
+      "e40",
+      "e41",
+      "e42",
+      "e43",
+      "e44",
+      "e45",
+      "e46",
+      "e47",
+      "e48",
+      "e60",
+      "e61",
+      "e68",
+      "e73",
+      "e80",
+      "e81",
+      "e82",
+      "e83",
+      "e84",
+      "e85",
+      "e85a",
+      "e86",
+      "e87"
+    ]
+  },
+  "proposal_coverage": {
+    "D0 axcess collectClickables": {
+      "candidates": 17,
+      "positive_candidates": 8,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e111",
+        "e130",
+        "e131",
+        "e140",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "D2 inline onclick attribute": {
+      "candidates": 2,
+      "positive_candidates": 2,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "D2b onclick property": {
+      "candidates": 3,
+      "positive_candidates": 3,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "D3 tabindex / ARIA": {
+      "candidates": 14,
+      "positive_candidates": 6,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    },
+    "D4 CSS + lexical": {
+      "candidates": 54,
+      "positive_candidates": 31,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e162",
+        "e163"
+      ]
+    },
+    "D7 React fiber props": {
+      "candidates": 0,
+      "positive_candidates": 0,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "D5 CDP getEventListeners": {
+      "candidates": 56,
+      "positive_candidates": 32,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e05",
+        "e06",
+        "e100",
+        "e111",
+        "e130",
+        "e131",
+        "e140",
+        "e31"
+      ]
+    },
+    "D6 addEventListener shim": {
+      "candidates": 52,
+      "positive_candidates": 28,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e05",
+        "e06",
+        "e07",
+        "e09",
+        "e100",
+        "e111",
+        "e130",
+        "e131",
+        "e140",
+        "e31"
+      ]
+    },
+    "D8 hover-diff": {
+      "candidates": 3,
+      "positive_candidates": 2,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "D1 axe-core (keyboard rules)": {
+      "candidates": 2,
+      "positive_candidates": 1,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    },
+    "D1x axe-core (any rule, unsound)": {
+      "candidates": 36,
+      "positive_candidates": 23,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e06",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e43",
+        "e62",
+        "e71",
+        "e72",
+        "e91"
+      ]
+    },
+    "U-D0 upstream crawler candidates": {
+      "candidates": 25,
+      "positive_candidates": 11,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e111",
+        "e130",
+        "e131",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D1 upstream tagged axe attribution": {
+      "candidates": 1,
+      "positive_candidates": 1,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D2 upstream inline attributes": {
+      "candidates": 2,
+      "positive_candidates": 2,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D2b upstream mouse handler properties": {
+      "candidates": 3,
+      "positive_candidates": 3,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D3 upstream missing tabindex": {
+      "candidates": 4,
+      "positive_candidates": 4,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D4 upstream CSS and class tokens": {
+      "candidates": 54,
+      "positive_candidates": 32,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e162",
+        "e163",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D5 upstream direct CDP listeners": {
+      "candidates": 50,
+      "positive_candidates": 30,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e05",
+        "e06",
+        "e100",
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e31",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D6 upstream registration shim": {
+      "candidates": 47,
+      "positive_candidates": 27,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e05",
+        "e06",
+        "e07",
+        "e100",
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e31",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D7 upstream React mouse props": {
+      "candidates": 0,
+      "positive_candidates": 0,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "U-D8 upstream pixel hover difference": {
+      "candidates": 14,
+      "positive_candidates": 5,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e130",
+        "e131",
+        "e150",
+        "e151",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "C1 upstream D4|D5|D6, minus Tab": {
+      "candidates": 61,
+      "positive_candidates": 34,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e90",
+        "e91"
+      ]
+    },
+    "C2 upstream D4|D5|D6|D8, minus Tab": {
+      "candidates": 65,
+      "positive_candidates": 35,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e130",
+        "e131",
+        "e90",
+        "e91"
+      ]
+    },
+    "C3 union, reject inert and pointer-events:none": {
+      "candidates": 59,
+      "positive_candidates": 34,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e90",
+        "e91"
+      ]
+    },
+    "C4 union, additionally reject blocked center": {
+      "candidates": 55,
+      "positive_candidates": 31,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    },
+    "C5 focusable custom mouse control, no observed key handler": {
+      "candidates": 10,
+      "positive_candidates": 3,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    },
+    "C6 visible label for a toggle absent from Tab": {
+      "candidates": 1,
+      "positive_candidates": 0,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "C7 ancestor mouse listener, minus Tab": {
+      "candidates": 9,
+      "positive_candidates": 9,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e100",
+        "e110",
+        "e111",
+        "e120",
+        "e121",
+        "e130",
+        "e131",
+        "e140",
+        "e150",
+        "e151",
+        "e162",
+        "e163",
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e25",
+        "e26",
+        "e28",
+        "e29",
+        "e31",
+        "e43",
+        "e44",
+        "e45",
+        "e60",
+        "e62",
+        "e71",
+        "e72",
+        "e73",
+        "e90",
+        "e91"
+      ]
+    },
+    "C8 union + focusable + label + ancestor leads": {
+      "candidates": 59,
+      "positive_candidates": 34,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e90",
+        "e91"
+      ]
+    },
+    "C9 combined leads, additionally reject blocked center": {
+      "candidates": 55,
+      "positive_candidates": 31,
+      "positive_total": 40,
+      "missing_positive_candidates": [
+        "e111",
+        "e121",
+        "e130",
+        "e131",
+        "e62",
+        "e71",
+        "e72",
+        "e90",
+        "e91"
+      ]
+    }
+  },
+  "candidate_evidence": {
+    "pages/binding.html": {
+      "tab_order": {
+        "index": {
+          "e10": 1
+        },
+        "capped": false,
+        "presses": 3
+      },
+      "features": {
+        "e01": {
+          "id": "e01",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e02": {
+          "id": "e02",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e03": {
+          "id": "e03",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e04": {
+          "id": "e04",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e05": {
+          "id": "e05",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e06": {
+          "id": "e06",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e07": {
+          "id": "e07",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e08": {
+          "id": "e08",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e09": {
+          "id": "e09",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e10": {
+          "id": "e10",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e01": [],
+        "e02": [],
+        "e03": [],
+        "e04": [],
+        "e05": [],
+        "e06": [],
+        "e07": [],
+        "e08": [],
+        "e09": [],
+        "e10": []
+      },
+      "listener_provenance": {
+        "e03": "    at https://tabbing.axcess.test/pages/binding.html:32:46",
+        "e04": "    at https://tabbing.axcess.test/pages/binding.html:33:46",
+        "e08": "    at https://tabbing.axcess.test/pages/binding.html:49:46",
+        "e09": "    at https://tabbing.axcess.test/pages/binding.html:54:46",
+        "e10": "    at https://tabbing.axcess.test/pages/binding.html:56:46"
+      },
+      "visible_probes": [
+        "e01",
+        "e02",
+        "e03",
+        "e04",
+        "e05",
+        "e06",
+        "e07",
+        "e08",
+        "e09",
+        "e10"
+      ],
+      "resolver": {
+        "e01": {
+          "via": "cdp",
+          "box": [
+            24,
+            144.59375,
+            182.59375,
+            40.5
+          ]
+        },
+        "e02": {
+          "via": "cdp",
+          "box": [
+            210.5,
+            144.59375,
+            139.546875,
+            40.5
+          ]
+        },
+        "e03": {
+          "via": "cdp",
+          "box": [
+            353.953125,
+            144.59375,
+            148.6875,
+            40.5
+          ]
+        },
+        "e04": {
+          "via": "cdp",
+          "box": [
+            506.546875,
+            144.59375,
+            206.46875,
+            40.5
+          ]
+        },
+        "e05": {
+          "via": "cdp",
+          "box": [
+            24,
+            197.09375,
+            194.84375,
+            40.5
+          ]
+        },
+        "e06": {
+          "via": "cdp",
+          "box": [
+            24,
+            249.59375,
+            190.078125,
+            40.5
+          ]
+        },
+        "e07": {
+          "via": "cdp",
+          "box": [
+            24,
+            302.09375,
+            162.3125,
+            40.5
+          ]
+        },
+        "e08": {
+          "via": "cdp",
+          "box": [
+            190.21875,
+            302.09375,
+            206.5625,
+            40.5
+          ]
+        },
+        "e09": {
+          "via": "cdp",
+          "box": [
+            400.6875,
+            302.09375,
+            112.25,
+            40.5
+          ]
+        },
+        "e10": {
+          "via": "cdp",
+          "box": [
+            516.84375,
+            313.09375,
+            203.46875,
+            21.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e01",
+          "e07",
+          "e10"
+        ],
+        "D2": [
+          "e01",
+          "e07"
+        ],
+        "D2b": [
+          "e01",
+          "e02",
+          "e07"
+        ],
+        "D3": [
+          "e01",
+          "e07"
+        ],
+        "D4": [
+          "e01",
+          "e02",
+          "e03",
+          "e04",
+          "e05",
+          "e06",
+          "e07",
+          "e08",
+          "e09"
+        ],
+        "D7": [],
+        "D5": [
+          "e01",
+          "e02",
+          "e03",
+          "e04",
+          "e07",
+          "e08",
+          "e09",
+          "e10"
+        ],
+        "D6": [
+          "e03",
+          "e04",
+          "e08",
+          "e09",
+          "e10"
+        ],
+        "D8": [
+          "e10"
+        ],
+        "D1": []
+      }
+    },
+    "pages/decoys.html": {
+      "tab_order": {
+        "index": {
+          "e80": 1,
+          "e81": 2,
+          "e82": 3,
+          "e85a": 4,
+          "e86a": 5,
+          "e87b": 6
+        },
+        "capped": false,
+        "presses": 8
+      },
+      "features": {
+        "e80": {
+          "id": "e80",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e81": {
+          "id": "e81",
+          "tag": "a",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e82": {
+          "id": "e82",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e83": {
+          "id": "e83",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e84": {
+          "id": "e84",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e85": {
+          "id": "e85",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e85a": {
+          "id": "e85a",
+          "tag": "a",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [
+            "click"
+          ],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e86": {
+          "id": "e86",
+          "tag": "label",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": true,
+          "control_probe": "e86a",
+          "control_disabled": false,
+          "control_visible": true
+        },
+        "e86a": {
+          "id": "e86a",
+          "tag": "input",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e87b": {
+          "id": "e87b",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e87": {
+          "id": "e87",
+          "tag": "span",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e80": [],
+        "e81": [],
+        "e82": [],
+        "e83": [],
+        "e84": [],
+        "e85": [],
+        "e85a": [],
+        "e86": [],
+        "e86a": [],
+        "e87b": [],
+        "e87": []
+      },
+      "listener_provenance": {
+        "e80": "    at https://tabbing.axcess.test/pages/decoys.html:26:10",
+        "e82": "    at https://tabbing.axcess.test/pages/decoys.html:27:10",
+        "e85": "    at https://tabbing.axcess.test/pages/decoys.html:36:10"
+      },
+      "visible_probes": [
+        "e80",
+        "e81",
+        "e82",
+        "e83",
+        "e84",
+        "e85",
+        "e85a",
+        "e86",
+        "e86a",
+        "e87",
+        "e87b"
+      ],
+      "resolver": {
+        "e80": {
+          "via": "cdp",
+          "box": [
+            24,
+            200.59375,
+            92.328125,
+            21.0
+          ]
+        },
+        "e81": {
+          "via": "cdp",
+          "box": [
+            120.234375,
+            199.59375,
+            79.96875,
+            20.0
+          ]
+        },
+        "e82": {
+          "via": "cdp",
+          "box": [
+            204.109375,
+            189.59375,
+            214.34375,
+            40.5
+          ]
+        },
+        "e83": {
+          "via": "cdp",
+          "box": [
+            422.359375,
+            189.59375,
+            246.921875,
+            40.5
+          ]
+        },
+        "e84": {
+          "via": "cdp",
+          "box": [
+            24,
+            236.09375,
+            800,
+            22.5
+          ]
+        },
+        "e85": {
+          "via": "cdp",
+          "box": [
+            24,
+            258.59375,
+            800,
+            44.5
+          ]
+        },
+        "e85a": {
+          "via": "cdp",
+          "box": [
+            196.765625,
+            270.59375,
+            141.578125,
+            20.0
+          ]
+        },
+        "e86": {
+          "via": "cdp",
+          "box": [
+            24,
+            304.09375,
+            140.46875,
+            20.0
+          ]
+        },
+        "e86a": {
+          "via": "cdp",
+          "box": [
+            172.375,
+            307.09375,
+            13.0,
+            13.0
+          ]
+        },
+        "e87b": {
+          "via": "cdp",
+          "box": [
+            192.28125,
+            305.09375,
+            200.5,
+            21.0
+          ]
+        },
+        "e87": {
+          "via": "cdp",
+          "box": [
+            200.28125,
+            308.09375,
+            184.5,
+            15.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e80",
+          "e82",
+          "e87b"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e81",
+          "e82",
+          "e83",
+          "e84",
+          "e85",
+          "e85a",
+          "e86",
+          "e87"
+        ],
+        "D7": [],
+        "D5": [
+          "e80",
+          "e82",
+          "e85"
+        ],
+        "D6": [
+          "e80",
+          "e82",
+          "e85"
+        ],
+        "D8": [
+          "e80",
+          "e86a",
+          "e87",
+          "e87b"
+        ],
+        "D1": []
+      }
+    },
+    "pages/effects.html": {
+      "tab_order": {
+        "index": {
+          "e30": 1
+        },
+        "capped": false,
+        "presses": 3
+      },
+      "features": {
+        "e20": {
+          "id": "e20",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e21": {
+          "id": "e21",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e22": {
+          "id": "e22",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e23": {
+          "id": "e23",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e24": {
+          "id": "e24",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e25": {
+          "id": "e25",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e26": {
+          "id": "e26",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e27": {
+          "id": "e27",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e28": {
+          "id": "e28",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e29": {
+          "id": "e29",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e30": {
+          "id": "e30",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e20": [],
+        "e21": [],
+        "e22": [],
+        "e23": [],
+        "e24": [],
+        "e25": [],
+        "e26": [],
+        "e27": [],
+        "e28": [],
+        "e29": [],
+        "e30": []
+      },
+      "listener_provenance": {
+        "e20": "    at https://tabbing.axcess.test/pages/effects.html:24:10",
+        "e21": "    at https://tabbing.axcess.test/pages/effects.html:28:10",
+        "e22": "    at https://tabbing.axcess.test/pages/effects.html:29:10",
+        "e23": "    at https://tabbing.axcess.test/pages/effects.html:30:10",
+        "e24": "    at https://tabbing.axcess.test/pages/effects.html:37:10",
+        "e25": "    at https://tabbing.axcess.test/pages/effects.html:39:10",
+        "e26": "    at https://tabbing.axcess.test/pages/effects.html:40:10",
+        "e27": "    at https://tabbing.axcess.test/pages/effects.html:44:10",
+        "e28": "    at https://tabbing.axcess.test/pages/effects.html:48:10",
+        "e29": "    at https://tabbing.axcess.test/pages/effects.html:49:10",
+        "e30": "    at https://tabbing.axcess.test/pages/effects.html:54:10"
+      },
+      "visible_probes": [
+        "e20",
+        "e21",
+        "e22",
+        "e23",
+        "e24",
+        "e25",
+        "e26",
+        "e27",
+        "e28",
+        "e29",
+        "e30"
+      ],
+      "resolver": {
+        "e20": {
+          "via": "cdp",
+          "box": [
+            149.90625,
+            154.59375,
+            130.9375,
+            40.5
+          ]
+        },
+        "e21": {
+          "via": "cdp",
+          "box": [
+            284.75,
+            154.59375,
+            95.28125,
+            40.5
+          ]
+        },
+        "e22": {
+          "via": "cdp",
+          "box": [
+            383.9375,
+            154.59375,
+            146.921875,
+            40.5
+          ]
+        },
+        "e23": {
+          "via": "cdp",
+          "box": [
+            534.765625,
+            154.59375,
+            147.109375,
+            40.5
+          ]
+        },
+        "e24": {
+          "via": "cdp",
+          "box": [
+            685.78125,
+            154.59375,
+            113.90625,
+            40.5
+          ]
+        },
+        "e25": {
+          "via": "cdp",
+          "box": [
+            24,
+            207.09375,
+            147.5,
+            40.5
+          ]
+        },
+        "e26": {
+          "via": "cdp",
+          "box": [
+            175.40625,
+            207.09375,
+            138.890625,
+            40.5
+          ]
+        },
+        "e27": {
+          "via": "cdp",
+          "box": [
+            318.203125,
+            207.09375,
+            129.390625,
+            40.5
+          ]
+        },
+        "e28": {
+          "via": "cdp",
+          "box": [
+            451.5,
+            207.09375,
+            154.265625,
+            40.5
+          ]
+        },
+        "e29": {
+          "via": "cdp",
+          "box": [
+            609.671875,
+            207.09375,
+            117.140625,
+            40.5
+          ]
+        },
+        "e30": {
+          "via": "cdp",
+          "box": [
+            24,
+            259.59375,
+            205.65625,
+            40.5
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e30"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e20",
+          "e21",
+          "e22",
+          "e23",
+          "e24",
+          "e25",
+          "e26",
+          "e27",
+          "e28",
+          "e29",
+          "e30"
+        ],
+        "D7": [],
+        "D5": [
+          "e20",
+          "e21",
+          "e22",
+          "e23",
+          "e24",
+          "e25",
+          "e26",
+          "e27",
+          "e28",
+          "e29",
+          "e30"
+        ],
+        "D6": [
+          "e20",
+          "e21",
+          "e22",
+          "e23",
+          "e24",
+          "e25",
+          "e26",
+          "e27",
+          "e28",
+          "e29",
+          "e30"
+        ],
+        "D8": [],
+        "D1": []
+      }
+    },
+    "pages/focus-redirect.html": {
+      "tab_order": {
+        "index": {},
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e110": {
+          "id": "e110",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e110": []
+      },
+      "listener_provenance": {
+        "e110": "    at https://tabbing.axcess.test/pages/focus-redirect.html:20:8"
+      },
+      "visible_probes": [
+        "e110"
+      ],
+      "resolver": {
+        "e110": {
+          "via": "cdp",
+          "box": [
+            144.6875,
+            182.09375,
+            152.703125,
+            33.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e110"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e110"
+        ],
+        "D7": [],
+        "D5": [
+          "e110"
+        ],
+        "D6": [
+          "e110"
+        ],
+        "D8": [],
+        "D1": []
+      }
+    },
+    "pages/geometry.html": {
+      "tab_order": {
+        "index": {
+          "e73": 2
+        },
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e71": {
+          "id": "e71",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e72": {
+          "id": "e72",
+          "tag": "span",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e64": {
+          "id": "e64",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e62": {
+          "id": "e62",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e63": {
+          "id": "e63",
+          "tag": "div",
+          "visible": false,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e61": {
+          "id": "e61",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e65": {
+          "id": "e65",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": true,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e66": {
+          "id": "e66",
+          "tag": "div",
+          "visible": true,
+          "inert": true,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": false,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e67": {
+          "id": "e67",
+          "tag": "button",
+          "visible": false,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e68": {
+          "id": "e68",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e69": {
+          "id": "e69",
+          "tag": "div",
+          "visible": false,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e70": {
+          "id": "e70",
+          "tag": "div",
+          "visible": false,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e73": {
+          "id": "e73",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e60": {
+          "id": "e60",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e71": [
+          "center hit test returned another element"
+        ],
+        "e72": [
+          "center hit test returned another element"
+        ],
+        "e64": [
+          "center hit test returned another element"
+        ],
+        "e62": [
+          "center hit test returned another element"
+        ],
+        "e63": [
+          "upstream visibility test failed"
+        ],
+        "e61": [],
+        "e65": [
+          "computed pointer-events:none",
+          "center hit test returned another element"
+        ],
+        "e66": [
+          "inert element or ancestor",
+          "center hit test returned another element"
+        ],
+        "e67": [
+          "upstream visibility test failed"
+        ],
+        "e68": [],
+        "e69": [
+          "upstream visibility test failed"
+        ],
+        "e70": [
+          "upstream visibility test failed"
+        ],
+        "e73": [],
+        "e60": []
+      },
+      "listener_provenance": {
+        "e60": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e61": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e62": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e64": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e65": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e66": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e68": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e71": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e72": "    at https://tabbing.axcess.test/pages/geometry.html:49:14",
+        "e73": "    at https://tabbing.axcess.test/pages/geometry.html:49:14"
+      },
+      "visible_probes": [
+        "e60",
+        "e61",
+        "e62",
+        "e64",
+        "e65",
+        "e66",
+        "e68",
+        "e71",
+        "e72",
+        "e73"
+      ],
+      "resolver": {
+        "e71": {
+          "via": "cdp",
+          "box": [
+            25,
+            501.59375,
+            303.75,
+            40.5
+          ]
+        },
+        "e72": {
+          "via": "cdp",
+          "box": [
+            24,
+            335.09375,
+            98.125,
+            87.5
+          ]
+        },
+        "e64": {
+          "via": "cdp",
+          "box": [
+            24,
+            467.59375,
+            222.390625,
+            40.5
+          ]
+        },
+        "e62": {
+          "via": "cdp",
+          "box": [
+            24,
+            521.59375,
+            1,
+            1.0
+          ]
+        },
+        "e63": {
+          "via": "cdp",
+          "box": [
+            24,
+            522.59375,
+            0,
+            0.0
+          ]
+        },
+        "e61": {
+          "via": "cdp",
+          "box": [
+            -9999,
+            522.59375,
+            72.34375,
+            22.5
+          ]
+        },
+        "e65": {
+          "via": "cdp",
+          "box": [
+            24,
+            528.59375,
+            168.4375,
+            40.5
+          ]
+        },
+        "e66": {
+          "via": "cdp",
+          "box": [
+            24,
+            581.09375,
+            105,
+            40.5
+          ]
+        },
+        "e67": {
+          "via": "cdp",
+          "box": [
+            24,
+            644.59375,
+            65.65625,
+            21.0
+          ]
+        },
+        "e68": {
+          "via": "cdp",
+          "box": [
+            93.5625,
+            633.59375,
+            89.34375,
+            40.5
+          ]
+        },
+        "e69": {
+          "via": "cdp",
+          "box": [
+            186.8125,
+            633.59375,
+            135.671875,
+            40.5
+          ]
+        },
+        "e70": {
+          "via": "cdp",
+          "box": null
+        },
+        "e73": {
+          "via": "cdp",
+          "box": [
+            326.390625,
+            633.59375,
+            206.625,
+            40.5
+          ]
+        },
+        "e60": {
+          "via": "cdp",
+          "box": [
+            24,
+            2086.09375,
+            150.078125,
+            40.5
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e67"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e60",
+          "e61",
+          "e62",
+          "e64",
+          "e65",
+          "e66",
+          "e68",
+          "e71",
+          "e72",
+          "e73"
+        ],
+        "D7": [],
+        "D5": [
+          "e60",
+          "e61",
+          "e62",
+          "e64",
+          "e65",
+          "e66",
+          "e68",
+          "e71",
+          "e72",
+          "e73"
+        ],
+        "D6": [
+          "e60",
+          "e61",
+          "e62",
+          "e64",
+          "e65",
+          "e66",
+          "e68",
+          "e71",
+          "e72",
+          "e73"
+        ],
+        "D8": [],
+        "D1": [
+          "e73"
+        ]
+      }
+    },
+    "pages/graphical-controls.html": {
+      "tab_order": {
+        "index": {},
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e150": {
+          "id": "e150",
+          "tag": "g",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e151": {
+          "id": "e151",
+          "tag": "canvas",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e150": [],
+        "e151": []
+      },
+      "listener_provenance": {
+        "e150": "    at https://tabbing.axcess.test/pages/graphical-controls.html:22:47",
+        "e151": "    at https://tabbing.axcess.test/pages/graphical-controls.html:36:8"
+      },
+      "visible_probes": [
+        "e150",
+        "e151"
+      ],
+      "resolver": {
+        "e150": {
+          "via": "cdp",
+          "box": [
+            39.5,
+            212.59375,
+            249.0,
+            53.0
+          ]
+        },
+        "e151": {
+          "via": "cdp",
+          "box": [
+            24,
+            279.09375,
+            280,
+            80.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e150",
+          "e151"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [
+          "e150",
+          "e151"
+        ],
+        "D4": [
+          "e150",
+          "e151"
+        ],
+        "D7": [],
+        "D5": [
+          "e150",
+          "e151"
+        ],
+        "D6": [
+          "e150",
+          "e151"
+        ],
+        "D8": [],
+        "D1": []
+      }
+    },
+    "pages/hover.html": {
+      "tab_order": {
+        "index": {
+          "e32": 1
+        },
+        "capped": false,
+        "presses": 3
+      },
+      "features": {
+        "e31": {
+          "id": "e31",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e32": {
+          "id": "e32",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e33": {
+          "id": "e33",
+          "tag": "span",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e31": [],
+        "e32": [],
+        "e33": []
+      },
+      "listener_provenance": {},
+      "visible_probes": [
+        "e31",
+        "e32",
+        "e33"
+      ],
+      "resolver": {
+        "e31": {
+          "via": "cdp",
+          "box": [
+            24,
+            138.59375,
+            800,
+            22.5
+          ]
+        },
+        "e32": {
+          "via": "cdp",
+          "box": [
+            24,
+            161.09375,
+            800,
+            57.0
+          ]
+        },
+        "e33": {
+          "via": "cdp",
+          "box": [
+            214.625,
+            234.09375,
+            88.46875,
+            20.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e31",
+          "e32"
+        ],
+        "D7": [],
+        "D5": [],
+        "D6": [],
+        "D8": [
+          "e31",
+          "e33"
+        ],
+        "D1": []
+      }
+    },
+    "pages/iframe-tab-scope.html": {
+      "tab_order": {
+        "index": {},
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e140": {
+          "id": "e140",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e140": []
+      },
+      "listener_provenance": {
+        "e140": "    at about:srcdoc:4:44"
+      },
+      "visible_probes": [
+        "e140"
+      ],
+      "resolver": {
+        "e140": {
+          "via": "cdp",
+          "box": [
+            34,
+            209.09375,
+            183.234375,
+            48.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e140"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e140"
+        ],
+        "D7": [],
+        "D5": [
+          "e140"
+        ],
+        "D6": [
+          "e140"
+        ],
+        "D8": [
+          "e140"
+        ],
+        "D1": []
+      }
+    },
+    "pages/keyboard.html": {
+      "tab_order": {
+        "index": {
+          "e46": 1,
+          "e40": 2,
+          "e41": 3,
+          "e42": 4,
+          "e43": 5,
+          "e44": 6,
+          "e47": 7,
+          "e48": 8
+        },
+        "capped": false,
+        "presses": 10
+      },
+      "features": {
+        "e40": {
+          "id": "e40",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e41": {
+          "id": "e41",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e42": {
+          "id": "e42",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e43": {
+          "id": "e43",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e44": {
+          "id": "e44",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e45": {
+          "id": "e45",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e46": {
+          "id": "e46",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": true,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e47": {
+          "id": "e47",
+          "tag": "div",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e48": {
+          "id": "e48",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e40": [],
+        "e41": [],
+        "e42": [],
+        "e43": [],
+        "e44": [],
+        "e45": [],
+        "e46": [],
+        "e47": [],
+        "e48": []
+      },
+      "listener_provenance": {
+        "e40": "    at https://tabbing.axcess.test/pages/keyboard.html:20:10",
+        "e41": "    at https://tabbing.axcess.test/pages/keyboard.html:23:10",
+        "e42": "    at https://tabbing.axcess.test/pages/keyboard.html:26:10",
+        "e43": "    at https://tabbing.axcess.test/pages/keyboard.html:33:10",
+        "e44": "    at https://tabbing.axcess.test/pages/keyboard.html:40:10",
+        "e45": "    at https://tabbing.axcess.test/pages/keyboard.html:43:10",
+        "e46": "    at https://tabbing.axcess.test/pages/keyboard.html:45:10",
+        "e47": "    at https://tabbing.axcess.test/pages/keyboard.html:48:10",
+        "e48": "    at https://tabbing.axcess.test/pages/keyboard.html:53:10"
+      },
+      "visible_probes": [
+        "e40",
+        "e41",
+        "e42",
+        "e43",
+        "e44",
+        "e45",
+        "e46",
+        "e47",
+        "e48"
+      ],
+      "resolver": {
+        "e40": {
+          "via": "cdp",
+          "box": [
+            24,
+            189.59375,
+            177,
+            40.5
+          ]
+        },
+        "e41": {
+          "via": "cdp",
+          "box": [
+            204.90625,
+            189.59375,
+            147.84375,
+            40.5
+          ]
+        },
+        "e42": {
+          "via": "cdp",
+          "box": [
+            356.65625,
+            189.59375,
+            148.625,
+            40.5
+          ]
+        },
+        "e43": {
+          "via": "cdp",
+          "box": [
+            509.1875,
+            189.59375,
+            262.484375,
+            40.5
+          ]
+        },
+        "e44": {
+          "via": "cdp",
+          "box": [
+            24,
+            242.09375,
+            260.109375,
+            40.5
+          ]
+        },
+        "e45": {
+          "via": "cdp",
+          "box": [
+            288.015625,
+            242.09375,
+            156.046875,
+            40.5
+          ]
+        },
+        "e46": {
+          "via": "cdp",
+          "box": [
+            447.96875,
+            242.09375,
+            200.203125,
+            40.5
+          ]
+        },
+        "e47": {
+          "via": "cdp",
+          "box": [
+            24,
+            294.59375,
+            281.171875,
+            40.5
+          ]
+        },
+        "e48": {
+          "via": "cdp",
+          "box": [
+            309.078125,
+            305.59375,
+            145.6875,
+            21.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e40",
+          "e41",
+          "e42",
+          "e43",
+          "e46",
+          "e47",
+          "e48"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e40",
+          "e41",
+          "e42",
+          "e43",
+          "e44",
+          "e45",
+          "e46",
+          "e47"
+        ],
+        "D7": [],
+        "D5": [
+          "e40",
+          "e41",
+          "e42",
+          "e43",
+          "e44",
+          "e45",
+          "e46",
+          "e47",
+          "e48"
+        ],
+        "D6": [
+          "e40",
+          "e41",
+          "e42",
+          "e43",
+          "e44",
+          "e45",
+          "e46",
+          "e47",
+          "e48"
+        ],
+        "D8": [
+          "e48"
+        ],
+        "D1": []
+      }
+    },
+    "pages/native-proxy.html": {
+      "tab_order": {
+        "index": {},
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e100": {
+          "id": "e100",
+          "tag": "label",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": false,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": false,
+          "control_visible": false
+        }
+      },
+      "exclusions": {
+        "e100": []
+      },
+      "listener_provenance": {},
+      "visible_probes": [
+        "e100"
+      ],
+      "resolver": {
+        "e100": {
+          "via": "cdp",
+          "box": [
+            144.671875,
+            182.09375,
+            103.8125,
+            40.5
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e100"
+        ],
+        "D7": [],
+        "D5": [],
+        "D6": [],
+        "D8": [],
+        "D1": []
+      }
+    },
+    "pages/pointer-gated.html": {
+      "tab_order": {
+        "index": {},
+        "capped": false,
+        "presses": 4
+      },
+      "features": {
+        "e120": {
+          "id": "e120",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e121": {
+          "id": "e121",
+          "tag": "button",
+          "visible": false,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": null,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e120": [],
+        "e121": [
+          "upstream visibility test failed"
+        ]
+      },
+      "listener_provenance": {
+        "e120": "    at https://tabbing.axcess.test/pages/pointer-gated.html:20:13"
+      },
+      "visible_probes": [
+        "e120"
+      ],
+      "resolver": {
+        "e120": {
+          "via": "cdp",
+          "box": [
+            151.34375,
+            236.09375,
+            188.984375,
+            33.0
+          ]
+        },
+        "e121": {
+          "via": "cdp",
+          "box": [
+            353.234375,
+            236.09375,
+            134.171875,
+            33.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e120",
+          "e121"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [
+          "e120"
+        ],
+        "D7": [],
+        "D5": [
+          "e120"
+        ],
+        "D6": [
+          "e120"
+        ],
+        "D8": [
+          "e121"
+        ],
+        "D1": []
+      }
+    },
+    "pages/roving-tabindex.html": {
+      "tab_order": {
+        "index": {
+          "e160": 2
+        },
+        "capped": false,
+        "presses": 5
+      },
+      "features": {
+        "e160": {
+          "id": "e160",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e161": {
+          "id": "e161",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e162": {
+          "id": "e162",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        },
+        "e163": {
+          "id": "e163",
+          "tag": "button",
+          "visible": true,
+          "inert": false,
+          "closed_shadow": false,
+          "pointer_events_none": false,
+          "center_hit": true,
+          "native": true,
+          "has_key_handler": false,
+          "delegated_types": [],
+          "label_toggle": false,
+          "control_probe": null,
+          "control_disabled": null,
+          "control_visible": null
+        }
+      },
+      "exclusions": {
+        "e160": [],
+        "e161": [],
+        "e162": [],
+        "e163": []
+      },
+      "listener_provenance": {
+        "e160": "    at https://tabbing.axcess.test/pages/roving-tabindex.html:41:47",
+        "e161": "    at https://tabbing.axcess.test/pages/roving-tabindex.html:42:47",
+        "e162": "    at https://tabbing.axcess.test/pages/roving-tabindex.html:43:47",
+        "e163": "    at https://tabbing.axcess.test/pages/roving-tabindex.html:44:47"
+      },
+      "visible_probes": [
+        "e160",
+        "e161",
+        "e162",
+        "e163"
+      ],
+      "resolver": {
+        "e160": {
+          "via": "cdp",
+          "box": [
+            24,
+            272.1875,
+            130.8125,
+            21.0
+          ]
+        },
+        "e161": {
+          "via": "cdp",
+          "box": [
+            158.71875,
+            272.1875,
+            150.109375,
+            21.0
+          ]
+        },
+        "e162": {
+          "via": "cdp",
+          "box": [
+            24,
+            366.28125,
+            158.25,
+            21.0
+          ]
+        },
+        "e163": {
+          "via": "cdp",
+          "box": [
+            186.15625,
+            366.28125,
+            177.546875,
+            21.0
+          ]
+        }
+      },
+      "axe_version": "4.10.2",
+      "upstream_proposals": {
+        "D0": [
+          "e160",
+          "e161",
+          "e162",
+          "e163"
+        ],
+        "D2": [],
+        "D2b": [],
+        "D3": [],
+        "D4": [],
+        "D7": [],
+        "D5": [
+          "e160",
+          "e161",
+          "e162",
+          "e163"
+        ],
+        "D6": [
+          "e160",
+          "e161",
+          "e162",
+          "e163"
+        ],
+        "D8": [
+          "e160",
+          "e161",
+          "e162",
+          "e163"
+        ],
+        "D1": []
+      }
+    }
+  },
+  "candidate_study_caveat": "Rules designed after inspecting this corpus's errors: development evaluation, not an unseen holdout. Raw proposals measure shortlist coverage, not violations.",
+  "reported": {
+    "D0 axcess collectClickables": [
+      "e01",
+      "e07",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151"
+    ],
+    "D2 inline onclick attribute": [
+      "e01",
+      "e07"
+    ],
+    "D2b onclick property": [
+      "e01",
+      "e02",
+      "e07"
+    ],
+    "D3 tabindex / ARIA": [
+      "e150",
+      "e151",
+      "e45"
+    ],
+    "D4 CSS + lexical": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e150",
+      "e151",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87",
+      "e90",
+      "e91"
+    ],
+    "D7 React fiber props": [],
+    "D5 CDP getEventListeners": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e07",
+      "e08",
+      "e09",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e67",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e85",
+      "e90",
+      "e91"
+    ],
+    "D6 addEventListener shim": [
+      "e03",
+      "e04",
+      "e08",
+      "e110",
+      "e120",
+      "e121",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e63",
+      "e64",
+      "e65",
+      "e66",
+      "e67",
+      "e68",
+      "e69",
+      "e70",
+      "e71",
+      "e72",
+      "e85",
+      "e90",
+      "e91"
+    ],
+    "D8 hover-diff": [
+      "e121",
+      "e31",
+      "e33"
+    ],
+    "D1 axe-core (keyboard rules)": [
+      "e46",
+      "e73"
+    ],
+    "D1x axe-core (any rule, unsound)": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e32",
+      "e44",
+      "e45",
+      "e46",
+      "e60",
+      "e61",
+      "e65",
+      "e68",
+      "e73",
+      "e81",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e86a",
+      "e90"
+    ],
+    "U-D0 upstream crawler candidates": [
+      "e01",
+      "e07",
+      "e110",
+      "e120",
+      "e121",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e67"
+    ],
+    "U-D1 upstream tagged axe attribution": [
+      "e73"
+    ],
+    "U-D2 upstream inline attributes": [
+      "e01",
+      "e07"
+    ],
+    "U-D2b upstream mouse handler properties": [
+      "e01",
+      "e02",
+      "e07"
+    ],
+    "U-D3 upstream missing tabindex": [
+      "e01",
+      "e07",
+      "e150",
+      "e151"
+    ],
+    "U-D4 upstream CSS and class tokens": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "U-D5 upstream direct CDP listeners": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e07",
+      "e08",
+      "e09",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e85"
+    ],
+    "U-D6 upstream registration shim": [
+      "e03",
+      "e04",
+      "e08",
+      "e09",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e85"
+    ],
+    "U-D7 upstream React mouse props": [],
+    "U-D8 upstream pixel hover difference": [
+      "e121",
+      "e140",
+      "e161",
+      "e162",
+      "e163",
+      "e31",
+      "e33",
+      "e87"
+    ],
+    "C1 upstream D4|D5|D6, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "C2 upstream D4|D5|D6|D8, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e121",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e33",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e65",
+      "e66",
+      "e68",
+      "e71",
+      "e72",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "C3 union, reject inert and pointer-events:none": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e45",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e68",
+      "e71",
+      "e72",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "C4 union, additionally reject blocked center": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e45",
+      "e60",
+      "e61",
+      "e68",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "C5 focusable custom mouse control, no observed key handler": [
+      "e44",
+      "e47",
+      "e73"
+    ],
+    "C6 visible label for a toggle absent from Tab": [],
+    "C7 ancestor mouse listener, minus Tab": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09"
+    ],
+    "C8 union + focusable + label + ancestor leads": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e44",
+      "e45",
+      "e47",
+      "e60",
+      "e61",
+      "e62",
+      "e64",
+      "e68",
+      "e71",
+      "e72",
+      "e73",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ],
+    "C9 combined leads, additionally reject blocked center": [
+      "e01",
+      "e02",
+      "e03",
+      "e04",
+      "e05",
+      "e06",
+      "e07",
+      "e08",
+      "e09",
+      "e100",
+      "e110",
+      "e120",
+      "e140",
+      "e150",
+      "e151",
+      "e161",
+      "e162",
+      "e163",
+      "e20",
+      "e21",
+      "e22",
+      "e23",
+      "e24",
+      "e25",
+      "e26",
+      "e27",
+      "e28",
+      "e29",
+      "e31",
+      "e44",
+      "e45",
+      "e47",
+      "e60",
+      "e61",
+      "e68",
+      "e73",
+      "e83",
+      "e84",
+      "e85",
+      "e86",
+      "e87"
+    ]
+  },
+  "unobservable": {
+    "D0 axcess collectClickables": [
+      "e140"
+    ],
+    "D2 inline onclick attribute": [
+      "e140"
+    ],
+    "D2b onclick property": [
+      "e140"
+    ],
+    "D3 tabindex / ARIA": [
+      "e140"
+    ],
+    "D4 CSS + lexical": [
+      "e140"
+    ],
+    "D7 React fiber props": [
+      "e140"
+    ],
+    "D5 CDP getEventListeners": [
+      "e140"
+    ],
+    "D6 addEventListener shim": [
+      "e140"
+    ],
+    "D8 hover-diff": [
+      "e140"
+    ],
+    "D1 axe-core (keyboard rules)": [
+      "e140"
+    ],
+    "D1x axe-core (any rule, unsound)": [
+      "e140"
+    ]
+  },
+  "scores": []
+}
