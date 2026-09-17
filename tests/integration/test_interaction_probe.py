@@ -465,6 +465,142 @@ async def test_a_button_that_opens_a_tab_reports_where_it_pointed(browser) -> No
         await context.close()
 
 
+async def test_a_tab_refused_in_the_page_still_reports_where_it_pointed(browser) -> None:  # type: ignore[no-untyped-def]
+    """A login scan cannot let the tab exist even for a moment.
+
+    Its browser is minimized, and Chromium raises a minimized window the
+    instant a tab is created in it, so the session refuses ``window.open`` in
+    the page. That leaves no popup request for the guard to learn from, which
+    is how this page used to be found. The refusal reports the destination to
+    the guard instead, and the page must still reach the frontier.
+    """
+    from audit.protected.session import (
+        _REFUSED_POPUP_BINDING,
+        _SCAN_QUIET_INIT_SCRIPT,
+        _on_refused_popup,
+    )
+
+    context = await browser.new_context(service_workers="block")
+    await context.expose_binding(_REFUSED_POPUP_BINDING, _on_refused_popup)
+    await context.add_init_script(_SCAN_QUIET_INIT_SCRIPT)
+    fetched: list[str] = []
+    tabs: list[object] = []
+    choosers: list[object] = []
+    html = """
+        <button id="open" onclick="window.open('/reports/summary')">Open summary</button>
+        <a id="blank" href="/help" target="_blank">Help</a>
+        <button id="print" onclick="window.print(); this.textContent = 'Printed'">Print</button>
+        <button id="attach" onclick="document.querySelector('#file').click()">Attach</button>
+        <input id="file" type="file" hidden>
+        <iframe name="pane" title="Pane"></iframe>
+        <a id="framed" href="/pane" target="pane">Open in pane</a>
+    """
+
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        fetched.append(route.request.url)
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    await context.route("**/*", fixture)
+    page = await context.new_page()
+    context.on("page", lambda tab: tabs.append(tab))
+    page.on("filechooser", lambda chooser: choosers.append(chooser))
+    try:
+        await page.goto("https://fixture.test/")
+        fetched.clear()
+        result = await InteractionProbe(axe=_NoopAxe(), settle_ms=10).run(page)  # type: ignore[arg-type]
+        assert "https://fixture.test/reports/summary" in result.urls
+        assert not any("/reports/summary" in url for url in fetched)
+
+        # Outside the probe's guard the same controls are still inert.
+        await page.click("#open")
+        await page.click("#blank")
+        await page.click("#attach")
+        await page.click("#print")  # would block on a preview nobody can see
+        assert await page.text_content("#print") == "Printed"
+        assert not tabs, "a tab was created, which raises a minimized window"
+        assert not choosers, "a file chooser opened"
+        assert page.url == "https://fixture.test/"
+
+        # A named frame in the page is not a new tab, and still works.
+        await page.click("#framed")
+        await page.wait_for_function("() => frames[0].location.pathname === '/pane'")
+    finally:
+        await context.close()
+
+
+async def test_the_scan_script_refuses_new_tabs_and_nothing_else(browser) -> None:  # type: ignore[no-untyped-def]
+    """Every way a page reaches a new tab, and every way it must still navigate."""
+    from audit.protected.session import (
+        _REFUSED_POPUP_BINDING,
+        _SCAN_QUIET_INIT_SCRIPT,
+        _on_refused_popup,
+    )
+
+    context = await browser.new_context(service_workers="block")
+    await context.expose_binding(_REFUSED_POPUP_BINDING, _on_refused_popup)
+    await context.add_init_script(_SCAN_QUIET_INIT_SCRIPT)
+    tabs: list[object] = []
+    html = """
+        <iframe name="pane" title="Pane"></iframe>
+        <form id="blank-form" action="/posted" target="_blank"></form>
+        <form id="pane-form" action="/pane-form" target="pane"></form>
+        <div id="host"></div>
+        <svg width="40" height="20"><a id="svg-link" href="/svg" target="_blank">
+          <rect width="40" height="20" fill="#000"></rect></a></svg>
+        <script>
+          document.querySelector('#host').attachShadow({mode: 'open'}).innerHTML =
+              '<a id="shadow-link" href="/shadow" target="_blank">In a shadow root</a>';
+        </script>
+    """
+
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    await context.route("**/*", fixture)
+    page = await context.new_page()
+    context.on("page", lambda tab: tabs.append(tab))
+    try:
+        await page.goto("https://fixture.test/")
+
+        # An anchor the page never attaches still navigates when clicked.
+        await page.evaluate(
+            "() => { const a = document.createElement('a'); a.href = '/detached';"
+            " a.target = '_blank'; a.click(); }"
+        )
+        # form.submit() fires no submit event to listen for.
+        await page.evaluate("() => document.querySelector('#blank-form').submit()")
+        # event.target stops at the shadow host; the anchor is inside it.
+        await page.click("#shadow-link")
+        await page.click("#svg-link")
+        await page.click("#shadow-link", modifiers=["Shift"])
+        # Code written for a browser that allows popups uses what it gets back.
+        used = await page.evaluate(
+            "() => { const w = window.open('/report'); w.focus(); w.location = '/report/2';"
+            " w.document.write('x'); w.close(); return w.closed; }"
+        )
+        assert used is True
+        # Strict-mode code that wraps window.open must not throw doing so.
+        await page.evaluate("() => { 'use strict'; window.open = function () {}; }")
+        await page.wait_for_timeout(300)
+        assert not tabs, "a tab was created, which raises a minimized window"
+        assert page.url == "https://fixture.test/"
+
+        # None of that may cost the page its ordinary navigation.
+        await page.evaluate("() => document.querySelector('#pane-form').submit()")
+        await page.wait_for_function("() => frames[0].location.pathname === '/pane-form'")
+        await page.evaluate("() => { window.open('/pane-open', 'pane'); }")
+        await page.wait_for_function("() => frames[0].location.pathname === '/pane-open'")
+        # Inside the frame, the same names still mean the same frames.
+        await page.frames[1].evaluate("() => { window.open('/from-inside', 'pane'); }")
+        await page.wait_for_function("() => frames[0].location.pathname === '/from-inside'")
+        async with page.expect_navigation():
+            await page.evaluate("() => { window.open('/moved', '_self'); }")
+        assert page.url == "https://fixture.test/moved"
+        assert not tabs
+    finally:
+        await context.close()
+
+
 async def test_time_budget_retains_earlier_evidence_and_removes_guard(page) -> None:  # type: ignore[no-untyped-def]
     async def fixture(route):  # type: ignore[no-untyped-def]
         await route.fulfill(status=200, content_type="text/html", body="<main>Fixture</main>")

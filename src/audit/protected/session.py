@@ -12,6 +12,7 @@ boundary between manual sign-in and a shared-context accessibility fetcher.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import shutil
@@ -28,6 +29,7 @@ from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import InteractionProbe
+from audit.analyzer.interaction.safety import report_refused_popup
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
@@ -70,6 +72,253 @@ for (const name of ["RTCPeerConnection", "webkitRTCPeerConnection", "mozRTCPeerC
   } catch (_) {}
 }
 """
+# A tab the scanned application opens for itself was never evidence: the
+# route guard closes it on arrival. Closing it is too late for the window,
+# though. Chromium raises a minimized window the moment a tab is created in
+# it, so every such click put the browser back in front of the auditor. While
+# scanning, the request is refused where it starts instead, and only the
+# request for a *new* tab: ``window.open(url, "_self")``, a named frame, and
+# every ordinary navigation go through untouched, because a legacy application
+# that redirects that way has to keep working. Where a refused tab was headed
+# is reported through a binding, as its first request used to be, because a
+# button that opens a tab leaves no href for the crawler to find (see
+# ``report_refused_popup``). Playwright starts Chromium with popup blocking
+# off, so a tab opened without a gesture was learned from before and still is.
+#
+# The ways in are wider than ``window.open``. A script can build an anchor it
+# never attaches and call ``click()`` on it, call ``form.submit()`` (which
+# fires no event), or put the link inside a shadow root, where ``event.target``
+# names the host. Each is covered below. What is not: a closed shadow root,
+# and a synthetic event dispatched at a detached node. The session re-hides
+# the window for those (``_keep_hidden``); they cost a flash, not the scan.
+#
+# Native dialogs get the same treatment. ``print()`` blocks its tab on a
+# preview nobody can see: a click that reached it never returned. A file
+# chooser is refused in the page rather than left to Playwright to intercept,
+# because an intercepted chooser stays pending, and measured on macOS one in
+# six of those put the minimized window back on screen when the tab navigated.
+_SCAN_QUIET_INIT_SCRIPT = """
+(() => {
+  try {
+    Object.defineProperty(window, "print", {
+      configurable: false,
+      get: () => () => undefined,
+      set: () => {},
+    });
+  } catch (_) {}
+
+  const report = (url) => {
+    try {
+      const send = window.__axcessPopupRefused;
+      if (url && typeof send === "function") send(new URL(String(url), document.baseURI).href);
+    } catch (_) {}
+  };
+
+  // A target that names a browsing context which already exists is a
+  // navigation inside the page: this window, an ancestor, or any frame under
+  // the same top. A cross-origin frame hides its own name, but the element
+  // that embeds it is readable from its parent.
+  const namesExistingContext = (name) => {
+    const search = (win, depth) => {
+      if (depth > 8) return false;
+      try { if (win.name === name) return true; } catch (_) {}
+      try {
+        for (const el of win.document.querySelectorAll("iframe[name], frame[name], object[name]")) {
+          if (el.getAttribute("name") === name) return true;
+        }
+      } catch (_) {}
+      try {
+        for (let i = 0; i < win.frames.length; i++) {
+          if (search(win.frames[i], depth + 1)) return true;
+        }
+      } catch (_) {}
+      return false;
+    };
+    let top = window;
+    try { top = window.top || window; } catch (_) {}
+    return search(top, 0);
+  };
+  const opensNewContext = (target) => {
+    const name = String(target === undefined || target === null ? "" : target).trim();
+    if (/^_(self|top|parent)$/i.test(name)) return false;
+    if (!name || /^_blank$/i.test(name)) return true;
+    return !namesExistingContext(name);
+  };
+  const baseTarget = () => {
+    const base = document.querySelector("base[target]");
+    return base ? base.getAttribute("target") : "";
+  };
+
+  // What the caller gets instead of a window. ``null`` is what a popup
+  // blocker returns, but code written against a browser that allows popups
+  // goes straight to ``w.focus()`` or ``w.location = url`` and would throw
+  // half way through its handler, leaving the page in a state a public scan
+  // never sees.
+  const inertWindow = () => {
+    let closed = false;
+    const location = {
+      get href() { return "about:blank"; },
+      set href(value) { report(value); },
+      assign: report,
+      replace: report,
+      reload() {},
+      toString: () => "about:blank",
+    };
+    return {
+      get closed() { return closed; },
+      close() { closed = true; },
+      focus() {}, blur() {}, print() {}, postMessage() {},
+      addEventListener() {}, removeEventListener() {},
+      dispatchEvent: () => false,
+      document: document.implementation.createHTMLDocument(""),
+      get location() { return location; },
+      set location(value) { report(value); },
+      opener: window,
+      name: "",
+      length: 0,
+    };
+  };
+  const nativeOpen = window.open;
+  const open = function (url, target) {
+    // No target, or an empty one, means a new tab.
+    if (!opensNewContext(target)) return nativeOpen.apply(window, arguments);
+    report(url);
+    return inertWindow();
+  };
+  try {
+    // An accessor, not a read-only value: strict-mode code that assigns its
+    // own wrapper to window.open must not throw.
+    Object.defineProperty(window, "open", { configurable: false, get: () => open, set: () => {} });
+  } catch (_) {
+    try { window.open = open; } catch (_) {}
+  }
+
+  const isElement = (node) => !!node && node.nodeType === 1;
+  const isFileInput = (node) =>
+    isElement(node) && node.localName === "input" &&
+    String(node.getAttribute("type") || "").toLowerCase() === "file";
+  const isLink = (node) =>
+    isElement(node) && (node.localName === "a" || node.localName === "area") &&
+    (node.hasAttribute("href") || node.hasAttributeNS("http://www.w3.org/1999/xlink", "href"));
+  const hrefOf = (node) =>
+    node.getAttribute("href") || node.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+  const isNewTabLink = (node) =>
+    isLink(node) && opensNewContext(node.getAttribute("target") || baseTarget() || "_self");
+  const formTarget = (form, submitter) =>
+    (submitter && submitter.getAttribute && submitter.getAttribute("formtarget")) ||
+    form.getAttribute("target") || baseTarget() || "_self";
+
+  try {
+    const showPicker = HTMLInputElement.prototype.showPicker;
+    if (typeof showPicker === "function") {
+      HTMLInputElement.prototype.showPicker = function () {
+        if (!isFileInput(this)) return showPicker.call(this);
+      };
+    }
+  } catch (_) {}
+  for (const name of ["showOpenFilePicker", "showSaveFilePicker", "showDirectoryPicker"]) {
+    try {
+      if (typeof window[name] === "function") {
+        window[name] = () => Promise.reject(new DOMException("Aborted", "AbortError"));
+      }
+    } catch (_) {}
+  }
+  try {
+    // An element the page never attached has no path to this document, so
+    // the listeners below never hear its click. Anchors navigate detached.
+    const click = HTMLElement.prototype.click;
+    HTMLElement.prototype.click = function () {
+      if (isFileInput(this)) return;
+      if (isNewTabLink(this)) { report(hrefOf(this)); return; }
+      return click.apply(this, arguments);
+    };
+  } catch (_) {}
+  try {
+    // form.submit() fires no submit event.
+    const submit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function () {
+      if (opensNewContext(formTarget(this, null))) return;
+      return submit.apply(this, arguments);
+    };
+  } catch (_) {}
+
+  const onClick = (event) => {
+    // composedPath sees into open shadow roots; event.target stops at the host.
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [event.target];
+    // Reached by a direct click, a label, or a script calling input.click().
+    if (isFileInput(path[0])) { event.preventDefault(); return; }
+    const link = path.find(isLink);
+    if (!link) return;
+    const newWindowGesture = event.button === 1 || event.ctrlKey || event.metaKey || event.shiftKey;
+    if (newWindowGesture || isNewTabLink(link)) {
+      event.preventDefault();
+      report(hrefOf(link));
+    }
+  };
+  window.addEventListener("click", onClick, true);
+  window.addEventListener("auxclick", onClick, true);
+  window.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!isElement(form) || form.localName !== "form") return;
+    if (opensNewContext(formTarget(form, event.submitter))) event.preventDefault();
+  }, true);
+})();
+"""
+# The crawl's standard viewport, the same one a public scan renders at. The
+# context is launched without a default viewport (see ``start``), so every
+# scan tab is given this explicitly.
+_SCAN_VIEWPORT = {"width": 1440, "height": 900}
+# The tab left in front of the hidden window. It never navigates anywhere.
+_COVER_PAGE_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Axcess is scanning in the background</title>
+<style>
+  body { font: 18px/1.5 system-ui, sans-serif; margin: 0; padding: 3rem; color: #1a1a1a; }
+  main { max-width: 38rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 1rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>Axcess is scanning in the background</h1>
+<p>You are signed in, and Axcess is checking pages in the other tabs of this
+window. Progress is shown in Axcess.</p>
+<p>Axcess keeps this window minimized while it scans, so it will put it away
+again if you open it from the Dock or taskbar. To watch the scan, choose
+<strong>Show browser window</strong> in Axcess.</p>
+<p><strong>Closing this window or quitting Chromium stops the scan.</strong></p>
+</main>
+</body>
+</html>
+"""
+_HIDE_RECHECK_SECONDS = 0.5
+# Consecutive passes that fail to put the browser away before it is left alone.
+_HIDE_GIVE_UP_AFTER = 10
+# Once given up on, the window's state is still read, this many passes apart.
+_GAVE_UP_LOOK_EVERY = 10
+# How many more passes a hide request waits for the OS to finish animating.
+_HIDE_SETTLE_PASSES = 4
+# A minimize ignored this many times running is not an animation in the way.
+_PARK_AFTER_IGNORED_MINIMIZES = 6
+# How far off any display the fallback parks a window that will not minimize.
+_OFFSCREEN_EDGE = -10_000
+
+
+_REFUSED_POPUP_BINDING = "__axcessPopupRefused"
+
+
+def _ignore_file_chooser(_chooser: object) -> None:
+    """Leave a file chooser unanswered; nothing is ever uploaded by a scan."""
+
+
+def _on_refused_popup(source: dict[str, Any], url: object) -> None:
+    """Hand a refused popup's destination to whoever is exploring that tab."""
+
+    page = source.get("page")
+    if page is not None and isinstance(url, str):
+        report_refused_popup(page, url)
 
 
 class ManualAuthState(StrEnum):
@@ -387,6 +636,27 @@ class ManualAuthenticationSession:
         self._auth_pages: list[Page] = []
         self._egress_proxy = LoopbackEgressProxy(self._policies.setup)
         self._profile_dir: str | None = None
+        # The inert tab left in front of the hidden window, and the task that
+        # keeps the window hidden for as long as the auditor wants it so.
+        self._cover_page: Page | None = None
+        self._hide_wanted = False
+        self._hidden = False
+        self._hide_lock = asyncio.Lock()
+        self._hide_task: asyncio.Task[None] | None = None
+        self._hide_recheck = asyncio.Event()
+        self._scan_pages: tuple[Page, ...] = ()
+        self._cover_fronted = False
+        # A tab opened or closed since the last hide: which tab is in front,
+        # and which windows exist, both have to be looked at again.
+        self._tabs_changed = False
+        self._hide_failures = 0
+        self._window_cdp: Any | None = None
+        self._window_cdp_anchor: Page | None = None
+        self._window_pages: dict[int, list[Page]] = {}
+        self._minimize_ignored: dict[int, int] = {}
+        # Windows the off-screen fallback moved: where each stood before
+        # ("from") and where the OS let it go ("at").
+        self._parked: dict[int, dict[str, dict[str, Any]]] = {}
 
     @property
     def state(self) -> ManualAuthState:
@@ -403,6 +673,28 @@ class ManualAuthenticationSession:
         if self._context is None:
             raise ManualAuthenticationError("The manual authentication browser is not running.")
         return self._context
+
+    @property
+    def backgrounded(self) -> bool:
+        """Whether the browser was out of the auditor's way when last checked."""
+
+        return self._hidden
+
+    @property
+    def parked(self) -> bool:
+        """The browser would not minimize and was moved to the screen's edge."""
+
+        return bool(self._parked) and not self._hidden
+
+    @property
+    def hiding_wanted(self) -> bool:
+        """False once the auditor has asked to see the browser.
+
+        Tells "showing because they asked" from "showing because it could not
+        be hidden", which deserve different words.
+        """
+
+        return self._hide_wanted
 
     async def __aenter__(self) -> Self:
         await self.start()
@@ -449,6 +741,16 @@ class ManualAuthenticationSession:
                     "--media-cache-size=1",
                 ],
                 user_agent=self._user_agent,
+                # With a default viewport Playwright owns the OS window: every
+                # ``set_viewport_size`` also resizes it, and Chromium answers a
+                # resize of a minimized window by putting it back on screen.
+                # The responsive probe resizes four times a page, so the
+                # browser returned to the foreground on the first page of
+                # every scan. Without one Playwright emulates the viewport
+                # and leaves the window alone; scan tabs are sized explicitly
+                # in ``prepare_background_scan_pages``. Sign-in also gets a
+                # page that follows the window the auditor is resizing.
+                no_viewport=True,
                 accept_downloads=False,
                 service_workers="block",
                 proxy={"server": self._egress_proxy.server_url, "bypass": ""},
@@ -536,11 +838,11 @@ class ManualAuthenticationSession:
     async def prepare_background_scan_pages(self, count: int) -> tuple[Page, ...]:
         """Prepare up to ``count`` authenticated tabs before hiding Chromium.
 
-        macOS restores a minimized Chromium window whenever Playwright creates
-        a new top-level page. Preparing every worker tab first lets the crawl
-        reuse those pages without repeatedly bringing the browser to the
-        foreground. The pages and their shared authenticated context remain
-        memory-only and are destroyed together at session close.
+        Chromium raises a minimized window whenever a tab is created in it, so
+        every tab the crawl will use has to exist before the window is hidden,
+        and the crawl reuses them from then on. The pages and their shared
+        authenticated context remain memory-only and are destroyed together
+        at session close.
         If sign-in uses sessionStorage, the pool retains its single tab;
         workers serialize access to preserve that tab-scoped session.
         """
@@ -551,90 +853,385 @@ class ManualAuthenticationSession:
             )
         if count <= 0:
             raise ValueError("Background scan page count must be positive.")
+        # Applies to every document loaded from here on, in every tab.
+        await self.context.expose_binding(_REFUSED_POPUP_BINDING, _on_refused_popup)
+        await self.context.add_init_script(_SCAN_QUIET_INIT_SCRIPT)
         # sessionStorage belongs to a tab, not its BrowserContext. Opening
         # fresh worker tabs and closing sign-in silently signs out SPAs that
         # keep their session there. Retain that tab and serialize the pool
         # instead of exporting or copying any authentication material.
         auth_page = self.page
-        if await auth_page.evaluate("() => sessionStorage.length > 0"):
-            self._auth_pages.remove(auth_page)
-            self._page = None
-            return (auth_page,)
         pages: list[Page] = []
+        created: list[Page] = []
         try:
-            for _ in range(count):
-                pages.append(await self.context.new_page())
-        except Exception:
+            if await auth_page.evaluate("() => sessionStorage.length > 0"):
+                self._auth_pages.remove(auth_page)
+                self._page = None
+                pages.append(auth_page)
+            else:
+                for _ in range(count):
+                    created.append(await self.context.new_page())
+                pages.extend(created)
             for page in pages:
+                await page.set_viewport_size(_SCAN_VIEWPORT)  # type: ignore[arg-type]
+                # The scan script refuses file choosers in the page. Should
+                # one open anyway, a listener makes Playwright hold it rather
+                # than let Chromium put a native dialog on screen.
+                page.on("filechooser", _ignore_file_chooser)
+            self._scan_pages = tuple(pages)
+            await self._open_cover_page()
+        except Exception:
+            for page in created:
                 with contextlib.suppress(Exception):
                     await page.close(run_before_unload=False)
             raise
         return tuple(pages)
 
-    async def minimize_for_background_scan(self, page: Page | None = None) -> bool:
-        """Minimize the headed sign-in window before reusing its context.
+    async def _open_cover_page(self) -> Page:
+        """Put an inert tab in front of the window that is about to be hidden.
+
+        Chromium stops compositing the front tab of a minimized window, and a
+        screenshot of that tab never returns: measured on macOS, every capture
+        timed out, while the same capture of a tab behind the front one took
+        40 ms. So no scan tab may be in front. A new tab opens in front, which
+        makes this the last one created before hiding.
+        """
+
+        cover = await self.context.new_page()
+        await cover.set_content(_COVER_PAGE_HTML)
+        self._cover_page = cover
+        return cover
+
+    async def hide_for_background_scan(self) -> bool:
+        """Take the signed-in browser out of the auditor's way and keep it there.
 
         Chromium cannot switch a live authenticated context from headed to
-        headless mode. Minimizing the existing window preserves the memory-only
-        session while allowing the auditor to keep using the computer. Some
-        macOS Chromium builds ignore the minimized state, so an off-screen
-        window is the verified fallback. CDP window management is best-effort
-        because a platform or Chromium build may not expose a native window.
+        headless mode, so the window is minimized instead, which preserves the
+        memory-only session while the auditor keeps using the computer. It is
+        re-checked for as long as hiding is wanted: see ``_keep_hidden``.
+        Returns whether the browser is minimized now; a window that was
+        fullscreen takes a second or two longer, and ``backgrounded`` follows
+        it. CDP window management is best-effort because a platform or
+        Chromium build may not expose a native window.
         """
 
         if self._state is not ManualAuthState.AUTHENTICATED:
             raise ManualAuthenticationError(
                 "Complete and verify manual sign-in before backgrounding the browser."
             )
-        target_page = page or self._page
-        if target_page is None:
-            return False
-        cdp_session: Any | None = None
-        try:
-            cdp_session = await self.context.new_cdp_session(target_page)
-            window = await cdp_session.send("Browser.getWindowForTarget")
-            window_id = window.get("windowId")
-            if not isinstance(window_id, int):
-                return False
-            await cdp_session.send(
-                "Browser.setWindowBounds",
-                {
-                    "windowId": window_id,
-                    "bounds": {"windowState": "minimized"},
-                },
-            )
-            bounds = await cdp_session.send("Browser.getWindowBounds", {"windowId": window_id})
-            native_bounds = bounds.get("bounds", {})
-            if native_bounds.get("windowState") == "minimized":
-                return True
+        async with self._hide_lock:
+            self._hide_wanted = True
+            self._hide_failures = 0
+            self._hidden = await self._hide_windows()
+            # The OS ignores a minimize while it is still animating: straight
+            # after the auditor asked to see the window, or as it leaves
+            # fullscreen. Measured at one or two passes. Waiting that out here
+            # means the answer given to the caller is the true one.
+            for _ in range(_HIDE_SETTLE_PASSES):
+                if self._hidden or self._parked:
+                    break
+                await asyncio.sleep(_HIDE_RECHECK_SECONDS)
+                self._hidden = await self._hide_windows()
+        if self._hide_task is None:
+            self.context.on("page", self._on_page_while_scanning)
+            self._hide_task = asyncio.create_task(self._keep_hidden())
+        return self._hidden
 
-            # macOS may acknowledge but ignore `windowState=minimized`.
-            # Move the persistent scan window out of the working area instead;
-            # Chromium clamps it to a small off-screen edge while keeping the
-            # renderer active for Playwright.
-            await cdp_session.send(
-                "Browser.setWindowBounds",
-                {
-                    "windowId": window_id,
-                    "bounds": {
-                        "windowState": "normal",
-                        "left": -10_000,
-                        "top": -10_000,
-                        "width": 1280,
-                        "height": 800,
-                    },
-                },
+    async def show_browser(self) -> bool:
+        """Put the scanning browser back on screen until it is hidden again."""
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before showing the scan browser."
             )
-            bounds = await cdp_session.send("Browser.getWindowBounds", {"windowId": window_id})
-            native_bounds = bounds.get("bounds", {})
-            left = native_bounds.get("left")
-            return isinstance(left, int) and left < 0
+        async with self._hide_lock:
+            # Off first, so the watchdog cannot minimize what is being shown.
+            self._hide_wanted = False
+            try:
+                cdp = await self._window_cdp_session()
+                for window_id in await self._windows():
+                    await cdp.send(
+                        "Browser.setWindowBounds",
+                        {"windowId": window_id, "bounds": {"windowState": "normal"}},
+                    )
+                    parked = self._parked.pop(window_id, None)
+                    if parked is not None and parked["from"]:
+                        await cdp.send(
+                            "Browser.setWindowBounds",
+                            {"windowId": window_id, "bounds": parked["from"]},
+                        )
+                # What the auditor asked to see is the scan, not the notice
+                # that it is running.
+                watched = next(
+                    (page for page in self._scan_pages if not page.is_closed()),
+                    self._cover_page,
+                )
+                if watched is not None and not watched.is_closed():
+                    await watched.bring_to_front()
+                    self._cover_fronted = False
+            except Exception:
+                await self._drop_window_cdp()
+                # Nothing is known to have moved, so nothing has changed: the
+                # browser is where it was and is still being kept there.
+                self._hide_wanted = True
+                return False
+            self._hidden = False
+            return True
+
+    def _on_page_while_scanning(self, page: Page) -> None:
+        """A tab appeared despite the popup block: the window is up again."""
+
+        self._tabs_changed = True
+        self._hide_failures = 0
+        self._hide_recheck.set()
+        # The route guard closes it, and Chromium then fronts the tab that
+        # opened it: a scan tab, in front of a window about to be minimized.
+        page.on("close", self._on_page_closed_while_scanning)
+
+    def _on_page_closed_while_scanning(self, _page: Page) -> None:
+        self._tabs_changed = True
+        self._hide_failures = 0
+        self._hide_recheck.set()
+
+    async def _keep_hidden(self) -> None:
+        """Re-hide the browser whenever something puts it back on screen.
+
+        Hiding once was not enough. A scan runs for minutes against an
+        application nobody here has read: a tab that slips past the scan
+        script, a native dialog, or a Chromium behaviour not yet met can each
+        raise the window again, and the auditor was left looking at it for
+        the rest of the scan. While hiding is wanted the window's state is
+        re-read twice a second, and at once when a tab opens or closes. The
+        auditor's own way to see the browser is ``show_browser``, which
+        switches this off until they hide it again.
+
+        It does not fight for ever. On a machine where nothing works, asking
+        twice a second would move and resize a window the auditor is trying
+        to place themselves; after a few seconds of failure the window is
+        left alone until a tab opens or hiding is asked for again.
+        """
+
+        idle_passes = 0
+        while True:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(self._hide_recheck.wait(), _HIDE_RECHECK_SECONDS)
+            self._hide_recheck.clear()
+            async with self._hide_lock:
+                if not self._hide_wanted or self._state is not ManualAuthState.AUTHENTICATED:
+                    continue
+                gave_up = self._hide_failures >= _HIDE_GIVE_UP_AFTER
+                if gave_up and not self._tabs_changed:
+                    # Still worth a look now and then: the auditor may have
+                    # minimized it themselves, and the UI should say so.
+                    idle_passes += 1
+                    if idle_passes % _GAVE_UP_LOOK_EVERY:
+                        continue
+                try:
+                    if not self._tabs_changed and await self._windows_settled():
+                        self._hide_failures = 0
+                        continue
+                    if gave_up:
+                        continue
+                    log.info(
+                        "protected.browser_hidden_again",
+                        reason="tab_changed" if self._tabs_changed else "window_restored",
+                    )
+                    self._hidden = await self._hide_windows()
+                    settled = await self._windows_settled()
+                except Exception:
+                    await self._drop_window_cdp()
+                    self._hidden = False
+                    settled = False
+                self._hide_failures = 0 if settled else self._hide_failures + 1
+                if self._hide_failures == _HIDE_GIVE_UP_AFTER:
+                    log.warning("protected.browser_hide_gave_up")
+
+    async def _hide_windows(self) -> bool:
+        """Front the cover tab, then put every window of the context away.
+
+        Returns whether every window is minimized, which is the only state
+        known to leave nothing on screen.
+        """
+
+        try:
+            cover = self._cover_page
+            if cover is None or cover.is_closed():
+                cover = await self._open_cover_page()
+            elif self._tabs_changed or not self._cover_fronted:
+                # Fronting a tab raises a minimized window, so only when the
+                # front tab can have changed since the last hide.
+                await cover.bring_to_front()
+            self._cover_fronted = True
+            self._tabs_changed = False
+            cdp = await self._window_cdp_session()
+            windows = await self._windows(refresh=True)
+            # No window to ask about is not the same as nothing on screen.
+            minimized = bool(windows)
+            for window_id, pages in windows.items():
+                covered = cover in pages
+                holds_scan_tab = any(page in pages for page in self._scan_pages)
+                if holds_scan_tab and not covered:
+                    # A scan tab in a window of its own (an SSO popup window
+                    # kept for its sessionStorage, a tab the auditor dragged
+                    # out) would be the front tab of a minimized window, where
+                    # its screenshots hang. A new tab cannot be aimed at a
+                    # window, so this one is parked instead: still rendering.
+                    await self._park_window(cdp, window_id)
+                    minimized = False
+                else:
+                    minimized = await self._minimize_window(cdp, window_id) and minimized
+            return minimized
         except Exception:
+            await self._drop_window_cdp()
             return False
-        finally:
-            if cdp_session is not None:
+
+    async def _minimize_window(self, cdp: Any, window_id: int) -> bool:
+        state = (await self._window_bounds(cdp, window_id)).get("windowState")
+        if state in {"fullscreen", "maximized"}:
+            # Chromium refuses to minimize a fullscreen window outright, and
+            # the OS is still animating for a moment after it leaves either
+            # state. Step down now; the next pass minimizes.
+            await cdp.send(
+                "Browser.setWindowBounds",
+                {"windowId": window_id, "bounds": {"windowState": "normal"}},
+            )
+            return False
+        await cdp.send(
+            "Browser.setWindowBounds",
+            {"windowId": window_id, "bounds": {"windowState": "minimized"}},
+        )
+        if (await self._window_bounds(cdp, window_id)).get("windowState") == "minimized":
+            self._minimize_ignored.pop(window_id, None)
+            self._parked.pop(window_id, None)
+            return True
+        # Ignored while an animation plays is ordinary; ignored every time is
+        # a Chromium build that does not minimize at all.
+        ignored = self._minimize_ignored.get(window_id, 0) + 1
+        self._minimize_ignored[window_id] = ignored
+        if ignored >= _PARK_AFTER_IGNORED_MINIMIZES:
+            await self._park_window(cdp, window_id)
+        return False
+
+    async def _park_window(self, cdp: Any, window_id: int) -> None:
+        """Move a window that cannot be minimized as far off screen as it goes.
+
+        macOS keeps a strip of any titled window reachable (measured: 40 px),
+        so a parked window is out of the way, not out of sight, and is never
+        reported as hidden.
+        """
+
+        if window_id in self._parked:
+            return
+        before = await self._window_bounds(cdp, window_id)
+        await cdp.send(
+            "Browser.setWindowBounds",
+            {
+                "windowId": window_id,
+                "bounds": {
+                    "windowState": "normal",
+                    "left": _OFFSCREEN_EDGE,
+                    "top": _OFFSCREEN_EDGE,
+                    "width": 1280,
+                    "height": 800,
+                },
+            },
+        )
+        after = await self._window_bounds(cdp, window_id)
+        self._parked[window_id] = {
+            "from": {
+                key: before[key]
+                for key in ("left", "top", "width", "height")
+                if isinstance(before.get(key), int)
+            },
+            "at": {key: after.get(key) for key in ("left", "top")},
+        }
+
+    async def _windows_settled(self) -> bool:
+        """Whether every window is still where hiding left it.
+
+        Also refreshes ``backgrounded``: minimized everywhere, or not.
+        """
+
+        cdp = await self._window_cdp_session()
+        windows = await self._windows()
+        settled = bool(windows)
+        minimized = bool(windows)
+        for window_id in windows:
+            try:
+                bounds = await self._window_bounds(cdp, window_id)
+            except Exception:
+                # The window is gone (its last tab closed, or the auditor
+                # closed it while it was showing). Look again next pass.
+                self._tabs_changed = True
+                return False
+            if bounds.get("windowState") == "minimized":
+                continue
+            minimized = False
+            parked = self._parked.get(window_id)
+            if parked is None or any(bounds.get(k) != v for k, v in parked["at"].items()):
+                settled = False
+        self._hidden = minimized and settled
+        return settled
+
+    @staticmethod
+    async def _window_bounds(cdp: Any, window_id: int) -> dict[str, Any]:
+        reply = await cdp.send("Browser.getWindowBounds", {"windowId": window_id})
+        bounds = reply.get("bounds", {})
+        return bounds if isinstance(bounds, dict) else {}
+
+    async def _window_cdp_session(self) -> Any:
+        """One CDP session for window management, attached to a live tab."""
+
+        if self._window_cdp is not None:
+            return self._window_cdp
+        anchor = self._cover_page
+        if anchor is None or anchor.is_closed():
+            anchor = next((page for page in self.context.pages if not page.is_closed()), None)
+        if anchor is None:
+            raise ManualAuthenticationError("The scan browser has no open tab.")
+        self._window_cdp = await self.context.new_cdp_session(anchor)
+        if anchor is not self._window_cdp_anchor:
+            self._window_cdp_anchor = anchor
+            anchor.on("close", self._forget_window_cdp)
+        return self._window_cdp
+
+    def _forget_window_cdp(self, _page: Page) -> None:
+        self._window_cdp = None
+        self._window_cdp_anchor = None
+
+    async def _drop_window_cdp(self) -> None:
+        """Detach a session that failed, so a retry does not pile up sessions."""
+
+        session, self._window_cdp = self._window_cdp, None
+        if session is not None:
+            with contextlib.suppress(Exception):
+                await session.detach()
+
+    async def _windows(self, *, refresh: bool = False) -> dict[int, list[Page]]:
+        """Every native window of the context, with the tabs each one holds.
+
+        Not only the window sign-in used: an identity provider may have
+        opened its own, and the auditor can drag a tab out of any of them.
+        """
+
+        if self._window_pages and not refresh:
+            return self._window_pages
+        found: dict[int, list[Page]] = {}
+        for page in list(self.context.pages):
+            if page.is_closed():
+                continue
+            session: Any | None = None
+            # A tab can close between being listed and being asked.
+            with contextlib.suppress(Exception):
+                session = await self.context.new_cdp_session(page)
+                window_id = (await session.send("Browser.getWindowForTarget")).get("windowId")
+                if isinstance(window_id, int):
+                    found.setdefault(window_id, []).append(page)
+            if session is not None and session is not self._window_cdp:
                 with contextlib.suppress(Exception):
-                    await cdp_session.detach()
+                    await session.detach()
+        self._window_pages = found
+        return found
 
     async def discard_manual_auth_page(self) -> None:
         """Close sign-in tabs that have not been retained for scanning.
@@ -778,6 +1375,20 @@ class ManualAuthenticationSession:
         if self._state is ManualAuthState.CLOSED:
             return
         self._state = ManualAuthState.CLOSED
+        self._hide_wanted = False
+        self._hidden = False
+        hide_task = self._hide_task
+        self._hide_task = None
+        if hide_task is not None:
+            hide_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await hide_task
+        self._window_cdp = None
+        self._window_cdp_anchor = None
+        self._window_pages = {}
+        self._parked = {}
+        self._cover_page = None
+        self._scan_pages = ()
         context = self._context
         browser = self._browser
         playwright = self._playwright

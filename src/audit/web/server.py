@@ -82,7 +82,7 @@ from audit.protected.repository import (
     purge_expired_protected_data,
     recover_stale_protected_run_leases,
 )
-from audit.protected.session import ManualAuthenticationSession
+from audit.protected.session import ManualAuthenticationError, ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
 from audit.synthesizer.diff import compute_diff
 from audit.web.comparison import (
@@ -204,6 +204,14 @@ class LocalLoginScanRequest(BaseModel):
         return normalize_exact_https_origin(f"{parsed.scheme}://{parsed.netloc}")
 
 
+class LocalLoginBrowserRequest(BaseModel):
+    """Whether the auditor wants the scanning browser on screen."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    visible: bool
+
+
 @dataclass
 class _LocalLoginRun:
     """One browser session owned by this loopback Axcess process."""
@@ -213,8 +221,21 @@ class _LocalLoginRun:
     confirmation: asyncio.Event
     status: str = "opening_browser"
     error: str | None = None
-    browser_backgrounded: bool = False
     task: asyncio.Task[Any] | None = None
+
+    @property
+    def browser_backgrounded(self) -> bool:
+        """Read from the session each time: a hidden window does not stay one."""
+
+        return self.session.backgrounded
+
+    @property
+    def browser_hiding_wanted(self) -> bool:
+        return self.session.hiding_wanted
+
+    @property
+    def browser_parked(self) -> bool:
+        return self.session.parked
 
 
 class _ProtectedRequestBodyTooLargeError(Exception):
@@ -1252,6 +1273,8 @@ def create_app(
                     "status": run.status,
                     "error": run.error,
                     "browser_backgrounded": run.browser_backgrounded,
+                    "browser_hiding_wanted": run.browser_hiding_wanted,
+                    "browser_parked": run.browser_parked,
                 },
                 headers={"Cache-Control": "no-store"},
             )
@@ -1275,6 +1298,8 @@ def create_app(
                     )
                 ),
                 "browser_backgrounded": False,
+                "browser_hiding_wanted": False,
+                "browser_parked": False,
             },
             headers={"Cache-Control": "no-store"},
         )
@@ -1295,6 +1320,44 @@ def create_app(
         run.confirmation.set()
         return JSONResponse(
             {"scan_id": scan_id, "status": "verifying_authentication"},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.post("/api/local-login-scans/{scan_id:int}/browser")
+    async def api_set_local_login_browser_visible(
+        request: Request, scan_id: int, body: LocalLoginBrowserRequest
+    ) -> JSONResponse:
+        """Show the scanning browser to the auditor, or hide it again."""
+
+        _require_local_login_request(request, mutation=True)
+        run = local_login_runs.get(scan_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Login browser is not available.")
+        if run.status != "scanning":
+            raise HTTPException(
+                status_code=409,
+                detail="The browser can be shown or hidden only while the scan is running.",
+            )
+        try:
+            if body.visible:
+                changed = await run.session.show_browser()
+            else:
+                changed = await run.session.hide_for_background_scan()
+        except ManualAuthenticationError as exc:
+            # The scan finished between the status check and the request.
+            raise HTTPException(
+                status_code=409,
+                detail="The browser can be shown or hidden only while the scan is running.",
+            ) from exc
+        return JSONResponse(
+            {
+                "scan_id": scan_id,
+                "status": run.status,
+                "changed": changed,
+                "browser_backgrounded": run.browser_backgrounded,
+                "browser_hiding_wanted": run.browser_hiding_wanted,
+                "browser_parked": run.browser_parked,
+            },
             headers={"Cache-Control": "no-store"},
         )
 
@@ -2978,7 +3041,7 @@ async def _run_local_login_background(
         # the authenticated crawl stays out of the auditor's way throughout.
         scan_pages = await run.session.prepare_background_scan_pages(config.workers)
         await run.session.discard_manual_auth_page()
-        run.browser_backgrounded = await run.session.minimize_for_background_scan(scan_pages[0])
+        await run.session.hide_for_background_scan()
 
         # The orchestrator normally constructs these around a fresh browser.
         # For an authenticated scan they must be attached before we inject the
