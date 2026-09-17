@@ -269,7 +269,6 @@ function createWindow() {
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
-  void window.loadFile(path.join(__dirname, "../static/loading.html"));
   return window;
 }
 
@@ -415,12 +414,20 @@ async function checkForUpdates() {
 async function launch() {
   failureShown = false;
   mainWindow = createWindow();
+  // When the backend is already running (Dock click after closing the window),
+  // /health answers before loading.html finishes. Navigating to the workbench
+  // then aborts that load, and Electron rejects the *new* loadURL with the old
+  // page's ERR_ABORTED (-3). Let the loading page settle first.
+  const loadingShown = mainWindow
+    .loadFile(path.join(__dirname, "../static/loading.html"))
+    .catch(() => {});
   if (!backendProcess || !backendOrigin) {
     const port = await findOpenPort();
     backendOrigin = `http://127.0.0.1:${port}`;
     startBackend(port);
   }
   await waitForBackend(backendOrigin);
+  await loadingShown;
   if (mainWindow && !mainWindow.isDestroyed()) {
     await mainWindow.loadURL(`${backendOrigin}/app/`);
   }
