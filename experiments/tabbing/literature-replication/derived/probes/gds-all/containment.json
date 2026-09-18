@@ -1,0 +1,58 @@
+{
+ "gds-real-link": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "gds-real-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "gds-lightbox-close": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "gds-concertina": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "gds-dropdown": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "gds-role-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "gds-tooltip": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "gds-fake-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ }
+}

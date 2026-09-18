@@ -1,0 +1,653 @@
+{
+ "h120": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h121": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h122": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h123": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h101": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h102": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h103": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h104": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h105": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h110": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h111": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h112": {
+  "contains_focusable": true,
+  "contained_probe": "h113",
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h113": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h150": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h151": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h152": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h170": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h171": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h172": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h173": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h182": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h130": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h131": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h132": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h133": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h140": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h141": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h142": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h160": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h161": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h162": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h163": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "h180": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "h181": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p01": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p02": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p03": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p04": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p05": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p06": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p07": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p08": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p09": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p10": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p11": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p12": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p20": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p21": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p22": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p23": {
+  "contains_focusable": true,
+  "contained_probe": "p23a",
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p23a": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p24": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p25i": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p25": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p26i": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p26": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p27b": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p27": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": true,
+  "ancestor_probe": "p27b",
+  "self_native": false
+ },
+ "p30": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p31": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p32": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p33": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p40": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p41": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p42": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p60": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p61": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p62": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p63": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p64": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p70": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p71": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p72": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p73": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p74": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p75": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p84": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p80": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p81": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p85": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p82": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p83": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p86": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p90": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p93": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p92": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p94": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p50": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p53": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ },
+ "p51": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p52": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p54": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "p55": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": false
+ }
+}

@@ -1,0 +1,6 @@
+{
+ "probe": "effect",
+ "corpus": "experiments/tabbing/fixtures",
+ "observation_ms": 16478.7,
+ "pages": 19
+}

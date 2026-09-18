@@ -1,0 +1,586 @@
+{
+ "e01": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e02": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e03": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e04": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e05": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e06": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e07": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e08": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e09": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e10": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e80": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e81": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e82": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e83": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e84": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e85": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e85a": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e86": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e86a": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e87b": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e87": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e20": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e21": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e22": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e23": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e24": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e25": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e26": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e27": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e28": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e29": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e30": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e110": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e71": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e72": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e64": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e62": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e63": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e61": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e65": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e66": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e67": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e68": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e69": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e70": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e73": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e60": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e150": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e151": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e31": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e32": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e33": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e140": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e40": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e41": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e42": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e43": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e44": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e45": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "-1",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e46": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "3",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e47": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e48": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e100": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e120": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "-1",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e121": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e160": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "0",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e161": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "-1",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e162": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "-1",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e163": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": "-1",
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e90": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e91": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e130": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "e111": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ }
+}

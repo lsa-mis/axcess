@@ -1,0 +1,30 @@
+{
+ "base-real-link": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "base-real-button": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "mutant-F42-real-link": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "mutant-F42-real-button": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "mutant-F55-real-link": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "mutant-F55-real-button": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "f55-target": {
+  "own_activation": [],
+  "hover_reveal": false
+ }
+}

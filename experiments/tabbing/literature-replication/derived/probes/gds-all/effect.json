@@ -1,0 +1,40 @@
+{
+ "gds-real-link": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "gds-real-button": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "gds-lightbox-close": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "gds-concertina": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "gds-dropdown": {
+  "own_activation": [],
+  "hover_reveal": null
+ },
+ "gds-role-button": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "gds-tooltip": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "gds-fake-button": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ }
+}

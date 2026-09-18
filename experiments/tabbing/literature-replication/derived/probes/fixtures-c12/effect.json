@@ -1,0 +1,515 @@
+{
+ "h120": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h121": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "h122": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h123": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "h101": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h102": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "h103": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "h104": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h105": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h110": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h111": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h112": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h113": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "h150": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "h151": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "h152": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "h170": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "h171": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "h172": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h173": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h182": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h130": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h131": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h132": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h133": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h140": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h141": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h142": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "h160": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h161": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h162": {
+  "own_activation": null,
+  "hover_reveal": false
+ },
+ "h163": {
+  "own_activation": null,
+  "hover_reveal": false
+ },
+ "h180": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "h181": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p01": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p02": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p03": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p04": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p05": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p06": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p07": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p08": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p09": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "p10": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p11": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p12": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p20": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p21": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p22": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p23": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p23a": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p24": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p25i": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p25": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p26i": {
+  "own_activation": [],
+  "hover_reveal": null
+ },
+ "p26": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p27b": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p27": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p30": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "p31": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "p32": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "p33": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "p40": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p41": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p42": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "p60": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p61": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p62": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p63": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p64": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p70": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p71": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p72": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p73": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "p74": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "p75": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p84": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p80": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p81": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "p85": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p82": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p83": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "p86": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p90": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p93": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p92": {
+  "own_activation": null,
+  "hover_reveal": false
+ },
+ "p94": {
+  "own_activation": null,
+  "hover_reveal": false
+ },
+ "p50": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p53": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p51": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p52": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p54": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "p55": {
+  "own_activation": [],
+  "hover_reveal": false
+ }
+}

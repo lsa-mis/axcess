@@ -1,0 +1,9 @@
+{
+ "probe": "effect2",
+ "corpus": "experiments/tabbing/edgecases",
+ "observation_ms": 65699.4,
+ "lead_set": "all probes",
+ "observed": 74,
+ "universe": 74,
+ "pages": 15
+}

@@ -1,0 +1,6 @@
+{
+ "probe": "composite",
+ "corpus": "experiments/tabbing/edgecases",
+ "observation_ms": 254.3,
+ "pages": 15
+}

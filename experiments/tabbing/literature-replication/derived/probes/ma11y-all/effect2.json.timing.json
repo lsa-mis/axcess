@@ -1,0 +1,9 @@
+{
+ "probe": "effect2",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/ma11y",
+ "observation_ms": 10572.5,
+ "lead_set": "all probes",
+ "observed": 7,
+ "universe": 7,
+ "pages": 3
+}

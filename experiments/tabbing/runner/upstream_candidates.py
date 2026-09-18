@@ -171,6 +171,105 @@ UPSTREAM_MOUSE_EVENTS = frozenset(
 
 _PROBE_ATTR = "data-probe"
 
+# Chromium's CBOR encoder refuses to serialise a response nested deeper than its
+# fixed stack limit, and each DOM level costs two nesting levels (the node map
+# plus its `children` array). A page nested ~150 elements deep therefore makes a
+# single `depth: -1` response unserialisable:
+#
+#   Protocol error (DOM.getDocument): Failed to convert response to JSON:
+#   CBOR: stack limit exceeded at position 53429
+#
+# Measured on Chromium 145 against `edgecases/pages/scale.html` (154 levels, 284
+# elements): `depth: 148` encodes in 73 KB, `depth: 150` does not. It is a
+# nesting limit, not a size limit, and nothing is wrong with the page or with
+# the traversal -- only with asking for the whole tree in one response. So the
+# unbounded call stays the primary path, byte-identical wherever it already
+# worked, and the tree is fetched in bounded slices only when it raises.
+_PIERCE_CHUNK = 64
+_PIERCE_CALL_CAP = 4096
+
+
+async def get_pierced_document(cdp: Any) -> dict[str, Any]:
+    """The pierced DOM tree root, fetched in slices if one response is too deep.
+
+    Returns the same structure ``DOM.getDocument`` returns under
+    ``{"depth": -1, "pierce": True}``, so callers walk it unchanged.
+    """
+    # The unbounded attempt is a probe, not a measurement. If it is recovered
+    # below it must not linger in a `CheckedInstrument`'s error list, where it
+    # would later be reported as a silent instrument failure.
+    recorded = getattr(cdp, "errors", None)
+    mark = len(recorded) if isinstance(recorded, list) else None
+
+    try:
+        document = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
+        return document.get("root", {})
+    except Exception as exc:
+        # Only the encoder's nesting limit is recoverable this way. A detached
+        # session or an unsupported command is still a failed measurement.
+        if "stack limit exceeded" not in str(exc):
+            raise
+        if mark is not None:
+            del recorded[mark:]
+
+    document = await cdp.send("DOM.getDocument", {"depth": _PIERCE_CHUNK, "pierce": True})
+    root = document.get("root", {})
+
+    # `DOM.describeNode` answers in its own response, so the subtree can be
+    # spliced in directly; `DOM.requestChildNodes` would deliver it as an event
+    # and need the DOM domain enabled and an event pump.
+    #
+    # It must be addressed by `backendNodeId`, not `nodeId`: nodes arriving in a
+    # `describeNode` response are not registered with the frontend and come back
+    # with `nodeId: 0`, so descending by `nodeId` fails one slice in with
+    # "Could not find node with given id". Backend ids are always populated.
+    pending = [root]
+    unregistered: list[dict[str, Any]] = []
+    calls = 0
+    while pending:
+        node = pending.pop()
+        for key in ("children", "shadowRoots"):
+            pending.extend(node.get(key) or [])
+        for key in ("contentDocument", "templateContent"):
+            child = node.get(key)
+            if child:
+                pending.append(child)
+        if not node.get("nodeId") and node.get("backendNodeId"):
+            unregistered.append(node)
+        if not node.get("childNodeCount") or node.get("children"):
+            continue
+        if calls >= _PIERCE_CALL_CAP:
+            raise RuntimeError(
+                f"pierced tree exceeded {_PIERCE_CALL_CAP} slice requests; refusing to "
+                "report a partial tree as a complete one"
+            )
+        calls += 1
+        described = await cdp.send(
+            "DOM.describeNode",
+            {"backendNodeId": node["backendNodeId"], "depth": _PIERCE_CHUNK, "pierce": True},
+        )
+        filled = described.get("node") or {}
+        for key in ("shadowRoots", "contentDocument", "templateContent"):
+            if filled.get(key):
+                node[key] = filled[key]
+        # Re-queue only what the call actually produced. A node that reports
+        # children but yields none would otherwise spin here forever.
+        if filled.get("children"):
+            node["children"] = filled["children"]
+            pending.extend(filled["children"])
+
+    # Callers pass the `nodeId` they find straight to `DOM.getBoxModel`, so a
+    # spliced-in node has to carry a real one rather than the placeholder zero.
+    for start in range(0, len(unregistered), 500):
+        batch = unregistered[start : start + 500]
+        pushed = await cdp.send(
+            "DOM.pushNodesByBackendIdsToFrontend",
+            {"backendNodeIds": [node["backendNodeId"] for node in batch]},
+        )
+        for node, node_id in zip(batch, pushed.get("nodeIds") or [], strict=False):
+            node["nodeId"] = node_id
+    return root
+
 
 @dataclass(frozen=True)
 class ProbeNode:
@@ -251,7 +350,7 @@ async def resolve_probe_nodes(
     Pierced means shadow roots, closed ones included, plus frame content
     documents and template contents — reach a Playwright locator does not have.
     """
-    document = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
+    document = await get_pierced_document(cdp)
 
     found: dict[str, int] = {}
 
@@ -268,7 +367,7 @@ async def resolve_probe_nodes(
             if child:
                 walk(child)
 
-    walk(document.get("root", {}))
+    walk(document)
 
     nodes: dict[str, ProbeNode] = {}
     wanted = set(only) if only is not None else None

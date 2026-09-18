@@ -1,0 +1,6 @@
+{
+ "probe": "containment",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/gds-corpus",
+ "observation_ms": 67.0,
+ "pages": 1
+}

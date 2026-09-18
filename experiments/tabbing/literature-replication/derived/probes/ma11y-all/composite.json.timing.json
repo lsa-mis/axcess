@@ -1,0 +1,6 @@
+{
+ "probe": "composite",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/ma11y",
+ "observation_ms": 155.1,
+ "pages": 3
+}

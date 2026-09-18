@@ -238,6 +238,18 @@ async def main(out_path, only_path):
             results.update(await observe(factory, page_path, list(ids), wanted))
         await browser.close()
     pathlib.Path(out_path).write_text(json.dumps(results, indent=1))
-    print(f"observed {len(results)} probes in {time.monotonic()-started:.1f}s -> {out_path}")
+    # Which lead set was actually observed is the whole scope caveat on C16: R9
+    # can only promote what it looked at. Recorded beside the observations so a
+    # scorer states the lead set rather than inferring it.
+    observed = [p for p, row in results.items() if row.get("ms")]
+    pathlib.Path(str(out_path) + ".timing.json").write_text(
+        json.dumps({"probe": "effect2", "corpus": str(root),
+                    "observation_ms": round(sum(results[p]["ms"] for p in observed), 1),
+                    "lead_set": pathlib.Path(only_path).name if only_path else "all probes",
+                    "observed": len(observed), "universe": len(results),
+                    "pages": len(truth["pages"])}, indent=1) + "\n"
+    )
+    print(f"observed {len(observed)}/{len(results)} probes in "
+          f"{time.monotonic()-started:.1f}s -> {out_path}")
 
 asyncio.run(main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None))

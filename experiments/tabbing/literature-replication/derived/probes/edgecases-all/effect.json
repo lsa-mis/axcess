@@ -1,0 +1,417 @@
+{
+ "e01": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e02": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e03": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e04": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e05": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e06": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e07": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e08": {
+  "own_activation": [
+   "mousedown"
+  ],
+  "hover_reveal": false
+ },
+ "e09": {
+  "own_activation": [
+   "dblclick"
+  ],
+  "hover_reveal": false
+ },
+ "e10": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e80": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e81": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e82": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e83": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e84": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e85": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e85a": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e86": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e86a": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e87b": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e87": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e20": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e21": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e22": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e23": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e24": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e25": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e26": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e27": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e28": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e29": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e30": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e110": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e71": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e72": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e64": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e62": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e63": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "e61": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "e65": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e66": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e67": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e68": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e69": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e70": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": null
+ },
+ "e73": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e60": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e150": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e151": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e31": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "e32": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "e33": {
+  "own_activation": [],
+  "hover_reveal": true
+ },
+ "e140": {
+  "own_activation": null,
+  "hover_reveal": false
+ },
+ "e40": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e41": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e42": {
+  "own_activation": [
+   "click",
+   "keyup"
+  ],
+  "hover_reveal": false
+ },
+ "e43": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e44": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e45": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e46": {
+  "own_activation": [
+   "click",
+   "keydown"
+  ],
+  "hover_reveal": false
+ },
+ "e47": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e48": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e100": {
+  "own_activation": [],
+  "hover_reveal": false
+ },
+ "e120": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e121": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e160": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e161": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e162": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e163": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e90": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e91": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e130": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ },
+ "e111": {
+  "own_activation": [
+   "click"
+  ],
+  "hover_reveal": false
+ }
+}

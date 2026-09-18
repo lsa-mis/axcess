@@ -1,0 +1,6 @@
+{
+ "probe": "composite",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/gds-corpus",
+ "observation_ms": 27.9,
+ "pages": 1
+}

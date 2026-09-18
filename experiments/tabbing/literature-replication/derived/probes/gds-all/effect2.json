@@ -1,0 +1,82 @@
+{
+ "gds-concertina": {
+  "name": "understanding user research",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1076.9
+ },
+ "gds-dropdown": {
+  "name": "benefits entitlement",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 465.9
+ },
+ "gds-fake-button": {
+  "name": "launch webchat",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 2185.0
+ },
+ "gds-lightbox-close": {
+  "name": "close lightbox",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 430.5
+ },
+ "gds-real-button": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 2025.7
+ },
+ "gds-real-link": {
+  "name": "taylor swift",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 1210.1
+ },
+ "gds-role-button": {
+  "name": "continue",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 1180.0
+ },
+ "gds-tooltip": {
+  "name": "?",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1025.3
+ }
+}

@@ -1,0 +1,6 @@
+{
+ "probe": "composite",
+ "corpus": "experiments/tabbing/fixtures",
+ "observation_ms": 323.3,
+ "pages": 19
+}

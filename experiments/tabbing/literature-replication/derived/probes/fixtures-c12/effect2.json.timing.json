@@ -1,0 +1,9 @@
+{
+ "probe": "effect2",
+ "corpus": "experiments/tabbing/fixtures",
+ "observation_ms": 36642.7,
+ "lead_set": "c12.json",
+ "observed": 42,
+ "universe": 95,
+ "pages": 19
+}

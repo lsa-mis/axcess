@@ -1,0 +1,6 @@
+{
+ "probe": "containment",
+ "corpus": "experiments/tabbing/fixtures",
+ "observation_ms": 316.1,
+ "pages": 19
+}

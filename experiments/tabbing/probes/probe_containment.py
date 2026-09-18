@@ -8,7 +8,7 @@ execution -- the cheapest class of signal there is.
 Writes its observations to JSON so the rule can be scored offline against the
 frozen labels, exactly as analyze_candidates.py does.
 """
-import asyncio, json, os, sys, pathlib
+import asyncio, json, os, sys, pathlib, time
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -47,6 +47,11 @@ async def main(out_path):
                         "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     results = {}
+    # Only the observation is timed. Browser launch, navigation and settle are
+    # what every detector on the page pays anyway; charging them to this rule
+    # would price the harness, not the rule. Written beside the observations so
+    # the observation file keeps exactly the shape the scorers expect.
+    observed_ms = 0.0
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         factory = ContextFactory(browser, VIEWPORT, root)
@@ -58,13 +63,21 @@ async def main(out_path):
                 await pg.wait_for_timeout(120)
                 for frame in pg.frames:
                     try:
-                        results.update(await frame.evaluate(JS, FOCUSABLE))
+                        t0 = time.monotonic()
+                        found = await frame.evaluate(JS, FOCUSABLE)
+                        observed_ms += (time.monotonic() - t0) * 1000
+                        results.update(found)
                     except Exception:
                         pass
             finally:
                 await ctx.close(); await factory.close_open_contexts()
         await browser.close()
     pathlib.Path(out_path).write_text(json.dumps(results, indent=1))
-    print(f"observed {len(results)} probes -> {out_path}")
+    pathlib.Path(str(out_path) + ".timing.json").write_text(
+        json.dumps({"probe": "containment", "corpus": str(root),
+                    "observation_ms": round(observed_ms, 1),
+                    "pages": len(truth["pages"])}, indent=1) + "\n"
+    )
+    print(f"observed {len(results)} probes in {observed_ms:.1f} ms -> {out_path}")
 
 asyncio.run(main(sys.argv[1]))

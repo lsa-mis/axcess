@@ -1,0 +1,51 @@
+{
+ "base-real-link": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "base-real-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "mutant-F42-real-link": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "mutant-F42-real-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "mutant-F55-real-link": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "mutant-F55-real-button": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ },
+ "f55-target": {
+  "contains_focusable": false,
+  "contained_probe": null,
+  "inside_focusable": false,
+  "ancestor_probe": null,
+  "self_native": true
+ }
+}

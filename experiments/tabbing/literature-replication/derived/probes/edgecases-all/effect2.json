@@ -1,0 +1,738 @@
+{
+ "e01": {
+  "name": "inline onclick attribute",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 713.7
+ },
+ "e02": {
+  "name": "onclick property",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 657.6
+ },
+ "e03": {
+  "name": "addeventlistener",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 622.4
+ },
+ "e04": {
+  "name": "addeventlistener capture",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 644.3
+ },
+ "e05": {
+  "name": "delegated on document",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 631.5
+ },
+ "e06": {
+  "name": "delegated on container",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 637.1
+ },
+ "e07": {
+  "name": "setattribute onclick",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 631.4
+ },
+ "e08": {
+  "name": "mousedown only, no click",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 610.9
+ },
+ "e09": {
+  "name": "dblclick only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1382.8
+ },
+ "e10": {
+  "name": "native button, addeventlistener",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 812.6
+ },
+ "e80": {
+  "name": "native button",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 781.2
+ },
+ "e81": {
+  "name": "real anchor",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 816.3
+ },
+ "e82": {
+  "name": "role=button done correctly",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 748.0
+ },
+ "e83": {
+  "name": "cursor:pointer, no handler at all",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1405.9
+ },
+ "e84": {
+  "name": "class says button, no handler",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1362.2
+ },
+ "e85": {
+  "name": "clickable card wrapper the real link inside it",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 659.3
+ },
+ "e85a": {
+  "name": "the real link inside it",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 792.6
+ },
+ "e86": {
+  "name": "label for a checkbox",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1380.6
+ },
+ "e86a": {
+  "name": "on",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1373.0
+ },
+ "e87": {
+  "name": "decorative span inside a button",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1371.0
+ },
+ "e87b": {
+  "name": "decorative span inside a button",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1360.3
+ },
+ "e20": {
+  "name": "dom mutation",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 670.1
+ },
+ "e21": {
+  "name": "fetch only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1630.1
+ },
+ "e22": {
+  "name": "localstorage only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 628.0
+ },
+ "e23": {
+  "name": "canvas draw only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 596.6
+ },
+ "e24": {
+  "name": "console only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1642.2
+ },
+ "e25": {
+  "name": "navigation (hash)",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 625.5
+ },
+ "e26": {
+  "name": "css class toggle",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 679.8
+ },
+ "e27": {
+  "name": "empty handler",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1393.7
+ },
+ "e28": {
+  "name": "effect after 600ms",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1265.0
+ },
+ "e29": {
+  "name": "effect via raf",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 653.8
+ },
+ "e30": {
+  "name": "idempotent storage write",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 781.0
+ },
+ "e110": {
+  "name": "run redirected action",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 659.0
+ },
+ "e60": {
+  "name": "far below the fold",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 637.3
+ },
+ "e61": {
+  "name": "off-canvas",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 286.5
+ },
+ "e62": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1367.9
+ },
+ "e63": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 279.2
+ },
+ "e64": {
+  "name": "under a transparent overlay",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1385.1
+ },
+ "e65": {
+  "name": "pointer-events none",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1385.6
+ },
+ "e66": {
+  "name": "inside inert",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1401.3
+ },
+ "e67": {
+  "name": "disabled",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1363.5
+ },
+ "e68": {
+  "name": "opacity 0",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 662.1
+ },
+ "e69": {
+  "name": "visibility hidden",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1394.0
+ },
+ "e70": {
+  "name": "display none",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 288.1
+ },
+ "e71": {
+  "name": "inside a scroll container, needs scrolling",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 644.2
+ },
+ "e72": {
+  "name": "a clickable span that wraps across lines",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 612.9
+ },
+ "e73": {
+  "name": "aria-hidden but focusable",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": false,
+  "same_effect": null,
+  "ms": 1808.9
+ },
+ "e150": {
+  "name": "run svg action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 630.0
+ },
+ "e151": {
+  "name": "run canvas action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 640.5
+ },
+ "e31": {
+  "name": "products css-only dropdown, mouse only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 628.6
+ },
+ "e32": {
+  "name": "services opens on hover and focus",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 739.6
+ },
+ "e33": {
+  "name": "abbreviation the expansion",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 605.7
+ },
+ "e140": {
+  "name": "run embedded action",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 850.1
+ },
+ "e40": {
+  "name": "click + keydown enter",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 745.7
+ },
+ "e41": {
+  "name": "click + space only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 785.7
+ },
+ "e42": {
+  "name": "click + keyup only",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 819.2
+ },
+ "e43": {
+  "name": "enter does something different",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": false,
+  "ms": 780.4
+ },
+ "e44": {
+  "name": "tabindex=0, click, no key handler",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": false,
+  "same_effect": null,
+  "ms": 1846.4
+ },
+ "e45": {
+  "name": "tabindex=-1 + click",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": false,
+  "same_effect": null,
+  "ms": 1782.7
+ },
+ "e46": {
+  "name": "positive tabindex + enter",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 768.1
+ },
+ "e47": {
+  "name": "key handler delegated on document",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 791.0
+ },
+ "e48": {
+  "name": "native button baseline",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 829.5
+ },
+ "e100": {
+  "name": "choose file",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 633.4
+ },
+ "e120": {
+  "name": "hover makes me a tab stop",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 836.3
+ },
+ "e121": {
+  "name": "hover enables me",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 654.6
+ },
+ "e160": {
+  "name": "first working action",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 764.7
+ },
+ "e161": {
+  "name": "second working action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 773.6
+ },
+ "e162": {
+  "name": "first unreachable action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 798.1
+ },
+ "e163": {
+  "name": "second unreachable action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 783.9
+ },
+ "e90": {
+  "name": "act broken",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 630.4
+ },
+ "e91": {
+  "name": "deeply nested clickable",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 607.1
+ },
+ "e130": {
+  "name": "open-root action",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 788.4
+ },
+ "e131": {
+  "click_effect": null,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 250.5
+ },
+ "e111": {
+  "name": "run action outside the trap",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 799.1
+ }
+}

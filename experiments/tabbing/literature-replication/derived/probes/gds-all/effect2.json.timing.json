@@ -1,0 +1,9 @@
+{
+ "probe": "effect2",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/gds-corpus",
+ "observation_ms": 9599.4,
+ "lead_set": "all probes",
+ "observed": 8,
+ "universe": 8,
+ "pages": 1
+}

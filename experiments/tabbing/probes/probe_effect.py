@@ -10,7 +10,7 @@ Also records whether any activation listener is bound directly to the element
 (CDP, depth 0), so "no handler evidence at all" can be stated precisely rather
 than inferred from the two flags the saved features happen to carry.
 """
-import asyncio, json, os, sys, pathlib
+import asyncio, json, os, sys, pathlib, time
 sys.path.insert(0, "src"); sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from experiments.tabbing.runner.serve import ContextFactory, page_url
@@ -76,6 +76,9 @@ async def main(out_path):
                         "experiments/tabbing/fixtures"))
     truth = json.loads((root / "truth.json").read_text())
     results = {}
+    # Only the observation is timed; see the note in probe_containment.py. Here
+    # that includes the hover and its settle, which is where R5's cost lives.
+    observed_ms = 0.0
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
         factory = ContextFactory(browser, VIEWPORT, root)
@@ -92,6 +95,7 @@ async def main(out_path):
                     except Exception:
                         continue
                     for pid in ids:
+                        t0 = time.monotonic()
                         row = {"own_activation": None, "hover_reveal": None}
                         row["own_activation"] = await own_listeners(cdp, pid)
                         try:
@@ -110,11 +114,17 @@ async def main(out_path):
                             await pg.wait_for_timeout(40)
                         except Exception:
                             pass
+                        observed_ms += (time.monotonic() - t0) * 1000
                         results[pid] = row
             finally:
                 await ctx.close(); await factory.close_open_contexts()
         await browser.close()
     pathlib.Path(out_path).write_text(json.dumps(results, indent=1))
-    print(f"observed {len(results)} probes -> {out_path}")
+    pathlib.Path(str(out_path) + ".timing.json").write_text(
+        json.dumps({"probe": "effect", "corpus": str(root),
+                    "observation_ms": round(observed_ms, 1),
+                    "pages": len(truth["pages"])}, indent=1) + "\n"
+    )
+    print(f"observed {len(results)} probes in {observed_ms:.1f} ms -> {out_path}")
 
 asyncio.run(main(sys.argv[1]))

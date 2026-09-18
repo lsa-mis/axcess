@@ -1,0 +1,6 @@
+{
+ "probe": "containment",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/ma11y",
+ "observation_ms": 88.4,
+ "pages": 3
+}

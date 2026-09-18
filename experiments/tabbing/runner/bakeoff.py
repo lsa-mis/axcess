@@ -985,7 +985,7 @@ async def _pierced_centre(cdp: Any, probe_id: str) -> tuple[tuple[float, float] 
     reach. Returns the centre of the border box, or a reason it has none.
     """
     try:
-        doc = await cdp.send("DOM.getDocument", {"depth": -1, "pierce": True})
+        root = await upstream_candidates.get_pierced_document(cdp)
     except Exception as exc:
         return None, f"pierced tree unavailable: {type(exc).__name__}"
 
@@ -1007,7 +1007,7 @@ async def _pierced_centre(cdp: Any, probe_id: str) -> tuple[tuple[float, float] 
             if child:
                 walk(child)
 
-    walk(doc.get("root", {}))
+    walk(root)
     if not found:
         return None, "probe not present in the pierced DOM tree"
     try:

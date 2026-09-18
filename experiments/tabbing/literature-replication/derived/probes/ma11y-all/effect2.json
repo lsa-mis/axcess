@@ -1,0 +1,72 @@
+{
+ "base-real-button": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 2012.1
+ },
+ "base-real-link": {
+  "name": "taylor swift",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 1165.1
+ },
+ "mutant-F42-real-button": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 2048.7
+ },
+ "mutant-F42-real-link": {
+  "name": "taylor swift",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 1139.7
+ },
+ "f55-target": {
+  "name": "continue",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 1002.5
+ },
+ "mutant-F55-real-button": {
+  "name": "",
+  "name_twin": false,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": false,
+  "key_effect": null,
+  "same_effect": null,
+  "ms": 2100.9
+ },
+ "mutant-F55-real-link": {
+  "name": "taylor swift",
+  "name_twin": true,
+  "framework": null,
+  "framework_activation": null,
+  "click_effect": true,
+  "key_effect": true,
+  "same_effect": true,
+  "ms": 1103.5
+ }
+}

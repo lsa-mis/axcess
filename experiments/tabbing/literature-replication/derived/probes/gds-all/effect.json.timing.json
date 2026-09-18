@@ -1,0 +1,6 @@
+{
+ "probe": "effect",
+ "corpus": "experiments/tabbing/literature-replication/artifacts/gds-corpus",
+ "observation_ms": 1329.0,
+ "pages": 1
+}

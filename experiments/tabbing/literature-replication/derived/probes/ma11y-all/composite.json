@@ -1,0 +1,58 @@
+{
+ "base-real-link": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "base-real-button": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "mutant-F42-real-link": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "mutant-F42-real-button": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "mutant-F55-real-link": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "mutant-F55-real-button": {
+  "role": "",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ },
+ "f55-target": {
+  "role": "button",
+  "owner_role": null,
+  "sibling_tabbable": false,
+  "own_tabindex": null,
+  "aria_keyshortcuts": null,
+  "chord_in_text": false
+ }
+}
