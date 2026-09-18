@@ -1199,7 +1199,7 @@ def get_started() -> str:
         </ul>
         <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a></p>
         <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
-        <p class="small" style="margin-top:1rem">The downloads are about 550 MB each. The preview is not yet Apple-notarized or Windows code-signed, so the first launch needs one extra approval; the <a href="#first-launch">steps for macOS and Windows</a> are below. Installed copies check for a newer build on launch. An Intel Mac build is not available yet.</p>
+        <div style="margin-top:1rem">{callout('<strong>See <a href="#first-launch">the next section</a> for important installation instructions.</strong> Both macOS and Windows show a warning on first launch that you need to approve.', "callout-maize", "warn")}</div>
       </article>
       <article class="card">
         {icon("cpu")}
@@ -1214,7 +1214,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <p class="small">Full instructions, hosting for a small team, and troubleshooting are in <a href="{DOCS}">the documentation</a>.</p>
       </article>
     </div>
-    <h3 id="first-launch" style="margin:2rem 0 .4rem">Install the desktop app and open it the first time</h3>
+    <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop App Installation Instructions</h3>
     <p class="small" style="margin-bottom:1rem">Because the preview is not yet notarized or code-signed, macOS and Windows each show a warning the first time. The warning is expected for this build; you approve it once, and later launches open normally.</p>
     <div class="grid grid-2">
       <article class="card">
