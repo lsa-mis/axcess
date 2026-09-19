@@ -1,0 +1,185 @@
+{
+  "generated_utc": "2026-09-19T15:36:51.778063+00:00",
+  "control_1_kafe_reproduction": {
+    "pass": true,
+    "expected": {
+      "n": 60,
+      "tp": 36,
+      "fp": 3,
+      "fn": 0,
+      "tn": 21,
+      "precision": "92.3%",
+      "recall": "100.0%"
+    },
+    "recomputed": {
+      "n": 60,
+      "tp": 36,
+      "fp": 3,
+      "fn": 0,
+      "tn": 21,
+      "precision": 0.9230769230769231,
+      "recall": 1.0,
+      "f1": 0.9600000000000001,
+      "precision_pct": 92.3,
+      "recall_pct": 100.0
+    },
+    "timing": {
+      "ms_per_subject_median": 1087.5,
+      "ms_per_subject_mean": 995.2,
+      "subjects_under_300ms": 8,
+      "ms_per_button_median": 25.8,
+      "ms_per_button_mean": 46.7,
+      "ms_per_button_pooled": 20.0,
+      "buttons_under_300ms_cap": "60/60",
+      "detection_ms_total": 59711.0,
+      "ctrl_nodes_total": 2992
+    },
+    "source": "artifacts/kafe_results_to_reproduce.csv"
+  },
+  "control_2_denominator": {
+    "kafe_corpus": 60,
+    "replayable": 53,
+    "attempted": 52,
+    "scored": 39,
+    "abstained_whole_subject": 13,
+    "pass": true,
+    "excluded_before_the_run": [
+      {
+        "subject": "4shared",
+        "reason": "capture parses to no HTML entry document"
+      },
+      {
+        "subject": "battlenet",
+        "reason": "folder-form on Drive; no flow dump fetched"
+      },
+      {
+        "subject": "canon",
+        "reason": "folder-form on Drive; no flow dump fetched"
+      },
+      {
+        "subject": "dmv_fl",
+        "reason": "capture parses to no HTML entry document"
+      },
+      {
+        "subject": "dmv_wc",
+        "reason": "folder-form on Drive; no flow dump fetched"
+      },
+      {
+        "subject": "gizmodo",
+        "reason": "folder-form on Drive; no flow dump fetched"
+      },
+      {
+        "subject": "speedway",
+        "reason": "folder-form on Drive; no flow dump fetched"
+      }
+    ],
+    "abstained_during_the_run": [
+      {
+        "subject": "indiegogo",
+        "reason": "the frozen candidate collector surfaced no addressable element (12 elements in the replayed document, 0 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "instagram",
+        "reason": "the frozen candidate collector surfaced no addressable element (135 elements in the replayed document, 0 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "mozilla",
+        "reason": "the frozen candidate collector surfaced no addressable element (13 elements in the replayed document, 0 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "sciencedirect",
+        "reason": "the frozen candidate collector surfaced no addressable element (10 elements in the replayed document, 0 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "whitepages",
+        "reason": "the frozen candidate collector surfaced no addressable element (7 elements in the replayed document, 0 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "spotify",
+        "reason": "tab walk capped at 212 with 12 focusable elements"
+      },
+      {
+        "subject": "salesforce",
+        "reason": "tab walk capped at 238 with 38 focusable elements"
+      },
+      {
+        "subject": "raise",
+        "reason": "tab walk capped at 262 with 62 focusable elements"
+      },
+      {
+        "subject": "capitalone",
+        "reason": "the frozen candidate collector surfaced no addressable element (20 elements in the replayed document, 51 focusable): no button to decide about, so this is an abstention and not a negative"
+      },
+      {
+        "subject": "costco",
+        "reason": "tab walk capped at 269 with 69 focusable elements"
+      },
+      {
+        "subject": "dell",
+        "reason": "tab walk capped at 297 with 97 focusable elements"
+      },
+      {
+        "subject": "dpreview",
+        "reason": "tab walk capped at 294 with 94 focusable elements"
+      },
+      {
+        "subject": "cnn",
+        "reason": "tab walk capped at 483 with 283 focusable elements"
+      }
+    ],
+    "not_yet_attempted": [
+      "craigslist"
+    ]
+  },
+  "control_3_negative": {
+    "pass": true,
+    "negative_subjects_scored": 15,
+    "negative_subject_names": [
+      "tinyurl",
+      "dmv_ca",
+      "bbc",
+      "venmo",
+      "coronavirus",
+      "bowiestate",
+      "walmart",
+      "roblox",
+      "ask",
+      "ancestry",
+      "ssa",
+      "ed",
+      "telegram",
+      "live",
+      "wiktionary"
+    ],
+    "witness": {
+      "subject": "tinyurl",
+      "kafe_label": false,
+      "detectors_recording_a_true_negative": 31,
+      "detectors_abstaining": 0,
+      "detectors_flagging": 17,
+      "example_true_negatives": [
+        "C10 = C9 minus redundant click surfaces (R1)",
+        "C11 = C10 minus roving-tabindex items (R2)",
+        "C12 = C11 minus declared shortcuts (R3)",
+        "C13 = C12 minus leads with no action path (R5)",
+        "C14 = C13 minus name-twinned leads (R6)"
+      ]
+    }
+  },
+  "control_4_frozen_code": {
+    "pass": true,
+    "expected_root": "/var/home/me/Development/axcess/src/audit/analyzer/keyboard/kbdiff",
+    "imported_from": {
+      "kbdiff package": "/var/home/me/Development/axcess/src/audit/analyzer/keyboard/kbdiff/__init__.py",
+      "detectors": "/var/home/me/Development/axcess/src/audit/analyzer/keyboard/kbdiff/detectors.py",
+      "differential": "/var/home/me/Development/axcess/src/audit/analyzer/keyboard/kbdiff/differential.py",
+      "taborder": "/var/home/me/Development/axcess/src/audit/analyzer/keyboard/kbdiff/taborder.py"
+    },
+    "all_under_expected_root": {
+      "kbdiff package": true,
+      "detectors": true,
+      "differential": true,
+      "taborder": true
+    }
+  }
+}
