@@ -68,6 +68,40 @@ the first measurement on a corpus nobody here authored, and it confirms it.
 C15 and C16 also produce **identical rows** — R9's divergent-key-effect promotion
 fires on nothing in this corpus.
 
+## The cheap C-rules, C10–C16, end to end
+
+These are the rules `CHEAP_DETECTOR_REVIEW.md` leads with. On KAFE's corpus:
+
+| rule | TP | FP | FN | precision | recall | ms/button |
+|---|---:|---:|---:|---:|---:|---:|
+| C10 = C9 − redundant click surfaces (R1) | 19 | 8 | 2 | 70.4% | 90.5% | 8.3 |
+| C11 = C10 − roving tabindex (R2) | 19 | 8 | 2 | 70.4% | 90.5% | 8.5 |
+| C12 = C11 − declared shortcuts (R3) | 19 | 8 | 2 | 70.4% | 90.5% | 8.5 |
+| C13 = C12 − no action path (R5) | 19 | 7 | 2 | 73.1% | 90.5% | 111.4 |
+| C14 = C13 − name-twinned leads (R6) | 19 | 7 | 2 | 73.1% | 90.5% | 111.4 |
+| C15 = C14 − no click effect (R7, R8) | 18 | 4 | 3 | 81.8% | 85.7% | 354.8 |
+| C16 = C15 + divergent key effect (R9) | 18 | 4 | 3 | 81.8% | 85.7% | 354.8 |
+
+Read against their fixtures figures, this is the whole story of the cheap rules:
+
+| | fixtures (development) | KAFE (unseen) | delta |
+|---|---|---|---|
+| C13 | 90.2% / 94.9% | 73.1% / 90.5% | **−17.1 precision** |
+| C15 | 100% / 94.9% | 81.8% / 85.7% | **−18.2 precision** |
+| C16 | 100% / 97.4% | 81.8% / 85.7% | **−18.2 / −11.7** |
+
+**R1, R2 and R3 fire on nothing** — C10, C11 and C12 are identical rows. Each was
+written to clear one specific fixture probe (`h112`/`p23`/`p27`, `h171`, `h172`),
+and none of those patterns recurs here. **R9 also fires on nothing**, so C16 = C15.
+
+Only **R5** (−1 FP) and **R7/R8** (−3 FP, +1 FN) do any work on unseen pages, and
+R7/R8 cost 354.8 ms/button — over the 300 ms cap, and 3× C14's 111.4 ms for
+8.7 points of precision.
+
+**On the gds and ma11y corpora C10–C16 are all zero**, because each is *C9 minus
+a rule* and C9 itself abstains on everything there. Those rows measure C9's
+abstention, not the rules. See the note under each table in `MATRIX-RESULTS.md`.
+
 ## Caveats that materially affect the numbers
 
 1. **Page-level scoring flatters everything.** KAFE labels pages, not elements, so

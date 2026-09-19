@@ -178,6 +178,15 @@ Published reference: all 13 audited tools score 0/6. 8 targets; artifacts: bakeo
 | D10b coverage set-difference (Enter only, no baseline subtraction) | 0 | 0 | 0 | 6 | 2 | — | 0.0% | — | n/a: decided 0 of 8 | 762.7 | priced at its arm |
 | D10b-u upstream coverage set-difference (sequential keys, baselined) | 0 | 0 | 0 | 6 | 2 | — | 0.0% | — | n/a: decided 0 of 8 | 762.7 | priced at its arm |
 
+> **Why C10–C16 are all zero on this corpus.** Each of C10–C16 is defined as
+> *C9 minus a dismissal rule*. C9 itself scores **0 TP with 3 abstentions**
+> here, because its filter stages (`inert`, `pointer-events:none`,
+> blocked-centre) cannot resolve the three elements D4/D5/D6 each find. Every
+> rule downstream therefore subtracts from an empty lead set and inherits the
+> zero. These rows measure **C9's abstention, not the rules themselves** — the
+> rules are untested on this corpus, which is different from having been tested
+> and found useless. The same cascade applies on `ma11y`.
+
 ### fixtures — blind-authored synthetic; 95 probes, 39 defects
 
 **Benchmark provenance.** No external literature. This is the project's own
@@ -317,6 +326,15 @@ Published reference: no published reference; ground truth by construction. 7 tar
 | D10a-u upstream coverage presence (sequential keys, baselined) | 0 | 0 | 0 | 1 | 3 | — | 0.0% | — | 2219.8 | 951.3 | priced at its arm |
 | D10b coverage set-difference (Enter only, no baseline subtraction) | 0 | 0 | 0 | 1 | 3 | — | 0.0% | — | 2219.8 | 951.3 | priced at its arm |
 | D10b-u upstream coverage set-difference (sequential keys, baselined) | 0 | 0 | 0 | 1 | 3 | — | 0.0% | — | 2219.8 | 951.3 | priced at its arm |
+
+> **Why C10–C16 are all zero on this corpus.** Each of C10–C16 is defined as
+> *C9 minus a dismissal rule*. C9 itself scores **0 TP with 3 abstentions**
+> here, because its filter stages (`inert`, `pointer-events:none`,
+> blocked-centre) cannot resolve the three elements D4/D5/D6 each find. Every
+> rule downstream therefore subtracts from an empty lead set and inherits the
+> zero. These rows measure **C9's abstention, not the rules themselves** — the
+> rules are untested on this corpus, which is different from having been tested
+> and found useless. The same cascade applies on `ma11y`.
 
 ### edgecases — shared-author development corpus; NO unbiased accuracy claim
 
