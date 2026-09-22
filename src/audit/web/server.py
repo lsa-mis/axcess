@@ -3894,6 +3894,7 @@ def _query_findings(
     list_sql = f"""
         SELECT DISTINCT f.id, f.severity, f.priority_score, f.status,
                a.vlm_classification, a.ocr_text,
+               i.id AS image_id,
                i.src_url_canonical, i.content_hash, i.has_svg_text, i.mime,
                i.width, i.height
           FROM findings f
@@ -3905,38 +3906,62 @@ def _query_findings(
          LIMIT ? OFFSET ?
     """  # noqa: S608
     rows = conn.execute(list_sql, [*params, size, offset]).fetchall()
+    samples = _sample_occurrences(
+        conn, scan_id=scan_id, image_ids=[int(r["image_id"]) for r in rows]
+    )
     findings: list[dict[str, Any]] = []
     for r in rows:
         item = dict(r)
         item["src_url_short"] = _short_url(item["src_url_canonical"])
         item["alt_adequacy"] = None
-        # Pull a sample occurrence for scannable context on the card.
-        sample = conn.execute(
-            """
-            SELECT pi.alt_text, p.url_normalized AS page_url
-              FROM page_images pi
-              JOIN pages p ON p.id = pi.page_id
-             WHERE pi.image_id = ? AND p.scan_id = ?
-             ORDER BY pi.above_fold DESC, pi.position ASC
-             LIMIT 1
-            """,
-            (item.get("content_hash") and _image_id_for_hash(conn, item["content_hash"]), scan_id),
-        ).fetchone()
-        if sample is not None:
-            item["sample_alt"] = sample["alt_text"]
-            item["sample_page"] = sample["page_url"]
-        else:
-            item["sample_alt"] = None
-            item["sample_page"] = None
+        # Sample occurrence for scannable context on the card.
+        sample = samples.get(int(r["image_id"]))
+        item["sample_alt"] = sample["alt_text"] if sample else None
+        item["sample_page"] = sample["page_url"] if sample else None
         findings.append(item)
     return findings, total
 
 
-def _image_id_for_hash(conn: sqlite3.Connection, content_hash: str) -> int | None:
-    row = conn.execute(
-        "SELECT id FROM images WHERE content_hash = ? LIMIT 1", (content_hash,)
-    ).fetchone()
-    return int(row["id"]) if row is not None else None
+def _sample_occurrences(
+    conn: sqlite3.Connection, *, scan_id: int, image_ids: list[int]
+) -> dict[int, dict[str, Any]]:
+    """One representative occurrence per image: above the fold, then earliest.
+
+    Replaces a pair of per-row queries. The findings list returns up to 500
+    rows, and each one used to cost a lookup of the image id from its
+    content hash plus a lookup of the occurrence itself, so a single page of
+    results could issue a thousand extra statements. The image id is on the
+    row already, from the join the list query performs.
+    """
+    if not image_ids:
+        return {}
+    unique_ids = list(dict.fromkeys(image_ids))
+    out: dict[int, dict[str, Any]] = {}
+    chunk_size = 900  # stay under SQLite's bound-parameter limit
+    for start in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[start : start + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT image_id, alt_text, page_url FROM (
+                SELECT pi.image_id, pi.alt_text, p.url_normalized AS page_url,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY pi.image_id
+                           ORDER BY pi.above_fold DESC, pi.position ASC
+                       ) AS rank
+                  FROM page_images pi
+                  JOIN pages p ON p.id = pi.page_id
+                 WHERE pi.image_id IN ({placeholders}) AND p.scan_id = ?
+            ) WHERE rank = 1
+            """,  # noqa: S608, placeholders are bound parameters, not values
+            (*chunk, scan_id),
+        ).fetchall()
+        for row in rows:
+            out[int(row["image_id"])] = {
+                "alt_text": row["alt_text"],
+                "page_url": row["page_url"],
+            }
+    return out
 
 
 def _pagination(*, page: int, size: int, total: int, filters: dict[str, str]) -> dict[str, Any]:

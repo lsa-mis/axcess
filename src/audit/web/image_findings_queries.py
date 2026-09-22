@@ -200,8 +200,10 @@ def _load_findings(
     string comparison heuristic in :mod:`alt_compare` can evolve
     without a migration.
     """
+    # Two scan_id bindings: the first scopes the `best` CTE, the second the
+    # findings themselves. Keep them in this order, the CTE is bound first.
     extra_clause = ""
-    params: list[Any] = [scan_id]
+    params: list[Any] = [scan_id, scan_id]
     if status:
         extra_clause = " AND f.status = ?"
         params.append(status)
@@ -222,6 +224,11 @@ def _load_findings(
                            a.id DESC
                    ) AS rank
               FROM analyses a
+             -- Scope the window to this scan's images. Unscoped, SQLite
+             -- materialized the ranking over every analysis row in the
+             -- database before the outer WHERE could narrow it, so the
+             -- cost of reading one scan grew with the history beside it.
+             WHERE a.image_id IN (SELECT image_id FROM findings WHERE scan_id = ?)
         )
         SELECT f.id, f.severity, f.status, f.priority_score,
                f.remediation_hint,
@@ -237,9 +244,16 @@ def _load_findings(
         tuple(params),
     ).fetchall()
 
+    # Every finding's occurrences in one query rather than one query per
+    # finding. This list is built for whole-scan views, so the per-row
+    # version issued a query per image on every Issues projection.
+    occurrences_by_image = _load_occurrences_for_images(
+        conn, scan_id=scan_id, image_ids=[int(r["image_id"]) for r in rows]
+    )
+
     findings: list[dict[str, Any]] = []
     for r in rows:
-        occurrences = _load_occurrences(conn, scan_id=scan_id, image_id=int(r["image_id"]))
+        occurrences = occurrences_by_image.get(int(r["image_id"]), [])
         ocr_text = r["ocr_text"] or ""
         # Mirror the synthesizer: prefer OCR, fall back to the SVG
         # snippet when the image is an inline SVG.
@@ -275,30 +289,47 @@ def _load_findings(
     return findings
 
 
-def _load_occurrences(
-    conn: sqlite3.Connection, *, scan_id: int, image_id: int
-) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        """
-        SELECT pi.page_id, pi.alt_text, pi.above_fold, pi.position,
-               pi.context_snippet,
-               p.url_normalized AS page_url, p.title AS page_title
-          FROM page_images pi
-          JOIN pages p ON p.id = pi.page_id
-         WHERE pi.image_id = ? AND p.scan_id = ?
-         ORDER BY pi.position
-        """,
-        (image_id, scan_id),
-    ).fetchall()
-    return [
-        {
-            "page_id": int(r["page_id"]),
-            "page_url": str(r["page_url"]),
-            "page_title": r["page_title"],
-            "alt_text": r["alt_text"],
-            "above_fold": bool(r["above_fold"]),
-            "position": int(r["position"]),
-            "context_snippet": r["context_snippet"],
-        }
-        for r in rows
-    ]
+def _load_occurrences_for_images(
+    conn: sqlite3.Connection, *, scan_id: int, image_ids: list[int]
+) -> dict[int, list[dict[str, Any]]]:
+    """Occurrences for many images at once, keyed by image id.
+
+    Ordered by position within each image, the order the page shows them
+    in. Images with no occurrences are absent from the result; callers
+    treat a missing key as an empty list.
+
+    Chunked because SQLite caps the number of bound parameters in a
+    statement (999 by default), and a large scan can hold more images
+    than that.
+    """
+    by_image: dict[int, list[dict[str, Any]]] = {}
+    unique_ids = list(dict.fromkeys(image_ids))
+    chunk_size = 900
+    for start in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[start : start + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT pi.image_id, pi.page_id, pi.alt_text, pi.above_fold, pi.position,
+                   pi.context_snippet,
+                   p.url_normalized AS page_url, p.title AS page_title
+              FROM page_images pi
+              JOIN pages p ON p.id = pi.page_id
+             WHERE pi.image_id IN ({placeholders}) AND p.scan_id = ?
+             ORDER BY pi.image_id, pi.position
+            """,  # noqa: S608, placeholders are bound parameters, not values
+            (*chunk, scan_id),
+        ).fetchall()
+        for r in rows:
+            by_image.setdefault(int(r["image_id"]), []).append(
+                {
+                    "page_id": int(r["page_id"]),
+                    "page_url": str(r["page_url"]),
+                    "page_title": r["page_title"],
+                    "alt_text": r["alt_text"],
+                    "above_fold": bool(r["above_fold"]),
+                    "position": int(r["position"]),
+                    "context_snippet": r["context_snippet"],
+                }
+            )
+    return by_image

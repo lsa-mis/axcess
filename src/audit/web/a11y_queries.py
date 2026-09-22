@@ -180,18 +180,29 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
             }
         )
 
-    # Now fill in each SC's true unique page count (re-query is cheap and
-    # avoids the wrong-sum trap above).
-    for sc, entry in by_sc_dict.items():
-        page_count_row = conn.execute(
+    # Fill in each SC's true unique page count. These cannot be summed from
+    # the per-rule counts above: one page can fail two rules under the same
+    # SC and would be counted twice.
+    #
+    # One grouped query for every SC rather than one query per SC. The
+    # per-SC version ran ~40 extra scans to answer a question a single
+    # GROUP BY answers, on an endpoint the report opens with.
+    page_counts = {
+        row["wcag_sc"]: int(row["n"])
+        for row in conn.execute(
             """
-            SELECT COUNT(DISTINCT page_id) AS n
+            SELECT wcag_sc, COUNT(DISTINCT page_id) AS n
               FROM page_a11y_findings
-             WHERE scan_id = ? AND wcag_sc IS ?
+             WHERE scan_id = ?
+             GROUP BY wcag_sc
             """,
-            (scan_id, sc),
-        ).fetchone()
-        entry["page_count"] = int(page_count_row["n"]) if page_count_row else 0
+            (scan_id,),
+        ).fetchall()
+    }
+    for sc, entry in by_sc_dict.items():
+        # `sc` may be None, which GROUP BY keys as NULL and sqlite3 returns
+        # as None, so the lookup matches the `IS` comparison this replaced.
+        entry["page_count"] = page_counts.get(sc, 0)
         # Sort rules within the SC: worst impact first, then page count.
         entry["rules"].sort(key=lambda x: (_IMPACT_RANK.get(x["impact"], 4), -x["page_count"]))
         entry.pop("page_count_set", None)
