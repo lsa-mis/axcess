@@ -109,8 +109,12 @@ async def test_issue_table_filters_are_keyboard_operable(
             await search.focus()
             await search.fill("logo")
             await page.wait_for_url("**?q=logo")
+            # The row header holds the issue's own link; the count link beside
+            # it names the issue too, so its purpose stands alone (SC 2.4.9).
             await playwright_async.expect(
-                page.get_by_role("link", name="Logo image, adequate alt")
+                page.get_by_role("rowheader").get_by_role(
+                    "link", name="Logo image, adequate alt"
+                )
             ).to_be_visible()
             await search.press("Tab")
             # The filter's visible caption is its accessible name; it no longer

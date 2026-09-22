@@ -67,7 +67,79 @@
   }
 }
 
+@layer base {
+  /* Tailwind's default placeholder grey is 2.4:1 on our surfaces, which fails
+     SC 1.4.3 — placeholder text is text. `fg-muted` is the lightest token that
+     clears 4.5:1 everywhere the app puts an input. A placeholder is still a
+     hint, never the label: every input here carries its own. */
+  /* Matches Tailwind preflight's own selector: a bare ``::placeholder`` is
+     less specific than its ``input::placeholder`` and silently loses. */
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-fg-muted opacity-100;
+  }
+}
+
 @layer components {
+  /* The New scan tab panel drops in when the tab changes, and a summary
+     chip pops when a check is turned on. Both are ≤300 ms, carry no
+     meaning of their own, and stop entirely under reduced motion
+     (SC 2.3.3). */
+  @keyframes drop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.85);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  /* Loaded DOM source tokens. Every colour clears 7:1 on surface-muted
+     (#F1F4F8), so the colouring is a reading aid on top of the structure
+     (indentation and line numbers), never the only signal. */
+  .tok-tag {
+    @apply font-semibold text-umich-blue;
+  }
+  .tok-attr {
+    color: #4f4200; /* 8.5:1 on surface-muted */
+  }
+  .tok-value {
+    color: #7a0000; /* 10.4:1 */
+  }
+  .tok-text {
+    @apply text-fg;
+  }
+  .tok-punct {
+    @apply text-fg-subtle;
+  }
+  .tok-comment,
+  .tok-doctype {
+    @apply italic text-fg-subtle;
+  }
+  .animate-drop-in {
+    animation: drop-in 0.3s ease;
+  }
+  .animate-pop-in {
+    animation: pop-in 0.25s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-drop-in,
+    .animate-pop-in {
+      animation: none;
+    }
+  }
+
   a.report-link {
     @apply rounded-xs text-umich-blue underline decoration-1 underline-offset-4;
   }

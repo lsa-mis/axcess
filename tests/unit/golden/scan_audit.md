@@ -311,9 +311,9 @@ These issue types *were* detected but every finding in them has already been tri
 
 These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
+- **The page has no top-level heading** (`page-has-heading-one`), 1 finding(s) on 1 page; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
 - **Keyboard users can't escape this element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Measured Tab and Shift+Tab exit attempts both remained on the same observable element; manually check for another documented exit command.
 - **Images of text have no alt and can't be read** (`essential_missing`), 1 finding(s) on 1 page; **expert review / medium confidence**. OCR/VLM-assisted image lead; confirm purpose and alternative in context.
-- **The page has no top-level heading** (`page-has-heading-one`), 1 finding(s) on 1 page; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
 - **Links don't describe their purpose (LLM-detected)** (`2.4.4`), 1 finding(s) on 1 page; **expert review / medium confidence**. AI-assisted semantic lead; confirm in page context.
 
 ---

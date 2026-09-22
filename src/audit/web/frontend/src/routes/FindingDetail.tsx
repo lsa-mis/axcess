@@ -131,8 +131,7 @@ export default function FindingDetailRoute() {
         }
         subtitle={
           <span className="text-sm">
-            priority <strong>{data.priority_score.toFixed(2)}</strong> · WCAG{" "}
-            {data.wcag_criterion}
+            WCAG {data.wcag_criterion}
           </span>
         }
         actions={

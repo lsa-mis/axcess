@@ -269,7 +269,8 @@ def list_issues(
         WCAG SC.
 
     Sort options:
-      * ``priority_desc`` (default), highest impact x spread first
+      * ``priority_desc`` (default), barriers first, then needs-review,
+        then informational; highest impact x spread first within a lane
       * ``priority_asc``
       * ``conformance``, A first, then AA, then AAA, then BP
       * ``occurrences_desc`` / ``pages_desc``
@@ -1161,9 +1162,16 @@ def _humanize_image_title(classification: str, adequacy: str) -> str:
     return f"{cls_human}, {adequacy_human}"
 
 
+# Barriers first, then leads that need a person, then informational records:
+# the score orders rows within a lane, never across lanes. A high-scoring
+# informational row above a real barrier is the priority order contradicting
+# the review lane, and the lane is what a reviewer acts on.
+_LANE_RANK: dict[str, int] = {"likely_barrier": 0, "expert_review": 1, "informational": 2}
+
+
 def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:
     if sort == "priority_asc":
-        return sorted(rows, key=lambda r: r.priority)
+        return sorted(rows, key=lambda r: (_LANE_RANK.get(r.review_lane, 9), r.priority))
     if sort == "conformance":
         return sorted(
             rows,
@@ -1173,8 +1181,8 @@ def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:
         return sorted(rows, key=lambda r: -r.occurrence_count)
     if sort == "pages_desc":
         return sorted(rows, key=lambda r: -r.page_count)
-    # Default: priority_desc.
-    return sorted(rows, key=lambda r: -r.priority)
+    # Default: priority_desc, lane-first.
+    return sorted(rows, key=lambda r: (_LANE_RANK.get(r.review_lane, 9), -r.priority))
 
 
 def _load_rules() -> dict[str, Any]:

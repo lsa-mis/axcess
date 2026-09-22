@@ -1,4 +1,6 @@
 import { useLocation } from "react-router";
+import { activeView } from "./ReportCrumb";
+import ReportSubTrail from "./ReportSubTrail";
 import Tabs from "./Tabs";
 
 /**
@@ -20,29 +22,29 @@ export default function ReportWorkspaceNav({
   scanId: number;
   previousScanId: number | null;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const overview = `/scans/${scanId}`;
-  const active = pathname.includes("/issues")
-    ? "issues"
-    : pathname.includes("/diff")
-      ? "diff"
-      : "overview";
+  const active = activeView(pathname, search);
 
   return (
-    <Tabs
-      mode="nav"
-      label="Report workspace"
-      className="mt-4"
-      value={active}
-      items={[
-        { key: "overview", label: "Overview", to: overview },
-        { key: "issues", label: "Issues", to: `${overview}/issues` },
-        {
-          key: "diff",
-          label: "Verify changes",
-          to: `${overview}/diff${previousScanId != null ? `?compare_to=${previousScanId}` : ""}`,
-        },
-      ]}
-    />
+    <>
+      <Tabs
+        mode="nav"
+        attached
+        label="Report workspace"
+        className="mt-0"
+        value={active}
+        items={[
+          { key: "overview", label: "Overview", to: overview },
+          { key: "issues", label: "Issues", to: `${overview}/issues` },
+          {
+            key: "diff",
+            label: "Verify changes",
+            to: `${overview}/diff${previousScanId != null ? `?compare_to=${previousScanId}` : ""}`,
+          },
+        ]}
+      />
+      {(active === "issues" || active === "diff") && <ReportSubTrail scanId={scanId} view={active} />}
+    </>
   );
 }

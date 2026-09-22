@@ -6,6 +6,8 @@ import ProtectedReportGate from "./components/ProtectedReportGate";
 const A11yRoute = lazy(() => import("./routes/A11y"));
 const A11yByRuleRoute = lazy(() => import("./routes/A11yByRule"));
 const IssueDetailRoute = lazy(() => import("./routes/IssueDetail"));
+const IssuePagesRoute = lazy(() => import("./routes/IssuePages"));
+const IssuePageScreenshotsRoute = lazy(() => import("./routes/IssuePageScreenshots"));
 const IssuesRoute = lazy(() => import("./routes/Issues"));
 const DashboardRoute = lazy(() => import("./routes/Dashboard"));
 const ScansRoute = lazy(() => import("./routes/Scans"));
@@ -45,6 +47,14 @@ export default function App() {
         <Route
           path="/scans/:scanId/issues/:issueKey"
           element={<ProtectedReportGate><IssueDetailRoute /></ProtectedReportGate>}
+        />
+        <Route
+          path="/scans/:scanId/issues/:issueKey/pages"
+          element={<ProtectedReportGate><IssuePagesRoute /></ProtectedReportGate>}
+        />
+        <Route
+          path="/scans/:scanId/issues/:issueKey/pages/:pageId/screenshots"
+          element={<ProtectedReportGate><IssuePageScreenshotsRoute /></ProtectedReportGate>}
         />
         <Route path="/scans/:scanId/findings" element={<ProtectedReportGate><FindingsRoute /></ProtectedReportGate>} />
         <Route

@@ -424,9 +424,6 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
       </td>
       <td className="px-3 py-2">
         <SeverityChip value={finding.severity} />
-        <div className="mt-1 text-2xs text-fg-subtle">
-          priority {finding.priority_score.toFixed(2)}
-        </div>
       </td>
       <td className="px-3 py-2">
         <StatusChip value={finding.status} />

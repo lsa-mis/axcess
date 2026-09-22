@@ -5,8 +5,9 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  * The one header every view of a report wears.
  *
  * Overview, Issues and Verify changes are three views of the same evidence,
- * so they get the same chrome in the same order: title, a single meta line,
- * the view's actions, then the tabs. Before this each route invented its own
+ * so they get the same chrome in the same order: the tabs (and, inside a
+ * drill-down, the trail under them), then the title, a single meta line and
+ * the view's actions. Before this each route invented its own
  * arrangement, different crumbs, different subtitle shapes, tabs on some
  * pages and not others, and the report stopped feeling like one place.
  *
@@ -37,7 +38,14 @@ export default function ReportHeader({
 }) {
   return (
     <header className="mb-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Tabs first, title second. The tabs are the report's own navigation
+          and belong at the top of its area, right under the topbar trail
+          that ends in the same word; the title then reads as the heading of
+          the view you chose, not as something the tabs sit beneath. */}
+      {tabs && (
+        <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
+      )}
+      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
             {title}
@@ -48,9 +56,6 @@ export default function ReportHeader({
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {tabs && (
-        <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
-      )}
     </header>
   );
 }

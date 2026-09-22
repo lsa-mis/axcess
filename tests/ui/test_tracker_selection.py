@@ -1,5 +1,6 @@
-"""The tracker renders only the selected table, with keyboard-operable filters."""
+"""The tracker is one table narrowed by keyboard-operable group and status filters."""
 
+import re
 from typing import Any
 
 import pytest
@@ -32,40 +33,50 @@ async def test_tracker_selection(client: TestClient) -> None:
 
             await page.route("**/*", respond)
             await page.goto("http://tracker.test/app/tracking", wait_until="networkidle")
-            await playwright_async.expect(page.get_by_role("table")).to_have_count(1)
+            matrix = page.get_by_role("table", name="WCAG 2.2 A/AA coverage and AI roadmap")
+            criteria = payload["coverage"]["criteria"]
+            expected_by_view = {
+                "Current Coverage": {c["sc"] for c in criteria if c["method"] != "manual"},
+                "Future Coverage": {c["sc"] for c in criteria if c["method"] == "manual"},
+                "AI Coverage": {item["wcag"] for item in payload["roadmap"]},
+            }
+            expected_by_view["All"] = set().union(*expected_by_view.values())
+            # Every group and the AI roadmap share one table; the group chips
+            # narrow it in place and keep focus on the chip that was pressed.
             sections = page.get_by_role("group", name="Tracker sections")
-            for label, heading in [
-                ("AI roadmap", "AI Roadmap"),
-                ("Shipped pipelines", "Shipped Pipelines"),
-                ("Current coverage", "Current Coverage"),
-                ("Not covered yet", "Not covered yet"),
-            ]:
-                button = sections.get_by_role("button", name=label, exact=True)
+            for label in ("AI Coverage", "Current Coverage", "Future Coverage", "All"):
+                button = sections.get_by_role("button", name=re.compile(rf"^{label} \(\d+\)$"))
                 await button.focus()
                 await page.keyboard.press("Enter")
                 await playwright_async.expect(button).to_be_focused()
                 await playwright_async.expect(button).to_have_attribute("aria-pressed", "true")
-                await playwright_async.expect(page.get_by_role("table")).to_have_count(1)
-                await playwright_async.expect(
-                    page.get_by_role("heading", name=heading)
-                ).to_be_visible()
-                if label in ("Current coverage", "Not covered yet"):
-                    expected_scs = {
-                        item["sc"]
-                        for item in payload["coverage"]["criteria"]
-                        if (item["method"] == "manual") == (label == "Not covered yet")
-                    }
-                    actual_scs = set(await page.locator("tbody th[scope=row]").all_text_contents())
-                    assert {sc.strip() for sc in actual_scs} == expected_scs
+                actual_scs = set(await matrix.locator("tbody th[scope=row]").all_text_contents())
+                assert {sc.strip() for sc in actual_scs} == expected_by_view[label], label
+                # The chips cross-fade their colours; let that settle before
+                # axe samples a mid-transition foreground against background.
+                await page.evaluate(
+                    "Promise.all(document.getAnimations().map((a) => a.finished))"
+                )
                 violations = await _run_axe(page)
                 assert not violations, _render_violations(violations)
-            await sections.get_by_role("button", name="AI roadmap", exact=True).click()
-            filters = page.get_by_role("group", name="Filter roadmap by status")
+            # The status sub-filter only exists inside AI Coverage, and it
+            # survives a reload because it lives in the URL.
+            await playwright_async.expect(
+                page.get_by_role("group", name="Filter AI coverage by status")
+            ).to_have_count(0)
+            await sections.get_by_role("button", name=re.compile(r"^AI Coverage")).click()
+            filters = page.get_by_role("group", name="Filter AI coverage by status")
             await filters.get_by_role("button", name="Planned", exact=False).click()
             expected = sum(item["status"] == "planned" for item in payload["roadmap"])
-            await playwright_async.expect(page.locator("tbody tr")).to_have_count(expected)
+            await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(expected)
             await page.reload(wait_until="networkidle")
-            await playwright_async.expect(page.locator("tbody tr")).to_have_count(expected)
-            await playwright_async.expect(page.get_by_role("table")).to_have_count(1)
+            await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(expected)
+            # Leaving the group drops its sub-filter rather than carrying a
+            # status that no coverage row could match.
+            await sections.get_by_role("button", name=re.compile(r"^Current Coverage")).click()
+            await playwright_async.expect(matrix.locator("tbody th[scope=row]")).to_have_count(
+                len(expected_by_view["Current Coverage"])
+            )
+            assert "status=" not in page.url
         finally:
             await browser.close()
