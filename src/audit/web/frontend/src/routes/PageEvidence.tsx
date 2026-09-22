@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Crosshair, ExternalLink, ImageOff, ScanEye } from "lucide-react";
 import { useLocation, useParams } from "react-router";
-import { api, blobUrl } from "../api/client";
+import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { Card, StatusChip } from "../components/ui";
@@ -49,10 +49,21 @@ export default function PageEvidenceRoute() {
     return () => window.cancelAnimationFrame(frame);
   }, [hash, data, scanData]);
 
+  // 404 is the only failure that means what the old single sentence claimed.
+  // Everything else — a database behind on migrations is the one that bites in
+  // practice — is the server failing, and saying "not part of this report"
+  // sends the reader hunting for a link they did not break.
   if (error)
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        This page is not part of the requested report.
+        {error instanceof ApiError && error.status === 404 ? (
+          "This page is not part of the requested report."
+        ) : (
+          <>
+            Couldn&rsquo;t load this page&rsquo;s evidence:{" "}
+            {error instanceof Error ? error.message : String(error)}
+          </>
+        )}
       </Card>
     );
   if (!scanData || !data) return <div className="text-fg-muted">Loading…</div>;

@@ -17,6 +17,7 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  pageEvidencePath,
   Select,
   StatCard,
 } from "../components/ui";
@@ -351,7 +352,7 @@ function FindingRow({
           </details>
         )}
         <AlfaEvidenceNote evidence={finding} />
-        <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${finding.page_id}#finding-${finding.id}`}>Open stored finding evidence</Link>
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "DOM-engine rules", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>Open stored finding evidence</Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}

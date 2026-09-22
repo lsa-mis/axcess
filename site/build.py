@@ -876,7 +876,7 @@ def coverage(crit, summ, cov) -> str:
     <div class="section-head">
       <span class="eyebrow">At a glance</span>
       <h2>{summ.covered} of {total} criteria with Axcess evidence</h2>
-      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Tracking screen, and the documentation can never disagree.</p>
+      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Product Roadmap screen, and the documentation can never disagree.</p>
     </div>
     <div class="covbar" role="img" aria-label="Of {total} criteria: {bm["automated"]} automated, {bm["partial"]} partly automated, {bm["ai-assisted"]} AI-assisted, {bm["manual"]} manual only.">{bar}</div>
     <div class="legend" aria-hidden="true">{legend}</div>

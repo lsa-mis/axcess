@@ -37,11 +37,14 @@ export default function SearchSettings({ value, onChange, disabled = false }: {
 }) {
   const update = (patch: Partial<SearchConfig>) => value && onChange({ ...value, ...patch });
   const field = (index: number, patch: Partial<SearchField>) => value && update({ fields: value.fields.map((item, i) => i === index ? { ...item, ...patch } : item) });
-  return <fieldset className="space-y-3 rounded-xs border border-border p-4">
-    <legend className="px-1 font-semibold">Search-driven pages</legend>
+  // The switch sits at the same level as the other advanced options; only
+  // the details it reveals are boxed, so an off switch takes one line like
+  // its neighbours instead of a titled container of its own.
+  return <>
     <Checkbox checked={!!value} disabled={disabled && !value} onChange={enabled => onChange(enabled ? structuredClone(defaults) : null)}
       label="Search to discover result pages" hint="For sites that expose routes only after a search. Requires browser rendering and axe-core." />
-    {value && <>
+    {value && <fieldset className="ml-6 space-y-3 rounded-xs border border-border p-4">
+      <legend className="px-1 text-sm font-semibold">Search settings</legend>
       {disabled && <p role="alert" className="text-sm text-sev-major">Select axe-core and browser rendering to use this search.</p>}
       <p className="text-sm text-fg-muted">Use non-sensitive examples. Settings are saved with the local report. Never enter passwords, verification codes, or personal records.</p>
       <Text label="Search page URL (blank uses starting page)" type="url" hint="Leave blank to search the starting page, or enter a full http:// or https:// address within the scan scope. Put search words in the field value below." value={value.page_url} maxLength={2048} onChange={page_url => update({ page_url })} />
@@ -71,6 +74,6 @@ export default function SearchSettings({ value, onChange, disabled = false }: {
       <label className="flex min-h-target items-start gap-2 text-sm"><input type="checkbox" required checked={value.confirmed} onChange={e => update({ confirmed: e.target.checked })} className="mt-1" />
         I authorize these search inputs and result clicks. These controls search and open results; they do not change records.
       </label>
-    </>}
-  </fieldset>;
+    </fieldset>}
+  </>;
 }

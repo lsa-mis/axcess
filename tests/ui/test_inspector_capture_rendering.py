@@ -111,7 +111,9 @@ async def test_the_dom_source_view_still_shows_the_capture_as_stored(
                 f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?view=dom",
                 wait_until="domcontentloaded",
             )
-            source = await page.locator('pre[aria-label="Loaded DOM source"]').inner_text()
+            # The source view prints one node per line from the capture; the
+            # wording of the stored markup has to survive that unchanged.
+            source = await page.locator('[aria-label="Loaded DOM source"]').inner_text()
         finally:
             await browser.close()
 

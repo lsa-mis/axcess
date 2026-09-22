@@ -176,9 +176,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          subject="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message | head -n 1)"
+          # The whole commit message, not just its subject: the body of the
+          # commit on main is written as the release notes for that build.
+          message="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message)"
+          subject="$(printf '%s\n' "$message" | head -n 1)"
+          body="$(printf '%s\n' "$message" | tail -n +2 | grep -viE '^(Co-Authored-By|Signed-off-by):' || true)"
           notes="Preview build of \`main\` at ${GITHUB_SHA::7}: ${subject}
+          ${body:+
+          ## What changed
 
+          ${body}
+          }
           Built by workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
 
           Installed copies of Axcess offer this build on their next launch. The macOS build is an ad-hoc signed preview: right-click Axcess and choose Open on first launch."

@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
 import { ExternalLinkButton, LinkButton } from "./ui";
+import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
 
@@ -60,42 +61,11 @@ const NAV: NavItem[] = [
   },
   {
     to: "/tracking",
-    label: "Tracking",
+    label: "Product Roadmap",
     icon: ListChecks,
     isActive: (p) => p === "/tracking",
   },
 ];
-
-/**
- * Brand mark: the A11y Crawler logo — an open scan path with a node riding its
- * leading edge. The outer ring is a crawl that has not closed yet, the dot is
- * the page it is on, and the inner form is the scan drawn as a rounded 'a' for
- * Axcess.
- *
- * Drawn in currentColor with no tile behind it, so it takes the colour of
- * whatever surface it sits on: UMich blue on the light sidebar, white on the
- * blue mobile bar. Stroke geometry is the original's, unaltered.
- *
- * Decorative: it always sits beside the word "Axcess", so naming it here would
- * only make a screen reader say it twice.
- */
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      className={cn("shrink-0", className)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      aria-hidden
-    >
-      <path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95" />
-      <path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>
-      <circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 /** Remember the sidebar collapse across sessions; fail soft when storage is
  * unavailable (private mode / test environment). */
@@ -190,7 +160,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
             onSearch={() => setCommandOpen(true)}
           />
           {mobileNavOpen && <MobileNav pathname={pathname} />}
-          <div className="border-b border-border bg-surface px-2 py-1 md:hidden"><ReportCrumb /></div>
+          {/* Sticky with the bar above it. Left in the scroll flow it slid
+              under the sticky top bar, and a crumb that is half-covered is a
+              target a thumb cannot reliably hit (SC 2.5.8) — it either sits
+              fully above the content or it does not show at all. */}
+          <div className="sticky top-[72px] z-10 border-b border-border bg-surface px-2 py-1 md:hidden">
+            <ReportCrumb />
+          </div>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>
@@ -454,6 +430,8 @@ function routeTitle(pathname: string): string {
     ],
     [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
     [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
+    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/\d+\/screenshots\/?$/, "Issue screenshots"],
+    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
     [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],

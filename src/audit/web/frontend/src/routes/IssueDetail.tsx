@@ -79,7 +79,14 @@ export default function IssueDetailRoute() {
             : undefined
         }
       />
-      <IssueEvidence scanId={scan.id} issueKey={key} />
+      {/* The trail names the issue, not the kind of page it is, so evidence
+          opened from here returns under the issue's own title. */}
+      <IssueEvidence
+        scanId={scan.id}
+        issueKey={key}
+        origin={row?.title ?? key}
+        backTo={`/scans/${scan.id}/issues/${encodeURIComponent(key)}`}
+      />
     </>
   );
 }

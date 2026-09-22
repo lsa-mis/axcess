@@ -51,7 +51,7 @@ export default function DashboardRoute() {
   return (
     <>
       <PageHeader
-        title="Workbench"
+        title="Dashboard"
         subtitle={
           completed.length === 0
             ? "Scan a site, inspect the evidence, and produce a remediation report."

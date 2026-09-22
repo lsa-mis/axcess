@@ -404,6 +404,7 @@ export function Disclosure({
   headingLevel = 2,
   defaultOpen = false,
   icon,
+  meta,
   className,
   children,
 }: {
@@ -412,37 +413,50 @@ export function Disclosure({
   headingLevel?: 2 | 3;
   defaultOpen?: boolean;
   icon?: ReactNode;
+  /**
+   * A short status shown at the right end of the header row ("3 of 4 on").
+   * It sits beside the button, not inside it, so the button's accessible
+   * name stays the title alone; give it its own text for a screen reader.
+   */
+  meta?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const buttonId = `${id}-button`;
   const panelId = `${id}-panel`;
-  const Caret = open ? ChevronDown : ChevronRight;
 
   return (
     <div className={cn("rounded-xs border border-border bg-surface", className)}>
+      <div className={cn("flex items-center rounded-xs", open ? "bg-surface-muted" : "hover:bg-surface-muted/60")}>
       {createElement(
         `h${headingLevel}`,
-        { className: "m-0" },
+        { className: "m-0 min-w-0 flex-1" },
         <button
           type="button"
           id={buttonId}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
-          className={cn(
-            "flex min-h-target w-full items-center gap-2 rounded-xs px-4 py-3 text-left text-sm font-semibold text-fg",
-            open ? "bg-surface-muted" : "hover:bg-surface-muted/60",
-          )}
+          className="flex min-h-target w-full items-center gap-2 rounded-xs px-4 py-3 text-left text-sm font-semibold text-fg"
         >
-          <Caret className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+          {/* One caret, rotated when open: the turn is the only motion and
+              the state is also in aria-expanded and the panel itself. */}
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 shrink-0 text-fg-subtle transition-transform duration-200 motion-reduce:transition-none",
+              open && "rotate-90",
+            )}
+            aria-hidden
+          />
           {icon}
           {/* The title must be this button's only text node: the UI tests
               address it both by exact text and by accessible name. */}
           <span>{title}</span>
         </button>,
       )}
+      {meta && <div className="shrink-0 pr-4 text-xs font-semibold text-fg-subtle">{meta}</div>}
+      </div>
       <div
         id={panelId}
         role="region"
@@ -542,6 +556,7 @@ export function Checkbox({
   name,
   disabled = false,
   describedBy,
+  error,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -554,15 +569,28 @@ export function Checkbox({
   /**
    * Id of an element that explains the consequence of ticking this box,
    * for the authorization checkbox, the note describing what the visible
-   * browser does during sign-in. The `hint` prop is part of the label
-   * (and so of the accessible name); this is a description instead,
-   * which is the right relationship for a longer standing explanation.
+   * browser does during sign-in. Joined with the `hint`'s own id: both are
+   * descriptions, read on request, never part of the name.
    */
   describedBy?: string;
+  /** A problem with this choice, shown under the row and announced. */
+  error?: string;
 }) {
   const showWarning = tone === "warning" && checked;
+  // The hint used to sit inside the label and so inside the accessible
+  // name, which made every row's name a paragraph. It is a description now,
+  // the same relationship `describedBy` always had.
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
+  const description = [hint ? hintId : null, error ? errorId : null, describedBy]
+    .filter(Boolean)
+    .join(" ");
   return (
+    <div className="min-w-0">
     <label
+      htmlFor={inputId}
       className={cn(
         // Full-row hit target: SC 2.5.5 AAA (44×44).
         "group flex min-h-target items-start gap-3 rounded-xs border border-transparent px-2 py-2 text-sm",
@@ -576,10 +604,11 @@ export function Checkbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        id={id}
+        id={inputId}
         name={name}
         disabled={disabled}
-        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={description || undefined}
         // 22×22 visual control. Padding on the parent label provides the
         // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
         // surface for the unchecked state, SC 1.4.11.
@@ -597,10 +626,18 @@ export function Checkbox({
       <span className="flex flex-col gap-0.5 text-fg">
         <span className="leading-snug">{label}</span>
         {hint && (
-          <span className="text-xs leading-snug text-fg-muted">{hint}</span>
+          <span id={hintId} className="text-xs leading-snug text-fg-muted">
+            {hint}
+          </span>
         )}
       </span>
     </label>
+    {error && (
+      <p id={errorId} role="alert" className="ml-[42px] mt-0.5 text-xs font-semibold text-sev-major">
+        {error}
+      </p>
+    )}
+    </div>
   );
 }
 
@@ -743,6 +780,57 @@ export function Select({
   );
 }
 
+/**
+ * Add the "you came from here" pair to an in-app path.
+ *
+ * ``origin``/``back`` are what the topbar breadcrumb turns into a parent crumb
+ * (see ReportCrumb), and that crumb is the only way back in the desktop app,
+ * which has no browser back button. Existing query and hash are preserved, and
+ * an off-app target is returned untouched: `back` is only honoured for
+ * absolute in-app paths, so there is nothing to gain by decorating one.
+ */
+export function withReturnTrail(to: string, origin?: string, backTo?: string): string {
+  if (!origin || !backTo || !to.startsWith("/") || to.startsWith("//")) return to;
+  const [beforeHash, ...hashParts] = to.split("#");
+  const hash = hashParts.length ? `#${hashParts.join("#")}` : "";
+  const [path, query = ""] = beforeHash.split("?");
+  const params = new URLSearchParams(query);
+  params.set("origin", origin);
+  params.set("back", backTo);
+  return `${path}?${params.toString()}${hash}`;
+}
+
+/**
+ * Path to a page's stored evidence, carrying the view it was opened from.
+ *
+ * ``origin``/``back`` are what the topbar breadcrumb reads to draw the parent
+ * crumb (see ReportCrumb). Without them the trail on Page evidence stops at
+ * ``Reports › site › Page evidence``, and in the desktop app — which has no
+ * browser back button — there is then no way back to Issues at all. So every
+ * link into stored evidence carries its origin, the same contract the
+ * inspector links already follow.
+ */
+export function pageEvidencePath({
+  scanId,
+  pageId,
+  origin,
+  backTo,
+  hash,
+}: {
+  scanId: number;
+  pageId: number;
+  origin?: string;
+  backTo?: string;
+  /** Fragment to append, e.g. ``"#finding-12"``; query comes first. */
+  hash?: string;
+}): string {
+  const params = new URLSearchParams();
+  if (origin) params.set("origin", origin);
+  if (backTo) params.set("back", backTo);
+  const qs = params.toString();
+  return `/scans/${scanId}/pages/${pageId}${qs ? `?${qs}` : ""}${hash ?? ""}`;
+}
+
 export function PageLink({
   pageId,
   scanId,
@@ -850,7 +938,7 @@ export function PageLink({
               ·
             </span>
             <Link
-              to={`/scans/${scanId}/pages/${pageId}`}
+              to={pageEvidencePath({ scanId, pageId, origin, backTo })}
               className="underline underline-offset-2 hover:text-fg"
             >
               stored evidence

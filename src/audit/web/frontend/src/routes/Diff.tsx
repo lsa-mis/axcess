@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Button, Card, Select } from "../components/ui";
+import { Button, Card, Select, withReturnTrail } from "../components/ui";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import type { ComparisonCategory, ComparisonCoverageState, ComparisonLink, ComparisonRow, ComparisonSnapshot } from "../api/types";
 
@@ -51,6 +51,9 @@ export default function DiffRoute() {
     setParams(next, { replace: true });
   };
   const error = scanQuery.error ?? query.error;
+  // Evidence opened from here returns to this comparison with its filters
+  // intact: the topbar crumb is the only way back in the desktop app.
+  const backTo = `/scans/${id}/diff${params.toString() ? `?${params.toString()}` : ""}`;
   return (
     <>
       <ReportHeader
@@ -153,8 +156,8 @@ export default function DiffRoute() {
                 <ul className="list-disc pl-5">{row.limitations.map((warning) => <li key={warning}>{warning}</li>)}</ul>
               </details>}
               <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <Snapshot label={`Before · Report #${data.baseline!.id}`} snapshot={row.before} />
-                <Snapshot label={`After · Report #${data.current.id}`} snapshot={row.after} />
+                <Snapshot label={`Before · Report #${data.baseline!.id}`} snapshot={row.before} backTo={backTo} />
+                <Snapshot label={`After · Report #${data.current.id}`} snapshot={row.after} backTo={backTo} />
               </div>
             </Card>)}
           </section>
@@ -168,17 +171,17 @@ export default function DiffRoute() {
   );
 }
 
-function Snapshot({ label, snapshot }: { label: string; snapshot: ComparisonSnapshot | null }) {
+function Snapshot({ label, snapshot, backTo }: { label: string; snapshot: ComparisonSnapshot | null; backTo: string }) {
   return <section className="min-w-0 rounded-xs border border-border bg-surface-subtle p-3">
     <h3 className="text-sm font-semibold">{label}</h3>
     {snapshot ? <>
       <p className="mt-1 text-sm">{snapshot.occurrences} {snapshot.occurrences === 1 ? "finding" : "findings"} on {snapshot.pages} {snapshot.pages === 1 ? "page" : "pages"}</p>
       <p className="mt-1 text-xs text-fg-muted"><strong>Review status:</strong> {countsLabel(snapshot.statuses)}</p>
       {Object.keys(snapshot.outcomes).length > 0 && <p className="mt-1 text-xs text-fg-muted"><strong>Check results:</strong> {countsLabel(snapshot.outcomes)}</p>}
-      <Links links={snapshot.issues} label="Open issue details" />
+      <Links links={snapshot.issues} label="Open issue details" backTo={backTo} />
       {snapshot.evidence.length > 0 && <details className="mt-2">
         <summary className="min-h-target cursor-pointer content-center py-2 text-sm font-semibold focus-visible:outline-none focus-visible:shadow-focus">Example evidence ({snapshot.evidence.length})</summary>
-        <Links links={snapshot.evidence} label="Finding links" />
+        <Links links={snapshot.evidence} label="Finding links" backTo={backTo} />
       </details>}
     </> : <p className="mt-1 text-sm text-fg-muted">No findings recorded for this group in this report. This alone does not prove it was fixed.</p>}
   </section>;
@@ -186,9 +189,9 @@ function Snapshot({ label, snapshot }: { label: string; snapshot: ComparisonSnap
 function countsLabel(counts: Record<string, number>) {
   return Object.entries(counts).map(([key, count]) => `${key === "cant_tell" ? "Cannot tell (manual review)" : key.replaceAll("_", " ")}: ${count}`).join(" · ") || "No recorded status";
 }
-function Links({ links, label }: { links: ComparisonLink[]; label: string }) {
+function Links({ links, label, backTo }: { links: ComparisonLink[]; label: string; backTo: string }) {
   if (links.length === 0) return null;
-  return <div className="mt-2"><p className="text-xs font-semibold">{label}</p><ul className="text-sm">{links.map((link) => <li key={link.url}><Link className="report-link inline-flex min-h-target max-w-full items-center break-all py-1" to={link.url.replace(/^\/app(?=\/)/, "")}>{link.label}</Link></li>)}</ul></div>;
+  return <div className="mt-2"><p className="text-xs font-semibold">{label}</p><ul className="text-sm">{links.map((link) => <li key={link.url}><Link className="report-link inline-flex min-h-target max-w-full items-center break-all py-1" to={withReturnTrail(link.url.replace(/^\/app(?=\/)/, ""), "Verify changes", backTo)}>{link.label}</Link></li>)}</ul></div>;
 }
 
 function coverageLabel(coverage: ComparisonCoverageState) {

@@ -70,6 +70,25 @@ export function apiErrorMessage(status: number, body: string): string {
 }
 
 /**
+ * A non-2xx response, carrying the status alongside the message.
+ *
+ * Routes need the status to tell "this evidence is not in this report" (404,
+ * a fact about the report) from "the server failed" (500, a fact about the
+ * install — an un-migrated database, say). Without it a route can only print
+ * one sentence for both, and the wrong one sends the reader looking for a
+ * mistake they did not make.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/**
  * Thin fetch wrapper for the /api/* surface. Throws on non-2xx with the
  * response body text attached so React Query surfaces useful errors.
  */
@@ -84,7 +103,7 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(apiErrorMessage(res.status, body));
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -109,7 +128,7 @@ async function downloadProtectedRedactedExport(scanId: number): Promise<void> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(apiErrorMessage(res.status, body));
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
   }
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);

@@ -56,7 +56,7 @@ src/audit/
 │   ├── coverage_status.py    # source of truth for the /tracking data
 │   ├── issues.py             # unified cross-pipeline issue model
 │   ├── frontend/             # React SPA (Vite + Tailwind), served at /app/
-│   │   ├── src/routes/       # one component per page (Scans, Findings, Tracking, …)
+│   │   ├── src/routes/       # one component per page (Scans, Findings, Product Roadmap, …)
 │   │   ├── src/api/          # typed fetch client + response types
 │   │   └── dist/             # `npm run build` output (gitignored)
 │   └── static/

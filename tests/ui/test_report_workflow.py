@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import pytest
 
@@ -39,8 +40,12 @@ async def test_report_links_and_review_lanes(live_server: tuple[str, int], width
 
             async def issues(route: Any) -> None:
                 query = parse_qs(urlparse(route.request.url).query)
+                needle = query.get("q", [""])[0].lower()
+                lane = query.get("review_lane", [""])[0]
                 shown = [
-                    row for row in rows if query.get("q", [""])[0].lower() in row["title"].lower()
+                    row
+                    for row in rows
+                    if needle in row["title"].lower() and (not lane or row["review_lane"] == lane)
                 ]
                 await asyncio.sleep(0.05)
                 await route.fulfill(json={**payload, "rows": shown})
@@ -64,39 +69,62 @@ async def test_report_links_and_review_lanes(live_server: tuple[str, int], width
             await page.keyboard.press("Enter")
             await page.wait_for_url("**/app/scans")
             await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-            await playwright_async.expect(
-                page.get_by_role("link", name="Named control failure", exact=False)
-            ).to_be_visible()
-            review = page.get_by_role("button", name="Needs manual review")
-            await playwright_async.expect(
-                page.get_by_role("link", name="Contrast calculation needs review", exact=False)
-            ).to_be_hidden()
-            await review.focus()
-            await page.keyboard.press("Enter")
-            await playwright_async.expect(
-                page.get_by_role("link", name="Contrast calculation needs review", exact=False)
-            ).to_be_visible()
-            await page.keyboard.press("Space")
-            await playwright_async.expect(
-                page.get_by_role("link", name="Contrast calculation needs review", exact=False)
-            ).to_be_hidden()
+            # Every issue group is a row of one table, whatever lane it is in.
+            issues = page.get_by_role("table", name="Accessibility issue groups")
+            # Scoped to the row header: the count link in the same row also
+            # names the issue, because a link's purpose has to be clear from
+            # its own name (SC 2.4.9).
+            for title in (
+                "Named control failure",
+                "Contrast calculation needs review",
+                "Decorative image note",
+            ):
+                await playwright_async.expect(
+                    issues.get_by_role("rowheader").get_by_role("link", name=title, exact=False)
+                ).to_be_visible()
             search = page.get_by_label("Search issues")
             await search.focus()
             await page.keyboard.type("Contrast")
             await playwright_async.expect(search).to_have_value("Contrast")
             await playwright_async.expect(
-                page.get_by_role("link", name="Contrast calculation needs review", exact=False)
+                issues.get_by_role("rowheader").get_by_role(
+                    "link", name="Contrast calculation needs review", exact=False
+                )
             ).to_be_visible()
             await playwright_async.expect(search).to_be_focused()
-            # A pending search must preserve a filter changed during its debounce.
+            await page.wait_for_url("**q=Contrast*")
+            # A pending search must preserve a filter changed during its debounce,
+            # and the filter must not drop the term still sitting in the box.
             await search.fill("Decorative")
-            await page.get_by_label("WCAG level", exact=True).select_option("A")
+            await page.get_by_label("Level", exact=True).select_option("A")
+            await page.wait_for_url("**q=Decorative*")
             await playwright_async.expect(
-                page.get_by_role("link", name="Decorative image note", exact=False)
+                issues.get_by_role("rowheader").get_by_role(
+                    "link", name="Decorative image note", exact=False
+                )
             ).to_be_visible()
             url_params = parse_qs(urlparse(page.url).query)
             assert url_params["q"] == ["Decorative"]
             assert url_params["conformance"] == ["A"]
+            # "Type" filters on the review lane the Type column shows. It is
+            # a URL parameter like the others, so it narrows the table to the
+            # one lane, reads the way the cells do, and clears with the rest.
+            await page.get_by_role("button", name="Clear filters").click()
+            await page.wait_for_url(re.compile(r"/issues$"))
+            await page.get_by_label("Type", exact=True).select_option("expert_review")
+            await page.wait_for_url("**type=expert_review*")
+            await playwright_async.expect(
+                issues.get_by_role("rowheader").get_by_role(
+                    "link", name="Contrast calculation needs review", exact=False
+                )
+            ).to_be_visible()
+            for hidden in ("Named control failure", "Decorative image note"):
+                await playwright_async.expect(
+                    issues.get_by_role("rowheader").get_by_role("link", name=hidden, exact=False)
+                ).to_have_count(0)
+            type_cells = issues.locator("tbody tr > td:nth-child(2)")
+            assert set(await type_cells.all_inner_texts()) == {"Needs review"}
+            assert "conformance" not in parse_qs(urlparse(page.url).query)
             assert await page.evaluate("document.body.scrollWidth <= innerWidth")
             violations = await _run_axe(page)
             assert not violations, _render_violations(violations)
@@ -295,7 +323,9 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
             await page.keyboard.press("Enter")
             await evidence.focus()
             await page.keyboard.press("Enter")
-            await page.wait_for_url(f"**/app/scans/{scan_id}/pages/1#finding-77")
+            # The link carries ?origin=&back= so the topbar trail can offer the
+            # way back to this comparison; the anchor still has to land.
+            await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/1\?[^#]*#finding-77$"))
             await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
             await playwright_async.expect(
                 page.get_by_text("Incomplete evidence.", exact=True)
@@ -331,6 +361,119 @@ async def test_finding_anchor_waits_for_scan_metadata(live_server: tuple[str, in
                 f"{base}/app/scans/{scan_id}/pages/1#finding-77", wait_until="networkidle"
             )
             await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_issue_filters_announce_results_and_keep_large_targets(
+    live_server: tuple[str, int],
+) -> None:
+    """Filtering says what it did, and the row's links stay 44px (SC 4.1.3, 2.5.5).
+
+    The table used to change under a screen-reader user in silence: the count
+    line in the header updated, and nothing announced it. The row links were
+    38px and 18px high, inside cells that looked bigger than the targets were.
+    """
+    base, scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+            # The sort line is a status region of its own; this one reports
+            # how many groups the filters left.
+            status = page.get_by_role("status").filter(has_text="issue groups shown")
+            await playwright_async.expect(status).to_contain_text("issue groups shown")
+            search = page.get_by_label("Search issues")
+            await search.fill("logo")
+            await page.wait_for_url("**q=logo*")
+            await playwright_async.expect(status).to_contain_text("filtered")
+
+            sizes = await page.evaluate(
+                """() => [...document.querySelectorAll('table tbody a')]
+                    .map(a => Math.round(a.getBoundingClientRect().height))
+                    .filter(h => h > 0)"""
+            )
+            assert sizes and all(height >= 44 for height in sizes), sizes
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_issue_evidence_trail_names_the_issue(live_server: tuple[str, int]) -> None:
+    """The trail's last chip is the issue itself, not the name of the view.
+
+    "Issue evidence" told the reader what kind of page they were on, which
+    they could already see; which issue they were reading was the part only
+    the trail could carry once the title scrolled out of view.
+    """
+    base, scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+            row = (await response.json())["rows"][0]
+            await page.goto(
+                f"{base}/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}",
+                wait_until="networkidle",
+            )
+            # The topbar stops at the tab; the issue itself is named under it,
+            # in the sub-trail, so the same thing is not said in two places.
+            crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+            await playwright_async.expect(crumb.get_by_text("Issues", exact=True)).to_be_visible()
+            await playwright_async.expect(
+                crumb.get_by_text(row["title"], exact=True)
+            ).to_have_count(0)
+            sub = page.get_by_role("navigation", name="Where you are in Issues")
+            await playwright_async.expect(sub.get_by_text(row["title"], exact=True)).to_be_visible()
+            # The list is the issue's parent, and the path alone proves it, so
+            # a deep link lands with the whole trail rather than a gap.
+            # The lit tab is the way back to the list; the sub-trail starts
+            # after it rather than naming Issues a third time on one screen.
+            await playwright_async.expect(
+                sub.get_by_role("link", name="Issues", exact=True)
+            ).to_have_count(0)
+            issues = page.get_by_role("navigation", name="Report workspace").get_by_role(
+                "link", name="Issues", exact=True
+            )
+            await playwright_async.expect(issues).to_have_attribute("aria-current", "page")
+            await issues.click()
+            await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_issue_evidence_page_link_offers_the_way_back(
+    live_server: tuple[str, int],
+) -> None:
+    """Page evidence opened from Issues names Issues in the trail, and returns.
+
+    The desktop app has no browser chrome, so the topbar trail is the only way
+    back out of a drill-down. Before this, stored evidence was a dead end: the
+    trail read ``Reports > site > Page evidence`` and nothing on the page led
+    back to the list the reviewer had been working through.
+    """
+    base, scan_id = live_server
+    async with playwright_async.async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+            row = (await response.json())["rows"][0]
+            issue_path = f"/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}"
+            await page.goto(f"{base}{issue_path}", wait_until="networkidle")
+            evidence = page.get_by_role("link", name="stored evidence").first
+            await playwright_async.expect(evidence).to_be_visible()
+            await evidence.click()
+            await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+\?"))
+            sub = page.get_by_role("navigation", name="Where you are in Issues")
+            back = sub.get_by_role("link", name=row["title"], exact=True)
+            await playwright_async.expect(back).to_be_visible()
+            await back.click()
+            await page.wait_for_url(f"**{issue_path}")
         finally:
             await browser.close()
 
@@ -398,13 +541,27 @@ async def test_actual_comparison_links_reach_stored_finding(
             # Each snapshot keeps its evidence behind an "Example evidence"
             # disclosure, so the link is in the DOM but not yet focusable.
             # Open the one holding this link, by keyboard, before following it.
-            link = page.locator(f'a[href="/app{target}"]')
+            # The rendered link adds ?origin=&back= so the evidence page can
+            # offer the way back to this comparison; match around that.
+            path, _, anchor = target.partition("#")
+            link = page.locator(f'a[href^="/app{path}?"][href$="#{anchor}"]')
             await link.locator("xpath=ancestor::details[1]").locator("summary").focus()
             await page.keyboard.press("Enter")
             await playwright_async.expect(link).to_be_visible()
             await link.focus()
             await page.keyboard.press("Enter")
-            await page.wait_for_url(f"{base}/app{target}")
-            await playwright_async.expect(page.locator(f"#{target.split('#')[1]}")).to_be_focused()
+            await page.wait_for_url(
+                re.compile(rf"{re.escape(base)}/app{re.escape(path)}\?[^#]*#{re.escape(anchor)}$")
+            )
+            await playwright_async.expect(page.locator(f"#{anchor}")).to_be_focused()
+            # …and the trail names it, the only way back with no browser chrome.
+            await playwright_async.expect(
+                page.get_by_role("navigation", name="Report workspace").get_by_role(
+                    "link", name="Verify changes", exact=True
+                )
+            ).to_have_attribute("aria-current", "page")
+            await playwright_async.expect(
+                page.get_by_role("navigation", name="Where you are in Verify changes")
+            ).to_contain_text("Page evidence")
         finally:
             await browser.close()
