@@ -64,6 +64,20 @@ which scores element-level probes, cannot consume it. The KAFE replication is a
 separate arm; see `RESULTS.md`, which covers **one** detector configuration on
 53 replayable subjects and must not be read as a result for the suite.
 
+**And the converse: KAFE's detector is not scored on the four corpora below.**
+The comparison runs one way. Every Axcess detector row in `KAFE-MATRIX.md` was
+scored on KAFE's own corpus, against KAFE's own published result; KAFE was never
+run on `fixtures`, `gds`, `ma11y` or `edgecases`. Their Java / Selenium 3.141.5 /
+Firefox 68 stack was not rebuilt here, and that is a scope decision, not pending
+work. The same unit mismatch blocks this direction independently: KAFE emits
+page-level labels and these four corpora label elements, so even with their
+binary running, scoring it here would require inventing a projection between two
+different units of truth — and that projection, not the detector, would decide
+the result. So read these tables knowing that our detectors have been measured
+against an outside benchmark but nothing outside has been measured against these
+corpora. `gds` is the only one below that carries a published competitor result
+at all, and it comes from the GDS audit's own 13 tools, not from KAFE.
+
 **BAGEL** (Chiou, Alotaibi & Halfond, CHI 2023, DOI
 [10.1145/3544548.3580749](https://doi.org/10.1145/3544548.3580749)) is in
 `LITERATURE.md` for scope but is **not replicated here**: its artifact folder was

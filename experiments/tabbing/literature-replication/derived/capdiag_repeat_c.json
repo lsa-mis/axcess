@@ -1,0 +1,177 @@
+{
+  "ceiling": 4000,
+  "subjects": {
+    "spotify": {
+      "focusable": 12,
+      "probe_ids": 10,
+      "headroom_cap": 212,
+      "presses_at_ceiling": 2472,
+      "still_capped_at_ceiling": false,
+      "distinct_stops": 7,
+      "verdict": "terminates at 2472 presses; headroom was short by 2260",
+      "elapsed_s": 44.6
+    },
+    "salesforce": {
+      "focusable": 38,
+      "probe_ids": 14,
+      "headroom_cap": 238,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 5,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 9,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 2,
+        "terminal_loop": [
+          "#el:body:42",
+          "#el:iframe:131"
+        ],
+        "terminal_loop_page_focus": {
+          "#el:body:42": false,
+          "#el:iframe:131": true
+        },
+        "loop_leaves_the_page": true,
+        "loop_entered_at_press": 9
+      },
+      "verdict": "not decided: from press 9 the walk repeats `#el:body:42`, `#el:iframe:131`, and `document.hasFocus()` is false inside that loop \u2014 focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this",
+      "elapsed_s": 163.5
+    },
+    "raise": {
+      "focusable": 62,
+      "probe_ids": 74,
+      "headroom_cap": 262,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 2,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 36,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 2,
+        "terminal_loop": [
+          "#el:body:59",
+          "#el:iframe:272"
+        ],
+        "terminal_loop_page_focus": {
+          "#el:body:59": false,
+          "#el:iframe:272": true
+        },
+        "loop_leaves_the_page": true,
+        "loop_entered_at_press": 170
+      },
+      "verdict": "not decided: from press 170 the walk repeats `#el:body:59`, `#el:iframe:272`, and `document.hasFocus()` is false inside that loop \u2014 focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this",
+      "elapsed_s": 68.3
+    },
+    "costco": {
+      "focusable": 69,
+      "probe_ids": 125,
+      "headroom_cap": 269,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 37,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 40,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 2,
+        "terminal_loop": [
+          "#el:iframe:355",
+          "#el:body:17"
+        ],
+        "terminal_loop_page_focus": {
+          "#el:iframe:355": true,
+          "#el:body:17": false
+        },
+        "loop_leaves_the_page": true,
+        "loop_entered_at_press": 39
+      },
+      "verdict": "not decided: from press 39 the walk repeats `#el:iframe:355`, `#el:body:17`, and `document.hasFocus()` is false inside that loop \u2014 focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this",
+      "elapsed_s": 61.5
+    },
+    "dell": {
+      "focusable": 97,
+      "probe_ids": 128,
+      "headroom_cap": 297,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 32,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 36,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 1,
+        "terminal_loop": [
+          "/343:a"
+        ],
+        "terminal_loop_page_focus": {
+          "/343:a": true
+        },
+        "loop_leaves_the_page": false,
+        "loop_entered_at_press": 36
+      },
+      "verdict": "focus trap: from press 36 the walk repeats `/343:a` with the page holding focus throughout, and never returns to its first stop, so no finite budget completes it",
+      "elapsed_s": 55.8
+    },
+    "dpreview": {
+      "focusable": 94,
+      "probe_ids": 177,
+      "headroom_cap": 294,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 92,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 97,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 3,
+        "terminal_loop": [
+          "#el:iframe:368",
+          "#el:iframe:369",
+          "#el:body:47"
+        ],
+        "terminal_loop_page_focus": {
+          "#el:iframe:368": true,
+          "#el:iframe:369": true,
+          "#el:body:47": false
+        },
+        "loop_leaves_the_page": true,
+        "loop_entered_at_press": 95
+      },
+      "verdict": "not decided: from press 95 the walk repeats `#el:iframe:368`, `#el:iframe:369`, `#el:body:47`, and `document.hasFocus()` is false inside that loop \u2014 focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this",
+      "elapsed_s": 135.8
+    },
+    "cnn": {
+      "focusable": 283,
+      "probe_ids": 462,
+      "headroom_cap": 483,
+      "presses_at_ceiling": 4000,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 17,
+      "walk": {
+        "observed_presses": 4000,
+        "ended": "budget exhausted",
+        "distinct_positions": 139,
+        "new_positions_in_last_100": 0,
+        "terminal_loop_period": 2,
+        "terminal_loop": [
+          "#el:body:119",
+          "#el:iframe:965"
+        ],
+        "terminal_loop_page_focus": {
+          "#el:body:119": false,
+          "#el:iframe:965": true
+        },
+        "loop_leaves_the_page": true,
+        "loop_entered_at_press": 293
+      },
+      "verdict": "not decided: from press 293 the walk repeats `#el:body:119`, `#el:iframe:965`, and `document.hasFocus()` is false inside that loop \u2014 focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this",
+      "elapsed_s": 133.5
+    }
+  }
+}

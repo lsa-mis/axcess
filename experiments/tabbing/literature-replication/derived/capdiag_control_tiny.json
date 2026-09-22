@@ -1,0 +1,22 @@
+{
+  "ceiling": 3,
+  "subjects": {
+    "snapchat": {
+      "focusable": 11,
+      "probe_ids": 22,
+      "headroom_cap": 211,
+      "presses_at_ceiling": 3,
+      "still_capped_at_ceiling": true,
+      "distinct_stops": 3,
+      "walk": {
+        "observed_presses": 3,
+        "ended": "budget exhausted",
+        "distinct_positions": 3,
+        "new_positions_in_last_100": 3,
+        "terminal_loop_period": null
+      },
+      "verdict": "budget, not a trap: 3 distinct positions in 3 presses with no repeating loop, and 3 of them first reached in the last 100 presses; the walk was still finding new controls when the budget ran out",
+      "elapsed_s": 7.2
+    }
+  }
+}

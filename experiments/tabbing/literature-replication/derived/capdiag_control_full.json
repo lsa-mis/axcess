@@ -1,0 +1,15 @@
+{
+  "ceiling": 4000,
+  "subjects": {
+    "snapchat": {
+      "focusable": 11,
+      "probe_ids": 22,
+      "headroom_cap": 211,
+      "presses_at_ceiling": 13,
+      "still_capped_at_ceiling": false,
+      "distinct_stops": 11,
+      "verdict": "terminates at 13 presses; headroom was 198 presses clear of the end",
+      "elapsed_s": 5.6
+    }
+  }
+}

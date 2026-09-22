@@ -1,0 +1,108 @@
+capdiag run log, newest last.
+
+The frozen tab walk that decides `capped` is identical in all five runs; the
+code changes between them touched only the observation pass that explains a
+cap and the wording of the verdict. Differences below are therefore the
+subjects, not the instrument.
+
+==============================================================================
+run 1 of 5, 09:58 — first run after the allow=probe_ids fix. Its JSON was overwritten by the runs below; this log is the only surviving record of it.
+==============================================================================
+2026-09-22 09:58:12 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+spotify            focus trap: from press 8 the walk repeats a 2-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 09:59:13 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+salesforce         focus trap: from press 9 the walk repeats a 2-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:00:04 [info     ] kbdiff.taborder.capped         found=2 presses=4000
+raise              focus trap: from press 415 the walk repeats a 2-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:00:46 [info     ] kbdiff.taborder.capped         found=37 presses=4000
+costco             focus trap: from press 39 the walk repeats a 2-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:01:24 [info     ] kbdiff.taborder.capped         found=32 presses=4000
+dell               focus trap: from press 36 the walk repeats a 1-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:02:27 [info     ] kbdiff.taborder.capped         found=92 presses=4000
+dpreview           focus trap: from press 95 the walk repeats a 3-position loop and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:03:49 [info     ] kbdiff.taborder.capped         found=17 presses=4000
+cnn                focus trap: from press 435 the walk repeats a 2-position loop and never returns to its first stop, so no finite budget completes it
+
+[exited with code 0]
+
+==============================================================================
+run 2 of 5, 10:07 — document.hasFocus() discriminator added. Its JSON was also overwritten; log only.
+==============================================================================
+2026-09-22 10:07:54 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 10:07:55 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+2026-09-22 10:08:15 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+spotify            not decided: from press 8 the walk repeats `#el:iframe:79`, `#el:body:15`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:08:57 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+salesforce         not decided: from press 9 the walk repeats `#el:body:42`, `#el:iframe:131`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:09:56 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 10:10:25 [info     ] kbdiff.taborder.capped         found=2 presses=4000
+2026-09-22 10:10:46 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 10:11:06 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+raise              budget, not a trap: 82 distinct positions in 4000 presses with no repeating loop (0 first seen in the last 100); a larger budget may complete it
+2026-09-22 10:12:19 [info     ] kbdiff.taborder.capped         found=37 presses=4000
+costco             not decided: from press 39 the walk repeats `#el:iframe:355`, `#el:body:17`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:14:12 [info     ] kbdiff.taborder.capped         found=32 presses=4000
+dell               focus trap: from press 36 the walk repeats `/343:a` with the page holding focus throughout, and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:17:05 [info     ] kbdiff.taborder.capped         found=92 presses=4000
+dpreview           not decided: from press 95 the walk repeats `#el:iframe:368`, `#el:iframe:369`, `#el:body:47`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:21:08 [info     ] kbdiff.taborder.capped         found=126 presses=4000
+cnn                not decided: from press 169 the walk repeats `#el:body:119`, `#el:iframe:966`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+
+[exited with code 0]
+
+==============================================================================
+run 3 of 5, 10:25 — terminal_period widened. Wrote derived/kafe_matrix_capdiag.json.
+==============================================================================
+spotify            terminates at 2645 presses; headroom was short by 2433
+2026-09-22 10:27:51 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+salesforce         not decided: from press 9 the walk repeats `#el:body:42`, `#el:iframe:131`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:29:40 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 10:30:22 [info     ] kbdiff.taborder.capped         found=45 presses=4000
+raise              not decided: from press 2531 the walk repeats `#el:a:217`, `#el:a:219`, `#el:a:222`, `#el:a:224`, `#el:a:226`, `#el:a:228`, `#el:a:230`, `#el:a:232`, `#el:a:234`, `#el:a:243`, `#el:a:245`, `#el:a:260`, `/252:a`, `#el:a:263`, `/255:a`, `#el:body:59`, `#el:a:68`, `#el:a:70`, `#el:a:72`, `#el:a:75`, `#el:a:77`, `#el:a:88`, `#el:input:95`, `#el:button:96`, `#el:a:104`, `#el:a:106`, `#el:a:108`, `#el:a:115`, `#el:a:117`, `#el:a:119`, `#el:a:137`, `#el:input:146`, `#el:input:153`, `#el:input:163`, `#el:input:167`, `#el:a:170`, `#el:a:172`, `#el:a:182`, `#el:a:187`, `#el:a:190`, `#el:a:193`, `#el:a:196`, `#el:a:199`, `#el:a:202`, `#el:a:207`, `#el:a:209`, `#el:a:211`, `#el:a:213`, `#el:a:215`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:32:27 [info     ] kbdiff.taborder.capped         found=37 presses=4000
+costco             not decided: from press 39 the walk repeats `#el:iframe:355`, `#el:body:17`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:34:23 [info     ] kbdiff.taborder.capped         found=32 presses=4000
+dell               focus trap: from press 36 the walk repeats `/343:a` with the page holding focus throughout, and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:37:30 [info     ] kbdiff.taborder.capped         found=92 presses=4000
+dpreview           not decided: from press 95 the walk repeats `#el:iframe:368`, `#el:iframe:369`, `#el:body:47`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:41:47 [info     ] kbdiff.taborder.capped         found=67 presses=4000
+cnn                not decided: from press 167 the walk repeats `#el:body:119`, `#el:iframe:965`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+
+[exited with code 0]
+
+==============================================================================
+runs 4 and 5 of 5, 10:42 and 11:00 — identical code, repeated for stability. Wrote derived/capdiag_repeat_b.json and derived/capdiag_repeat_c.json.
+==============================================================================
+2026-09-22 10:44:36 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 10:44:56 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+spotify            terminates at 2502 presses; headroom was short by 2290
+2026-09-22 10:46:28 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+salesforce         not decided: from press 9 the walk repeats `#el:body:42`, `#el:iframe:131`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:49:13 [info     ] kbdiff.taborder.capped         found=2 presses=4000
+raise              not decided: from press 2433 the walk repeats `#el:a:219`, `#el:a:222`, `#el:a:224`, `#el:a:226`, `#el:a:228`, `#el:a:230`, `#el:a:232`, `#el:a:234`, `#el:a:243`, `#el:a:245`, `#el:a:260`, `/252:a`, `#el:a:263`, `/255:a`, `#el:body:59`, `#el:a:68`, `#el:a:70`, `#el:a:72`, `#el:a:75`, `#el:a:77`, `#el:a:88`, `#el:input:95`, `#el:button:96`, `#el:a:104`, `#el:a:106`, `#el:a:108`, `#el:a:115`, `#el:a:117`, `#el:a:119`, `#el:a:137`, `#el:input:146`, `#el:input:153`, `#el:input:163`, `#el:input:167`, `#el:a:170`, `#el:a:172`, `#el:a:182`, `#el:a:187`, `#el:a:190`, `#el:a:193`, `#el:a:196`, `#el:a:199`, `#el:a:202`, `#el:a:207`, `#el:a:209`, `#el:a:211`, `#el:a:213`, `#el:a:215`, `#el:a:217`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:51:26 [info     ] kbdiff.taborder.capped         found=37 presses=4000
+costco             not decided: from press 39 the walk repeats `#el:iframe:355`, `#el:body:17`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 10:53:25 [info     ] kbdiff.taborder.capped         found=32 presses=4000
+dell               focus trap: from press 36 the walk repeats `/343:a` with the page holding focus throughout, and never returns to its first stop, so no finite budget completes it
+2026-09-22 10:56:31 [info     ] kbdiff.taborder.capped         found=92 presses=4000
+dpreview           not decided: from press 95 the walk repeats `#el:iframe:368`, `#el:iframe:369`, `#el:body:47`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 11:00:18 [info     ] kbdiff.taborder.capped         found=17 presses=4000
+cnn                not decided: from press 213 the walk repeats `#el:body:119`, `#el:iframe:966`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+spotify            terminates at 2472 presses; headroom was short by 2260
+2026-09-22 11:03:45 [info     ] kbdiff.taborder.capped         found=5 presses=4000
+salesforce         not decided: from press 9 the walk repeats `#el:body:42`, `#el:iframe:131`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 11:05:24 [debug    ] kbdiff.taborder.frame_skipped  error='Frame.evaluate: Frame was detached'
+2026-09-22 11:05:34 [info     ] kbdiff.taborder.capped         found=2 presses=4000
+raise              not decided: from press 170 the walk repeats `#el:body:59`, `#el:iframe:272`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 11:06:39 [info     ] kbdiff.taborder.capped         found=37 presses=4000
+costco             not decided: from press 39 the walk repeats `#el:iframe:355`, `#el:body:17`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 11:07:39 [info     ] kbdiff.taborder.capped         found=32 presses=4000
+dell               focus trap: from press 36 the walk repeats `/343:a` with the page holding focus throughout, and never returns to its first stop, so no finite budget completes it
+2026-09-22 11:09:13 [info     ] kbdiff.taborder.capped         found=92 presses=4000
+dpreview           not decided: from press 95 the walk repeats `#el:iframe:368`, `#el:iframe:369`, `#el:body:47`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+2026-09-22 11:11:37 [info     ] kbdiff.taborder.capped         found=17 presses=4000
+cnn                not decided: from press 293 the walk repeats `#el:body:119`, `#el:iframe:965`, and `document.hasFocus()` is false inside that loop — focus is leaving the page and re-entering at the same position rather than at the first stop. `compute_tab_order` ends a walk on `activeElement === null`, which never happens because `activeElement` falls back to `<body>`, so the wrap goes unnoticed and the budget runs out. Whether the page itself traps a keyboard user is not established by this
+ALL_REPEATS_DONE
+
+[exited with code 0]
+

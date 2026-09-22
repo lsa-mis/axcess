@@ -71,7 +71,10 @@ from audit.analyzer.axe import AxeAnalyzer  # noqa: E402
 from audit.analyzer.keyboard.kbdiff import detectors as frozen_detectors  # noqa: E402
 from audit.analyzer.keyboard.kbdiff.candidates import collect_candidates  # noqa: E402
 from audit.analyzer.keyboard.kbdiff.differential import TrialConfig  # noqa: E402
-from audit.analyzer.keyboard.kbdiff.taborder import compute_tab_order  # noqa: E402
+from audit.analyzer.keyboard.kbdiff.taborder import (  # noqa: E402
+    _active_marker,  # private on purpose: the cap diagnostic must read focus
+    compute_tab_order,  # exactly as the frozen walker does, frames included
+)
 from experiments.tabbing.runner import bakeoff, candidate_analysis, upstream_candidates  # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent.parent
@@ -86,6 +89,8 @@ DENOM = HERE / "derived" / "kafe_denominator.json"
 PRIOR = HERE / "derived" / "kafe_scored.jsonl"
 OUT = HERE / "derived" / "kafe_matrix.jsonl"
 CONTROLS = HERE / "derived" / "kafe_matrix_controls.json"
+SUMMARY = HERE / "derived" / "kafe_matrix_summary.json"
+SUMMARY_PERMISSIVE = HERE / "derived" / "kafe_matrix_summary_permissive.json"
 PROBES_DIR = REPO / "experiments" / "tabbing" / "probes"
 
 VIEWPORT = {"width": 1920, "height": 1080}  # KAFE section 5.1
@@ -223,6 +228,25 @@ MIRROR_JS = """
   mirror(document);
 })
 """
+
+
+# The discovery context's init script and the focusable count, lifted verbatim
+# out of `measure_subject` so the cap diagnostic below cannot drift away from
+# the scored path the way it silently had. Both are used by both callers, and
+# neither differs from what produced `derived/kafe_matrix.jsonl` in anything but
+# leading whitespace.
+DISCOVERY_TAG_JS = f"""
+window.addEventListener('load', () => {{
+    ({FRAMED_CENSUS_JS})('{replay.CENSUS_ATTR}');
+    for (const el of document.querySelectorAll('[{replay.CENSUS_ATTR}]')) {{
+        el.setAttribute('data-probe',
+                        el.getAttribute('{replay.CENSUS_ATTR}'));
+    }}
+}});
+"""
+
+FOCUSABLE_JS = """() => document.querySelectorAll(
+    'a[href],button,input,select,textarea,[tabindex],[onclick]').length"""
 
 
 def capture_path(subject: str) -> pathlib.Path:
@@ -627,17 +651,7 @@ async def measure_subject(browser: Any, subject: str, label: bool | None, axe: A
     discovery = ReplayFactory(browser, router, allow=None)
     try:
         context = await discovery()
-        await context.add_init_script(
-            f"""
-            window.addEventListener('load', () => {{
-                ({FRAMED_CENSUS_JS})('{replay.CENSUS_ATTR}');
-                for (const el of document.querySelectorAll('[{replay.CENSUS_ATTR}]')) {{
-                    el.setAttribute('data-probe',
-                                    el.getAttribute('{replay.CENSUS_ATTR}'));
-                }}
-            }});
-            """
-        )
+        await context.add_init_script(DISCOVERY_TAG_JS)
         page = await context.new_page()
         await page.goto(url, wait_until="load", timeout=60_000)
         await page.wait_for_timeout(3_000)
@@ -664,10 +678,7 @@ async def measure_subject(browser: Any, subject: str, label: bool | None, axe: A
                 return n;
             }}"""
         )
-        focusable = await page.evaluate(
-            """() => document.querySelectorAll(
-                'a[href],button,input,select,textarea,[tabindex],[onclick]').length"""
-        )
+        focusable = await page.evaluate(FOCUSABLE_JS)
         candidates = await collect_candidates(page)
         await context.close()
     except Exception as exc:
@@ -1393,6 +1404,217 @@ async def run(args: argparse.Namespace) -> int:
 # Why a capped subject capped
 # ---------------------------------------------------------------------------
 CAPDIAG = HERE / "derived" / "kafe_matrix_capdiag.json"
+# Independent repeats of the same diagnosis, written by `capdiag --out`. A cap
+# diagnosis that only ever ran once could not tell a property of the subject
+# from a property of the load, so the report states how far the repeats agree.
+CAPDIAG_REPEATS = sorted((HERE / "derived").glob("capdiag_repeat_*.json"))
+
+
+LOOP_TAIL = 60  # shortest trailing window examined, however short the period
+LOOP_MAX_PERIOD = 400  # longest repeat this will look for
+LOOP_MIN_REPEATS = 4  # the window must contain the period at least this often
+
+
+def terminal_period(sequence: list[str]) -> int | None:
+    """The period of the loop the walk ends in, or None if it is not looping.
+
+    Only the tail is read, so a page that wandered for three thousand presses
+    before settling still reports the loop it settled into. The window scales
+    with the period — a 2-position bounce is only believed after `LOOP_TAIL`
+    presses of it, and an 80-position orbit after four laps — because a short
+    window makes a long orbit look like fresh ground and a fixed long window
+    would reject a short bounce that only just started.
+
+    A first version fixed the window at `LOOP_TAIL` regardless of period. On
+    `raise`, whose orbit is longer than that, it reported "no loop" for a walk
+    that had not reached a new position in its last hundred presses.
+    """
+    n = len(sequence)
+    for period in range(1, min(LOOP_MAX_PERIOD, n // LOOP_MIN_REPEATS) + 1):
+        window = min(n, max(period * LOOP_MIN_REPEATS, LOOP_TAIL))
+        tail = sequence[-window:]
+        if all(tail[i] == tail[i - period] for i in range(period, window)):
+            return period
+    return None
+
+
+async def observe_walk(page, budget: int) -> dict[str, Any]:
+    """Re-walk a freshly navigated page, recording *where* focus went.
+
+    `compute_tab_order` is frozen and returns only named stops, `capped` and a
+    press count — enough to know a walk capped, never enough to say why. This
+    reads focus with the walker's own reader (`_active_marker`, so frames and
+    shadow roots resolve identically) and keeps the marker sequence, which is
+    what separates a page whose focus is stuck in a short loop from a page that
+    is still reaching new controls when the budget runs out.
+
+    Each new position is also asked whether the page still holds focus.
+    `document.activeElement` falls back to `<body>` when nothing in the document
+    is focused, so a `#el:body:*` marker on its own cannot tell "Tab landed on
+    the body" from "focus left the page for the browser's own UI" — and those
+    two have opposite meanings for a user. `document.hasFocus()` separates them.
+
+    It observes; it decides nothing. The `capped` fact in every row below comes
+    from the frozen walker, never from here.
+    """
+    sequence: list[str] = []
+    page_focus: dict[str, bool] = {}
+    for step in range(1, budget + 1):
+        await page.keyboard.press("Tab")
+        marker = await _active_marker(page)
+        if marker is None:
+            return {"observed_presses": step, "ended": "focus left the document"}
+        sequence.append(marker)
+        if marker not in page_focus:
+            page_focus[marker] = await page.evaluate("() => document.hasFocus()")
+        if len(sequence) > 1 and sequence[-1] == sequence[0]:
+            return {"observed_presses": step, "ended": "cycled back to the first stop"}
+
+    period = terminal_period(sequence)
+    out: dict[str, Any] = {
+        "observed_presses": len(sequence),
+        "ended": "budget exhausted",
+        "distinct_positions": len(set(sequence)),
+        "new_positions_in_last_100": len(set(sequence[-100:]) - set(sequence[:-100])),
+        "terminal_loop_period": period,
+    }
+    if period is not None:
+        loop = sequence[-period:]
+        out["terminal_loop"] = loop
+        out["terminal_loop_page_focus"] = {m: page_focus.get(m) for m in loop}
+        out["loop_leaves_the_page"] = any(page_focus.get(m) is False for m in loop)
+        first = next(i for i, m in enumerate(sequence) if m == sequence[-period])
+        out["loop_entered_at_press"] = first + 1
+    return out
+
+
+async def diagnose_subject(browser: Any, subject: str, ceiling: int) -> dict[str, Any]:
+    """One subject's cap diagnosis, walked the way `measure_subject` walks.
+
+    The first version of this walked a context built with ``allow=[]``, which
+    mirrors `data-probe` onto nothing. `TabOrder.index` only records *named*
+    stops, so `distinct_stops` was zero for every subject by construction while
+    focus was in fact moving normally — an instrument reading, not a finding.
+    The discovery pass below is therefore the scored run's, verbatim: census at
+    `load`, let the frozen collector choose the ids, tag exactly those. Only
+    then is the walk comparable to the `tab_stops` already in the matrix.
+    """
+    index = flowfile.load_exchanges(capture_path(subject).read_bytes())
+    url = entry_url(index)
+    if url is None:
+        return {"error": "no HTML entry document"}
+    router = replay.ReplayRouter(index)
+
+    # --- discovery: the same census and the same collector as the scored run --
+    discovery = ReplayFactory(browser, router, allow=None)
+    context = await discovery()
+    try:
+        await context.add_init_script(DISCOVERY_TAG_JS)
+        page = await context.new_page()
+        await page.goto(url, wait_until="load", timeout=60_000)
+        await page.wait_for_timeout(3_000)
+        focusable = await page.evaluate(FOCUSABLE_JS)
+        probe_ids = sorted({c.probe_id for c in await collect_candidates(page) if c.probe_id})
+    finally:
+        await context.close()
+
+    factory = ReplayFactory(browser, router, allow=probe_ids)
+
+    # --- the frozen walk, at the ceiling, on its own freshly navigated page ---
+    context = await factory()
+    try:
+        page = await context.new_page()
+        await page.goto(url, wait_until="load", timeout=60_000)
+        await page.wait_for_timeout(1_000)
+        order = await compute_tab_order(page, max_tabs=ceiling)
+    finally:
+        await context.close()
+
+    row: dict[str, Any] = {
+        "focusable": focusable,
+        "probe_ids": len(probe_ids),
+        "headroom_cap": focusable + TAB_HEADROOM,
+        "presses_at_ceiling": order.presses,
+        "still_capped_at_ceiling": order.capped,
+        "distinct_stops": len(order.index),
+    }
+    if not order.capped:
+        short_by = order.presses - (focusable + TAB_HEADROOM)
+        row["verdict"] = (
+            f"terminates at {order.presses} presses; "
+            + (
+                f"headroom was short by {short_by}"
+                if short_by > 0
+                else f"headroom was {-short_by} presses clear of the end"
+            )
+        )
+        return row
+
+    # --- capped: a second fresh page, only to say what it capped *on* ---------
+    # `compute_tab_order` requires an unfocused page, so this cannot reuse the
+    # one above.
+    context = await factory()
+    try:
+        page = await context.new_page()
+        await page.goto(url, wait_until="load", timeout=60_000)
+        await page.wait_for_timeout(1_000)
+        walk = await observe_walk(page, ceiling)
+    finally:
+        await context.close()
+    row["walk"] = walk
+
+    period = walk.get("terminal_loop_period")
+    if period is not None and walk.get("loop_leaves_the_page"):
+        # `document.hasFocus()` is false somewhere in the loop, so focus is not
+        # trapped *in the page* — it steps out to the browser's own UI and comes
+        # back to the same position instead of to the first stop. The frozen
+        # walker means to end the walk here ("focus left the document"), but it
+        # detects that as `activeElement === null`, and `activeElement` falls
+        # back to `<body>` instead of going null. So the wrap is never seen and
+        # the walk runs to its budget. This is an instrument limit, not a page
+        # defect, and nothing here can be concluded about the site's keyboard
+        # behaviour.
+        loop = ", ".join(f"`{m}`" for m in walk["terminal_loop"])
+        row["verdict"] = (
+            f"not decided: from press {walk['loop_entered_at_press']} the walk repeats "
+            f"{loop}, and `document.hasFocus()` is false inside that loop — focus is "
+            f"leaving the page and re-entering at the same position rather than at the "
+            f"first stop. `compute_tab_order` ends a walk on `activeElement === null`, "
+            f"which never happens because `activeElement` falls back to `<body>`, so the "
+            f"wrap goes unnoticed and the budget runs out. Whether the page itself traps "
+            f"a keyboard user is not established by this"
+        )
+    elif period is not None:
+        loop = ", ".join(f"`{m}`" for m in walk["terminal_loop"])
+        row["verdict"] = (
+            f"focus trap: from press {walk['loop_entered_at_press']} the walk repeats "
+            f"{loop} with the page holding focus throughout, and never returns to its "
+            f"first stop, so no finite budget completes it"
+        )
+    elif walk.get("ended") != "budget exhausted":
+        # The frozen walker capped and the observation did not: the page is not
+        # reproducing press-for-press, so neither reading is trustworthy alone.
+        row["verdict"] = (
+            f"unstable: the frozen walk capped at {ceiling} but the observation "
+            f"{walk['ended']} after {walk['observed_presses']} presses"
+        )
+    elif walk["new_positions_in_last_100"] == 0:
+        # No repeat this can name, but no new ground either. Saying "a larger
+        # budget may complete it" here would be a guess dressed as a finding.
+        row["verdict"] = (
+            f"not decided: {walk['distinct_positions']} distinct positions in {ceiling} "
+            f"presses and none of the last 100 presses reached a new one, so the walk is "
+            f"going back over ground it has already covered — but no repeat shorter than "
+            f"{LOOP_MAX_PERIOD} presses fits it, so what it is circling is not pinned down"
+        )
+    else:
+        row["verdict"] = (
+            f"budget, not a trap: {walk['distinct_positions']} distinct positions in "
+            f"{ceiling} presses with no repeating loop, and "
+            f"{walk['new_positions_in_last_100']} of them first reached in the last 100 "
+            f"presses; the walk was still finding new controls when the budget ran out"
+        )
+    return row
 
 
 async def cap_diagnosis(subjects: list[str], ceiling: int = 4000) -> dict[str, Any]:
@@ -1409,37 +1631,14 @@ async def cap_diagnosis(subjects: list[str], ceiling: int = 4000) -> dict[str, A
         for subject in subjects:
             browser = await pw.chromium.launch(headless=True)
             row: dict[str, Any] = {}
+            started = time.perf_counter()
             try:
-                index = flowfile.load_exchanges(capture_path(subject).read_bytes())
-                url = entry_url(index)
-                factory = ReplayFactory(browser, replay.ReplayRouter(index), allow=[])
-                context = await factory()
-                page = await context.new_page()
-                await page.goto(url, wait_until="load", timeout=60_000)
-                await page.wait_for_timeout(1_000)
-                focusable = await page.evaluate(
-                    """() => document.querySelectorAll(
-                        'a[href],button,input,select,textarea,[tabindex],[onclick]').length"""
-                )
-                order = await compute_tab_order(page, max_tabs=ceiling)
-                row = {
-                    "focusable": focusable,
-                    "headroom_cap": focusable + TAB_HEADROOM,
-                    "presses_at_ceiling": order.presses,
-                    "still_capped_at_ceiling": order.capped,
-                    "distinct_stops": len(order.index),
-                    "verdict": (
-                        "focus never returns: no finite budget completes this walk"
-                        if order.capped
-                        else f"terminates at {order.presses} presses; "
-                        f"headroom was short by {order.presses - (focusable + TAB_HEADROOM)}"
-                    ),
-                }
-                await context.close()
+                row = await diagnose_subject(browser, subject, ceiling)
             except Exception as exc:
                 row = {"error": f"{type(exc).__name__}: {exc}"[:300]}
             finally:
                 await browser.close()
+            row["elapsed_s"] = round(time.perf_counter() - started, 1)
             out["subjects"][subject] = row
             print(f"{subject:<18} {row.get('verdict', row.get('error'))}", flush=True)
     return out
@@ -1633,6 +1832,7 @@ def write_report(
     controls: dict[str, Any],
     records: list[dict[str, Any]],
     capdiag: dict[str, Any] | None,
+    capdiag_repeats: list[dict[str, Any]] | None = None,
 ) -> str:
     """The companion report: what failed, what was controlled, what was found."""
     c2 = controls["control_2_denominator"]
@@ -1678,10 +1878,131 @@ def write_report(
                 )
         return out
 
+    def cap_outcome(row: dict[str, Any]) -> str:
+        """The one-line form of a cap diagnosis. `verdict` states the mechanism
+        in full and is in the JSON; repeating it seven times here would bury the
+        table, so the shared mechanism is explained once in the prose below."""
+        walk = row.get("walk") or {}
+        loop = walk.get("terminal_loop") or []
+        # `raise` orbits 82 positions; listing them all would be a paragraph of
+        # markers. The full list is in the JSON under `walk.terminal_loop`.
+        shown = ", ".join(f"`{m}`" for m in loop[:4])
+        names = shown if len(loop) <= 4 else f"{shown} and {len(loop) - 4} more"
+        if loop and walk.get("loop_leaves_the_page"):
+            return (
+                f"from press {walk['loop_entered_at_press']} focus leaves the page and "
+                f"re-enters on a {len(loop)}-position orbit ({names}); **not decided** — "
+                f"see below"
+            )
+        if loop:
+            return (
+                f"**focus trap** on a {len(loop)}-position loop ({names}) from press "
+                f"{walk['loop_entered_at_press']}, with the page holding focus throughout"
+            )
+        if row.get("still_capped_at_ceiling") and walk.get("new_positions_in_last_100") == 0:
+            return (
+                f"**not decided** — {walk.get('distinct_positions', '?')} distinct positions, "
+                f"no new one in the last 100 presses, but no repeat short enough to name"
+            )
+        if row.get("still_capped_at_ceiling"):
+            return (
+                f"**still advancing** at the ceiling: {walk.get('distinct_positions', '?')} "
+                f"distinct positions, {walk['new_positions_in_last_100']} of them new in the "
+                f"last 100 presses"
+            )
+        return f"**completes** — {row['verdict']}"
+
     cap_lines = []
-    if capdiag:
-        for subject, row in sorted((capdiag.get("subjects") or {}).items()):
-            cap_lines.append(f"`{subject}` — {row.get('verdict', row.get('error', '?'))}")
+    diag_rows = (capdiag or {}).get("subjects") or {}
+    for subject, row in sorted(diag_rows.items()):
+        if "verdict" not in row:
+            cap_lines.append(f"`{subject}` — diagnosis failed: {row.get('error', '?')}")
+            continue
+        cap_lines.append(
+            f"`{subject}` — {row['distinct_stops']} named stops in "
+            f"{row['presses_at_ceiling']} presses; {cap_outcome(row)}"
+        )
+    leaky = [
+        s for s, r in diag_rows.items() if (r.get("walk") or {}).get("loop_leaves_the_page")
+    ]
+    still = [s for s, r in diag_rows.items() if r.get("still_capped_at_ceiling")]
+    freed = [s for s, r in diag_rows.items() if r.get("still_capped_at_ceiling") is False]
+    if diag_rows and not freed:
+        cap_note = (
+            "Raising the ceiling frees none of them, so every one of these "
+            "abstentions stands; what the re-walk adds is *why* each abstains. "
+        )
+    elif freed:
+        names = ", ".join(f"`{s}`" for s in sorted(freed))
+        verb = "completes" if len(freed) == 1 else "complete"
+        was = "was an abstention" if len(freed) == 1 else "were abstentions"
+        cap_note = (
+            f"{len(freed)} of these ({names}) {verb} the walk at the higher ceiling and "
+            f"{was} only because the `focusable + {TAB_HEADROOM}` budget was too tight; "
+            f"{len(still)} still cap. The published numbers are unchanged either way — they "
+            f"were measured at the derived budget, and this diagnosis is not a re-score."
+        )
+    else:
+        cap_note = ""
+
+    all_runs = [capdiag, *(capdiag_repeats or [])] if capdiag else []
+    if len(all_runs) > 1:
+
+        def readings(subject: str, field: str) -> list[Any]:
+            return [(r["subjects"].get(subject) or {}).get(field) for r in all_runs]
+
+        split_cap = sorted(
+            s for s in diag_rows if len(set(readings(s, "still_capped_at_ceiling"))) > 1
+        )
+        split_stops = sorted(
+            s
+            for s in diag_rows
+            if s not in split_cap and len(set(readings(s, "distinct_stops"))) > 1
+        )
+        agreed = sorted(s for s in diag_rows if s not in split_cap and s not in split_stops)
+        cap_note += (
+            f"\n\nThe diagnosis was run {len(all_runs)} times over independent page loads, "
+            f"because one reading cannot separate a property of the subject from a property "
+            f"of the load. "
+        )
+        if agreed:
+            cap_note += (
+                f"{len(agreed)} gave the same answer in all {len(all_runs)} "
+                f"({', '.join(f'`{s}`' for s in agreed)}) — which is agreement across these "
+                f"runs, not a guarantee. "
+            )
+        if split_cap:
+            cap_note += (
+                f"**{', '.join(f'`{s}`' for s in split_cap)} did not even agree on whether the "
+                f"walk caps**, so no verdict above should be read as a property of those "
+                f"subjects. "
+            )
+        if split_stops:
+            cap_note += (
+                f"{', '.join(f'`{s}`' for s in split_stops)} agreed on capping and on the "
+                f"shape of the walk but not on how many of its stops carry a probe id — the "
+                f"same identity instability §1.4 records. "
+            )
+        cap_note += (
+            "Every run's output, earlier ones whose JSON a later run overwrote included, "
+            "is in `derived/capdiag-runs.log`."
+        )
+    if leaky:
+        cap_note = cap_note.rstrip() + "\n\n" if cap_note else ""
+        cap_note += (
+            f"{len(leaky)} of them ({', '.join(f'`{s}`' for s in sorted(leaky))}) share one "
+            f"mechanism, and it is **not** a page defect. Their walk settles into a loop in "
+            f"which `document.hasFocus()` is false: Tab steps out of the page to the browser's own "
+            f"UI, and the next Tab re-enters at the position it left from rather than at the first "
+            f"stop. `compute_tab_order` means to end a walk exactly there — its comment calls it "
+            f"\"focus left the document (browser chrome)\" — but it detects that as "
+            f"`document.activeElement === null`, and `activeElement` falls back to `<body>` "
+            f"instead of going null, so the branch never fires and the budget runs out. These "
+            f"subjects are abstentions for an instrument reason, and **nothing here says whether "
+            f"the site traps a keyboard user**. Deciding that needs a walker whose termination "
+            f"test is `document.hasFocus()` rather than a null `activeElement`, which is a change "
+            f"to a frozen detector and out of scope for this run.\n\n"
+        )
 
     text = f"""# KAFE matrix: report
 
@@ -1724,9 +2045,17 @@ no result here describes those subjects.
 
 The budget is `focusable + {TAB_HEADROOM}`, the convention
 `tools/kafe_scored_run.py` established. A walk that still caps is an abstention
-by the brief's own rule. Re-walked afterwards with a {(capdiag or {}).get("ceiling", "n/a")}-press ceiling:
+by the brief's own rule. Re-walked afterwards by `kafe_matrix capdiag` with a
+{(capdiag or {}).get("ceiling", "n/a")}-press ceiling, through the same discovery pass, the same
+`data-probe` set and the same frozen walker the scored run uses, so the stop
+counts below are the same measurement as `tab_stops` in the matrix:
 
 {bullets(cap_lines) if cap_lines else "- not diagnosed: `capdiag` did not run"}
+
+{cap_note}Where a terminal loop is named, the walk was observed a second time on
+a fresh page with the walker's own focus reader, and the loop is the positions
+it repeated to the end of the budget. That observation explains the cap; it
+never overrides it — `capped` always comes from the frozen walker.
 
 ### 1.4 Element identity is not perfectly stable across page loads
 
@@ -1910,20 +2239,42 @@ def main() -> int:
     runner.add_argument("--restart", action="store_true", help="ignore existing checkpoints")
     sub.add_parser("controls")
     sub.add_parser("assemble")
-    sub.add_parser("report")
-    sub.add_parser("capdiag")
+    reporter = sub.add_parser("report")
+    reporter.add_argument(
+        "--reuse",
+        action="store_true",
+        help=(
+            "rebuild only KAFE-MATRIX-REPORT.md, from the summaries and controls already "
+            "in derived/. Re-running the controls launches browsers and re-times them, and "
+            "a plain `report` rewrites KAFE-MATRIX.md too; use this when only the report "
+            "prose changed and no published number may move."
+        ),
+    )
+    diag = sub.add_parser("capdiag")
+    diag.add_argument(
+        "--subjects",
+        default="",
+        help="comma-separated subjects; default is every subject the matrix capped",
+    )
+    diag.add_argument("--ceiling", type=int, default=4000)
+    diag.add_argument(
+        "--out",
+        default="",
+        help="write here instead of derived/kafe_matrix_capdiag.json (controls)",
+    )
     args = parser.parse_args()
 
     if args.cmd == "run":
         return asyncio.run(run(args))
     if args.cmd == "capdiag":
-        capped = [
+        capped = [s for s in args.subjects.split(",") if s.strip()] or [
             json.loads(line)["subject"]
             for line in OUT.read_text().splitlines()
             if line.strip() and "tab walk capped" in (json.loads(line).get("reason") or "")
         ]
-        payload = asyncio.run(cap_diagnosis(capped))
-        CAPDIAG.write_text(json.dumps(payload, indent=2) + "\n")
+        payload = asyncio.run(cap_diagnosis(capped, ceiling=args.ceiling))
+        target = pathlib.Path(args.out) if args.out else CAPDIAG
+        target.write_text(json.dumps(payload, indent=2) + "\n")
         return 0
     if args.cmd == "controls":
         payload = run_controls()
@@ -1931,14 +2282,23 @@ def main() -> int:
         print(json.dumps(payload, indent=2))
         return 0 if all(v.get("pass") for k, v in payload.items() if k.startswith("control")) else 1
 
+    reuse = getattr(args, "reuse", False)
+    records = [json.loads(line) for line in OUT.read_text().splitlines() if line.strip()]
+    capdiag = json.loads(CAPDIAG.read_text()) if CAPDIAG.exists() else None
+    repeats = [json.loads(p.read_text()) for p in CAPDIAG_REPEATS]
+
+    if reuse:
+        payload = json.loads(SUMMARY.read_text())
+        permissive = json.loads(SUMMARY_PERMISSIVE.read_text())
+        controls = json.loads(CONTROLS.read_text())
+        write_report(payload, permissive, controls, records, capdiag, repeats)
+        print(f"wrote {REPORT_MD.name} from derived/; {MATRIX_MD.name} untouched")
+        return 0
+
     payload = assemble(rule="strict")
     permissive = assemble(rule="permissive")
-    (HERE / "derived" / "kafe_matrix_summary.json").write_text(
-        json.dumps(payload, indent=2) + "\n"
-    )
-    (HERE / "derived" / "kafe_matrix_summary_permissive.json").write_text(
-        json.dumps(permissive, indent=2) + "\n"
-    )
+    SUMMARY.write_text(json.dumps(payload, indent=2) + "\n")
+    SUMMARY_PERMISSIVE.write_text(json.dumps(permissive, indent=2) + "\n")
     if args.cmd == "assemble":
         print(json.dumps({k: v for k, v in payload.items() if k != "rows"}, indent=2))
         return 0
@@ -1946,11 +2306,7 @@ def main() -> int:
     controls = run_controls()
     CONTROLS.write_text(json.dumps(controls, indent=2) + "\n")
     write_matrix(payload, controls, permissive)
-    records = [
-        json.loads(line) for line in OUT.read_text().splitlines() if line.strip()
-    ]
-    capdiag = json.loads(CAPDIAG.read_text()) if CAPDIAG.exists() else None
-    write_report(payload, permissive, controls, records, capdiag)
+    write_report(payload, permissive, controls, records, capdiag, repeats)
     print(f"wrote {MATRIX_MD.name} ({len(payload['rows'])} rows) and {REPORT_MD.name}")
     return 0
 

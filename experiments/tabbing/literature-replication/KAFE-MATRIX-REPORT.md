@@ -50,9 +50,29 @@ no result here describes those subjects.
 
 The budget is `focusable + 200`, the convention
 `tools/kafe_scored_run.py` established. A walk that still caps is an abstention
-by the brief's own rule. Re-walked afterwards with a n/a-press ceiling:
+by the brief's own rule. Re-walked afterwards by `kafe_matrix capdiag` with a
+4000-press ceiling, through the same discovery pass, the same
+`data-probe` set and the same frozen walker the scored run uses, so the stop
+counts below are the same measurement as `tab_stops` in the matrix:
 
-- not diagnosed: `capdiag` did not run
+- `cnn` — 67 named stops in 4000 presses; from press 167 focus leaves the page and re-enters on a 2-position orbit (`#el:body:119`, `#el:iframe:965`); **not decided** — see below
+- `costco` — 37 named stops in 4000 presses; from press 39 focus leaves the page and re-enters on a 2-position orbit (`#el:iframe:355`, `#el:body:17`); **not decided** — see below
+- `dell` — 32 named stops in 4000 presses; **focus trap** on a 1-position loop (`/343:a`) from press 36, with the page holding focus throughout
+- `dpreview` — 92 named stops in 4000 presses; from press 95 focus leaves the page and re-enters on a 3-position orbit (`#el:iframe:368`, `#el:iframe:369`, `#el:body:47`); **not decided** — see below
+- `raise` — 45 named stops in 4000 presses; from press 2531 focus leaves the page and re-enters on a 49-position orbit (`#el:a:217`, `#el:a:219`, `#el:a:222`, `#el:a:224` and 45 more); **not decided** — see below
+- `salesforce` — 5 named stops in 4000 presses; from press 9 focus leaves the page and re-enters on a 2-position orbit (`#el:body:42`, `#el:iframe:131`); **not decided** — see below
+- `spotify` — 7 named stops in 2645 presses; **completes** — terminates at 2645 presses; headroom was short by 2433
+
+1 of these (`spotify`) completes the walk at the higher ceiling and was an abstention only because the `focusable + 200` budget was too tight; 6 still cap. The published numbers are unchanged either way — they were measured at the derived budget, and this diagnosis is not a re-score.
+
+The diagnosis was run 3 times over independent page loads, because one reading cannot separate a property of the subject from a property of the load. 5 gave the same answer in all 3 (`costco`, `dell`, `dpreview`, `salesforce`, `spotify`) — which is agreement across these runs, not a guarantee. `cnn`, `raise` agreed on capping and on the shape of the walk but not on how many of its stops carry a probe id — the same identity instability §1.4 records. Every run's output, earlier ones whose JSON a later run overwrote included, is in `derived/capdiag-runs.log`.
+
+5 of them (`cnn`, `costco`, `dpreview`, `raise`, `salesforce`) share one mechanism, and it is **not** a page defect. Their walk settles into a loop in which `document.hasFocus()` is false: Tab steps out of the page to the browser's own UI, and the next Tab re-enters at the position it left from rather than at the first stop. `compute_tab_order` means to end a walk exactly there — its comment calls it "focus left the document (browser chrome)" — but it detects that as `document.activeElement === null`, and `activeElement` falls back to `<body>` instead of going null, so the branch never fires and the budget runs out. These subjects are abstentions for an instrument reason, and **nothing here says whether the site traps a keyboard user**. Deciding that needs a walker whose termination test is `document.hasFocus()` rather than a null `activeElement`, which is a change to a frozen detector and out of scope for this run.
+
+Where a terminal loop is named, the walk was observed a second time on
+a fresh page with the walker's own focus reader, and the loop is the positions
+it repeated to the end of the budget. That observation explains the cap; it
+never overrides it — `capped` always comes from the frozen walker.
 
 ### 1.4 Element identity is not perfectly stable across page loads
 
@@ -101,6 +121,29 @@ arms' verdicts standing.
   Python 3.14.7. The ms columns are not comparable as
   hardware benchmarks, only as orders of magnitude, and every Axcess figure is
   wall time on one shared machine.
+
+### 1.7 The comparison runs in one direction only
+
+All 48 rows are Axcess detectors scored on KAFE's corpus. KAFE's detector was
+never scored on ours. Its row here is their **published output** —
+`artifacts/kafe_results_to_reproduce.csv`, their tool's real result on their own
+60 subjects, reconciled against their paper's Table 1 by Control 1 below — and
+not a local execution: their Java / Selenium 3.141.5 / Firefox 68 stack was not
+rebuilt, and by decision it will not be. The reverse direction is out of scope
+for this work, not queued behind it.
+
+One part of it could not be closed even if it were in scope. KAFE emits
+page-level labels; `fixtures`, `gds` and `ma11y` label elements. Running their
+binary against those corpora would still need a projection invented between two
+different units of truth, and that projection — not their detector — would
+decide the result.
+
+The asymmetry is not neutral, and it cuts both ways. Measuring our detectors on
+someone else's corpus against their published numbers is the harder and more
+exposed direction, and that is the direction taken. But it means nothing in this
+work independently validates **our** corpora: `edgecases` is shared-author and
+already carries no unbiased accuracy claim, and `fixtures` was authored here
+too. No outside tool has been scored on either.
 
 ## 2. Controls
 
