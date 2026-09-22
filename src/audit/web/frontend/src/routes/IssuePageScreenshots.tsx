@@ -6,6 +6,7 @@ import ConformanceBadge from "../components/ConformanceBadge";
 import ReportHeader from "../components/ReportHeader";
 import { Card, EmptyState, LinkButton, pageEvidencePath } from "../components/ui";
 import { issueInspectorPath } from "./IssuePages";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 /** The trail label for this view; ReportCrumb shows the same words. */
 export const ISSUE_SCREENSHOTS_VIEW = "Issue screenshots";
@@ -31,11 +32,7 @@ export default function IssuePageScreenshotsRoute() {
   const page = Number(pageId);
   const location = useLocation();
 
-  const scanQuery = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const scanQuery = useScanQuery(id);
   const detailQuery = useQuery({
     queryKey: ["issue-detail", id, key, "occurrences_desc"],
     queryFn: () => api.getIssueDetail(id, key, "occurrences_desc"),

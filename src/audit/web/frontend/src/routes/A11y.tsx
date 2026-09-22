@@ -20,6 +20,7 @@ import type {
   Severity,
 } from "../api/types";
 import { requestStatusRationale } from "../statusDecision";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -60,11 +61,7 @@ export default function A11yRoute() {
     STATUS_OPTIONS.includes(rawStatus as FindingStatus) ? rawStatus : ""
   ) as FindingStatus | "";
 
-  const { data: scan, error: scanError } = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const { data: scan, error: scanError } = useScanQuery(id);
   const { data: rollup, isLoading: rollupLoading } = useQuery({
     queryKey: ["a11y-rollup", id],
     queryFn: () => api.getA11yRollup(id),

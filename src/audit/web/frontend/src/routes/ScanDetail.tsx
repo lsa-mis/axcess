@@ -1,3 +1,17 @@
+/**
+ * A single report's overview: progress while it runs, coverage and entry
+ * points once it finishes.
+ *
+ * This route has three faces, chosen by scan status. Running shows the
+ * progress panel and a cancel control. Completed shows coverage and the
+ * links into the evidence. Failed or interrupted shows why and offers a
+ * retry. They are one route rather than three because the reader does not
+ * navigate between them: a scan finishes underneath them while they watch.
+ *
+ * The mutations here are the report's lifecycle actions -- cancel, retry,
+ * delete -- and each has to reconcile the cache by hand afterwards, since
+ * they change records other screens are already showing.
+ */
 import { Link, useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -36,6 +50,7 @@ import {
 } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { formatScanEta } from "../lib/scanProgress";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 export default function ScanDetailRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -44,19 +59,32 @@ export default function ScanDetailRoute() {
   const navigate = useNavigate();
   const [liveUpdates, setLiveUpdates] = useState(true);
 
-  const { data, isLoading, error, isFetching } = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
+  // Polls only while the scan is actually running, and only in a visible
+  // tab. Shares the report summary cache entry with the gate and every
+  // other report route; see useScanQuery.
+  const { data, isLoading, error, isFetching } = useScanQuery(id, {
     refetchInterval: (query) =>
       liveUpdates && query.state.data?.status === "running" ? 2000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
+  // Invalidating on the `["scan", id]` prefix reaches the identity-
+  // partitioned key the shared hook actually uses. Do not narrow it to an
+  // exact key here without reading useScanQuery first.
   const cancel = useMutation({
     mutationFn: () => api.cancelScan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
   });
+  // "Retry" re-submits the same seed with a fixed balanced profile rather
+  // than the settings the original scan used: this button exists for a scan
+  // that failed, and repeating a configuration that just failed is rarely
+  // what the operator wants. The expensive optional passes (VLM, semantic,
+  // interaction, visual) are off so the retry finishes quickly enough to
+  // tell them whether the site is reachable at all.
+  //
+  // A retry may produce a new scan id. When it does, navigate to it,
+  // replacing history so Back does not return to a report that is now
+  // superseded.
   const retryBalanced = useMutation({
     mutationFn: () =>
       api.createScan({
@@ -90,11 +118,17 @@ export default function ScanDetailRoute() {
       if (scan_id !== id) navigate(`/scans/${scan_id}`, { replace: true });
     },
   });
+  // Only for the counts on the workspace links, and only once the scan is
+  // finished: a running scan's issue list changes under the reader and is
+  // not worth the query.
   const { data: issueSummary } = useQuery({
     queryKey: ["issues", id, "workspace-summary"],
     queryFn: () => api.listIssues(id),
     enabled: Number.isFinite(id) && data?.status === "completed",
   });
+  // Delete removes the cache entry rather than invalidating it: there is no
+  // record left to refetch, and an invalidation would send this screen to
+  // the server for a report that is gone.
   const deleteScan = useMutation({
     mutationFn: () => api.deleteScan(id),
     onSuccess: () => {

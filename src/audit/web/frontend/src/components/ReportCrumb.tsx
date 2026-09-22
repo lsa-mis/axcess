@@ -1,8 +1,9 @@
 import { Fragment } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { api } from "../api/client";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 /**
  * The topbar's orientation line for everything under a report.
@@ -270,11 +271,12 @@ export default function ReportCrumb() {
   const { pathname, search } = useLocation();
   const { match, trail: full } = useReportTrail();
   const labelled = topbarTrail(full, pathname, search);
-  const scanQuery = useQuery({
-    queryKey: ["scan", match?.scanId],
-    queryFn: () => api.getScan(match!.scanId as number),
-    enabled: match != null && match.scanId != null,
-  });
+  // The same shared report-summary query the gate and the route use, so
+  // the breadcrumb reads the site name from cache. It previously kept its
+  // own `["scan", id]` entry, which meant a second request for the same
+  // record on every report page, and one that was not partitioned by
+  // proxy identity.
+  const scanQuery = useScanQuery(typeof match?.scanId === "number" ? match.scanId : 0);
   if (!match) return null;
 
   const ancestors = labelled.slice(0, -1);

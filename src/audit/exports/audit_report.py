@@ -39,10 +39,7 @@ import json
 import sqlite3
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from importlib import resources
 from typing import Any
-
-import yaml
 
 from audit import coverage_matrix, evaluation
 from audit.analyzer.alfa_evidence import (
@@ -69,9 +66,6 @@ MAX_LOCATIONS_PER_CARD = 10
 
 # How many worst pages to list in the hotspots table.
 MAX_HOTSPOTS = 10
-
-_RULES_FILE = "audit_report.yaml"
-_RULES_PACKAGE = "audit.rules"
 
 # Owner-type taxonomy used in the YAML. The renderer doesn't validate
 # beyond this, anything else from the YAML passes through verbatim so
@@ -1870,13 +1864,17 @@ def load_report_rules() -> dict[str, Any]:
 
 
 def _load_rules() -> dict[str, Any]:
-    """Read ``rules/audit_report.yaml`` once. Returns ``{}`` on parse error."""
-    try:
-        text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")
-        data = yaml.safe_load(text) or {}
-        return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, yaml.YAMLError):
-        return {}
+    """Read ``rules/audit_report.yaml``. Returns ``{}`` on parse error.
+
+    Delegates to the Issues projection's cached loader so the exports and
+    the API resolve an issue against the same authored copy, parsed once
+    per process. This module used to carry a byte-identical second reader,
+    which meant a workbook re-parsed 59 KB of YAML dozens of times and the
+    two surfaces could disagree if only one of them were updated.
+
+    The returned dict is shared and must be treated as read-only.
+    """
+    return issues_mod._load_rules()
 
 
 __all__ = [

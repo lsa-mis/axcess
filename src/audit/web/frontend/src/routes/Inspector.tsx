@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import { Card, EmptyState, ExternalLinkButton, LinkButton, pageEvidencePath, Select } from "../components/ui";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 type TabId = "page" | "dom";
 
@@ -59,11 +60,7 @@ export default function InspectorRoute() {
   const directSelector = params.get("selector");
   const directSnippet = params.get("snippet");
 
-  const { data: scanData } = useQuery({
-    queryKey: ["scan", scan],
-    queryFn: () => api.getScan(scan),
-    enabled: Number.isFinite(scan),
-  });
+  const { data: scanData } = useScanQuery(scan);
 
   // Fetch the page's full evidence so we can resolve the current issue's
   // finding(s) on this page, and only those, not every issue the page happens

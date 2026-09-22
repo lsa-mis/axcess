@@ -35,6 +35,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from dataclasses import dataclass, field
+from functools import lru_cache
 from importlib import resources
 from typing import Any, Literal
 
@@ -285,6 +286,38 @@ def list_issues(
     rows.extend(_axe_issue_rows(conn, scan_id, rules))
     rows.extend(_image_issue_rows(conn, scan_id, rules))
 
+    return filter_and_sort(
+        rows,
+        conformance=conformance,
+        responsibility=responsibility,
+        abilities=abilities,
+        status=status,
+        search=search,
+        review_lane=review_lane,
+        sort=sort,
+    )
+
+
+def filter_and_sort(
+    rows: list[IssueRow],
+    *,
+    conformance: list[str] | None = None,
+    responsibility: list[str] | None = None,
+    abilities: list[str] | None = None,
+    status: str | None = None,
+    search: str | None = None,
+    review_lane: str | None = None,
+    sort: str = "priority_desc",
+) -> list[IssueRow]:
+    """Apply the Issues filters and sort to an already-built row list.
+
+    Filter semantics are documented on :func:`list_issues`; this is the same
+    pass, split out so a caller that needs both the filtered rows and
+    scan-wide facet counts can build the projection once and filter twice,
+    rather than running the scan-wide grouping queries for each.
+
+    Pure: ``rows`` is not mutated, and each step returns a new list.
+    """
     if conformance:
         wanted = {c.upper() for c in conformance}
         rows = [r for r in rows if r.conformance in wanted]
@@ -327,8 +360,32 @@ def get_issue_detail(
       * ``occurrences_asc``
       * ``url``                      , alphabetical by URL
       * ``status``                   , pages with un-triaged findings first
+
+    Builds the scan's issue list to resolve ``issue_key``. A caller that
+    already holds that list -- an export walking every issue, the API
+    answering a list and a detail together -- must pass it to
+    :func:`detail_for_row` instead, or the projection is rebuilt once per
+    issue and the walk becomes quadratic.
     """
     rows = list_issues(conn, scan_id)
+    return detail_for_row(conn, scan_id, rows, issue_key, sort=sort)
+
+
+def detail_for_row(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    rows: list[IssueRow],
+    issue_key: str,
+    *,
+    sort: str = "occurrences_desc",
+) -> IssueDetail | None:
+    """Build the detail view for ``issue_key`` from an already-built issue list.
+
+    Same result as :func:`get_issue_detail`, without re-running the scan-wide
+    grouping queries. ``rows`` must be the unfiltered list for ``scan_id``:
+    a filtered list can hide the row that ``issue_key`` names and turn a
+    valid detail request into a 404.
+    """
     row = next((r for r in rows if r.issue_key == issue_key), None)
     if row is None:
         # Compatibility for links emitted before Alfa outcome subgroups were
@@ -1063,9 +1120,7 @@ def _a11y_location_samples(
                 evidence_url=f"/scans/{scan_id}/pages/{page_id}#finding-{finding['id']}",
                 revealed_by=(str(finding["revealed_by"]) if finding.get("revealed_by") else None),
                 screenshot_hash=(
-                    str(finding["screenshot_hash"])
-                    if finding.get("screenshot_hash")
-                    else None
+                    str(finding["screenshot_hash"]) if finding.get("screenshot_hash") else None
                 ),
                 html_snippet=(
                     " ".join(str(finding["html_snippet"]).split())[:2000]
@@ -1185,11 +1240,18 @@ def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:
     return sorted(rows, key=lambda r: (_LANE_RANK.get(r.review_lane, 9), -r.priority))
 
 
+@lru_cache(maxsize=1)
 def _load_rules() -> dict[str, Any]:
     """Load audit_report.yaml. Returns ``{}`` on parse error.
 
     The Issues view degrades cleanly without metadata, every row
     still gets a sensible default title and 'dev' as the owner.
+
+    Cached because the file is authored copy, not scan data: it is ~59 KB
+    of YAML that took ~17 ms to parse, and an export that renders 200
+    issues used to re-read it once per issue. Every caller therefore
+    shares one dict and must treat it as read-only; the per-row lookups
+    in :func:`_rule_meta_for` already copy the block they return.
     """
     try:
         text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")
@@ -1208,6 +1270,8 @@ __all__ = [
     "IssueRow",
     "abilities_breakdown",
     "conformance_breakdown",
+    "detail_for_row",
+    "filter_and_sort",
     "get_issue_detail",
     "list_issues",
     "responsibility_breakdown",

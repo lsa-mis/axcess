@@ -16,9 +16,10 @@ import gzip
 import hashlib
 import json
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from functools import wraps
+from typing import Any, Concatenate, ParamSpec, Protocol, TypeVar
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -64,6 +65,7 @@ from audit.crawler.robots import RobotsChecker
 from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
+from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
@@ -148,6 +150,42 @@ class CrawlConfig:
     # crawl when rendered-DOM checks aren't needed.
     js_enabled: bool = True
     js_eager: bool = True
+    # How long to keep waiting for network quiet after a page's `load`
+    # event, in milliseconds. The wait is a best effort and its timeout is
+    # suppressed, so this is a budget, not a deadline: when it expires the
+    # already-rendered DOM is used as-is.
+    #
+    # Was a hard-coded 10s. Any page holding a socket open -- a websocket, a
+    # poller, a chat widget, an analytics beacon -- never goes idle, so it
+    # spent the entire budget on every page and the crawl paid ten seconds
+    # per page for nothing. 2.5s covers ordinary deferred rendering; raise
+    # it for an application that genuinely settles late.
+    js_idle_timeout_ms: int = 2_500
+    # Fetch each page once when the browser is going to render it anyway.
+    #
+    # With `js_eager` on, the static HTTP response is fetched, its body read,
+    # and then discarded in favour of the rendered DOM, so every HTML page
+    # costs the target an extra request and a full extra body transfer.
+    # Enabling this skips that first fetch and renders directly, which
+    # measured about 11% faster over the fixture site with identical
+    # findings.
+    #
+    # Off by default, because it is not free:
+    #
+    #   * The static fetch is the only request a crawl currently paces. The
+    #     per-host limiter has never covered browser renders, so skipping
+    #     the static fetch means `rps` and `concurrency_per_host` stop
+    #     applying to the default crawl entirely. Moving the render under
+    #     the limiter restores the pacing but measured slower than doing
+    #     both fetches, because the limiter then gates the expensive step.
+    #   * Content type is only knowable after fetching. `_document_url`
+    #     below keeps obvious non-documents on the static path, but it is a
+    #     heuristic on the URL, so an extensionless PDF still reaches
+    #     Playwright.
+    #
+    # Turn it on for a crawl of a known all-HTML property where the target
+    # can take the load; leave it off when politeness settings matter.
+    skip_static_when_rendering: bool = False
     # Run Axcess' public Playwright browser in the background by default.
     # Local operators can opt into a headed window to watch page navigation.
     browser_headless: bool = True
@@ -518,6 +556,7 @@ async def run_crawl(
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
             search_explorer=build_search_explorer(config, axe_analyzer),
+            idle_timeout_ms=config.js_idle_timeout_ms,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -858,6 +897,7 @@ class _LazyJs:
         capture_screenshots: bool = False,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
+        idle_timeout_ms: int | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -872,6 +912,7 @@ class _LazyJs:
         self._capture_screenshots = capture_screenshots
         self._headless = headless
         self._search_explorer = search_explorer
+        self._idle_timeout_ms = idle_timeout_ms
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -887,6 +928,7 @@ class _LazyJs:
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
                 search_explorer=self._search_explorer,
+                idle_timeout_ms=self._idle_timeout_ms,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -1132,41 +1174,72 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # recoverable even when a later one fails or the process dies.
     log.info("crawl.navigating", url=url, depth=depth)
 
-    async with ctx.limiter.throttle(url):
-        if ctx.config.browser_only:
-            if ctx.js is None:
-                raise RuntimeError("Browser-only crawling requires an injected browser fetcher.")
-            try:
-                result = await (await ctx.js.get()).fetch(url)
-                render_mode = "js"
-            except FetchError as exc:
-                # The class only, never the message or the URL. A protected
-                # target's address and a failure string can both carry session
-                # detail, which is why this branch stays quiet where its public
-                # sibling logs ``error=str(exc)``. Dropping the type as well
-                # overcorrected: every cause -- DNS, a navigation timeout, a
-                # closed context, the rendered-size cap -- arrived as one
-                # indistinguishable line, and the UI could only tell the
-                # operator to read a log that said nothing.
-                log.warning(
-                    "crawl.js_fetch_failed",
-                    protected_context=True,
-                    error_type=type(exc).__name__,
-                )
-                ctx.summary.errors += 1
-                _record_page(ctx, url, status_code=None, result=None, render_mode="js")
-                return
-        else:
-            try:
-                result = await ctx.static.fetch(url)
-            except FetchError as exc:
-                log.warning("crawl.fetch_failed", url=url, error=str(exc))
-                ctx.summary.errors += 1
-                _record_page(ctx, url, status_code=None, result=None, render_mode="static")
-                return
+    if ctx.js is not None and _renders_without_static_fetch(ctx, url):
+        # One fetch, in the browser. The escalation below would otherwise
+        # pull the whole document over HTTP first and discard the body.
+        #
+        # Outside the per-host throttle, exactly where the escalation it
+        # replaces already ran. Browser renders have never been throttled;
+        # putting one under the limiter here would quietly change crawl
+        # politeness and cost about a second per page on a local target,
+        # which is a separate decision from fetching each page once.
+        try:
+            result = await (await ctx.js.get()).fetch(url)
+            render_mode = "js"
+        except FetchError as exc:
+            # Fall back to the plain fetch that was skipped. Escalation
+            # always had a static result to keep when the browser failed,
+            # and a degraded page beats no page at all.
+            log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            async with ctx.limiter.throttle(url):
+                try:
+                    result = await ctx.static.fetch(url)
+                except FetchError as static_exc:
+                    log.warning("crawl.fetch_failed", url=url, error=str(static_exc))
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+                    return
             render_mode = "static"
+    else:
+        async with ctx.limiter.throttle(url):
+            if ctx.config.browser_only:
+                if ctx.js is None:
+                    raise RuntimeError(
+                        "Browser-only crawling requires an injected browser fetcher."
+                    )
+                try:
+                    result = await (await ctx.js.get()).fetch(url)
+                    render_mode = "js"
+                except FetchError as exc:
+                    # The class only, never the message or the URL. A protected
+                    # target's address and a failure string can both carry session
+                    # detail, which is why this branch stays quiet where its public
+                    # sibling logs ``error=str(exc)``. Dropping the type as well
+                    # overcorrected: every cause -- DNS, a navigation timeout, a
+                    # closed context, the rendered-size cap -- arrived as one
+                    # indistinguishable line, and the UI could only tell the
+                    # operator to read a log that said nothing.
+                    log.warning(
+                        "crawl.js_fetch_failed",
+                        protected_context=True,
+                        error_type=type(exc).__name__,
+                    )
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="js")
+                    return
+            else:
+                try:
+                    result = await ctx.static.fetch(url)
+                except FetchError as exc:
+                    log.warning("crawl.fetch_failed", url=url, error=str(exc))
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+                    return
+                render_mode = "static"
 
-    if not ctx.config.browser_only and ctx.js is not None and _should_escalate_to_js(ctx, result):
+    # Already rendered above (browser-only, or the direct-render path) means
+    # there is nothing to escalate.
+    if render_mode != "js" and ctx.js is not None and _should_escalate_to_js(ctx, result):
         try:
             js_fetcher = await ctx.js.get()
             result = await js_fetcher.fetch(url)
@@ -1526,6 +1599,107 @@ def _enqueue_children(
         log.info("crawl.enqueued", url=normalized, source=base_url, depth=depth)
 
 
+# File extensions a browser will download or hand to a viewer rather than
+# render as a document. Only consulted to decide whether to skip the static
+# fetch: everything here is served perfectly well by StaticFetcher, and
+# routing it through Playwright turns a cheap GET into a navigation that can
+# fail, open a viewer, or trigger a download prompt.
+_NON_DOCUMENT_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".rar",
+        ".7z",
+        ".dmg",
+        ".exe",
+        ".msi",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".csv",
+        ".rtf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".avif",
+        ".svg",
+        ".ico",
+        ".bmp",
+        ".tiff",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".mov",
+        ".webm",
+        ".ogg",
+        ".m4a",
+        ".m4v",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".json",
+        ".xml",
+        ".rss",
+        ".atom",
+        ".txt",
+        ".md",
+        ".css",
+        ".js",
+        ".map",
+    }
+)
+
+
+def _is_document_url(url: str) -> bool:
+    """Whether this URL plausibly names a document a browser should render.
+
+    A heuristic on the path's extension, and only ever used to keep obvious
+    non-documents on the static path. Content type is not knowable before
+    fetching, so an extensionless PDF still looks like a document here; the
+    cost of being wrong is one wasted navigation, not a wrong result.
+    """
+    path = urlsplit(url).path
+    dot = path.rfind(".")
+    if dot == -1 or "/" in path[dot:]:
+        return True
+    return path[dot:].lower() not in _NON_DOCUMENT_SUFFIXES
+
+
+def _renders_without_static_fetch(ctx: _WorkerContext, url: str) -> bool:
+    """Whether this page should go straight to the browser, skipping HTTP.
+
+    True only when the browser would render this URL anyway: ``js_eager``
+    makes :func:`_should_escalate_to_js` return True for every HTML
+    response, so the static fetch's body is read and then discarded. That
+    costs the target one extra request and one extra full body per page.
+
+    Restricted to document-looking URLs. The frontier holds every in-scope
+    ``href``, including PDFs, images and downloads, and those never escalate
+    to the browser on the two-step path; sending them through Playwright
+    would be a new behavior rather than a saved request.
+
+    Off unless ``skip_static_when_rendering`` is set; see that field for why
+    it is not the default. Not used for the browser-only path, which has its
+    own branch and its own quieter error handling for protected targets.
+    """
+    return (
+        ctx.config.skip_static_when_rendering
+        and ctx.config.js_eager
+        and not ctx.config.browser_only
+        and _is_document_url(url)
+    )
+
+
 def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
     """Decide whether a static fetch result warrants a re-fetch via Playwright.
 
@@ -1564,6 +1738,34 @@ def _store_screenshot(
         return None
 
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _batched_writes(
+    fn: Callable[Concatenate[_WorkerContext, _P], _R],
+) -> Callable[Concatenate[_WorkerContext, _P], _R]:
+    """Commit a persistence helper's writes once instead of once per row.
+
+    The crawl connection is in autocommit mode, so each `upsert_*` call
+    below used to be its own transaction and its own WAL commit. A page
+    carrying a hundred axe violations paid for a hundred commits to write
+    one page's evidence.
+
+    Safe to apply only because every helper it decorates is synchronous.
+    All workers share one connection, so a transaction left open across an
+    `await` would swallow whatever the next worker wrote.
+    """
+
+    @wraps(fn)
+    def wrapper(ctx: _WorkerContext, /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with write_batch(ctx.conn):
+            return fn(ctx, *args, **kwargs)
+
+    return wrapper
+
+
+@_batched_writes
 def _persist_axe(
     ctx: _WorkerContext,
     *,
@@ -1573,10 +1775,13 @@ def _persist_axe(
 ) -> None:
     """Write the page's axe violations to the DB + bump the scan counters.
 
-    One DB statement per violation row keeps the code simple at the
-    expense of N writes per page. SQLite handles this trivially at our
-    scale (10k pages x ~10 violations = 100k inserts, all under one
-    transaction held open by the worker context).
+    One DB statement per violation row keeps the code simple. The
+    ``_batched_writes`` decorator makes the page's rows one commit rather
+    than one commit each; an earlier version of this docstring claimed the
+    worker already held such a transaction open, which was never true.
+
+    A per-row sqlite3 error logs and drops that row; the rest of the page
+    still lands.
     """
     for v in violations:
         try:
@@ -1615,6 +1820,7 @@ def _persist_axe(
     ctx.summary.axe_violations_total += len(violations)
 
 
+@_batched_writes
 def _persist_interaction(
     ctx: _WorkerContext,
     *,
@@ -1712,6 +1918,7 @@ def _persist_interaction(
     )
 
 
+@_batched_writes
 def _persist_alfa(
     ctx: _WorkerContext,
     *,
@@ -1770,6 +1977,7 @@ def _add_note_once(summary: CrawlSummary, note: str) -> None:
         summary.notes.append(note)
 
 
+@_batched_writes
 def _persist_keyboard(
     ctx: _WorkerContext,
     *,
@@ -1809,6 +2017,7 @@ def _persist_keyboard(
     ctx.summary.keyboard_traps_total += len(traps)
 
 
+@_batched_writes
 def _persist_responsive(
     ctx: _WorkerContext,
     *,
@@ -1847,6 +2056,7 @@ def _persist_responsive(
     ctx.summary.responsive_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_focus(
     ctx: _WorkerContext,
     *,
@@ -1875,6 +2085,7 @@ def _persist_focus(
     ctx.summary.focus_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_visual(
     ctx: _WorkerContext,
     *,
@@ -1931,6 +2142,7 @@ async def _run_semantic(
     _persist_semantic(ctx, page_id=page_id, findings=findings)
 
 
+@_batched_writes
 def _persist_semantic(
     ctx: _WorkerContext,
     *,
@@ -1939,9 +2151,9 @@ def _persist_semantic(
 ) -> None:
     """Upsert semantic findings into ``page_a11y_findings``.
 
-    Same row-by-row insert pattern as ``_persist_axe``, SQLite at our
-    scale handles 100k inserts cleanly. A per-row sqlite3 error logs
-    + drops; the rest of the page's findings still land.
+    Same row-by-row insert pattern as ``_persist_axe``, committed once per
+    page by ``_batched_writes``. A per-row sqlite3 error logs + drops; the
+    rest of the page's findings still land.
 
     Note: semantic findings carry no element screenshot, the semantic
     pass runs against the static HTML body with no live Playwright page,

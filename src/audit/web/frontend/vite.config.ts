@@ -38,5 +38,34 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: "dist",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Split the parts that change on their own schedule from the parts
+        // that change whenever the app does. Everything used to land in one
+        // 348 kB entry chunk, so editing a route invalidated React in every
+        // reader's cache and the browser could not start fetching the
+        // framework and the app shell at the same time.
+        //
+        // The react ecosystem stays in one chunk. Splitting the data layer
+        // out from react produced a circular chunk dependency, because
+        // Rollup hoists the modules they share; a cycle between chunks can
+        // leave a module uninitialized at import time, which is a worse
+        // problem than a slightly larger vendor file.
+        //
+        // The icon set is a genuinely separate leaf, so it splits cleanly.
+        // Matched on the resolved module path rather than a list of bare
+        // specifiers, because the app imports `react-dom/client`, which a
+        // bare "react-dom" entry does not catch: react-dom then stayed in
+        // the entry chunk, which was most of what needed splitting out.
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("lucide-react")) return "vendor-icons";
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|scheduler|@tanstack)[\\/]/.test(id)) {
+            return "vendor";
+          }
+          return undefined;
+        },
+      },
+    },
   },
 }));

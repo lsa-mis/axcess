@@ -224,7 +224,22 @@ def build_protected_router(
     settings: Settings,
     vault: ProtectedVault | None,
 ) -> APIRouter:
-    """Build routes; unavailable KMS configuration fails closed on writes."""
+    """Build routes; unavailable KMS configuration fails closed on writes.
+
+    Read endpoints here are plain ``def``, so FastAPI runs them in its
+    threadpool and their SQLite work does not hold the event loop. WAL lets
+    readers run concurrently with each other and with the writer, so this
+    costs nothing in contention. The companion and identity endpoints are
+    polled every couple of seconds by the protected UI, which is what made
+    blocking the loop on them expensive.
+
+    The writers are deliberately left as ``async def``. Running on the event
+    loop serializes them, which matches the single-writer model the schema
+    assumes: two threads entering ``BEGIN IMMEDIATE`` at once would instead
+    contend for the write lock and surface as a busy-timeout error. The cost
+    is that a slow write blocks the loop, which is the trade this codebase
+    already makes elsewhere for the same reason.
+    """
     router = APIRouter()
 
     @router.post("/protected-scans", status_code=201)
@@ -330,7 +345,7 @@ def build_protected_router(
         return {"scan_id": scan_id, "protection_status": record.protection_status.value}
 
     @router.get("/protected-scans")
-    async def list_protected_scans(request: Request) -> dict[str, Any]:
+    def list_protected_scans(request: Request) -> dict[str, Any]:
         """List only the current proxy subject's non-sensitive reports.
 
         Protected reports are intentionally omitted from the public scan list.
@@ -381,7 +396,7 @@ def build_protected_router(
         return {"reports": reports}
 
     @router.get("/protected-scans/identity-context")
-    async def protected_identity_context(request: Request) -> JSONResponse:
+    def protected_identity_context(request: Request) -> JSONResponse:
         """Return a non-reversible cache partition for the current proxy user.
 
         This endpoint deliberately appears before ``/{scan_id}`` so the
@@ -400,7 +415,7 @@ def build_protected_router(
         )
 
     @router.get("/protected-scans/{scan_id:int}")
-    async def get_scan(request: Request, scan_id: int) -> dict[str, Any]:
+    def get_scan(request: Request, scan_id: int) -> dict[str, Any]:
         identity = _browser_identity(request, settings)
         with get_conn() as conn:
             record = get_protected_scan_for_owner(
@@ -432,7 +447,7 @@ def build_protected_router(
         return payload
 
     @router.get("/protected-scans/{scan_id:int}/issue-index")
-    async def protected_issue_index(request: Request, scan_id: int) -> dict[str, Any]:
+    def protected_issue_index(request: Request, scan_id: int) -> dict[str, Any]:
         """Return a grouped, page-anonymous index for protected review."""
 
         identity = _browser_identity(request, settings)
@@ -464,7 +479,7 @@ def build_protected_router(
         }
 
     @router.get("/protected-scans/{scan_id:int}/manual-checks")
-    async def list_protected_manual_checks(request: Request, scan_id: int) -> dict[str, Any]:
+    def list_protected_manual_checks(request: Request, scan_id: int) -> dict[str, Any]:
         """List outcome-only WCAG manual review state for one protected scan.
 
         Criterion guidance is static product content. The response deliberately
@@ -647,7 +662,7 @@ def build_protected_router(
         }
 
     @router.get("/protected-scans/{scan_id:int}/companion")
-    async def get_companion(request: Request, scan_id: int) -> dict[str, Any]:
+    def get_companion(request: Request, scan_id: int) -> dict[str, Any]:
         """Return only non-secret re-run information for the paired computer.
 
         A session can expire long after the one-time pairing code disappears

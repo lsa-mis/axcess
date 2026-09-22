@@ -5,6 +5,7 @@ import ReportHeader from "../components/ReportHeader";
 import IssueEvidence from "../components/IssueEvidence";
 import { Card, EmptyState, LinkButton } from "../components/ui";
 import ConformanceBadge from "../components/ConformanceBadge";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
@@ -19,11 +20,7 @@ export default function IssueDetailRoute() {
   const id = Number(scanId);
   const key = decodeURIComponent(issueKey ?? "");
 
-  const { data: scan, error: scanError } = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const { data: scan, error: scanError } = useScanQuery(id);
   // Fetched once for the header title/meta; the same query key is reused by
   // <IssueEvidence>, so React Query serves both from one request.
   const { data: detail, error: detailError } = useQuery({

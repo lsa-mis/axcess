@@ -19,6 +19,7 @@ import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { cn } from "../lib/cn";
+import { useScanQuery } from "../hooks/useScanQuery";
 import type {
   ConformanceLabel,
   IssueRow,
@@ -53,11 +54,7 @@ export default function IssuesRoute() {
   const q = params.get("q") ?? "";
   const sort = parseSort(params.get("sort"));
 
-  const scanQuery = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const scanQuery = useScanQuery(id);
   const issuesQuery = useQuery({
     // Ordering is done here, not by the server: every row is already in
     // hand, and the column headers can then sort by any column in either

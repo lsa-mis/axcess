@@ -418,14 +418,20 @@ def _build_tickets(conn: sqlite3.Connection, scan: ExportScan) -> list[_Ticket]:
     # issue: a scan with 200 issue types would otherwise re-parse the YAML
     # 200 times to answer the same question.
     rules = load_report_rules()
+    # Build the scan's issue list once and resolve every detail against it.
+    # `get_issue_detail` rebuilds the whole scan-wide projection to find one
+    # row, so calling it per issue made this loop quadratic: it was ~1.2 s of
+    # the export on a 2,300-finding scan, nearly all of it re-grouping
+    # findings the list in hand already describes.
+    rows = issues.list_issues(conn, scan.id)
     tickets: list[_Ticket] = []
-    for index, row in enumerate(issues.list_issues(conn, scan.id)):
+    for index, row in enumerate(rows):
         locations, overflow = issue_locations(conn, row)
         tickets.append(
             _Ticket(
                 index=index,
                 row=row,
-                detail=issues.get_issue_detail(conn, scan.id, row.issue_key),
+                detail=issues.detail_for_row(conn, scan.id, rows, row.issue_key),
                 locations=locations,
                 overflow=overflow,
                 fix_options=fix_options_for(row, rules),
@@ -1118,8 +1124,10 @@ def _build_page_references_sheet(
     page_urls: list[str] = []
     asset_urls: list[str | None] = []
     cards_by_issue = {(card.pipeline, card.title): card for card in cards}
-    for issue in issues.list_issues(conn, scan.id):
-        detail = issues.get_issue_detail(conn, scan.id, issue.issue_key)
+    # One projection for the whole sheet, same reason as `_build_tickets`.
+    issue_rows = issues.list_issues(conn, scan.id)
+    for issue in issue_rows:
+        detail = issues.detail_for_row(conn, scan.id, issue_rows, issue.issue_key)
         if detail is None:
             continue
         card = cards_by_issue.get((issue.pipeline, issue.title))

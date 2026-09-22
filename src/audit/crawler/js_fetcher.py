@@ -123,7 +123,7 @@ class JsFetcher:
         user_agent: str,
         viewport: ViewportSize | None = None,
         nav_timeout_ms: int = _NAV_TIMEOUT_MS,
-        idle_timeout_ms: int = _IDLE_TIMEOUT_MS,
+        idle_timeout_ms: int | None = None,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: Level = "AA",
         keyboard_probe: KeyboardProbe | None = None,
@@ -142,7 +142,9 @@ class JsFetcher:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
         self._nav_timeout_ms = nav_timeout_ms
-        self._idle_timeout_ms = idle_timeout_ms
+        # None means "use the module default"; the orchestrator passes the
+        # crawl's configured budget through unconditionally.
+        self._idle_timeout_ms = _IDLE_TIMEOUT_MS if idle_timeout_ms is None else idle_timeout_ms
         self._axe_analyzer = axe_analyzer
         self._axe_level: Level = axe_level
         # SC 2.1.2 keyboard probe. When set, runs *after* the axe scan

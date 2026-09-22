@@ -439,6 +439,24 @@ class InteractionProbe:
     max_depth: int = DEFAULT_MAX_DEPTH
     timeout_s: float = DEFAULT_TIMEOUT_S
     # Time for a revealed state to settle (animations, async content).
+    # Time for a revealed state to settle (animations, async content).
+    #
+    # Deliberately a fixed wait, and deliberately taken even after the DOM
+    # has been seen to change. Two faster designs were tried and both
+    # under-reported:
+    #
+    #   * Skip the settle once the DOM hash differs. A click usually mutates
+    #     twice, synchronously to flip `aria-expanded` or a class, then again
+    #     when the panel it revealed actually renders. The first mutation is
+    #     not the last one.
+    #   * Wait for mutations to stop for a quiet period. A pending
+    #     `setTimeout` is indistinguishable from a finished page: the
+    #     observer reports quiet during the gap and axe runs too early.
+    #
+    # `tests/integration/test_interaction_settle.py` holds a fixture whose
+    # panel renders 250ms after the click, with the defect inside it. Both
+    # designs above report nothing for it, and nothing is what a clean scan
+    # looks like. Re-measure against that test before shortening this again.
     settle_ms: int = 400
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
     # Store the markup of states that held a new defect, so the inspector can

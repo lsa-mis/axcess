@@ -21,6 +21,7 @@ import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
+from time import perf_counter
 from typing import Annotated, Any, Literal
 from urllib.parse import urlencode, urlsplit
 
@@ -239,7 +240,9 @@ class _ProtectedRequestBodyLimitMiddleware:
         self.max_body_bytes = max_body_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not _is_protected_request_path(scope["path"], self.db_path):
+        if scope["type"] != "http" or not _is_protected_request_path(
+            scope["path"], self.db_path, scope
+        ):
             await self.app(scope, receive, send)
             return
 
@@ -602,6 +605,7 @@ def create_app(
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
     settings = get_settings()
     resolved_db = db_path or settings.db_path
+    slow_request_ms = settings.slow_request_ms
     resolved_blob = blob_dir or settings.blob_dir
     blob_store = BlobStore(resolved_blob)
     resolved_protected_vault = _resolve_protected_vault(settings, protected_vault)
@@ -621,7 +625,7 @@ def create_app(
         unchanged.
         """
 
-        if _is_protected_request_path(request.url.path, resolved_db):
+        if _is_protected_request_path(request.url.path, resolved_db, request.scope):
             return JSONResponse(
                 {"detail": "Invalid protected request."},
                 status_code=422,
@@ -860,12 +864,50 @@ def create_app(
         leave cache behavior to an upstream default.
         """
 
-        protected_path = _is_protected_request_path(request.url.path, resolved_db)
+        protected_path = _is_protected_request_path(request.url.path, resolved_db, request.scope)
         response = await call_next(request)
         if protected_path:
             response.headers["Cache-Control"] = "no-store, private, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.middleware("http")
+    async def _log_slow_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Log any HTTP request that takes longer than the threshold.
+
+        There was no way to notice a slow endpoint here: nothing timed a
+        request, so a projection that grew quadratic with a report's size
+        looked exactly like a fast one until somebody waited for it.
+
+        Every request, not only ``/api``. Blob serving is a real latency
+        source -- an evidence page asks for one screenshot per thumbnail,
+        and resolving each to its finding was a full table scan until
+        migration 0029 -- so excluding it would hide the thing most worth
+        watching. Static SPA assets are timed too and simply never cross
+        the threshold.
+
+        Logs only above ``AUDIT_SLOW_REQUEST_MS`` so an ordinary session
+        stays quiet and the line means something when it appears. Set the
+        threshold to 0 to time every request, which turns this into a full
+        request log for an investigation.
+
+        The route template is logged, not the path: ``/api/scans/{scan_id}``
+        groups a report's requests together, and a raw path on the protected
+        routes would put a scan id in the log for every request to it.
+        """
+        started = perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (perf_counter() - started) * 1000.0
+        if elapsed_ms >= slow_request_ms:
+            route = request.scope.get("route")
+            log.warning(
+                "http.slow_request",
+                method=request.method,
+                route=getattr(route, "path", None) or "unmatched",
+                status=response.status_code,
+                duration_ms=round(elapsed_ms, 1),
+            )
         return response
 
     # ``add_middleware`` inserts this outer ASGI guard ahead of the
@@ -1770,9 +1812,13 @@ def create_app(
 
         with get_conn() as conn:
             _load_scan_or_404(conn, scan_id)
-            filtered = issues_mod.list_issues(
-                conn,
-                scan_id,
+            # One projection per request. The facet counts below describe the
+            # whole scan, so this endpoint needs both the filtered and the
+            # unfiltered list; building each with its own `list_issues` ran
+            # the scan-wide grouping queries twice for one response.
+            unfiltered = issues_mod.list_issues(conn, scan_id)
+            filtered = issues_mod.filter_and_sort(
+                unfiltered,
                 conformance=_split_csv(conformance),
                 responsibility=_split_csv(responsibility),
                 abilities=_split_csv(abilities),
@@ -1785,7 +1831,6 @@ def create_app(
                 ),
                 sort=sort,
             )
-            unfiltered = issues_mod.list_issues(conn, scan_id)
         return JSONResponse(
             {
                 "rows": [asdict(r) for r in filtered],
@@ -2500,7 +2545,15 @@ def _protected_scan_id_for_request(path: str) -> int | None:
     return int(identifier) if _is_canonical_positive_identifier(identifier) else None
 
 
-def _is_protected_request_path(path: str, db_path: Path) -> bool:
+# Scope key holding this request's already-computed protected-path verdict.
+# The ASGI scope is per request and is the same dict object for every
+# middleware layer, so a value stored here cannot outlive the request or be
+# read by another one. Deliberately not a process-wide cache: a stale
+# "not protected" answer would be an authorization failure, not a slow page.
+_PROTECTED_PATH_SCOPE_KEY = "axcess.is_protected_path"
+
+
+def _is_protected_request_path(path: str, db_path: Path, scope: Scope | None = None) -> bool:
     """Return whether a request can carry protected input or report data.
 
     The dedicated routes are protected before a scan record exists (for
@@ -2508,8 +2561,28 @@ def _is_protected_request_path(path: str, db_path: Path) -> bool:
     routes are protected only when their resolved record belongs to the
     protected workflow. Keeping this decision in one helper prevents cache,
     validation, and body-size boundaries from drifting apart.
-    """
 
+    Three middleware layers ask this same question about the same request:
+    the body-size guard, the access guard and the cache-control guard. Pass
+    ``scope`` and the answer is computed once for the request instead of
+    opening a fresh database connection on each layer. Omitting ``scope``
+    keeps the original uncached behavior.
+    """
+    if scope is not None:
+        cached = scope.get(_PROTECTED_PATH_SCOPE_KEY)
+        # Compare the path too: a verdict is only reusable for the path it
+        # was computed from, whatever a caller passes in.
+        if cached is not None and cached[0] == path:
+            return bool(cached[1])
+
+    verdict = _compute_is_protected_request_path(path, db_path)
+    if scope is not None:
+        scope[_PROTECTED_PATH_SCOPE_KEY] = (path, verdict)
+    return verdict
+
+
+def _compute_is_protected_request_path(path: str, db_path: Path) -> bool:
+    """The uncached decision behind :func:`_is_protected_request_path`."""
     if path.startswith(("/api/protected-scans", "/api/agents")):
         return True
     if _has_noncanonical_legacy_identifier(path):
@@ -3891,6 +3964,7 @@ def _query_findings(
     list_sql = f"""
         SELECT DISTINCT f.id, f.severity, f.priority_score, f.status,
                a.vlm_classification, a.ocr_text,
+               i.id AS image_id,
                i.src_url_canonical, i.content_hash, i.has_svg_text, i.mime,
                i.width, i.height
           FROM findings f
@@ -3902,38 +3976,62 @@ def _query_findings(
          LIMIT ? OFFSET ?
     """  # noqa: S608
     rows = conn.execute(list_sql, [*params, size, offset]).fetchall()
+    samples = _sample_occurrences(
+        conn, scan_id=scan_id, image_ids=[int(r["image_id"]) for r in rows]
+    )
     findings: list[dict[str, Any]] = []
     for r in rows:
         item = dict(r)
         item["src_url_short"] = _short_url(item["src_url_canonical"])
         item["alt_adequacy"] = None
-        # Pull a sample occurrence for scannable context on the card.
-        sample = conn.execute(
-            """
-            SELECT pi.alt_text, p.url_normalized AS page_url
-              FROM page_images pi
-              JOIN pages p ON p.id = pi.page_id
-             WHERE pi.image_id = ? AND p.scan_id = ?
-             ORDER BY pi.above_fold DESC, pi.position ASC
-             LIMIT 1
-            """,
-            (item.get("content_hash") and _image_id_for_hash(conn, item["content_hash"]), scan_id),
-        ).fetchone()
-        if sample is not None:
-            item["sample_alt"] = sample["alt_text"]
-            item["sample_page"] = sample["page_url"]
-        else:
-            item["sample_alt"] = None
-            item["sample_page"] = None
+        # Sample occurrence for scannable context on the card.
+        sample = samples.get(int(r["image_id"]))
+        item["sample_alt"] = sample["alt_text"] if sample else None
+        item["sample_page"] = sample["page_url"] if sample else None
         findings.append(item)
     return findings, total
 
 
-def _image_id_for_hash(conn: sqlite3.Connection, content_hash: str) -> int | None:
-    row = conn.execute(
-        "SELECT id FROM images WHERE content_hash = ? LIMIT 1", (content_hash,)
-    ).fetchone()
-    return int(row["id"]) if row is not None else None
+def _sample_occurrences(
+    conn: sqlite3.Connection, *, scan_id: int, image_ids: list[int]
+) -> dict[int, dict[str, Any]]:
+    """One representative occurrence per image: above the fold, then earliest.
+
+    Replaces a pair of per-row queries. The findings list returns up to 500
+    rows, and each one used to cost a lookup of the image id from its
+    content hash plus a lookup of the occurrence itself, so a single page of
+    results could issue a thousand extra statements. The image id is on the
+    row already, from the join the list query performs.
+    """
+    if not image_ids:
+        return {}
+    unique_ids = list(dict.fromkeys(image_ids))
+    out: dict[int, dict[str, Any]] = {}
+    chunk_size = 900  # stay under SQLite's bound-parameter limit
+    for start in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[start : start + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT image_id, alt_text, page_url FROM (
+                SELECT pi.image_id, pi.alt_text, p.url_normalized AS page_url,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY pi.image_id
+                           ORDER BY pi.above_fold DESC, pi.position ASC
+                       ) AS rank
+                  FROM page_images pi
+                  JOIN pages p ON p.id = pi.page_id
+                 WHERE pi.image_id IN ({placeholders}) AND p.scan_id = ?
+            ) WHERE rank = 1
+            """,  # noqa: S608, placeholders are bound parameters, not values
+            (*chunk, scan_id),
+        ).fetchall()
+        for row in rows:
+            out[int(row["image_id"])] = {
+                "alt_text": row["alt_text"],
+                "page_url": row["page_url"],
+            }
+    return out
 
 
 def _pagination(*, page: int, size: int, total: int, filters: dict[str, str]) -> dict[str, Any]:

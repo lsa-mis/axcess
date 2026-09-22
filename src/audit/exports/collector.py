@@ -299,6 +299,11 @@ def _collect_findings(
                            a.id DESC
                    ) AS rank
               FROM analyses a
+             -- Scope the window to this scan's images. Unscoped, the
+             -- ranking was materialized over every analysis row in the
+             -- database before the outer WHERE narrowed it, so exporting
+             -- one scan got slower as unrelated scans accumulated.
+             WHERE a.image_id IN (SELECT image_id FROM findings WHERE scan_id = ?)
         )
         SELECT f.id, f.scan_id, f.severity, f.status, f.priority_score,
                f.wcag_criterion, f.remediation_hint,
@@ -311,12 +316,18 @@ def _collect_findings(
          WHERE f.scan_id = ?
          ORDER BY f.priority_score DESC, f.id ASC
         """,
-        (scan_id,),
+        # Twice: the first binding scopes the `best` CTE, the second the rows.
+        (scan_id, scan_id),
     ).fetchall()
+
+    # One occurrence query for the whole export, not one per finding.
+    occurrences_by_image = _collect_occurrences_for_images(
+        conn, scan_id=scan_id, image_ids=[int(row["image_id"]) for row in rows]
+    )
 
     findings: list[ExportFinding] = []
     for row in rows:
-        occurrences = _collect_occurrences(conn, scan_id=scan_id, image_id=int(row["image_id"]))
+        occurrences = occurrences_by_image.get(int(row["image_id"]), [])
         ocr_text = row["ocr_text"] or ""
         adequacy = (
             worst([compare(occ.alt_text, ocr_text) for occ in occurrences])
@@ -350,30 +361,45 @@ def _collect_findings(
     return findings
 
 
-def _collect_occurrences(
-    conn: sqlite3.Connection, *, scan_id: int, image_id: int
-) -> list[ExportOccurrence]:
-    rows = conn.execute(
-        """
-        SELECT pi.page_id, pi.alt_text, pi.above_fold, pi.position,
-               p.url_normalized AS page_url
-          FROM page_images pi
-          JOIN pages p ON p.id = pi.page_id
-         WHERE pi.image_id = ? AND p.scan_id = ?
-         ORDER BY pi.position
-        """,
-        (image_id, scan_id),
-    ).fetchall()
-    return [
-        ExportOccurrence(
-            page_id=int(r["page_id"]),
-            page_url=str(r["page_url"]),
-            alt_text=r["alt_text"],
-            above_fold=bool(r["above_fold"]),
-            position=int(r["position"]),
-        )
-        for r in rows
-    ]
+def _collect_occurrences_for_images(
+    conn: sqlite3.Connection, *, scan_id: int, image_ids: list[int]
+) -> dict[int, list[ExportOccurrence]]:
+    """Occurrences for many images at once, keyed by image id.
+
+    Ordered by position within each image. Images with no occurrences are
+    absent; callers treat a missing key as an empty list.
+
+    Chunked to stay under SQLite's bound-parameter limit, which a scan with
+    more than ~900 images would otherwise exceed.
+    """
+    by_image: dict[int, list[ExportOccurrence]] = {}
+    unique_ids = list(dict.fromkeys(image_ids))
+    chunk_size = 900
+    for start in range(0, len(unique_ids), chunk_size):
+        chunk = unique_ids[start : start + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = conn.execute(
+            f"""
+            SELECT pi.image_id, pi.page_id, pi.alt_text, pi.above_fold, pi.position,
+                   p.url_normalized AS page_url
+              FROM page_images pi
+              JOIN pages p ON p.id = pi.page_id
+             WHERE pi.image_id IN ({placeholders}) AND p.scan_id = ?
+             ORDER BY pi.image_id, pi.position
+            """,  # noqa: S608, placeholders are bound parameters, not values
+            (*chunk, scan_id),
+        ).fetchall()
+        for r in rows:
+            by_image.setdefault(int(r["image_id"]), []).append(
+                ExportOccurrence(
+                    page_id=int(r["page_id"]),
+                    page_url=str(r["page_url"]),
+                    alt_text=r["alt_text"],
+                    above_fold=bool(r["above_fold"]),
+                    position=int(r["position"]),
+                )
+            )
+    return by_image
 
 
 def _to_iso(value: Any) -> str | None:

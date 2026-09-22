@@ -9,6 +9,7 @@ import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
 import type { PageEvidence } from "../api/types";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 /** One row of a page's accessibility evidence. */
 type PageEvidenceFinding = PageEvidence["a11y_findings"][number];
@@ -28,11 +29,7 @@ export default function PageEvidenceRoute() {
   const { hash } = useLocation();
   const scan = Number(scanId);
   const page = Number(pageId);
-  const { data: scanData } = useQuery({
-    queryKey: ["scan", scan],
-    queryFn: () => api.getScan(scan),
-    enabled: Number.isFinite(scan),
-  });
+  const { data: scanData } = useScanQuery(scan);
   const { data, error } = useQuery({
     queryKey: ["page-evidence", scan, page],
     queryFn: () => api.getPageEvidence(scan, page),

@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { Button, Card, Select, withReturnTrail } from "../components/ui";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import type { ComparisonCategory, ComparisonCoverageState, ComparisonLink, ComparisonRow, ComparisonSnapshot } from "../api/types";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 const CATEGORIES: Record<ComparisonCategory, string> = {
   new: "New",
@@ -33,7 +34,7 @@ export default function DiffRoute() {
   const category = (params.get("category") ?? "") as ComparisonCategory | "";
   const pipeline = params.get("pipeline") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
-  const scanQuery = useQuery({ queryKey: ["scan", id], queryFn: () => api.getScan(id), enabled: Number.isFinite(id) });
+  const scanQuery = useScanQuery(id);
   const query = useQuery({
     queryKey: ["comparison", id, compareTo, category, pipeline, page],
     queryFn: () => api.getComparison(id, { compare_to: compareTo, category, pipeline, page }),
