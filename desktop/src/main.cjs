@@ -375,10 +375,12 @@ async function offerMacDownload(release) {
     title: "Update available",
     message: `Axcess ${release.version} is available.`,
     detail:
-      `You are running ${buildLabel()}. Download opens the new disk image in ` +
-      "your browser. Quit Axcess, open the image, and drag Axcess to " +
-      "Applications to replace this copy. Until builds are notarized, macOS " +
-      "may ask you to right-click Axcess and choose Open the first time.",
+      `You are running ${buildLabel()}. To install it: click Download and wait ` +
+      "for the download to finish, quit Axcess, double-click the downloaded " +
+      "file, drag Axcess to Applications, choose Replace, and re-run Axcess.\n\n" +
+      "Until Axcess is officially launched, macOS may prevent you from running " +
+      "it. To get past this, follow the steps at " +
+      "https://lsa-mis.github.io/axcess/get-started/#first-launch",
     buttons: ["Download", "Later"],
     defaultId: 0,
     cancelId: 1,
