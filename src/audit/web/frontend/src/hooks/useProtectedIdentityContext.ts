@@ -96,7 +96,7 @@ export const NO_IDENTITY_PARTITION = "identity-context-unavailable";
  * Still fetches if nothing has fetched yet: `refetchOnMount: false` only
  * suppresses refetching when data is already present.
  */
-export function useProtectedIdentityPartition(): string {
+export function useProtectedIdentityPartition(enabled = true): string {
   const context = useQuery({
     queryKey: IDENTITY_CONTEXT_QUERY_KEY,
     queryFn: api.getProtectedIdentityContext,
@@ -104,6 +104,11 @@ export function useProtectedIdentityPartition(): string {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    // The breadcrumb is mounted on every screen, including the dashboard
+    // and the scan list, which have no report to partition. Without this
+    // it would ask the server for an identity context those screens never
+    // use.
+    enabled,
   });
   if (context.error) return NO_IDENTITY_PARTITION;
   return context.data?.subject_fingerprint ?? NO_IDENTITY_PARTITION;

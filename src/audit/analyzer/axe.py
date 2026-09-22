@@ -266,8 +266,17 @@ class AxeAnalyzer:
         # the bundle, deliberately: eval inside the page is subject to the
         # target's own script-src, which is the restriction the evaluation
         # channel exists to avoid.
+        #
+        # It asks for the API this analyzer calls, not merely for the name.
+        # `window.axe` is an ordinary global that a target page is free to
+        # define for its own purposes; treating any truthy value as "axe is
+        # loaded" would skip the injection and then fail on `axe.run`, and
+        # the failure mode is a page reporting zero violations rather than
+        # an error. Under-reporting an accessibility scan is the one
+        # outcome worth an extra round trip to avoid.
+        already_loaded = "() => typeof window.axe?.run === 'function'"
         try:
-            if not await page.evaluate("() => typeof window.axe !== 'undefined'"):
+            if not await page.evaluate(already_loaded):
                 await page.evaluate(self.axe_source)
         except Exception as exc:
             if self.suppress_diagnostics:

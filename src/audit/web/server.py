@@ -874,15 +874,23 @@ def create_app(
 
     @app.middleware("http")
     async def _log_slow_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
-        """Log any API request that takes longer than the threshold.
+        """Log any HTTP request that takes longer than the threshold.
 
         There was no way to notice a slow endpoint here: nothing timed a
         request, so a projection that grew quadratic with a report's size
         looked exactly like a fast one until somebody waited for it.
 
+        Every request, not only ``/api``. Blob serving is a real latency
+        source -- an evidence page asks for one screenshot per thumbnail,
+        and resolving each to its finding was a full table scan until
+        migration 0029 -- so excluding it would hide the thing most worth
+        watching. Static SPA assets are timed too and simply never cross
+        the threshold.
+
         Logs only above ``AUDIT_SLOW_REQUEST_MS`` so an ordinary session
         stays quiet and the line means something when it appears. Set the
-        threshold to 0 to time every request.
+        threshold to 0 to time every request, which turns this into a full
+        request log for an investigation.
 
         The route template is logged, not the path: ``/api/scans/{scan_id}``
         groups a report's requests together, and a raw path on the protected

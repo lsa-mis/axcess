@@ -162,11 +162,30 @@ class CrawlConfig:
     # it for an application that genuinely settles late.
     js_idle_timeout_ms: int = 2_500
     # Fetch each page once when the browser is going to render it anyway.
-    # With `js_eager` on, the static HTTP response was fetched, its body
-    # read, and then discarded in favour of the rendered DOM, so every page
-    # cost the target an extra request and a full extra body transfer.
-    # Set False to restore the double fetch.
-    skip_static_when_rendering: bool = True
+    #
+    # With `js_eager` on, the static HTTP response is fetched, its body read,
+    # and then discarded in favour of the rendered DOM, so every HTML page
+    # costs the target an extra request and a full extra body transfer.
+    # Enabling this skips that first fetch and renders directly, which
+    # measured about 11% faster over the fixture site with identical
+    # findings.
+    #
+    # Off by default, because it is not free:
+    #
+    #   * The static fetch is the only request a crawl currently paces. The
+    #     per-host limiter has never covered browser renders, so skipping
+    #     the static fetch means `rps` and `concurrency_per_host` stop
+    #     applying to the default crawl entirely. Moving the render under
+    #     the limiter restores the pacing but measured slower than doing
+    #     both fetches, because the limiter then gates the expensive step.
+    #   * Content type is only knowable after fetching. `_document_url`
+    #     below keeps obvious non-documents on the static path, but it is a
+    #     heuristic on the URL, so an extensionless PDF still reaches
+    #     Playwright.
+    #
+    # Turn it on for a crawl of a known all-HTML property where the target
+    # can take the load; leave it off when politeness settings matter.
+    skip_static_when_rendering: bool = False
     # Run Axcess' public Playwright browser in the background by default.
     # Local operators can opt into a headed window to watch page navigation.
     browser_headless: bool = True
@@ -1155,7 +1174,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # recoverable even when a later one fails or the process dies.
     log.info("crawl.navigating", url=url, depth=depth)
 
-    if ctx.js is not None and _renders_without_static_fetch(ctx):
+    if ctx.js is not None and _renders_without_static_fetch(ctx, url):
         # One fetch, in the browser. The escalation below would otherwise
         # pull the whole document over HTTP first and discard the body.
         #
@@ -1580,23 +1599,104 @@ def _enqueue_children(
         log.info("crawl.enqueued", url=normalized, source=base_url, depth=depth)
 
 
-def _renders_without_static_fetch(ctx: _WorkerContext) -> bool:
+# File extensions a browser will download or hand to a viewer rather than
+# render as a document. Only consulted to decide whether to skip the static
+# fetch: everything here is served perfectly well by StaticFetcher, and
+# routing it through Playwright turns a cheap GET into a navigation that can
+# fail, open a viewer, or trigger a download prompt.
+_NON_DOCUMENT_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".rar",
+        ".7z",
+        ".dmg",
+        ".exe",
+        ".msi",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".csv",
+        ".rtf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".avif",
+        ".svg",
+        ".ico",
+        ".bmp",
+        ".tiff",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".mov",
+        ".webm",
+        ".ogg",
+        ".m4a",
+        ".m4v",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".json",
+        ".xml",
+        ".rss",
+        ".atom",
+        ".txt",
+        ".md",
+        ".css",
+        ".js",
+        ".map",
+    }
+)
+
+
+def _is_document_url(url: str) -> bool:
+    """Whether this URL plausibly names a document a browser should render.
+
+    A heuristic on the path's extension, and only ever used to keep obvious
+    non-documents on the static path. Content type is not knowable before
+    fetching, so an extensionless PDF still looks like a document here; the
+    cost of being wrong is one wasted navigation, not a wrong result.
+    """
+    path = urlsplit(url).path
+    dot = path.rfind(".")
+    if dot == -1 or "/" in path[dot:]:
+        return True
+    return path[dot:].lower() not in _NON_DOCUMENT_SUFFIXES
+
+
+def _renders_without_static_fetch(ctx: _WorkerContext, url: str) -> bool:
     """Whether this page should go straight to the browser, skipping HTTP.
 
-    True only when the browser would render the page anyway: ``js_eager``
+    True only when the browser would render this URL anyway: ``js_eager``
     makes :func:`_should_escalate_to_js` return True for every HTML
-    response, so the static fetch's body was read and then discarded. That
-    cost the target one extra request and one extra full body per page.
+    response, so the static fetch's body is read and then discarded. That
+    costs the target one extra request and one extra full body per page.
 
-    ``skip_static_when_rendering=False`` restores the two-step fetch.
+    Restricted to document-looking URLs. The frontier holds every in-scope
+    ``href``, including PDFs, images and downloads, and those never escalate
+    to the browser on the two-step path; sending them through Playwright
+    would be a new behavior rather than a saved request.
 
-    Not used for the browser-only path, which has its own branch and its own
-    quieter error handling for protected targets.
+    Off unless ``skip_static_when_rendering`` is set; see that field for why
+    it is not the default. Not used for the browser-only path, which has its
+    own branch and its own quieter error handling for protected targets.
     """
     return (
         ctx.config.skip_static_when_rendering
         and ctx.config.js_eager
         and not ctx.config.browser_only
+        and _is_document_url(url)
     )
 
 

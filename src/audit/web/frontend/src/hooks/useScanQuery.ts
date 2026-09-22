@@ -38,11 +38,14 @@ export function useScanQuery(
     "refetchInterval" | "refetchIntervalInBackground" | "refetchOnWindowFocus"
   >,
 ) {
-  const identityPartition = useProtectedIdentityPartition();
+  // A non-report screen passes 0 and gets no queries at all, neither the
+  // scan nor the identity context behind its partition.
+  const wanted = Number.isSafeInteger(id) && id > 0;
+  const identityPartition = useProtectedIdentityPartition(wanted);
   return useQuery<ScanDetail>({
     queryKey: scanQueryKey(id, identityPartition),
     queryFn: () => api.getScan(id),
-    enabled: Number.isSafeInteger(id) && id > 0,
+    enabled: wanted,
     // Only the refetch cadence is configurable. The key and the fetcher are
     // fixed, because sharing one cache entry across the gate and the routes
     // is the point of this hook. A route that polls while a scan runs

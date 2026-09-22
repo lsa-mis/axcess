@@ -21,21 +21,29 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 5000")
-    # Page cache, expressed in KiB rather than pages so the size does not
-    # move when the page size does. The web layer opens a connection per
-    # request and a crawl holds one for its whole run; 64 MiB keeps a
-    # report's working set resident instead of re-reading it from the OS
-    # on every projection.
-    conn.execute("PRAGMA cache_size = -65536")
     # Read the database through the page cache of the OS rather than
     # copying each page. 256 MiB is a ceiling, not an allocation: SQLite
     # maps up to the file's size, and a database smaller than this is
-    # mapped whole. Harmless where mmap is unavailable, SQLite falls back
-    # to ordinary reads.
+    # mapped whole. The mapping is shared and read-only, so it does not
+    # multiply with the number of open connections. Harmless where mmap is
+    # unavailable, SQLite falls back to ordinary reads.
     conn.execute("PRAGMA mmap_size = 268435456")
-    # Sorting and the temporary B-trees behind GROUP BY belong in memory.
-    # The alternative is a temp file per grouped query.
-    conn.execute("PRAGMA temp_store = MEMORY")
+    # Deliberately NOT set here, both tried and removed:
+    #
+    #   cache_size    A larger page cache measured no faster than the
+    #                 default once mmap was on, and it is per connection.
+    #                 The web layer opens one per request and read routes
+    #                 run in a threadpool, so the ceiling multiplies.
+    #   temp_store    MEMORY forces every sort and GROUP BY B-tree onto the
+    #                 heap with no spill, again per connection. The covering
+    #                 index added in migration 0029 removed the temporary
+    #                 B-tree from the projection this was meant to help, so
+    #                 it bought nothing and risked unbounded growth under
+    #                 concurrent large-report requests.
+    #
+    # Measured on a 2,276-finding report, fresh connection per call, which
+    # is how the web layer works: stock 17.4 ms, mmap only 16.5 ms, all
+    # three 16.7 ms. Re-measure before adding either back.
     return conn
 
 
