@@ -57,6 +57,7 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
     rps: 1,
     workers: 2,
     whole_host: false,
+    show_browser: false,
     scan_engine: "axe",
     axe_level: "AA",
     // Explore revealed DOM states and routes within the signed-in session.
@@ -269,9 +270,9 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
               stored in your local Axcess database.
             </p>
             <p className="mt-2">
-              After you select “I’m signed in, start scan”, Axcess transfers
-              your login session to a background browser and closes the sign-in
-              window. Keep Axcess running and follow the scan progress here.
+              {form.show_browser
+                ? "After you start the scan, Axcess keeps the signed-in browser visible so you can watch. Leave it open until the scan finishes."
+                : "After you select ‘I’m signed in, start scan’, Axcess transfers your login session to a background browser and closes the sign-in window. Keep Axcess running and follow the scan progress here."}
             </p>
           </div>
 
@@ -455,6 +456,12 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
                 </fieldset>
 
                 <div className="-mx-2 mt-1 space-y-1">
+                  <Checkbox
+                    checked={form.show_browser ?? false}
+                    onChange={(value) => update("show_browser", value)}
+                    label="Show the scanning browser window"
+                    hint="Keep the signed-in browser visible to watch page navigation. Leave this off to scan in a background browser."
+                  />
                   <Checkbox
                     checked={form.whole_host}
                     onChange={(value) => update("whole_host", value)}
@@ -703,12 +710,15 @@ function LocalLoginHandoff({
       verifying_authentication: {
         title: "Preparing the signed-in session",
         detail:
-          "Axcess is transferring your signed-in session to a new background browser. The sign-in window will close automatically.",
+          "Axcess is preparing your signed-in session using your browser visibility setting.",
       },
       scanning: {
-        title: "Scanning in the background",
-        detail:
-          "The sign-in window has closed. Axcess is scanning in a headless browser with your transferred login session. Keep Axcess running until the scan finishes.",
+        title: status.data?.browser_backgrounded
+          ? "Scanning in the background"
+          : "Scanning with the browser visible",
+        detail: status.data?.browser_backgrounded
+          ? "The sign-in window has closed. Axcess is scanning in a background browser with your transferred login session. Keep Axcess running until the scan finishes."
+          : "Axcess is scanning in your signed-in browser. Leave the browser window open until the scan finishes.",
       },
       completed: {
         title: "Report ready",
@@ -791,7 +801,7 @@ function LocalLoginHandoff({
                   Live page activity
                 </h3>
                 <p className="mt-1 text-xs text-fg-muted">
-                  The background browser is checking your signed-in pages.
+                  Axcess is checking your signed-in pages.
                   This panel updates without reloading or scrolling the page.
                 </p>
               </div>

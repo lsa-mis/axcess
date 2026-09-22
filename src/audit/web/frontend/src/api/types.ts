@@ -345,6 +345,8 @@ export interface LocalLoginScanPayload {
   /** Concurrent authenticated tabs; the local login API caps this at four. */
   workers: number;
   whole_host: boolean;
+  /** Keep the signed-in browser visible instead of transferring to headless Chromium. */
+  show_browser?: boolean;
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
   axe_level: "A" | "AA" | "AAA";

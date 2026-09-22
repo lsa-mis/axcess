@@ -223,9 +223,11 @@ The desktop and loopback web app support a practical local login flow:
    another factor. Do not enter credentials into Axcess itself.
 5. Navigate to the approved post-login application page and select **I’m
    signed in, start scan**.
-6. Axcess transfers cookies, localStorage, IndexedDB, and the selected tab’s
+6. By default, Axcess transfers cookies, localStorage, IndexedDB, and the selected tab’s
    sessionStorage in memory to a new headless Chromium, then closes the visible
    sign-in browser. The existing scan pipeline crawls from the signed-in page.
+   If **Show the scanning browser window** is enabled, Axcess keeps scanning
+   in the original visible browser instead.
 7. Keep Axcess running and follow progress in the app. No reusable login-state
    file is saved. Sites whose login depends on live JavaScript memory or a
    browser-bound session may require signing in again; a scan that only reaches

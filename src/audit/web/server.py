@@ -142,6 +142,7 @@ class LocalLoginScanRequest(BaseModel):
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
     workers: int = Field(default=2, ge=1, le=4)
+    show_browser: bool = False
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
@@ -1152,6 +1153,7 @@ def create_app(
             # target application while still using modern laptop capacity.
             concurrency_per_host=body.workers,
             workers=body.workers,
+            browser_headless=not body.show_browser,
             user_agent=settings.user_agent,
             request_timeout_s=settings.request_timeout_s,
             # Optional protected-image analysis uses the same authenticated
@@ -2973,11 +2975,15 @@ async def _run_local_login_background(
         # that seed when the landing page sits outside it, so a landing page
         # Axcess cannot use costs the crawl nothing.
         config = replace(config, start_url=run.session.enter_scan_mode())
-        # Keep the same scan pipeline, with a newly launched headless browser
-        # carrying the manually established session in memory.
-        config = replace(config, browser_headless=True)
-        scan_pages = await run.session.switch_to_headless(config.workers)
-        run.browser_backgrounded = True
+        if config.browser_headless:
+            scan_pages = await run.session.switch_to_headless(config.workers)
+            run.browser_backgrounded = True
+        else:
+            # An explicit visible-browser preference keeps the original
+            # signed-in browser. Do not transfer or minimize its session.
+            scan_pages = await run.session.prepare_background_scan_pages(config.workers)
+            await run.session.discard_manual_auth_page()
+            run.browser_backgrounded = False
 
         # The orchestrator normally constructs these around a fresh browser.
         # For an authenticated scan they must be attached before we inject the
