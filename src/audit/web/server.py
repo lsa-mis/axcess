@@ -2973,12 +2973,11 @@ async def _run_local_login_background(
         # that seed when the landing page sits outside it, so a landing page
         # Axcess cannot use costs the crawl nothing.
         config = replace(config, start_url=run.session.enter_scan_mode())
-        # Chromium on macOS restores a minimized window whenever a new page is
-        # created. Prepare reusable scan tabs before minimizing so
-        # the authenticated crawl stays out of the auditor's way throughout.
-        scan_pages = await run.session.prepare_background_scan_pages(config.workers)
-        await run.session.discard_manual_auth_page()
-        run.browser_backgrounded = await run.session.minimize_for_background_scan(scan_pages[0])
+        # Keep the same scan pipeline, with a newly launched headless browser
+        # carrying the manually established session in memory.
+        config = replace(config, browser_headless=True)
+        scan_pages = await run.session.switch_to_headless(config.workers)
+        run.browser_backgrounded = True
 
         # The orchestrator normally constructs these around a fresh browser.
         # For an authenticated scan they must be attached before we inject the

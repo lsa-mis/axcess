@@ -1722,14 +1722,8 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         def enter_scan_mode(self):  # type: ignore[no-untyped-def]
             return landed
 
-        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
-
-        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             return SimpleNamespace()
@@ -1741,6 +1735,7 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
 
     config = CrawlConfig(
         seed_url=seed,
+        browser_headless=False,  # Login handoff must override a visible-browser preference.
         alfa_enabled=False,
         image_extraction_enabled=False,
         vlm_enabled=False,
@@ -1758,6 +1753,7 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
     )
     # Scope must not have moved with it.
     assert captured["config"].seed_url == seed
+    assert captured["config"].browser_headless is True
 
 
 def test_login_handoff_fails_when_every_page_was_a_sign_in_wall() -> None:
@@ -1848,14 +1844,8 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         def enter_scan_mode(self):  # type: ignore[no-untyped-def]
             return "https://app.example.edu/dashboard"
 
-        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
-
-        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             captured.update(kwargs)
@@ -1920,14 +1910,8 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         def enter_scan_mode(self):  # type: ignore[no-untyped-def]
             return "https://app.example.edu/dashboard"
 
-        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
-
-        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             captured.update(kwargs)

@@ -373,6 +373,7 @@ export interface LocalLoginScanState {
   scan_id: number;
   status: LocalLoginScanStatus;
   error: string | null;
+  /** True once the login session has transferred to the headless scan browser. */
   browser_backgrounded?: boolean;
   message?: string;
 }

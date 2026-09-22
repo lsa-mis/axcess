@@ -268,6 +268,11 @@ function LocalLoginForm({ showSteps }: { showSteps: boolean }) {
               in memory and is destroyed when the scan ends. Report evidence is
               stored in your local Axcess database.
             </p>
+            <p className="mt-2">
+              After you select “I’m signed in, start scan”, Axcess transfers
+              your login session to a background browser and closes the sign-in
+              window. Keep Axcess running and follow the scan progress here.
+            </p>
           </div>
 
           <Disclosure
@@ -698,13 +703,12 @@ function LocalLoginHandoff({
       verifying_authentication: {
         title: "Preparing the signed-in session",
         detail:
-          "Axcess is setting up the background tabs that will reuse your signed-in browser.",
+          "Axcess is transferring your signed-in session to a new background browser. The sign-in window will close automatically.",
       },
       scanning: {
         title: "Scanning in the background",
-        detail: status.data?.browser_backgrounded
-          ? "The signed-in Chromium window has been moved out of the way while Axcess reuses its in-memory session. You can keep working, but quitting Chromium will stop the scan."
-          : "Axcess is reusing the signed-in browser session in the background. You can keep working, but closing Chromium will stop the scan.",
+        detail:
+          "The sign-in window has closed. Axcess is scanning in a headless browser with your transferred login session. Keep Axcess running until the scan finishes.",
       },
       completed: {
         title: "Report ready",
@@ -787,7 +791,7 @@ function LocalLoginHandoff({
                   Live page activity
                 </h3>
                 <p className="mt-1 text-xs text-fg-muted">
-                  The visible signed-in browser follows the page being tested.
+                  The background browser is checking your signed-in pages.
                   This panel updates without reloading or scrolling the page.
                 </p>
               </div>

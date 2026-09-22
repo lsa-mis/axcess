@@ -113,7 +113,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pillow", specifier = ">=10.2" },
-    { name = "playwright", specifier = ">=1.40" },
+    { name = "playwright", specifier = ">=1.51" },
     { name = "pydantic", specifier = ">=2.6" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "pytesseract", specifier = ">=0.3.10" },

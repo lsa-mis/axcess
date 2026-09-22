@@ -1,9 +1,10 @@
 """Companion-side, manual authentication for protected accessibility scans.
 
-This module owns a headed Playwright browser context only on the auditor's
-machine. The auditor completes sign-in and any second factor directly in that
+This module owns local Playwright browsers on the auditor's machine.
+The auditor completes sign-in and any second factor directly in that
 window. No method exports Playwright storage state, cookies, credentials, or
-MFA material; closing the context destroys the session in memory.
+MFA material to callers. Local login scans transfer supported state in memory
+to a new headless browser; closing the session destroys both browsers.
 
 It is intentionally independent of FastAPI, the public crawler, the CLI, and
 database persistence. A future paired companion can use it as the narrow
@@ -12,6 +13,7 @@ boundary between manual sign-in and a shared-context accessibility fetcher.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import os
 import shutil
@@ -45,12 +47,25 @@ from audit.protected.egress import (
     PublicHttpsManualAuthPolicy,
     ValidatedUrl,
 )
+from audit.protected.handoff import capture_session_storage, restore_session_storage
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright, Route
 
 _DEFAULT_USER_AGENT = "axcess/0.1 (+authorized protected accessibility audit)"
 _DEFAULT_NAV_TIMEOUT_MS = 30_000
+_BROWSER_ARGS = [
+    "--disable-background-timer-throttling",
+    "--disable-quic",
+    "--disable-background-networking",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-component-update",
+    "--disable-renderer-backgrounding",
+    "--disable-sync",
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    "--disk-cache-size=1",
+    "--media-cache-size=1",
+]
 log = get_logger(__name__)
 
 _SETUP_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "POST"})
@@ -429,25 +444,9 @@ class ManualAuthenticationSession:
             self._context = await self._playwright.chromium.launch_persistent_context(
                 self._profile_dir,
                 headless=False,
-                args=[
-                    # No --incognito. With a persistent context that flag adds
-                    # a second, off-to-the-side incognito window while the
-                    # sign-in page created below lives in the ordinary profile
-                    # -- so it never protected the session, it only doubled the
-                    # windows the auditor has to find. Isolation here is the
-                    # ephemeral mode-0700 profile directory, which is removed
-                    # on close (see _create_ephemeral_profile_dir).
-                    "--disable-background-timer-throttling",
-                    "--disable-quic",
-                    "--disable-background-networking",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-component-update",
-                    "--disable-renderer-backgrounding",
-                    "--disable-sync",
-                    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-                    "--disk-cache-size=1",
-                    "--media-cache-size=1",
-                ],
+                # A dedicated disposable profile isolates manual sign-in;
+                # --incognito would open an additional unrelated window.
+                args=_BROWSER_ARGS,
                 user_agent=self._user_agent,
                 accept_downloads=False,
                 service_workers="block",
@@ -532,6 +531,61 @@ class ManualAuthenticationSession:
         self._egress_proxy.set_policy(self._policies.scan)
         self._state = ManualAuthState.AUTHENTICATED
         return self.page.url
+
+    async def switch_to_headless(self, count: int) -> tuple[Page, ...]:
+        """Restore transferable login state in a new, normal headless Chromium.
+
+        State stays in memory. The local login flow opts into this handoff;
+        the managed companion can continue using its original browser. Keep
+        one reusable tab when sessionStorage is present so token updates are
+        shared across successive pages, just as in the original login tab.
+        """
+        if self._state is not ManualAuthState.AUTHENTICATED or self._playwright is None:
+            raise ManualAuthenticationError("Confirm sign-in before starting the headless scan.")
+        if self._browser is not None:
+            raise ManualAuthenticationError("The headless scan browser is already running.")
+        if not 1 <= count <= 16:
+            raise ValueError("Headless scan page count must be between 1 and 16.")
+        login_context = self.context
+        browser: Browser | None = None
+        try:
+            async with asyncio.timeout(60):
+                # IndexedDB is opt-in in Playwright; some authentication SDKs
+                # keep their tokens there rather than in cookies/localStorage.
+                login_page = self.page
+                tab_storage = await capture_session_storage(login_page)
+                storage = await login_context.storage_state(indexed_db=True)
+                browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=_BROWSER_ARGS,
+                )
+                context = await browser.new_context(
+                    storage_state=storage,
+                    user_agent=self._user_agent,
+                    viewport={"width": 1440, "height": 900},
+                    accept_downloads=False,
+                    service_workers="block",
+                    proxy={"server": self._egress_proxy.server_url, "bypass": ""},
+                )
+                await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
+                await self._route_guard.install_on_context(context)
+                pages = []
+                for _ in range(1 if tab_storage else count):
+                    page = await context.new_page()
+                    await restore_session_storage(page, tab_storage)
+                    pages.append(page)
+                # Only retire the login browser after the new context is ready.
+                await login_context.close()
+                self._context = context
+                self._browser = browser
+                self._auth_pages.clear()
+                self._page = None
+                return tuple(pages)
+        except BaseException:
+            if browser is not None:
+                with contextlib.suppress(Exception):
+                    await browser.close()
+            raise
 
     async def prepare_background_scan_pages(self, count: int) -> tuple[Page, ...]:
         """Prepare up to ``count`` authenticated tabs before hiding Chromium.
