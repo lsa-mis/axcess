@@ -239,7 +239,9 @@ class _ProtectedRequestBodyLimitMiddleware:
         self.max_body_bytes = max_body_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not _is_protected_request_path(scope["path"], self.db_path):
+        if scope["type"] != "http" or not _is_protected_request_path(
+            scope["path"], self.db_path, scope
+        ):
             await self.app(scope, receive, send)
             return
 
@@ -621,7 +623,7 @@ def create_app(
         unchanged.
         """
 
-        if _is_protected_request_path(request.url.path, resolved_db):
+        if _is_protected_request_path(request.url.path, resolved_db, request.scope):
             return JSONResponse(
                 {"detail": "Invalid protected request."},
                 status_code=422,
@@ -860,7 +862,7 @@ def create_app(
         leave cache behavior to an upstream default.
         """
 
-        protected_path = _is_protected_request_path(request.url.path, resolved_db)
+        protected_path = _is_protected_request_path(request.url.path, resolved_db, request.scope)
         response = await call_next(request)
         if protected_path:
             response.headers["Cache-Control"] = "no-store, private, max-age=0"
@@ -2503,7 +2505,15 @@ def _protected_scan_id_for_request(path: str) -> int | None:
     return int(identifier) if _is_canonical_positive_identifier(identifier) else None
 
 
-def _is_protected_request_path(path: str, db_path: Path) -> bool:
+# Scope key holding this request's already-computed protected-path verdict.
+# The ASGI scope is per request and is the same dict object for every
+# middleware layer, so a value stored here cannot outlive the request or be
+# read by another one. Deliberately not a process-wide cache: a stale
+# "not protected" answer would be an authorization failure, not a slow page.
+_PROTECTED_PATH_SCOPE_KEY = "axcess.is_protected_path"
+
+
+def _is_protected_request_path(path: str, db_path: Path, scope: Scope | None = None) -> bool:
     """Return whether a request can carry protected input or report data.
 
     The dedicated routes are protected before a scan record exists (for
@@ -2511,8 +2521,28 @@ def _is_protected_request_path(path: str, db_path: Path) -> bool:
     routes are protected only when their resolved record belongs to the
     protected workflow. Keeping this decision in one helper prevents cache,
     validation, and body-size boundaries from drifting apart.
-    """
 
+    Three middleware layers ask this same question about the same request:
+    the body-size guard, the access guard and the cache-control guard. Pass
+    ``scope`` and the answer is computed once for the request instead of
+    opening a fresh database connection on each layer. Omitting ``scope``
+    keeps the original uncached behavior.
+    """
+    if scope is not None:
+        cached = scope.get(_PROTECTED_PATH_SCOPE_KEY)
+        # Compare the path too: a verdict is only reusable for the path it
+        # was computed from, whatever a caller passes in.
+        if cached is not None and cached[0] == path:
+            return bool(cached[1])
+
+    verdict = _compute_is_protected_request_path(path, db_path)
+    if scope is not None:
+        scope[_PROTECTED_PATH_SCOPE_KEY] = (path, verdict)
+    return verdict
+
+
+def _compute_is_protected_request_path(path: str, db_path: Path) -> bool:
+    """The uncached decision behind :func:`_is_protected_request_path`."""
     if path.startswith(("/api/protected-scans", "/api/agents")):
         return True
     if _has_noncanonical_legacy_identifier(path):
