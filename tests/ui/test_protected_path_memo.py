@@ -37,9 +37,7 @@ def verdict_calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     return calls
 
 
-def test_verdict_is_computed_once_per_request(
-    client: TestClient, verdict_calls: list[str]
-) -> None:
+def test_verdict_is_computed_once_per_request(client: TestClient, verdict_calls: list[str]) -> None:
     """One report request must not re-resolve its own protected status."""
     assert client.get("/api/scans/1/issues").status_code == 200
     assert verdict_calls.count("/api/scans/1/issues") == 1, (

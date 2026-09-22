@@ -21,6 +21,7 @@ import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
+from time import perf_counter
 from typing import Annotated, Any, Literal
 from urllib.parse import urlencode, urlsplit
 
@@ -604,6 +605,7 @@ def create_app(
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
     settings = get_settings()
     resolved_db = db_path or settings.db_path
+    slow_request_ms = settings.slow_request_ms
     resolved_blob = blob_dir or settings.blob_dir
     blob_store = BlobStore(resolved_blob)
     resolved_protected_vault = _resolve_protected_vault(settings, protected_vault)
@@ -868,6 +870,36 @@ def create_app(
             response.headers["Cache-Control"] = "no-store, private, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @app.middleware("http")
+    async def _log_slow_requests(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Log any API request that takes longer than the threshold.
+
+        There was no way to notice a slow endpoint here: nothing timed a
+        request, so a projection that grew quadratic with a report's size
+        looked exactly like a fast one until somebody waited for it.
+
+        Logs only above ``AUDIT_SLOW_REQUEST_MS`` so an ordinary session
+        stays quiet and the line means something when it appears. Set the
+        threshold to 0 to time every request.
+
+        The route template is logged, not the path: ``/api/scans/{scan_id}``
+        groups a report's requests together, and a raw path on the protected
+        routes would put a scan id in the log for every request to it.
+        """
+        started = perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (perf_counter() - started) * 1000.0
+        if elapsed_ms >= slow_request_ms:
+            route = request.scope.get("route")
+            log.warning(
+                "http.slow_request",
+                method=request.method,
+                route=getattr(route, "path", None) or "unmatched",
+                status=response.status_code,
+                duration_ms=round(elapsed_ms, 1),
+            )
         return response
 
     # ``add_middleware`` inserts this outer ASGI guard ahead of the

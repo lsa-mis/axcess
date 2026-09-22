@@ -54,9 +54,7 @@ async def test_tracker_selection(client: TestClient) -> None:
                 assert {sc.strip() for sc in actual_scs} == expected_by_view[label], label
                 # The chips cross-fade their colours; let that settle before
                 # axe samples a mid-transition foreground against background.
-                await page.evaluate(
-                    "Promise.all(document.getAnimations().map((a) => a.finished))"
-                )
+                await page.evaluate("Promise.all(document.getAnimations().map((a) => a.finished))")
                 violations = await _run_axe(page)
                 assert not violations, _render_violations(violations)
             # The status sub-filter only exists inside AI Coverage, and it
