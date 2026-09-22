@@ -25,11 +25,6 @@ class _Page:
     same_document: bool = False
     reload_status: int = 200
     reload_calls: int = 0
-    #: A signed-in context has no default viewport; the fetcher supplies one.
-    viewport_size: dict[str, int] | None = None
-
-    async def set_viewport_size(self, size: dict[str, int]) -> None:
-        self.viewport_size = dict(size)
 
     async def goto(self, url: str, *, timeout: int, wait_until: str) -> _Response | None:
         assert timeout == 30_000
@@ -91,10 +86,6 @@ async def test_shared_page_pool_reuses_prepared_tabs_without_opening_new_windows
     assert sum(len(page.goto_calls) for page in pages) == 3
     assert all(not page.closed for page in pages)
     assert not any(result.interaction_evaluated for result in (first, second, third))
-    # The signed-in context has no default viewport, so that Playwright leaves
-    # its real window alone. A page that arrives without one still has to
-    # render at the crawl's standard size, not at the size of that window.
-    assert [page.viewport_size for page in pages] == [{"width": 1440, "height": 900}] * 2
 
 
 @pytest.mark.asyncio

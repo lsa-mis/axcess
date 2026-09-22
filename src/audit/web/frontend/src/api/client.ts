@@ -163,11 +163,6 @@ export const api = {
     request<LocalLoginScanState>(`/api/local-login-scans/${scanId}/confirm`, {
       method: "POST",
     }),
-  setLocalLoginBrowserVisible: (scanId: number, visible: boolean) =>
-    request<LocalLoginScanState>(`/api/local-login-scans/${scanId}/browser`, {
-      method: "POST",
-      body: JSON.stringify({ visible }),
-    }),
   getEvaluation: (scanId: number) =>
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`),
   updateEvaluation: (scanId: number, payload: Partial<EvaluationRecord>) =>

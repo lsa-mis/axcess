@@ -140,7 +140,6 @@ export const LOGIN_POLICY: ScanPolicy = {
     include_subdomain: false,
     static_only: false,
     ignore_robots: true,
-    show_browser: false,
     // Not offered for signed-in scans; the login payload has no field for
     // them, so they stay at their defaults and are dropped at submit.
     skip_semantic: true,
@@ -223,6 +222,7 @@ export function toLocalLoginPayload(
     rps: settings.rps,
     workers: settings.workers,
     whole_host: settings.whole_host,
+    show_browser: settings.show_browser,
     scan_engine: settings.scan_engine,
     axe_level: settings.axe_level,
     skip_interaction: settings.skip_interaction,

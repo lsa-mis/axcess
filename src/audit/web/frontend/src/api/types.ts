@@ -345,6 +345,8 @@ export interface LocalLoginScanPayload {
   /** Concurrent authenticated tabs; the local login API caps this at four. */
   workers: number;
   whole_host: boolean;
+  /** Keep the signed-in browser visible instead of transferring to headless Chromium. */
+  show_browser?: boolean;
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
   axe_level: "A" | "AA" | "AAA";
@@ -373,14 +375,8 @@ export interface LocalLoginScanState {
   scan_id: number;
   status: LocalLoginScanStatus;
   error: string | null;
-  /** Whether the sign-in browser is out of the way right now, not whether it once was. */
+  /** True once the login session has transferred to the headless scan browser. */
   browser_backgrounded?: boolean;
-  /** False once the auditor has asked to see the browser. */
-  browser_hiding_wanted?: boolean;
-  /** It would not minimize, so it was moved to the edge of the screen instead. */
-  browser_parked?: boolean;
-  /** On a show/hide request: whether the browser actually moved. */
-  changed?: boolean;
   message?: string;
 }
 

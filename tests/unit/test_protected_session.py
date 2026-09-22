@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
-import inspect
 import io
 import os
-from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import pytest
@@ -204,38 +201,17 @@ class _FakeResponse:
         self.disposed = True
 
 
-@dataclass(eq=False)
+@dataclass
 class _FakePage:
     url: str = "about:blank"
     goto_calls: list[tuple[str, int, str]] = field(default_factory=list)
     event_handlers: dict[str, object] = field(default_factory=dict)
     closed: bool = False
     has_session_storage: bool = False
-    viewport: dict[str, int] | None = None
-    content: str | None = None
-    fronted: int = 0
-    context: _FakeContext | None = None
 
     async def evaluate(self, script: str) -> bool:
         assert script == "() => sessionStorage.length > 0"
         return self.has_session_storage
-
-    async def set_viewport_size(self, size: dict[str, int]) -> None:
-        self.viewport = dict(size)
-
-    async def set_content(self, html: str) -> None:
-        self.content = html
-
-    async def bring_to_front(self) -> None:
-        self.fronted += 1
-        # Measured on macOS: fronting a tab raises a minimized window, even
-        # when that tab was already in front. Hiding has to come after it.
-        if self.context is not None:
-            cdp = self.context.cdp_session
-            cdp.window(cdp.window_of.get(id(self), 7))["windowState"] = "normal"
-
-    def is_closed(self) -> bool:
-        return self.closed
 
     async def goto(self, url: str, *, timeout: int, wait_until: str) -> object:
         self.url = url
@@ -262,52 +238,29 @@ class _FakePage:
 class _FakeCdpSession:
     calls: list[tuple[str, object | None]] = field(default_factory=list)
     detached: bool = False
-    #: Some macOS Chromium builds acknowledge a minimize and ignore it.
-    honors_minimize: bool = False
-    #: Native window of each tab; a tab not listed here lives in window 7.
-    window_of: dict[int, int] = field(default_factory=dict)
-    windows: dict[int, dict[str, object]] = field(default_factory=dict)
-    attached_to: object | None = None
-
-    def window(self, window_id: int) -> dict[str, object]:
-        return self.windows.setdefault(
-            window_id,
-            {"windowState": "normal", "left": 40, "top": 60, "width": 1200, "height": 900},
-        )
-
-    def minimize_requests(self, window_id: int = 7) -> int:
-        wanted = {"windowId": window_id, "bounds": {"windowState": "minimized"}}
-        return sum(
-            1
-            for method, params in self.calls
-            if method == "Browser.setWindowBounds" and params == wanted
-        )
+    window_state: str = "normal"
+    left: int = 0
 
     async def send(self, method: str, params: object | None = None) -> dict[str, object]:
         self.calls.append((method, params))
         if method == "Browser.getWindowForTarget":
-            return {"windowId": self.window_of.get(id(self.attached_to), 7)}
+            return {"windowId": 7}
         if method == "Browser.setWindowBounds" and isinstance(params, dict):
-            window = self.window(params["windowId"])
             bounds = params.get("bounds")
-            assert isinstance(bounds, dict)
-            if bounds.get("windowState") == "minimized":
-                if window["windowState"] == "fullscreen":
-                    raise RuntimeError(
-                        "To minimize a fullscreen window, restore it to normal state first."
-                    )
-                if self.honors_minimize:
-                    window["windowState"] = "minimized"
-                return {}
-            window["windowState"] = "normal"
-            if bounds.get("left") == -10_000:
+            if isinstance(bounds, dict) and bounds.get("left") == -10_000:
                 # Match Chromium on macOS: it keeps a narrow edge reachable.
-                window["left"] = -1240
-            elif "left" in bounds:
-                window["left"] = bounds["left"]
+                self.window_state = "normal"
+                self.left = -1240
+            # Deliberately ignore the first minimized request so the unit test
+            # exercises the macOS off-screen fallback.
             return {}
-        if method == "Browser.getWindowBounds" and isinstance(params, dict):
-            return {"bounds": dict(self.window(params["windowId"]))}
+        if method == "Browser.getWindowBounds":
+            return {
+                "bounds": {
+                    "windowState": self.window_state,
+                    "left": self.left,
+                }
+            }
         return {}
 
     async def detach(self) -> None:
@@ -322,8 +275,6 @@ class _FakeContext:
     web_socket_route_calls: list[tuple[str, object]] = field(default_factory=list)
     event_handlers: dict[str, object] = field(default_factory=dict)
     init_scripts: list[str] = field(default_factory=list)
-    bindings: dict[str, object] = field(default_factory=dict)
-    cdp_sessions_opened: int = 0
     additional_pages: list[_FakePage] = field(default_factory=list)
     new_page_calls: int = 0
     closed: bool = False
@@ -347,18 +298,8 @@ class _FakeContext:
     async def add_init_script(self, script: str) -> None:
         self.init_scripts.append(script)
 
-    async def expose_binding(self, name: str, callback: object) -> None:
-        assert name not in self.bindings, "Playwright refuses to expose a binding twice"
-        self.bindings[name] = callback
-
     def on(self, event: str, handler: object) -> None:
-        self.event_handlers.setdefault(event, []).append(handler)  # type: ignore[attr-defined]
-
-    async def emit_page(self, page: _FakePage) -> None:
-        for handler in list(self.event_handlers.get("page", [])):  # type: ignore[call-overload]
-            outcome = handler(page)
-            if inspect.isawaitable(outcome):
-                await outcome
+        self.event_handlers[event] = handler
 
     async def new_page(self) -> _FakePage:
         self.new_page_calls += 1
@@ -367,16 +308,15 @@ class _FakeContext:
         else:
             page = _FakePage()
             self.additional_pages.append(page)
-        page.context = self
         # Playwright emits the context's page event before new_page returns.
         # Omitting it hid duplicate registration of the initial sign-in tab.
-        await self.emit_page(page)
+        handler = self.event_handlers.get("page")
+        if handler is not None:
+            await handler(page)  # type: ignore[operator]
         return page
 
     async def new_cdp_session(self, page: _FakePage) -> _FakeCdpSession:
         assert page is self.page or page in self.additional_pages or page in self.startup_pages
-        self.cdp_sessions_opened += 1
-        self.cdp_session.attached_to = page
         return self.cdp_session
 
     async def close(self) -> None:
@@ -445,9 +385,7 @@ async def test_tab_scoped_session_survives_login_handoff() -> None:
     await session.discard_manual_auth_page()
     assert scan_pages == (page,)
     assert not page.closed
-    # No worker tabs: only the inert tab that sits in front of the retained one.
-    assert [p.content is not None for p in context.additional_pages] == [True]
-    assert page.viewport == {"width": 1440, "height": 900}
+    assert not context.additional_pages
     await session.close()
     assert context.closed
 
@@ -478,9 +416,6 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert "--disable-renderer-backgrounding" in chromium.context_options["args"]
     assert len(context.init_scripts) == 1
     assert "RTCPeerConnection" in context.init_scripts[0]
-    # Playwright resizes the OS window for every viewport change unless the
-    # context has no default viewport, and a resize un-minimizes the window.
-    assert chromium.context_options["no_viewport"] is True
     assert chromium.user_data_dir is not None
     assert os.path.isdir(chromium.user_data_dir)
     assert os.stat(chromium.user_data_dir).st_mode & 0o777 == 0o700
@@ -514,18 +449,8 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert session.state is ManualAuthState.AUTHENTICATED
 
     scan_pages = await session.prepare_background_scan_pages(2)
-    # Two scan tabs, then the inert tab that stays in front of them.
-    assert scan_pages == tuple(context.additional_pages[:2])
+    assert scan_pages == tuple(context.additional_pages)
     assert len(set(map(id, scan_pages))) == 2
-    cover = context.additional_pages[2]
-    assert cover.content is not None and "scanning in the background" in cover.content
-    assert not cover.goto_calls
-    # No default viewport on the context, so each scan tab is sized to the
-    # crawl's standard one explicitly.
-    assert [p.viewport for p in scan_pages] == [{"width": 1440, "height": 900}] * 2
-    assert len(context.init_scripts) == 2
-    assert "window" in context.init_scripts[1] and '"open"' in context.init_scripts[1]
-    assert set(context.bindings) == {"__axcessPopupRefused"}
 
     # Prepare the fixed worker tabs before minimizing. Creating a new tab
     # after this point restores a minimized Chromium window on macOS.
@@ -534,19 +459,30 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     with pytest.raises(ManualAuthenticationError):
         _ = session.page
 
-    context.cdp_session.honors_minimize = True
-    assert await session.hide_for_background_scan()
-    assert session.backgrounded
-    assert not session.parked
-    assert cover.fronted == 1
-    # Fronting the cover raises the window, so minimizing has to come last:
-    # the fake un-minimizes on bring_to_front exactly as Chromium does.
-    assert context.cdp_session.window(7)["windowState"] == "minimized"
-    assert [
-        params
-        for method, params in context.cdp_session.calls
-        if method == "Browser.setWindowBounds"
-    ] == [{"windowId": 7, "bounds": {"windowState": "minimized"}}]
+    assert await session.minimize_for_background_scan(scan_pages[0])
+    assert context.cdp_session.calls == [
+        ("Browser.getWindowForTarget", None),
+        (
+            "Browser.setWindowBounds",
+            {"windowId": 7, "bounds": {"windowState": "minimized"}},
+        ),
+        ("Browser.getWindowBounds", {"windowId": 7}),
+        (
+            "Browser.setWindowBounds",
+            {
+                "windowId": 7,
+                "bounds": {
+                    "windowState": "normal",
+                    "left": -10_000,
+                    "top": -10_000,
+                    "width": 1280,
+                    "height": 800,
+                },
+            },
+        ),
+        ("Browser.getWindowBounds", {"windowId": 7}),
+    ]
+    assert context.cdp_session.detached
 
     # A scan no longer refuses these. An identity-provider origin is a public
     # HTTPS origin like any other; a POST is how a single-page application
@@ -588,340 +524,12 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert fetcher._shared_context is context  # Shared context, never exported state.
     assert fetcher._shared_pages == scan_pages
 
-    hide_task = session._hide_task
-    assert hide_task is not None and not hide_task.done()
     await session.close()
-    assert hide_task.done(), "the window watchdog outlived the session"
-    assert not session.backgrounded
     assert session.state is ManualAuthState.CLOSED
     assert context.closed
     assert chromium.user_data_dir is not None
     assert not os.path.exists(chromium.user_data_dir)
     assert playwright.stopped
-
-
-async def _scanning_session(
-    monkeypatch: pytest.MonkeyPatch, *, workers: int = 2
-) -> tuple[ManualAuthenticationSession, _FakeContext, tuple[_FakePage, ...], _FakePage]:
-    """A signed-in session, hidden, on a Chromium that honors minimize."""
-
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.01)
-    session, _, _, context, page = _session_with_fake_browser()
-    context.cdp_session.honors_minimize = True
-    await session.start()
-    page.url = "https://app.example.edu/dashboard"
-    session.enter_scan_mode()
-    scan_pages = await session.prepare_background_scan_pages(workers)
-    await session.discard_manual_auth_page()
-    assert await session.hide_for_background_scan()
-    cover = context.additional_pages[workers]
-    return session, context, scan_pages, cover  # type: ignore[return-value]
-
-
-async def _until(condition: Callable[[], bool]) -> None:
-    for _ in range(200):
-        if condition():
-            return
-        await asyncio.sleep(0.01)
-    raise AssertionError("the session never reacted")
-
-
-@pytest.mark.asyncio
-async def test_a_window_that_comes_back_is_hidden_again(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hiding once was the bug: anything later in the scan could undo it."""
-    session, context, _, cover = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    try:
-        assert cdp.window(7)["windowState"] == "minimized"
-        assert cdp.minimize_requests() == 1
-
-        cdp.window(7)["windowState"] = "normal"  # something raised it
-        await _until(lambda: cdp.window(7)["windowState"] == "minimized")
-        assert cdp.minimize_requests() == 2
-        assert session.backgrounded
-        # Nothing changed which tab is in front, and fronting a tab raises a
-        # minimized window, so the cover is left alone.
-        assert cover.fronted == 1
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_tab_opened_mid_scan_puts_the_cover_back_in_front(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Chromium fronts the opener when a popup closes: a scan tab, whose
-    screenshots then hang for as long as the window stays minimized."""
-    session, context, scan_pages, cover = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    try:
-        popup = _FakePopup(opener_page=scan_pages[0])
-        context.additional_pages.append(popup)
-        cdp.window(7)["windowState"] = "normal"  # a new tab raises the window
-        await context.emit_page(popup)
-        assert popup.closed, "the route guard still closes a tab opened while scanning"
-
-        await _until(lambda: cover.fronted == 2 and cdp.window(7)["windowState"] == "minimized")
-        assert session.backgrounded
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_every_window_of_the_context_is_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Only the window of the first scan tab used to be minimized."""
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.01)
-    session, _, _, context, page = _session_with_fake_browser()
-    context.cdp_session.honors_minimize = True
-    await session.start()
-    page.url = "https://app.example.edu/dashboard"
-    session.enter_scan_mode()
-    scan_pages = await session.prepare_background_scan_pages(2)
-    context.cdp_session.window_of[id(scan_pages[1])] = 9  # a tab dragged out, or an SSO window
-    await session.discard_manual_auth_page()
-    stray = _FakePage()  # not a scan tab: an identity provider's leftover window
-    context.additional_pages.append(stray)
-    context.cdp_session.window_of[id(stray)] = 11
-    try:
-        assert not await session.hide_for_background_scan()
-        cdp = context.cdp_session
-        assert cdp.window(7)["windowState"] == "minimized"
-        assert cdp.window(11)["windowState"] == "minimized"
-        # A scan tab alone in a window would be the front tab of a minimized
-        # window, where its screenshots hang. A cover tab cannot be aimed at
-        # a window, so that one is moved aside and keeps rendering, and is
-        # never reported as hidden: macOS leaves a strip of it on screen.
-        assert cdp.window(9)["windowState"] == "normal"
-        assert cdp.window(9)["left"] == -1240
-        assert session.parked and not session.backgrounded
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_fullscreen_sign_in_window_is_stepped_down_then_minimized(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Chromium refuses to minimize a fullscreen window outright."""
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.01)
-    session, _, _, context, page = _session_with_fake_browser()
-    cdp = context.cdp_session
-    cdp.honors_minimize = True
-    await session.start()
-    page.url = "https://app.example.edu/dashboard"
-    session.enter_scan_mode()
-    await session.prepare_background_scan_pages(1)
-    await session.discard_manual_auth_page()
-    cdp.window(7)["windowState"] = "fullscreen"  # the green button, during sign-in
-    original_front = _FakePage.bring_to_front
-
-    async def front_keeps_fullscreen(self: _FakePage) -> None:
-        state = cdp.window(7)["windowState"]
-        await original_front(self)
-        if state == "fullscreen":
-            cdp.window(7)["windowState"] = "fullscreen"
-
-    monkeypatch.setattr(_FakePage, "bring_to_front", front_keeps_fullscreen)
-    try:
-        # The request waits out the step down rather than answering "no".
-        assert await session.hide_for_background_scan()
-        assert cdp.window(7)["windowState"] == "minimized"
-        assert session.backgrounded
-        states = [
-            params["bounds"]["windowState"]  # type: ignore[index]
-            for method, params in cdp.calls
-            if method == "Browser.setWindowBounds"
-        ]
-        assert states == ["normal", "minimized"], "minimize was sent at a fullscreen window"
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_window_that_appears_later_is_hidden_too(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The list of windows was cached on the first hide and never looked at again."""
-    session, context, _, _ = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    try:
-        late = _FakePage()
-        context.additional_pages.append(late)
-        cdp.window_of[id(late)] = 9
-        cdp.window(9)
-        await context.emit_page(late)
-        await _until(lambda: cdp.window(9)["windowState"] == "minimized")
-        await _until(lambda: session.backgrounded)
-
-        # And one that goes away does not strand the rest.
-        await late.close(run_before_unload=False)
-        cdp.window_of.pop(id(late))
-        cdp.window(7)["windowState"] = "normal"
-        await _until(lambda: cdp.window(7)["windowState"] == "minimized")
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_closed_cover_tab_is_replaced_before_hiding_again(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session, context, scan_pages, cover = await _scanning_session(monkeypatch)
-    try:
-        assert await session.show_browser()
-        await cover.close(run_before_unload=False)  # the auditor tidied up
-        assert await session.hide_for_background_scan()
-        replacement = context.additional_pages[-1]
-        assert replacement is not cover and replacement not in scan_pages
-        assert replacement.content is not None
-        assert context.cdp_session.window(7)["windowState"] == "minimized"
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_browser_that_will_not_minimize_is_parked_then_left_alone(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Some macOS Chromium builds acknowledge a minimize and ignore it."""
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.005)
-    session, _, _, context, page = _session_with_fake_browser()
-    cdp = context.cdp_session
-    await session.start()
-    page.url = "https://app.example.edu/dashboard"
-    session.enter_scan_mode()
-    await session.prepare_background_scan_pages(1)
-    await session.discard_manual_auth_page()
-    try:
-        assert not await session.hide_for_background_scan()
-        await _until(lambda: session.parked)
-        assert cdp.window(7)["left"] == -1240
-        assert not session.backgrounded, "a parked window leaves a strip on screen"
-
-        # Parked is as far as it goes. Asking again twice a second would move
-        # and resize a window the auditor may be trying to place themselves.
-        await asyncio.sleep(0.1)
-        moves = len([c for c in cdp.calls if c[0] == "Browser.setWindowBounds"])
-        sessions = context.cdp_sessions_opened
-        await asyncio.sleep(0.2)
-        assert len([c for c in cdp.calls if c[0] == "Browser.setWindowBounds"]) == moves
-        assert context.cdp_sessions_opened == sessions, "CDP sessions are piling up"
-
-        # Showing it puts it back where the auditor had it.
-        assert await session.show_browser()
-        assert cdp.window(7)["left"] == 40
-        assert not session.parked
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_browser_that_cannot_be_managed_is_given_up_on(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.002)
-    session, context, _, _ = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    attempts = 0
-
-    async def refuse(method: str, params: object | None = None) -> dict[str, object]:
-        nonlocal attempts
-        attempts += 1
-        raise RuntimeError("no native window")
-
-    try:
-        monkeypatch.setattr(cdp, "send", refuse)
-        await asyncio.sleep(0.2)
-        assert not session.backgrounded
-        settled = attempts
-        await asyncio.sleep(0.2)
-        # About a hundred passes went by. It may still look once in a while
-        # (the auditor can minimize the window themselves), not every pass.
-        assert attempts - settled <= 25, "the watchdog never stopped asking"
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_show_that_fails_changes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """It used to report the browser as showing, and switch the watchdog off."""
-    session, context, _, _ = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    real_send = cdp.send
-
-    async def refuse_normal(method: str, params: object | None = None) -> dict[str, object]:
-        if method == "Browser.setWindowBounds":
-            raise RuntimeError("no native window")
-        return await real_send(method, params)
-
-    try:
-        monkeypatch.setattr(cdp, "send", refuse_normal)
-        assert not await session.show_browser()
-        assert session.backgrounded and session.hiding_wanted
-        assert cdp.window(7)["windowState"] == "minimized"
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_the_auditor_can_show_the_browser_and_hide_it_again(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session, context, scan_pages, cover = await _scanning_session(monkeypatch)
-    cdp = context.cdp_session
-    try:
-        assert await session.show_browser()
-        assert cdp.window(7)["windowState"] == "normal"
-        assert not session.backgrounded
-        # They asked to watch the scan, not the notice that it is running.
-        assert scan_pages[0].fronted == 1
-
-        await asyncio.sleep(0.1)  # many watchdog passes
-        assert cdp.window(7)["windowState"] == "normal", "the watchdog overruled the auditor"
-        assert cdp.minimize_requests() == 1
-
-        assert await session.hide_for_background_scan()
-        assert cdp.window(7)["windowState"] == "minimized"
-        # A scan tab was in front; minimized like that, its screenshots hang.
-        assert cover.fronted == 2
-        assert session.backgrounded
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_a_window_that_cannot_be_hidden_is_reported_as_showing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The UI tells the auditor what is on their screen, not what was asked for."""
-    monkeypatch.setattr("audit.protected.session._HIDE_RECHECK_SECONDS", 0.01)
-    session, _, _, context, page = _session_with_fake_browser()
-
-    async def refuse(method: str, params: object | None = None) -> dict[str, object]:
-        raise RuntimeError("no native window")
-
-    await session.start()
-    page.url = "https://app.example.edu/dashboard"
-    session.enter_scan_mode()
-    await session.prepare_background_scan_pages(1)
-    await session.discard_manual_auth_page()
-    monkeypatch.setattr(context.cdp_session, "send", refuse)
-    try:
-        assert not await session.hide_for_background_scan()
-        assert not session.backgrounded
-    finally:
-        await session.close()
-
-
-@pytest.mark.asyncio
-async def test_the_browser_cannot_be_hidden_or_shown_before_sign_in_is_confirmed() -> None:
-    session, _, _, _, _ = _session_with_fake_browser()
-    await session.start()
-    try:
-        with pytest.raises(ManualAuthenticationError):
-            await session.hide_for_background_scan()
-        with pytest.raises(ManualAuthenticationError):
-            await session.show_browser()
-    finally:
-        await session.close()
 
 
 @dataclass
@@ -946,7 +554,7 @@ async def test_sign_in_tab_opened_by_sso_is_kept_and_becomes_the_session_page() 
     session, _playwright, _chromium, context, page = _session_with_fake_browser()
     await session.start()
 
-    on_page = context.emit_page
+    on_page = context.event_handlers["page"]
     popup = _FakePopup(opener_page=page)
     popup.url = "https://app.example.edu/dashboard"
 
@@ -971,7 +579,7 @@ async def test_auxiliary_tab_is_still_closed_once_scanning_starts() -> None:
     page.url = "https://app.example.edu/dashboard"
     session.enter_scan_mode()
 
-    on_page = context.emit_page
+    on_page = context.event_handlers["page"]
     popup = _FakePopup(opener_page=page)
 
     await on_page(popup)  # type: ignore[operator]
@@ -985,7 +593,7 @@ async def test_a_handoff_tab_that_closes_itself_falls_back_to_the_previous_tab()
     session, _playwright, _chromium, context, page = _session_with_fake_browser()
     await session.start()
 
-    on_page = context.emit_page
+    on_page = context.event_handlers["page"]
     popup = _FakePopup(opener_page=page)
     await on_page(popup)  # type: ignore[operator]
     assert session.page is popup
@@ -1004,7 +612,7 @@ async def test_closing_extra_login_tabs_preserves_the_original_for_scanning() ->
         await session.start()
         page.url = "https://app.example.edu/dashboard"
         page.has_session_storage = True
-        on_page = context.emit_page
+        on_page = context.event_handlers["page"]
         popups = [_FakePopup(opener_page=page), _FakePopup(opener_page=page)]
         for popup in popups:
             await on_page(popup)  # type: ignore[operator]
@@ -1040,7 +648,7 @@ async def test_discarding_sign_in_closes_every_tab_it_used() -> None:
     session, _playwright, _chromium, context, page = _session_with_fake_browser()
     await session.start()
 
-    on_page = context.emit_page
+    on_page = context.event_handlers["page"]
     popup = _FakePopup(opener_page=page)
     popup.url = "https://app.example.edu/dashboard"
     await on_page(popup)  # type: ignore[operator]
@@ -1119,7 +727,7 @@ async def test_a_popup_opened_during_sign_in_is_kept() -> None:
     await session.start()
 
     popup = _FakePopup(opener_page=page)
-    await context.emit_page(popup)
+    await context.event_handlers["page"](popup)  # type: ignore[operator]
 
     assert not popup.closed
     assert session.page is popup, "the handoff window should become the live tab"

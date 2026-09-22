@@ -221,16 +221,17 @@ The desktop and loopback web app support a practical local login flow:
 3. Axcess opens a visible Chromium window.
 4. Sign in directly with the website using password, passkey, push, OTP, or
    another factor. Do not enter credentials into Axcess itself.
-5. Navigate to the approved post-login application page and select **I have
-   signed in**.
-6. Axcess verifies the page is in scope and begins the scan using that live
-   in-memory browser session.
-7. The Chromium window is minimized and the scan runs in it in the background.
-   Axcess keeps it minimized while you work, so a window opened from the Dock
-   or taskbar is put away again. Chromium stays in the Dock or taskbar, and
-   quitting it ends the scan. Progress is shown in Axcess, where **Show
-   browser window** brings the browser back if you want to watch, and **Hide
-   browser window** sends it away again.
+5. Navigate to the approved post-login application page and select **I’m
+   signed in, start scan**.
+6. By default, Axcess transfers cookies, localStorage, IndexedDB, and the selected tab’s
+   sessionStorage in memory to a new headless Chromium, then closes the visible
+   sign-in browser. The existing scan pipeline crawls from the signed-in page.
+   If **Show the scanning browser window** is enabled, Axcess keeps scanning
+   in the original visible browser instead.
+7. Keep Axcess running and follow progress in the app. No reusable login-state
+   file is saved. Sites whose login depends on live JavaScript memory or a
+   browser-bound session may require signing in again; a scan that only reaches
+   sign-in pages is reported as failed.
 
 Axcess does not ask for the password or second factor. Login and identity
 provider pages are not report evidence. The local session ends with the scan or
