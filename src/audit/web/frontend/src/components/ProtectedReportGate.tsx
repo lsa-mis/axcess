@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
 import { api } from "../api/client";
 import { useProtectedIdentityContext } from "../hooks/useProtectedIdentityContext";
+import { scanQueryKey } from "../hooks/useScanQuery";
 import { Card } from "./ui";
 
 /**
@@ -25,7 +26,10 @@ export default function ProtectedReportGate({ children }: { children: ReactNode 
   const identityPartition =
     protectedIdentity.fingerprint ?? "identity-context-unavailable";
   const scan = useQuery({
-    queryKey: ["scan", id, "identity", identityPartition],
+    // Same key the report routes use, via scanQueryKey. They render inside
+    // this gate, so they read this entry from cache instead of fetching the
+    // record a second time.
+    queryKey: scanQueryKey(id, identityPartition),
     queryFn: () => api.getScan(id),
     // Wait for a pending identity assertion. If protected identity is not
     // configured at all, its failed response makes this query available so

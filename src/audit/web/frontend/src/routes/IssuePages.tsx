@@ -5,6 +5,7 @@ import ConformanceBadge from "../components/ConformanceBadge";
 import IssuePagesTable from "../components/IssuePagesTable";
 import ReportHeader from "../components/ReportHeader";
 import { Card, EmptyState, LinkButton } from "../components/ui";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 export { ISSUE_PAGES_VIEW, issueInspectorPath } from "../components/IssuePagesTable";
 
@@ -26,11 +27,7 @@ export default function IssuePagesRoute() {
   const key = decodeURIComponent(issueKey ?? "");
   const location = useLocation();
 
-  const scanQuery = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const scanQuery = useScanQuery(id);
   const detailQuery = useQuery({
     queryKey: ["issue-detail", id, key],
     queryFn: () => api.getIssueDetail(id, key),

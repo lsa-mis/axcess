@@ -36,6 +36,7 @@ import {
 } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { formatScanEta } from "../lib/scanProgress";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 export default function ScanDetailRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -44,10 +45,10 @@ export default function ScanDetailRoute() {
   const navigate = useNavigate();
   const [liveUpdates, setLiveUpdates] = useState(true);
 
-  const { data, isLoading, error, isFetching } = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
+  // Polls only while the scan is actually running, and only in a visible
+  // tab. Shares the report summary cache entry with the gate and every
+  // other report route; see useScanQuery.
+  const { data, isLoading, error, isFetching } = useScanQuery(id, {
     refetchInterval: (query) =>
       liveUpdates && query.state.data?.status === "running" ? 2000 : false,
     refetchIntervalInBackground: false,

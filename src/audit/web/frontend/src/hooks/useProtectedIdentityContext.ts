@@ -81,6 +81,34 @@ function clearProtectedClientState(
   }
 }
 
+/** Fallback partition used when no identity has been established. */
+export const NO_IDENTITY_PARTITION = "identity-context-unavailable";
+
+/**
+ * Read the current identity partition without driving the identity query.
+ *
+ * `useProtectedIdentityContext` sets `refetchOnMount: "always"`, so every
+ * component that calls it triggers another identity request when it mounts.
+ * Callers that only need the cache partition -- the report routes, which
+ * key their scan query on it -- observe the same entry read-only instead,
+ * and leave the refresh policy to the gate that owns it.
+ *
+ * Still fetches if nothing has fetched yet: `refetchOnMount: false` only
+ * suppresses refetching when data is already present.
+ */
+export function useProtectedIdentityPartition(): string {
+  const context = useQuery({
+    queryKey: IDENTITY_CONTEXT_QUERY_KEY,
+    queryFn: api.getProtectedIdentityContext,
+    retry: false,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  if (context.error) return NO_IDENTITY_PARTITION;
+  return context.data?.subject_fingerprint ?? NO_IDENTITY_PARTITION;
+}
+
 export interface ProtectedIdentityContext {
   /** Opaque HMAC-derived cache partition, never the proxy subject. */
   fingerprint: string | null;
