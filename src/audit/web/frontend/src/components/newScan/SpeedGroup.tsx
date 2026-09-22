@@ -38,7 +38,13 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
           className="w-64"
         />
       </div>
-      <div className="-mx-2 grid gap-x-4 border-t border-border pt-4 sm:grid-cols-2">
+      {/* Two columns only when both switches show: a lone switch in half a
+          row wraps its label one word per line. */}
+      <div
+        className={`-mx-2 grid gap-x-4 border-t border-border pt-4${
+          isFixed(policy, "static_only") ? "" : " sm:grid-cols-2"
+        }`}
+      >
           {!isFixed(policy, "static_only") && (
             <SwitchRow
               id={fieldIds.static_only}
