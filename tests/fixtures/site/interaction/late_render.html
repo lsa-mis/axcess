@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Panel that renders after its control reports open</title>
+  </head>
+  <body>
+    <h1>Late-rendering panel</h1>
+
+    <!--
+      The shape this fixture exists to pin down.
+
+      Clicking the control mutates the DOM twice. First synchronously, to flip
+      aria-expanded and add a class, which is what a framework does on the
+      click itself. Then again 250ms later, when the panel it revealed is
+      actually inserted.
+
+      The defect lives only in the second mutation: an image with no alt text
+      inside the panel. A settle that stops at the first DOM change hands axe
+      the intermediate document and reports nothing, which is a silent
+      under-report rather than a visible failure.
+    -->
+    <button id="open" type="button" aria-expanded="false" aria-controls="panel">
+      Show details
+    </button>
+    <div id="panel"></div>
+
+    <script>
+      const button = document.getElementById("open");
+      const panel = document.getElementById("panel");
+      button.addEventListener("click", () => {
+        // Synchronous mutation: the control now claims to be open.
+        button.setAttribute("aria-expanded", "true");
+        button.classList.add("is-open");
+        // Asynchronous mutation: the panel, and the defect, arrive later.
+        setTimeout(() => {
+          const image = document.createElement("img");
+          image.src =
+            "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+          image.width = 40;
+          image.height = 40;
+          panel.appendChild(image);
+        }, 250);
+      });
+    </script>
+  </body>
+</html>

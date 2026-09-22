@@ -439,18 +439,25 @@ class InteractionProbe:
     max_depth: int = DEFAULT_MAX_DEPTH
     timeout_s: float = DEFAULT_TIMEOUT_S
     # Time for a revealed state to settle (animations, async content).
+    # Time for a revealed state to settle (animations, async content).
+    #
+    # Deliberately a fixed wait, and deliberately taken even after the DOM
+    # has been seen to change. Two faster designs were tried and both
+    # under-reported:
+    #
+    #   * Skip the settle once the DOM hash differs. A click usually mutates
+    #     twice, synchronously to flip `aria-expanded` or a class, then again
+    #     when the panel it revealed actually renders. The first mutation is
+    #     not the last one.
+    #   * Wait for mutations to stop for a quiet period. A pending
+    #     `setTimeout` is indistinguishable from a finished page: the
+    #     observer reports quiet during the gap and axe runs too early.
+    #
+    # `tests/integration/test_interaction_settle.py` holds a fixture whose
+    # panel renders 250ms after the click, with the defect inside it. Both
+    # designs above report nothing for it, and nothing is what a clean scan
+    # looks like. Re-measure against that test before shortening this again.
     settle_ms: int = 400
-    # Skip that wait when the DOM has already been observed to change.
-    #
-    # Every click first waits for the document hash to differ, then slept
-    # the full settle regardless. On a page allowing a hundred clicks that
-    # was up to forty seconds per page spent waiting for something that had
-    # already happened. When the hash wait times out the settle is still
-    # taken, which is the case it was written for: a state that changes
-    # nothing observable until its animation finishes.
-    #
-    # Set False to sleep after every click, as before.
-    skip_settle_when_dom_changed: bool = True
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
     # Store the markup of states that held a new defect, so the inspector can
     # show the element in the state it exists in. Off leaves the probe's
@@ -768,18 +775,13 @@ class InteractionProbe:
             await locator.click(timeout=3000)
             budget.clicks_succeeded += 1
             budget.operated_keys.add(self._interaction_key(control, pinned))
-            dom_changed = False
             with contextlib.suppress(Exception):
                 await page.wait_for_function(
                     "before => (" + _DOM_HASH_JS + ")() !== before",
                     arg=before_hash,
                     timeout=max(1000, self.settle_ms),
                 )
-                dom_changed = True
-            # The wait above already proves the DOM moved, so the fixed
-            # settle only has work to do when it did not fire.
-            if not (dom_changed and self.skip_settle_when_dom_changed):
-                await page.wait_for_timeout(self.settle_ms)
+            await page.wait_for_timeout(self.settle_ms)
 
             # A click that navigated is out of this probe's remit: the page
             # it landed on belongs to the crawl frontier, which owns scope,
