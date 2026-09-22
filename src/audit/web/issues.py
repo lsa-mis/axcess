@@ -1120,9 +1120,7 @@ def _a11y_location_samples(
                 evidence_url=f"/scans/{scan_id}/pages/{page_id}#finding-{finding['id']}",
                 revealed_by=(str(finding["revealed_by"]) if finding.get("revealed_by") else None),
                 screenshot_hash=(
-                    str(finding["screenshot_hash"])
-                    if finding.get("screenshot_hash")
-                    else None
+                    str(finding["screenshot_hash"]) if finding.get("screenshot_hash") else None
                 ),
                 html_snippet=(
                     " ".join(str(finding["html_snippet"]).split())[:2000]
