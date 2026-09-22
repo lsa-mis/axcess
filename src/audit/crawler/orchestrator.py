@@ -16,9 +16,10 @@ import gzip
 import hashlib
 import json
 import sqlite3
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from functools import wraps
+from typing import Any, Concatenate, ParamSpec, Protocol, TypeVar
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -64,6 +65,7 @@ from audit.crawler.robots import RobotsChecker
 from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
+from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
@@ -1564,6 +1566,34 @@ def _store_screenshot(
         return None
 
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _batched_writes(
+    fn: Callable[Concatenate[_WorkerContext, _P], _R],
+) -> Callable[Concatenate[_WorkerContext, _P], _R]:
+    """Commit a persistence helper's writes once instead of once per row.
+
+    The crawl connection is in autocommit mode, so each `upsert_*` call
+    below used to be its own transaction and its own WAL commit. A page
+    carrying a hundred axe violations paid for a hundred commits to write
+    one page's evidence.
+
+    Safe to apply only because every helper it decorates is synchronous.
+    All workers share one connection, so a transaction left open across an
+    `await` would swallow whatever the next worker wrote.
+    """
+
+    @wraps(fn)
+    def wrapper(ctx: _WorkerContext, /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with write_batch(ctx.conn):
+            return fn(ctx, *args, **kwargs)
+
+    return wrapper
+
+
+@_batched_writes
 def _persist_axe(
     ctx: _WorkerContext,
     *,
@@ -1573,10 +1603,13 @@ def _persist_axe(
 ) -> None:
     """Write the page's axe violations to the DB + bump the scan counters.
 
-    One DB statement per violation row keeps the code simple at the
-    expense of N writes per page. SQLite handles this trivially at our
-    scale (10k pages x ~10 violations = 100k inserts, all under one
-    transaction held open by the worker context).
+    One DB statement per violation row keeps the code simple. The
+    ``_batched_writes`` decorator makes the page's rows one commit rather
+    than one commit each; an earlier version of this docstring claimed the
+    worker already held such a transaction open, which was never true.
+
+    A per-row sqlite3 error logs and drops that row; the rest of the page
+    still lands.
     """
     for v in violations:
         try:
@@ -1615,6 +1648,7 @@ def _persist_axe(
     ctx.summary.axe_violations_total += len(violations)
 
 
+@_batched_writes
 def _persist_interaction(
     ctx: _WorkerContext,
     *,
@@ -1712,6 +1746,7 @@ def _persist_interaction(
     )
 
 
+@_batched_writes
 def _persist_alfa(
     ctx: _WorkerContext,
     *,
@@ -1770,6 +1805,7 @@ def _add_note_once(summary: CrawlSummary, note: str) -> None:
         summary.notes.append(note)
 
 
+@_batched_writes
 def _persist_keyboard(
     ctx: _WorkerContext,
     *,
@@ -1809,6 +1845,7 @@ def _persist_keyboard(
     ctx.summary.keyboard_traps_total += len(traps)
 
 
+@_batched_writes
 def _persist_responsive(
     ctx: _WorkerContext,
     *,
@@ -1847,6 +1884,7 @@ def _persist_responsive(
     ctx.summary.responsive_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_focus(
     ctx: _WorkerContext,
     *,
@@ -1875,6 +1913,7 @@ def _persist_focus(
     ctx.summary.focus_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_visual(
     ctx: _WorkerContext,
     *,
@@ -1931,6 +1970,7 @@ async def _run_semantic(
     _persist_semantic(ctx, page_id=page_id, findings=findings)
 
 
+@_batched_writes
 def _persist_semantic(
     ctx: _WorkerContext,
     *,
@@ -1939,9 +1979,9 @@ def _persist_semantic(
 ) -> None:
     """Upsert semantic findings into ``page_a11y_findings``.
 
-    Same row-by-row insert pattern as ``_persist_axe``, SQLite at our
-    scale handles 100k inserts cleanly. A per-row sqlite3 error logs
-    + drops; the rest of the page's findings still land.
+    Same row-by-row insert pattern as ``_persist_axe``, committed once per
+    page by ``_batched_writes``. A per-row sqlite3 error logs + drops; the
+    rest of the page's findings still land.
 
     Note: semantic findings carry no element screenshot, the semantic
     pass runs against the static HTML body with no live Playwright page,
