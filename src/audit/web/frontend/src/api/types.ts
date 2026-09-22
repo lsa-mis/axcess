@@ -373,14 +373,7 @@ export interface LocalLoginScanState {
   scan_id: number;
   status: LocalLoginScanStatus;
   error: string | null;
-  /** Whether the sign-in browser is out of the way right now, not whether it once was. */
   browser_backgrounded?: boolean;
-  /** False once the auditor has asked to see the browser. */
-  browser_hiding_wanted?: boolean;
-  /** It would not minimize, so it was moved to the edge of the screen instead. */
-  browser_parked?: boolean;
-  /** On a show/hide request: whether the browser actually moved. */
-  changed?: boolean;
   message?: string;
 }
 

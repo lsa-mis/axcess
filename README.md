@@ -225,12 +225,6 @@ The desktop and loopback web app support a practical local login flow:
    signed in**.
 6. Axcess verifies the page is in scope and begins the scan using that live
    in-memory browser session.
-7. The Chromium window is minimized and the scan runs in it in the background.
-   Axcess keeps it minimized while you work, so a window opened from the Dock
-   or taskbar is put away again. Chromium stays in the Dock or taskbar, and
-   quitting it ends the scan. Progress is shown in Axcess, where **Show
-   browser window** brings the browser back if you want to watch, and **Hide
-   browser window** sends it away again.
 
 Axcess does not ask for the password or second factor. Login and identity
 provider pages are not report evidence. The local session ends with the scan or

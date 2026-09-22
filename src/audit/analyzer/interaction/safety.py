@@ -8,7 +8,7 @@ matter. Configured search journeys have a separate authorization boundary.
 from __future__ import annotations
 
 import re
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlsplit
@@ -19,24 +19,6 @@ if TYPE_CHECKING:
     from playwright.async_api import Dialog, Page, Request, Route
 
 log = get_logger(__name__)
-
-# Pages being explored right now, and where each one's discovered URLs go.
-_REFUSED_POPUP_SINKS: dict[Page, Callable[[str], None]] = {}
-
-
-def report_refused_popup(page: Page, url: str) -> None:
-    """Remember where a popup was headed when it was refused before it existed.
-
-    The guard below learns a new-tab destination from the popup's first
-    request. A browser that must not open tabs at all (a login scan keeps its
-    window hidden, and a new tab raises it) refuses ``window.open`` in the
-    page, so there is no request to learn from. Whoever refused it reports
-    the destination here instead, and it is remembered exactly as the request
-    would have been. Outside exploration there is nothing to feed, as before.
-    """
-    sink = _REFUSED_POPUP_SINKS.get(page)
-    if sink is not None:
-        sink(url)
 
 
 def safe_url(url: str, blocked_labels: Sequence[str]) -> bool:
@@ -83,13 +65,15 @@ async def exploration_guard(
         enqueue: scope, the blocklist, and whether the URL was already fetched
         or queued for this scan.
         """
+        if len(urls) >= 1000:
+            return
         with suppress(Exception):
-            if request.is_navigation_request() and request.method == "GET":
-                remember_url(request.url)
-
-    def remember_url(url: str) -> None:
-        if len(urls) < 1000 and safe_url(url, blocked_labels):
-            urls.add(url)
+            if (
+                request.is_navigation_request()
+                and request.method == "GET"
+                and safe_url(request.url, blocked_labels)
+            ):
+                urls.add(request.url)
 
     async def guard(route: Route) -> None:
         nonlocal blocked
@@ -157,11 +141,9 @@ async def exploration_guard(
     page.on("dialog", dismiss)
     page.on("popup", remember_popup)
     await page.context.route("**/*", guard)
-    _REFUSED_POPUP_SINKS[page] = remember_url
     try:
         yield
     finally:
-        _REFUSED_POPUP_SINKS.pop(page, None)
         for popup in popups:
             with suppress(Exception):
                 await popup.close()

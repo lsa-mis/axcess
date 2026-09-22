@@ -78,7 +78,6 @@ markers = [
     "integration: end-to-end integration tests (may hit local fixture server)",
     "live_vlm: tests that require a live Ollama instance",
     "ui: Playwright-based UI tests",
-    "headed: opens a real browser window on this machine (opt in with AXCESS_HEADED=1)",
 ]
 
 [tool.coverage.run]

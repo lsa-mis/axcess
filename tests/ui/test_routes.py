@@ -440,198 +440,6 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.capture_screenshots is True
 
 
-def test_the_auditor_can_show_the_scanning_browser_and_hide_it_again(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Hidden is the default, not a trap: the browser is theirs to look at.
-
-    The status endpoint reports what the session says now. It used to repeat
-    whatever the one hiding attempt returned, for the rest of the scan.
-    """
-
-    from audit.web import server
-
-    db_path, blob_dir, _ = seeded_db
-    outcome = {"status": "scanning"}
-
-    class _HiddenSession:
-        def __init__(self, **_kwargs: object) -> None:
-            self.backgrounded = True
-            self.hiding_wanted = True
-            self.parked = False
-
-        async def show_browser(self) -> bool:
-            self.backgrounded = self.hiding_wanted = False
-            return True
-
-        async def hide_for_background_scan(self) -> bool:
-            self.backgrounded = self.hiding_wanted = True
-            return True
-
-    async def _reach(_db_path: object, _blob_dir: object, _config: object, run: object) -> None:
-        run.status = outcome["status"]  # type: ignore[attr-defined]
-
-    monkeypatch.setattr(server, "_run_local_login_background", _reach)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _HiddenSession)
-    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
-    origin = {"origin": "http://127.0.0.1:8765"}
-    start = {
-        "seed_url": "https://app.example.test/secure/",
-        "authorization_acknowledged": True,
-        "max_pages": 10,
-        "max_depth": 2,
-        "rps": 1,
-        "scan_engine": "axe",
-    }
-    with TestClient(
-        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
-    ) as local_client:
-        created = local_client.post("/api/local-login-scans", headers=origin, json=start)
-        assert created.status_code == 201, created.text
-        scan_id = created.json()["scan_id"]
-        url = f"/api/local-login-scans/{scan_id}"
-        assert local_client.get(url).json()["browser_backgrounded"] is True
-
-        shown = local_client.post(f"{url}/browser", headers=origin, json={"visible": True})
-        assert shown.status_code == 200
-        assert shown.json() == {
-            "scan_id": scan_id,
-            "status": "scanning",
-            "changed": True,
-            "browser_backgrounded": False,
-            "browser_hiding_wanted": False,
-            "browser_parked": False,
-        }
-        assert shown.headers["cache-control"] == "no-store"
-        assert local_client.get(url).json()["browser_backgrounded"] is False
-
-        hidden = local_client.post(f"{url}/browser", headers=origin, json={"visible": False})
-        assert hidden.json()["browser_backgrounded"] is True
-        assert local_client.get(url).json()["browser_backgrounded"] is True
-
-        assert (
-            local_client.post(f"{url}/browser", headers=origin, json={"visible": 1, "x": 2})
-        ).status_code == 422
-        assert (
-            local_client.post(
-                "/api/local-login-scans/999999/browser", headers=origin, json={"visible": True}
-            ).status_code
-            == 404
-        )
-        # Another site open in the auditor's browser must not move their windows.
-        assert (
-            local_client.post(
-                f"{url}/browser", headers={"origin": "https://evil.example"}, json={"visible": True}
-            ).status_code
-            == 403
-        )
-
-
-def test_a_scan_that_ends_mid_request_is_a_conflict_not_a_crash(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The status said scanning; by the time the session is asked, it has closed."""
-
-    from audit.protected.session import ManualAuthenticationError
-    from audit.web import server
-
-    db_path, blob_dir, _ = seeded_db
-
-    class _ClosingSession:
-        backgrounded = False
-        hiding_wanted = False
-        parked = False
-
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
-        async def show_browser(self) -> bool:
-            raise ManualAuthenticationError("The manual authentication browser is not running.")
-
-    async def _scanning(_db_path: object, _blob_dir: object, _config: object, run: object) -> None:
-        run.status = "scanning"  # type: ignore[attr-defined]
-
-    monkeypatch.setattr(server, "_run_local_login_background", _scanning)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _ClosingSession)
-    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
-    origin = {"origin": "http://127.0.0.1:8765"}
-    with TestClient(
-        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
-    ) as local_client:
-        created = local_client.post(
-            "/api/local-login-scans",
-            headers=origin,
-            json={
-                "seed_url": "https://app.example.test/secure/",
-                "authorization_acknowledged": True,
-                "max_pages": 10,
-                "max_depth": 2,
-                "rps": 1,
-                "scan_engine": "axe",
-            },
-        )
-        assert created.status_code == 201, created.text
-        response = local_client.post(
-            f"/api/local-login-scans/{created.json()['scan_id']}/browser",
-            headers=origin,
-            json={"visible": True},
-        )
-    assert response.status_code == 409
-    # Never the session's own words: they can name a URL.
-    assert "not running" not in response.text
-
-
-def test_the_browser_cannot_be_shown_before_the_scan_is_running(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """During sign-in the window is already on screen, and it is the auditor's."""
-
-    from audit.web import server
-
-    db_path, blob_dir, _ = seeded_db
-
-    class _SigningInSession:
-        backgrounded = False
-        hiding_wanted = False
-        parked = False
-
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
-        async def show_browser(self) -> bool:
-            raise AssertionError("the window must not be touched during sign-in")
-
-    async def _waiting(_db_path: object, _blob_dir: object, _config: object, run: object) -> None:
-        run.status = "awaiting_authentication"  # type: ignore[attr-defined]
-
-    monkeypatch.setattr(server, "_run_local_login_background", _waiting)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _SigningInSession)
-    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
-    origin = {"origin": "http://127.0.0.1:8765"}
-    with TestClient(
-        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
-    ) as local_client:
-        created = local_client.post(
-            "/api/local-login-scans",
-            headers=origin,
-            json={
-                "seed_url": "https://app.example.test/secure/",
-                "authorization_acknowledged": True,
-                "max_pages": 10,
-                "max_depth": 2,
-                "rps": 1,
-                "scan_engine": "axe",
-            },
-        )
-        assert created.status_code == 201, created.text
-        response = local_client.post(
-            f"/api/local-login-scans/{created.json()['scan_id']}/browser",
-            headers=origin,
-            json={"visible": True},
-        )
-    assert response.status_code == 409
-
-
 def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1920,7 +1728,7 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
             return None
 
-        async def hide_for_background_scan(self):  # type: ignore[no-untyped-def]
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
             return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
@@ -2046,7 +1854,7 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
             return None
 
-        async def hide_for_background_scan(self):  # type: ignore[no-untyped-def]
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
             return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
@@ -2118,7 +1926,7 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
             return None
 
-        async def hide_for_background_scan(self):  # type: ignore[no-untyped-def]
+        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
             return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
