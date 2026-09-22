@@ -1770,9 +1770,13 @@ def create_app(
 
         with get_conn() as conn:
             _load_scan_or_404(conn, scan_id)
-            filtered = issues_mod.list_issues(
-                conn,
-                scan_id,
+            # One projection per request. The facet counts below describe the
+            # whole scan, so this endpoint needs both the filtered and the
+            # unfiltered list; building each with its own `list_issues` ran
+            # the scan-wide grouping queries twice for one response.
+            unfiltered = issues_mod.list_issues(conn, scan_id)
+            filtered = issues_mod.filter_and_sort(
+                unfiltered,
                 conformance=_split_csv(conformance),
                 responsibility=_split_csv(responsibility),
                 abilities=_split_csv(abilities),
@@ -1785,7 +1789,6 @@ def create_app(
                 ),
                 sort=sort,
             )
-            unfiltered = issues_mod.list_issues(conn, scan_id)
         return JSONResponse(
             {
                 "rows": [asdict(r) for r in filtered],
