@@ -1,11 +1,12 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
+import DomSource from "../components/DomSource";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
-import { Card, EmptyState, ExternalLinkButton, LinkButton, Select } from "../components/ui";
+import { Card, EmptyState, ExternalLinkButton, LinkButton, pageEvidencePath, Select } from "../components/ui";
 
 type TabId = "page" | "dom";
 
@@ -424,24 +425,18 @@ export default function InspectorRoute() {
     tryScroll();
   }, [scopedTargets]);
 
-  // The flagged element's markup, split out of the source so the Loaded DOM tab
-  // can wrap it in a <mark>. Null when there is no target or the element is not
-  // present in the captured markup. Computed lazily, only when the DOM tab is
-  // actually open, because it needs its own unmarked parse of the document.
-  const domParts = useMemo(
-    () => (tab === "dom" ? highlightInDom(data?.render.dom_html ?? null, scopedTargets) : null),
-    [tab, data?.render.dom_html, scopedTargets],
+  // The Loaded DOM tab locates the flagged elements in its own inert parse of
+  // the capture and reports how many it found; the count feeds the header line
+  // beside the source. Stable across renders so the source is not re-walked
+  // on every state change.
+  const [domMarkCount, setDomMarkCount] = useState(0);
+  const locateFlagged = useCallback(
+    (doc: Document) =>
+      scopedTargets
+        .map((target) => findTargetElement(doc, target))
+        .filter((element): element is Element => element !== null),
+    [scopedTargets],
   );
-  const domMarkCount = domParts?.filter((s) => s.marked).length ?? 0;
-
-  // Bring the first marked run into view. The source of a real page is far too
-  // long to expect anyone to hunt through it for the flagged markup.
-  const domPreRef = useRef<HTMLPreElement | null>(null);
-  useEffect(() => {
-    if (tab !== "dom" || domMarkCount === 0) return;
-    const mark = domPreRef.current?.querySelector("mark");
-    mark?.scrollIntoView({ block: "center" });
-  }, [tab, domMarkCount, domParts]);
 
   if (error) {
     return (
@@ -453,7 +448,15 @@ export default function InspectorRoute() {
             : "This page could not be inspected. It may belong to a running or login-protected report, or be outside the scan's scope."
         }
         action={
-          <LinkButton to={`/scans/${scan}/pages/${page}`} variant="primary">
+          <LinkButton
+            to={pageEvidencePath({
+              scanId: scan,
+              pageId: page,
+              origin: params.get("origin") ?? undefined,
+              backTo: params.get("back") ?? undefined,
+            })}
+            variant="primary"
+          >
             Back to stored page evidence
           </LinkButton>
         }
@@ -478,7 +481,6 @@ export default function InspectorRoute() {
       <ReportHeader
         scanId={scan}
         previousScanId={scanData?.previous_scan_id ?? null}
-        tabs={false}
         title={displayTitle}
         meta={
           <ReportMeta
@@ -797,41 +799,13 @@ export default function InspectorRoute() {
                 )}
               </span>
             </div>
-            {/* Scanned page markup is untrusted and rendered as escaped text,
-                never executed. Each flagged element's markup is wrapped in a
-                <mark> so it is visible in the source, matching the page view. */}
-            <pre
-              ref={domPreRef}
-              role="region"
-              aria-label="Loaded DOM source"
-              // Keyboard users need focus on the overflow region to scroll the
-              // source. The panel wrapper is not the scroll container — this
-              // is — so the tabIndex has to sit here to satisfy SC 2.1.1.
-              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-              tabIndex={0}
-              // A serialized DOM is one enormous line, so an unwrapped <pre>
-              // shows a mostly empty box with everything scrolled off to the
-              // right. Wrapping (breaking inside long attribute values) keeps
-              // the marked markup readable in place.
-              className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface-muted p-3 text-2xs leading-relaxed text-fg focus-visible:shadow-focus"
-            >
-              <code>
-                {domParts
-                  ? domParts.map((segment, i) =>
-                      segment.marked ? (
-                        <mark
-                          key={i}
-                          className="rounded-[2px] bg-umich-maize/40 px-0 text-fg outline outline-1 outline-umich-maize"
-                        >
-                          {segment.text}
-                        </mark>
-                      ) : (
-                        <Fragment key={i}>{segment.text}</Fragment>
-                      ),
-                    )
-                  : render.dom_html}
-              </code>
-            </pre>
+            {/* Scanned page markup is untrusted and rendered as text, never
+                executed: DomSource re-walks DOMParser's inert document and
+                prints one node per line, with each flagged element marked
+                as a block, matching the page view. */}
+            {tab === "dom" && (
+              <DomSource html={render.dom_html} locate={locateFlagged} onMarked={setDomMarkCount} />
+            )}
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
@@ -945,7 +919,16 @@ function keepCentered(target: HTMLElement): void {
       const top = target.getBoundingClientRect().top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
-      target.scrollIntoView({ block: "center" });
+      // Scroll the *frame* only. `scrollIntoView` also scrolls every ancestor
+      // scroll container, including the page that holds the iframe, so each
+      // re-centre yanked the reader down the inspector page; where the page
+      // itself starts is the app shell's decision (the top), not the frame's.
+      const rect = target.getBoundingClientRect();
+      win.scrollTo({
+        top: win.scrollY + rect.top - (win.innerHeight - rect.height) / 2,
+        left: win.scrollX + rect.left - (win.innerWidth - rect.width) / 2,
+        behavior: "instant",
+      });
       ticks += 1;
       if (quiet < 2 && ticks < 20) window.setTimeout(step, 300);
     } catch {
@@ -969,61 +952,7 @@ const SNIPPET_HEAD = 64;
 const TRUNCATED_SNIPPET_LENGTH = 3900;
 
 /** A run of the captured source, either plain or inside a highlight mark. */
-type DomSegment = { text: string; marked: boolean };
 
-/**
- * Split the captured HTML into segments so every flagged occurrence can be
- * marked in the Loaded DOM (source) tab, matching what the Rendered page tab
- * outlines. Each target is located in the parsed document and its markup found
- * in the source; overlapping matches are merged so the marks can never cross.
- * Returns ``null`` when nothing could be located (the source is then shown
- * unhighlighted rather than guessed at).
- */
-function highlightInDom(html: string | null, targets: Target[]): DomSegment[] | null {
-  if (!html || targets.length === 0) return null;
-  let doc: Document | null = null;
-  try {
-    doc = new DOMParser().parseFromString(html, "text/html");
-  } catch {
-    doc = null; // fall through to matching the stored snippets literally
-  }
-
-  const ranges: Array<[number, number]> = [];
-  for (const target of targets) {
-    const located = doc ? findTargetElement(doc, target) : null;
-    // The element's own serialization first. It can differ from the source
-    // text (the parser normalizes quoting, entities and void elements), so the
-    // stored snippet is the fallback: it is frequently the literal source.
-    for (const candidate of [located?.outerHTML, target.snippet]) {
-      if (!candidate) continue;
-      const index = html.indexOf(candidate);
-      if (index >= 0) {
-        ranges.push([index, index + candidate.length]);
-        break;
-      }
-    }
-  }
-  if (ranges.length === 0) return null;
-
-  // Merge overlaps so nested or repeated matches can't produce crossing marks.
-  ranges.sort((a, b) => a[0] - b[0]);
-  const merged: Array<[number, number]> = [];
-  for (const range of ranges) {
-    const last = merged[merged.length - 1];
-    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
-    else merged.push([range[0], range[1]]);
-  }
-
-  const segments: DomSegment[] = [];
-  let cursor = 0;
-  for (const [start, end] of merged) {
-    if (start > cursor) segments.push({ text: html.slice(cursor, start), marked: false });
-    segments.push({ text: html.slice(start, end), marked: true });
-    cursor = end;
-  }
-  if (cursor < html.length) segments.push({ text: html.slice(cursor), marked: false });
-  return segments;
-}
 
 /**
  * Build the ``srcDoc`` for the Rendered-page tab with the current issue's

@@ -17,7 +17,7 @@ type Item = {
 /**
  * Cmd/Ctrl+K command palette, search everything across the app.
  *
- * Quick actions (Dashboard, New scan, Reports, Tracking), every report (by site
+ * Quick actions (Dashboard, New scan, Reports, Product Roadmap), every report (by site
  * URL), and, when you're inside a report, every issue in it. Fully keyboard
  * driven: type to filter, ↑/↓ to move, ↵ to open, Esc to close. Screen-reader
  * friendly: a modal dialog with a labelled dialog/listbox.

@@ -1,19 +1,10 @@
-import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
-import { api, blobUrl } from "../api/client";
-import { Card, PageLink, Select } from "./ui";
+import { api } from "../api/client";
+import { Card, Disclosure } from "./ui";
 import ConformanceBadge from "./ConformanceBadge";
+import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueRow } from "../api/types";
-
-const STATUS_LABELS_ORDER = [
-  "new",
-  "reviewing",
-  "in_progress",
-  "remediated",
-  "accepted_risk",
-  "false_positive",
-] as const;
 
 /**
  * The full evidence for one issue group: what it is, why it matters, the fix,
@@ -26,14 +17,25 @@ const STATUS_LABELS_ORDER = [
 export default function IssueEvidence({
   scanId,
   issueKey,
+  origin = "Issues",
+  backTo,
 }: {
   scanId: number;
   issueKey: string;
+  /**
+   * The view this evidence is being read in, and the path back to it. They
+   * travel with every page link below so the topbar trail on the page's own
+   * views names the view the reviewer actually came from — the only way back
+   * in the desktop app, which has no browser back button. Defaults to the
+   * Issues list, where this is expanded inline.
+   */
+  origin?: string;
+  backTo?: string;
 }) {
-  const [sort, setSort] = useState("occurrences_desc");
+  const parentTo = backTo ?? `/scans/${scanId}/issues`;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["issue-detail", scanId, issueKey, sort],
-    queryFn: () => api.getIssueDetail(scanId, issueKey, sort),
+    queryKey: ["issue-detail", scanId, issueKey],
+    queryFn: () => api.getIssueDetail(scanId, issueKey),
     enabled: Number.isFinite(scanId) && !!issueKey,
   });
 
@@ -101,265 +103,108 @@ export default function IssueEvidence({
         )}
       </Card>
 
-      {/* A quiet spec list, not a row of stat tiles. Six equal-weight boxes
-          gave this metadata the same visual weight as the evidence below it,
-          and at anything under a wide viewport the values truncated inside
-          their own tiles ("Interm…", "Desig…"). A list reads at a glance, cannot
-          truncate, and keeps the reader's attention on the issue itself. */}
-      <dl className="mb-4 divide-y divide-border rounded-xs border border-border bg-surface">
+      {/* One strip of facts, read left to right: criterion, urgency,
+          spread, who fixes it. The earlier stacked list put each fact on its
+          own row, which pushed the pages — the part a reviewer opens this
+          record for — below the fold on every issue. */}
+      <dl className="mb-4 flex flex-wrap gap-x-6 gap-y-2 rounded-xs border border-border bg-surface px-4 py-3">
         {issueFacts(row, isInformational).map((fact) => (
-          <div
-            key={fact.label}
-            className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-3 py-2"
-          >
-            {/* Sentence case and a lighter weight. Capitals strip the
-                ascenders and descenders that give a word its outline, so the
-                reader spells the label out instead of recognising its shape --
-                and that cost lands hardest on the low-vision and dyslexic
-                readers this tool exists to serve. Size and colour already mark
-                the label as secondary; it need not shout as well. */}
-            <dt className="text-xs font-medium text-fg-subtle">{fact.label}</dt>
-            <dd className="text-sm font-semibold tabular-nums text-fg">
-              {fact.value}
-            </dd>
-            {fact.hint && (
-              <dd className="w-full text-2xs font-normal text-fg-muted">{fact.hint}</dd>
-            )}
+          <div key={fact.label} className="flex min-w-0 flex-col" title={fact.hint}>
+            <dt className="text-2xs font-medium text-fg-subtle">{fact.label}</dt>
+            <dd className="text-sm font-semibold tabular-nums text-fg">{fact.value}</dd>
           </div>
         ))}
+        {!isInformational && row.abilities_affected.length > 0 && (
+          <div className="flex min-w-0 flex-col">
+            <dt className="text-2xs font-medium text-fg-subtle">Abilities affected</dt>
+            <dd className="flex flex-wrap gap-1 pt-0.5">
+              {row.abilities_affected.map((a: AbilityLabel) => (
+                <span
+                  key={a}
+                  className="inline-block rounded-full border border-border bg-surface-muted px-2 py-0.5 text-2xs font-semibold"
+                  title={`Affects users with ${a} impairments`}
+                >
+                  {capitalize(a)}
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
       </dl>
 
-      {!isInformational && row.abilities_affected.length > 0 && (
-        <p className="mb-3 text-sm">
-          <strong className="text-fg">Abilities affected:</strong>{" "}
-          {row.abilities_affected.map((a: AbilityLabel) => (
-            <span
-              key={a}
-              className="ml-1 inline-block rounded-full border border-border bg-surface-muted px-2 py-0.5 text-2xs"
-              title={`Affects users with ${a} impairments`}
-            >
-              {a.charAt(0).toUpperCase() + a.slice(1)}
-            </span>
-          ))}
-        </p>
-      )}
-
-      <Card className="mb-4 p-4">
-        <h3 className="mb-2 text-base font-semibold">
-          {isInformational ? "Evidence summary" : "About this issue"}
-        </h3>
-
-        <h4 className="text-2xs font-semibold text-fg-subtle">
-          What it is
-        </h4>
-        <p className="mt-1 text-sm text-fg">
-          {description ||
-            row.evidence_summary ||
-            "This is an automated evidence record. Review the affected pages below for the captured detail."}
-        </p>
-        {!isInformational && why_matters && (
-          <p className="mt-2 text-sm text-fg-muted">
-            <span className="font-semibold text-fg">Why it matters:</span> {why_matters}
-          </p>
-        )}
-
-        {!isInformational && fix_steps.length > 0 && (
-          <>
-            <h4 className="mt-4 text-2xs font-semibold text-fg-subtle">
-              Expected behavior
-            </h4>
-            <ol className="mt-1 list-decimal space-y-1.5 pl-5 text-sm text-fg">
-              {fix_steps.map((step, i) => (
-                <li
-                  key={i}
-                  // Steps include inline <code> / <em> from the YAML.
-                  // We trust YAML authors (it's our own rule book).
-                  dangerouslySetInnerHTML={{ __html: step }}
-                />
-              ))}
-            </ol>
-          </>
-        )}
-        {!isInformational && acceptance && (
-          <p className="mt-2 text-sm text-fg-muted">
-            <span className="font-semibold text-fg">Done when:</span> {acceptance}
-          </p>
-        )}
-
-        {!isInformational && (verify_manual || verify_automated) && (
-          <>
-            <h4 className="mt-4 text-2xs font-semibold text-fg-subtle">
-              {row.review_lane === "expert_review"
-                ? "What to check to confirm"
-                : "How to verify"}
-            </h4>
-            <ul className="mt-1 list-disc space-y-1.5 pl-5 text-sm text-fg">
-              {verify_manual && <li>{verify_manual}</li>}
-              {verify_automated && <li>{verify_automated}</li>}
-              {row.review_lane === "expert_review" && (
-                <li className="font-semibold text-umich-blue">
-                  Confirm the finding in page context before reporting it as a barrier.
-                </li>
-              )}
-            </ul>
-          </>
-        )}
-      </Card>
-
-      <Card className="overflow-hidden">
+      <Card className="mb-4 overflow-hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border bg-surface-muted px-4 py-3">
           <h3 className="text-base font-semibold">
-            {isInformational ? "Pages with this evidence" : "Pages with this issue"}
+            Pages with this issue
             <span className="ml-2 text-sm font-normal text-fg-muted">
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>
           </h3>
-          <Select
-            label="Sort by"
-            value={sort}
-            onChange={setSort}
-            options={[
-              { value: "occurrences_desc", label: "Occurrences (most first)" },
-              { value: "occurrences_asc", label: "Occurrences (least first)" },
-              { value: "url", label: "Page URL (A–Z)" },
-              ...(isInformational
-                ? []
-                : [{ value: "status", label: "Status (un-triaged first)" }]),
-            ]}
-          />
         </div>
-        {pages.length === 0 ? (
-          <div className="p-4 text-sm text-fg-muted">
-            No pages are currently associated with this evidence group.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <caption className="sr-only">
-                Pages with the evidence group {row.title}
-              </caption>
-              <thead className="bg-surface-muted text-2xs text-fg-subtle">
-                <tr>
-                  <th scope="col" className="w-10 px-3 py-2 text-right font-semibold">
-                    <span aria-hidden="true">#</span>
-                    <span className="sr-only">Row number</span>
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-left font-semibold">
-                    Page
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-right font-semibold">
-                    Occurrences
-                  </th>
-                  {!isInformational && (
-                    <th scope="col" className="px-3 py-2 text-left font-semibold">
-                      Status
-                    </th>
+        <IssuePagesTable
+          scanId={scanId}
+          issueKey={issueKey}
+          row={row}
+          pages={pages}
+          backTo={parentTo}
+          origin={origin}
+        />
+      </Card>
+
+      <Card className="mb-4 p-4">
+        <h3 className="text-base font-semibold">
+          {isInformational ? "Evidence summary" : "What it is"}
+        </h3>
+        <p className="mt-1 text-sm text-fg">
+          {description ||
+            row.evidence_summary ||
+            "This is an automated evidence record. Review the affected pages above for the captured detail."}
+        </p>
+        {!isInformational && (why_matters || fix_steps.length > 0 || verify_manual || verify_automated) && (
+          <Disclosure
+            id="issue-fix"
+            title={row.review_lane === "expert_review" ? "Why it matters, and what to check" : "Why it matters, and how to fix it"}
+            headingLevel={3}
+            className="mt-3"
+          >
+            {why_matters && <p className="text-sm text-fg-muted">{why_matters}</p>}
+            {fix_steps.length > 0 && (
+              <>
+                <h4 className="mt-3 text-2xs font-semibold text-fg-subtle">Expected behavior</h4>
+                <ol className="mt-1 list-decimal space-y-1.5 pl-5 text-sm text-fg">
+                  {fix_steps.map((step, i) => (
+                    <li
+                      key={i}
+                      // Steps include inline <code> / <em> from the YAML.
+                      // We trust YAML authors (it's our own rule book).
+                      dangerouslySetInnerHTML={{ __html: step }}
+                    />
+                  ))}
+                </ol>
+              </>
+            )}
+            {acceptance && (
+              <p className="mt-2 text-sm text-fg-muted">
+                <span className="font-semibold text-fg">Done when:</span> {acceptance}
+              </p>
+            )}
+            {(verify_manual || verify_automated) && (
+              <>
+                <h4 className="mt-3 text-2xs font-semibold text-fg-subtle">
+                  {row.review_lane === "expert_review" ? "What to check to confirm" : "How to verify"}
+                </h4>
+                <ul className="mt-1 list-disc space-y-1.5 pl-5 text-sm text-fg">
+                  {verify_manual && <li>{verify_manual}</li>}
+                  {verify_automated && <li>{verify_automated}</li>}
+                  {row.review_lane === "expert_review" && (
+                    <li className="font-semibold text-umich-blue">
+                      Confirm the finding in page context before reporting it as a barrier.
+                    </li>
                   )}
-                </tr>
-              </thead>
-              {/* Finder-style banding rather than a rule between every row: with
-                  a title, a wrapped URL and two links in each cell, horizontal
-                  lines added a fourth thing to look at. The band is keyed to
-                  `pageIndex`, NOT to the `<tr>` position, because a page with
-                  screenshots renders two rows and CSS `odd:`/`even:` would then
-                  stripe halfway through a record. Both rows of a page share one
-                  band, so a record reads as a single block. */}
-              <tbody>
-                {pages.map((p, pageIndex) => {
-                  const missingScreenshots = Math.max(
-                    0,
-                    p.occurrence_count - p.screenshot_hashes.length,
-                  );
-                  const pageLabel = p.page_title || p.page_url;
-                  const band = pageIndex % 2 === 1 ? "bg-surface-subtle" : "bg-surface";
-                  return (
-                    <Fragment key={p.page_id}>
-                      <tr className={band}>
-                        <th
-                          scope="row"
-                          className="px-3 py-2 text-right align-top font-normal tabular-nums text-fg-subtle"
-                        >
-                          {pageIndex + 1}
-                        </th>
-                        <td className="px-3 py-2 align-top">
-                          <PageLink
-                            pageId={p.page_id}
-                            scanId={scanId}
-                            pageUrl={p.page_url}
-                            pageTitle={p.page_title}
-                            issue={issueKey}
-                            origin="Issues"
-                            context={issueKey}
-                            contextTo={`/scans/${scanId}/issues/${encodeURIComponent(issueKey)}`}
-                            backTo={`/scans/${scanId}/issues`}
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right align-top tabular-nums">
-                          {p.occurrence_count}
-                        </td>
-                        {!isInformational && (
-                          <td className="px-3 py-2 align-top">
-                            <div className="flex flex-wrap gap-1">
-                              {STATUS_LABELS_ORDER.map((s) => {
-                                const n = p.status_summary[s] ?? 0;
-                                if (!n) return null;
-                                const isOpen =
-                                  s === "new" || s === "reviewing" || s === "in_progress";
-                                return (
-                                  <span
-                                    key={s}
-                                    className={
-                                      isOpen
-                                        ? "inline-block rounded-xs bg-sev-major-bg/15 px-1.5 py-0.5 text-2xs text-fg"
-                                        : "inline-block rounded-xs bg-surface-muted px-1.5 py-0.5 text-2xs text-fg-subtle"
-                                    }
-                                  >
-                                    {n} {s.replace(/_/g, " ")}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                      {p.screenshot_hashes.length > 0 && (
-                        <tr className={band}>
-                          <td colSpan={isInformational ? 3 : 4} className="px-3 pb-4 pt-2">
-                            <h4 className="text-xs font-semibold text-fg-subtle">
-                              Instance screenshots
-                            </h4>
-                            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                              {p.screenshot_hashes.map((hash, index) => (
-                                <figure
-                                  key={`${hash}-${index}`}
-                                  className="rounded-xs border border-border bg-surface p-2"
-                                >
-                                  <img
-                                    src={blobUrl(hash)}
-                                    alt={`Issue instance ${index + 1} on ${pageLabel}. A circular marker identifies the detected location.`}
-                                    className="max-h-80 w-full rounded-xs object-contain"
-                                    loading="lazy"
-                                  />
-                                  <figcaption className="mt-2 text-xs text-fg-muted">
-                                    Instance {index + 1} of {p.occurrence_count}. The circle marks the detected location.
-                                  </figcaption>
-                                </figure>
-                              ))}
-                            </div>
-                            {missingScreenshots > 0 && (
-                              <p className="mt-2 text-xs text-fg-muted">
-                                {missingScreenshots} additional instance{missingScreenshots === 1 ? "" : "s"} had no locatable screenshot or exceeded the per-page safety limit.
-                              </p>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                </ul>
+              </>
+            )}
+          </Disclosure>
         )}
       </Card>
 
@@ -426,8 +271,8 @@ function issueFacts(row: IssueRow, isInformational: boolean): IssueFact[] {
   if (!isInformational) {
     facts.push({
       label: "Priority",
-      value: `${row.priority.toFixed(2)} · ${priorityTier(row.priority)}`,
-      hint: "Fix sooner when it's both severe and affects many pages.",
+      value: priorityTier(row.priority),
+      hint: "Severity × how many pages it touches. Fix sooner when both are high.",
     });
   }
   facts.push(

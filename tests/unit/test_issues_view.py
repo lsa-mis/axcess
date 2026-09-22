@@ -190,11 +190,17 @@ def test_adequate_unclassified_image_is_informational_with_real_page_count(
 
 
 def test_list_issues_priority_sort_default(tmp_db: sqlite3.Connection) -> None:
-    """Default sort is priority_desc — highest-impact row appears first."""
+    """Default sort is lane-first, then priority_desc within each lane.
+
+    A barrier always outranks a needs-review lead, which always outranks an
+    informational record, whatever their scores; the score only orders rows
+    inside a lane.
+    """
     scan_id = _seed_two_pipelines(tmp_db)
     rows = issues_mod.list_issues(tmp_db, scan_id)
-    priorities = [r.priority for r in rows]
-    assert priorities == sorted(priorities, reverse=True)
+    lane_rank = {"likely_barrier": 0, "expert_review": 1, "informational": 2}
+    keys = [(lane_rank[r.review_lane], -r.priority) for r in rows]
+    assert keys == sorted(keys)
 
 
 def test_list_issues_filters_by_conformance(tmp_db: sqlite3.Connection) -> None:

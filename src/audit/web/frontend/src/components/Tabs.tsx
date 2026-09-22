@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 
@@ -68,6 +68,7 @@ export default function Tabs({
   onChange,
   controls,
   replace = false,
+  attached = false,
   className,
 }: {
   mode: Mode;
@@ -84,26 +85,27 @@ export default function Tabs({
    *  that switches views of the page you are already on, so that Back still
    *  leaves the page rather than stepping through every chip you tried. */
   replace?: boolean;
+  /**
+   * `nav` mode — the row heads a content area. The active chip's fill
+   * slides between chips instead of jumping, and a rail under the track
+   * carries a small pointer beneath the active chip, so the content below
+   * reads as belonging to that tab. Motion is 250 ms and off under
+   * reduced motion; the state is still the fill, the pointer and
+   * `aria-current`, never the movement.
+   */
+  attached?: boolean;
   className?: string;
 }) {
   if (mode === "nav") {
     return (
-      <nav aria-label={label} className={className}>
-        <ul className={TRACK}>
-          {items.map((item) => (
-            <li key={item.key}>
-              <Link
-                to={item.to ?? "#"}
-                replace={replace}
-                aria-current={item.key === value ? "page" : undefined}
-                className={chipClass(item.key === value)}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <NavTabs
+        label={label}
+        items={items}
+        value={value}
+        replace={replace}
+        attached={attached}
+        className={className}
+      />
     );
   }
 
@@ -125,5 +127,138 @@ export default function Tabs({
         );
       })}
     </div>
+  );
+}
+
+type Slot = { left: number; width: number };
+/** The last measured active slot per row, so a re-mounted row can slide from it. */
+const lastSlot = new Map<string, Slot>();
+
+const pointerTransform = (s: Slot) => `translateX(${s.left + s.width / 2}px) translateX(-50%) rotate(45deg)`;
+
+/** Slide the fill and the pointer from the previous slot to the current one. */
+function slideFrom(fill: HTMLElement | null, pointer: HTMLElement | null, from: Slot, to: Slot) {
+  if (typeof fill?.animate !== "function") return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  const timing: KeyframeAnimationOptions = { duration: 300, easing: "cubic-bezier(0.2, 0, 0, 1)" };
+  fill.animate(
+    [
+      { transform: `translateX(${from.left}px)`, width: `${from.width}px` },
+      { transform: `translateX(${to.left}px)`, width: `${to.width}px` },
+    ],
+    timing,
+  );
+  pointer?.animate([{ transform: pointerTransform(from) }, { transform: pointerTransform(to) }], timing);
+}
+
+function NavTabs({
+  label,
+  items,
+  value,
+  replace,
+  attached = false,
+  className,
+}: {
+  label: string;
+  items: TabItem[];
+  value: string;
+  replace: boolean;
+  attached: boolean;
+  className?: string;
+}) {
+  const trackRef = useRef<HTMLUListElement>(null);
+  const chipRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const fillRef = useRef<HTMLLIElement>(null);
+  const pointerRef = useRef<HTMLSpanElement>(null);
+  // Where the active chip is, measured, so the fill and the pointer can sit
+  // under it. Measured again on resize and whenever the labels wrap.
+  //
+  // Each report route mounts its own copy of this row, so a tab change
+  // re-mounts it and React state cannot carry the old position across. The
+  // module-level `lastSlot` (keyed by the row's label) remembers where the
+  // previous copy left the fill, and the slide from there to the new chip is
+  // a Web Animations API animation on the two elements: it starts from the
+  // old position in the same frame the new one is committed, and no later
+  // re-render can cancel it. Off under reduced motion.
+  // Start from the remembered slot so the fill and pointer exist on the
+  // first render and can be animated in the layout effect below.
+  const [slot, setSlot] = useState<Slot | null>(() => (attached ? lastSlot.get(label) ?? null : null));
+  useLayoutEffect(() => {
+    if (!attached) return;
+    const measure = () => {
+      const track = trackRef.current;
+      const chip = chipRefs.current[value];
+      if (!track || !chip) {
+        setSlot(null);
+        return;
+      }
+      const t = track.getBoundingClientRect();
+      const c = chip.getBoundingClientRect();
+      const next = { left: c.left - t.left, width: c.width };
+      const from = lastSlot.get(label);
+      lastSlot.set(label, next);
+      setSlot(next);
+      if (from && (from.left !== next.left || from.width !== next.width)) {
+        slideFrom(fillRef.current, pointerRef.current, from, next);
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (trackRef.current) observer.observe(trackRef.current);
+    return () => observer.disconnect();
+  }, [attached, value, items, label]);
+
+  return (
+    <nav aria-label={label} className={className}>
+      <ul ref={trackRef} className={cn(TRACK, attached && "relative")}>
+        {attached && slot && (
+          // The sliding fill. Chips above it keep their own colours, so the
+          // one it sits under reads as filled; the transition is the only
+          // thing this element adds.
+          <li
+            ref={fillRef}
+            aria-hidden
+            className="pointer-events-none absolute top-1 bottom-1 left-0 rounded-2xs bg-umich-blue"
+            style={{ width: slot.width, transform: `translateX(${slot.left}px)` }}
+          />
+        )}
+        {items.map((item) => {
+          const active = item.key === value;
+          return (
+            <li key={item.key} className="relative">
+              <Link
+                ref={(element) => {
+                  chipRefs.current[item.key] = element;
+                }}
+                to={item.to ?? "#"}
+                replace={replace}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  chipClass(active),
+                  // With the sliding fill behind, the active chip's own fill
+                  // is transparent so the two never double up mid-slide.
+                  attached && active && "bg-transparent hover:bg-transparent",
+                )}
+              >
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {attached && (
+        // The rail: a hairline the content hangs from, with a pointer under
+        // the active chip. It says "everything below is this tab's".
+        <div aria-hidden className="relative mt-3 h-px bg-border-strong">
+          {slot && (
+            <span
+              ref={pointerRef}
+              className="absolute -top-[6px] h-3 w-3 border-2 border-border-strong bg-surface"
+              style={{ transform: pointerTransform(slot) }}
+            />
+          )}
+        </div>
+      )}
+    </nav>
   );
 }

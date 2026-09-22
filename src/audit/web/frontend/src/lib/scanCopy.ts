@@ -12,10 +12,6 @@ export const SITE_URL_LABEL = "Site URL";
 /** The same thing in running prose, for hints and helper text. */
 export const SITE_URL_NOUN = "site URL";
 
-export const WHOLE_HOST_HINT = `Ignores the ${SITE_URL_NOUN}’s path, every page on the host is in scope.`;
-
-export const WHOLE_HOST_HINT_LOGIN = `Ignores the ${SITE_URL_NOUN}’s path, but never leaves the exact signed-in website origin.`;
-
 /**
  * Where the in-app "Send feedback" action goes.
  *

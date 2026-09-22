@@ -9,6 +9,7 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  pageEvidencePath,
   Select,
   StatCard,
 } from "../components/ui";
@@ -454,7 +455,7 @@ function DrillDownView({
                       </details>
                     )}
                     <AlfaEvidenceNote evidence={f} />
-                    <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${f.page_id}#finding-${f.id}`}>Open stored finding evidence</Link>
+                    <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "DOM-engine findings", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open stored finding evidence</Link>
                     {f.failure_summary && (
                       <div className="mt-1 text-2xs text-fg-muted">
                         {f.failure_summary}

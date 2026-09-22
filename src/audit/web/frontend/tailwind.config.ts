@@ -119,9 +119,17 @@ const config: Config = {
         "spin-ring": {
           to: { transform: "rotate(360deg)" },
         },
+        // The sort chip in a table header lands with a small pop when a
+        // column is chosen, so the eye is drawn to what just changed. Used
+        // behind `motion-safe:` only.
+        "sort-pop": {
+          from: { transform: "scale(0.7)", opacity: "0" },
+          to: { transform: "scale(1)", opacity: "1" },
+        },
       },
       animation: {
         "spin-ring": "spin-ring 1.6s linear infinite",
+        "sort-pop": "sort-pop 180ms ease-out",
       },
       minHeight: {
         // WCAG 2.2 SC 2.5.5 AAA — every interactive target must be ≥44×44px.

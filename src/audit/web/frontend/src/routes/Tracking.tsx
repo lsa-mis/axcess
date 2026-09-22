@@ -4,48 +4,113 @@ import Tabs from "../components/Tabs";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
-import { cn } from "../lib/cn";
 import { Card, EmptyState, PageHeader } from "../components/ui";
 import type {
-  CoverageCriterion,
-  CoverageData,
   CoverageMethod,
   RoadmapItem,
+  TrackingData,
   TrackingStatus,
 } from "../api/types";
 
 /**
- * Coverage & feature tracker, what the tool detects today versus what's
- * planned, across every pipeline. Reads from /api/tracking, which is
+ * Product roadmap: what the tool detects today versus what's planned,
+ * across every pipeline, in one table. Reads from /api/tracking, which is
  * backed by the same source of truth as docs/coverage-tracker.md
  * (coverage_status.py) so the page can't claim coverage the code lacks.
+ *
+ * Three lists used to sit behind three tabs — current coverage, criteria
+ * not covered yet, and the AI roadmap — which meant a reader asking "where
+ * does 1.4.5 stand?" had to know which tab to open. They are one table now,
+ * with a group filter (Current / Future / AI) and, where a group has its
+ * own vocabulary, a second row of chips: coverage method for Current, and
+ * shipped / in progress / planned for AI.
  */
 export default function TrackingRoute() {
   const [params, setParams] = useSearchParams();
-  const requestedView = params.get("view");
-  const view = requestedView === "roadmap" || requestedView === "pipelines" || requestedView === "uncovered" ? requestedView : "coverage";
-  const status = params.get("status");
-  const roadmapStatus = status === "shipped" || status === "in_progress" || status === "planned" ? status : "";
-  const select = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
-  };
   const { data, isLoading, error } = useQuery({
     queryKey: ["tracking"],
     queryFn: api.getTracking,
   });
 
+  // Filter and sort live in the URL, matching the Issues and Findings
+  // pages, so a filtered view can be bookmarked or pasted into a ticket.
+  const setParam = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    setParams(next, { replace: true });
+  };
+
+  const rawView = params.get("view") ?? "";
+  const view: Group | "" = isGroup(rawView) ? rawView : "";
+  const rawStatus = params.get("status") ?? "";
+  const status: TrackingStatus | "" =
+    view === "ai" && isStatus(rawStatus) ? rawStatus : "";
+  const rawMethod = params.get("method") ?? "";
+  const method: CoverageMethod | "" =
+    view === "current" && data?.coverage.methods.includes(rawMethod as CoverageMethod)
+      ? (rawMethod as CoverageMethod)
+      : "";
+  const rawSort = params.get("sort") ?? "";
+  const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey) ? (rawSort as SortKey) : "sc";
+  const dir: SortDir = params.get("dir") === "desc" ? "desc" : "asc";
+
+  const onSort = (key: SortKey) => {
+    // Re-clicking the active column reverses it; a new column starts
+    // ascending, which is what "first click" means everywhere else.
+    setParam({ sort: key, dir: key === sort && dir === "asc" ? "desc" : "asc" });
+  };
+
+  const allRows = useMemo(() => (data ? buildRows(data) : []), [data]);
+  const groupCounts = useMemo(() => {
+    const counts: Record<Group, number> = { current: 0, future: 0, ai: 0 };
+    for (const row of allRows) counts[row.group] += 1;
+    return counts;
+  }, [allRows]);
+
+  const rows = useMemo(() => {
+    const filtered = allRows.filter(
+      (row) =>
+        (!view || row.group === view) &&
+        (!status || row.status === status) &&
+        (!method || row.method === method),
+    );
+    filtered.sort((a, b) => {
+      const by =
+        sort === "sc"
+          ? compareSc(a.sc, b.sc)
+          : sort === "name"
+            ? a.name.localeCompare(b.name)
+            : sort === "level"
+              ? a.level.localeCompare(b.level) || compareSc(a.sc, b.sc)
+              : GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) ||
+                a.badge.localeCompare(b.badge) ||
+                compareSc(a.sc, b.sc);
+      return dir === "asc" ? by : -by;
+    });
+    return filtered;
+  }, [allRows, view, status, method, sort, dir]);
+
+  const coverage = data?.coverage;
   const counts = data?.counts;
-  const deterministicCount =
-    data?.shipped.filter((p) => !p.needs_ai).length ?? 0;
+  const methodLabel = (m: CoverageMethod) => coverage?.method_labels[m] ?? m;
+  const deterministicCount = data?.shipped.filter((p) => !p.needs_ai).length ?? 0;
   const aiCount = (data?.shipped.length ?? 0) - deterministicCount;
+
+  const filterSummary = [
+    view ? GROUP_LABEL[view] : "",
+    status ? STATUS_LABEL[status] : "",
+    method ? methodLabel(method) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
       <PageHeader
-        title="Coverage & Feature Tracker"
+        title="Product Roadmap"
         subtitle="What the tool detects today versus what's planned. Status is reconciled against the actual code."
       />
 
@@ -57,41 +122,45 @@ export default function TrackingRoute() {
         </Card>
       )}
 
-      <Tabs
-        mode="filter"
-        label="Tracker sections"
-        className="mb-5"
-        controls="tracker-content"
-        value={view}
-        onChange={(key) => select("view", key)}
-        items={[
-          { key: "coverage", label: "Current coverage" },
-          { key: "uncovered", label: "Not covered yet" },
-          { key: "roadmap", label: "AI roadmap" },
-          { key: "pipelines", label: "Shipped pipelines" },
-        ]}
-      />
-      <p role="status" className="sr-only">Showing {view === "coverage" ? "current coverage" : view === "roadmap" ? "AI roadmap" : view === "uncovered" ? "criteria not covered yet" : "shipped pipelines"}</p>
-      {isLoading && <p role="status">Loading tracker…</p>}
-      <div id="tracker-content">
-      {(view === "coverage" || view === "uncovered") && data?.coverage && <CoverageSection coverage={data.coverage} notCovered={view === "uncovered"} />}
-
-      {view === "roadmap" && <section aria-labelledby="roadmap-h" className="mb-8">
+      <section aria-labelledby="roadmap-h" className="mb-8">
         <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
-          AI Roadmap
+          Coverage and roadmap
         </h2>
         <p className="mb-3 text-sm text-fg-muted">
-          The queue to close the AI coverage gap. A criterion listed in the
-          orchestrator&apos;s default criteria but with no analyzer class is
-          skipped at runtime, those read “planned,” not “shipped.”
+          Every WCAG 2.2 A/AA criterion, with what Axcess checks today, what
+          still needs manual testing, and the AI analyzers queued to close the
+          gap. Coverage does not mean every requirement is tested; the last
+          column is what you must still check yourself.
         </p>
-        {counts && (
+
+        {/* Group chips first; the second row only appears for a group that
+        has its own sub-vocabulary. Switching group clears the sub-filter,
+        since a method or status from another group would match nothing. */}
+        <Tabs
+          mode="filter"
+          label="Tracker sections"
+          className="mb-2"
+          controls="tracker-content"
+          value={view || "all"}
+          onChange={(key) =>
+            setParam({ view: key === "all" ? "" : key, status: "", method: "" })
+          }
+          items={[
+            { key: "all", label: `All (${allRows.length})` },
+            ...GROUPS.map((g) => ({
+              key: g,
+              label: `${GROUP_LABEL[g]} (${groupCounts[g]})`,
+            })),
+          ]}
+        />
+        {view === "ai" && counts && (
           <Tabs
             mode="filter"
-            label="Filter roadmap by status"
-            className="mb-3"
-            value={roadmapStatus || "all"}
-            onChange={(key) => select("status", key === "all" ? "" : key)}
+            label="Filter AI coverage by status"
+            className="mb-2"
+            controls="tracker-content"
+            value={status || "all"}
+            onChange={(key) => setParam({ status: key === "all" ? "" : key })}
             items={[
               { key: "all", label: "All" },
               ...(["shipped", "in_progress", "planned"] as const).map((key) => ({
@@ -101,32 +170,86 @@ export default function TrackingRoute() {
             ]}
           />
         )}
-        <p role="status" className="mb-2 text-xs text-fg-muted">Showing {data?.roadmap.filter((item) => !roadmapStatus || item.status === roadmapStatus).length ?? 0} roadmap items{roadmapStatus ? ` · ${STATUS_LABEL[roadmapStatus]}` : ""}</p>
-        <Card className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <caption className="sr-only">
-              Planned AI analyzers by WCAG criterion
-            </caption>
-            <thead className="bg-surface-muted text-xs text-fg-muted">
-              <tr>
-                <Th>SC</Th>
-                <Th>Criterion</Th>
-                <Th>Status</Th>
-                <Th>Model class</Th>
-                <Th>What the AI step does</Th>
-                <Th>Reuses</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border align-top">
-              {data?.roadmap.filter((item) => !roadmapStatus || item.status === roadmapStatus).map((r) => (
-                <RoadmapRow key={r.wcag} item={r} />
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      </section>}
+        {view === "current" && coverage && (
+          <Tabs
+            mode="filter"
+            label="Filter coverage by method"
+            className="mb-2"
+            controls="tracker-content"
+            value={method || "all"}
+            onChange={(key) => setParam({ method: key === "all" ? "" : key })}
+            items={[
+              { key: "all", label: "All" },
+              ...coverage.methods
+                .filter((m) => m !== "manual")
+                .map((m) => ({
+                  key: m,
+                  label: `${methodLabel(m)} (${coverage.by_method[m] ?? 0})`,
+                })),
+            ]}
+          />
+        )}
 
-      {view === "pipelines" && <section aria-labelledby="shipped-h" className="mb-8">
+        <p role="status" className="mb-2 text-xs text-fg-muted">
+          {isLoading
+            ? "Loading tracker…"
+            : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
+        </p>
+
+        <div id="tracker-content">
+          <Card className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <caption className="sr-only">
+                WCAG 2.2 A/AA coverage and AI roadmap
+              </caption>
+              <thead className="bg-surface-muted text-xs text-fg-muted">
+                <tr>
+                  <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="name" label="Criterion" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="level" label="Lvl" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="method" label="Coverage" sort={sort} dir={dir} onSort={onSort} />
+                  <Th>Status</Th>
+                  <Th>What Axcess does</Th>
+                  <Th>What remains</Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border align-top">
+                {rows.map((row) => (
+                  <tr key={row.key} className="hover:bg-surface-muted/60">
+                    <th
+                      scope="row"
+                      className="whitespace-nowrap px-4 py-3 text-left font-mono text-xs text-fg"
+                    >
+                      {row.sc}
+                    </th>
+                    <td className="px-4 py-3 text-fg">{row.name}</td>
+                    <td className="px-4 py-3 text-xs text-fg-muted">{row.level}</td>
+                    <td className="px-4 py-3 text-xs text-fg-muted">{GROUP_LABEL[row.group]}</td>
+                    <td className="px-4 py-3">
+                      <Badge tone={row.tone}>{row.badge}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-fg-muted">
+                      {row.detail || <span className="text-fg-subtle">n/a</span>}
+                      {row.note && (
+                        <span className="mt-1 block text-2xs text-fg-subtle">{row.note}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-fg-muted">{row.remaining}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          {!isLoading && rows.length === 0 && (
+            <EmptyState
+              title="No rows match"
+              message="Choose All to see every criterion and roadmap item."
+            />
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
           Shipped Pipelines, What Runs Today
         </h2>
@@ -189,8 +312,7 @@ export default function TrackingRoute() {
             </tbody>
           </table>
         </Card>
-      </section>}
-      </div>
+      </section>
 
       <p className="mt-4 text-xs text-fg-subtle">
         Long-form version with the verification map:{" "}
@@ -200,6 +322,21 @@ export default function TrackingRoute() {
   );
 }
 
+// --- Row model --------------------------------------------------------
+
+const GROUPS = ["current", "future", "ai"] as const;
+type Group = (typeof GROUPS)[number];
+
+const GROUP_LABEL: Record<Group, string> = {
+  current: "Current Coverage",
+  future: "Future Coverage",
+  ai: "AI Coverage",
+};
+
+const isGroup = (value: string): value is Group => (GROUPS as readonly string[]).includes(value);
+const isStatus = (value: string): value is TrackingStatus =>
+  value === "shipped" || value === "in_progress" || value === "planned";
+
 /** Human labels for the roadmap status enum (never the raw key). */
 const STATUS_LABEL: Record<TrackingStatus, string> = {
   shipped: "Shipped",
@@ -207,29 +344,81 @@ const STATUS_LABEL: Record<TrackingStatus, string> = {
   planned: "Planned",
 };
 
-function RoadmapRow({ item }: { item: RoadmapItem }) {
-  return (
-    <tr className="hover:bg-surface-muted/60">
-      <th scope="row" className="whitespace-nowrap px-4 py-3 text-left font-mono text-xs text-fg">
-        {item.wcag}
-      </th>
-      <td className="px-4 py-3 text-fg">{item.issue}</td>
-      <td className="px-4 py-3">
-        <StatusBadge status={item.status}>
-          {STATUS_LABEL[item.status]}
-        </StatusBadge>
-      </td>
-      <td className="px-4 py-3 text-xs text-fg-muted">{item.model_class}</td>
-      <td className="px-4 py-3 text-fg-muted">
-        {item.what}
-        {item.note && (
-          <span className="mt-1 block text-2xs text-fg-subtle">{item.note}</span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-xs text-fg-subtle">{item.reuse}</td>
-    </tr>
-  );
+/**
+ * One line of the merged table. Coverage criteria and roadmap items carry
+ * different fields, so each is flattened to the same shape up front and
+ * the table never has to branch on where a row came from.
+ */
+interface Row {
+  key: string;
+  sc: string;
+  name: string;
+  level: string;
+  group: Group;
+  method?: CoverageMethod;
+  status?: TrackingStatus;
+  badge: string;
+  tone: string;
+  detail: string;
+  remaining: string;
+  note?: string;
 }
+
+// Badge fills: dark tones paired with white for AAA contrast (≥7:1).
+const METHOD_TONE: Record<CoverageMethod, string> = {
+  automated: "bg-[#0f5132]",
+  partial: "bg-[#0b4f6c]",
+  "ai-assisted": "bg-[#6b3a00]",
+  manual: "bg-[#374151]",
+};
+const STATUS_TONE: Record<TrackingStatus, string> = {
+  shipped: "bg-[#0f5132]",
+  in_progress: "bg-[#6b3a00]",
+  planned: "bg-[#374151]",
+};
+
+function buildRows(data: TrackingData): Row[] {
+  const rows: Row[] = [];
+  const levelBySc = new Map<string, string>();
+  for (const c of data.coverage.criteria) {
+    levelBySc.set(c.sc, c.level);
+    const future = c.method === "manual";
+    rows.push({
+      key: `cov:${c.sc}`,
+      sc: c.sc,
+      name: c.name,
+      level: c.level,
+      group: future ? "future" : "current",
+      method: c.method,
+      badge: future ? "Not covered yet" : data.coverage.method_labels[c.method],
+      tone: METHOD_TONE[c.method],
+      detail: c.automated_check,
+      remaining: c.manual_check,
+    });
+  }
+  for (const item of data.roadmap) rows.push(roadmapRow(item, levelBySc.get(item.wcag) ?? ""));
+  return rows;
+}
+
+function roadmapRow(item: RoadmapItem, level: string): Row {
+  return {
+    key: `ai:${item.wcag}`,
+    sc: item.wcag,
+    name: item.issue,
+    level,
+    group: "ai",
+    status: item.status,
+    badge: STATUS_LABEL[item.status],
+    tone: STATUS_TONE[item.status],
+    detail: item.what,
+    note: item.note || undefined,
+    remaining: [item.model_class && `Model: ${item.model_class}`, item.reuse && `Reuses: ${item.reuse}`]
+      .filter(Boolean)
+      .join(". "),
+  };
+}
+
+// --- Sorting ----------------------------------------------------------
 
 const SORT_KEYS = ["sc", "name", "level", "method"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -286,50 +475,6 @@ function SortableTh({
   );
 }
 
-/** A count tile that also filters the table below it. */
-function FilterTile({
-  active,
-  onClick,
-  count,
-  blurb,
-  label,
-  badge,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count: number;
-  blurb: string;
-  label?: string;
-  badge?: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "min-h-target rounded-xs border p-3 text-left",
-        active
-          ? "border-umich-blue bg-umich-blue text-fg-inverse"
-          : "border-border bg-surface text-fg hover:bg-surface-muted",
-      )}
-    >
-      <span className="flex items-baseline justify-between gap-2">
-        {badge ?? <span className="text-2xs font-bold">{label}</span>}
-        <span className="text-lg font-bold tabular-nums">{count}</span>
-      </span>
-      <span
-        className={cn(
-          "mt-1.5 block text-2xs leading-snug",
-          active ? "text-fg-inverse" : "text-fg-subtle",
-        )}
-      >
-        {blurb}
-      </span>
-    </button>
-  );
-}
-
 const Th = ({ children }: { children: React.ReactNode }) => (
   <th scope="col" className="px-4 py-2 text-left font-semibold">
     {children}
@@ -341,218 +486,13 @@ const Th = ({ children }: { children: React.ReactNode }) => (
  * the badge clears WCAG 1.4.1; each fill is a dark tone paired with white
  * for AAA contrast (≥7:1).
  */
-function StatusBadge({
-  status,
-  children,
-}: {
-  status: TrackingStatus;
-  children: React.ReactNode;
-}) {
-  const tone: Record<TrackingStatus, string> = {
-    shipped: "bg-[#0f5132]",
-    in_progress: "bg-[#6b3a00]",
-    planned: "bg-[#374151]",
-  };
+function Badge({ tone, children }: { tone: string; children: React.ReactNode }) {
   return (
     <span
-      className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-2xs font-bold text-white ${tone[status]}`}
+      className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-2xs font-bold text-white ${tone}`}
     >
       {children}
     </span>
   );
 }
 
-// Method fills: dark tones paired with white for AAA contrast (≥7:1).
-const METHOD_TONE: Record<CoverageMethod, string> = {
-  automated: "bg-[#0f5132]",
-  partial: "bg-[#0b4f6c]",
-  "ai-assisted": "bg-[#6b3a00]",
-  manual: "bg-[#374151]",
-};
-
-function CoverageMethodBadge({
-  method,
-  label,
-}: {
-  method: CoverageMethod;
-  label: string;
-}) {
-  return (
-    <span
-      className={`inline-block whitespace-nowrap rounded px-2 py-0.5 text-2xs font-bold text-white ${METHOD_TONE[method]}`}
-    >
-      {label}
-    </span>
-  );
-}
-
-/**
- * The honest WCAG 2.2 A/AA coverage breakdown, what Axcess checks
- * automatically, what it AI-assists, and (the long tail) what still needs
- * manual testing. Rendered straight from the coverage matrix so it can't
- * over-claim. The "What you must still test" column is the whole point.
- */
-function CoverageSection({ coverage: fullCoverage, notCovered = false }: { coverage: CoverageData; notCovered?: boolean }) {
-  const coverage = useMemo(() => {
-    const criteria = fullCoverage.criteria.filter((criterion) => (criterion.method === "manual") === notCovered);
-    return {
-      ...fullCoverage,
-      criteria,
-      total: criteria.length,
-      methods: fullCoverage.methods.filter((method) => (method === "manual") === notCovered),
-    };
-  }, [fullCoverage, notCovered]);
-  const label = (m: CoverageMethod) => coverage.method_labels[m];
-  const [params, setParams] = useSearchParams();
-
-  // Filter and sort live in the URL, matching the Issues and Findings
-  // pages, so a filtered view can be bookmarked or pasted into a ticket.
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next, { replace: true });
-  };
-
-  const rawMethod = params.get("method") ?? "";
-  const method = (
-    coverage.methods.includes(rawMethod as CoverageMethod) ? rawMethod : ""
-  ) as CoverageMethod | "";
-  const rawSort = params.get("sort") ?? "";
-  const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey)
-    ? (rawSort as SortKey)
-    : "sc";
-  const dir: SortDir = params.get("dir") === "desc" ? "desc" : "asc";
-
-  const onSort = (key: SortKey) => {
-    const next = new URLSearchParams(params);
-    next.set("sort", key);
-    // Re-clicking the active column reverses it; a new column starts
-    // ascending, which is what "first click" means everywhere else.
-    next.set("dir", key === sort && dir === "asc" ? "desc" : "asc");
-    setParams(next, { replace: true });
-  };
-
-  const rows = useMemo(() => {
-    const filtered = method
-      ? coverage.criteria.filter((c) => c.method === method)
-      : [...coverage.criteria];
-    const rank = (m: CoverageMethod) => coverage.methods.indexOf(m);
-    filtered.sort((a, b) => {
-      const by =
-        sort === "sc"
-          ? compareSc(a.sc, b.sc)
-          : sort === "name"
-            ? a.name.localeCompare(b.name)
-            : sort === "level"
-              ? a.level.localeCompare(b.level) || compareSc(a.sc, b.sc)
-              : rank(a.method) - rank(b.method) || compareSc(a.sc, b.sc);
-      return dir === "asc" ? by : -by;
-    });
-    return filtered;
-  }, [coverage.criteria, coverage.methods, method, sort, dir]);
-
-  return (
-    <section aria-labelledby="cov-h" className="mb-8">
-      <h2 id="cov-h" className="mb-3 text-base font-semibold text-fg">
-        {notCovered ? "Not covered yet" : "Current Coverage"}
-      </h2>
-      <p className="mb-3 text-sm text-fg-muted">
-        {notCovered
-          ? "Axcess has no automated detection for these WCAG 2.2 A/AA criteria yet. They require manual testing; this list does not imply an implementation is planned."
-          : "WCAG 2.2 A/AA criteria with an implemented automated, partial, or AI-assisted check. Coverage does not mean every requirement is tested; review the manual checks below."}
-      </p>
-
-      {/* The method tiles double as the table's filter. They already
-      carried the counts, so making them the control removes a separate
-      filter row and keeps the number and the thing it filters together. */}
-      {!notCovered && <div
-        role="group"
-        aria-label="Filter coverage by method"
-        className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
-      >
-        <FilterTile
-          active={!method}
-          onClick={() => setParam("method", "")}
-          count={coverage.total}
-          blurb="Criteria with an implemented Axcess check."
-          label="All"
-        />
-        {coverage.methods.map((m) => (
-          <FilterTile
-            key={m}
-            active={method === m}
-            onClick={() => setParam("method", m)}
-            count={coverage.by_method[m] ?? 0}
-            blurb={coverage.method_blurb[m]}
-            badge={<CoverageMethodBadge method={m} label={label(m)} />}
-          />
-        ))}
-      </div>}
-
-      <p role="status" className="mb-2 text-xs text-fg-muted">
-        Showing {rows.length} of {coverage.total} criteria
-        {method ? ` · ${label(method)}` : ""}
-      </p>
-
-      <Card className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <caption className="sr-only">
-            {notCovered ? "WCAG 2.2 A/AA criteria not covered by Axcess yet" : "WCAG 2.2 A/AA criteria with current Axcess coverage"}
-          </caption>
-          <thead className="bg-surface-muted text-xs text-fg-muted">
-            <tr>
-              <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
-              <SortableTh
-                sortKey="name"
-                label="Criterion"
-                sort={sort}
-                dir={dir}
-                onSort={onSort}
-              />
-              <SortableTh sortKey="level" label="Lvl" sort={sort} dir={dir} onSort={onSort} />
-              <SortableTh
-                sortKey="method"
-                label="Coverage"
-                sort={sort}
-                dir={dir}
-                onSort={onSort}
-              />
-              <Th>What Axcess does</Th>
-              <Th>What you must still test</Th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border align-top">
-            {rows.map((c: CoverageCriterion) => (
-              <tr key={c.sc} className="hover:bg-surface-muted/60">
-                <th
-                  scope="row"
-                  className="whitespace-nowrap px-4 py-3 text-left font-mono text-xs text-fg"
-                >
-                  {c.sc}
-                </th>
-                <td className="px-4 py-3 text-fg">{c.name}</td>
-                <td className="px-4 py-3 text-xs text-fg-muted">{c.level}</td>
-                <td className="px-4 py-3">
-                  <CoverageMethodBadge method={c.method} label={notCovered ? "Not covered yet" : label(c.method)} />
-                </td>
-                <td className="px-4 py-3 text-xs text-fg-muted">
-                  {c.automated_check || <span className="text-fg-subtle">n/a</span>}
-                </td>
-                <td className="px-4 py-3 text-xs text-fg-muted">
-                  {c.manual_check}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      {rows.length === 0 && (
-        <EmptyState
-          title="No criteria match"
-          message="Choose All to see every criterion in this section."
-        />
-      )}
-    </section>
-  );
-}

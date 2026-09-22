@@ -132,10 +132,6 @@ export default function ScanDetailRoute() {
   const isComplete = data.status === "completed";
   const issueOccurrences = issueSummary?.occurrence_counts.all_evidence ?? 0;
   const issueGroups = issueSummary?.rows.length ?? 0;
-  const likelyBarrierGroups =
-    issueSummary?.review_lane_counts.likely_barrier ?? 0;
-  const expertReviewGroups =
-    issueSummary?.review_lane_counts.expert_review ?? 0;
   const reviewedBackingFindings =
     issueSummary?.rows
       .filter((issue) => issue.review_lane !== "informational")
@@ -200,9 +196,7 @@ export default function ScanDetailRoute() {
             <>
               <ExportMenu scanId={data.id} />
               <LinkButton to={`/scans/${data.id}/issues`} variant="primary">
-                {issueSummary
-                  ? `Open the ${issueGroups.toLocaleString()} issue${issueGroups === 1 ? "" : "s"}`
-                  : "Open issue table"}
+                Open Issue Groups
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </LinkButton>
             </>
@@ -299,32 +293,31 @@ export default function ScanDetailRoute() {
               Review leads, Pages crawled and Occurrences a second time in a
               different tile style, then repeat "open the issues" at the
               bottom under a button already in the header. */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          {/* Read left to right as the scan itself ran: how much was tested,
+              what that turned up, how those findings group, and how much of
+              the site only existed after a control was used. Barriers and
+              Review leads used to lead as two tiles; they are two lanes of the
+              same issue groups, and splitting them put a judgement call in
+              front of the reader before the size of the evidence. */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              label="Barriers"
-              value={issueSummary ? likelyBarrierGroups.toLocaleString() : "n/a"}
-              hint="High-confidence issue groups"
-            />
-            <StatCard
-              label="Review leads"
-              value={issueSummary ? expertReviewGroups.toLocaleString() : "n/a"}
-              hint="Expert decision required"
-            />
-            <StatCard
-              label="Occurrences"
-              value={issueSummary ? issueOccurrences.toLocaleString() : "n/a"}
-              hint="Not a conformance score"
-            />
-            <StatCard
-              label="Pages tested"
+              label="Pages Tested"
               value={data.page_count.toLocaleString()}
               hint={`${data.error_count.toLocaleString()} crawl errors`}
               tone={data.error_count ? "major" : "default"}
             />
+            <StatCard
+              label="Issues Found"
+              value={issueSummary ? issueOccurrences.toLocaleString() : "n/a"}
+            />
+            <StatCard
+              label="Issue Groups"
+              value={issueSummary ? issueGroups.toLocaleString() : "n/a"}
+            />
             {/* Pages alone understate an application whose content mostly does
                 not exist until a control is used. */}
             <StatCard
-              label="DOM states"
+              label="DOM States Found"
               value={(data.dom_state_count ?? 0).toLocaleString()}
               hint="Reached by operating controls"
             />

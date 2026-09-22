@@ -602,20 +602,20 @@ function ProtectedScanFormRoute({
                   hint="Fast DOM and computed-style checks in the authenticated browser."
                 />
                 <EngineChoice
+                  value="alfa"
+                  selected={form.scan_engine}
+                  onChange={(value) => update("scan_engine", value)}
+                  disabled={alfaUnavailable}
+                  label="Siteimprove Alfa"
+                  hint="ACT means Accessibility Conformance Testing. Each standardized rule checks one specific condition; Alfa also records when an expert must decide the outcome."
+                />
+                <EngineChoice
                   value="both"
                   selected={form.scan_engine}
                   onChange={(value) => update("scan_engine", value)}
                   disabled={alfaUnavailable}
                   label="axe-core + Siteimprove Alfa"
                   hint="Adds independent engine coverage; slower because Alfa runs a separate local browser capture."
-                />
-                <EngineChoice
-                  value="alfa"
-                  selected={form.scan_engine}
-                  onChange={(value) => update("scan_engine", value)}
-                  disabled={alfaUnavailable}
-                  label="Siteimprove Alfa only"
-                  hint="ACT means Accessibility Conformance Testing. Each standardized rule checks one specific condition; Alfa also records when an expert must decide the outcome."
                 />
               </div>
               {alfaUnavailable && (
