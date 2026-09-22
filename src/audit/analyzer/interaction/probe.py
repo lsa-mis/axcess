@@ -440,6 +440,17 @@ class InteractionProbe:
     timeout_s: float = DEFAULT_TIMEOUT_S
     # Time for a revealed state to settle (animations, async content).
     settle_ms: int = 400
+    # Skip that wait when the DOM has already been observed to change.
+    #
+    # Every click first waits for the document hash to differ, then slept
+    # the full settle regardless. On a page allowing a hundred clicks that
+    # was up to forty seconds per page spent waiting for something that had
+    # already happened. When the hash wait times out the settle is still
+    # taken, which is the case it was written for: a state that changes
+    # nothing observable until its animation finishes.
+    #
+    # Set False to sleep after every click, as before.
+    skip_settle_when_dom_changed: bool = True
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
     # Store the markup of states that held a new defect, so the inspector can
     # show the element in the state it exists in. Off leaves the probe's
@@ -757,13 +768,18 @@ class InteractionProbe:
             await locator.click(timeout=3000)
             budget.clicks_succeeded += 1
             budget.operated_keys.add(self._interaction_key(control, pinned))
+            dom_changed = False
             with contextlib.suppress(Exception):
                 await page.wait_for_function(
                     "before => (" + _DOM_HASH_JS + ")() !== before",
                     arg=before_hash,
                     timeout=max(1000, self.settle_ms),
                 )
-            await page.wait_for_timeout(self.settle_ms)
+                dom_changed = True
+            # The wait above already proves the DOM moved, so the fixed
+            # settle only has work to do when it did not fire.
+            if not (dom_changed and self.skip_settle_when_dom_changed):
+                await page.wait_for_timeout(self.settle_ms)
 
             # A click that navigated is out of this probe's remit: the page
             # it landed on belongs to the crawl frontier, which owns scope,

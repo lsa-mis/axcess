@@ -42,7 +42,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -223,7 +223,6 @@ class AxeAnalyzer:
     # can echo an authenticated URL, a fragment of a selector, or a response
     # detail. Public scans retain the existing actionable diagnostic output.
     suppress_diagnostics: bool = False
-    _injected: bool = field(default=False, init=False)
 
     @classmethod
     def from_bundled(
@@ -255,8 +254,21 @@ class AxeAnalyzer:
         # pages even though the auditor controls the browser.  page.evaluate
         # runs in Playwright's execution context, does not weaken or modify the
         # target's CSP, and keeps the bundle entirely local.
+        #
+        # Ask the page whether axe is already there before shipping half a
+        # megabyte of bundle across the CDP connection. The interaction probe
+        # re-runs this analyzer on the same page once per DOM-changing click,
+        # up to a hundred times, and every one of those used to re-send the
+        # whole bundle. A fresh navigation clears the JS context, so this
+        # cannot skip an injection the page actually needs.
+        #
+        # The check is a separate round trip rather than an in-page `eval` of
+        # the bundle, deliberately: eval inside the page is subject to the
+        # target's own script-src, which is the restriction the evaluation
+        # channel exists to avoid.
         try:
-            await page.evaluate(self.axe_source)
+            if not await page.evaluate("() => typeof window.axe !== 'undefined'"):
+                await page.evaluate(self.axe_source)
         except Exception as exc:
             if self.suppress_diagnostics:
                 log.warning("axe-core installation failed in protected context")
