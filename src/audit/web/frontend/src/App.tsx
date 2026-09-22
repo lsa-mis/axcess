@@ -1,3 +1,25 @@
+/**
+ * The route table.
+ *
+ * Every route is `lazy`, so a screen's code is fetched when it is first
+ * visited rather than in the entry bundle. The one Suspense boundary around
+ * the whole table is deliberate: a per-route boundary would replace the
+ * shell chrome on each navigation, and the shell is what makes a report
+ * feel like one place.
+ *
+ * Report routes are wrapped in ProtectedReportGate. The gate resolves
+ * whether a report is protected before its children mount, and sends
+ * protected reports to their own workflow, which has permission-aware
+ * navigation and no export controls. The protected routes themselves are
+ * not wrapped: they are that workflow, and wrapping them would redirect
+ * them to themselves.
+ *
+ * The redirects at the bottom keep links people already have working.
+ * Review, manual-checks and handoff were separate screens before the
+ * Issues table absorbed them; /scans/protected/new was a separate form
+ * before protected scans became a mode of the one New scan form. They are
+ * cheap to keep and the alternative is a 404 on a bookmark.
+ */
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router";
 import AppShell from "./components/AppShell";

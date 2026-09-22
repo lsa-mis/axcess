@@ -1,3 +1,32 @@
+/**
+ * The protected report's own workspace: pair a companion agent, start and
+ * stop the run, and read progress.
+ *
+ * This is the most secret-handling screen in the app, and most of what looks
+ * like ceremony here is that. Three rules explain nearly all of it.
+ *
+ * 1. Nothing sensitive renders unless the identity it was created under is
+ *    still the current one. A pairing code and a certificate fingerprint are
+ *    each stored beside the identity fingerprint that produced them, and the
+ *    `visible*` values below resolve to nothing when those disagree. A shared
+ *    tab whose identity-aware proxy session changes users therefore shows the
+ *    new user nothing belonging to the previous one, without waiting for a
+ *    refetch to notice.
+ *
+ * 2. A pairing code is one-time and short-lived. It is cleared when it
+ *    expires, and eagerly when the tab is hidden or the page is about to
+ *    enter the back/forward cache, using flushSync so the DOM no longer holds
+ *    it before the snapshot is taken.
+ *
+ * 3. Mutation callbacks re-check the identity fingerprint before committing
+ *    anything to state. A request begun under one identity must not deliver
+ *    its result into a view that now belongs to another; the ref holds the
+ *    current value because the callback closes over a stale render.
+ *
+ * Queries here deliberately opt out of caching (`gcTime: 0`, and refetch on
+ * mount) so protected report data is not retained in the client cache after
+ * the view is closed.
+ */
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -241,9 +270,17 @@ export default function ProtectedCompanionRoute() {
     protectedIdentity.isReady,
   ]);
 
+  // `useMutation` returns a fresh result object on every render, so depending
+  // on `enroll` re-runs these effects continuously: this screen re-renders on
+  // two 2-second polls. `reset` is bound once on the mutation observer and is
+  // stable, so depend on the method rather than the object. Without this the
+  // expiry timer below was cleared and rebuilt, and the three global
+  // listeners further down were removed and re-added, on every render.
+  const resetEnroll = enroll.reset;
+
   useEffect(() => {
-    if (visiblePairing) enroll.reset();
-  }, [enroll, visiblePairing]);
+    if (visiblePairing) resetEnroll();
+  }, [resetEnroll, visiblePairing]);
 
   useEffect(() => {
     if (!visiblePairing) return undefined;
@@ -254,11 +291,11 @@ export default function ProtectedCompanionRoute() {
       setPairingIdentityFingerprint(null);
       setCertificateFingerprint("");
       setCertificateIdentityFingerprint(null);
-      enroll.reset();
+      resetEnroll();
       setMessage("The one-time pairing code expired and was cleared from this browser view.");
     }, delay);
     return () => window.clearTimeout(timeout);
-  }, [enroll, visiblePairing]);
+  }, [resetEnroll, visiblePairing]);
 
   const startCompanion = useMutation({
     mutationKey: protectedMutationKey("companion-start", identityFingerprint, id),
@@ -337,7 +374,7 @@ export default function ProtectedCompanionRoute() {
         setCertificateFingerprint("");
         setCertificateIdentityFingerprint(null);
       });
-      enroll.reset();
+      resetEnroll();
     };
     const refreshProtectedIdentity = () => {
       void queryClient.invalidateQueries({
@@ -369,7 +406,7 @@ export default function ProtectedCompanionRoute() {
       window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [enroll, queryClient]);
+  }, [resetEnroll, queryClient]);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return (
