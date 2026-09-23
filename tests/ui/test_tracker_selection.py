@@ -15,6 +15,9 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 
 async def test_tracker_selection(client: TestClient, new_page: Any) -> None:
+    # The pages are served from the built SPA, as in test_reports_table.
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
     payload = client.get("/api/tracking").json()
     page = await new_page()
 
