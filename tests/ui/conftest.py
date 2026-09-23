@@ -24,6 +24,7 @@ from audit.blob_store import BlobStore
 from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
+from audit.web import server as web_server
 from audit.web.server import create_app
 
 if TYPE_CHECKING:
@@ -182,8 +183,13 @@ def client(seeded_db: tuple[Path, Path, int]) -> TestClient:
 def live_server(seeded_db: tuple[Path, Path, int]) -> Iterator[tuple[str, int]]:
     """Run the FastAPI app on an ephemeral port in a background thread.
 
-    Yielded as ``(base_url, scan_id)``. Used by Playwright tests.
+    Yielded as ``(base_url, scan_id)``. Used by Playwright tests, which all
+    drive the SPA at /app/: without a built bundle the server answers the
+    shell with a 503 page, and each test would wait out its locator timeouts
+    (30 s apiece) instead of saying why.
     """
+    if not (web_server._FRONTEND_DIST / "index.html").exists():
+        pytest.skip("SPA bundle not built (run `npm run build`)")
     db_path, blob_dir, scan_id = seeded_db
     app = create_app(db_path=db_path, blob_dir=blob_dir)
     config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", access_log=False)
