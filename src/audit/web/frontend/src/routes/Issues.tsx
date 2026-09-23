@@ -1,16 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Info,
-  Search,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card, Select, withReturnTrail, type SelectOption } from "../components/ui";
 // The same helper the topbar trail and the overview use.
@@ -32,17 +23,12 @@ import type {
  * Each column is one of the facts the old right-hand evidence pane listed
  * for the selected issue (type, criterion, priority, spread, difficulty,
  * owner), so the whole report can be compared at a glance instead of one
- * issue at a time. The two things that do not fit in a cell open from the
- * row without leaving it: "About" expands an inline panel with the issue's
- * description, and the page count links to a page of its own
- * (``/scans/:id/issues/:key/pages``) listing every affected page in
- * columns. Both stay in the reading order and in the current tab, which is
- * the behaviour the desktop app needs because it has no browser back
- * button; the topbar trail is the way back, and every link out of here
- * carries the origin it needs to draw that trail.
- *
- * The per-issue route (``/scans/:id/issues/:key``) still exists for deep
- * links and for the full evidence record.
+ * issue at a time. What does not fit in a cell is one link away: the title
+ * opens the issue's full record (what it is, why it matters, the fix), and
+ * the page count opens a page of its own (``/scans/:id/issues/:key/pages``)
+ * listing every affected page in columns. The topbar trail is the way back,
+ * which the desktop app needs because it has no browser back button, and
+ * every link out of here carries the origin it needs to draw that trail.
  */
 export default function IssuesRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -284,10 +270,8 @@ const COLUMNS = [
   "Occurrences",
   "Difficulty",
   "Responsibility",
-  "About",
 ] as const;
-type Column = (typeof COLUMNS)[number];
-type SortColumn = Exclude<Column, "About">;
+type SortColumn = (typeof COLUMNS)[number];
 type Direction = "asc" | "desc";
 type SortState = { column: SortColumn; direction: Direction };
 
@@ -421,9 +405,12 @@ function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
 /**
  * The flat table itself.
  *
- * Nine columns do not fit at phone width, so the table sits in a scroll
+ * Eight columns do not fit at phone width, so the table sits in a scroll
  * region of its own rather than forcing the page sideways (the shell keeps
- * ``overflow-x: hidden`` on the document). The region is focusable so a
+ * ``overflow-x: hidden`` on the document). At desktop width they do fit:
+ * there is no minimum table width, the issue title is the one column that
+ * wraps, and the cells are padded just enough to keep all eight in view
+ * beside the expanded sidebar at 1280 px. The region is focusable so a
  * keyboard user can scroll it, and it is named so that focus lands on
  * something with a name. The issue column is sticky, so the row keeps its
  * label while the rest scrolls under it.
@@ -477,7 +464,7 @@ function IssueTable({
         tabIndex={0}
         className="overflow-x-auto focus:outline-none focus-visible:shadow-focus"
       >
-      <table className="w-full min-w-[64rem] text-sm">
+      <table className="w-full text-sm">
         <caption className="sr-only">Accessibility issue groups</caption>
         <thead className="bg-surface-muted text-2xs text-fg-subtle">
           <tr>
@@ -489,13 +476,6 @@ function IssueTable({
                 column === "Issue" && "sticky left-0 z-[1] bg-surface-muted",
                 numeric && "text-right",
               );
-              if (column === "About") {
-                return (
-                  <th key={column} scope="col" className={cn(cell, "px-3 py-2")}>
-                    {column}
-                  </th>
-                );
-              }
               const active = sort.column === column;
               const Arrow = !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
               return (
@@ -517,7 +497,7 @@ function IssueTable({
                     type="button"
                     onClick={() => choose(column)}
                     className={cn(
-                      "group inline-flex min-h-target items-center gap-1.5 rounded-xs px-2 text-2xs font-semibold hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+                      "group inline-flex min-h-target items-center gap-1.5 rounded-xs px-1 text-2xs font-semibold hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
                       active ? "text-umich-blue" : "text-fg-subtle",
                     )}
                   >
@@ -554,227 +534,103 @@ function IssueTable({
 }
 
 /**
- * One issue group and, under it, its "About" panel.
+ * One issue group.
  *
- * The panel is a second ``<tr>`` that is always mounted and toggled with
- * ``hidden``, so the button's ``aria-controls`` always names a real element
- * and the description reads in place, straight after the row, for anyone
- * moving through the table linearly. Both rows share one band so they read
- * as one record; ``odd:``/``even:`` on the ``<tr>`` would stripe halfway
- * through it.
+ * There used to be an "About" column whose button opened the issue's
+ * description in a second row under this one. It repeated what the title
+ * link opens, and it was the column that got cut off, so it is gone: the
+ * title is the one way to what an issue is.
  */
 function IssueTableRow({ scanId, row, index }: { scanId: number; row: IssueRow; index: number }) {
   const location = useLocation();
-  const [open, setOpen] = useState(false);
   const isInformational = row.review_lane === "informational";
-  const slug = row.issue_key.replace(/[^A-Za-z0-9_-]/g, "-");
-  const titleId = `issue-${slug}-title`;
-  const buttonId = `issue-about-${slug}-button`;
-  const panelId = `issue-about-${slug}-panel`;
   const band = index % 2 === 1 ? "bg-surface-subtle" : "bg-surface";
-  const Caret = open ? ChevronDown : ChevronRight;
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
   // The pages table needs the way back to this list, filters included.
   const here = `${location.pathname}${location.search}`;
   const pagesPath = withReturnTrail(`${detailPath}/pages`, "Issues", here);
 
   return (
-    <Fragment>
-      <tr className={cn(band, "border-t border-border")}>
-        <th
-          scope="row"
-          className={cn(
-            band,
-            "sticky left-0 z-[1] max-w-[18rem] min-w-[14rem] px-3 py-2.5 text-left align-top font-semibold shadow-[inset_-1px_0_0_theme(colors.border.DEFAULT)]",
-          )}
-        >
-          {/* The title is the row's main link and opens the issue's full
-              evidence record: what it is, why it matters, the fix, and its
-              pages. The page count beside it is the shortcut straight to
-              the pages. It is styled
-              like every other link so nobody has to guess it is one. The
-              other links in this row point at this id for their context
-              instead of repeating the title in their own names: a name is
-              what gets read on every stop, a description only on request. */}
-          {/* min-h-target goes on the link, not as padding on the cell: SC
-              2.5.5 measures the target itself, and a 38px-high link inside a
-              taller cell is still a 38px target. */}
-          <Link
-            id={titleId}
-            to={withReturnTrail(detailPath, "Issues", here)}
-            data-issue-link="true"
-            className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
-          >
-            {row.title}
-            <span className="sr-only">, full evidence</span>
-          </Link>
-        </th>
-        <td className="whitespace-nowrap px-3 py-2.5 align-top">
-          <Tag tone={isInformational ? "neutral" : "flag"}>{laneLabel(row.review_lane)}</Tag>
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 align-top">
-          {row.wcag_sc ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="tabular-nums">{row.wcag_sc}</span>
-              <ConformanceBadge level={row.conformance} />
-              {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-            </span>
-          ) : (
-            <span className="text-fg-muted">Best practice</span>
-          )}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 align-top">
-          {isInformational ? (
-            <span className="text-fg-muted">n/a</span>
-          ) : (
-            // The band, not the score: "11.28" means nothing to a reader,
-            // and two decimals invited comparing issues by hundredths. The
-            // score still orders the column; the word is what shows.
-            priorityTier(row.priority)
-          )}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">
-          {/* "211 pages" says nothing about which issue on its own, and a
-              description is not a name: SC 2.4.9 wants the purpose from the
-              link text alone, so the issue rides along inside the name while
-              the cell stays a number wide. */}
-          <Link
-            to={pagesPath}
-            className="flex min-h-target items-center justify-end text-umich-blue underline underline-offset-2"
-          >
-            {row.page_count} page{row.page_count === 1 ? "" : "s"}
-            <span className="sr-only"> with {row.title}</span>
-          </Link>
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">
-          {row.occurrence_count}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 align-top">
-          {isInformational || row.difficulty === "Unknown" ? (
-            <span className="text-fg-muted">n/a</span>
-          ) : (
-            row.difficulty
-          )}
-        </td>
-        <td className="whitespace-nowrap px-3 py-2.5 align-top">
-          {isInformational ? (
-            <span className="text-fg-muted">n/a</span>
-          ) : (
-            capitalize(row.responsibility)
-          )}
-        </td>
-        <td className="whitespace-nowrap px-3 py-1 align-top">
-          <button
-            type="button"
-            id={buttonId}
-            aria-expanded={open}
-            aria-controls={panelId}
-            onClick={() => setOpen((value) => !value)}
-            className="inline-flex min-h-target items-center gap-1 rounded-xs px-2 text-sm font-semibold text-umich-blue hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
-          >
-            <Caret className="h-4 w-4 shrink-0" aria-hidden />
-            <span>About</span>
-            <span className="sr-only"> this issue: {row.title}</span>
-          </button>
-        </td>
-      </tr>
-      <tr id={panelId} hidden={!open} className={band}>
-        <td colSpan={COLUMNS.length} className="px-3 pb-4 pt-1">
-          <div
-            role="region"
-            aria-labelledby={buttonId}
-            className="max-w-3xl rounded-xs border border-border bg-surface p-4"
-          >
-            <AboutIssue row={row} detailPath={detailPath} titleId={titleId} />
-          </div>
-        </td>
-      </tr>
-    </Fragment>
-  );
-}
-
-/** The issue's description, why it matters, the fix, and where the full record lives. */
-function AboutIssue({
-  row,
-  detailPath,
-  titleId,
-}: {
-  row: IssueRow;
-  detailPath: string;
-  titleId: string;
-}) {
-  const isInformational = row.review_lane === "informational";
-  return (
-    <>
-      <h2 className="text-2xs font-semibold text-fg-subtle">What it is</h2>
-      <p className="mt-1 text-sm text-fg">
-        {row.description ||
-          row.evidence_summary ||
-          "This is an automated evidence record. Open the affected pages for the captured detail."}
-      </p>
-      {row.review_lane === "expert_review" && (
-        <p className="mt-2 text-sm font-semibold">
-          Do not describe this as a confirmed barrier until the expert decision is documented.
-        </p>
-      )}
-      {isInformational && (
-        <p className="mt-2 text-sm font-semibold">
-          No barrier was detected by this check. This record is read-only evidence retained for transparency.
-        </p>
-      )}
-      {!isInformational && row.why_matters && (
-        <p className="mt-2 text-sm text-fg-muted">
-          <span className="font-semibold text-fg">Why it matters:</span> {row.why_matters}
-        </p>
-      )}
-      {!isInformational && row.fix_steps.length > 0 && (
-        <>
-          <h2 className="mt-4 text-2xs font-semibold text-fg-subtle">Expected behavior</h2>
-          <ol className="mt-1 list-decimal space-y-1.5 pl-5 text-sm text-fg">
-            {row.fix_steps.map((step, i) => (
-              <li
-                key={i}
-                // Steps include inline <code> / <em> from the YAML.
-                // We trust YAML authors (it's our own rule book).
-                dangerouslySetInnerHTML={{ __html: step }}
-              />
-            ))}
-          </ol>
-        </>
-      )}
-      {!isInformational && row.acceptance && (
-        <p className="mt-2 text-sm text-fg-muted">
-          <span className="font-semibold text-fg">Done when:</span> {row.acceptance}
-        </p>
-      )}
-      {!isInformational && row.abilities_affected.length > 0 && (
-        <p className="mt-3 text-sm">
-          <span className="font-semibold text-fg">Abilities affected:</span>{" "}
-          {row.abilities_affected.map((a) => capitalize(a)).join(", ")}
-        </p>
-      )}
-      <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <Link
-          to={detailPath}
-          aria-describedby={titleId}
-          className="font-semibold text-umich-blue underline underline-offset-2"
-        >
-          Full evidence record
-        </Link>
-        {row.help_url && (
-          <a
-            href={row.help_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
-          >
-            Rule docs
-            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="sr-only">, opens in a new tab</span>
-          </a>
+    <tr className={cn(band, "border-t border-border")}>
+      <th
+        scope="row"
+        className={cn(
+          band,
+          "sticky left-0 z-[1] max-w-[18rem] min-w-[12rem] px-2 py-2.5 text-left align-top font-semibold shadow-[inset_-1px_0_0_theme(colors.border.DEFAULT)]",
         )}
-      </p>
-    </>
+      >
+        {/* The title is the row's main link and opens the issue's full
+            evidence record: what it is, why it matters, the fix, and its
+            pages. The page count beside it is the shortcut straight to
+            the pages. It is styled like every other link so nobody has to
+            guess it is one. */}
+        {/* min-h-target goes on the link, not as padding on the cell: SC
+            2.5.5 measures the target itself, and a 38px-high link inside a
+            taller cell is still a 38px target. */}
+        <Link
+          to={withReturnTrail(detailPath, "Issues", here)}
+          data-issue-link="true"
+          className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
+        >
+          {row.title}
+          <span className="sr-only">, full evidence</span>
+        </Link>
+      </th>
+      <td className="whitespace-nowrap px-2 py-2.5 align-top">
+        <Tag tone={isInformational ? "neutral" : "flag"}>{laneLabel(row.review_lane)}</Tag>
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 align-top">
+        {row.wcag_sc ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="tabular-nums">{row.wcag_sc}</span>
+            <ConformanceBadge level={row.conformance} />
+            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+          </span>
+        ) : (
+          <span className="text-fg-muted">Best practice</span>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 align-top">
+        {isInformational ? (
+          <span className="text-fg-muted">n/a</span>
+        ) : (
+          // The band, not the score: "11.28" means nothing to a reader,
+          // and two decimals invited comparing issues by hundredths. The
+          // score still orders the column; the word is what shows.
+          priorityTier(row.priority)
+        )}
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums">
+        {/* "211 pages" says nothing about which issue on its own, and a
+            description is not a name: SC 2.4.9 wants the purpose from the
+            link text alone, so the issue rides along inside the name while
+            the cell stays a number wide. */}
+        <Link
+          to={pagesPath}
+          className="flex min-h-target items-center justify-end text-umich-blue underline underline-offset-2"
+        >
+          {row.page_count} page{row.page_count === 1 ? "" : "s"}
+          <span className="sr-only"> with {row.title}</span>
+        </Link>
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums">
+        {row.occurrence_count}
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 align-top">
+        {isInformational || row.difficulty === "Unknown" ? (
+          <span className="text-fg-muted">n/a</span>
+        ) : (
+          row.difficulty
+        )}
+      </td>
+      <td className="whitespace-nowrap px-2 py-2.5 align-top">
+        {isInformational ? (
+          <span className="text-fg-muted">n/a</span>
+        ) : (
+          capitalize(row.responsibility)
+        )}
+      </td>
+    </tr>
   );
 }
 

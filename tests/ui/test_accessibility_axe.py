@@ -91,41 +91,6 @@ async def _axe_clean(new_page: Any, base: str, path: str) -> None:
         await page.context.close()
 
 
-async def _mock_repeated_review_leads(
-    page: Any,
-    *,
-    base: str,
-    scan_id: int,
-    copies: int,
-) -> None:
-    """Give the browser a deterministic multi-option queue without mutating the DB."""
-    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
-    assert response.ok
-    payload = await response.json()
-    template = next(row for row in payload["rows"] if row["review_lane"] == "expert_review")
-    repeated = [
-        {
-            **template,
-            "issue_key": f"{template['issue_key']}:qa-{index}",
-            "title": f"Review lead {index + 2}",
-        }
-        for index in range(copies)
-    ]
-    payload["rows"].extend(repeated)
-    payload["total_unfiltered"] += copies
-    payload["review_lane_counts"]["expert_review"] += copies
-    payload["occurrence_counts"]["all_evidence"] += sum(row["occurrence_count"] for row in repeated)
-
-    async def serve_issues(route: Any) -> None:
-        await route.fulfill(
-            status=200,
-            content_type="application/json",
-            body=json.dumps(payload),
-        )
-
-    await page.route(f"**/api/scans/{scan_id}/issues*", serve_issues)
-
-
 async def test_dashboard_has_no_axe_violations(live_server: tuple[str, int], new_page: Any) -> None:
     base, _ = live_server
     await _axe_clean(new_page, base, "/app/")
@@ -260,44 +225,66 @@ async def test_issue_card_answers_what_why_fix_and_where(
     """The report still answers what, why, fix, and location, one issue at a time.
 
     The four answers used to be four columns, then the four sections of a
-    side pane. They are now the "About" panel that opens inline under a row
-    of the issues table, which is the only structural claim this test makes.
+    side pane, then an "About" column whose button opened them under the
+    row. That column repeated what the issue name opens and is gone; the
+    issue name is the one way to them.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await _mock_repeated_review_leads(page, base=base, scan_id=scan_id, copies=3)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_label("Type", exact=True).select_option("expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issue groups")
-    rows = issues.get_by_role("rowheader")
-    row_count = await rows.count()
-    assert row_count >= 2
+    # Contains, not equals: the sorted header also carries its direction chip.
+    await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
+        [
+            "Issue",
+            "Type",
+            "WCAG",
+            "Priority",
+            "Pages",
+            "Occurrences",
+            "Difficulty",
+            "Responsibility",
+        ]
+    )
+    assert await issues.get_by_role("button", name="About", exact=False).count() == 0
 
-    # Nothing is open on load: the row is what gets read on every
-    # stop, the description only on request.
-    about = issues.get_by_role("button", name="About this issue", exact=False)
-    await playwright_async.expect(about.first).to_have_attribute("aria-expanded", "false")
-    await about.first.click()
-    await playwright_async.expect(about.first).to_have_attribute("aria-expanded", "true")
-    first_title = (await rows.first.inner_text()).splitlines()[0]
-    panel = page.get_by_role("region", name=re.compile(re.escape(first_title)))
-    await playwright_async.expect(panel).to_be_visible()
+    first = issues.get_by_role("rowheader").first.get_by_role("link")
+    title = (await first.inner_text()).splitlines()[0].strip()
+    await first.click()
+    await page.wait_for_url("**/issues/**")
+    await playwright_async.expect(page.get_by_role("heading", name=title, level=1)).to_be_visible()
     # What it is, why it matters (or the expert-decision caution for a
-    # lead), and where the full record lives.
-    await playwright_async.expect(panel.get_by_role("heading", name="What it is")).to_be_visible()
+    # lead), and where it was found.
     await playwright_async.expect(
-        panel.get_by_text(re.compile("Why it matters|expert decision")).first
+        page.get_by_role("heading", name="What it is", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        panel.get_by_role("link", name="Full evidence record")
+        page.get_by_text(re.compile("Why it matters|expert decision")).first
     ).to_be_visible()
 
-    # Opening a second issue keeps the table whole: the reader never
-    # leaves the list to learn what an issue is.
-    await about.nth(1).click()
-    await playwright_async.expect(about.nth(1)).to_have_attribute("aria-expanded", "true")
-    assert await issues.get_by_role("rowheader").count() == row_count
+
+async def test_issue_table_fits_the_default_desktop_width(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """At 1280 px beside the expanded sidebar, no column is cut off.
+
+    Whichever column is sorted (the sorted header carries a wider chip), the
+    table is no wider than the region that holds it, so it never scrolls
+    sideways at desktop width.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    issues = page.get_by_role("table", name="Accessibility issue groups")
+    scroller = page.get_by_role("region", name="Issue table")
+    for column in (None, "Issue", "Occurrences", "Responsibility"):
+        if column:
+            await issues.get_by_role("button", name=column, exact=False).first.click()
+        widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")
+        assert widths["scroll"] <= widths["client"], (column, widths)
 
 
 async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
@@ -378,17 +365,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         informational_row.get_by_text("Informational", exact=True)
     ).to_be_visible()
     # Informational evidence never inherits triage or remediation
-    # controls: the row's only control is the "About" disclosure, and
-    # what it discloses is read-only.
-    buttons = informational_row.get_by_role("button")
-    assert await buttons.count() == 1
-    await buttons.first.click()
-    about = page.get_by_role("region", name="Logo image, adequate alt", exact=False)
-    await playwright_async.expect(
-        about.get_by_text("No barrier was detected by this check.", exact=False)
-    ).to_be_visible()
-    assert await about.get_by_role("heading", name="Expected behavior").count() == 0
-    assert await about.get_by_role("button").count() == 0
+    # controls: the row has no buttons at all, only its links.
+    assert await informational_row.get_by_role("button").count() == 0
 
     await page.goto(
         f"{base}/app/scans/{scan_id}/issues/image:logo_adequate",
