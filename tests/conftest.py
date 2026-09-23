@@ -10,7 +10,31 @@ import pytest
 
 from audit.db.schema import connect
 
-MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "src" / "audit" / "db" / "migrations"
+TESTS_DIR = Path(__file__).resolve().parent
+MIGRATIONS_DIR = TESTS_DIR.parent / "src" / "audit" / "db" / "migrations"
+
+# Markers follow the directory a test lives in. The Makefile selects suites
+# with `-m integration` / `-m ui`, and a file that forgot its `pytestmark`
+# used to drop out of those runs without anyone noticing.
+_DIRECTORY_MARKERS = {"integration": "integration", "ui": "ui"}
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    imports_playwright: dict[Path, bool] = {}
+    for item in items:
+        path = Path(str(item.path))
+        try:
+            top = path.relative_to(TESTS_DIR).parts[0]
+        except (ValueError, IndexError):
+            continue
+        marker = _DIRECTORY_MARKERS.get(top)
+        if marker is None:
+            continue
+        item.add_marker(marker)
+        if path not in imports_playwright:
+            imports_playwright[path] = "playwright" in path.read_text(encoding="utf-8")
+        if imports_playwright[path]:
+            item.add_marker("browser")
 
 
 def _apply_migrations(conn: sqlite3.Connection) -> None:

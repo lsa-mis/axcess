@@ -75,9 +75,10 @@ addopts = "-ra --strict-markers --strict-config"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
-    "integration: end-to-end integration tests (may hit local fixture server)",
+    "integration: end-to-end integration tests (may hit local fixture server; auto-applied under tests/integration)",
     "live_vlm: tests that require a live Ollama instance",
-    "ui: Playwright-based UI tests",
+    "ui: FastAPI route and Playwright UI tests (auto-applied under tests/ui)",
+    "browser: module imports Playwright; needs a Chromium install (auto-applied under tests/integration and tests/ui)",
 ]
 
 [tool.coverage.run]

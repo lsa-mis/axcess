@@ -103,10 +103,11 @@ def test_favicon_svg_served(client: TestClient) -> None:
     resp = client.get("/favicon.svg")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    # The actual mark is a UMich-blue rounded rect with a maize T — assert
-    # the maize hex is present so a swap to a placeholder (or an empty
-    # file) is caught loudly rather than rendering a blank tab icon.
-    assert b"#FFCB05" in resp.content
+    # The mark is a stroked Axcess logo in UMich blue that turns white in
+    # dark mode -- assert the blue hex is present so a swap to a placeholder
+    # (or an empty file) is caught loudly rather than rendering a blank tab
+    # icon.
+    assert b"#00274C" in resp.content
 
 
 def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
@@ -115,7 +116,7 @@ def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
     resp = client.get("/favicon.ico")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    assert b"#FFCB05" in resp.content
+    assert b"#00274C" in resp.content
 
 
 # ------------------------------------------------------------------ /api/scans
