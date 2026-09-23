@@ -1,0 +1,4 @@
+start 2026-09-22_20:28:31
+48 detectors x 1 subjects (52 already in kafe_matrix.jsonl)
+[1/1] craigslist         y=True buttons=898   pos=36  neg=12  abst=0   (5351.6s)
+exit=0 end 2026-09-22_21:57:44

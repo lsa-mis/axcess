@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-09-23T01:36:31.538714+00:00",
+  "generated_utc": "2026-09-23T13:21:53.540676+00:00",
   "control_1_kafe_reproduction": {
     "pass": true,
     "expected": {
@@ -74,8 +74,8 @@
   "control_2_denominator": {
     "kafe_corpus": 60,
     "replayable": 53,
-    "attempted": 52,
-    "scored": 39,
+    "attempted": 53,
+    "scored": 40,
     "abstained_whole_subject": 13,
     "pass": true,
     "excluded_before_the_run": [
@@ -162,9 +162,7 @@
         "reason": "tab walk capped at 483 with 283 focusable elements"
       }
     ],
-    "not_yet_attempted": [
-      "craigslist"
-    ]
+    "not_yet_attempted": []
   },
   "control_3_negative": {
     "pass": true,

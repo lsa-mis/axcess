@@ -1,6 +1,6 @@
 # KAFE matrix: report
 
-Companion to `KAFE-MATRIX.md`. Generated 2026-09-23T01:36:31.512206+00:00.
+Companion to `KAFE-MATRIX.md`. Generated 2026-09-23T13:21:53.500404+00:00.
 Everything below is derived from `derived/kafe_matrix.jsonl`,
 `derived/kafe_matrix_summary.json` and `derived/kafe_matrix_controls.json`;
 no figure in this file is typed by hand.
@@ -233,7 +233,7 @@ is kept here only as a record and is quoted nowhere as a cost:
 
 - KAFE's corpus: **60** subjects.
 - Judged replayable beforehand: **53**.
-- Attempted here: **52**. Scored: **39**.
+- Attempted here: **53**. Scored: **40**.
   Whole-subject abstentions: **13**.
 
 Excluded before the run ever started:
@@ -265,9 +265,9 @@ Abstained during the run:
 Replayable, but with no result in `derived/kafe_matrix.jsonl` — not scored, and
 not counted as an abstention, because nothing was measured:
 
-- `craigslist`
+- none
 
-The scored denominator in `KAFE-MATRIX.md` is **39**,
+The scored denominator in `KAFE-MATRIX.md` is **40**,
 which is exactly the number of subjects that replayed and produced a verdict.
 
 ### Control 3 — negative control: PASS
@@ -316,11 +316,11 @@ committed.
 
 ## 3. What the run found
 
-- **39 subjects scored** of 52 attempted, of 60 in KAFE's corpus:
-  24 KAFE-positive, 15 KAFE-negative.
-- **4707 controls probed** in total across those subjects.
+- **40 subjects scored** of 53 attempted, of 60 in KAFE's corpus:
+  25 KAFE-positive, 15 KAFE-negative.
+- **5605 controls probed** in total across those subjects.
 - On the same subjects, KAFE itself scores
-  {"tp": 24, "fp": 1, "fn": 0, "tn": 14}.
+  {"tp": 25, "fp": 1, "fn": 0, "tn": 14}.
 
 Read the precision column with the page-level caveat in front of it. A page with
 hundreds of candidates makes "flagged at least one element" nearly free, so a
@@ -335,27 +335,27 @@ what they say.
 detector flagged nothing **and** left no candidate undecided. The permissive
 rule lets any decided candidate license a negative. Rows where the two disagree:
 
-- `D0 axcess collectClickables` — strict 17/9/5/5 (16 abst.), permissive 17/9/7/5 (14 abst.)
-- `D1 axe-core (keyboard rules)` — strict 2/1/20/12 (17 abst.), permissive 2/1/22/13 (14 abst.)
-- `D1x axe-core (any rule, unsound)` — strict 22/11/1/2 (16 abst.), permissive 22/11/2/3 (14 abst.)
-- `D2 inline onclick attribute` — strict 5/2/17/11 (17 abst.), permissive 5/2/19/12 (14 abst.)
-- `D2b onclick property` — strict 12/3/10/10 (17 abst.), permissive 12/3/12/11 (14 abst.)
-- `D3 tabindex / ARIA` — strict 9/1/13/12 (17 abst.), permissive 9/1/15/13 (14 abst.)
-- `D5 CDP getEventListeners` — strict 20/5/2/8 (17 abst.), permissive 20/5/4/9 (14 abst.)
-- `D6 addEventListener shim` — strict 2/0/20/13 (17 abst.), permissive 2/0/22/14 (14 abst.)
-- `D7 React fiber props` — strict 0/0/22/13 (17 abst.), permissive 0/0/24/14 (14 abst.)
-- `D8 hover-diff` — strict 17/9/5/5 (16 abst.), permissive 17/9/7/5 (14 abst.)
-- `C6 visible label for a toggle absent from Tab` — strict 0/1/20/13 (18 abst.), permissive 0/1/21/14 (16 abst.)
-- `C15 = C14 minus leads with no click effect (R7, R8)` — strict 18/4/3/10 (17 abst.), permissive 18/4/3/11 (16 abst.)
-- `C16 = C15 plus divergent-key-effect promotions (R9)` — strict 18/4/3/10 (17 abst.), permissive 18/4/3/11 (16 abst.)
-- `D9 behavioural differential` — strict 22/8/0/0 (22 abst.), permissive 22/8/2/6 (14 abst.)
-- `D9+S4ours coverage-armed differential, our payload Stage 4` — strict 23/8/0/0 (21 abst.), permissive 23/8/1/6 (14 abst.)
-- `D9+S4u differential with upstream Stage 4 (coverage-exact)` — strict 24/12/0/0 (16 abst.), permissive 24/12/0/2 (14 abst.)
-- `D9-noS4 coverage-armed differential, no equivalence filter` — strict 24/12/0/0 (16 abst.), permissive 24/12/0/2 (14 abst.)
-- `D9u upstream-style differential (8 channels, keys in sequence)` — strict 19/12/0/0 (21 abst.), permissive 19/12/5/3 (13 abst.)
-- `D9u+S4u upstream differential with upstream Stage 4 (1:1)` — strict 19/12/0/0 (21 abst.), permissive 19/12/5/3 (13 abst.)
-- `D10a-u upstream coverage presence (sequential keys, baselined)` — strict 14/8/1/0 (29 abst.), permissive 14/8/10/7 (13 abst.)
-- `D10b-u upstream coverage set-difference (sequential keys, baselined)` — strict 17/10/0/0 (25 abst.), permissive 17/10/7/5 (13 abst.)
+- `D0 axcess collectClickables` — strict 18/9/5/5 (16 abst.), permissive 18/9/7/5 (14 abst.)
+- `D1 axe-core (keyboard rules)` — strict 2/1/21/12 (17 abst.), permissive 2/1/23/13 (14 abst.)
+- `D1x axe-core (any rule, unsound)` — strict 23/11/1/2 (16 abst.), permissive 23/11/2/3 (14 abst.)
+- `D2 inline onclick attribute` — strict 5/2/18/11 (17 abst.), permissive 5/2/20/12 (14 abst.)
+- `D2b onclick property` — strict 12/3/11/10 (17 abst.), permissive 12/3/13/11 (14 abst.)
+- `D3 tabindex / ARIA` — strict 10/1/13/12 (17 abst.), permissive 10/1/15/13 (14 abst.)
+- `D5 CDP getEventListeners` — strict 21/5/2/8 (17 abst.), permissive 21/5/4/9 (14 abst.)
+- `D6 addEventListener shim` — strict 2/0/21/13 (17 abst.), permissive 2/0/23/14 (14 abst.)
+- `D7 React fiber props` — strict 0/0/23/13 (17 abst.), permissive 0/0/25/14 (14 abst.)
+- `D8 hover-diff` — strict 18/9/5/5 (16 abst.), permissive 18/9/7/5 (14 abst.)
+- `C6 visible label for a toggle absent from Tab` — strict 0/1/21/13 (18 abst.), permissive 0/1/22/14 (16 abst.)
+- `C15 = C14 minus leads with no click effect (R7, R8)` — strict 19/4/3/10 (17 abst.), permissive 19/4/3/11 (16 abst.)
+- `C16 = C15 plus divergent-key-effect promotions (R9)` — strict 19/4/3/10 (17 abst.), permissive 19/4/3/11 (16 abst.)
+- `D9 behavioural differential` — strict 23/8/0/0 (22 abst.), permissive 23/8/2/6 (14 abst.)
+- `D9+S4ours coverage-armed differential, our payload Stage 4` — strict 24/8/0/0 (21 abst.), permissive 24/8/1/6 (14 abst.)
+- `D9+S4u differential with upstream Stage 4 (coverage-exact)` — strict 25/12/0/0 (16 abst.), permissive 25/12/0/2 (14 abst.)
+- `D9-noS4 coverage-armed differential, no equivalence filter` — strict 25/12/0/0 (16 abst.), permissive 25/12/0/2 (14 abst.)
+- `D9u upstream-style differential (8 channels, keys in sequence)` — strict 20/12/0/0 (21 abst.), permissive 20/12/5/3 (13 abst.)
+- `D9u+S4u upstream differential with upstream Stage 4 (1:1)` — strict 20/12/0/0 (21 abst.), permissive 20/12/5/3 (13 abst.)
+- `D10a-u upstream coverage presence (sequential keys, baselined)` — strict 15/8/1/0 (29 abst.), permissive 15/8/10/7 (13 abst.)
+- `D10b-u upstream coverage set-difference (sequential keys, baselined)` — strict 18/10/0/0 (25 abst.), permissive 18/10/7/5 (13 abst.)
 
 Full permissive numbers: `derived/kafe_matrix_summary_permissive.json`.
 
