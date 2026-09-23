@@ -28,7 +28,7 @@ from starlette.routing import BaseRoute, Mount
 
 from audit.web import server
 
-from ._golden import check_golden_document, check_golden_entry
+from ._golden import check_golden_document, check_golden_entry, check_golden_keys
 
 pytestmark = pytest.mark.ui
 
@@ -148,6 +148,13 @@ def test_app_structure_matches_golden(
 ) -> None:
     app = _build_app(monkeypatch, tmp_path, _db_path(tmp_db), gate=gate, dist=dist)
     check_golden_entry(_SURFACE_GOLDEN, f"{gate}/{dist}", _describe_app(app))
+
+
+def test_structure_golden_holds_exactly_the_build_variants() -> None:
+    # Each variant above checks only its own entry, so without this a
+    # renamed or dropped variant would leave a stale entry nobody reads.
+    expected = {f"{gate}/{dist}" for gate in _GATE_VARIANTS for dist in _DIST_VARIANTS}
+    check_golden_keys(_SURFACE_GOLDEN, expected)
 
 
 def test_openapi_document_matches_golden_in_every_variant(
