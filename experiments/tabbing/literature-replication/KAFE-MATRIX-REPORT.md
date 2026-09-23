@@ -1,6 +1,6 @@
 # KAFE matrix: report
 
-Companion to `KAFE-MATRIX.md`. Generated 2026-09-23T00:53:05.466646+00:00.
+Companion to `KAFE-MATRIX.md`. Generated 2026-09-23T01:36:31.512206+00:00.
 Everything below is derived from `derived/kafe_matrix.jsonl`,
 `derived/kafe_matrix_summary.json` and `derived/kafe_matrix_controls.json`;
 no figure in this file is typed by hand.
@@ -166,17 +166,64 @@ too. No outside tool has been scored on either.
 
 Their published Table 1 reports 92% / 100%; recomputing from
 `artifacts/kafe_results_to_reproduce.csv` gives 36/3/0/21 at 92.3% / 100.0% over
-n=60. Their timing reproduces too:
+n=60. Their cost is taken from their own per-subject logs
+(`artifacts/kafe_output/`, fetched by `tools/fetch_kafe_output.py`), not from
+the results CSV. The mean full pipeline per subject comes to
+19.33 min, against
+their paper's 19.22 min:
 
 ```json
 {
+  "available": true,
+  "source": "artifacts/kafe_output/<subject>/execTime.csv + execTimeDetection.csv",
+  "subjects": 60,
+  "ctrl_nodes_total": 2992,
+  "type2_counted": false,
+  "type1_detection": {
+    "ms_total": 196114,
+    "ms_per_subject_mean": 3268.6,
+    "ms_per_button_pooled": 65.5,
+    "ms_per_button_median": 104.3,
+    "ms_per_button_min": 6.2,
+    "ms_per_button_max": 636.1,
+    "subjects_under_300ms_per_button": "53/60"
+  },
+  "crawl_phases": {
+    "ms_total": 9578172,
+    "ms_per_subject_mean": 159636.2,
+    "ms_per_button_pooled": 3201.3,
+    "ms_per_button_median": 3866.2,
+    "ms_per_button_min": 330.8,
+    "ms_per_button_max": 22359.7,
+    "subjects_under_300ms_per_button": "0/60"
+  },
+  "full_pipeline": {
+    "ms_total": 69597558,
+    "ms_per_subject_mean": 1159959.3,
+    "ms_per_button_pooled": 23261.2,
+    "ms_per_button_median": 24004.7,
+    "ms_per_button_min": 5182.0,
+    "ms_per_button_max": 130006.9,
+    "subjects_under_300ms_per_button": "0/60",
+    "mean_minutes_per_subject": 19.33,
+    "paper_mean_minutes_per_subject": 19.22
+  },
+  "proxy_init_share_pct": 40.1
+}
+```
+
+The results CSV's `Detection` column does **not** reproduce as a per-subject
+detection time. It climbs in alphabetical order, and it differs by more than 5% from
+their logged `01-Type1Detection` on nearly every subject (`KAFE-MATRIX.md`). It
+is kept here only as a record and is quoted nowhere as a cost:
+
+```json
+{
+  "caveat": "not a per-subject detection time; do not quote as KAFE's cost",
   "ms_per_subject_median": 1087.5,
   "ms_per_subject_mean": 995.2,
-  "subjects_under_300ms": 8,
   "ms_per_button_median": 25.8,
-  "ms_per_button_mean": 46.7,
   "ms_per_button_pooled": 20.0,
-  "buttons_under_300ms_cap": "60/60",
   "detection_ms_total": 59711.0,
   "ctrl_nodes_total": 2992
 }
@@ -345,7 +392,10 @@ Full permissive numbers: `derived/kafe_matrix_summary_permissive.json`.
 - **Milliseconds.** Composed by `tools/assemble_matrix.cost_of`, so the
   `ms covers` conventions match the existing matrix by construction.
   `ms/button` divides by the candidates that subject probed; `ms/subject` by the
-  subjects measured. KAFE's two figures come from their `Detection` column over
-  their `Size of All Visible Ctrl Nodes`. The pooling arithmetic is the same on
-  both sides; the instrument, hardware, browser and control count are not, so
-  the two are comparable as orders of magnitude only (see `KAFE-MATRIX.md`).
+  subjects measured. KAFE's two figures are their full pipeline (both graph
+  crawls plus Type 1 detection), from their own per-subject `execTime.csv` and
+  `execTimeDetection.csv`, over their `Size of All Visible Ctrl Nodes`. Type 1
+  detection alone excludes both crawls and is not comparable to an Axcess row.
+  The pooling arithmetic is the same on both sides. The instrument, hardware,
+  browser and control count are not, so the two are comparable as orders of
+  magnitude only (see `KAFE-MATRIX.md`).

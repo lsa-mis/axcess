@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-09-23T00:53:05.479190+00:00",
+  "generated_utc": "2026-09-23T01:36:31.538714+00:00",
   "control_1_kafe_reproduction": {
     "pass": true,
     "expected": {
@@ -23,14 +23,49 @@
       "precision_pct": 92.3,
       "recall_pct": 100.0
     },
-    "timing": {
+    "timing_per_subject_logs": {
+      "available": true,
+      "source": "artifacts/kafe_output/<subject>/execTime.csv + execTimeDetection.csv",
+      "subjects": 60,
+      "ctrl_nodes_total": 2992,
+      "type2_counted": false,
+      "type1_detection": {
+        "ms_total": 196114,
+        "ms_per_subject_mean": 3268.6,
+        "ms_per_button_pooled": 65.5,
+        "ms_per_button_median": 104.3,
+        "ms_per_button_min": 6.2,
+        "ms_per_button_max": 636.1,
+        "subjects_under_300ms_per_button": "53/60"
+      },
+      "crawl_phases": {
+        "ms_total": 9578172,
+        "ms_per_subject_mean": 159636.2,
+        "ms_per_button_pooled": 3201.3,
+        "ms_per_button_median": 3866.2,
+        "ms_per_button_min": 330.8,
+        "ms_per_button_max": 22359.7,
+        "subjects_under_300ms_per_button": "0/60"
+      },
+      "full_pipeline": {
+        "ms_total": 69597558,
+        "ms_per_subject_mean": 1159959.3,
+        "ms_per_button_pooled": 23261.2,
+        "ms_per_button_median": 24004.7,
+        "ms_per_button_min": 5182.0,
+        "ms_per_button_max": 130006.9,
+        "subjects_under_300ms_per_button": "0/60",
+        "mean_minutes_per_subject": 19.33,
+        "paper_mean_minutes_per_subject": 19.22
+      },
+      "proxy_init_share_pct": 40.1
+    },
+    "results_csv_detection_column": {
+      "caveat": "not a per-subject detection time; do not quote as KAFE's cost",
       "ms_per_subject_median": 1087.5,
       "ms_per_subject_mean": 995.2,
-      "subjects_under_300ms": 8,
       "ms_per_button_median": 25.8,
-      "ms_per_button_mean": 46.7,
       "ms_per_button_pooled": 20.0,
-      "buttons_under_300ms_cap": "60/60",
       "detection_ms_total": 59711.0,
       "ctrl_nodes_total": 2992
     },

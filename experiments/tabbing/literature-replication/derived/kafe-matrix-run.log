@@ -63,3 +63,4 @@
 19:14:45 48 detectors x 1 subjects (52 already in kafe_matrix.jsonl)
 20:49:24 48 detectors x 1 subjects (52 already in kafe_matrix.jsonl)
 00:28:32 48 detectors x 1 subjects (52 already in kafe_matrix.jsonl)
+01:57:44 [1/1] craigslist         y=True buttons=898   pos=36  neg=12  abst=0   (5351.6s)

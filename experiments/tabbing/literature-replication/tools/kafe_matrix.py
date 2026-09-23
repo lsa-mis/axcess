@@ -1030,20 +1030,137 @@ def kafe_confusion(rows: list[dict[str, str]]) -> dict[str, Any]:
     }
 
 
-def kafe_timing(rows: list[dict[str, str]]) -> dict[str, Any]:
+def kafe_csv_detection_column(rows: list[dict[str, str]]) -> dict[str, Any]:
+    """The results CSV's `Detection` column, kept only so the error stays visible.
+
+    It is not a per-subject detection time: it climbs in alphabetical order
+    (2 drops in 59 steps, correlation 0.93 with rank) and differs by more than
+    5% from the `01-Type1Detection` in KAFE's own per-subject logs on 59 of 60
+    subjects (median ratio 3.5). No
+    report quotes it as a cost; `kafe_logged_timing` is the cost.
+    """
     detection = [float(r["Detection"]) for r in rows]
     ctrl = [float(r["Size of All Visible Ctrl Nodes"]) for r in rows]
     per_button = [d / c for d, c in zip(detection, ctrl) if c]
     return {
+        "caveat": "not a per-subject detection time; do not quote as KAFE's cost",
         "ms_per_subject_median": round(statistics.median(detection), 1),
         "ms_per_subject_mean": round(statistics.mean(detection), 1),
-        "subjects_under_300ms": sum(1 for d in detection if d < 300),
         "ms_per_button_median": round(statistics.median(per_button), 1),
-        "ms_per_button_mean": round(statistics.mean(per_button), 1),
         "ms_per_button_pooled": round(sum(detection) / sum(ctrl), 1),
-        "buttons_under_300ms_cap": f"{sum(1 for x in per_button if x < 300)}/{len(per_button)}",
         "detection_ms_total": sum(detection),
         "ctrl_nodes_total": int(sum(ctrl)),
+    }
+
+
+# KAFE's per-subject timing logs, fetched by `tools/fetch_kafe_output.py` into
+# the git-ignored `artifacts/kafe_output/<subject>/`. Phases 12 and 13
+# (`TotalConstruct*`) are not summed: each equals phase 05 (resp. 10) plus about
+# half a second, so adding them would count those crawls twice.
+KAFE_OUTPUT = HERE / "artifacts" / "kafe_output"
+KAFE_BUILD_PHASES = (
+    "00-InitializeProxyKnfg", "01-ExtractNodesKnfg", "02-InitialCrawlKnfg",
+    "03-CrawlKnfg", "04-ExtractNodesInCrawlKnfg", "05-CrawlInputsKnfg",
+    "06-InitializeProxyPcnfg", "07-ExtractNodesPcnfg", "08-BuildEFEsPcnfg",
+    "09-InitialCrawlPcnfg", "10-CrawlPcnfg", "11-ExtractNodesInCrawlPcnfg",
+)
+KAFE_CRAWL_PHASES = (
+    "02-InitialCrawlKnfg", "03-CrawlKnfg", "05-CrawlInputsKnfg",
+    "08-BuildEFEsPcnfg", "09-InitialCrawlPcnfg", "10-CrawlPcnfg",
+)
+KAFE_TYPE1 = "01-Type1Detection"
+PAPER_MEAN_PIPELINE_MIN = 19.22
+
+
+def _kafe_log(subject: str, name: str) -> dict[str, int]:
+    with (KAFE_OUTPUT / subject / name).open() as handle:
+        return {key: int(value) for key, value in csv.reader(handle)}
+
+
+def kafe_logged_timing(rows: list[dict[str, str]]) -> dict[str, Any]:
+    """KAFE's cost from its own per-subject logs, in three scopes.
+
+    The denominator is the results CSV's `Size of All Visible Ctrl Nodes`, the
+    same one the accuracy rows use. `type1_detection` is the IAF comparison
+    alone, after both graphs exist; `full_pipeline` adds everything that builds
+    them. Type 2 detection is counted in none of the three.
+    """
+    subjects = [r["Subject"].strip() for r in rows]
+    missing = [
+        s for s in subjects
+        if not all((KAFE_OUTPUT / s / f).is_file() for f in ("execTime.csv", "execTimeDetection.csv"))
+    ]
+    if missing:
+        return {"available": False, "missing_subjects": missing}
+    ctrl = {r["Subject"].strip(): int(r["Size of All Visible Ctrl Nodes"]) for r in rows}
+    phases = {s: _kafe_log(s, "execTime.csv") for s in subjects}
+    detect = {s: _kafe_log(s, "execTimeDetection.csv") for s in subjects}
+    scopes = {
+        "type1_detection": lambda s: detect[s][KAFE_TYPE1],
+        "crawl_phases": lambda s: sum(phases[s][p] for p in KAFE_CRAWL_PHASES),
+        "full_pipeline": lambda s: sum(phases[s][p] for p in KAFE_BUILD_PHASES)
+        + detect[s][KAFE_TYPE1],
+    }
+    out: dict[str, Any] = {
+        "available": True,
+        "source": "artifacts/kafe_output/<subject>/execTime.csv + execTimeDetection.csv",
+        "subjects": len(subjects),
+        "ctrl_nodes_total": sum(ctrl.values()),
+        "type2_counted": False,
+    }
+    for scope, cost in scopes.items():
+        total = [cost(s) for s in subjects]
+        per = [cost(s) / ctrl[s] for s in subjects if ctrl[s]]
+        out[scope] = {
+            "ms_total": sum(total),
+            "ms_per_subject_mean": round(statistics.mean(total), 1),
+            "ms_per_button_pooled": round(sum(total) / sum(ctrl.values()), 1),
+            "ms_per_button_median": round(statistics.median(per), 1),
+            "ms_per_button_min": round(min(per), 1),
+            "ms_per_button_max": round(max(per), 1),
+            "subjects_under_300ms_per_button": f"{sum(1 for x in per if x < 300)}/{len(per)}",
+        }
+    out["full_pipeline"]["mean_minutes_per_subject"] = round(
+        out["full_pipeline"]["ms_per_subject_mean"] / 60000, 2
+    )
+    out["full_pipeline"]["paper_mean_minutes_per_subject"] = PAPER_MEAN_PIPELINE_MIN
+    proxy = sum(
+        phases[s]["00-InitializeProxyKnfg"] + phases[s]["06-InitializeProxyPcnfg"] for s in subjects
+    )
+    out["proxy_init_share_pct"] = round(100 * proxy / out["full_pipeline"]["ms_total"], 1)
+    return out
+
+
+def kafe_detection_column_evidence(rows: list[dict[str, str]]) -> dict[str, Any]:
+    """Why the results CSV's `Detection` column is not read as a per-subject time.
+
+    A per-subject time wanders as subjects change; a running total only climbs.
+    Counted in alphabetical order, which is the order KAFE's CSV lists them in.
+    """
+    ordered = sorted(rows, key=lambda r: r["Subject"].strip())
+    subjects = [r["Subject"].strip() for r in ordered]
+    if any(not (KAFE_OUTPUT / s / "execTimeDetection.csv").is_file() for s in subjects):
+        return {}
+
+    def drops(values: list[float]) -> int:
+        return sum(1 for a, b in zip(values, values[1:]) if b < a)
+
+    type1 = [_kafe_log(s, "execTimeDetection.csv")[KAFE_TYPE1] for s in subjects]
+    column = [float(r["Detection"]) for r in ordered]
+    crawl = [
+        drops([float(r[c]) for r in ordered])
+        for c in ("ExtractNodesKnfg", "CrawlKnfg", "ExtractNodesPcnfg", "CrawlPcnfg")
+    ]
+    return {
+        "subjects": len(subjects),
+        "steps": len(subjects) - 1,
+        "drops_csv_detection": drops(column),
+        "drops_type1": drops([float(v) for v in type1]),
+        "drops_crawl_min": min(crawl),
+        "drops_crawl_max": max(crawl),
+        "type1_mismatch_over_5pct": sum(
+            1 for t, c in zip(type1, column) if abs(t - c) > 0.05 * c
+        ),
     }
 
 
@@ -1067,7 +1184,8 @@ def run_controls(scored_path: pathlib.Path = OUT) -> dict[str, Any]:
             "precision_pct": round(confusion["precision"] * 100, 1),
             "recall_pct": round(confusion["recall"] * 100, 1),
         },
-        "timing": kafe_timing(rows),
+        "timing_per_subject_logs": kafe_logged_timing(rows),
+        "results_csv_detection_column": kafe_csv_detection_column(rows),
         "source": str(KAFE_CSV.relative_to(HERE)),
     }
 
@@ -1160,8 +1278,13 @@ def assemble(scored_path: pathlib.Path = OUT, rule: str = "strict") -> dict[str,
     ratio = {r["subject"]: r for r in ok}
 
     detector_rows: dict[str, dict[str, Any]] = {}
+    positives_scored = sum(1 for r in ok if r["y"])
     for name in ALL_DETECTORS:
         tp = fp = fn = tn = abst = 0
+        # Abstentions inside the scored subjects, split by KAFE's label. The
+        # whole-subject abstentions are outside that basis and stay in `abst.`
+        # only, so strict recall and these two share the scored denominator.
+        unk_pos = unk_neg = 0
         ms_total = 0.0
         ms_subjects = 0
         buttons = 0
@@ -1172,20 +1295,24 @@ def assemble(scored_path: pathlib.Path = OUT, rule: str = "strict") -> dict[str,
             # counted here rather than dropped, so `decided + abstentions` is
             # always the number of subjects attempted and no exclusion is silent.
             row = (record.get("detectors") or {}).get(name)
-            if record.get("status") != "scored" or row is None:
+            if record.get("status") != "scored":
                 abst += 1
                 continue
             # An arm that failed carries no counts and stays an abstention. Where
             # counts exist the verdict is recomputed under the requested rule, so
             # the projection can change without re-measuring the corpus.
-            if "undecided" not in row:
-                abst += 1
-                continue
-            verdict, _reason = project(
-                row["flagged"], row["undecided"], row.get("universe") or record["probe_ids"], rule
-            )
+            if row is None or "undecided" not in row:
+                verdict = "abstain"
+            else:
+                verdict, _reason = project(
+                    row["flagged"], row["undecided"], row.get("universe") or record["probe_ids"], rule
+                )
             if verdict == "abstain":
                 abst += 1
+                if record["y"]:
+                    unk_pos += 1
+                else:
+                    unk_neg += 1
                 continue
             y = bool(record["y"])
             yhat = verdict == "positive"
@@ -1220,9 +1347,14 @@ def assemble(scored_path: pathlib.Path = OUT, rule: str = "strict") -> dict[str,
             "fn": fn,
             "tn": tn,
             "abstentions": abst,
+            "unknown_positive": unk_pos,
+            "unknown_negative": unk_neg,
             "decided_subjects": decided,
             "precision": precision,
+            # `recall` is over decided subjects; `recall_strict` is over every
+            # KAFE-positive subject scored, so an abstention there is a miss.
             "recall": recall,
+            "recall_strict": tp / positives_scored if positives_scored else None,
             "f1": f1,
             "ms_total": round(ms_total, 1) if ms_subjects else None,
             "ms_per_button": round(ms_total / buttons, 1) if buttons else None,
@@ -1247,8 +1379,17 @@ def assemble(scored_path: pathlib.Path = OUT, rule: str = "strict") -> dict[str,
         "positives": sum(1 for r in ok if r["y"]),
         "negatives": sum(1 for r in ok if not r["y"]),
         "buttons_total": sum(r["probe_ids"] for r in ok),
-        "kafe_whole_corpus": kafe_confusion(rows) | kafe_timing(rows),
-        "kafe_on_scored_subset": kafe_confusion(kafe_subset) | kafe_timing(kafe_subset)
+        "kafe_whole_corpus": kafe_confusion(rows)
+        | {
+            "timing": kafe_logged_timing(rows),
+            "results_csv_detection_column": kafe_csv_detection_column(rows),
+            "detection_column_evidence": kafe_detection_column_evidence(rows),
+        },
+        "kafe_on_scored_subset": kafe_confusion(kafe_subset)
+        | {
+            "timing": kafe_logged_timing(kafe_subset),
+            "results_csv_detection_column": kafe_csv_detection_column(kafe_subset),
+        }
         if kafe_subset
         else None,
         "rows": detector_rows,
@@ -1257,18 +1398,22 @@ def assemble(scored_path: pathlib.Path = OUT, rule: str = "strict") -> dict[str,
 
 def kafe_row(subset: list[dict[str, str]], attempted: int = 0) -> dict[str, Any]:
     """KAFE's own row, computed on the same subjects and in the same two units."""
+    covers = "full pipeline from their per-subject logs (both graph crawls + Type 1 detection)"
     if not subset:
         return {
             "tp": 0, "fp": 0, "fn": 0, "tn": 0, "abstentions": 0, "decided_subjects": 0,
-            "precision": None, "recall": None, "f1": None,
+            "unknown_positive": 0, "unknown_negative": 0,
+            "precision": None, "recall": None, "recall_strict": None, "f1": None,
             "ms_total": None, "ms_per_button": None, "ms_per_subject": None,
             "buttons": 0, "ms_subjects": 0,
-            "ms_covers": "measured (their Detection column)",
+            "ms_covers": covers,
             "ms_reason": "not measured: no scored subject overlaps their CSV",
         }
     confusion = kafe_confusion(subset)
-    detection = [float(r["Detection"]) for r in subset]
-    ctrl = [float(r["Size of All Visible Ctrl Nodes"]) for r in subset]
+    timing = kafe_logged_timing(subset)
+    ctrl = sum(int(r["Size of All Visible Ctrl Nodes"]) for r in subset)
+    full = timing.get("full_pipeline") or {}
+    detection = timing.get("type1_detection") or {}
     return {
         **{k: confusion[k] for k in ("tp", "fp", "fn", "tn", "precision", "recall", "f1")},
         # Zero, and that is the honest figure: KAFE decided every subject in its
@@ -1277,15 +1422,30 @@ def kafe_row(subset: list[dict[str, str]], attempted: int = 0) -> dict[str, Any]
         # the subjects Axcess could not put in front of it are counted in
         # control 2 and named there, not charged to KAFE here.
         "abstentions": 0,
+        "unknown_positive": 0,
+        "unknown_negative": 0,
+        "recall_strict": confusion["recall"],
         "subjects_axcess_could_not_score": max(attempted - confusion["n"], 0),
         "decided_subjects": confusion["n"],
-        "ms_total": round(sum(detection), 1),
-        "ms_per_button": round(sum(detection) / sum(ctrl), 1) if sum(ctrl) else None,
-        "ms_per_subject": round(sum(detection) / len(detection), 1),
-        "buttons": int(sum(ctrl)),
-        "ms_subjects": len(detection),
-        "ms_covers": "measured (their Detection column / their visible ctrl nodes)",
-        "ms_reason": None,
+        # The full pipeline is the figure an Axcess row is read against: Axcess
+        # timings include the detector's own browser work (navigation, tab
+        # walks, behavioural passes), as KAFE's include its two crawls.
+        "ms_total": full.get("ms_total"),
+        "ms_per_button": full.get("ms_per_button_pooled"),
+        "ms_per_subject": full.get("ms_per_subject_mean"),
+        "ms_per_button_type1_detection": detection.get("ms_per_button_pooled"),
+        "buttons": ctrl,
+        "ms_subjects": len(subset) if timing.get("available") else 0,
+        "ms_covers": covers
+        + (
+            f"; Type 1 detection alone {detection['ms_per_button_pooled']:.1f} ms/button"
+            if detection
+            else ""
+        ),
+        "ms_reason": None
+        if timing.get("available")
+        else "not measured: per-subject logs absent for "
+        + ", ".join(timing.get("missing_subjects", [])),
     }
 
 
@@ -1721,10 +1881,11 @@ def row_order(name: str) -> tuple:
 
 def matrix_table(payload: dict[str, Any]) -> str:
     head = (
-        "| detector | TP | FP | FN | TN | abst. | precision | recall | F1 "
+        "| detector | TP | FP | FN | TN | abst. | unk pos | unk neg | precision "
+        "| strict recall | recall (decided) | F1 (decided recall) "
         "| ms/button | ms/subject | ms covers |"
     )
-    rule = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"
+    rule = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"
     body = []
     for name in sorted(payload["rows"], key=row_order):
         r = payload["rows"][name]
@@ -1741,7 +1902,10 @@ def matrix_table(payload: dict[str, Any]) -> str:
             str(r["fn"]),
             str(r["tn"]),
             str(r["abstentions"]),
+            str(r["unknown_positive"]),
+            str(r["unknown_negative"]),
             pct(r["precision"], undefined_p),
+            pct(r["recall_strict"], "undefined: no labelled positive scored"),
             pct(r["recall"], undefined_r),
             pct(r["f1"], undefined_f),
             num(r["ms_per_button"], ms_reason),
@@ -1759,6 +1923,30 @@ def write_matrix(
     subset = payload.get("kafe_on_scored_subset") or {}
     scored = payload["subjects_scored"]
     attempted = payload["subjects_attempted"]
+    positives, negatives = payload["positives"], payload["negatives"]
+    t_all = kafe_all.get("timing") or {}
+    t_sub = subset.get("timing") or {}
+    evidence = kafe_all.get("detection_column_evidence") or {}
+
+    def cost(t: dict[str, Any], scope: str, key: str) -> str:
+        value = (t.get(scope) or {}).get(key)
+        return "—" if value is None else f"{value:,.1f}" if isinstance(value, float) else str(value)
+
+    kafe_cost_rows = "\n".join(
+        f"| {label} | {cost(t_sub, scope, 'ms_per_button_pooled')} "
+        f"| {cost(t_sub, scope, 'ms_per_button_median')} "
+        f"| {cost(t_sub, scope, 'ms_per_button_min')}–{cost(t_sub, scope, 'ms_per_button_max')} "
+        f"| {cost(t_sub, scope, 'subjects_under_300ms_per_button')} "
+        f"| {cost(t_all, scope, 'ms_per_button_pooled')} "
+        f"| {cost(t_all, scope, 'ms_per_button_median')} "
+        f"| {cost(t_all, scope, 'ms_per_button_min')}–{cost(t_all, scope, 'ms_per_button_max')} "
+        f"| {cost(t_all, scope, 'subjects_under_300ms_per_button')} |"
+        for label, scope in (
+            ("Type 1 detection alone (`01-Type1Detection`)", "type1_detection"),
+            ("both crawls (phases 02, 03, 05, 08, 09, 10)", "crawl_phases"),
+            ("**full pipeline** (phases 00–11 + Type 1 detection)", "full_pipeline"),
+        )
+    )
     text = f"""# KAFE's benchmark, all 48 Axcess detectors and KAFE's own result
 
 Generated {payload["generated_utc"]} by `tools/kafe_matrix.py assemble`, from
@@ -1807,6 +1995,16 @@ replication scored, so the two sides are read on one denominator; the
 {attempted - scored} subjects Axcess could not put in front of it are named in
 control 2, not charged to KAFE.
 
+**Two recalls, on two bases.** `abst.` counts over the {attempted} subjects
+attempted. `unk pos` and `unk neg` count only the abstentions that fall inside
+the {scored} scored subjects, split by KAFE's label, so for every row
+`TP + FN + unk pos = {positives}` and `FP + TN + unk neg = {negatives}`, and
+`abst.` is those two plus the {attempted - scored} whole-subject abstentions.
+**`strict recall`** is TP over all {positives} KAFE-positive scored subjects:
+an abstention on one of them counts as a miss. **`recall (decided)`** is
+TP / (TP + FN), which drops those abstentions from the denominator, and it is
+the recall **F1** uses. Where a row has `unk pos` 0 the two recalls agree.
+
 **The two sides' ms columns are not measured the same way.** Only the
 arithmetic is shared: both are pooled, total time over total controls. What goes
 into it differs on both sides of the division.
@@ -1814,17 +2012,43 @@ into it differs on both sides of the division.
 - **Axcess** `ms/button` is this harness's wall time for the detector's arm on
   a subject — the `ms covers` column says what that includes — summed over the
   scored subjects and divided by the candidates `collect_candidates` surfaced on
-  them. It is an amortised quotient, not latency measured one button at a time,
-  and it is headless Chromium under Playwright on one shared machine.
-- **KAFE** `ms/button` is their published `Detection` column divided by their
+  them. It includes the detector's own browser work: navigation, tab walks and
+  behavioural passes where the row needs them. It excludes replay-server setup.
+  It is an amortised quotient, not latency measured one button at a time, and
+  it is headless Chromium under Playwright on one shared machine.
+- **KAFE** `ms/button` is their **full pipeline** from their own per-subject
+  logs (`execTime.csv` phases 00–11 plus `execTimeDetection.csv`'s
+  `01-Type1Detection`): proxy start-up, both graph crawls (keyboard and
+  pointer), node extraction, then Type 1 detection. It is divided by their
   `Size of All Visible Ctrl Nodes`, whose node-selection code was not
-  published. It is also an amortised quotient, taken with their own instrument
-  on their 2019 Firefox 68 / Selenium setup, and nothing here re-timed it.
+  published. That is the figure comparable to an Axcess row, because both
+  include the browser work that produces the verdict. Type 1 detection alone
+  (the graph comparison once both graphs exist) is given in `ms covers` and in
+  the section below; it excludes both crawls and is not comparable. Type 2
+  detection is counted in neither. It is an amortised quotient too, taken with
+  their own instrument on their 2019 Firefox 68 / Selenium setup, and nothing
+  here re-timed it.
+- {t_sub.get("proxy_init_share_pct", "—")}% of KAFE's full pipeline on the {scored} is proxy
+  initialisation (phases 00 and 06), which has no counterpart in an Axcess
+  arm's time. Even so, the full pipeline is the only figure that includes
+  KAFE's crawls.
 
 Neither figure is measured per-button latency, and the two are comparable as
 orders of magnitude only. The 300 ms per-button ceiling is this project's
 constraint, not KAFE's. `ms/subject` is total time for one subject, pooled the
 same way on each side and subject to the same caveat.
+
+**The results CSV's `Detection` column is not used.** An earlier version of this
+table divided it by the control count. It is not a per-subject detection time.
+Across the 60 subjects in alphabetical order, the order their CSV lists them,
+it falls only
+{evidence.get("drops_csv_detection", "—")} times in {evidence.get("steps", "—")} steps, where
+`01-Type1Detection` falls {evidence.get("drops_type1", "—")} times and the CSV's crawl and
+node-extraction columns {evidence.get("drops_crawl_min", "—")}–{evidence.get("drops_crawl_max", "—")} times. It also differs by more than 5% from
+KAFE's own per-subject `01-Type1Detection` on
+{evidence.get("type1_mismatch_over_5pct", "—")} of {evidence.get("subjects", "—")} subjects. Its
+figures are kept in `derived/kafe_matrix_summary.json` under
+`results_csv_detection_column` only so the error stays visible.
 
 **The candidate universe is Axcess's own.** `data-probe` could only be placed on
 the elements `audit.analyzer.keyboard.kbdiff.candidates.collect_candidates`
@@ -1846,10 +2070,25 @@ result, not a missing measurement.
 
 KAFE decided all 60 subjects. Restricted to the {scored} subjects this
 replication actually scored, their own numbers are
-TP {subset.get("tp", "—")}, FP {subset.get("fp", "—")}, FN {subset.get("fn", "—")}, TN {subset.get("tn", "—")};
-their pooled cost on that subset is {subset.get("ms_per_button_pooled", "—")} ms/button and
-{subset.get("ms_per_subject_mean", "—")} ms/subject. The `KAFE` row in the table above is
-computed on that subset, so it is read against the Axcess rows on one denominator.
+TP {subset.get("tp", "—")}, FP {subset.get("fp", "—")}, FN {subset.get("fn", "—")}, TN {subset.get("tn", "—")}.
+The `KAFE` row in the table above is computed on that subset, so it is read
+against the Axcess rows on one denominator.
+
+Their cost, from their per-subject logs, in ms per visible control node
+(denominator: the results CSV's `Size of All Visible Ctrl Nodes`,
+{t_sub.get("ctrl_nodes_total", "—")} on the {scored}, {t_all.get("ctrl_nodes_total", "—")} on all 60).
+"Pooled" is total ms over total controls, as for the Axcess rows; median, min
+and max are over per-subject quotients:
+
+| scope | pooled ({scored}) | median ({scored}) | min–max ({scored}) | under 300 ms ({scored}) | pooled (60) | median (60) | min–max (60) | under 300 ms (60) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+{kafe_cost_rows}
+
+Mean full pipeline per subject over all 60:
+{(t_all.get("full_pipeline") or {}).get("mean_minutes_per_subject", "—")} min (their paper:
+{PAPER_MEAN_PIPELINE_MIN} min). The per-subject logs are
+unlicensed third-party files, fetched by `tools/fetch_kafe_output.py` into the
+git-ignored `artifacts/kafe_output/` and never committed.
 
 ## Controls
 
@@ -2257,10 +2496,23 @@ too. No outside tool has been scored on either.
 
 Their published Table 1 reports 92% / 100%; recomputing from
 `artifacts/kafe_results_to_reproduce.csv` gives 36/3/0/21 at 92.3% / 100.0% over
-n=60. Their timing reproduces too:
+n=60. Their cost is taken from their own per-subject logs
+(`artifacts/kafe_output/`, fetched by `tools/fetch_kafe_output.py`), not from
+the results CSV. The mean full pipeline per subject comes to
+{(controls["control_1_kafe_reproduction"]["timing_per_subject_logs"].get("full_pipeline") or {}).get("mean_minutes_per_subject", "—")} min, against
+their paper's {PAPER_MEAN_PIPELINE_MIN} min:
 
 ```json
-{json.dumps(controls["control_1_kafe_reproduction"]["timing"], indent=2)}
+{json.dumps(controls["control_1_kafe_reproduction"]["timing_per_subject_logs"], indent=2)}
+```
+
+The results CSV's `Detection` column does **not** reproduce as a per-subject
+detection time. It climbs in alphabetical order, and it differs by more than 5% from
+their logged `01-Type1Detection` on nearly every subject (`KAFE-MATRIX.md`). It
+is kept here only as a record and is quoted nowhere as a cost:
+
+```json
+{json.dumps(controls["control_1_kafe_reproduction"]["results_csv_detection_column"], indent=2)}
 ```
 
 ### Control 2 — denominator: {"PASS" if c2["pass"] else "FAIL"}
@@ -2370,10 +2622,13 @@ Full permissive numbers: `derived/kafe_matrix_summary_permissive.json`.
 - **Milliseconds.** Composed by `tools/assemble_matrix.cost_of`, so the
   `ms covers` conventions match the existing matrix by construction.
   `ms/button` divides by the candidates that subject probed; `ms/subject` by the
-  subjects measured. KAFE's two figures come from their `Detection` column over
-  their `Size of All Visible Ctrl Nodes`. The pooling arithmetic is the same on
-  both sides; the instrument, hardware, browser and control count are not, so
-  the two are comparable as orders of magnitude only (see `KAFE-MATRIX.md`).
+  subjects measured. KAFE's two figures are their full pipeline (both graph
+  crawls plus Type 1 detection), from their own per-subject `execTime.csv` and
+  `execTimeDetection.csv`, over their `Size of All Visible Ctrl Nodes`. Type 1
+  detection alone excludes both crawls and is not comparable to an Axcess row.
+  The pooling arithmetic is the same on both sides. The instrument, hardware,
+  browser and control count are not, so the two are comparable as orders of
+  magnitude only (see `KAFE-MATRIX.md`).
 """
     REPORT_MD.write_text(text)
     return text

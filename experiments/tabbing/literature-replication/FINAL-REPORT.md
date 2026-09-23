@@ -12,7 +12,11 @@ before writing), through `derived/kafe_matrix_summary.json` and
 at it started at 20:28 and may append a 53rd line later; nothing in this report
 uses one. The fixtures, gds, ma11y and edgecases figures come from
 `derived/matrix.json` through `MATRIX-RESULTS.md`, `closed` run. Nothing was
-re-run to write this report, and no cell was recomputed.
+re-run to write this report. Two corrections since it was first written
+recomputed KAFE-corpus cells from the same 52 lines, and both are listed in
+§8.4. KAFE's cost now comes from KAFE's own per-subject timing logs, not the
+results CSV's `Detection` column. The KAFE table's strict recall and
+unknown-positive/negative columns are now computed on the 39 scored subjects.
 
 ## 1. What this study can and cannot claim
 
@@ -23,14 +27,23 @@ re-run to write this report, and no cell was recomputed.
   KAFE's own published per-subject result. 39 subjects were scored; every
   subject that was not is named in §3 with its reason.
 - That **no Axcess detector beats KAFE** on that benchmark. KAFE's published
-  output scores 96.0% precision / 100% recall / F1 98.0% on the 39 subjects;
-  the best Axcess F1 is 85.2%.
+  output scores 96.0% precision / 100% recall / F1 98.0% on the 39 subjects.
+  KAFE decided all 39, so its strict and decided recall are the same. The
+  best Axcess F1 is 85.2% (`D9+S4ours`), computed, like every KAFE-corpus
+  F1 here, with recall over decided subjects. Its strict recall is 95.8%.
 - How the same detectors score on the **GDS Accessibility Tool Audit**'s six
   inoperable-functionality cases, where every one of the 13 tools GDS audited
   scored 0 of 6. The best Axcess detectors find 3 of 6.
 - What each detector costs, as harness time divided by the number of buttons
   (candidates) it covered, and which detectors stay under the project's 300 ms
   per-button ceiling on each corpus.
+- What KAFE itself costs per visible control, from KAFE's own per-subject
+  timing logs, in two scopes. **Full pipeline** (both graph crawls plus Type 1
+  detection): **22,747.5 ms** pooled over the 39, over 300 ms on 0 of 39
+  subjects. This is the figure comparable to an Axcess row, because both
+  include the browser work that produces the verdict. **Type 1 detection
+  alone** (the graph comparison once both crawls are done): **84.4 ms**, under
+  300 ms on 34 of 39. It excludes the crawls and is not comparable (§7).
 - That the cheap C-rules (C10–C16) lose precision when they leave the corpus
   they were written on, and which individual rules still do anything.
 
@@ -47,14 +60,18 @@ re-run to write this report, and no cell was recomputed.
 - **Element-level precision on KAFE's corpus.** KAFE labels pages. A detector
   that flags 20 elements on a page with one real failure gets the same true
   positive as one that flags only that failure.
-- **Strict recall on KAFE's corpus.** The KAFE-corpus "recall" is taken over the
-  subjects each detector decided. The artifacts do not split abstentions by label,
-  so strict recall and the unknown-positive/negative counts cannot be read from
-  them (§4).
+- **Strict recall over all 52 attempted KAFE subjects.** Strict recall on
+  KAFE's corpus is taken over the **39 scored** subjects (TP / 24 positives).
+  The 13 whole-subject abstentions are outside that basis, and they include
+  one KAFE-positive subject (`indiegogo`). `craigslist` (positive) was never
+  measured (§3.2, §4).
 - **Measured per-button latency.** Every ms/button figure in the main table, on
   either side, is total time divided by a button count, not a latency measured
   one button at a time. Ours and KAFE's also differ in instrument, hardware and
   browser (§7).
+- **A cost comparison from the results CSV's `Detection` column.** That column
+  is not a per-subject detection time. The per-button figure earlier versions
+  of this report took from it is withdrawn (§8.4).
 - **Anything about the live sites.** Every KAFE subject is an offline replay of
   KAFE's own capture. A replay that renders no controls, or never ends its tab
   walk, says nothing about the site today.
@@ -72,25 +89,45 @@ The findings that count against Axcess come first.
 ### 2.1 No Axcess detector beats KAFE
 
 On the 39 scored subjects, KAFE's published output is 24 TP / 1 FP / 0 FN /
-14 TN: **96.0% precision, 100% recall, F1 98.0%, 25.7 ms per button**. KAFE
-decided all 39, so its recall has no abstentions to hide. The 25.7 ms is their
-`Detection` column divided by their visible control nodes, pooled over the 39.
+14 TN: **96.0% precision, 100% recall, F1 98.0%**. KAFE decided all 39, so its
+strict recall and its recall over decided subjects are both 100%. Its cost,
+from KAFE's own per-subject timing logs pooled over the 39 visible-control
+counts, is **22,747.5 ms per button for the full pipeline** (both graph crawls
+plus Type 1 detection). That is the figure comparable to Axcess's. Type 1
+detection alone is **84.4 ms per button**; it excludes the crawls (§7).
 
 The best Axcess F1 is **85.2%**, from `D9+S4ours` (23/8/0/0, 74.2% precision,
-100% recall over the 31 subjects it decided, 21 abstentions), at **1353.6
-ms/button**. The best cheap row is `D5 CDP getEventListeners`: F1 85.1% at 3.2
-ms/button (20/5/2/8, 17 abstentions). Five Axcess rows beat KAFE's precision:
-D6, C5, U-D2, U-D3 and U-D6, all at 100%. They get there by flagging almost
-nothing, and their recall over decided subjects is 9.1% to 52.4%.
+21 abstentions), at **1353.6 ms/button**. That F1 uses recall over decided
+subjects, which is 100% (23 of 23). Its strict recall is **95.8%** (23 of the
+24 KAFE-positive subjects: it abstained on one). With strict recall its F1
+would be 83.6%, still the best Axcess row. The best cheap row is `D5 CDP
+getEventListeners`: F1 85.1% (decided recall 90.9%; strict recall 83.3%) at
+3.2 ms/button (20/5/2/8, 17 abstentions). Five Axcess rows beat KAFE's
+precision: D6, C5, U-D2, U-D3 and U-D6, all at 100%. They get there by
+flagging almost nothing, and their strict recall is 8.3% to 45.8% (9.1% to
+52.4% over decided subjects).
 
 ### 2.2 Where Axcess wins is cost
 
-**30 of the 48 Axcess rows** have a lower ms/button than KAFE's 25.7. That is
-**28 of the 46** rows with a defined precision; D7 and U-D7 flag no subject, so
-their precision is undefined. `D4 CSS + lexical` reaches 100% recall over
-decided subjects at **0.1 ms/button**, but with **14 false positives against
-KAFE's 1** (63.2% precision). §7 explains why these cost figures compare only
-as orders of magnitude.
+On the comparable basis, KAFE's full pipeline, **all 48 Axcess rows** have a
+lower ms/button than KAFE's 22,747.5. That is **46 of the 46** rows with a
+defined precision; D7 and U-D7 flag no subject, so their precision is
+undefined. The dearest Axcess row, `D9+S4u` at 1694.7, costs about a
+thirteenth as much, and the best-F1 row, `D9+S4ours` at 1353.6, about a
+seventeenth. 44.6% of KAFE's full pipeline on the 39 is proxy
+initialisation (phases 00 and 06), which no Axcess arm's time includes.
+Without it KAFE's figure would still be 12,594.4 ms/button (computed from the
+same logs), and every Axcess row would still be below it.
+
+On Type 1 detection alone, which excludes KAFE's crawls and is **not**
+comparable, 30 of the 48 rows (28 of the 46) are lower than KAFE's 84.4. No
+Axcess row falls between 84.4 and the withdrawn figure, so this count is the
+same as the one earlier versions reported (§8.4).
+
+`D4 CSS + lexical` reaches **100% strict recall** (it abstains on no positive)
+at **0.1 ms/button**, but with **14 false positives against KAFE's 1** (63.2%
+precision). §7 explains why these cost figures compare only as orders of
+magnitude.
 
 ### 2.3 The cheap rules do not transfer
 
@@ -98,9 +135,11 @@ C15 and C16 were built on `fixtures`. There they carry three rows (element
 precision / strict recall): C15 at 100.0% / 94.9%, C16 at 100.0% / 97.4% when
 R9 observes the 42-probe C12 lead set, and C16 at 77.6% / 97.4% when R9
 observes all 95 probes. On KAFE's corpus both score **81.8% page precision /
-85.7% recall over decided subjects**. Those are different units and a different
-recall, so the 18.2-point precision drop gives the direction, not a like-for-like
-difference.
+75.0% strict recall** (85.7% over decided subjects; F1 83.7% uses the latter).
+Both recalls are now strict, but the units still differ (elements on
+`fixtures`, pages on KAFE's corpus). So the 18.2-point precision drop and the
+19.9-point strict-recall drop from C15's `fixtures` row give the direction, not
+a like-for-like difference.
 
 Rule by rule on KAFE's corpus:
 
@@ -211,7 +250,9 @@ those three subjects. Element identity was unstable across page loads on
 row's abstentions come from the strict negative rule: a subject on which a
 detector flagged nothing but left some candidate undecided is an abstention for
 that detector, not a negative. That is why, for example, D9 abstains on 22
-subjects while only 13 abstain as whole subjects.
+subjects while only 13 abstain as whole subjects. D9's other 9 are inside the
+39: 2 on KAFE-positive subjects and 7 on negatives. Those are its unknown pos
+and unknown neg in §5.1.
 
 ## 4. How to read the main table
 
@@ -223,31 +264,34 @@ included, sit in detector order in every table, next to everything else.
 |---|---|---|
 | detector | the detector's full name as in the artifacts | same |
 | TP / FP / FN | confusion counts. **Unit: the page** on KAFE's corpus; **the element probe** on the other four | same |
-| unknown pos / unknown neg | abstentions on labelled defects / labelled negatives; an abstention is never scored as a negative | `unk pos` / `unk neg` (`MATRIX-RESULTS.md`). On KAFE's corpus the artifact keeps **one unsplit count**, `abst.`, so both cells read `n/a (N abst.)` with that count |
+| unknown pos / unknown neg | abstentions on labelled defects / labelled negatives; an abstention is never scored as a negative | `unk pos` / `unk neg` (`MATRIX-RESULTS.md`; on KAFE's corpus `KAFE-MATRIX.md`, over the 39 scored subjects only) |
 | precision | TP / (TP + FP). Page precision on KAFE's corpus, element precision elsewhere | `precision`. `—` in `MATRIX-RESULTS.md` is shown here as `undefined: flagged nothing` |
-| strict recall | TP over **every** labelled defect, abstentions included | `strict recall` (`MATRIX-RESULTS.md`; `bakeoff.py`'s `recall`). **Not available on KAFE's corpus**; see below |
-| F1 | harmonic mean of the precision and recall columns as the artifact computed it | `F1`. `—` is shown as `undefined: TP = 0` |
+| strict recall | TP over **every** labelled defect, abstentions included | `strict recall` (`MATRIX-RESULTS.md`; `bakeoff.py`'s `recall`; `KAFE-MATRIX.md`). On KAFE's corpus the cell reads `X% · decided Y%`: strict recall over the 39 scored subjects, then recall over decided subjects; see below |
+| F1 | harmonic mean of the precision and recall columns as the artifact computed it. **On KAFE's corpus it uses recall over decided subjects**; on the other four, strict recall | `F1` (`F1 (decided recall)` in `KAFE-MATRIX.md`). `—` is shown as `undefined: TP = 0` |
 | **ms per element/button** | this is the CEO's "ms per element". Each figure is a total time divided by a count of buttons; none is a latency measured one button at a time | `ms/button`. Its denominator differs by corpus; see the next table |
 | timing scope | what work the ms figure includes | `ms covers` |
 
-**Why KAFE-corpus recall is not strict recall.** `KAFE-MATRIX.md`'s `recall`
-is TP / (TP + FN) over the subjects each detector *decided*. A subject it
-abstained on drops out of the denominator instead of counting as a miss. Strict
-recall needs to know how many of a detector's abstentions fall on
-KAFE-positive subjects. `derived/kafe_matrix_summary.json` records each
-detector's abstentions only as one total, so strict recall and the
-unknown-positive/negative split cannot be read from any artifact. Producing
-them would mean new arithmetic over the per-subject JSONL, which this report
-does not do. The strict-recall cell on KAFE's corpus therefore shows
-`n/a · decided X%`, carrying the decided-only recall so the value is visible and
-its difference is explicit.
+**Two recalls on KAFE's corpus.** `KAFE-MATRIX.md`'s `recall (decided)` is
+TP / (TP + FN) over the subjects each detector *decided*. A subject it
+abstained on drops out of the denominator instead of counting as a miss. Its
+`strict recall` is TP / 24, over every KAFE-positive subject among the **39
+scored**, so an abstention on one of them counts as a miss. `unk pos` and
+`unk neg` split each detector's abstentions *inside the 39* by KAFE's label,
+so `TP + FN + unk pos = 24` and `FP + TN + unk neg = 15`. The table's `abst.`
+column in `KAFE-MATRIX.md` still counts over the 52 attempted, and it equals
+`unk pos + unk neg + 13`, the 13 being the whole-subject abstentions. The
+counts come from each detector's per-subject verdict in
+`derived/kafe_matrix.jsonl`, computed by `tools/kafe_matrix.py assemble`. The
+§5.1 cell shows both recalls, strict first: `X% · decided Y%`. Where a row has
+no unknown positive the two agree. The F1 column keeps the artifact's value,
+which uses the decided recall.
 
 **What each ms figure divides by.**
 
 | corpus | numerator | denominator | source |
 |---|---|---|---|
 | KAFE, Axcess rows | this harness's wall time for the detector's arm, summed over the 39 scored subjects | every candidate `collect_candidates` surfaced on those subjects (4707), decided or not | `tools/kafe_matrix.py assemble` |
-| KAFE, KAFE row | KAFE's published `Detection` column, summed over the 39 | KAFE's `Size of All Visible Ctrl Nodes` over the same 39 (1539) | their CSV; not re-timed |
+| KAFE, KAFE row | KAFE's **full pipeline** from their per-subject logs, summed over the 39: `execTime.csv` phases 00–11 (proxy start-up, node extraction, both graph crawls) plus `execTimeDetection.csv`'s `01-Type1Detection`. Type 1 detection alone is given beside it; Type 2 is in neither | KAFE's `Size of All Visible Ctrl Nodes` over the same 39 (1539), from the results CSV | their logs (`artifacts/kafe_output/`, git-ignored); not re-timed |
 | fixtures, gds, ma11y, edgecases | measured browser work for the detector | the probes that detector **decided** | `tools/assemble_matrix.py` |
 
 On the four element corpora `MATRIX-RESULTS.md` also carries `ms/target`, the
@@ -269,63 +313,68 @@ trial, so it costs what that arm cost.
 
 39 scored subjects (24 positive, 15 negative); unit = page. Source:
 `KAFE-MATRIX.md` / `derived/kafe_matrix_summary.json`. For every Axcess row,
-TP + FP + FN + TN + abst. = 52. TN is not a required column, and every row's TN
-is in `KAFE-MATRIX.md`. The last row is the **reference row**: KAFE's **published
-CSV output**, not a local run of their tool, restricted to the same 39
-subjects. This is the only table with a KAFE row. KAFE was never run on the
+TP + FN + unknown pos = 24 and FP + TN + unknown neg = 15, over the 39 scored
+subjects. The 13 whole-subject abstentions are outside both; `KAFE-MATRIX.md`'s
+`abst.` column counts them too (TP + FP + FN + TN + abst. = 52). TN is not a
+required column, and every row's TN is in `KAFE-MATRIX.md`. **F1 on this corpus
+uses recall over decided subjects**, the second figure in the strict-recall
+cell. The last row is the **reference row**: KAFE's **published CSV output**
+(its accuracy), not a local run of their tool, restricted to the same 39
+subjects. Its cost comes from KAFE's per-subject timing logs, not from that
+CSV (§7). This is the only table with a KAFE row. KAFE was never run on the
 other four corpora (§6), and by decision they carry no KAFE row.
 
 | detector | TP | FP | FN | unknown pos | unknown neg | precision | strict recall | F1 | ms per element/button | timing scope |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| D0 axcess collectClickables | 17 | 9 | 5 | n/a (16 abst.) | n/a (16 abst.) | 65.4% | n/a · decided 77.3% | 70.8% | 0.1 | survey + method |
-| D1 axe-core (keyboard rules) | 2 | 1 | 20 | n/a (17 abst.) | n/a (17 abst.) | 66.7% | n/a · decided 9.1% | 16.0% | 2.9 | survey + method |
-| D1x axe-core (any rule, unsound) | 22 | 11 | 1 | n/a (16 abst.) | n/a (16 abst.) | 66.7% | n/a · decided 95.7% | 78.6% | 2.9 | survey + method |
-| D2 inline onclick attribute | 5 | 2 | 17 | n/a (17 abst.) | n/a (17 abst.) | 71.4% | n/a · decided 22.7% | 34.5% | 0.1 | survey + method |
-| D2b onclick property | 12 | 3 | 10 | n/a (17 abst.) | n/a (17 abst.) | 80.0% | n/a · decided 54.5% | 64.9% | 0.1 | survey + method |
-| D3 tabindex / ARIA | 9 | 1 | 13 | n/a (17 abst.) | n/a (17 abst.) | 90.0% | n/a · decided 40.9% | 56.3% | 0.1 | survey + method |
-| D4 CSS + lexical | 24 | 14 | 0 | n/a (14 abst.) | n/a (14 abst.) | 63.2% | n/a · decided 100.0% | 77.4% | 0.1 | survey + method |
-| D5 CDP getEventListeners | 20 | 5 | 2 | n/a (17 abst.) | n/a (17 abst.) | 80.0% | n/a · decided 90.9% | 85.1% | 3.2 | survey + method |
-| D6 addEventListener shim | 2 | 0 | 20 | n/a (17 abst.) | n/a (17 abst.) | 100.0% | n/a · decided 9.1% | 16.7% | 0.2 | survey + method |
-| D7 React fiber props | 0 | 0 | 22 | n/a (17 abst.) | n/a (17 abst.) | undefined: flagged nothing | n/a · decided 0.0% | undefined: TP = 0 | 0.1 | survey + method |
-| D8 hover-diff | 17 | 9 | 5 | n/a (16 abst.) | n/a (16 abst.) | 65.4% | n/a · decided 77.3% | 70.8% | 124.5 | survey + method |
-| U-D0 upstream crawler candidates | 11 | 3 | 10 | n/a (16 abst.) | n/a (16 abst.) | 78.6% | n/a · decided 52.4% | 62.9% | 5.7 | shared + method |
-| U-D1 upstream tagged axe attribution | 20 | 8 | 1 | n/a (16 abst.) | n/a (16 abst.) | 71.4% | n/a · decided 95.2% | 81.6% | 8.6 | shared + method |
-| U-D2 upstream inline attributes | 4 | 0 | 17 | n/a (16 abst.) | n/a (16 abst.) | 100.0% | n/a · decided 19.0% | 32.0% | 5.7 | shared + method |
-| U-D2b upstream mouse handler properties | 9 | 1 | 12 | n/a (16 abst.) | n/a (16 abst.) | 90.0% | n/a · decided 42.9% | 58.1% | 5.7 | shared + method |
-| U-D3 upstream missing tabindex | 7 | 0 | 14 | n/a (16 abst.) | n/a (16 abst.) | 100.0% | n/a · decided 33.3% | 50.0% | 5.7 | shared + method |
-| U-D4 upstream CSS and class tokens | 21 | 14 | 0 | n/a (16 abst.) | n/a (16 abst.) | 60.0% | n/a · decided 100.0% | 75.0% | 5.7 | shared + method |
-| U-D5 upstream direct CDP listeners | 16 | 1 | 5 | n/a (16 abst.) | n/a (16 abst.) | 94.1% | n/a · decided 76.2% | 84.2% | 7.8 | shared + method |
-| U-D6 upstream registration shim | 11 | 0 | 10 | n/a (16 abst.) | n/a (16 abst.) | 100.0% | n/a · decided 52.4% | 68.8% | 5.7 | shared + method |
-| U-D7 upstream React mouse props | 0 | 0 | 21 | n/a (16 abst.) | n/a (16 abst.) | undefined: flagged nothing | n/a · decided 0.0% | undefined: TP = 0 | 5.7 | shared + method |
-| U-D8 upstream pixel hover difference | 15 | 14 | 6 | n/a (16 abst.) | n/a (16 abst.) | 51.7% | n/a · decided 71.4% | 60.0% | 104.9 | shared + method |
-| C1 upstream D4\|D5\|D6, minus Tab | 21 | 14 | 0 | n/a (16 abst.) | n/a (16 abst.) | 60.0% | n/a · decided 100.0% | 75.0% | 7.8 | shared + components |
-| C2 upstream D4\|D5\|D6\|D8, minus Tab | 21 | 15 | 0 | n/a (16 abst.) | n/a (16 abst.) | 58.3% | n/a · decided 100.0% | 73.7% | 107.0 | shared + components |
-| C3 union, reject inert and pointer-events:none | 21 | 14 | 0 | n/a (16 abst.) | n/a (16 abst.) | 60.0% | n/a · decided 100.0% | 75.0% | 8.0 | shared + components |
-| C4 union, additionally reject blocked center | 21 | 14 | 0 | n/a (16 abst.) | n/a (16 abst.) | 60.0% | n/a · decided 100.0% | 75.0% | 8.0 | shared + components |
-| C5 focusable custom mouse control, no observed key handler | 3 | 0 | 18 | n/a (16 abst.) | n/a (16 abst.) | 100.0% | n/a · decided 14.3% | 25.0% | 8.0 | shared + components |
-| C6 visible label for a toggle absent from Tab | 0 | 1 | 20 | n/a (18 abst.) | n/a (18 abst.) | 0.0% | n/a · decided 0.0% | 0.0% [^kafe-f1] | 5.8 | shared + components |
-| C7 ancestor mouse listener, minus Tab | 21 | 12 | 0 | n/a (16 abst.) | n/a (16 abst.) | 63.6% | n/a · decided 100.0% | 77.8% | 5.9 | shared + components |
-| C8 union + focusable + label + ancestor leads | 21 | 15 | 0 | n/a (16 abst.) | n/a (16 abst.) | 58.3% | n/a · decided 100.0% | 73.7% | 8.0 | shared + components |
-| C9 combined leads, additionally reject blocked center | 21 | 15 | 0 | n/a (16 abst.) | n/a (16 abst.) | 58.3% | n/a · decided 100.0% | 73.7% | 8.0 | shared + components |
-| C10 = C9 minus redundant click surfaces (R1) | 19 | 8 | 2 | n/a (16 abst.) | n/a (16 abst.) | 70.4% | n/a · decided 90.5% | 79.2% | 8.3 | C9 + rule observation |
-| C11 = C10 minus roving-tabindex items (R2) | 19 | 8 | 2 | n/a (16 abst.) | n/a (16 abst.) | 70.4% | n/a · decided 90.5% | 79.2% | 8.5 | C9 + rule observation |
-| C12 = C11 minus declared shortcuts (R3) | 19 | 8 | 2 | n/a (16 abst.) | n/a (16 abst.) | 70.4% | n/a · decided 90.5% | 79.2% | 8.5 | C9 + rule observation |
-| C13 = C12 minus leads with no action path (R5) | 19 | 7 | 2 | n/a (16 abst.) | n/a (16 abst.) | 73.1% | n/a · decided 90.5% | 80.9% | 111.4 | C9 + rule observation |
-| C14 = C13 minus name-twinned leads (R6) | 19 | 7 | 2 | n/a (16 abst.) | n/a (16 abst.) | 73.1% | n/a · decided 90.5% | 80.9% | 111.4 | C9 + rule observation |
-| C15 = C14 minus leads with no click effect (R7, R8) | 18 | 4 | 3 | n/a (17 abst.) | n/a (17 abst.) | 81.8% | n/a · decided 85.7% | 83.7% | 354.8 | C9 + rule observation |
-| C16 = C15 plus divergent-key-effect promotions (R9) | 18 | 4 | 3 | n/a (17 abst.) | n/a (17 abst.) | 81.8% | n/a · decided 85.7% | 83.7% | 354.8 | C9 + rule observation |
-| D9 behavioural differential | 22 | 8 | 0 | n/a (22 abst.) | n/a (22 abst.) | 73.3% | n/a · decided 100.0% | 84.6% | 1345.0 | measured |
-| D9+S4ours coverage-armed differential, our payload Stage 4 | 23 | 8 | 0 | n/a (21 abst.) | n/a (21 abst.) | 74.2% | n/a · decided 100.0% | 85.2% | 1353.6 | priced at its arm |
-| D9+S4u differential with upstream Stage 4 (coverage-exact) | 24 | 12 | 0 | n/a (16 abst.) | n/a (16 abst.) | 66.7% | n/a · decided 100.0% | 80.0% | 1694.7 | measured |
-| D9-noS4 coverage-armed differential, no equivalence filter | 24 | 12 | 0 | n/a (16 abst.) | n/a (16 abst.) | 66.7% | n/a · decided 100.0% | 80.0% | 1551.8 | priced at its arm |
-| D9u upstream-style differential (8 channels, keys in sequence) | 19 | 12 | 0 | n/a (21 abst.) | n/a (21 abst.) | 61.3% | n/a · decided 100.0% | 76.0% | 1361.9 | measured |
-| D9u+S4u upstream differential with upstream Stage 4 (1:1) | 19 | 12 | 0 | n/a (21 abst.) | n/a (21 abst.) | 61.3% | n/a · decided 100.0% | 76.0% | 1361.9 | priced at its arm |
-| D10a coverage differential (Enter only, no baseline subtraction) | 24 | 15 | 0 | n/a (13 abst.) | n/a (13 abst.) | 61.5% | n/a · decided 100.0% | 76.2% | 762.8 | measured |
-| D10a+base coverage differential (Enter only, baseline subtracted) | 24 | 15 | 0 | n/a (13 abst.) | n/a (13 abst.) | 61.5% | n/a · decided 100.0% | 76.2% | 762.8 | priced at its arm |
-| D10a-u upstream coverage presence (sequential keys, baselined) | 14 | 8 | 1 | n/a (29 abst.) | n/a (29 abst.) | 63.6% | n/a · decided 93.3% | 75.7% | 753.2 | priced at its arm |
-| D10b coverage set-difference (Enter only, no baseline subtraction) | 24 | 15 | 0 | n/a (13 abst.) | n/a (13 abst.) | 61.5% | n/a · decided 100.0% | 76.2% | 762.8 | priced at its arm |
-| D10b-u upstream coverage set-difference (sequential keys, baselined) | 17 | 10 | 0 | n/a (25 abst.) | n/a (25 abst.) | 63.0% | n/a · decided 100.0% | 77.3% | 744.7 | priced at its arm |
-| **KAFE (reference row: their published CSV output, not a local execution)** | 24 | 1 | 0 | 0 (decided all 39) | 0 (decided all 39) | 96.0% | n/a · decided 100.0% (all 39 decided) | 98.0% | 25.7 | their `Detection` column ÷ their visible ctrl nodes; amortised, their 2019 setup, not re-timed |
+| D0 axcess collectClickables | 17 | 9 | 5 | 2 | 1 | 65.4% | 70.8% · decided 77.3% | 70.8% | 0.1 | survey + method |
+| D1 axe-core (keyboard rules) | 2 | 1 | 20 | 2 | 2 | 66.7% | 8.3% · decided 9.1% | 16.0% | 2.9 | survey + method |
+| D1x axe-core (any rule, unsound) | 22 | 11 | 1 | 1 | 2 | 66.7% | 91.7% · decided 95.7% | 78.6% | 2.9 | survey + method |
+| D2 inline onclick attribute | 5 | 2 | 17 | 2 | 2 | 71.4% | 20.8% · decided 22.7% | 34.5% | 0.1 | survey + method |
+| D2b onclick property | 12 | 3 | 10 | 2 | 2 | 80.0% | 50.0% · decided 54.5% | 64.9% | 0.1 | survey + method |
+| D3 tabindex / ARIA | 9 | 1 | 13 | 2 | 2 | 90.0% | 37.5% · decided 40.9% | 56.3% | 0.1 | survey + method |
+| D4 CSS + lexical | 24 | 14 | 0 | 0 | 1 | 63.2% | 100.0% · decided 100.0% | 77.4% | 0.1 | survey + method |
+| D5 CDP getEventListeners | 20 | 5 | 2 | 2 | 2 | 80.0% | 83.3% · decided 90.9% | 85.1% | 3.2 | survey + method |
+| D6 addEventListener shim | 2 | 0 | 20 | 2 | 2 | 100.0% | 8.3% · decided 9.1% | 16.7% | 0.2 | survey + method |
+| D7 React fiber props | 0 | 0 | 22 | 2 | 2 | undefined: flagged nothing | 0.0% · decided 0.0% | undefined: TP = 0 | 0.1 | survey + method |
+| D8 hover-diff | 17 | 9 | 5 | 2 | 1 | 65.4% | 70.8% · decided 77.3% | 70.8% | 124.5 | survey + method |
+| U-D0 upstream crawler candidates | 11 | 3 | 10 | 3 | 0 | 78.6% | 45.8% · decided 52.4% | 62.9% | 5.7 | shared + method |
+| U-D1 upstream tagged axe attribution | 20 | 8 | 1 | 3 | 0 | 71.4% | 83.3% · decided 95.2% | 81.6% | 8.6 | shared + method |
+| U-D2 upstream inline attributes | 4 | 0 | 17 | 3 | 0 | 100.0% | 16.7% · decided 19.0% | 32.0% | 5.7 | shared + method |
+| U-D2b upstream mouse handler properties | 9 | 1 | 12 | 3 | 0 | 90.0% | 37.5% · decided 42.9% | 58.1% | 5.7 | shared + method |
+| U-D3 upstream missing tabindex | 7 | 0 | 14 | 3 | 0 | 100.0% | 29.2% · decided 33.3% | 50.0% | 5.7 | shared + method |
+| U-D4 upstream CSS and class tokens | 21 | 14 | 0 | 3 | 0 | 60.0% | 87.5% · decided 100.0% | 75.0% | 5.7 | shared + method |
+| U-D5 upstream direct CDP listeners | 16 | 1 | 5 | 3 | 0 | 94.1% | 66.7% · decided 76.2% | 84.2% | 7.8 | shared + method |
+| U-D6 upstream registration shim | 11 | 0 | 10 | 3 | 0 | 100.0% | 45.8% · decided 52.4% | 68.8% | 5.7 | shared + method |
+| U-D7 upstream React mouse props | 0 | 0 | 21 | 3 | 0 | undefined: flagged nothing | 0.0% · decided 0.0% | undefined: TP = 0 | 5.7 | shared + method |
+| U-D8 upstream pixel hover difference | 15 | 14 | 6 | 3 | 0 | 51.7% | 62.5% · decided 71.4% | 60.0% | 104.9 | shared + method |
+| C1 upstream D4\|D5\|D6, minus Tab | 21 | 14 | 0 | 3 | 0 | 60.0% | 87.5% · decided 100.0% | 75.0% | 7.8 | shared + components |
+| C2 upstream D4\|D5\|D6\|D8, minus Tab | 21 | 15 | 0 | 3 | 0 | 58.3% | 87.5% · decided 100.0% | 73.7% | 107.0 | shared + components |
+| C3 union, reject inert and pointer-events:none | 21 | 14 | 0 | 3 | 0 | 60.0% | 87.5% · decided 100.0% | 75.0% | 8.0 | shared + components |
+| C4 union, additionally reject blocked center | 21 | 14 | 0 | 3 | 0 | 60.0% | 87.5% · decided 100.0% | 75.0% | 8.0 | shared + components |
+| C5 focusable custom mouse control, no observed key handler | 3 | 0 | 18 | 3 | 0 | 100.0% | 12.5% · decided 14.3% | 25.0% | 8.0 | shared + components |
+| C6 visible label for a toggle absent from Tab | 0 | 1 | 20 | 4 | 1 | 0.0% | 0.0% · decided 0.0% | 0.0% [^kafe-f1] | 5.8 | shared + components |
+| C7 ancestor mouse listener, minus Tab | 21 | 12 | 0 | 3 | 0 | 63.6% | 87.5% · decided 100.0% | 77.8% | 5.9 | shared + components |
+| C8 union + focusable + label + ancestor leads | 21 | 15 | 0 | 3 | 0 | 58.3% | 87.5% · decided 100.0% | 73.7% | 8.0 | shared + components |
+| C9 combined leads, additionally reject blocked center | 21 | 15 | 0 | 3 | 0 | 58.3% | 87.5% · decided 100.0% | 73.7% | 8.0 | shared + components |
+| C10 = C9 minus redundant click surfaces (R1) | 19 | 8 | 2 | 3 | 0 | 70.4% | 79.2% · decided 90.5% | 79.2% | 8.3 | C9 + rule observation |
+| C11 = C10 minus roving-tabindex items (R2) | 19 | 8 | 2 | 3 | 0 | 70.4% | 79.2% · decided 90.5% | 79.2% | 8.5 | C9 + rule observation |
+| C12 = C11 minus declared shortcuts (R3) | 19 | 8 | 2 | 3 | 0 | 70.4% | 79.2% · decided 90.5% | 79.2% | 8.5 | C9 + rule observation |
+| C13 = C12 minus leads with no action path (R5) | 19 | 7 | 2 | 3 | 0 | 73.1% | 79.2% · decided 90.5% | 80.9% | 111.4 | C9 + rule observation |
+| C14 = C13 minus name-twinned leads (R6) | 19 | 7 | 2 | 3 | 0 | 73.1% | 79.2% · decided 90.5% | 80.9% | 111.4 | C9 + rule observation |
+| C15 = C14 minus leads with no click effect (R7, R8) | 18 | 4 | 3 | 3 | 1 | 81.8% | 75.0% · decided 85.7% | 83.7% | 354.8 | C9 + rule observation |
+| C16 = C15 plus divergent-key-effect promotions (R9) | 18 | 4 | 3 | 3 | 1 | 81.8% | 75.0% · decided 85.7% | 83.7% | 354.8 | C9 + rule observation |
+| D9 behavioural differential | 22 | 8 | 0 | 2 | 7 | 73.3% | 91.7% · decided 100.0% | 84.6% | 1345.0 | measured |
+| D9+S4ours coverage-armed differential, our payload Stage 4 | 23 | 8 | 0 | 1 | 7 | 74.2% | 95.8% · decided 100.0% | 85.2% | 1353.6 | priced at its arm |
+| D9+S4u differential with upstream Stage 4 (coverage-exact) | 24 | 12 | 0 | 0 | 3 | 66.7% | 100.0% · decided 100.0% | 80.0% | 1694.7 | measured |
+| D9-noS4 coverage-armed differential, no equivalence filter | 24 | 12 | 0 | 0 | 3 | 66.7% | 100.0% · decided 100.0% | 80.0% | 1551.8 | priced at its arm |
+| D9u upstream-style differential (8 channels, keys in sequence) | 19 | 12 | 0 | 5 | 3 | 61.3% | 79.2% · decided 100.0% | 76.0% | 1361.9 | measured |
+| D9u+S4u upstream differential with upstream Stage 4 (1:1) | 19 | 12 | 0 | 5 | 3 | 61.3% | 79.2% · decided 100.0% | 76.0% | 1361.9 | priced at its arm |
+| D10a coverage differential (Enter only, no baseline subtraction) | 24 | 15 | 0 | 0 | 0 | 61.5% | 100.0% · decided 100.0% | 76.2% | 762.8 | measured |
+| D10a+base coverage differential (Enter only, baseline subtracted) | 24 | 15 | 0 | 0 | 0 | 61.5% | 100.0% · decided 100.0% | 76.2% | 762.8 | priced at its arm |
+| D10a-u upstream coverage presence (sequential keys, baselined) | 14 | 8 | 1 | 9 | 7 | 63.6% | 58.3% · decided 93.3% | 75.7% | 753.2 | priced at its arm |
+| D10b coverage set-difference (Enter only, no baseline subtraction) | 24 | 15 | 0 | 0 | 0 | 61.5% | 100.0% · decided 100.0% | 76.2% | 762.8 | priced at its arm |
+| D10b-u upstream coverage set-difference (sequential keys, baselined) | 17 | 10 | 0 | 7 | 5 | 63.0% | 70.8% · decided 100.0% | 77.3% | 744.7 | priced at its arm |
+| **KAFE (reference row: their published CSV output, not a local execution)** | 24 | 1 | 0 | 0 (decided all 39) | 0 (decided all 39) | 96.0% | 100.0% · decided 100.0% (all 39 decided) | 98.0% | 22747.5 | **full pipeline**, from their per-subject logs: proxy start-up, both graph crawls and Type 1 detection. Type 1 detection alone is 84.4, excludes both crawls, and is not comparable to an Axcess row. Amortised, their 2019 setup, not re-timed |
 
 [^kafe-f1]: `KAFE-MATRIX.md` prints F1 0.0% for C6, which has TP 0 and a
 defined precision of 0.0%. `MATRIX-RESULTS.md` prints `—` in the same
@@ -598,14 +647,28 @@ with three facts in mind:
    corpus our denominator is every candidate probed. On the element corpora it
    is the probes the detector decided. The two Axcess quotients are therefore
    not the same unit either.
-2. **KAFE's 25.7 ms/button is an amortised quotient from their published CSV**:
-   their `Detection` column divided by their `Size of All Visible Ctrl Nodes`,
-   pooled over the 39 subjects. It was taken with their instrument on their
-   2019 Firefox 68 / Selenium setup and was not re-timed here. Per subject,
-   that quotient is under 300 ms on 39 of 39 subjects (60 of 60 over their
-   whole corpus). It is not a measured per-button latency, and it was not
-   measured the same way as any Axcess figure. The two compare as orders of
-   magnitude only.
+2. **KAFE has two figures, from its own per-subject timing logs**
+   (`execTime.csv`, `execTimeDetection.csv`), each divided by their
+   `Size of All Visible Ctrl Nodes`. Both were taken with their instrument on
+   their 2019 Firefox 68 / Selenium setup and were not re-timed here:
+
+   | KAFE cost per visible control | pooled (39) | median (39) | min–max (39) | under 300 ms (39) | pooled (60) | median (60) | min–max (60) | under 300 ms (60) |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|
+   | Type 1 detection alone | 84.4 | 128.5 | 7.2–636.1 | 34 of 39 | 65.5 | 104.3 | 6.2–636.1 | 53 of 60 |
+   | both crawls (phases 02, 03, 05, 08, 09, 10) | 3,639.1 | 4,638.4 | 672.4–16,133.9 | 0 of 39 | 3,201.3 | 3,866.2 | 330.8–22,359.7 | 0 of 60 |
+   | **full pipeline** (phases 00–11 + Type 1) | **22,747.5** | 27,682.0 | 7,344.1–68,265.3 | **0 of 39** | 23,261.2 | 24,004.7 | 5,182.0–130,006.9 | 0 of 60 |
+
+   **The full pipeline is the figure comparable to Axcess's**, because every
+   Axcess figure includes that detector's own browser work (navigation, tab
+   walks, behavioural passes), and KAFE's verdict needs both of its crawls.
+   Type 1 detection alone is the graph comparison once both graphs exist. It
+   excludes the crawls, so it understates KAFE's cost the way an Axcess D9
+   figure without its tab walk would. Type 2 detection is counted in neither.
+   The full pipeline averages 19.33 min per subject over all 60, against
+   their paper's 19.22. Of it, 44.6% on the 39 is proxy initialisation, which
+   no Axcess figure includes. None of these is a measured per-button latency,
+   and none was measured the same way as any Axcess figure. They compare as
+   orders of magnitude only.
 3. **The only direct per-button measurement is outside the main table.**
    `TIMING-AND-SPOTCHECK.md` timed one `run_probe` call of the frozen
    `DifferentialRunner` (the D9 machinery) per button: 3 probes × 2 repeats,
@@ -616,7 +679,7 @@ Against 300 ms/button, read as the §5 quotient:
 
 | corpus | rows at or under 300 ms/button | source |
 |---|---:|---|
-| KAFE | 35 of 48 Axcess rows (KAFE's own 25.7 also under) | §5.1 |
+| KAFE | 35 of 48 Axcess rows. KAFE's own full pipeline (22,747.5) is over, on 0 of 39 subjects under; its Type 1 detection alone (84.4, not comparable) is under | §5.1 |
 | fixtures | 33 of 49 rows | `MATRIX-RESULTS.md` cost table |
 | gds | 20 of 41 timed rows (7 rows decided no target and have no ms/button) | `MATRIX-RESULTS.md` cost table |
 | ma11y | 9 of 48 rows | `MATRIX-RESULTS.md` cost table |
@@ -671,8 +734,14 @@ attempted, but its artifact proved inaccessible, so it is not replicated here
 
 Each of these is stated as missing. None was generated for this report.
 
-- Strict recall and the unknown-positive/negative split on KAFE's corpus (§4).
+- Strict recall over all 52 attempted KAFE subjects. Strict recall and the
+  unknown-positive/negative split now exist on the 39 scored subjects (§4),
+  the basis KAFE's own row uses. A 52-subject figure would count the 13
+  whole-subject abstentions as unknown for every row and is not reported.
 - Element-level precision on KAFE's corpus: KAFE's labels are per page.
+- A like-for-like KAFE cost. Their logs give the full pipeline and Type 1
+  detection separately, but nothing isolates the part of an Axcess figure that
+  corresponds to KAFE's proxy start-up or crawls (§7).
 - Latency measured per button for any main-table detector (§7). The 6-trial
   probe in `TIMING-AND-SPOTCHECK.md` is the only per-button timing.
 - Any KAFE result on `fixtures`, `gds`, `ma11y` or `edgecases` (§6).
@@ -680,8 +749,9 @@ Each of these is stated as missing. None was generated for this report.
 
 ### 8.4 Corrections made while preparing this report
 
-The addendum assigned these corrections to this work. None moves a table cell
-in any report.
+The addendum assigned the first set of corrections to this work, and none of
+them moves a table cell. The two later corrections at the end of this section
+(`BRIEF-COST-FIX.md`) do move cells, and each names every cell it moved.
 
 - **`KAFE-HIGHLIGHTS.md`:**
   - The R1/R6 claim now says R1 does the most work of any rule, and that R2,
@@ -720,15 +790,125 @@ in any report.
   generated §1.7 is identical to the hand-added one it replaces.
   `tests/test_capdiag.py` passes (8 tests).
 
+**Correction: KAFE's cost was quoted from a column that is not a per-subject
+time.** Earlier versions of this report, `KAFE-HIGHLIGHTS.md` and
+`KAFE-MATRIX.md` gave KAFE's cost as **25.7 ms per button**: the results CSV's
+`Detection` column, pooled over the 39 and divided by `Size of All Visible Ctrl
+Nodes`. They set that figure against Axcess's per-button timings as if both
+were a detector's full cost. That was wrong twice over:
+
+1. **Scope.** Even taken at face value, a detection-only figure excludes both
+   of KAFE's graph crawls, while every Axcess figure includes its own browser
+   work.
+2. **The column is not per-subject detection time.** The evidence:
+   - Listed alphabetically (the CSV's order), `Detection` falls only 2 times
+     in 59 steps, and so does `Localization`. The CSV's crawl and extraction
+     columns fall 27–30 times, and KAFE's own per-subject `01-Type1Detection`
+     falls 26 times. `Detection`'s correlation with alphabetical rank is 0.93,
+     against 0.02 for `01-Type1Detection`. Its correlation with the
+     visible-control count is 0.05.
+   - KAFE's per-subject `execTimeDetection.csv` disagrees with it by more
+     than 5% on 59 of 60 subjects. The median ratio (log ÷ CSV) is 3.5, and it
+     ranges from 0.38 (`ssa`) to 75 (`4shared`). The logged value is higher on
+     55 of 60 subjects. Examples: `4shared` 4,959 ms against 66; `adorama`
+     2,135 against 69; `bbc` 2,193 against 141.
+   - The same logs agree with the CSV's other six columns (below), so they
+     describe the same pipeline. Only `Detection` and `Localization` do not
+     match.
+   - What the column does measure was not established. An intermediate
+     reading of it as a running total, differenced per subject, is also
+     contradicted by the logs and is used nowhere.
+
+**KAFE's per-subject logs.** `tools/fetch_kafe_output.py` fetched
+`execTime.csv`, `execTimeDetection.csv` and `resultsSubjectStats.csv` for all
+60 subjects from KAFE's `KAFE_output` Drive folder into the git-ignored
+`artifacts/kafe_output/`. They are unlicensed third-party files and are not
+committed. No file is missing, empty or unparseable. The 14 `execTime.csv`
+phases map onto the results CSV's columns as follows. Each mapping was chosen
+by testing every combination of up to four phases per column, and each best
+fit matches the phase names. The ratio is per-subject log ÷ CSV, over all 60:
+
+| results CSV column | per-subject phases | median ratio | within ±5% | within ±10% | pooled ratio | subjects off by >25% |
+|---|---|---:|---:|---:|---:|---:|
+| `InitializeProxyKnfg` | 00 | 1.007 | 17 of 60 | 28 of 60 | 1.028 | 15 |
+| `ExtractNodesKnfg` | 01 + 04 | 0.991 | 38 of 60 | 44 of 60 | 1.035 | 8 |
+| `CrawlKnfg` | 02 + 03 + 05 | 1.008 | 45 of 60 | 52 of 60 | 1.028 | 4 |
+| `InitializeProxyPcnfg` | 06 | 1.019 | 16 of 60 | 31 of 60 | 0.978 | 12 |
+| `ExtractNodesPcnfg` | 07 + 11 | 1.001 | 38 of 60 | 38 of 60 | 0.989 | 16 |
+| `CrawlPcnfg` | 08 + 09 + 10 | 1.006 | 37 of 60 | 47 of 60 | 1.023 | 8 |
+| `Detection` | **none**: vs `01-Type1Detection` | 3.48 | 1 of 60 | 1 of 60 | 3.28 | 58 |
+| `Localization` | **none** (not used) | — | — | — | — | — |
+| (not a CSV column) | 12, 13 `TotalConstruct*` | — | — | — | — | — |
+
+Phases 12 and 13 equal phase 05 (resp. 10) plus 0.3–0.7 s (resp. 0.3–3.7 s).
+They overlap other phases, so they are not summed. The six mapped columns agree
+at the median and when pooled, but **not subject for subject everywhere**. The
+two proxy-start-up columns are only loosely matched, and some subjects are off
+by up to a factor of 6 (worst: `indiegogo` `CrawlKnfg` 5.96×, `dell`
+`ExtractNodesPcnfg` 3.85×, `gizmodo` `CrawlPcnfg` 3.12×). `resultsSubjectStats.csv`
+also differs from the results CSV's node counts in 8 values on 5 subjects
+(`boostmobile`, `indiegogo`, `instagram`, `resellerratings`, `usgsgov`). The only
+difference in the denominator is `resellerratings`: 50 visible controls in its
+own file against 146 in the CSV. So the logs look like a separate run of the
+same pipeline, not the same record. The denominator is kept from the results
+CSV, the one the accuracy rows use. With the per-subject counts instead, the
+39-subject pooled figures would be 90.0 (Type 1) and 24,260.9 (full pipeline),
+and no under-300 count would change.
+
+**What changed.** KAFE's cost is now the full pipeline (22,747.5 ms per
+button pooled over the 39), with Type 1 detection alone (84.4) beside it, as in
+§7. "Faster than KAFE" is re-derived on the full pipeline: 48 of 48 (46 of 46).
+The detection-only count stays 30 of 48 (28 of 46), labelled as not
+comparable. Cells moved:
+
+- `KAFE-MATRIX.md` KAFE row: `ms/button` 25.7 → 22747.5, `ms/subject`
+  1012.7 → 897652.7, and `ms covers`. No other number in that table moved.
+- This report's §5.1 KAFE row: ms 25.7 → 22747.5 and its timing scope. The
+  §7 table is new.
+- `KAFE-HIGHLIGHTS.md`: every cost comparison.
+- `tools/kafe_matrix.py`: the KAFE row and the "KAFE on the same denominator"
+  section now read the per-subject logs. The results-CSV figures are kept in
+  `derived/kafe_matrix_summary.json` only under `results_csv_detection_column`,
+  marked as not a cost.
+
+**Correction: strict recall and the unknown split on KAFE's corpus.** §5.1
+used to read `n/a (N abst.)` in both unknown columns, where N counted
+abstentions over the **52 attempted** subjects, in a table whose denominator
+is **39**. It also read `n/a` for strict recall, and §4, §1 and §8.3 said
+neither could be computed. They can: `derived/kafe_matrix.jsonl` holds every
+detector's verdict on every subject. `tools/kafe_matrix.py assemble` now
+computes `unknown_positive`, `unknown_negative` and `recall_strict` on the
+39-subject basis. `KAFE-MATRIX.md` gains `unk pos`, `unk neg` and `strict
+recall` columns, and relabels `recall` as `recall (decided)` and `F1` as
+`F1 (decided recall)`. For example, C12 gave no verdict on 3 of the 39
+(`godaddy`, `thefreedictionary` and `wendys`, all KAFE-positive). Its strict
+recall is 19/24 = 79.2%, against 90.5% over decided subjects. Cells moved in
+§5.1: the unknown pos, unknown neg and strict-recall cells of all 48 Axcess
+rows, and the KAFE row's strict-recall cell (n/a → 100.0%). TP, FP, FN,
+precision, F1 and the Axcess ms cells are unchanged, and so are TN and `abst.`
+in `KAFE-MATRIX.md`. Where this report and `KAFE-HIGHLIGHTS.md` quote KAFE-corpus
+recall, they now say which recall it is. Every KAFE-corpus F1 uses decided recall.
+
+**Regenerated for these two corrections:** `KAFE-MATRIX.md`,
+`KAFE-MATRIX-REPORT.md`, `derived/kafe_matrix_summary.json`,
+`derived/kafe_matrix_summary_permissive.json` and
+`derived/kafe_matrix_controls.json` (`assemble`, `report`), from the same 52
+JSONL lines. The controls file changed only in control 1's timing block.
+`tests/test_capdiag.py` passes (8 tests).
+
 ## 9. What to take away
 
 KAFE is better than anything Axcess has. On KAFE's own benchmark its published
 output reaches 96% precision and 100% recall. Our best detector reaches an F1
-of 85%, at roughly fifty times KAFE's per-button cost figure. Where Axcess is
-ahead is cost. Its cheapest detectors run at a fraction of a millisecond per
-button. The best of them, D4, finds every labelled failure on the pages it
-decides, but it also flags 14 pages whose label says they are fine, where KAFE
-flags 1. The cheap rules
+of 85% (computed with recall over decided subjects; its strict recall is
+95.8%). Where Axcess is ahead is cost. Per button, KAFE's full pipeline,
+including the two crawls its verdict needs, costs about 22.7 s, and every
+Axcess detector costs less. The best-F1 one costs about a seventeenth of that.
+KAFE's detection step alone, after the crawls, is 84.4 ms per button, and it
+does not compare with our figures, which include our own browser work. Our
+cheapest detectors run at a fraction of a millisecond per button. The best of
+them, D4, finds every labelled failure (100% strict recall), but it also flags
+14 pages whose label says they are fine, where KAFE flags 1. The cheap rules
 written to fix those false positives on our own test corpus mostly do not
 carry over to real pages. Only R1, R5 and R7/R8 still change anything, and
 R7/R8 break the 300 ms ceiling. On the GDS audit, where 13 published tools
