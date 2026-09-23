@@ -27,6 +27,7 @@ export default function ReportHeader({
   meta,
   actions,
   tabs = true,
+  titleInTrail = false,
 }: {
   scanId: number;
   previousScanId: number | null;
@@ -35,6 +36,12 @@ export default function ReportHeader({
   actions?: ReactNode;
   /** Show the report's view tabs. Off on drill-downs (see above). */
   tabs?: boolean;
+  /**
+   * The trail under the tabs already shows the title (the inspector's page),
+   * so the heading stays for screen readers and heading navigation but is not
+   * drawn a second time.
+   */
+  titleInTrail?: boolean;
 }) {
   return (
     <header className="mb-5">
@@ -45,13 +52,19 @@ export default function ReportHeader({
       {tabs && (
         <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
       )}
-      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
+      <div className={`${titleInTrail ? "mt-2" : "mt-5"} flex flex-wrap items-start justify-between gap-3`}>
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
+          <h1
+            className={
+              titleInTrail
+                ? "sr-only"
+                : "text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]"
+            }
+          >
             {title}
           </h1>
           {meta && (
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">{meta}</p>
+            <p className={`${titleInTrail ? "" : "mt-1"} max-w-4xl text-sm leading-6 text-fg-muted`}>{meta}</p>
           )}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

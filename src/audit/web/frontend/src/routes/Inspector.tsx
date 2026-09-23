@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
+import { activeView } from "../components/ReportCrumb";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import { Card, EmptyState, ExternalLinkButton, LinkButton, pageEvidencePath, Select } from "../components/ui";
@@ -53,6 +54,7 @@ type Target = {
 export default function InspectorRoute() {
   const { scanId, pageId } = useParams<{ scanId: string; pageId: string }>();
   const [params] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const scan = Number(scanId);
   const page = Number(pageId);
@@ -471,6 +473,9 @@ export default function InspectorRoute() {
 
   const { page: pageInfo, render } = data;
   const displayTitle = pageInfo.title || pageInfo.url;
+  // Reached from Issues or Verify changes, the trail under the tabs ends in
+  // ``Page inspector: “<title>”``, so the title is not drawn twice.
+  const titleInTrail = activeView(location.pathname, location.search) !== "";
   const liveUrl = pageInfo.url;
 
   return (
@@ -479,6 +484,7 @@ export default function InspectorRoute() {
         scanId={scan}
         previousScanId={scanData?.previous_scan_id ?? null}
         title={displayTitle}
+        titleInTrail={titleInTrail}
         meta={
           <ReportMeta
             counts={

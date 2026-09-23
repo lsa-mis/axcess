@@ -554,3 +554,40 @@ async def test_actual_comparison_links_reach_stored_finding(
     await playwright_async.expect(
         page.get_by_role("navigation", name="Where you are in Verify changes")
     ).to_contain_text("Page evidence")
+
+
+async def test_inspector_trail_names_the_page_it_shows(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The inspector's step in the trail carries the page title.
+
+    It reads ``Page inspector: “<page title>”`` after the issue. The title is then
+    the view's heading, so it is not drawn a second time, but the h1 stays
+    for screen readers and heading navigation.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}",
+        wait_until="networkidle",
+    )
+    inspect = page.locator("a[href*='/inspect']").first
+    await playwright_async.expect(inspect).to_be_visible()
+    await inspect.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+/inspect\?"))
+    sub = page.get_by_role("navigation", name="Where you are in Issues")
+    current = sub.locator("[aria-current=page]")
+    await playwright_async.expect(current).to_contain_text("Page inspector:")
+    heading = page.get_by_role("heading", level=1)
+    title = (await heading.text_content() or "").strip()
+    assert title
+    await playwright_async.expect(current).to_contain_text(f"“{title}”")
+    await playwright_async.expect(
+        sub.get_by_role("link", name="Issues", exact=True)
+    ).to_be_visible()
+    await playwright_async.expect(
+        sub.get_by_role("link", name=row["title"], exact=True)
+    ).to_be_visible()
+    assert await heading.evaluate("el => el.getBoundingClientRect().width <= 1")

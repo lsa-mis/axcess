@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { ChevronRight, CornerDownRight } from "lucide-react";
+import { ChevronRight, CornerDownRight, FileText } from "lucide-react";
 import { Link } from "react-router";
 import { useReportTrail } from "./ReportCrumb";
 
@@ -33,27 +33,40 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
   return (
     <nav
       aria-label={`Where you are in ${view === "issues" ? "Issues" : "Verify changes"}`}
-      className="animate-drop-in mt-2 pl-3 text-xs"
+      className="animate-drop-in mt-2 pl-3 text-sm"
     >
       <ol className="flex min-w-0 flex-wrap items-center gap-x-0.5">
         <li aria-hidden className="flex items-center pr-1.5 text-border-strong">
-          <CornerDownRight className="h-3.5 w-3.5" />
+          <CornerDownRight className="h-4 w-4" />
         </li>
         {crumbs.map((crumb, index) => (
           <Fragment key={`${crumb.to}-${index}`}>
             {index > 0 && (
               <li aria-hidden className="flex items-center text-border-strong">
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-4 w-4" />
               </li>
             )}
             <li className="min-w-0">
               {index === last ? (
+                // The last step names the page it shows when there is one
+                // (the inspector): ``Page inspector: “Find a Room”``. It is
+                // the view's title, so the view does not repeat it as a
+                // heading of its own (see Inspector).
                 <span
                   aria-current="page"
-                  title={crumb.label}
-                  className="block max-w-[28rem] truncate px-1.5 py-2 font-semibold text-fg"
+                  title={crumb.detail ? `${crumb.label}: ${crumb.detail}` : crumb.label}
+                  className="flex max-w-[40rem] min-w-0 items-center gap-1.5 px-1.5 py-2 font-medium text-fg"
                 >
-                  {crumb.label}
+                  <span className="shrink-0">
+                    {crumb.label}
+                    {crumb.detail ? ":" : ""}
+                  </span>
+                  {crumb.detail && (
+                    <>
+                      <FileText className="h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
+                      <span className="truncate font-semibold">“{crumb.detail}”</span>
+                    </>
+                  )}
                 </span>
               ) : (
                 <Link
@@ -63,7 +76,7 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
                   // blue at rest, so a step reads as somewhere you can go
                   // before you hover it. Subtle is in the size and spacing,
                   // never in hiding the affordance (the visible-links rule).
-                  className="report-link block max-w-[18rem] min-h-target content-center truncate px-1.5 py-2 font-medium"
+                  className="report-link block max-w-[28rem] min-h-target content-center truncate px-1.5 py-2 font-medium"
                 >
                   {crumb.label}
                 </Link>
