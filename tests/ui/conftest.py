@@ -212,7 +212,10 @@ async def browser() -> AsyncIterator[Browser]:
     through ``new_page``, never directly, so each one still starts from a
     context of its own. Playwright objects belong to the event loop that
     created them, so a module using this runs its tests on the module's loop:
-    ``pytest.mark.asyncio(loop_scope="module")``.
+    ``pytest.mark.asyncio(loop_scope="module")``. Off that loop they hang
+    rather than fail. A bare ``@pytest.mark.asyncio`` on a test overrides the
+    module's mark and does exactly that, so tests/conftest.py refuses to
+    collect one.
     """
     from playwright.async_api import async_playwright
 

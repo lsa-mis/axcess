@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import sqlite3
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -35,6 +36,44 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             imports_playwright[path] = "playwright" in path.read_text(encoding="utf-8")
         if imports_playwright[path]:
             item.add_marker("browser")
+    # This hook runs before -m and -k deselect anything, so a run that leaves
+    # the browser tests out, like CI's "not browser" job, still refuses one.
+    stray = _off_loop_browser_tests(config, items)
+    if stray:
+        raise pytest.UsageError(
+            "These tests use the shared browser but would not run on its event "
+            "loop, where they wait forever instead of failing. Mark them "
+            "pytest.mark.asyncio(loop_scope='module'); a bare asyncio mark "
+            "overrides the module's:\n  " + "\n  ".join(stray)
+        )
+
+
+# Both ``browser`` fixtures (the tests/integration and tests/ui conftests)
+# start Chromium on pytest-asyncio's module event loop, and Playwright objects
+# only answer on the loop that created them. A test that awaits one from
+# another loop does not fail: it hangs, and nothing times the suite out. The
+# easy way in is a bare ``@pytest.mark.asyncio``, the house style elsewhere.
+# The closest asyncio mark wins, so a bare one overrides the module's
+# ``loop_scope="module"`` and puts the test on a loop of its own.
+_BROWSER_LOOP_SCOPE = "module"
+
+
+def _off_loop_browser_tests(config: pytest.Config, items: list[pytest.Item]) -> list[str]:
+    default_scope = config.getini("asyncio_default_test_loop_scope")
+    stray = []
+    for item in items:
+        if "browser" not in getattr(item, "fixturenames", ()):
+            continue
+        if not inspect.iscoroutinefunction(getattr(item, "obj", None)):
+            continue
+        mark = item.get_closest_marker("asyncio")
+        if mark is None:  # pytest-asyncio will not run it on any loop
+            continue
+        # Read the mark as pytest-asyncio does; "scope" is the old spelling.
+        loop_scope = mark.kwargs.get("loop_scope") or mark.kwargs.get("scope") or default_scope
+        if loop_scope != _BROWSER_LOOP_SCOPE:
+            stray.append(item.nodeid)
+    return stray
 
 
 def _apply_migrations(conn: sqlite3.Connection) -> None:
