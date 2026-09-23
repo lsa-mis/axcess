@@ -133,9 +133,36 @@
   .animate-pop-in {
     animation: pop-in 0.25s ease;
   }
+  /* The report trail's curl (ReportSubTrail) draws itself toward the
+     page heading, then its arrowhead lands. */
+  @keyframes trail-curl-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes trail-curl-land {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .trail-curl-line {
+    stroke-dasharray: 1;
+    animation: trail-curl-draw 0.45s ease-out 0.15s both;
+  }
+  .trail-curl-head {
+    animation: trail-curl-land 0.15s ease-out 0.55s both;
+  }
   @media (prefers-reduced-motion: reduce) {
     .animate-drop-in,
-    .animate-pop-in {
+    .animate-pop-in,
+    .trail-curl-line,
+    .trail-curl-head {
       animation: none;
     }
   }
