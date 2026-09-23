@@ -6,11 +6,13 @@ import { useReportTrail } from "./ReportCrumb";
 /**
  * Where you are inside the current report view, one quiet line under its tab.
  *
- * ``↳ Contrast (Minimum)… › Pages › Page inspector``. It starts *after* the
- * tab — the lit tab is already the first crumb and the way back to the list,
- * so repeating "Issues" here would be the third time on one screen. The
- * corner glyph hangs the line off the tab row like a branch, which is the
- * relationship: a place inside Issues, not a page of its own.
+ * ``↳ Issues › Contrast (Minimum)… › Pages › Page inspector``. It starts at
+ * the view itself: the lit tab also leads back to the list, but the step back
+ * belongs where the eye is already reading the path, as the first link in it.
+ * That crumb carries the link the list was opened from, so it returns to the
+ * list as it was left, filters and sort included. The corner glyph hangs the
+ * line off the tab row like a branch, which is the relationship: a place
+ * inside Issues, not a page of its own.
  *
  * Deliberately plain: small text, hairline chevrons, no pills, no background.
  * The topbar trail owns the chip. Every earlier step is a real link and looks
@@ -25,7 +27,7 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
   const root = `/scans/${scanId}/${view}`;
   const start = trail.findIndex((crumb) => crumb.to.split("?")[0] === root);
   if (start < 0 || start >= trail.length - 1) return null;
-  const crumbs = trail.slice(start + 1);
+  const crumbs = trail.slice(start);
   const last = crumbs.length - 1;
 
   return (
