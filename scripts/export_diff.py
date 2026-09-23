@@ -7,16 +7,24 @@ export the web route can produce, under whichever ``audit`` package is on
 
 Usage, from the checkout that has this script (the branch)::
 
+    # 0. If the app might write to data/audit.db while you work, freeze one
+    #    copy first and pass it to both renders instead:
+    #    sqlite3 -readonly data/audit.db ".backup /tmp/audit-frozen.db"
+
     # 1. Render with the base code. BASE is another checkout or worktree.
     PYTHONPATH=BASE/src python scripts/export_diff.py render \\
-        --db data/audit.db --out /tmp/exports-base
+        --db data/audit.db --blob-dir data/blobs --out /tmp/exports-base
 
-    # 2. Render with the branch code.
+    # 2. Render with the branch code, from the same database and blobs.
     PYTHONPATH=src python scripts/export_diff.py render \\
-        --db data/audit.db --out /tmp/exports-branch
+        --db data/audit.db --blob-dir data/blobs --out /tmp/exports-branch
 
-    # 3. Compare. Exit status 0 means identical, 1 means a difference.
+    # 3. Compare. Exit status 0 means identical, 1 means a difference or a
+    #    failed render, 2 means there was nothing to compare.
     python scripts/export_diff.py compare /tmp/exports-base /tmp/exports-branch
+
+Leave out ``--blob-dir`` and the workbooks embed no evidence screenshots, so
+the screenshot embedding goes uncompared; compare warns when that happened.
 
 ``render --db PATH --out DIR [--blob-dir DIR] [--scan ID ...]``
     Takes a consistent snapshot of ``PATH`` through SQLite's backup API from
@@ -29,17 +37,25 @@ Usage, from the checkout that has this script (the branch)::
     (``.xlsx.json``) for reading diffs. The UI base URL, Markdown generation
     time and workbook audit date are pinned, so a render is reproducible.
     ``--blob-dir`` passes a read-only blob store, as the route does, so
-    workbooks embed evidence screenshots. ``DIR`` must be new or empty. A
-    render that raises is recorded as ``<name>.error.txt`` and makes the
-    command exit 1 after every other export has been written.
+    workbooks embed evidence screenshots. ``manifest.json`` records the
+    snapshot's SHA-256 so compare can tell a data change from a code change,
+    and lists the protected scans skipped because the route refuses them.
+    ``DIR`` must be new or empty. Exits 2, having written nothing, when a
+    ``--scan`` is not a completed, non-protected scan or when there is no
+    scan to render. A render that raises is recorded as
+    ``<name>.error.txt`` and makes the command exit 1 after every other
+    export has been written.
 
 ``compare DIR_A DIR_B``
     Byte comparison for the text formats (with a short unified diff), and a
     fingerprint comparison for workbooks, recomputed from the raw ``.xlsx``
     files with this checkout's fingerprint code so both sides are measured
-    the same way. Files present on one side only count as differences.
-    ``manifest.json`` is informational and never compared; compare warns when
-    both renders came from the same ``audit`` package.
+    the same way. Files present on one side only count as differences, and
+    any ``*.error.txt`` counts as a failure even when both sides failed the
+    same way. Exits 2 when neither directory holds an export. The manifests
+    are never compared as content; compare warns when both renders came from
+    the same ``audit`` package, read different database snapshots, or did
+    not both embed evidence from the same ``--blob-dir``.
 
 Rendering goes through ``tests/support/export_render.py``, which calls the
 route's own entry points (``collect_scan``, the per-format renderers,
@@ -53,6 +69,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import sqlite3
 import sys
@@ -65,7 +82,8 @@ from typing import Any
 # tool render and fingerprint exports the same way. tests/ is not a package;
 # put it on the path explicitly.
 _TESTS_DIR = Path(__file__).resolve().parent.parent / "tests"
-sys.path.insert(0, str(_TESTS_DIR))
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
 
 from support.xlsx_fingerprint import (  # noqa: E402
     dumps_fingerprint,
@@ -74,6 +92,7 @@ from support.xlsx_fingerprint import (  # noqa: E402
 )
 
 MANIFEST = "manifest.json"
+_ERROR_SUFFIX = ".error.txt"
 _DIFF_LINES = 40
 
 
@@ -100,6 +119,14 @@ def _snapshot(source: Path, destination: Path) -> None:
         reader.close()
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def _render(args: argparse.Namespace) -> int:
     # Imported here so `compare` needs neither `audit` nor a database.
     from support import export_render
@@ -116,7 +143,10 @@ def _render(args: argparse.Namespace) -> int:
     if out.exists() and any(out.iterdir()):
         print(f"error: output directory is not empty: {out}", file=sys.stderr)
         return 2
-    out.mkdir(parents=True, exist_ok=True)
+    if args.blob_dir and not Path(args.blob_dir).is_dir():
+        # A mistyped path would silently render workbooks without evidence.
+        print(f"error: blob directory not found: {args.blob_dir}", file=sys.stderr)
+        return 2
     blob_store = BlobStore(Path(args.blob_dir)) if args.blob_dir else None
     audit_package = str(Path(audit.__file__).resolve().parent)
     started = time.perf_counter()
@@ -134,6 +164,8 @@ def _render(args: argparse.Namespace) -> int:
     failures = 0
     written = 0
     print(f"audit package: {audit_package}")
+    if blob_store is None:
+        print("note: no --blob-dir, so workbooks embed no evidence screenshots")
 
     with tempfile.TemporaryDirectory(prefix="export-diff-") as scratch:
         copy = Path(scratch) / "audit.db"
@@ -141,20 +173,44 @@ def _render(args: argparse.Namespace) -> int:
         _snapshot(source, copy)
         copy_seconds = time.perf_counter() - copy_started
         print(f"snapshot of {source} taken in {copy_seconds:.2f} s")
-        manifest["snapshot_seconds"] = round(copy_seconds, 3)
+        manifest["snapshot"] = {
+            "sha256": _sha256(copy),
+            "bytes": copy.stat().st_size,
+            "seconds": round(copy_seconds, 3),
+        }
 
         conn = connect(copy)
         try:
-            scan_ids = [
+            completed = [
                 int(row["id"])
                 for row in conn.execute(
                     "SELECT id FROM scans WHERE status = 'completed' ORDER BY id"
                 ).fetchall()
             ]
+            protected = [scan_id for scan_id in completed if _is_protected(conn, scan_id)]
+            renderable = [scan_id for scan_id in completed if scan_id not in protected]
+            if protected and not args.scan:
+                manifest["skipped_protected"] = protected
+                print(
+                    "skipping protected scan(s) the export route refuses: "
+                    + ", ".join(str(scan_id) for scan_id in protected)
+                )
             if args.scan:
                 wanted = set(args.scan)
-                scan_ids = [scan_id for scan_id in scan_ids if scan_id in wanted]
-            for scan_id in scan_ids:
+                unknown = sorted(wanted - set(renderable))
+                if unknown:
+                    print(
+                        "error: not a completed, non-protected scan: "
+                        + ", ".join(str(scan_id) for scan_id in unknown),
+                        file=sys.stderr,
+                    )
+                    return 2
+                renderable = [scan_id for scan_id in renderable if scan_id in wanted]
+            if not renderable:
+                print("error: the database has no completed, non-protected scan", file=sys.stderr)
+                return 2
+            out.mkdir(parents=True, exist_ok=True)
+            for scan_id in renderable:
                 entry, scan_failures, scan_written = _render_scan(
                     conn, scan_id, out, blob_store=blob_store, export_render=export_render
                 )
@@ -175,7 +231,7 @@ def _render(args: argparse.Namespace) -> int:
 
 
 def _is_protected(conn: sqlite3.Connection, scan_id: int) -> bool:
-    """The route refuses protected scans outright, so the harness skips them."""
+    """The route refuses protected scans outright, so the harness never renders them."""
     table = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'protected_scans'"
     ).fetchone()
@@ -197,10 +253,6 @@ def _render_scan(
     entry, the number of failed exports and the number of files written."""
     seed = conn.execute("SELECT seed_url FROM scans WHERE id = ?", (scan_id,)).fetchone()
     entry: dict[str, Any] = {"id": scan_id, "seed_url": seed["seed_url"] if seed else None}
-    if _is_protected(conn, scan_id):
-        entry["skipped"] = "protected scan; the export route refuses it"
-        print(f"scan {scan_id}: skipped (protected)")
-        return entry, 0, 0
     status, route_draft = export_render.evaluation_status(conn, scan_id)
     entry["evaluation_status"] = status
     entry["route_disposition"] = "draft" if route_draft else "final"
@@ -232,7 +284,7 @@ def _render_scan(
             if error is not None:
                 # Type and message only: a traceback carries checkout paths
                 # that would differ between two otherwise identical renders.
-                (out / f"{name}.error.txt").write_text(f"{type(error).__name__}: {error}\n")
+                (out / f"{name}{_ERROR_SUFFIX}").write_text(f"{type(error).__name__}: {error}\n")
                 failures += 1
                 written += 1
                 continue
@@ -291,6 +343,7 @@ def _text_diff(name: str, left: bytes, right: bytes) -> list[str]:
 
 
 def _warn_on_manifests(left: Path, right: Path) -> None:
+    """Point out render conditions that make a comparison weaker or misleading."""
     manifests = []
     for directory in (left, right):
         try:
@@ -308,6 +361,28 @@ def _warn_on_manifests(left: Path, right: Path) -> None:
         )
     if manifests[0].get("pinned") != manifests[1].get("pinned"):
         print("warning: the two renders pinned different inputs", file=sys.stderr)
+    left_snapshot, right_snapshot = ((m.get("snapshot") or {}).get("sha256") for m in manifests)
+    if left_snapshot != right_snapshot:
+        print(
+            "warning: the two renders read different database snapshots, so a data "
+            "change between them shows up here as an export difference. Freeze one "
+            "copy of the database and render both from it.",
+            file=sys.stderr,
+        )
+    left_blobs, right_blobs = (m.get("blob_dir") for m in manifests)
+    if left_blobs is None or right_blobs is None:
+        missing = " and ".join(
+            side for side, blobs in (("a", left_blobs), ("b", right_blobs)) if blobs is None
+        )
+        print(
+            f"warning: render {missing} ran without --blob-dir, so workbook evidence "
+            "screenshots were not compared",
+            file=sys.stderr,
+        )
+    elif left_blobs != right_blobs:
+        print(
+            "warning: the two renders embedded evidence from different --blob-dir", file=sys.stderr
+        )
 
 
 def _compare(args: argparse.Namespace) -> int:
@@ -320,6 +395,21 @@ def _compare(args: argparse.Namespace) -> int:
     left_names, right_names = _compared_names(left), _compared_names(right)
     identical = 0
     different: list[str] = []
+    failed: list[str] = []
+    # A render that raised is never evidence of equivalence, even when both
+    # checkouts raised the same way: the format was not compared at all.
+    for name in sorted(left_names | right_names):
+        if name.endswith(_ERROR_SUFFIX):
+            sides = "+".join(
+                side for side, names in (("a", left_names), ("b", right_names)) if name in names
+            )
+            failed.append(name)
+            print(f"FAILED     {name} ({sides})")
+    left_names = {name for name in left_names if not name.endswith(_ERROR_SUFFIX)}
+    right_names = {name for name in right_names if not name.endswith(_ERROR_SUFFIX)}
+    if not left_names | right_names and not failed:
+        print(f"error: no exports to compare in {left} or {right}", file=sys.stderr)
+        return 2
     for name in sorted(left_names - right_names):
         different.append(name)
         print(f"ONLY IN A  {name}")
@@ -347,8 +437,8 @@ def _compare(args: argparse.Namespace) -> int:
             print("\n".join(diff))
         else:
             identical += 1
-    print(f"{identical} identical, {len(different)} different")
-    return 1 if different else 0
+    print(f"{identical} identical, {len(different)} different, {len(failed)} failed render(s)")
+    return 1 if different or failed else 0
 
 
 # --------------------------------------------------------------------------
