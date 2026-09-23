@@ -26,7 +26,9 @@ that predates this harness, ``scan_audit.md``, pins a different fixture
 beside it would read as its sibling. ``rich_scan`` pins the audit report.
 
 Refresh the new goldens with ``AUDIT_UPDATE_GOLDEN=1`` after a deliberate
-output change. The pre-existing goldens are never written from here.
+output change. A missing golden fails rather than being recorded, so one
+deleted or renamed during a refactor cannot quietly regenerate. The
+pre-existing goldens are never written from here.
 """
 
 from __future__ import annotations
@@ -80,9 +82,14 @@ def _assert_matches_golden(rendered: str | bytes, export_format: str, name: str)
     """Compare bytes, not text: a bare ``\\r`` would not survive ``read_text``."""
     actual = _golden_bytes(rendered, export_format)
     path = GOLDEN_DIR / name
-    if UPDATE_GOLDEN or not path.exists():
+    if UPDATE_GOLDEN:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(actual)
+    elif not path.exists():
+        pytest.fail(
+            f"Golden {name} is missing. Record it with AUDIT_UPDATE_GOLDEN=1 only if "
+            "the export is new; a golden that went missing in a refactor must be restored."
+        )
     expected = path.read_bytes()
     if export_format == "xlsx":
         expected_fp = json.loads(expected)
