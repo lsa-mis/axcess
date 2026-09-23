@@ -109,6 +109,7 @@ export default function IssuesRoute() {
   return (
     <>
       <ReportHeader
+        tabs
         scanId={scan.id}
         previousScanId={scan.previous_scan_id}
         title="Issues"

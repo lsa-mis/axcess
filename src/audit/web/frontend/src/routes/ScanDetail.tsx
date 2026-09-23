@@ -198,6 +198,7 @@ export default function ScanDetailRoute() {
           because "Verify changes" is now a tab a few pixels below it. */}
       {isComplete ? (
         <ReportHeader
+          tabs
           scanId={data.id}
           previousScanId={data.previous_scan_id}
           // "Overview" and not "Report #46": the topbar trail already names the

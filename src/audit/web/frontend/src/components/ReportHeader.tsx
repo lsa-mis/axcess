@@ -2,23 +2,24 @@ import type { ReactNode } from "react";
 import ReportWorkspaceNav from "./ReportWorkspaceNav";
 
 /**
- * The one header every view of a report wears.
+ * The one header every page inside a report wears.
  *
- * Overview, Issues and Verify changes are three views of the same evidence,
- * so they get the same chrome in the same order: the tabs (and, inside a
- * drill-down, the trail under them), then the title, a single meta line and
- * the view's actions. Before this each route invented its own
- * arrangement, different crumbs, different subtitle shapes, tabs on some
- * pages and not others, and the report stopped feeling like one place.
+ * Every page of a report gets the same chrome in the same order: the tabs
+ * where there are tabs, then the title, a single meta line and the page's
+ * actions. Before this each route invented its own arrangement, different
+ * crumbs, different subtitle shapes, and the report stopped feeling like one
+ * place.
  *
  * The breadcrumb is deliberately absent: it lives in the topbar
- * (see ``ReportCrumb``) where it stays put while this content scrolls.
+ * (see ``ReportCrumb``) where it stays put while this content scrolls, and
+ * it is the only trail -- a page inside a report is one location, and two
+ * trails for it disagreed about where it sat.
  *
- * Drill-downs below those three views pass ``tabs={false}``. The tabs mark a
- * current view, and on a page that is none of them the marker has to land
- * somewhere — it fell on "Overview", so the inspector claimed to be the
- * overview while showing a single page. Their trail crumb carries the
- * orientation on those routes instead.
+ * Only the report's own views -- Overview, Issues and Verify changes -- pass
+ * ``tabs``.
+ * An issue, its pages and the inspector sit *inside* the report rather than
+ * beside those views, so a tab row there claimed a sibling relationship
+ * they do not have; the breadcrumb carries the way back instead.
  */
 export default function ReportHeader({
   scanId,
@@ -26,21 +27,21 @@ export default function ReportHeader({
   title,
   meta,
   actions,
-  tabs = true,
+  tabs = false,
 }: {
   scanId: number;
   previousScanId: number | null;
   title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
-  /** Show the report's view tabs. Off on drill-downs (see above). */
+  /** Show the report's view tabs. Only the report's own views (see above). */
   tabs?: boolean;
 }) {
   return (
     <header className="mb-5">
       {/* Tabs first, title second. The tabs are the report's own navigation
           and belong at the top of its area, right under the topbar trail
-          that ends in the same word; the title then reads as the heading of
+          that ends at the report; the title then reads as the heading of
           the view you chose, not as something the tabs sit beneath. */}
       {tabs && (
         <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
@@ -61,9 +62,9 @@ export default function ReportHeader({
 }
 
 /**
- * The shared shape of every report meta line: the counts that identify this
- * view, then the standing caveat. Keeping it in one component is what stops
- * the three views from drifting into three different sentences.
+ * The shared shape of every report meta line: what identifies this page,
+ * then the standing caveat. Keeping it in one component is what stops the
+ * pages from drifting into different sentences.
  */
 export function ReportMeta({
   counts,
