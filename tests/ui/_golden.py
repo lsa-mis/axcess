@@ -73,6 +73,19 @@ def _write(name: str, data: Any) -> None:
     (GOLDEN_DIR / name).write_text(_pretty(data), encoding="utf-8")
 
 
+def _changed_entries(expected: Any, actual: Any) -> str:
+    # A diff hunk can sit far below the key that owns it (an endpoint label,
+    # "routes"), so name the top-level entries that changed up front.
+    if not (isinstance(expected, dict) and isinstance(actual, dict)):
+        return ""
+    keys = [*expected, *(key for key in actual if key not in expected)]
+    missing = object()
+    changed = [key for key in keys if expected.get(key, missing) != actual.get(key, missing)]
+    if not changed:
+        return "Same content, different key order (route registration order, say).\n"
+    return f"Changed entries: {', '.join(changed)}\n"
+
+
 def _diff(expected: Any, actual: Any, label: str) -> str:
     lines = list(
         difflib.unified_diff(
@@ -85,7 +98,7 @@ def _diff(expected: Any, actual: Any, label: str) -> str:
     )
     if len(lines) > _MAX_DIFF_LINES:
         lines = [*lines[:_MAX_DIFF_LINES], f"... {len(lines) - _MAX_DIFF_LINES} more diff lines"]
-    return "\n".join(lines)
+    return _changed_entries(expected, actual) + "\n".join(lines)
 
 
 def check_golden_entry(name: str, key: str, actual: Any) -> None:
