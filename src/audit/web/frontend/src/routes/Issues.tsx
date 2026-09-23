@@ -211,16 +211,19 @@ function IssueToolbar({
   onParam: (key: string, value: string) => void;
   onClearFilters: () => void;
 }) {
+  // One row, search first, so the table starts as high as it can. It wraps
+  // rather than clipping: the search keeps a usable minimum width and the
+  // filters drop under it on a narrow screen.
   return (
-    <div className="border-b border-border bg-surface-subtle p-3">
-      <div className="relative max-w-xl">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-surface-subtle p-3">
+      <div className="relative min-w-[min(100%,16rem)] max-w-xl flex-1 basis-80">
         <Search
           className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
           aria-hidden
         />
         <IssueSearch value={q} onChange={(value) => onParam("q", value)} />
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterSelect
           caption="Level"
           value={conformance}
