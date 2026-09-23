@@ -13,13 +13,17 @@ from __future__ import annotations
 import gzip
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
-from playwright import async_api as playwright_async
 
 from audit.db.schema import connect
 
-pytestmark = pytest.mark.ui
+pytest.importorskip("playwright.async_api")
+
+# One browser per module (tests/ui/conftest.py), so the tests run on the
+# module's event loop. Each ``new_page`` call still opens its own context.
+pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 CAPTURE = (
     "<!doctype html><html><head><title>App</title>"
@@ -50,10 +54,10 @@ def _seed_capture(db_path: Path, scan_id: int) -> int:
         conn.close()
 
 
-@pytest.mark.asyncio
 async def test_the_rendered_frame_drops_what_would_break_the_capture(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     """Without these the page renders as unstyled serif text under a banner
     telling the reviewer to enable JavaScript, on a capture taken with
@@ -62,28 +66,23 @@ async def test_the_rendered_frame_drops_what_would_break_the_capture(
     page_id = _seed_capture(db_path, scan_id)
     base = live_server[0]
 
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page(viewport={"width": 1280, "height": 900})
-            await page.goto(
-                f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect",
-                wait_until="domcontentloaded",
-            )
-            await page.locator("iframe").wait_for(timeout=15000)
-            await page.wait_for_timeout(1500)
-            frame = page.frame_locator("iframe")
-            state = await frame.locator("html").evaluate(
-                """el => ({
-                    crossorigin: el.querySelectorAll('link[crossorigin]').length,
-                    links: el.querySelectorAll('link[rel="stylesheet"]').length,
-                    noscript: el.querySelectorAll('noscript').length,
-                    base: el.querySelectorAll('base[href]').length,
-                    body: el.querySelector('#app')?.textContent || '',
-                })"""
-            )
-        finally:
-            await browser.close()
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect",
+        wait_until="domcontentloaded",
+    )
+    await page.locator("iframe").wait_for(timeout=15000)
+    await page.wait_for_timeout(1500)
+    frame = page.frame_locator("iframe")
+    state = await frame.locator("html").evaluate(
+        """el => ({
+            crossorigin: el.querySelectorAll('link[crossorigin]').length,
+            links: el.querySelectorAll('link[rel="stylesheet"]').length,
+            noscript: el.querySelectorAll('noscript').length,
+            base: el.querySelectorAll('base[href]').length,
+            body: el.querySelector('#app')?.textContent || '',
+        })"""
+    )
 
     assert state["crossorigin"] == 0, "a CORS-mode stylesheet request is refused here"
     # Dropped the attribute, not the stylesheet.
@@ -93,29 +92,24 @@ async def test_the_rendered_frame_drops_what_would_break_the_capture(
     assert state["body"] == "Hydrated content"
 
 
-@pytest.mark.asyncio
 async def test_the_dom_source_view_still_shows_the_capture_as_stored(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     """That tab is the evidence. Rendering edits must not reach it."""
     db_path, _, scan_id = seeded_db
     page_id = _seed_capture(db_path, scan_id)
     base = live_server[0]
 
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page(viewport={"width": 1280, "height": 900})
-            await page.goto(
-                f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?view=dom",
-                wait_until="domcontentloaded",
-            )
-            # The source view prints one node per line from the capture; the
-            # wording of the stored markup has to survive that unchanged.
-            source = await page.locator('[aria-label="Loaded DOM source"]').inner_text()
-        finally:
-            await browser.close()
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?view=dom",
+        wait_until="domcontentloaded",
+    )
+    # The source view prints one node per line from the capture; the
+    # wording of the stored markup has to survive that unchanged.
+    source = await page.locator('[aria-label="Loaded DOM source"]').inner_text()
 
     assert "crossorigin" in source
     assert "noscript" in source

@@ -3,7 +3,7 @@
 Builds a fresh tmp DB and blob store, seeds them with a few findings, and
 exposes a FastAPI ``TestClient`` so route-level tests don't need a browser.
 Playwright-based tests in ``test_accessibility_axe.py`` use the same seed
-data via a live uvicorn server.
+data via a live uvicorn server, and open their pages with ``new_page``.
 """
 
 from __future__ import annotations
@@ -11,10 +11,12 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
+import pytest_asyncio
 import uvicorn
 from fastapi.testclient import TestClient
 
@@ -23,6 +25,9 @@ from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
 from audit.web.server import create_app
+
+if TYPE_CHECKING:
+    from playwright.async_api import Browser, BrowserContext, Page
 
 
 def _seed(conn: sqlite3.Connection, blob_dir: Path) -> int:
@@ -197,3 +202,44 @@ def live_server(seeded_db: tuple[Path, Path, int]) -> Iterator[tuple[str, int]]:
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def browser() -> AsyncIterator[Browser]:
+    """One Chromium for every test in a module.
+
+    Launching it costs more than many of the tests that use it. Tests reach it
+    through ``new_page``, never directly, so each one still starts from a
+    context of its own. Playwright objects belong to the event loop that
+    created them, so a module using this runs its tests on the module's loop:
+    ``pytest.mark.asyncio(loop_scope="module")``.
+    """
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            yield browser
+        finally:
+            await browser.close()
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def new_page(browser: Browser) -> AsyncIterator[Callable[..., Awaitable[Page]]]:
+    """``Browser.new_page`` for one test: a fresh context per page, closed after.
+
+    Takes the same options, so cookies, storage, permissions, routes and the
+    viewport never carry from one test, or one page, to the next.
+    """
+    contexts: list[BrowserContext] = []
+
+    async def open_page(**options: Any) -> Page:
+        context = await browser.new_context(**options)
+        contexts.append(context)
+        return await context.new_page()
+
+    try:
+        yield open_page
+    finally:
+        for context in contexts:
+            await context.close()
