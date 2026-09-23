@@ -215,6 +215,7 @@ These criteria were not tested. Their expert rationales are part of the evaluati
 | SC | Page | External reference | Expert note |
 |---|---|---|---|
 | 1.1.1 | https://example.org/ | https://evidence.example.org/1-1-1 | Screen reader announced the file name. |
+| 2.4.7 | n/a | n/a | Checked with the keyboard only. |
 
 ## Page hotspots
 

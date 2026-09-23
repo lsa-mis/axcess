@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
-from test_export_goldens import seed_rich_scan
+from support.rich_scan import seed_rich_scan
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "export_diff.py"
 
