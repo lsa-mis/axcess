@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -23,18 +23,6 @@ from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
 from audit.web.server import create_app
-
-_MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
-
-
-def _apply_migrations(conn: sqlite3.Connection) -> None:
-    # Skip *.rollback.sql — those are yoyo-rollback scripts and must not
-    # run as part of forward setup. See the root conftest for the longer
-    # explanation; same issue, same fix.
-    for path in sorted(_MIGRATIONS.glob("*.sql")):
-        if path.name.endswith(".rollback.sql"):
-            continue
-        conn.executescript(path.read_text())
 
 
 def _seed(conn: sqlite3.Connection, blob_dir: Path) -> int:
@@ -162,14 +150,16 @@ def _pixel_png(color: tuple[int, int, int] = (200, 200, 200)) -> bytes:
 
 
 @pytest.fixture
-def seeded_db(tmp_path: Path) -> tuple[Path, Path, int]:
+def seeded_db(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> tuple[Path, Path, int]:
     """Return ``(db_path, blob_dir, scan_id)`` with a seeded schema."""
     db_path = tmp_path / "audit.db"
     blob_dir = tmp_path / "blobs"
     blob_dir.mkdir()
     conn = connect(db_path)
     try:
-        _apply_migrations(conn)
+        migrate_db(conn)
         scan_id = _seed(conn, blob_dir)
     finally:
         conn.close()
