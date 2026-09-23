@@ -32,9 +32,11 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if marker is None:
             continue
         item.add_marker(marker)
+        # A test needs Chromium if it uses a browser fixture, whatever its
+        # module imports, or if its module drives Playwright some other way.
         if path not in imports_playwright:
             imports_playwright[path] = "playwright" in path.read_text(encoding="utf-8")
-        if imports_playwright[path]:
+        if imports_playwright[path] or "browser" in getattr(item, "fixturenames", ()):
             item.add_marker("browser")
     # This hook runs before -m and -k deselect anything, so a run that leaves
     # the browser tests out, like CI's "not browser" job, still refuses one.

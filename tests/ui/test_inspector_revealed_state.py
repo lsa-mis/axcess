@@ -19,8 +19,6 @@ import pytest
 
 from audit.db.schema import connect
 
-pytest.importorskip("playwright.async_api")
-
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]

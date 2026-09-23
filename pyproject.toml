@@ -78,7 +78,7 @@ markers = [
     "integration: end-to-end integration tests (may hit local fixture server; auto-applied under tests/integration)",
     "live_vlm: tests that require a live Ollama instance",
     "ui: FastAPI route and Playwright UI tests (auto-applied under tests/ui)",
-    "browser: module imports Playwright; needs a Chromium install (auto-applied under tests/integration and tests/ui)",
+    "browser: uses a browser fixture or its module imports Playwright; needs a Chromium install (auto-applied under tests/integration and tests/ui)",
 ]
 
 [tool.coverage.run]
