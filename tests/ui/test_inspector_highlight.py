@@ -63,10 +63,14 @@ async def _status(new_page: Any, base: str, scan_id: int, page_id: int, selector
         f"?selector={selector.replace('#', '%23')}"
     )
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(url, wait_until="networkidle")
-    # The highlight pass runs in requestIdleCallback.
-    await page.wait_for_timeout(1500)
-    return await page.locator("body").inner_text()
+    try:
+        await page.goto(url, wait_until="networkidle")
+        # The highlight pass runs in requestIdleCallback.
+        await page.wait_for_timeout(1500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
 async def test_a_start_tag_snippet_finds_its_container(

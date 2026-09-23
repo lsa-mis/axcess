@@ -79,12 +79,16 @@ def _render_violations(violations: list[dict[str, Any]]) -> str:
 async def _axe_clean(new_page: Any, base: str, path: str) -> None:
     """Open a SPA route, wait for React to settle, assert no axe violations."""
     page = await new_page()
-    await page.goto(f"{base}{path}", wait_until="networkidle")
-    # The SPA renders into #main; wait for it to have content so axe
-    # doesn't scan an empty shell.
-    await page.wait_for_selector("main#main *", timeout=5000)
-    violations = await _run_axe(page)
-    assert not violations, f"{path}:\n{_render_violations(violations)}"
+    try:
+        await page.goto(f"{base}{path}", wait_until="networkidle")
+        # The SPA renders into #main; wait for it to have content so axe
+        # doesn't scan an empty shell.
+        await page.wait_for_selector("main#main *", timeout=5000)
+        violations = await _run_axe(page)
+        assert not violations, f"{path}:\n{_render_violations(violations)}"
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
 async def _mock_repeated_review_leads(

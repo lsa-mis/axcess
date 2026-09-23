@@ -67,11 +67,15 @@ async def _inspector_text(new_page: Any, base: str, scan_id: int, page_id: int) 
     """Open the inspector on the unmatchable findings and return its text."""
     url = f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-dialog-name"
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(url, wait_until="networkidle")
-    # The highlight pass runs in requestIdleCallback, so the status
-    # line settles a beat after the document is ready.
-    await page.wait_for_timeout(1500)
-    return await page.locator("body").inner_text()
+    try:
+        await page.goto(url, wait_until="networkidle")
+        # The highlight pass runs in requestIdleCallback, so the status
+        # line settles a beat after the document is ready.
+        await page.wait_for_timeout(1500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
 async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
@@ -181,9 +185,13 @@ async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, s
         "?issue=axe:aria-required-parent&state=" + state
     )
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(url, wait_until="domcontentloaded")
-    await page.wait_for_timeout(2500)
-    return await page.locator("body").inner_text()
+    try:
+        await page.goto(url, wait_until="domcontentloaded")
+        await page.wait_for_timeout(2500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
 async def test_each_state_shows_only_the_occurrences_it_contains(

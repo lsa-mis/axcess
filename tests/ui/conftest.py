@@ -232,7 +232,9 @@ async def new_page(browser: Browser) -> AsyncIterator[Callable[..., Awaitable[Pa
     """``Browser.new_page`` for one test: a fresh context per page, closed after.
 
     Takes the same options, so cookies, storage, permissions, routes and the
-    viewport never carry from one test, or one page, to the next.
+    viewport never carry from one test, or one page, to the next. A helper
+    done with its page may close ``page.context`` itself; closing twice is a
+    no-op.
     """
     contexts: list[BrowserContext] = []
 
