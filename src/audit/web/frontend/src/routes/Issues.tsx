@@ -17,6 +17,7 @@ import { Card, Select, withReturnTrail, type SelectOption } from "../components/
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
+import { TABLE_PAGE_SIZE, TablePagination, usePagedRows } from "../components/TablePagination";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { cn } from "../lib/cn";
 import { useScanQuery } from "../hooks/useScanQuery";
@@ -124,10 +125,10 @@ export default function IssuesRoute() {
                 {siteLabel(scan.seed_url)}
                 {" · "}
                 {rows.length === data.total_unfiltered
-                  ? `${data.total_unfiltered} issue groups`
-                  : `${rows.length} of ${data.total_unfiltered} issue groups`}
+                  ? `${data.total_unfiltered.toLocaleString()} issue groups`
+                  : `${rows.length.toLocaleString()} of ${data.total_unfiltered.toLocaleString()} issue groups`}
                 {" · "}
-                {occurrences} occurrences
+                {occurrences.toLocaleString()} occurrences
               </>
             }
           />
@@ -445,6 +446,8 @@ function IssueTable({
   // has asked for anything; and the table stays sorted by priority with no
   // announcement, as it always has.
   const [announced, setAnnounced] = useState<SortState | null>(null);
+  const paged = usePagedRows(rows, { resetKey: rows.map((row) => row.issue_key).join("\n") });
+  const offset = (paged.page - 1) * TABLE_PAGE_SIZE;
   const choose = (column: SortColumn) => {
     const next: SortState =
       sort.column === column
@@ -476,6 +479,8 @@ function IssueTable({
         tabIndex={0}
         className="overflow-x-auto focus:outline-none focus-visible:shadow-focus"
       >
+      {/* Holds the tallest page's height, so paging never moves the pager. */}
+      <div {...paged.hold}>
       <table className="w-full min-w-[64rem] text-sm">
         <caption className="sr-only">Accessibility issue groups</caption>
         <thead className="bg-surface-muted text-2xs text-fg-subtle">
@@ -542,12 +547,14 @@ function IssueTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <IssueTableRow key={row.issue_key} scanId={scanId} row={row} index={index} />
+          {paged.pageRows.map((row, index) => (
+            <IssueTableRow key={row.issue_key} scanId={scanId} row={row} index={offset + index} />
           ))}
         </tbody>
       </table>
       </div>
+      </div>
+      <TablePagination label="Issues" noun="issue groups" {...paged} />
     </>
   );
 }

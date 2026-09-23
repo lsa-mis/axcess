@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, ScanEye, Search } from "lucide-react";
 import { cn } from "../lib/cn";
+import { TABLE_PAGE_SIZE, TablePagination, usePagedRows } from "./TablePagination";
 import { pageEvidencePath, withReturnTrail } from "./ui";
 import type { IssuePage, IssueRow } from "../api/types";
 
@@ -174,6 +175,8 @@ export default function IssuePagesTable({
     () => sortPages(pages.filter((page) => matches(page, query)), sort),
     [pages, query, sort],
   );
+  const paged = usePagedRows(visible, { resetKey: visible.map((page) => page.page_id).join(",") });
+  const offset = (paged.page - 1) * TABLE_PAGE_SIZE;
 
   const choose = (column: SortColumn) => {
     const next: PagesSort =
@@ -212,9 +215,12 @@ export default function IssuePagesTable({
             : "No pages match that search."}
         </p>
       ) : (
-        // Keyboard users need focus on the overflow region to scroll the table.
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        <>
+        {/* Keyboard users need focus on the overflow region to scroll the table. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
         <div role="region" aria-label="Pages table" tabIndex={0} className="overflow-x-auto focus:outline-none focus-visible:shadow-focus">
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...paged.hold}>
           <table className="w-full min-w-[56rem] text-sm">
             <caption className="sr-only">Pages with the issue {row.title}</caption>
             <thead className="bg-surface-muted text-2xs text-fg-subtle">
@@ -280,7 +286,8 @@ export default function IssuePagesTable({
               </tr>
             </thead>
             <tbody>
-              {visible.map((page, index) => {
+              {paged.pageRows.map((page, rowIndex) => {
+                const index = offset + rowIndex;
                 const label = page.page_title?.trim() || page.page_url;
                 const shots = page.screenshot_hashes.length;
                 const screenshotsPath = withReturnTrail(
@@ -377,7 +384,10 @@ export default function IssuePagesTable({
               })}
             </tbody>
           </table>
+          </div>
         </div>
+        <TablePagination label="Pages with this issue" noun="pages" {...paged} />
+        </>
       )}
     </>
   );

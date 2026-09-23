@@ -28,6 +28,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -188,6 +189,11 @@ function RuleGroupCard({
   scanId: number;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // One table per rule, so the page is kept per card rather than in the URL.
+  const paged = usePagedRows(group.findings, {
+    local: true,
+    resetKey: group.findings.map((f) => f.id).join(","),
+  });
 
   return (
     <Card className="overflow-hidden">
@@ -281,6 +287,8 @@ function RuleGroupCard({
           />
 
           <div className="overflow-x-auto">
+            {/* Holds the tallest page's height, so paging never moves the pager. */}
+            <div {...paged.hold}>
             <table className="w-full text-sm">
               <thead className="bg-surface-muted text-2xs text-fg-subtle">
                 <tr>
@@ -296,12 +304,14 @@ function RuleGroupCard({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {group.findings.map((f) => (
+                {paged.pageRows.map((f) => (
                   <FindingRow key={f.id} finding={f} scanId={scanId} ruleId={group.rule_id} />
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
+          <TablePagination label={`${group.rule_id} findings`} noun="findings" {...paged} />
         </div>
       )}
     </Card>

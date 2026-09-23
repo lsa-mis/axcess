@@ -183,7 +183,7 @@ def _comparison(scan_id: int) -> dict[str, Any]:
         ],
         "total": 51,
         "page": 1,
-        "page_size": 50,
+        "page_size": 10,
     }
 
 
@@ -293,12 +293,12 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
     await next_page.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(
-        page.get_by_text("51 issue groups · Page 2 of 2", exact=True)
+        page.get_by_text("51 issue groups · Page 2 of 6", exact=True)
     ).to_be_visible()
     assert requests[-1]["category"] == ["changed"]
     assert requests[-1]["pipeline"] == ["alfa"]
     assert requests[-1]["page"] == ["2"]
-    assert requests[-1]["page_size"] == ["50"]
+    assert requests[-1]["page_size"] == ["10"]
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -400,19 +400,45 @@ async def test_issue_evidence_trail_names_the_issue(
     await playwright_async.expect(crumb.get_by_text(row["title"], exact=True)).to_have_count(0)
     sub = page.get_by_role("navigation", name="Where you are in Issues")
     await playwright_async.expect(sub.get_by_text(row["title"], exact=True)).to_be_visible()
-    # The list is the issue's parent, and the path alone proves it, so
-    # a deep link lands with the whole trail rather than a gap.
-    # The lit tab is the way back to the list; the sub-trail starts
-    # after it rather than naming Issues a third time on one screen.
-    await playwright_async.expect(sub.get_by_role("link", name="Issues", exact=True)).to_have_count(
-        0
-    )
-    issues = page.get_by_role("navigation", name="Report workspace").get_by_role(
+    # The list is the issue's parent, and the path alone proves it, so a deep
+    # link lands with the whole trail rather than a gap. The sub-trail starts
+    # at Issues, as a link, so the way back is the first step of the path
+    # being read, not only the lit tab above it.
+    steps = sub.get_by_role("listitem").filter(has_text=re.compile(r"\S"))
+    await playwright_async.expect(steps.first).to_have_text("Issues")
+    back = sub.get_by_role("link", name="Issues", exact=True)
+    await playwright_async.expect(back).to_have_count(1)
+    tab = page.get_by_role("navigation", name="Report workspace").get_by_role(
         "link", name="Issues", exact=True
     )
-    await playwright_async.expect(issues).to_have_attribute("aria-current", "page")
-    await issues.click()
+    await playwright_async.expect(tab).to_have_attribute("aria-current", "page")
+    await back.click()
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+
+
+async def test_sub_trail_issues_link_returns_to_the_filtered_list(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The sub-trail's Issues link goes back to the list as the reviewer left it.
+
+    The crumb is the link the list was opened from, so a search typed into
+    the list survives the round trip through an issue.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    query = row["title"].split()[0]
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?q={quote(query)}", wait_until="networkidle")
+    table = page.get_by_role("table", name="Accessibility issue groups")
+    await table.get_by_role("rowheader").get_by_role("link", name=row["title"]).first.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues/[^?]+\?"))
+    sub = page.get_by_role("navigation", name="Where you are in Issues")
+    back = sub.get_by_role("link", name="Issues", exact=True)
+    await playwright_async.expect(back).to_be_visible()
+    await back.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues\?q="))
+    assert parse_qs(urlparse(page.url).query)["q"] == [query]
 
 
 async def test_issue_evidence_page_link_offers_the_way_back(
@@ -528,3 +554,35 @@ async def test_actual_comparison_links_reach_stored_finding(
     await playwright_async.expect(
         page.get_by_role("navigation", name="Where you are in Verify changes")
     ).to_contain_text("Page evidence")
+
+
+async def test_inspector_trail_names_the_page_it_shows(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The inspector's step in the trail is the page's heading.
+
+    It reads ``Page inspector: “<page title>”`` after the issue, and it is
+    the page's only h1: a screen reader's heading list gets that step, then
+    the steps above it as context in words, not the whole trail.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}",
+        wait_until="networkidle",
+    )
+    inspect = page.locator("a[href*='/inspect']").first
+    await playwright_async.expect(inspect).to_be_visible()
+    await inspect.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+/inspect\?"))
+    sub = page.get_by_role("navigation", name="Where you are in Issues")
+    heading = sub.get_by_role("heading", level=1)
+    await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
+    await playwright_async.expect(heading).to_have_attribute("aria-current", "page")
+    await playwright_async.expect(heading).to_contain_text(re.compile(r"^Page inspector: “.+”"))
+    await playwright_async.expect(heading).to_contain_text(f", in Issues, {row['title']}")
+    for step in ("Issues", row["title"]):
+        link = sub.get_by_role("link", name=step, exact=True)
+        await playwright_async.expect(link).to_be_visible()

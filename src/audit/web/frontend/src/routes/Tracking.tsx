@@ -4,6 +4,7 @@ import Tabs from "../components/Tabs";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { Card, EmptyState, PageHeader } from "../components/ui";
 import type {
   CoverageMethod,
@@ -106,6 +107,12 @@ export default function TrackingRoute() {
   ]
     .filter(Boolean)
     .join(" · ");
+  const criteria = usePagedRows(rows, { resetKey: rows.map((row) => row.key).join(",") });
+  const shipped = data?.shipped ?? [];
+  const pipelines = usePagedRows(shipped, {
+    param: "pipelinesPage",
+    resetKey: shipped.map((p) => p.pipeline).join(","),
+  });
 
   return (
     <>
@@ -198,6 +205,8 @@ export default function TrackingRoute() {
 
         <div id="tracker-content">
           <Card className="overflow-x-auto">
+            {/* Holds the tallest page's height, so paging never moves the pager. */}
+            <div {...criteria.hold}>
             <table className="w-full text-sm">
               <caption className="sr-only">
                 WCAG 2.2 A/AA coverage and AI roadmap
@@ -214,7 +223,7 @@ export default function TrackingRoute() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border align-top">
-                {rows.map((row) => (
+                {criteria.pageRows.map((row) => (
                   <tr key={row.key} className="hover:bg-surface-muted/60">
                     <th
                       scope="row"
@@ -239,6 +248,8 @@ export default function TrackingRoute() {
                 ))}
               </tbody>
             </table>
+            </div>
+            <TablePagination label="Criteria" noun="criteria" {...criteria} />
           </Card>
           {!isLoading && rows.length === 0 && (
             <EmptyState
@@ -261,6 +272,8 @@ export default function TrackingRoute() {
           (no Ollama); the {aiCount} AI pipelines need a local Ollama daemon.
         </p>
         <Card className="overflow-x-auto">
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...pipelines.hold}>
           <table className="w-full text-sm">
             <caption className="sr-only">
               Detection pipelines that run on a default crawl
@@ -281,7 +294,7 @@ export default function TrackingRoute() {
                   </td>
                 </tr>
               )}
-              {data?.shipped.map((p) => (
+              {pipelines.pageRows.map((p) => (
                 <tr key={p.pipeline} className="hover:bg-surface-muted/60">
                   <th scope="row" className="px-4 py-3 text-left font-medium text-fg">
                     {p.name}{" "}
@@ -311,6 +324,8 @@ export default function TrackingRoute() {
               ))}
             </tbody>
           </table>
+          </div>
+          <TablePagination label="Detection pipelines" noun="pipelines" {...pipelines} />
         </Card>
       </section>
 

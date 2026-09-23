@@ -38,8 +38,18 @@ export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
-/** One link in the trail. `issue` is set when the label should be that issue's title. */
-export type Crumb = { label: string; to: string; issue?: { scanId: number; key: string } };
+/**
+ * One link in the trail. `issue` is set when the label should be that issue's
+ * title; `page` when the step also names the page it shows (`detail`, the
+ * page's title once it has loaded).
+ */
+export type Crumb = {
+  label: string;
+  to: string;
+  issue?: { scanId: number; key: string };
+  page?: { scanId: number; pageId: number };
+  detail?: string;
+};
 
 /** An in-app absolute path, or null. `<Link to>` follows a full URL off-site,
  *  which would let a crafted link put an attacker's destination inside the
@@ -180,6 +190,10 @@ function trailFor(
     const query = params.toString();
     const self: Crumb = { label: match.view, to: `${pathname}${query ? `?${query}` : ""}` };
     if (onIssueItself && issueKey && scanId != null) self.issue = { scanId, key: issueKey };
+    // The inspector and page evidence say which page they show, so the trail
+    // carries the page's title and the view needs no second heading for it.
+    const inspected = Number(pathname.match(/^\/scans\/\d+\/pages\/(\d+)(?:\/inspect)?\/?$/)?.[1]);
+    if (scanId != null && Number.isFinite(inspected)) self.page = { scanId, pageId: inspected };
     add(self);
   }
   return chain;
@@ -217,12 +231,34 @@ export function useReportTrail(): {
     const index = distinct.findIndex((other) => other.scanId === issue.scanId && other.key === issue.key);
     return titleQueries[index]?.data?.row.title ?? null;
   };
+  // The page a step shows. Same key as the inspector's own page-evidence
+  // query, so on that route this is a cache hit, not a second request.
+  const pages = trail.flatMap((crumb) => (crumb.page ? [crumb.page] : []));
+  const pageQueries = useQueries({
+    queries: pages.map((page) => ({
+      queryKey: ["page-evidence", page.scanId, page.pageId],
+      queryFn: () => api.getPageEvidence(page.scanId, page.pageId),
+      enabled: match != null,
+    })),
+  });
+  const pageNameOf = (page: { scanId: number; pageId: number }): string | null => {
+    const index = pages.findIndex((other) => other.scanId === page.scanId && other.pageId === page.pageId);
+    const record = pageQueries[index]?.data?.page;
+    return record ? record.title || record.url_normalized : null;
+  };
   // Until a title lands the key (or the link's own label) holds the place, so
   // the trail is never empty and never jumps in length twice.
   const labelled = trail.map((crumb) => {
-    if (!crumb.issue) return crumb;
-    const title = titleOf(crumb.issue);
-    return title ? { ...crumb, label: title } : crumb;
+    let next = crumb;
+    if (crumb.issue) {
+      const title = titleOf(crumb.issue);
+      if (title) next = { ...next, label: title };
+    }
+    if (crumb.page) {
+      const name = pageNameOf(crumb.page);
+      if (name) next = { ...next, detail: name };
+    }
+    return next;
   });
   return { match, trail: labelled };
 }

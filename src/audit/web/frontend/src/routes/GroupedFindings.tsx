@@ -19,6 +19,7 @@ import type {
   FindingsGroup,
   GroupedFinding,
 } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -346,8 +347,13 @@ function BulkStatusBar({
 }
 
 function FindingsInGroup({ findings }: { findings: GroupedFinding[] }) {
+  // One table per group, so the page is kept per group rather than in the URL.
+  const paged = usePagedRows(findings, { local: true, resetKey: findings.map((f) => f.id).join(",") });
   return (
+    <>
     <div className="overflow-x-auto">
+      {/* Holds the tallest page's height, so paging never moves the pager. */}
+      <div {...paged.hold}>
       <table className="w-full text-sm">
         <thead className="bg-surface-muted text-2xs text-fg-subtle">
           <tr>
@@ -369,12 +375,15 @@ function FindingsInGroup({ findings }: { findings: GroupedFinding[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {findings.map((f) => (
+          {paged.pageRows.map((f) => (
             <FindingRow key={f.id} finding={f} />
           ))}
         </tbody>
       </table>
+      </div>
     </div>
+    <TablePagination label="Images in this group" noun="images" {...paged} />
+    </>
   );
 }
 

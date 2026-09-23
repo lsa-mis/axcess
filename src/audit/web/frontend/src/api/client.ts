@@ -339,7 +339,8 @@ export const api = {
     pipeline?: string;
     page?: number;
   } = {}) => {
-    const params = new URLSearchParams({ page: String(filter.page ?? 1), page_size: "50" });
+    // Ten rows a page, like every table in the app (TABLE_PAGE_SIZE).
+    const params = new URLSearchParams({ page: String(filter.page ?? 1), page_size: "10" });
     if (filter.compare_to !== undefined) params.set("compare_to", String(filter.compare_to));
     if (filter.category) params.set("category", filter.category);
     if (filter.pipeline) params.set("pipeline", filter.pipeline);
