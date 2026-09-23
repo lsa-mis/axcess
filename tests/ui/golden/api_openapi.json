@@ -1,0 +1,2100 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Axcess", "version": "0.1.0"},
+  "paths": {
+    "/api/protected-scans": {
+      "get": {
+        "summary": "List Protected Scans",
+        "description": "List only the current proxy subject's non-sensitive reports.\n\nProtected reports are intentionally omitted from the public scan list.\nThis separate list exposes no seed, owner, origin, evidence, or\ncompanion state—only enough information to resume the protected\nworkflow after the SPA is reloaded.",
+        "operationId": "list_protected_scans_api_protected_scans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Protected Scans Api Protected Scans Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Scan",
+        "operationId": "create_scan_api_protected_scans_post",
+        "requestBody": {
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProtectedScanRequest"}}},
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Scan Api Protected Scans Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/identity-context": {
+      "get": {
+        "summary": "Protected Identity Context",
+        "description": "Return a non-reversible cache partition for the current proxy user.\n\nThis endpoint deliberately appears before ``/{scan_id}`` so the\nstatic path cannot be interpreted as a malformed scan identifier.\nIt returns neither a proxy subject nor any report metadata.",
+        "operationId": "protected_identity_context_api_protected_scans_identity_context_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}": {
+      "get": {
+        "summary": "Get Scan",
+        "operationId": "get_scan_api_protected_scans__scan_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Scan Api Protected Scans  Scan Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/issue-index": {
+      "get": {
+        "summary": "Protected Issue Index",
+        "description": "Return a grouped, page-anonymous index for protected review.",
+        "operationId": "protected_issue_index_api_protected_scans__scan_id__issue_index_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Protected Issue Index Api Protected Scans  Scan Id  Issue Index Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/manual-checks": {
+      "get": {
+        "summary": "List Protected Manual Checks",
+        "description": "List outcome-only WCAG manual review state for one protected scan.\n\nCriterion guidance is static product content. The response deliberately\nexcludes result IDs, rationale, page references, evidence URLs, and\nevidence notes, which are not safe to retain through the public\nevaluation tables for a protected report.",
+        "operationId": "list_protected_manual_checks_api_protected_scans__scan_id__manual_checks_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response List Protected Manual Checks Api Protected Scans  Scan Id  Manual Checks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/manual-checks/{criterion_sc}": {
+      "patch": {
+        "summary": "Update Protected Manual Check",
+        "description": "Persist a bounded result without accepting protected narrative.\n\nA manual authentication review may be recorded before, during, or\nafter the companion crawl: supporting a post-MFA crawl is never an\nautomatic verdict on WCAG 2.2 SC 3.3.8. The v1 protected API does not\naccept detailed evidence or attachment uploads.",
+        "operationId": "update_protected_manual_check_api_protected_scans__scan_id__manual_checks__criterion_sc__patch",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "criterion_sc",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Criterion Sc"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/ProtectedManualCheckUpdate"}}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Protected Manual Check Api Protected Scans  Scan Id  Manual Checks  Criterion Sc  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/exports/redacted": {
+      "post": {
+        "summary": "Export Redacted Report",
+        "description": "Download one explicitly requested, redacted protected summary.\n\nThe normal export collectors intentionally remain unavailable for\nprotected scans: they can include raw page evidence.  This operation\nreads only the bounded ordinary issue index and returns Markdown\ndirectly from memory.  No generated export is persisted on the host.",
+        "operationId": "export_redacted_report_api_protected_scans__scan_id__exports_redacted_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/agent-enrollments": {
+      "post": {
+        "summary": "Create Enrollment",
+        "operationId": "create_enrollment_api_protected_scans__scan_id__agent_enrollments_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentEnrollmentRequest"}}}
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Create Enrollment Api Protected Scans  Scan Id  Agent Enrollments Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/companion": {
+      "get": {
+        "summary": "Get Companion",
+        "description": "Return only non-secret re-run information for the paired computer.\n\nA session can expire long after the one-time pairing code disappears\nfrom the browser. The existing scan-bound certificate is the correct\nway to re-authenticate, so this avoids minting a second pairing secret\nmerely to rediscover an enrollment id. It never returns a pairing\nverifier/code, certificate fingerprint, target URL, or work item.",
+        "operationId": "get_companion_api_protected_scans__scan_id__companion_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Companion Api Protected Scans  Scan Id  Companion Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/companion-start": {
+      "post": {
+        "summary": "Companion Start",
+        "operationId": "companion_start_api_protected_scans__scan_id__companion_start_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Companion Start Api Protected Scans  Scan Id  Companion Start Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/protected-scans/{scan_id}/stop": {
+      "post": {
+        "summary": "Stop Protected Scan",
+        "description": "Explicit owner stop; invalidate the paired companion immediately.",
+        "operationId": "stop_protected_scan_api_protected_scans__scan_id__stop_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Stop Protected Scan Api Protected Scans  Scan Id  Stop Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/agents/enroll": {
+      "post": {
+        "summary": "Claim Enrollment",
+        "operationId": "claim_enrollment_api_agents_enroll_post",
+        "requestBody": {
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentClaimRequest"}}},
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Claim Enrollment Api Agents Enroll Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/agents/{enrollment_id}/work": {
+      "get": {
+        "summary": "Agent Work",
+        "operationId": "agent_work_api_agents__enrollment_id__work_get",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Enrollment Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Agent Work Api Agents  Enrollment Id  Work Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/agents/{enrollment_id}/heartbeat": {
+      "post": {
+        "summary": "Agent Heartbeat",
+        "operationId": "agent_heartbeat_api_agents__enrollment_id__heartbeat_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Enrollment Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentHeartbeatRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Agent Heartbeat Api Agents  Enrollment Id  Heartbeat Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/agents/{enrollment_id}/events": {
+      "post": {
+        "summary": "Agent Event",
+        "operationId": "agent_event_api_agents__enrollment_id__events_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Enrollment Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentEventRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Agent Event Api Agents  Enrollment Id  Events Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/agents/{enrollment_id}/artifacts": {
+      "post": {
+        "summary": "Agent Artifact",
+        "description": "Reject companion artifact uploads in the v1 protected workflow.\n\nA paired process cannot self-certify arbitrary bytes as \"reviewed and\nredacted.\" Leaving this endpoint writable would make a compromised or\nstale certificate a path for raw screenshots, DOM data, or disk\nexhaustion. The v1 protected workflow therefore retains no uploads;\nredacted exports are browser-authorized, generated in memory, and\ndelivered without server-side files.",
+        "operationId": "agent_artifact_api_agents__enrollment_id__artifacts_post",
+        "parameters": [
+          {
+            "name": "enrollment_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Enrollment Id"}
+          }
+        ],
+        "responses": {
+          "403": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {"type": "string"},
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/app/favicon.svg": {
+      "get": {
+        "summary": "Favicon",
+        "description": "Serve the brand favicon as SVG.\n\nThree paths because browsers, tooling, and Vite are inconsistent:\n\n* ``/favicon.svg``, modern browsers honor the ``<link rel=\"icon\">``\n  tag in the Jinja base template.\n* ``/favicon.ico``, devtools, screenshot pipelines, and a handful\n  of older clients still poke this URL from the root regardless of\n  the link tag. Every browser we care about accepts an SVG payload\n  at the ``.ico`` path.\n* ``/app/favicon.svg``, the SPA's index.html ships with\n  ``base: \"/app/\"`` (vite.config.ts), so Vite rewrites\n  ``href=\"/favicon.svg\"`` to ``href=\"/app/favicon.svg\"`` at build\n  time. We mirror the route under that prefix so the SPA tab\n  icon resolves without an extra static mount or a build hack.\n\nAll three URLs return the same SVG with ``image/svg+xml``. One\nsource file, three callable paths.",
+        "operationId": "favicon_app_favicon_svg_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/favicon.ico": {
+      "get": {
+        "summary": "Favicon",
+        "description": "Serve the brand favicon as SVG.\n\nThree paths because browsers, tooling, and Vite are inconsistent:\n\n* ``/favicon.svg``, modern browsers honor the ``<link rel=\"icon\">``\n  tag in the Jinja base template.\n* ``/favicon.ico``, devtools, screenshot pipelines, and a handful\n  of older clients still poke this URL from the root regardless of\n  the link tag. Every browser we care about accepts an SVG payload\n  at the ``.ico`` path.\n* ``/app/favicon.svg``, the SPA's index.html ships with\n  ``base: \"/app/\"`` (vite.config.ts), so Vite rewrites\n  ``href=\"/favicon.svg\"`` to ``href=\"/app/favicon.svg\"`` at build\n  time. We mirror the route under that prefix so the SPA tab\n  icon resolves without an extra static mount or a build hack.\n\nAll three URLs return the same SVG with ``image/svg+xml``. One\nsource file, three callable paths.",
+        "operationId": "favicon_favicon_ico_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/favicon.svg": {
+      "get": {
+        "summary": "Favicon",
+        "description": "Serve the brand favicon as SVG.\n\nThree paths because browsers, tooling, and Vite are inconsistent:\n\n* ``/favicon.svg``, modern browsers honor the ``<link rel=\"icon\">``\n  tag in the Jinja base template.\n* ``/favicon.ico``, devtools, screenshot pipelines, and a handful\n  of older clients still poke this URL from the root regardless of\n  the link tag. Every browser we care about accepts an SVG payload\n  at the ``.ico`` path.\n* ``/app/favicon.svg``, the SPA's index.html ships with\n  ``base: \"/app/\"`` (vite.config.ts), so Vite rewrites\n  ``href=\"/favicon.svg\"`` to ``href=\"/app/favicon.svg\"`` at build\n  time. We mirror the route under that prefix so the SPA tab\n  icon resolves without an extra static mount or a build hack.\n\nAll three URLs return the same SVG with ``image/svg+xml``. One\nsource file, three callable paths.",
+        "operationId": "favicon_favicon_svg_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/scans": {
+      "get": {
+        "summary": "Api List Scans",
+        "operationId": "api_list_scans_api_scans_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      },
+      "post": {
+        "summary": "Api Create Scan",
+        "description": "Kick off a crawl. Body mirrors the new-scan form fields.",
+        "operationId": "api_create_scan_api_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {"schema": {"additionalProperties": true, "type": "object", "title": "Body"}}
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}": {
+      "get": {
+        "summary": "Api Scan Detail",
+        "operationId": "api_scan_detail_api_scans__scan_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      },
+      "delete": {
+        "summary": "Api Delete Scan",
+        "description": "Permanently delete a scan and everything it owns.\n\nCascades take care of the obvious children (pages, page_images,\nfindings, finding_history) via the FK declarations in\n0001_initial_schema.sql. Two things they don't cover and we have\nto handle ourselves:\n\n* ``images.first_seen_scan_id`` has no ``ON DELETE`` action, if\n  left pointing at a doomed scan, the DELETE FK-violates. We NULL\n  it instead of cascading because images are dedupe'd by\n  ``content_hash`` and may be referenced by later scans; losing\n  the image row would orphan blobs and break diff history.\n* ``jobs`` rows aren't FK-bound (``scan_id`` lives inside\n  ``payload_json``), so they need an explicit DELETE keyed on\n  ``json_extract``, same trick the cancel endpoint uses.\n\nWe refuse to delete a currently-running scan: the live asyncio\ntask would keep writing rows after the DELETE, leaving\nhalf-resurrected state. Caller must cancel first, then delete.",
+        "operationId": "api_delete_scan_api_scans__scan_id__delete",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/capabilities/alfa": {
+      "get": {
+        "summary": "Api Alfa Capability",
+        "description": "Expose only local runner readiness for the new-scan form.",
+        "operationId": "api_alfa_capability_api_capabilities_alfa_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/capabilities/local-analysis": {
+      "get": {
+        "summary": "Api Local Analysis Capability",
+        "description": "Report bundled OCR and local Ollama readiness without model downloads.\n\nMerely opening the scan form must never pull a model or start an\nanalyzer.  This endpoint performs one short read-only Ollama tags\nrequest and returns only model names/sizes already present locally.",
+        "operationId": "api_local_analysis_capability_api_capabilities_local_analysis_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/capabilities/protected-scans": {
+      "get": {
+        "summary": "Api Protected Scan Capability",
+        "description": "Describe manual sign-in readiness without exposing deployment secrets.",
+        "operationId": "api_protected_scan_capability_api_capabilities_protected_scans_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/local-login-scans": {
+      "post": {
+        "summary": "Api Create Local Login Scan",
+        "description": "Open a headed, memory-only login browser on the Axcess computer.\n\nThis is the direct local equivalent of the reference crawler's\n``requires login`` mode. Unlike that implementation it does not use a\nmarker file or serialize ``storageState``; the subsequent crawl uses\nthe same live Playwright context.",
+        "operationId": "api_create_local_login_scan_api_local_login_scans_post",
+        "requestBody": {
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalLoginScanRequest"}}},
+          "required": true
+        },
+        "responses": {
+          "201": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-login-scans/{scan_id}": {
+      "get": {
+        "summary": "Api Local Login Scan Status",
+        "description": "Return operational state only; never browser URLs or session data.",
+        "operationId": "api_local_login_scan_status_api_local_login_scans__scan_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-login-scans/{scan_id}/confirm": {
+      "post": {
+        "summary": "Api Confirm Local Login",
+        "description": "Human confirmation signal; the server independently verifies target scope.",
+        "operationId": "api_confirm_local_login_api_local_login_scans__scan_id__confirm_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Scan",
+        "operationId": "api_cancel_scan_api_scans__scan_id__cancel_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/evaluation": {
+      "get": {
+        "summary": "Api Get Evaluation",
+        "description": "Return expert-review metadata without mutating the scan record.",
+        "operationId": "api_get_evaluation_api_scans__scan_id__evaluation_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      },
+      "put": {
+        "summary": "Api Put Evaluation",
+        "description": "Persist the human-authored evaluation context for a completed scan.",
+        "operationId": "api_put_evaluation_api_scans__scan_id__evaluation_put",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EvaluationUpdate"}}}
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/manual-checks": {
+      "get": {
+        "summary": "Api List Manual Checks",
+        "description": "Return the full WCAG 2.2 A/AA expert-review matrix for a report.",
+        "operationId": "api_list_manual_checks_api_scans__scan_id__manual_checks_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/manual-checks/{criterion_sc}": {
+      "patch": {
+        "summary": "Api Update Manual Check",
+        "operationId": "api_update_manual_check_api_scans__scan_id__manual_checks__criterion_sc__patch",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "criterion_sc",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Criterion Sc"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ManualCheckUpdate"}}}
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/manual-checks/{criterion_sc}/evidence": {
+      "post": {
+        "summary": "Api Add Manual Evidence",
+        "operationId": "api_add_manual_evidence_api_scans__scan_id__manual_checks__criterion_sc__evidence_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "criterion_sc",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Criterion Sc"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ManualEvidenceCreate"}}}
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/pages/{page_id}": {
+      "get": {
+        "summary": "Api Page Evidence",
+        "description": "Return page evidence only when the page belongs to this report.",
+        "operationId": "api_page_evidence_api_scans__scan_id__pages__page_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/pages/{page_id}/inspect": {
+      "get": {
+        "summary": "Api Page Inspect",
+        "description": "Rendered page + DOM for the Page/DOM inspector.\n\nScan-scoped and read-only on the report: refuses running / failed /\ninterrupted scans, login-protected reports, and any target outside the\nscan's recorded scope. Serves the rendered document persisted at scan\ntime when present; otherwise (a predating scan, an over-bound page, or\na scan configured not to store rendered pages) it loads that single\npage once in a throwaway headless Chromium and returns its rendered\nDOM. Nothing is stored by this route, the issue highlight is applied\nclient-side as a CSS outline. The only live fetch is of a URL the scan\nalready recorded, and this route sits behind the existing\naccess-token gate.\n\n``?state=`` asks for one of the DOM states the interaction probe\ncaptured rather than the page as it loaded. It is bounded to the\nprobe's own label cap, since anything longer cannot be a key it wrote.",
+        "operationId": "api_page_inspect_api_scans__scan_id__pages__page_id__inspect_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "State"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/findings": {
+      "get": {
+        "summary": "Api List Findings",
+        "operationId": "api_list_findings_api_scans__scan_id__findings_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Severity"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Status"}
+          },
+          {
+            "name": "classification",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Classification"}
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Q"}
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 1, "default": 1, "title": "Page"}
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 500, "minimum": 1, "default": 50, "title": "Page Size"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/issues/{issue_key}": {
+      "get": {
+        "summary": "Api Scan Issue Detail",
+        "description": "JSON form of the per-issue detail, used by the SPA.",
+        "operationId": "api_scan_issue_detail_api_scans__scan_id__issues__issue_key__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "issue_key",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Issue Key"}
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "occurrences_desc", "title": "Sort"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/issues": {
+      "get": {
+        "summary": "Api Scan Issues",
+        "description": "JSON form of the unified Issues list, used by the SPA.",
+        "operationId": "api_scan_issues_api_scans__scan_id__issues_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "conformance",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Conformance"}
+          },
+          {
+            "name": "responsibility",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Responsibility"}
+          },
+          {
+            "name": "abilities",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Abilities"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Status"}
+          },
+          {
+            "name": "review_lane",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Review Lane"}
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Q"}
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "priority_desc", "title": "Sort"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/a11y/by-rule": {
+      "get": {
+        "summary": "Api Scan A11Y By Rule",
+        "description": "JSON form of the per-rule rollup. Used by the SPA.",
+        "operationId": "api_scan_a11y_by_rule_api_scans__scan_id__a11y_by_rule_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Status"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/a11y": {
+      "get": {
+        "summary": "Api Scan A11Y",
+        "description": "Roll-up of source-attributed DOM-engine WCAG findings by SC and level.\n\nShape:\n\n    {\n        \"coverage\": {pages_total, axe_pages_scanned, alfa_pages_scanned, ...},\n        \"by_level\": {\"A\": n, \"AA\": n, \"AAA\": n, \"best_practice\": n},\n        \"by_impact\": {\"critical\": n, \"serious\": n, ...},\n        \"by_status\": {\"new\": n, \"reviewing\": n, ...},\n        \"groups\": [{ wcag_sc, wcag_level, violation_count,\n                     page_count, worst_impact,\n                     rules: [{ pipeline, rule_id, impact, help, help_url,\n                               violation_count, page_count }] }]\n    }",
+        "operationId": "api_scan_a11y_api_scans__scan_id__a11y_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/a11y/findings": {
+      "get": {
+        "summary": "Api Scan A11Y Findings",
+        "description": "Drill-down list for a single WCAG SC (or null = best-practice).\n\nOptional ``status`` filter mirrors the Jinja side, pass a\nstatus name to hide already-handled findings; omit (or pass\nempty) for all rows.",
+        "operationId": "api_scan_a11y_findings_api_scans__scan_id__a11y_findings_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "wcag_sc",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Wcag Sc"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Status"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 1000, "minimum": 1, "default": 200, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/findings/{finding_id}": {
+      "get": {
+        "summary": "Api Finding Detail",
+        "operationId": "api_finding_detail_api_findings__finding_id__get",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Finding Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/findings/grouped": {
+      "get": {
+        "summary": "Api Scan Findings Grouped",
+        "description": "Image findings grouped by ``(classification, alt_adequacy)``.\n\nMirrors the Jinja roll-up at ``/scans/{id}/findings/grouped``.\nEach group carries its shared remediation hint, a severity +\nstatus breakdown, and an ordered list of contained findings\nwith their occurrences attached. ``status`` narrows to one\ntriage state; empty means all.",
+        "operationId": "api_scan_findings_grouped_api_scans__scan_id__findings_grouped_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Status"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/findings/{finding_id}/status": {
+      "post": {
+        "summary": "Api Set Finding Status",
+        "operationId": "api_set_finding_status_api_findings__finding_id__status_post",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Finding Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Body"}}
+          }
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/findings/bulk-status": {
+      "post": {
+        "summary": "Api Bulk Set Finding Status",
+        "description": "Update many image-of-text findings at once.\n\nBody: ``{\"finding_ids\": [1, 2, 3], \"status\": \"accepted_risk\"}``.\n\nDesigned for the grouped-by-issue view: every finding in a group\nshares one remediation hint, so the natural operator move is\n\"all 96 of these are accepted_risk.\" A loop of per-row POSTs\nworks but burns a request per finding and produces N rerenders;\none transaction here is the right shape.",
+        "operationId": "api_bulk_set_finding_status_api_findings_bulk_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {"schema": {"additionalProperties": true, "type": "object", "title": "Body"}}
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/a11y-findings/bulk-status": {
+      "post": {
+        "summary": "Api Bulk Set A11Y Finding Status",
+        "description": "Update many WCAG axe findings at once. See bulk-findings doc.",
+        "operationId": "api_bulk_set_a11y_finding_status_api_a11y_findings_bulk_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {"schema": {"additionalProperties": true, "type": "object", "title": "Body"}}
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/a11y-findings/{finding_id}/status": {
+      "post": {
+        "summary": "Api Set A11Y Finding Status",
+        "description": "Update a WCAG axe finding's triage status.\n\nMirrors ``api_set_finding_status`` (image-of-text findings) but\ntargets ``page_a11y_findings``. We deliberately reuse the same\nstatus enum so the SPA's StatusChip / shortcuts work without a\nsecond vocabulary.\n\nMigration 0019 gives page-scoped findings the same durable status\ndecision trail as image findings. Decisive dispositions require a\nbounded rationale; workflow-only transitions remain compatible with\nolder callers that send only ``status``.",
+        "operationId": "api_set_a11y_finding_status_api_a11y_findings__finding_id__status_post",
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Finding Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {"schema": {"type": "object", "additionalProperties": true, "title": "Body"}}
+          }
+        },
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/comparison": {
+      "get": {
+        "summary": "Api Scan Comparison",
+        "operationId": "api_scan_comparison_api_scans__scan_id__comparison_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "compare_to",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}], "title": "Compare To"}
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 1, "default": 1, "title": "Page"}
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 50, "title": "Page Size"}
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"],
+                  "type": "string"
+                },
+                {"type": "null"}
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "pipeline",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+                  "type": "string"
+                },
+                {"type": "null"}
+              ],
+              "title": "Pipeline"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComparisonResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/diff": {
+      "get": {
+        "summary": "Api Scan Diff",
+        "operationId": "api_scan_diff_api_scans__scan_id__diff_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "compare_to",
+            "in": "query",
+            "required": true,
+            "schema": {"type": "integer", "title": "Compare To"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scope-preview": {
+      "get": {
+        "summary": "Api Scope Preview",
+        "operationId": "api_scope_preview_api_scope_preview_get",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Url"}
+          },
+          {
+            "name": "whole_host",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Whole Host"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/tracking": {
+      "get": {
+        "summary": "Api Tracking",
+        "description": "Coverage & feature tracker data for the SPA /tracking page.\n\nPipeline/roadmap data comes from ``coverage_status``; the per-WCAG\ncoverage breakdown comes from the ``coverage_matrix`` (the\nauthoritative A/AA source of truth). Both drive the page directly\nso it can't drift from the code.",
+        "operationId": "api_tracking_api_tracking_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/scans/{scan_id}/export/{fmt}": {
+      "get": {
+        "summary": "Export Scan",
+        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit.",
+        "operationId": "export_scan_api_scans__scan_id__export__fmt__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "fmt",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Fmt"}
+          },
+          {
+            "name": "draft",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{"type": "string"}, {"type": "null"}],
+              "description": "Set exactly to 'acknowledged' to download an incomplete expert evaluation as a visibly labeled draft.",
+              "title": "Draft"
+            },
+            "description": "Set exactly to 'acknowledged' to download an incomplete expert evaluation as a visibly labeled draft."
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/blobs/{content_hash}": {
+      "get": {
+        "summary": "Serve Blob",
+        "description": "Serve an image blob by content hash. Hash format is validated.",
+        "operationId": "serve_blob_blobs__content_hash__get",
+        "parameters": [
+          {
+            "name": "content_hash",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Content Hash"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentClaimRequest": {
+        "properties": {
+          "enrollment_id": {"type": "string", "maxLength": 64, "minLength": 8, "title": "Enrollment Id"},
+          "pairing_code": {"type": "string", "maxLength": 256, "minLength": 16, "title": "Pairing Code"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["enrollment_id", "pairing_code"],
+        "title": "AgentClaimRequest"
+      },
+      "AgentEnrollmentRequest": {
+        "properties": {
+          "certificate_fingerprint": {"type": "string", "maxLength": 128, "minLength": 64, "title": "Certificate Fingerprint"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["certificate_fingerprint"],
+        "title": "AgentEnrollmentRequest",
+        "description": "Browser-approved fingerprint for the one companion that may pair."
+      },
+      "AgentEventRequest": {
+        "properties": {
+          "event_type": {"type": "string", "maxLength": 64, "minLength": 1, "title": "Event Type"},
+          "run_lease_id": {"type": "string", "maxLength": 200, "minLength": 24, "title": "Run Lease Id"},
+          "status": {"anyOf": [{"$ref": "#/components/schemas/ProtectedScanStatus"}, {"type": "null"}]},
+          "details": {
+            "additionalProperties": {
+              "anyOf": [
+                {"type": "string"},
+                {"type": "integer"},
+                {"type": "number"},
+                {"type": "boolean"},
+                {"type": "null"}
+              ]
+            },
+            "type": "object",
+            "title": "Details"
+          },
+          "page_index": {"anyOf": [{"$ref": "#/components/schemas/ProtectedPageIndex"}, {"type": "null"}]}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["event_type", "run_lease_id"],
+        "title": "AgentEventRequest"
+      },
+      "AgentHeartbeatRequest": {
+        "properties": {
+          "run_lease_id": {"type": "string", "maxLength": 200, "minLength": 24, "title": "Run Lease Id"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["run_lease_id"],
+        "title": "AgentHeartbeatRequest",
+        "description": "Opaque lease presentation for a companion liveness heartbeat."
+      },
+      "ComparisonResponse": {
+        "properties": {
+          "current": {"$ref": "#/components/schemas/ReportIdentity"},
+          "baseline": {"anyOf": [{"$ref": "#/components/schemas/ReportIdentity"}, {"type": "null"}]},
+          "counts": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Counts"},
+          "pipeline_counts": {
+            "additionalProperties": {"type": "integer"},
+            "type": "object",
+            "title": "Pipeline Counts"
+          },
+          "coverage": {
+            "items": {"$ref": "#/components/schemas/CoveragePair"},
+            "type": "array",
+            "title": "Coverage"
+          },
+          "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"},
+          "rows": {
+            "items": {"$ref": "#/components/schemas/ComparisonRow"},
+            "type": "array",
+            "maxItems": 50,
+            "title": "Rows"
+          },
+          "total": {"type": "integer", "title": "Total"},
+          "page": {"type": "integer", "title": "Page"},
+          "page_size": {"type": "integer", "title": "Page Size"}
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "baseline",
+          "counts",
+          "pipeline_counts",
+          "limitations",
+          "rows",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "ComparisonResponse"
+      },
+      "ComparisonRow": {
+        "properties": {
+          "key": {"type": "string", "title": "Key"},
+          "pipeline": {
+            "type": "string",
+            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "title": "Pipeline"
+          },
+          "title": {"type": "string", "title": "Title"},
+          "category": {
+            "type": "string",
+            "enum": ["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"],
+            "title": "Category"
+          },
+          "before": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
+          "after": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
+          "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"}
+        },
+        "type": "object",
+        "required": ["key", "pipeline", "title", "category", "before", "after", "limitations"],
+        "title": "ComparisonRow"
+      },
+      "CoveragePair": {
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "title": "Pipeline"
+          },
+          "before": {"$ref": "#/components/schemas/MethodCoverage"},
+          "after": {"$ref": "#/components/schemas/MethodCoverage"}
+        },
+        "type": "object",
+        "required": ["pipeline", "before", "after"],
+        "title": "CoveragePair"
+      },
+      "DataClassification": {
+        "type": "string",
+        "enum": ["internal", "sensitive", "restricted"],
+        "title": "DataClassification",
+        "description": "Minimal data labels for protected scan approval records."
+      },
+      "EvaluationUpdate": {
+        "properties": {
+          "target_standard": {
+            "anyOf": [{"type": "string", "maxLength": 64}, {"type": "null"}],
+            "title": "Target Standard"
+          },
+          "target_level": {
+            "anyOf": [{"type": "string", "enum": ["A", "AA", "AAA"]}, {"type": "null"}],
+            "title": "Target Level"
+          },
+          "purpose": {"anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}], "title": "Purpose"},
+          "scope_included": {
+            "anyOf": [{"type": "string", "maxLength": 12000}, {"type": "null"}],
+            "title": "Scope Included"
+          },
+          "scope_excluded": {
+            "anyOf": [{"type": "string", "maxLength": 12000}, {"type": "null"}],
+            "title": "Scope Excluded"
+          },
+          "sample_description": {
+            "anyOf": [{"type": "string", "maxLength": 12000}, {"type": "null"}],
+            "title": "Sample Description"
+          },
+          "reviewer": {"anyOf": [{"type": "string", "maxLength": 256}, {"type": "null"}], "title": "Reviewer"},
+          "methods_note": {
+            "anyOf": [{"type": "string", "maxLength": 12000}, {"type": "null"}],
+            "title": "Methods Note"
+          },
+          "limitations": {
+            "anyOf": [{"type": "string", "maxLength": 12000}, {"type": "null"}],
+            "title": "Limitations"
+          },
+          "status": {
+            "anyOf": [{"type": "string", "enum": ["draft", "in_progress", "completed"]}, {"type": "null"}],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvaluationUpdate",
+        "description": "Editable expert-review metadata; crawler evidence remains immutable."
+      },
+      "EvidenceLink": {
+        "properties": {"label": {"type": "string", "title": "Label"}, "url": {"type": "string", "title": "Url"}},
+        "type": "object",
+        "required": ["label", "url"],
+        "title": "EvidenceLink"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {"$ref": "#/components/schemas/ValidationError"},
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LocalLoginScanRequest": {
+        "properties": {
+          "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
+          "approved_auth_origins": {
+            "items": {"type": "string"},
+            "type": "array",
+            "maxItems": 32,
+            "title": "Approved Auth Origins",
+            "default": []
+          },
+          "authorization_acknowledged": {"type": "boolean", "title": "Authorization Acknowledged"},
+          "max_pages": {
+            "type": "integer",
+            "maximum": 2500.0,
+            "minimum": 1.0,
+            "title": "Max Pages",
+            "default": 2500
+          },
+          "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
+          "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
+          "workers": {"type": "integer", "maximum": 4.0, "minimum": 1.0, "title": "Workers", "default": 2},
+          "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
+          "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
+          "scan_engine": {
+            "type": "string",
+            "enum": ["axe", "alfa", "both"],
+            "title": "Scan Engine",
+            "default": "axe"
+          },
+          "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level", "default": "AA"},
+          "skip_interaction": {"type": "boolean", "title": "Skip Interaction", "default": false},
+          "skip_keyboard": {"type": "boolean", "title": "Skip Keyboard", "default": false},
+          "skip_responsive": {"type": "boolean", "title": "Skip Responsive", "default": false},
+          "skip_ocr": {"type": "boolean", "title": "Skip Ocr", "default": true},
+          "skip_vlm": {"type": "boolean", "title": "Skip Vlm", "default": true},
+          "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage", "default": false},
+          "image_analysis_acknowledged": {"type": "boolean", "title": "Image Analysis Acknowledged", "default": false},
+          "search": {"anyOf": [{"$ref": "#/components/schemas/SearchConfig"}, {"type": "null"}]}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["seed_url", "authorization_acknowledged"],
+        "title": "LocalLoginScanRequest",
+        "description": "Local-only manual-login scan input, never credentials or browser state."
+      },
+      "ManualCheckUpdate": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["not_started", "pass", "fail", "not_tested", "needs_follow_up"],
+            "title": "Outcome"
+          },
+          "rationale": {"type": "string", "maxLength": 12000, "title": "Rationale", "default": ""}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["outcome"],
+        "title": "ManualCheckUpdate"
+      },
+      "ManualEvidenceCreate": {
+        "properties": {
+          "note": {"type": "string", "maxLength": 12000, "minLength": 1, "title": "Note"},
+          "page_id": {"anyOf": [{"type": "integer", "minimum": 1.0}, {"type": "null"}], "title": "Page Id"},
+          "evidence_url": {"type": "string", "maxLength": 4096, "title": "Evidence Url", "default": ""}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["note"],
+        "title": "ManualEvidenceCreate"
+      },
+      "MethodCoverage": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["complete", "incomplete", "unknown", "disabled"],
+            "title": "State"
+          },
+          "checked": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Checked"},
+          "total": {"type": "integer", "title": "Total"}
+        },
+        "type": "object",
+        "required": ["state", "checked", "total"],
+        "title": "MethodCoverage"
+      },
+      "ProtectedEnvironment": {
+        "type": "string",
+        "enum": ["staging", "production"],
+        "title": "ProtectedEnvironment",
+        "description": "Deployment environments that are eligible for an authorized scan."
+      },
+      "ProtectedIndexFinding": {
+        "properties": {
+          "pipeline": {"$ref": "#/components/schemas/ProtectedIndexPipeline"},
+          "rule_id": {"type": "string", "maxLength": 128, "minLength": 1, "title": "Rule Id"},
+          "occurrence_key": {"type": "string", "maxLength": 128, "minLength": 32, "title": "Occurrence Key"},
+          "wcag_sc": {"anyOf": [{"type": "string", "maxLength": 16}, {"type": "null"}], "title": "Wcag Sc"},
+          "wcag_scs": {
+            "items": {"type": "string"},
+            "type": "array",
+            "maxItems": 12,
+            "title": "Wcag Scs",
+            "default": []
+          },
+          "wcag_level": {"anyOf": [{"type": "string", "maxLength": 3}, {"type": "null"}], "title": "Wcag Level"},
+          "impact": {"anyOf": [{"type": "string", "maxLength": 16}, {"type": "null"}], "title": "Impact"},
+          "engine_outcome": {"type": "string", "title": "Engine Outcome", "default": "failed"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["pipeline", "rule_id", "occurrence_key"],
+        "title": "ProtectedIndexFinding",
+        "description": "A non-sensitive finding summary sent by a paired companion.\n\nIt intentionally has no selector, HTML, URL, OCR text, screenshot, DOM\nname, or free-form diagnostic. Those data types can contain protected\ncontent. ``occurrence_key`` is an opaque one-use identifier generated in\nthe local companion solely to keep the ordinary SQLite index idempotent."
+      },
+      "ProtectedIndexPipeline": {
+        "type": "string",
+        "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "protected_image"],
+        "title": "ProtectedIndexPipeline",
+        "description": "A source layer safe to retain in a protected report's minimal index."
+      },
+      "ProtectedManualCheckUpdate": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["not_started", "pass", "fail", "not_tested", "needs_follow_up"],
+            "title": "Outcome"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["outcome"],
+        "title": "ProtectedManualCheckUpdate",
+        "description": "One deliberately non-narrative manual-check outcome.\n\nProtected report details cannot go into the public-report evaluation\ntables.  The only manual state kept in the ordinary index is the bounded\nWCAG outcome itself; rationale, evidence URLs, notes, and page references\nare intentionally not accepted by this browser contract."
+      },
+      "ProtectedPageIndex": {
+        "properties": {
+          "page_key": {"type": "string", "maxLength": 128, "minLength": 32, "title": "Page Key"},
+          "status_code": {"type": "integer", "maximum": 599.0, "minimum": 0.0, "title": "Status Code"},
+          "axe_evaluated": {"type": "boolean", "title": "Axe Evaluated", "default": false},
+          "axe_violations_total": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Axe Violations Total",
+            "default": 0
+          },
+          "alfa_evaluated": {"type": "boolean", "title": "Alfa Evaluated", "default": false},
+          "alfa_failed_total": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Alfa Failed Total",
+            "default": 0
+          },
+          "alfa_cant_tell_total": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Alfa Cant Tell Total",
+            "default": 0
+          },
+          "findings": {
+            "items": {"$ref": "#/components/schemas/ProtectedIndexFinding"},
+            "type": "array",
+            "maxItems": 250,
+            "title": "Findings",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["page_key", "status_code"],
+        "title": "ProtectedPageIndex",
+        "description": "A bounded, opaque page-level index record from the companion."
+      },
+      "ProtectedScanRequest": {
+        "properties": {
+          "target_owner": {"type": "string", "maxLength": 200, "minLength": 1, "title": "Target Owner"},
+          "environment": {"$ref": "#/components/schemas/ProtectedEnvironment"},
+          "data_classification": {"$ref": "#/components/schemas/DataClassification"},
+          "authorized_by": {"type": "string", "maxLength": 200, "minLength": 1, "title": "Authorized By"},
+          "authorization_acknowledged": {"type": "boolean", "title": "Authorization Acknowledged"},
+          "least_privilege_account_acknowledged": {"type": "boolean", "title": "Least Privilege Account Acknowledged"},
+          "approved_target_origins": {
+            "items": {"type": "string"},
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Approved Target Origins"
+          },
+          "approved_auth_origins": {
+            "items": {"type": "string"},
+            "type": "array",
+            "maxItems": 32,
+            "title": "Approved Auth Origins",
+            "default": []
+          },
+          "approved_cdn_origins": {
+            "items": {"type": "string"},
+            "type": "array",
+            "maxItems": 64,
+            "title": "Approved Cdn Origins",
+            "default": []
+          },
+          "allow_local_ai": {"type": "boolean", "title": "Allow Local Ai", "default": false},
+          "local_ai_acknowledged": {"type": "boolean", "title": "Local Ai Acknowledged", "default": false},
+          "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
+          "scan_engine": {
+            "type": "string",
+            "enum": ["axe", "alfa", "both"],
+            "title": "Scan Engine",
+            "default": "axe"
+          },
+          "max_pages": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Pages",
+            "default": 100
+          },
+          "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
+          "rps": {"type": "number", "maximum": 10.0, "minimum": 0.1, "title": "Rps", "default": 1.0}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target_owner",
+          "environment",
+          "data_classification",
+          "authorized_by",
+          "authorization_acknowledged",
+          "least_privilege_account_acknowledged",
+          "approved_target_origins",
+          "seed_url"
+        ],
+        "title": "ProtectedScanRequest",
+        "description": "Public draft request; no field can carry a credential or session."
+      },
+      "ProtectedScanStatus": {
+        "type": "string",
+        "enum": [
+          "awaiting_authentication",
+          "running",
+          "authentication_required",
+          "completed",
+          "failed",
+          "interrupted"
+        ],
+        "title": "ProtectedScanStatus",
+        "description": "Protected workflow state, separate from the crawler's legacy scan state."
+      },
+      "ReportIdentity": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "seed_url": {"type": "string", "title": "Seed Url"},
+          "started_at": {"type": "string", "title": "Started At"}
+        },
+        "type": "object",
+        "required": ["id", "seed_url", "started_at"],
+        "title": "ReportIdentity"
+      },
+      "SearchConfig": {
+        "properties": {
+          "confirmed": {"type": "boolean", "const": true, "title": "Confirmed"},
+          "page_url": {"type": "string", "maxLength": 2048, "title": "Page Url", "default": ""},
+          "fields": {
+            "items": {"$ref": "#/components/schemas/SearchField"},
+            "type": "array",
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Fields"
+          },
+          "submit": {"anyOf": [{"$ref": "#/components/schemas/SearchTarget"}, {"type": "null"}]},
+          "results_selector": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Results Selector",
+            "default": "a[href], [role=option]"
+          },
+          "next_button": {"anyOf": [{"$ref": "#/components/schemas/SearchTarget"}, {"type": "null"}]},
+          "max_result_pages": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Max Result Pages",
+            "default": 3
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "default": 20
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "maximum": 15000.0,
+            "minimum": 500.0,
+            "title": "Timeout Ms",
+            "default": 5000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["confirmed", "fields"],
+        "title": "SearchConfig",
+        "description": "No implicit form submission: the auditor supplies the journey and consent."
+      },
+      "SearchField": {
+        "properties": {
+          "by": {"type": "string", "enum": ["label", "selector"], "title": "By", "default": "label"},
+          "target": {"type": "string", "maxLength": 300, "minLength": 1, "title": "Target"},
+          "value": {"type": "string", "maxLength": 200, "title": "Value"},
+          "kind": {"type": "string", "enum": ["text", "select"], "title": "Kind", "default": "text"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["target", "value"],
+        "title": "SearchField"
+      },
+      "SearchTarget": {
+        "properties": {
+          "by": {"type": "string", "enum": ["label", "selector"], "title": "By", "default": "label"},
+          "target": {"type": "string", "maxLength": 300, "minLength": 1, "title": "Target"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["target"],
+        "title": "SearchTarget"
+      },
+      "Snapshot": {
+        "properties": {
+          "occurrences": {"type": "integer", "title": "Occurrences"},
+          "pages": {"type": "integer", "title": "Pages"},
+          "statuses": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Statuses"},
+          "outcomes": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Outcomes"},
+          "issues": {
+            "items": {"$ref": "#/components/schemas/EvidenceLink"},
+            "type": "array",
+            "maxItems": 4,
+            "title": "Issues"
+          },
+          "evidence": {
+            "items": {"$ref": "#/components/schemas/EvidenceLink"},
+            "type": "array",
+            "maxItems": 10,
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": ["occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
+        "title": "Snapshot"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {"type": "string", "title": "Message"},
+          "type": {"type": "string", "title": "Error Type"},
+          "input": {"title": "Input"},
+          "ctx": {"type": "object", "title": "Context"}
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
