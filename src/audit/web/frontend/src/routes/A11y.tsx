@@ -19,6 +19,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -307,6 +308,7 @@ function DrillDownView({
   onStatusFilterChange: (value: FindingStatus | "") => void;
   statusCounts: Record<FindingStatus, number>;
 }) {
+  const paged = usePagedRows(drill, { resetKey: drill.map((f) => f.id).join(",") });
   return (
     <>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -397,7 +399,7 @@ function DrillDownView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {drill.map((f) => (
+              {paged.pageRows.map((f) => (
                 <tr key={f.id} className="align-top">
                   <td className="px-3 py-2">
                     <code className="font-mono text-xs text-fg">
@@ -470,6 +472,7 @@ function DrillDownView({
               ))}
             </tbody>
           </table>
+          <TablePagination label="Findings" noun="findings" {...paged} />
         </Card>
       )}
     </>

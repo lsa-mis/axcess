@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from ._paging import all_pages_text
 from .test_accessibility_axe import _render_violations, _run_axe
 from .test_reports_table import DIST, playwright_async
 
@@ -48,8 +49,11 @@ async def test_tracker_selection(client: TestClient, new_page: Any) -> None:
         await page.keyboard.press("Enter")
         await playwright_async.expect(button).to_be_focused()
         await playwright_async.expect(button).to_have_attribute("aria-pressed", "true")
-        actual_scs = set(await matrix.locator("tbody th[scope=row]").all_text_contents())
-        assert {sc.strip() for sc in actual_scs} == expected_by_view[label], label
+        # Ten rows a page: read every page of the table.
+        actual_scs = set(
+            await all_pages_text(page, matrix.locator("tbody th[scope=row]"), "Criteria")
+        )
+        assert actual_scs == expected_by_view[label], label
         # The chips cross-fade their colours; let that settle before
         # axe samples a mid-transition foreground against background.
         await page.evaluate("Promise.all(document.getAnimations().map((a) => a.finished))")
@@ -64,13 +68,16 @@ async def test_tracker_selection(client: TestClient, new_page: Any) -> None:
     filters = page.get_by_role("group", name="Filter AI coverage by status")
     await filters.get_by_role("button", name="Planned", exact=False).click()
     expected = sum(item["status"] == "planned" for item in payload["roadmap"])
-    await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(expected)
+    await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(min(expected, 10))
     await page.reload(wait_until="networkidle")
-    await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(expected)
+    await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(min(expected, 10))
     # Leaving the group drops its sub-filter rather than carrying a
     # status that no coverage row could match.
     await sections.get_by_role("button", name=re.compile(r"^Current Coverage")).click()
+    current = expected_by_view["Current Coverage"]
     await playwright_async.expect(matrix.locator("tbody th[scope=row]")).to_have_count(
-        len(expected_by_view["Current Coverage"])
+        min(len(current), 10)
     )
+    rows = await all_pages_text(page, matrix.locator("tbody th[scope=row]"), "Criteria")
+    assert set(rows) == current
     assert "status=" not in page.url

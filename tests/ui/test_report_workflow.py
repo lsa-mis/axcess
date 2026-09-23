@@ -183,7 +183,7 @@ def _comparison(scan_id: int) -> dict[str, Any]:
         ],
         "total": 51,
         "page": 1,
-        "page_size": 50,
+        "page_size": 10,
     }
 
 
@@ -293,12 +293,12 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
     await next_page.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(
-        page.get_by_text("51 issue groups · Page 2 of 2", exact=True)
+        page.get_by_text("51 issue groups · Page 2 of 6", exact=True)
     ).to_be_visible()
     assert requests[-1]["category"] == ["changed"]
     assert requests[-1]["pipeline"] == ["alfa"]
     assert requests[-1]["page"] == ["2"]
-    assert requests[-1]["page_size"] == ["50"]
+    assert requests[-1]["page_size"] == ["10"]
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

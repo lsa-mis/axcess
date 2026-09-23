@@ -6,6 +6,7 @@ import {
   protectedQueryKey,
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedIssueIndexGroup } from "../api/types";
 
 const SOURCE_LABEL: Record<ProtectedIssueIndexGroup["source_layer"], string> = {
@@ -40,6 +41,10 @@ export default function ProtectedIssueIndexRoute() {
     gcTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
+  });
+  const groups = index.data?.groups ?? [];
+  const paged = usePagedRows(groups, {
+    resetKey: groups.map((group) => `${group.source_layer}:${group.rule_id}:${group.engine_outcome}`).join(","),
   });
 
   if (!Number.isSafeInteger(id) || id <= 0) {
@@ -118,9 +123,10 @@ export default function ProtectedIssueIndexRoute() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {index.data.groups.map((group) => <IssueRow key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`} group={group} />)}
+                  {paged.pageRows.map((group) => <IssueRow key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`} group={group} />)}
                 </tbody>
               </table>
+              <TablePagination label="Protected issues" noun="issue groups" {...paged} />
             </Card>
           )}
           <p className="mt-4 text-sm text-fg-muted">

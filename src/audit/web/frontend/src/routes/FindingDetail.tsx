@@ -14,6 +14,7 @@ import {
   SeverityChip,
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { requestStatusRationale } from "../statusDecision";
 
 const STATUSES: FindingStatus[] = [
@@ -100,6 +101,10 @@ export default function FindingDetailRoute() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [attemptSave]);
+  const occurrences = data?.occurrences ?? [];
+  const paged = usePagedRows(occurrences, {
+    resetKey: occurrences.map((o) => `${o.page_id}:${o.page_url}`).join(","),
+  });
 
   if (error) {
     return (
@@ -287,7 +292,7 @@ export default function FindingDetailRoute() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.occurrences.map((o, i) => (
+              {paged.pageRows.map((o, i) => (
                 <tr key={i} className="hover:bg-surface-muted/60">
                   <td className="px-4 py-2">
                     <PageLink
@@ -311,6 +316,7 @@ export default function FindingDetailRoute() {
               ))}
             </tbody>
           </table>
+          <TablePagination label="Occurrences" noun="occurrences" {...paged} />
         </Card>
       )}
     </>
