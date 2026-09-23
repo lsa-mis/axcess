@@ -13,11 +13,23 @@ Text formats are compared byte for byte. Workbooks are compared through the
 semantic fingerprint in ``tests/support/xlsx_fingerprint.py`` (values, styles,
 links, layout), because an .xlsx file's bytes change on every save.
 
+A final export is pinned in full (``rich_scan.csv``, ``rich_scan.xlsx.json``).
+A draft is its final plus draft labeling, so only that difference is
+committed: ``<draft golden>.diff`` (``rich_scan_DRAFT.csv.diff``) is a unified
+diff from the final golden to the draft, made by
+``tests/support/golden_delta.py``. A draft must equal its final golden with
+that diff applied, which is exactly the draft a full copy would pin. A change
+to the final output therefore fails the final golden (and the drafts built on
+it); a change to draft labeling alone fails only the draft.
+``patch -o - rich_scan.csv < rich_scan_DRAFT.csv.diff``, run in ``golden/``,
+prints a whole draft for reading.
+
 Two scans back the goldens:
 
 * ``scan``, the fixture behind the existing ``scan.csv`` / ``scan.json`` /
   ``scan.jira.csv`` / ``scan.md`` goldens, imported unchanged. Its finals are
-  checked against those files (read-only); its drafts and workbook are new.
+  checked against those files (read-only); its draft diffs and workbook are
+  new.
 * ``rich_scan``, seeded by ``tests/support/rich_scan.py``, which reaches the
   paths the small fixture does not (see that module), rendered with a blob
   store holding its evidence screenshots, as the route renders it.
@@ -38,10 +50,12 @@ written from here.
 from __future__ import annotations
 
 import csv
+import difflib
 import io
 import json
 import os
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -53,6 +67,7 @@ from support.export_render import (
     render_export,
     render_unlabeled,
 )
+from support.golden_delta import DeltaError, apply_delta, make_delta
 from support.rich_scan import seed_rich_scan, write_evidence_blobs
 from support.xlsx_fingerprint import dumps_fingerprint, fingerprint_diff, fingerprint_xlsx
 from test_exports_csv_json import scan_fixture  # noqa: F401  # fixture behind scan.csv
@@ -68,6 +83,14 @@ UPDATE_ENV = "AUDIT_UPDATE_GOLDEN"
 # against those files and never rewritten here.
 _EXISTING_FINALS = ("csv", "json", "jira", "markdown")
 
+# Unchanged lines a draft diff keeps around each change, so a reader can see
+# where the labeling lands.
+_DELTA_CONTEXT = 1
+_DIFF_LINES = 60
+
+#: Renders one export of a scan: ``render(draft)``.
+Render = Callable[[bool], str | bytes]
+
 
 def _updating() -> bool:
     if os.environ.get(UPDATE_ENV) != "1":
@@ -77,23 +100,35 @@ def _updating() -> bool:
     return True
 
 
-def _record(path: Path, content: bytes) -> NoReturn:
+def _record(name: str, content: str) -> NoReturn:
     """Write a golden, then fail: an update run must never leave the suite green."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
+    GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+    (GOLDEN_DIR / name).write_bytes(content.encode("utf-8"))
     pytest.fail(
-        f"Wrote {path.name}. Review `git diff tests/unit/golden`, then rerun without "
+        f"Wrote {name}. Review `git diff tests/unit/golden`, then rerun without "
         f"{UPDATE_ENV} to verify.",
         pytrace=False,
     )
 
 
-def _golden_bytes(rendered: str | bytes, export_format: str) -> bytes:
+def _read_golden(name: str) -> str:
+    """Read bytes, not text: a bare ``\\r`` would not survive ``read_text``."""
+    path = GOLDEN_DIR / name
+    if not path.is_file():
+        pytest.fail(
+            f"Golden {name} is missing. Record it with {UPDATE_ENV}=1 only if the export "
+            "is new; a golden that went missing in a refactor must be restored."
+        )
+    return path.read_bytes().decode("utf-8")
+
+
+def _golden_text(rendered: str | bytes, export_format: str) -> str:
+    """What a golden holds for an export: the text, or the workbook's fingerprint."""
     if export_format == "xlsx":
         assert isinstance(rendered, bytes)
-        return dumps_fingerprint(fingerprint_xlsx(rendered)).encode("utf-8")
+        return dumps_fingerprint(fingerprint_xlsx(rendered))
     assert isinstance(rendered, str)
-    return rendered.encode("utf-8")
+    return rendered
 
 
 def _golden_name(stem: str, export_format: str, *, draft: bool) -> str:
@@ -101,30 +136,75 @@ def _golden_name(stem: str, export_format: str, *, draft: bool) -> str:
     return f"{name}.json" if export_format == "xlsx" else name
 
 
-def _assert_matches_golden(rendered: str | bytes, export_format: str, name: str) -> None:
-    """Compare bytes, not text: a bare ``\\r`` would not survive ``read_text``."""
-    actual = _golden_bytes(rendered, export_format)
-    path = GOLDEN_DIR / name
-    if _updating():
-        _record(path, actual)
-    if not path.exists():
-        pytest.fail(
-            f"Golden {name} is missing. Record it with {UPDATE_ENV}=1 only if "
-            "the export is new; a golden that went missing in a refactor must be restored."
-        )
-    expected = path.read_bytes()
-    if export_format == "xlsx":
-        expected_fp = json.loads(expected)
-        actual_fp = json.loads(actual)
-        diff = fingerprint_diff(expected_fp, actual_fp, labels=(name, "rendered"))
-        assert not diff, (
-            f"Workbook fingerprint mismatch for {name}. Re-run with "
-            f"{UPDATE_ENV}=1 if the change was deliberate.\n" + "\n".join(diff)
-        )
-        return
-    assert actual == expected, (
-        f"Golden mismatch for {name}. Re-run with {UPDATE_ENV}=1 if the change was deliberate."
+def _text_diff(expected: str, actual: str, labels: tuple[str, str]) -> list[str]:
+    lines = list(
+        difflib.unified_diff(expected.splitlines(), actual.splitlines(), *labels, lineterm="", n=1)
     )
+    if not lines:
+        return [f"Same lines, different line endings ({len(expected)} vs {len(actual)} chars)."]
+    if len(lines) > _DIFF_LINES:
+        lines = [*lines[:_DIFF_LINES], f"... {len(lines) - _DIFF_LINES} more diff line(s)"]
+    return lines
+
+
+def _assert_same(
+    expected: str,
+    rendered: str | bytes,
+    export_format: str,
+    labels: tuple[str, str],
+    message: str,
+) -> None:
+    if export_format == "xlsx":
+        assert isinstance(rendered, bytes)
+        # Against the fingerprint itself, not a reserialized copy, so the
+        # golden's layout cannot drop anything without failing here.
+        diff = fingerprint_diff(json.loads(expected), fingerprint_xlsx(rendered), labels=labels)
+    else:
+        assert isinstance(rendered, str)
+        diff = [] if rendered == expected else _text_diff(expected, rendered, labels)
+    assert not diff, f"{message} Re-run with {UPDATE_ENV}=1 if the change was deliberate.\n" + (
+        "\n".join(diff)
+    )
+
+
+def _check_final(render: Render, stem: str, export_format: str) -> None:
+    name = _golden_name(stem, export_format, draft=False)
+    rendered = render(False)
+    if _updating():
+        _record(name, _golden_text(rendered, export_format))
+    expected = _read_golden(name)
+    _assert_same(expected, rendered, export_format, (name, "rendered"), f"{name} mismatch.")
+
+
+def _check_draft(render: Render, stem: str, export_format: str) -> None:
+    """The draft must be its final golden with the recorded draft diff applied."""
+    final_name = _golden_name(stem, export_format, draft=False)
+    draft_name = _golden_name(stem, export_format, draft=True)
+    delta_name = f"{draft_name}.diff"
+    rendered = render(True)
+    if _updating():
+        final = _golden_text(render(False), export_format)
+        draft = _golden_text(rendered, export_format)
+        delta = make_delta(
+            final, draft, before_name=final_name, after_name=draft_name, context=_DELTA_CONTEXT
+        )
+        assert apply_delta(final, delta) == draft
+        _record(delta_name, delta)
+    delta = _read_golden(delta_name)
+    assert not delta or delta.startswith(f"--- {final_name}\n+++ {draft_name}\n"), (
+        f"{delta_name} must be a diff from {final_name} to {draft_name}."
+    )
+    try:
+        expected = apply_delta(_read_golden(final_name), delta)
+    except DeltaError as exc:
+        pytest.fail(
+            f"{delta_name} does not apply to {final_name}: {exc}. Record it again with "
+            f"{UPDATE_ENV}=1.",
+            pytrace=False,
+        )
+    labels = (f"{final_name} + {delta_name}", "rendered")
+    message = f"{draft_name} is no longer {final_name} with {delta_name} applied."
+    _assert_same(expected, rendered, export_format, labels, message)
 
 
 # --------------------------------------------------------------------------
@@ -138,6 +218,14 @@ def test_harness_renders_every_route_format() -> None:
 
     assert set(EXPORT_FORMATS) == set(server._EXPORT_RENDERERS)
     assert EXPORT_EXTENSIONS == server._EXPORT_EXTENSIONS
+
+
+def test_drafts_are_pinned_only_as_diffs() -> None:
+    """A full draft golden beside its diff would be read by nothing and go stale."""
+    full_drafts = sorted(
+        path.name for path in GOLDEN_DIR.glob("*_DRAFT.*") if path.suffix != ".diff"
+    )
+    assert not full_drafts, f"Draft goldens are stored as diffs; remove {full_drafts}."
 
 
 # --------------------------------------------------------------------------
@@ -154,7 +242,8 @@ def test_scan_final_matches_existing_golden(
     """The harness renders exactly what the older per-format goldens pin."""
     rendered = render_export(tmp_db, scan_fixture, export_format, draft=False)
     name = _golden_name("scan", export_format, draft=False)
-    assert _golden_bytes(rendered, export_format) == (GOLDEN_DIR / name).read_bytes()
+    expected = (GOLDEN_DIR / name).read_bytes()
+    assert _golden_text(rendered, export_format).encode("utf-8") == expected
 
 
 @pytest.mark.parametrize(
@@ -167,9 +256,11 @@ def test_scan_export_matches_golden(
     export_format: str,
     draft: bool,
 ) -> None:
-    rendered = render_export(tmp_db, scan_fixture, export_format, draft=draft)
-    name = _golden_name("scan", export_format, draft=draft)
-    _assert_matches_golden(rendered, export_format, name)
+    def render(as_draft: bool) -> str | bytes:
+        return render_export(tmp_db, scan_fixture, export_format, draft=as_draft)
+
+    check = _check_draft if draft else _check_final
+    check(render, "scan", export_format)
 
 
 # --------------------------------------------------------------------------
@@ -197,9 +288,13 @@ def test_rich_scan_export_matches_golden(
     export_format: str,
     draft: bool,
 ) -> None:
-    rendered = render_export(tmp_db, rich_scan, export_format, draft=draft, blob_store=rich_blobs)
-    name = _golden_name("rich_scan", export_format, draft=draft)
-    _assert_matches_golden(rendered, export_format, name)
+    def render(as_draft: bool) -> str | bytes:
+        return render_export(
+            tmp_db, rich_scan, export_format, draft=as_draft, blob_store=rich_blobs
+        )
+
+    check = _check_draft if draft else _check_final
+    check(render, "rich_scan", export_format)
 
 
 def test_rich_scan_reaches_the_paths_its_goldens_pin(
