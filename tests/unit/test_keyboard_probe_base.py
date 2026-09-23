@@ -9,6 +9,7 @@ and the to_repo_kwargs() round-trip via upsert_keyboard_finding.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -25,18 +26,15 @@ from audit.analyzer.keyboard.base import (
 from audit.db import repo
 from audit.db.schema import connect
 
-_MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
-
 
 @pytest.fixture
-def tmp_conn(tmp_path: Path) -> sqlite3.Connection:
+def tmp_conn(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> sqlite3.Connection:
     """A temp DB with every forward migration applied."""
     db = tmp_path / "k.db"
     conn = connect(db)
-    for path in sorted(_MIGRATIONS.glob("*.sql")):
-        if path.name.endswith(".rollback.sql"):
-            continue
-        conn.executescript(path.read_text())
+    migrate_db(conn)
     return conn
 
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 
 import pytest
+import pytest_asyncio
 from PIL import Image
 
 from audit.crawler.js_fetcher import JsFetcher
@@ -23,24 +24,12 @@ from audit.crawler.js_fetcher import JsFetcher
 # Skip the whole module if Playwright isn't importable / chromium not installed.
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    """One headless chromium per test."""
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     ctx = await browser.new_context()
     try:

@@ -1,0 +1,153 @@
+name: CI
+
+# The gates AGENTS.md asks for before handoff, run on every pull request and
+# on main. Until this existed nothing ran pytest, ruff, mypy or the frontend
+# checks, while desktop-build publishes a release from every push to main.
+#
+# Browser-driven suites (tests/integration and the Playwright files under
+# tests/ui, auto-marked `browser` by tests/conftest.py) need Chromium, the
+# fixture site and minutes of wall clock; they run in the `browser-suites`
+# job only on a schedule, on demand, or when a pull request carries the
+# `run-browser-tests` label.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "41 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-static:
+    name: Ruff and mypy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - run: uv run --no-sync ruff check src tests scripts
+      - run: uv run --no-sync ruff format --check src tests scripts
+      - run: uv run --no-sync mypy
+
+  python-tests:
+    name: Unit, quality and route tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        # Tests import from src; installing the Axcess wheel would need the
+        # packaged React dist, which this job does not build.
+        run: uv sync --frozen --no-install-project
+      - name: Run tests
+        env:
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest -p no:cacheprovider
+          tests/unit tests/quality tests/ui -m "not browser"
+
+  frontend:
+    name: Frontend lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/audit/web/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/audit/web/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # `build` runs `tsc -b` before `vite build`, so it is also the typecheck.
+      - run: npm run build
+
+  desktop-node:
+    name: Desktop launcher tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install launcher dependencies
+        # The tests load forge.config.cjs (for @electron/fuses) but never
+        # start Electron, so the Electron binary download is skipped.
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci
+      - run: npm test
+
+  browser-suites:
+    name: Browser and integration suites
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'run-browser-tests')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/audit/web/frontend/package-lock.json
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - name: Install Chromium and Tesseract
+        run: |
+          uv run --no-sync playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr
+      - name: Build the review UI
+        # The Playwright UI tests drive the built SPA served at /app/.
+        run: |
+          npm ci
+          npm run build
+        working-directory: src/audit/web/frontend
+      - name: Install the pinned Alfa runner
+        run: npm ci
+        working-directory: src/audit/alfa_runner
+      - name: Run integration suites
+        # All of tests/integration: several suites drive Chromium through the
+        # crawler without importing Playwright themselves.
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest -p no:cacheprovider tests/integration
+      - name: Run Playwright UI suites
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest -p no:cacheprovider tests/ui -m browser

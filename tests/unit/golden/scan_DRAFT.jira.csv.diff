@@ -1,0 +1,20 @@
+--- scan.jira.csv
++++ scan_DRAFT.jira.csv
+@@ -1,2 +1,2 @@
+-Summary,Description,Priority,Issue Type,Labels,Component
++Summary,Description,Priority,Issue Type,Labels,Component,Axcess export state
+ "WCAG 1.4.5: image of text, BUY WIDGETS NOW","**Severity:** critical  (priority score 9.10)
+@@ -14,3 +14,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/1",Highest,Bug,wcag-1-4-5 accessibility images-of-text sev-critical class-essential,Accessibility
++Review locally: http://127.0.0.1:8765/findings/1",Highest,Bug,wcag-1-4-5 accessibility images-of-text sev-critical class-essential,Accessibility,DRAFT
+ WCAG 1.4.5: inline SVG with visible text (minor),"**Severity:** minor  (priority score 3.69)
+@@ -24,3 +24,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/3",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor inline-svg,Accessibility
++Review locally: http://127.0.0.1:8765/findings/3",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor inline-svg,Accessibility,DRAFT
+ "WCAG 1.4.5: image of text, Acme Corp","**Severity:** info  (priority score 1.69)
+@@ -37,2 +37,2 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/2",Lowest,Bug,wcag-1-4-5 accessibility images-of-text sev-info class-logo,Accessibility
++Review locally: http://127.0.0.1:8765/findings/2",Lowest,Bug,wcag-1-4-5 accessibility images-of-text sev-info class-logo,Accessibility,DRAFT

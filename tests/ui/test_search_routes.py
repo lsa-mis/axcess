@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from audit.analyzer.alfa import AlfaAvailability
 from audit.crawler.orchestrator import CrawlConfig
 from audit.crawler.search import SearchOutcome
 from audit.db import repo
@@ -170,7 +171,12 @@ def test_refusal_names_the_setting_without_echoing_the_request(
 
 def test_engine_and_render_refusals_are_distinguishable(
     seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Without the pinned Alfa install the Alfa request would be refused for
+    # that reason first, and this would test the machine rather than the
+    # search refusal.
+    monkeypatch.setattr(server, "alfa_availability", lambda: AlfaAvailability(True))
     db_path, blob_dir, _ = seeded_db
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45000)) as client:

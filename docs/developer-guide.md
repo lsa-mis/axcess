@@ -96,6 +96,15 @@ tests/
   `tmp_db` (fresh migrated SQLite) and `tmp_path` (fresh blob dir).
   Integration tests use the repo's `tests/fixtures/site` served from
   `stdlib http.server` on an ephemeral port.
+- **Browser tests share one Chromium per module, never a context.** Open
+  pages through the module's own `page` fixture (tests/integration, built on
+  `browser.new_context()`) or through `new_page` (tests/ui); either way each
+  test gets a context of its own, closed when it ends. Playwright only works
+  on the event loop that launched it, so mark the module
+  `pytestmark = pytest.mark.asyncio(loop_scope="module")` and give async
+  fixtures that touch the browser `loop_scope="module"`. Never put a bare
+  `@pytest.mark.asyncio` on such a test: it overrides the module's mark, and
+  the test would hang instead of failing, so collection refuses it.
 
 ## Running gates
 
@@ -174,9 +183,11 @@ uv run yoyo apply --database "sqlite:///data/audit.db" --batch \
     src/audit/db/migrations
 ```
 
-The unit-test `tmp_db` fixture picks up new migrations automatically
-(it `.executescript`s every `.sql` file in the migrations dir in
-filename order).
+The unit-test `tmp_db` fixture picks up new migrations automatically.
+Each test session runs every forward `.sql` file in the migrations dir,
+in filename order, into a template database once, and `tmp_db` copies
+that template into each test's database with SQLite's backup API. Tests
+that open their own connection get the same copy from `migrate_db`.
 
 ### Add a UI page
 

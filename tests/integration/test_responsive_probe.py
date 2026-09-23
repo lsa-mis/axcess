@@ -24,6 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.responsive.base import (
@@ -41,23 +42,12 @@ def _file_url(name: str) -> str:
 
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     # Match the crawler's standard viewport so the probe's restore step
     # and the fixtures' vw-based geometry behave exactly as production.
@@ -74,7 +64,6 @@ async def page(browser):  # type: ignore[no-untyped-def]
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-untyped-def]
     """A fluid page must produce zero findings from all three checks."""
     await page.goto(_file_url("clean.html"))
@@ -84,7 +73,6 @@ async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-unty
     )
 
 
-@pytest.mark.asyncio
 async def test_probe_restores_viewport(page) -> None:  # type: ignore[no-untyped-def]
     """The probe must leave the page at the crawl's standard viewport."""
     await page.goto(_file_url("clean.html"))
@@ -98,7 +86,6 @@ async def test_probe_restores_viewport(page) -> None:  # type: ignore[no-untyped
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_detects_reflow_overflow_at_320(page) -> None:  # type: ignore[no-untyped-def]
     """A fixed 900px container → responsive-reflow-overflow, only."""
     await page.goto(_file_url("reflow_overflow.html"))
@@ -118,7 +105,6 @@ async def test_detects_reflow_overflow_at_320(page) -> None:  # type: ignore[no-
     assert all(f.criterion_sc == "1.4.10" for f in reflow)
 
 
-@pytest.mark.asyncio
 async def test_detects_text_clipping_at_zoom_proxy(page) -> None:  # type: ignore[no-untyped-def]
     """A vw-sized nowrap box that clips only at 640px → text-clipped, only."""
     await page.goto(_file_url("zoom_clipped.html"))
@@ -134,7 +120,6 @@ async def test_detects_text_clipping_at_zoom_proxy(page) -> None:  # type: ignor
     assert all(f.criterion_sc == "1.4.4" for f in clipped)
 
 
-@pytest.mark.asyncio
 async def test_detects_clipping_under_text_spacing_override(page) -> None:  # type: ignore[no-untyped-def]
     """A height-locked overflow-hidden box → spacing-clipped, only."""
     await page.goto(_file_url("spacing_clipped.html"))
@@ -155,7 +140,6 @@ async def test_detects_clipping_under_text_spacing_override(page) -> None:  # ty
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_finding_repo_kwargs_shape(page) -> None:  # type: ignore[no-untyped-def]
     """to_repo_kwargs() carries the pipeline + SC the Issues view needs."""
     await page.goto(_file_url("reflow_overflow.html"))

@@ -12,14 +12,16 @@ from __future__ import annotations
 import gzip
 import sqlite3
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 import pytest
-from playwright import async_api as playwright_async
 
 from audit.db.schema import connect
 
-pytestmark = pytest.mark.ui
+# One browser per module (tests/ui/conftest.py), so the tests run on the
+# module's event loop. Each ``new_page`` call still opens its own context.
+pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 #: A selector that cannot match the stored capture, so the highlight pass
 #: always misses — which is the branch under test.
@@ -61,31 +63,30 @@ def _seed_findings(db_path: Path, scan_id: int, *revealed_by: str | None) -> int
         conn.close()
 
 
-async def _inspector_text(base: str, scan_id: int, page_id: int) -> str:
+async def _inspector_text(new_page: Any, base: str, scan_id: int, page_id: int) -> str:
     """Open the inspector on the unmatchable findings and return its text."""
     url = f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-dialog-name"
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page(viewport={"width": 1280, "height": 900})
-            await page.goto(url, wait_until="networkidle")
-            # The highlight pass runs in requestIdleCallback, so the status
-            # line settles a beat after the document is ready.
-            await page.wait_for_timeout(1500)
-            return await page.locator("body").inner_text()
-        finally:
-            await browser.close()
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="networkidle")
+        # The highlight pass runs in requestIdleCallback, so the status
+        # line settles a beat after the document is ready.
+        await page.wait_for_timeout(1500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
-@pytest.mark.asyncio
 async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     db_path, _, scan_id = seeded_db
     page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL)
 
-    text = await _inspector_text(live_server[0], scan_id, page_id)
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
     assert REVEALING_CONTROL in text
     assert "the page as it loaded" in text
@@ -97,15 +98,15 @@ async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
     assert "changed since the scan" not in text
 
 
-@pytest.mark.asyncio
 async def test_load_state_finding_still_reports_a_possible_change(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     db_path, _, scan_id = seeded_db
     page_id = _seed_findings(db_path, scan_id, None)
 
-    text = await _inspector_text(live_server[0], scan_id, page_id)
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
     # Nothing revealed this one, so it genuinely should have been in the
     # capture and drift is the honest explanation.
@@ -113,10 +114,10 @@ async def test_load_state_finding_still_reports_a_possible_change(
     assert "the page as it loaded" not in text
 
 
-@pytest.mark.asyncio
 async def test_a_mixed_issue_keeps_both_explanations_open(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     """One issue can span load-state and interaction-revealed occurrences.
 
@@ -127,7 +128,7 @@ async def test_a_mixed_issue_keeps_both_explanations_open(
     db_path, _, scan_id = seeded_db
     page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL, None)
 
-    text = await _inspector_text(live_server[0], scan_id, page_id)
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
     assert "a control was operated" in text
     assert "changed since the scan" in text
@@ -178,26 +179,25 @@ def _seed_two_state_issue(db_path: Path, scan_id: int) -> tuple[int, str]:
         conn.close()
 
 
-async def _evidence_text(base: str, scan_id: int, page_id: int, state: str) -> str:
+async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, state: str) -> str:
     url = (
         base + "/app/scans/" + str(scan_id) + "/pages/" + str(page_id) + "/inspect"
         "?issue=axe:aria-required-parent&state=" + state
     )
-    async with playwright_async.async_playwright() as pw:
-        browser = await pw.chromium.launch()
-        try:
-            page = await browser.new_page(viewport={"width": 1280, "height": 900})
-            await page.goto(url, wait_until="domcontentloaded")
-            await page.wait_for_timeout(2500)
-            return await page.locator("body").inner_text()
-        finally:
-            await browser.close()
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="domcontentloaded")
+        await page.wait_for_timeout(2500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
 
 
-@pytest.mark.asyncio
 async def test_each_state_shows_only_the_occurrences_it_contains(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
+    new_page: Any,
 ) -> None:
     """One issue can fail both at load and behind a control.
 
@@ -211,12 +211,12 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
     page_id, state_key = _seed_two_state_issue(db_path, scan_id)
     base = live_server[0]
 
-    at_load = await _evidence_text(base, scan_id, page_id, "")
+    at_load = await _evidence_text(new_page, base, scan_id, page_id, "")
     assert "#at-load" in at_load
     assert "#after-click" not in at_load
     assert "in another state" in at_load
 
-    revealed = await _evidence_text(base, scan_id, page_id, quote(state_key, safe=""))
+    revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
     assert "#after-click" in revealed
     # The load-state occurrence is still there: the click added markup, it did
     # not remove the page underneath.

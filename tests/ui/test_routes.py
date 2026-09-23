@@ -13,6 +13,7 @@ import csv
 import hashlib
 import json
 import sqlite3
+from collections.abc import Callable
 from io import BytesIO, StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -103,10 +104,11 @@ def test_favicon_svg_served(client: TestClient) -> None:
     resp = client.get("/favicon.svg")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    # The actual mark is a UMich-blue rounded rect with a maize T — assert
-    # the maize hex is present so a swap to a placeholder (or an empty
-    # file) is caught loudly rather than rendering a blank tab icon.
-    assert b"#FFCB05" in resp.content
+    # The mark is a stroked Axcess logo in UMich blue that turns white in
+    # dark mode -- assert the blue hex is present so a swap to a placeholder
+    # (or an empty file) is caught loudly rather than rendering a blank tab
+    # icon.
+    assert b"#00274C" in resp.content
 
 
 def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
@@ -115,7 +117,7 @@ def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
     resp = client.get("/favicon.ico")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    assert b"#FFCB05" in resp.content
+    assert b"#00274C" in resp.content
 
 
 # ------------------------------------------------------------------ /api/scans
@@ -1168,23 +1170,18 @@ def test_api_delete_scan_409s_when_scan_is_running(
     assert row[0] == "running"
 
 
-def test_stale_running_scans_interrupted_on_server_boot(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_stale_running_scans_interrupted_on_server_boot(tmp_path, migrate_db) -> None:  # type: ignore[no-untyped-def]
     """When the app boots it marks every DB row stuck in 'running' as
     'interrupted', because the live task driving it is gone after a
     process restart."""
     import sqlite3 as _sqlite3
-    from pathlib import Path as _Path
 
     from audit.db.schema import connect as _connect
 
     db_path = tmp_path / "sweep.db"
-    migrations_dir = _Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
     prep = _connect(db_path)
     try:
-        for p in sorted(migrations_dir.glob("*.sql")):
-            if p.name.endswith(".rollback.sql"):
-                continue
-            prep.executescript(p.read_text())
+        migrate_db(prep)
         prep.execute(
             "INSERT INTO scans (seed_url, status, config_json) "
             "VALUES ('http://stuck.example/', 'running', '{}')"
@@ -1683,7 +1680,10 @@ def test_access_token_gate_blocks_and_admits(
 
 @pytest.mark.parametrize("headless", [True, False])
 async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, headless: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    headless: bool,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """The verified landing URL must reach the crawl as ``start_url``.
 
@@ -1699,15 +1699,10 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
     from audit.web import server as srv
 
     # The handoff writes the scan row itself once the crawl returns, so the
-    # database has to be real even though the browser is not. `tests` is not
-    # an importable package, so apply the forward migrations directly rather
-    # than reaching into conftest.
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
+    # database has to be real even though the browser is not.
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     seed = "https://app.example.edu/"
@@ -1822,7 +1817,9 @@ def test_login_handoff_still_completes_when_real_pages_were_scanned() -> None:
 
 
 async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """A login scan must actually operate the application's controls.
 
@@ -1837,12 +1834,9 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
     from audit.db.schema import connect
     from audit.web import server as srv
 
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     captured: dict[str, object] = {}
@@ -1890,7 +1884,9 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
 
 
 async def test_login_handoff_says_so_when_interaction_cannot_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """Choosing Alfa only leaves interaction enabled but inert — say so.
 
@@ -1903,12 +1899,9 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
     from audit.db.schema import connect
     from audit.web import server as srv
 
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     captured: dict[str, object] = {}

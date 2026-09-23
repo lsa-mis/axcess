@@ -18,11 +18,12 @@ import re
 import secrets
 import shutil
 import sqlite3
+import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
-from typing import Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 from urllib.parse import urlencode, urlsplit
 
 import httpx
@@ -4059,5 +4060,31 @@ def _short_url(url: str | None) -> str:
     return url
 
 
-# Module-level app instance so `uvicorn audit.web.server:app` works.
-app = create_app()
+# `uvicorn audit.web.server:app` and `from audit.web.server import app` resolve
+# the application lazily (PEP 562): the first access builds and caches it. An
+# eager module-level `create_app()` meant that merely importing this module --
+# pytest collection, `desktop_server --verify-runtime`, an ad-hoc script --
+# opened the configured database, swept its running scans to "interrupted",
+# and purged expired protected data.
+_APP_LOCK = threading.Lock()
+
+if TYPE_CHECKING:
+    app: FastAPI
+else:
+
+    def __getattr__(name: str) -> FastAPI:
+        if name != "app":
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+        with _APP_LOCK:
+            built = globals().get("app")
+            if built is None:
+                try:
+                    built = create_app()
+                except AttributeError as exc:
+                    # getattr-based loaders (uvicorn's import_from_string,
+                    # `from ... import app`) would report an AttributeError
+                    # raised inside create_app as a missing attribute and drop
+                    # the real cause.
+                    raise RuntimeError("audit.web.server.create_app() failed") from exc
+                globals()["app"] = built
+            return built

@@ -1,0 +1,2600 @@
+{
+  "token-set/dist-absent": {
+    "routes": [
+      {"type": "Route", "path": "/openapi.json", "methods": ["GET", "HEAD"], "name": "openapi"},
+      {"type": "Route", "path": "/docs", "methods": ["GET", "HEAD"], "name": "swagger_ui_html"},
+      {
+        "type": "Route",
+        "path": "/docs/oauth2-redirect",
+        "methods": ["GET", "HEAD"],
+        "name": "swagger_ui_redirect"
+      },
+      {"type": "Route", "path": "/redoc", "methods": ["GET", "HEAD"], "name": "redoc_html"},
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["POST"],
+        "name": "create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["GET"],
+        "name": "list_protected_scans",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/identity-context",
+        "methods": ["GET"],
+        "name": "protected_identity_context",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "get_scan",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/issue-index",
+        "methods": ["GET"],
+        "name": "protected_issue_index",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "list_protected_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "update_protected_manual_check",
+        "async": true,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/exports/redacted",
+        "methods": ["POST"],
+        "name": "export_redacted_report",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/agent-enrollments",
+        "methods": ["POST"],
+        "name": "create_enrollment",
+        "async": true,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion",
+        "methods": ["GET"],
+        "name": "get_companion",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion-start",
+        "methods": ["POST"],
+        "name": "companion_start",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/stop",
+        "methods": ["POST"],
+        "name": "stop_protected_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/enroll",
+        "methods": ["POST"],
+        "name": "claim_enrollment",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/work",
+        "methods": ["GET"],
+        "name": "agent_work",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/heartbeat",
+        "methods": ["POST"],
+        "name": "agent_heartbeat",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/events",
+        "methods": ["POST"],
+        "name": "agent_event",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/artifacts",
+        "methods": ["POST"],
+        "name": "agent_artifact",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/health",
+        "methods": ["GET"],
+        "name": "health",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.ico",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["GET"],
+        "name": "api_list_scans",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/alfa",
+        "methods": ["GET"],
+        "name": "api_alfa_capability",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/local-analysis",
+        "methods": ["GET"],
+        "name": "api_local_analysis_capability",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/protected-scans",
+        "methods": ["GET"],
+        "name": "api_protected_scan_capability",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans",
+        "methods": ["POST"],
+        "name": "api_create_local_login_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "methods": ["POST"],
+        "name": "api_confirm_local_login",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["POST"],
+        "name": "api_create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["DELETE"],
+        "name": "api_delete_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["GET"],
+        "name": "api_get_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["PUT"],
+        "name": "api_put_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "api_list_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "api_update_manual_check",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}/evidence",
+        "methods": ["POST"],
+        "name": "api_add_manual_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_page_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
+        "methods": ["GET"],
+        "name": "api_page_inspect",
+        "async": true,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings",
+        "methods": ["GET"],
+        "name": "api_list_findings",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["severity", "status", "classification", "q", "page", "page_size"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues/{issue_key:path}",
+        "methods": ["GET"],
+        "name": "api_scan_issue_detail",
+        "async": false,
+        "params": {"path": ["scan_id", "issue_key"], "query": ["sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues",
+        "methods": ["GET"],
+        "name": "api_scan_issues",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/by-rule",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_by_rule",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y",
+        "methods": ["GET"],
+        "name": "api_scan_a11y",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/findings",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_findings",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["wcag_sc", "status", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}",
+        "methods": ["GET"],
+        "name": "api_finding_detail",
+        "async": false,
+        "params": {"path": ["finding_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings/grouped",
+        "methods": ["GET"],
+        "name": "api_scan_findings_grouped",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_a11y_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_a11y_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/comparison",
+        "methods": ["GET"],
+        "name": "api_scan_comparison",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to", "page", "page_size", "category", "pipeline"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/diff",
+        "methods": ["GET"],
+        "name": "api_scan_diff",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scope-preview",
+        "methods": ["GET"],
+        "name": "api_scope_preview",
+        "async": false,
+        "params": {"query": ["url", "whole_host"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/tracking",
+        "methods": ["GET"],
+        "name": "api_tracking",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/",
+        "methods": ["GET"],
+        "name": "root",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/{path:path}",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"path": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/export/{fmt}",
+        "methods": ["GET"],
+        "name": "export_scan",
+        "async": false,
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/blobs/{content_hash}",
+        "methods": ["GET"],
+        "name": "serve_blob",
+        "async": false,
+        "params": {"path": ["content_hash"]},
+        "request_param": null,
+        "background_tasks_param": null
+      }
+    ],
+    "middleware": [
+      ["_ProtectedRequestBodyLimitMiddleware", null, ["db_path", "max_body_bytes"]],
+      ["BaseHTTPMiddleware", "_log_slow_requests", []],
+      ["BaseHTTPMiddleware", "_prevent_protected_response_caching", []],
+      ["BaseHTTPMiddleware", "_require_protected_scan_access", []],
+      ["BaseHTTPMiddleware", "_require_token", []]
+    ],
+    "exception_handlers": {
+      "fastapi.exceptions.RequestValidationError": "_protected_validation_error",
+      "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
+      "starlette.exceptions.HTTPException": "http_exception_handler"
+    },
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
+    "on_shutdown": ["_stop_protected_retention_worker"]
+  },
+  "token-set/dist-built": {
+    "routes": [
+      {"type": "Route", "path": "/openapi.json", "methods": ["GET", "HEAD"], "name": "openapi"},
+      {"type": "Route", "path": "/docs", "methods": ["GET", "HEAD"], "name": "swagger_ui_html"},
+      {
+        "type": "Route",
+        "path": "/docs/oauth2-redirect",
+        "methods": ["GET", "HEAD"],
+        "name": "swagger_ui_redirect"
+      },
+      {"type": "Route", "path": "/redoc", "methods": ["GET", "HEAD"], "name": "redoc_html"},
+      {
+        "type": "Mount",
+        "path": "/app/assets",
+        "methods": [],
+        "name": "app-assets",
+        "app": "StaticFiles"
+      },
+      {
+        "type": "Mount",
+        "path": "/app/fonts",
+        "methods": [],
+        "name": "app-fonts",
+        "app": "StaticFiles"
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["POST"],
+        "name": "create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["GET"],
+        "name": "list_protected_scans",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/identity-context",
+        "methods": ["GET"],
+        "name": "protected_identity_context",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "get_scan",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/issue-index",
+        "methods": ["GET"],
+        "name": "protected_issue_index",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "list_protected_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "update_protected_manual_check",
+        "async": true,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/exports/redacted",
+        "methods": ["POST"],
+        "name": "export_redacted_report",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/agent-enrollments",
+        "methods": ["POST"],
+        "name": "create_enrollment",
+        "async": true,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion",
+        "methods": ["GET"],
+        "name": "get_companion",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion-start",
+        "methods": ["POST"],
+        "name": "companion_start",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/stop",
+        "methods": ["POST"],
+        "name": "stop_protected_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/enroll",
+        "methods": ["POST"],
+        "name": "claim_enrollment",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/work",
+        "methods": ["GET"],
+        "name": "agent_work",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/heartbeat",
+        "methods": ["POST"],
+        "name": "agent_heartbeat",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/events",
+        "methods": ["POST"],
+        "name": "agent_event",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/artifacts",
+        "methods": ["POST"],
+        "name": "agent_artifact",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/health",
+        "methods": ["GET"],
+        "name": "health",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.ico",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["GET"],
+        "name": "api_list_scans",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/alfa",
+        "methods": ["GET"],
+        "name": "api_alfa_capability",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/local-analysis",
+        "methods": ["GET"],
+        "name": "api_local_analysis_capability",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/protected-scans",
+        "methods": ["GET"],
+        "name": "api_protected_scan_capability",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans",
+        "methods": ["POST"],
+        "name": "api_create_local_login_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "methods": ["POST"],
+        "name": "api_confirm_local_login",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["POST"],
+        "name": "api_create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["DELETE"],
+        "name": "api_delete_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["GET"],
+        "name": "api_get_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["PUT"],
+        "name": "api_put_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "api_list_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "api_update_manual_check",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}/evidence",
+        "methods": ["POST"],
+        "name": "api_add_manual_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_page_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
+        "methods": ["GET"],
+        "name": "api_page_inspect",
+        "async": true,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings",
+        "methods": ["GET"],
+        "name": "api_list_findings",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["severity", "status", "classification", "q", "page", "page_size"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues/{issue_key:path}",
+        "methods": ["GET"],
+        "name": "api_scan_issue_detail",
+        "async": false,
+        "params": {"path": ["scan_id", "issue_key"], "query": ["sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues",
+        "methods": ["GET"],
+        "name": "api_scan_issues",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/by-rule",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_by_rule",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y",
+        "methods": ["GET"],
+        "name": "api_scan_a11y",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/findings",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_findings",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["wcag_sc", "status", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}",
+        "methods": ["GET"],
+        "name": "api_finding_detail",
+        "async": false,
+        "params": {"path": ["finding_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings/grouped",
+        "methods": ["GET"],
+        "name": "api_scan_findings_grouped",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_a11y_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_a11y_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/comparison",
+        "methods": ["GET"],
+        "name": "api_scan_comparison",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to", "page", "page_size", "category", "pipeline"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/diff",
+        "methods": ["GET"],
+        "name": "api_scan_diff",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scope-preview",
+        "methods": ["GET"],
+        "name": "api_scope_preview",
+        "async": false,
+        "params": {"query": ["url", "whole_host"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/tracking",
+        "methods": ["GET"],
+        "name": "api_tracking",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/",
+        "methods": ["GET"],
+        "name": "root",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/{path:path}",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"path": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/export/{fmt}",
+        "methods": ["GET"],
+        "name": "export_scan",
+        "async": false,
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/blobs/{content_hash}",
+        "methods": ["GET"],
+        "name": "serve_blob",
+        "async": false,
+        "params": {"path": ["content_hash"]},
+        "request_param": null,
+        "background_tasks_param": null
+      }
+    ],
+    "middleware": [
+      ["_ProtectedRequestBodyLimitMiddleware", null, ["db_path", "max_body_bytes"]],
+      ["BaseHTTPMiddleware", "_log_slow_requests", []],
+      ["BaseHTTPMiddleware", "_prevent_protected_response_caching", []],
+      ["BaseHTTPMiddleware", "_require_protected_scan_access", []],
+      ["BaseHTTPMiddleware", "_require_token", []]
+    ],
+    "exception_handlers": {
+      "fastapi.exceptions.RequestValidationError": "_protected_validation_error",
+      "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
+      "starlette.exceptions.HTTPException": "http_exception_handler"
+    },
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
+    "on_shutdown": ["_stop_protected_retention_worker"]
+  },
+  "token-unset/dist-absent": {
+    "routes": [
+      {"type": "Route", "path": "/openapi.json", "methods": ["GET", "HEAD"], "name": "openapi"},
+      {"type": "Route", "path": "/docs", "methods": ["GET", "HEAD"], "name": "swagger_ui_html"},
+      {
+        "type": "Route",
+        "path": "/docs/oauth2-redirect",
+        "methods": ["GET", "HEAD"],
+        "name": "swagger_ui_redirect"
+      },
+      {"type": "Route", "path": "/redoc", "methods": ["GET", "HEAD"], "name": "redoc_html"},
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["POST"],
+        "name": "create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["GET"],
+        "name": "list_protected_scans",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/identity-context",
+        "methods": ["GET"],
+        "name": "protected_identity_context",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "get_scan",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/issue-index",
+        "methods": ["GET"],
+        "name": "protected_issue_index",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "list_protected_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "update_protected_manual_check",
+        "async": true,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/exports/redacted",
+        "methods": ["POST"],
+        "name": "export_redacted_report",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/agent-enrollments",
+        "methods": ["POST"],
+        "name": "create_enrollment",
+        "async": true,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion",
+        "methods": ["GET"],
+        "name": "get_companion",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion-start",
+        "methods": ["POST"],
+        "name": "companion_start",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/stop",
+        "methods": ["POST"],
+        "name": "stop_protected_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/enroll",
+        "methods": ["POST"],
+        "name": "claim_enrollment",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/work",
+        "methods": ["GET"],
+        "name": "agent_work",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/heartbeat",
+        "methods": ["POST"],
+        "name": "agent_heartbeat",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/events",
+        "methods": ["POST"],
+        "name": "agent_event",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/artifacts",
+        "methods": ["POST"],
+        "name": "agent_artifact",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/health",
+        "methods": ["GET"],
+        "name": "health",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.ico",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["GET"],
+        "name": "api_list_scans",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/alfa",
+        "methods": ["GET"],
+        "name": "api_alfa_capability",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/local-analysis",
+        "methods": ["GET"],
+        "name": "api_local_analysis_capability",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/protected-scans",
+        "methods": ["GET"],
+        "name": "api_protected_scan_capability",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans",
+        "methods": ["POST"],
+        "name": "api_create_local_login_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "methods": ["POST"],
+        "name": "api_confirm_local_login",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["POST"],
+        "name": "api_create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["DELETE"],
+        "name": "api_delete_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["GET"],
+        "name": "api_get_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["PUT"],
+        "name": "api_put_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "api_list_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "api_update_manual_check",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}/evidence",
+        "methods": ["POST"],
+        "name": "api_add_manual_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_page_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
+        "methods": ["GET"],
+        "name": "api_page_inspect",
+        "async": true,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings",
+        "methods": ["GET"],
+        "name": "api_list_findings",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["severity", "status", "classification", "q", "page", "page_size"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues/{issue_key:path}",
+        "methods": ["GET"],
+        "name": "api_scan_issue_detail",
+        "async": false,
+        "params": {"path": ["scan_id", "issue_key"], "query": ["sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues",
+        "methods": ["GET"],
+        "name": "api_scan_issues",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/by-rule",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_by_rule",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y",
+        "methods": ["GET"],
+        "name": "api_scan_a11y",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/findings",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_findings",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["wcag_sc", "status", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}",
+        "methods": ["GET"],
+        "name": "api_finding_detail",
+        "async": false,
+        "params": {"path": ["finding_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings/grouped",
+        "methods": ["GET"],
+        "name": "api_scan_findings_grouped",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_a11y_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_a11y_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/comparison",
+        "methods": ["GET"],
+        "name": "api_scan_comparison",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to", "page", "page_size", "category", "pipeline"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/diff",
+        "methods": ["GET"],
+        "name": "api_scan_diff",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scope-preview",
+        "methods": ["GET"],
+        "name": "api_scope_preview",
+        "async": false,
+        "params": {"query": ["url", "whole_host"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/tracking",
+        "methods": ["GET"],
+        "name": "api_tracking",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/",
+        "methods": ["GET"],
+        "name": "root",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/{path:path}",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"path": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/export/{fmt}",
+        "methods": ["GET"],
+        "name": "export_scan",
+        "async": false,
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/blobs/{content_hash}",
+        "methods": ["GET"],
+        "name": "serve_blob",
+        "async": false,
+        "params": {"path": ["content_hash"]},
+        "request_param": null,
+        "background_tasks_param": null
+      }
+    ],
+    "middleware": [
+      ["_ProtectedRequestBodyLimitMiddleware", null, ["db_path", "max_body_bytes"]],
+      ["BaseHTTPMiddleware", "_log_slow_requests", []],
+      ["BaseHTTPMiddleware", "_prevent_protected_response_caching", []],
+      ["BaseHTTPMiddleware", "_require_protected_scan_access", []]
+    ],
+    "exception_handlers": {
+      "fastapi.exceptions.RequestValidationError": "_protected_validation_error",
+      "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
+      "starlette.exceptions.HTTPException": "http_exception_handler"
+    },
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
+    "on_shutdown": ["_stop_protected_retention_worker"]
+  },
+  "token-unset/dist-built": {
+    "routes": [
+      {"type": "Route", "path": "/openapi.json", "methods": ["GET", "HEAD"], "name": "openapi"},
+      {"type": "Route", "path": "/docs", "methods": ["GET", "HEAD"], "name": "swagger_ui_html"},
+      {
+        "type": "Route",
+        "path": "/docs/oauth2-redirect",
+        "methods": ["GET", "HEAD"],
+        "name": "swagger_ui_redirect"
+      },
+      {"type": "Route", "path": "/redoc", "methods": ["GET", "HEAD"], "name": "redoc_html"},
+      {
+        "type": "Mount",
+        "path": "/app/assets",
+        "methods": [],
+        "name": "app-assets",
+        "app": "StaticFiles"
+      },
+      {
+        "type": "Mount",
+        "path": "/app/fonts",
+        "methods": [],
+        "name": "app-fonts",
+        "app": "StaticFiles"
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["POST"],
+        "name": "create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans",
+        "methods": ["GET"],
+        "name": "list_protected_scans",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/identity-context",
+        "methods": ["GET"],
+        "name": "protected_identity_context",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "get_scan",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/issue-index",
+        "methods": ["GET"],
+        "name": "protected_issue_index",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "list_protected_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "update_protected_manual_check",
+        "async": true,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/exports/redacted",
+        "methods": ["POST"],
+        "name": "export_redacted_report",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/agent-enrollments",
+        "methods": ["POST"],
+        "name": "create_enrollment",
+        "async": true,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion",
+        "methods": ["GET"],
+        "name": "get_companion",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/companion-start",
+        "methods": ["POST"],
+        "name": "companion_start",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/protected-scans/{scan_id:int}/stop",
+        "methods": ["POST"],
+        "name": "stop_protected_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/enroll",
+        "methods": ["POST"],
+        "name": "claim_enrollment",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/work",
+        "methods": ["GET"],
+        "name": "agent_work",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/heartbeat",
+        "methods": ["POST"],
+        "name": "agent_heartbeat",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/events",
+        "methods": ["POST"],
+        "name": "agent_event",
+        "async": true,
+        "params": {"path": ["enrollment_id"], "body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/agents/{enrollment_id}/artifacts",
+        "methods": ["POST"],
+        "name": "agent_artifact",
+        "async": true,
+        "params": {"path": ["enrollment_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/health",
+        "methods": ["GET"],
+        "name": "health",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.ico",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/favicon.svg",
+        "methods": ["GET"],
+        "name": "favicon",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["GET"],
+        "name": "api_list_scans",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/alfa",
+        "methods": ["GET"],
+        "name": "api_alfa_capability",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/local-analysis",
+        "methods": ["GET"],
+        "name": "api_local_analysis_capability",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/capabilities/protected-scans",
+        "methods": ["GET"],
+        "name": "api_protected_scan_capability",
+        "async": false,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans",
+        "methods": ["POST"],
+        "name": "api_create_local_login_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "methods": ["POST"],
+        "name": "api_confirm_local_login",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans",
+        "methods": ["POST"],
+        "name": "api_create_scan",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}",
+        "methods": ["DELETE"],
+        "name": "api_delete_scan",
+        "async": true,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["GET"],
+        "name": "api_get_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/evaluation",
+        "methods": ["PUT"],
+        "name": "api_put_evaluation",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks",
+        "methods": ["GET"],
+        "name": "api_list_manual_checks",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}",
+        "methods": ["PATCH"],
+        "name": "api_update_manual_check",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/manual-checks/{criterion_sc}/evidence",
+        "methods": ["POST"],
+        "name": "api_add_manual_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "criterion_sc"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_page_evidence",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
+        "methods": ["GET"],
+        "name": "api_page_inspect",
+        "async": true,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings",
+        "methods": ["GET"],
+        "name": "api_list_findings",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["severity", "status", "classification", "q", "page", "page_size"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues/{issue_key:path}",
+        "methods": ["GET"],
+        "name": "api_scan_issue_detail",
+        "async": false,
+        "params": {"path": ["scan_id", "issue_key"], "query": ["sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issues",
+        "methods": ["GET"],
+        "name": "api_scan_issues",
+        "async": false,
+        "params": {
+          "path": ["scan_id"],
+          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+        },
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/by-rule",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_by_rule",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y",
+        "methods": ["GET"],
+        "name": "api_scan_a11y",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/a11y/findings",
+        "methods": ["GET"],
+        "name": "api_scan_a11y_findings",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["wcag_sc", "status", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}",
+        "methods": ["GET"],
+        "name": "api_finding_detail",
+        "async": false,
+        "params": {"path": ["finding_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/findings/grouped",
+        "methods": ["GET"],
+        "name": "api_scan_findings_grouped",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["status"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/bulk-status",
+        "methods": ["POST"],
+        "name": "api_bulk_set_a11y_finding_status",
+        "async": true,
+        "params": {"body": ["body"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/a11y-findings/{finding_id:int}/status",
+        "methods": ["POST"],
+        "name": "api_set_a11y_finding_status",
+        "async": true,
+        "params": {"path": ["finding_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/comparison",
+        "methods": ["GET"],
+        "name": "api_scan_comparison",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to", "page", "page_size", "category", "pipeline"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/diff",
+        "methods": ["GET"],
+        "name": "api_scan_diff",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["compare_to"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scope-preview",
+        "methods": ["GET"],
+        "name": "api_scope_preview",
+        "async": false,
+        "params": {"query": ["url", "whole_host"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/tracking",
+        "methods": ["GET"],
+        "name": "api_tracking",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/",
+        "methods": ["GET"],
+        "name": "root",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/{path:path}",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"path": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app/",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/app",
+        "methods": ["GET"],
+        "name": "spa_shell",
+        "async": false,
+        "params": {"query": ["path"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/export/{fmt}",
+        "methods": ["GET"],
+        "name": "export_scan",
+        "async": false,
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/blobs/{content_hash}",
+        "methods": ["GET"],
+        "name": "serve_blob",
+        "async": false,
+        "params": {"path": ["content_hash"]},
+        "request_param": null,
+        "background_tasks_param": null
+      }
+    ],
+    "middleware": [
+      ["_ProtectedRequestBodyLimitMiddleware", null, ["db_path", "max_body_bytes"]],
+      ["BaseHTTPMiddleware", "_log_slow_requests", []],
+      ["BaseHTTPMiddleware", "_prevent_protected_response_caching", []],
+      ["BaseHTTPMiddleware", "_require_protected_scan_access", []]
+    ],
+    "exception_handlers": {
+      "fastapi.exceptions.RequestValidationError": "_protected_validation_error",
+      "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
+      "starlette.exceptions.HTTPException": "http_exception_handler"
+    },
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
+    "on_shutdown": ["_stop_protected_retention_worker"]
+  }
+}

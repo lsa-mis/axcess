@@ -23,6 +23,7 @@ import re
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.interaction import InteractionProbe
@@ -36,23 +37,13 @@ def _file_url(name: str) -> str:
 
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``, and
+# the tests that take ``browser`` build and close their own.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
     try:
@@ -68,7 +59,6 @@ def axe() -> AxeAnalyzer:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_reveals_violation_that_only_exists_after_a_click(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The unlabelled input appears only after "Add another guest"."""
     await page.goto(_file_url("hidden_state.html"))
@@ -86,7 +76,6 @@ async def test_reveals_violation_that_only_exists_after_a_click(page, axe) -> No
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_load_state_violation_is_never_reported_again(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The core dedupe guarantee.
 
@@ -108,7 +97,6 @@ async def test_load_state_violation_is_never_reported_again(page, axe) -> None: 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_never_operates_a_destructive_control(page, axe) -> None:  # type: ignore[no-untyped-def]
     """ "Sign out" must not be clicked, and the page proves it."""
     await page.goto(_file_url("hidden_state.html"))
@@ -121,7 +109,6 @@ async def test_never_operates_a_destructive_control(page, axe) -> None:  # type:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_repeated_controls_are_sampled_not_exhausted(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Ten same-shaped buttons must not produce ten clicks."""
     await page.goto(_file_url("hidden_state.html"))
@@ -134,7 +121,6 @@ async def test_repeated_controls_are_sampled_not_exhausted(page, axe) -> None:  
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_click_budget_is_respected(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A tight budget bounds the work even on a page full of controls."""
     await page.goto(_file_url("hidden_state.html"))
@@ -151,7 +137,6 @@ async def test_click_budget_is_respected(page, axe) -> None:  # type: ignore[no-
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_control_is_operated_only_once(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Regression: the nested sweep must not re-click its own parent.
 
@@ -547,7 +532,6 @@ async def test_reopens_the_full_path_when_a_nested_menu_closes_all_ancestors(pag
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_coverage_counts_operated_controls_and_names_the_bound(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A capped sweep must report what it left alone, not just what it did.
 
@@ -569,7 +553,6 @@ async def test_coverage_counts_operated_controls_and_names_the_bound(page, axe) 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_controls_revealed_by_a_click_are_counted_as_discovered(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Depth-limited exploration still records the controls it uncovered."""
     await page.goto(_file_url("nested_depth.html"))
@@ -588,7 +571,6 @@ async def test_controls_revealed_by_a_click_are_counted_as_discovered(page, axe)
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_is_closed_before_the_next_control_is_used(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Escape-closable and button-closable dialogs must both be cleared.
 
@@ -613,7 +595,6 @@ async def test_a_dialog_is_closed_before_the_next_control_is_used(page, axe) -> 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_that_will_not_close_stops_the_page_and_is_reported(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The stuck dialog must end the sweep rather than click through an overlay.
 
@@ -642,7 +623,6 @@ async def test_a_dialog_that_will_not_close_stops_the_page_and_is_reported(page,
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_controls_inside_a_dialog_are_still_explored_before_it_closes(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Closing the dialog must not cost the coverage inside it.
 
@@ -660,7 +640,6 @@ async def test_controls_inside_a_dialog_are_still_explored_before_it_closes(page
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_ignoring_escape_is_closed_by_its_own_close_control(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Escape is not the only exit, so a dialog that ignores it still closes.
 
@@ -686,7 +665,6 @@ async def test_a_dialog_ignoring_escape_is_closed_by_its_own_close_control(page,
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # type: ignore[no-untyped-def]
     """role="dialog" alone is not modal, and must not cost the rest of the page.
 
@@ -713,7 +691,6 @@ async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # ty
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_capture_records_the_state_a_finding_was_revealed_in(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Every revealed finding must be able to reach the markup it was found in.
 
@@ -742,7 +719,6 @@ async def test_capture_records_the_state_a_finding_was_revealed_in(page, axe) ->
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_failed_capture_costs_nothing_but_the_capture(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A capture that throws must not take the sweep down with it.
 
@@ -772,7 +748,6 @@ async def test_a_failed_capture_costs_nothing_but_the_capture(page, axe) -> None
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_grid_of_inert_controls_does_not_consume_the_page_budget(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A date picker must not cost a page its whole sweep.
 
@@ -797,7 +772,6 @@ async def test_a_grid_of_inert_controls_does_not_consume_the_page_budget(page, a
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_small_group_of_controls_is_never_sampled(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Three duds out of four is not evidence about the fourth.
 
@@ -831,7 +805,6 @@ async def test_a_small_group_of_controls_is_never_sampled(page, axe) -> None:  #
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_revealed_element_is_photographed_while_its_state_is_open(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The only moment the element is on screen.
 
@@ -862,7 +835,6 @@ async def test_a_revealed_element_is_photographed_while_its_state_is_open(page, 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_screenshot_failure_costs_nothing_but_the_screenshot(page, axe) -> None:  # type: ignore[no-untyped-def]
     """It sits ahead of the dialog-dismissal loop, like the DOM capture.
 
