@@ -23,6 +23,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.keyboard.base import RULE_STUCK
@@ -39,28 +40,12 @@ def _file_url(name: str) -> str:
 # installed. Mirrors how the existing axe integration tests gate.
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    """One headless chromium per test session.
-
-    A fresh context per test (in the page fixture) gives test isolation
-    without paying the browser-launch cost five times.
-    """
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     ctx = await browser.new_context()
     try:
@@ -77,7 +62,6 @@ async def page(browser):  # type: ignore[no-untyped-def]
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-untyped-def]
     """A normal page with several focusable elements: zero findings."""
     await page.goto(_file_url("clean.html"))
@@ -89,7 +73,6 @@ async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-unty
     )
 
 
-@pytest.mark.asyncio
 async def test_modal_with_proper_escape_handler_clean(page) -> None:  # type: ignore[no-untyped-def]
     """A modal that releases focus on Escape isn't flagged as no-escape."""
     await page.goto(_file_url("modal_clean.html"))
@@ -105,7 +88,6 @@ async def test_modal_with_proper_escape_handler_clean(page) -> None:  # type: ig
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_shadow_dom_component_is_not_a_stuck_trap(page) -> None:  # type: ignore[no-untyped-def]
     """A web component with several internal focusable controls.
 
@@ -132,7 +114,6 @@ async def test_shadow_dom_component_is_not_a_stuck_trap(page) -> None:  # type: 
     )
 
 
-@pytest.mark.asyncio
 async def test_hidden_iframes_are_not_flagged(page) -> None:  # type: ignore[no-untyped-def]
     """Tracking / ad / pixel iframes aren't keyboard-reachable.
 
@@ -155,7 +136,6 @@ async def test_hidden_iframes_are_not_flagged(page) -> None:  # type: ignore[no-
     assert findings == []
 
 
-@pytest.mark.asyncio
 async def test_visible_untitled_iframe_is_not_called_a_keyboard_trap(page) -> None:  # type: ignore[no-untyped-def]
     """A missing frame title does not establish that keyboard focus is trapped."""
     await page.set_content(
@@ -168,7 +148,6 @@ async def test_visible_untitled_iframe_is_not_called_a_keyboard_trap(page) -> No
     assert findings == []
 
 
-@pytest.mark.asyncio
 async def test_two_control_page_wrap_is_not_a_trap(page) -> None:  # type: ignore[no-untyped-def]
     """A normal A→B→A tab sequence is page wrapping, not a focus trap."""
     await page.set_content(
@@ -180,7 +159,6 @@ async def test_two_control_page_wrap_is_not_a_trap(page) -> None:  # type: ignor
     assert findings == []
 
 
-@pytest.mark.asyncio
 async def test_opaque_iframe_focus_is_not_misread_as_stuck(page) -> None:  # type: ignore[no-untyped-def]
     """The parent sees only the iframe while focus moves through inner controls."""
     await page.set_content(
@@ -198,7 +176,6 @@ async def test_opaque_iframe_focus_is_not_misread_as_stuck(page) -> None:  # typ
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_detects_stuck_focus_from_swallowed_tab(page) -> None:  # type: ignore[no-untyped-def]
     """A button whose keydown handler eats Tab → keyboard-trap-stuck."""
     await page.goto(_file_url("tab_loop.html"))
@@ -223,7 +200,6 @@ async def test_detects_stuck_focus_from_swallowed_tab(page) -> None:  # type: ig
     assert all("6 failed exit attempts total" in f.failure_summary for f in stuck)
 
 
-@pytest.mark.asyncio
 async def test_forward_only_block_is_suppressed_when_reverse_exits(page) -> None:  # type: ignore[no-untyped-def]
     """A forward observation alone cannot support a no-keyboard-trap lead."""
     await page.set_content(
@@ -238,7 +214,6 @@ async def test_forward_only_block_is_suppressed_when_reverse_exits(page) -> None
     assert findings == []
 
 
-@pytest.mark.asyncio
 async def test_modal_without_escape_is_not_automatically_a_trap(page) -> None:  # type: ignore[no-untyped-def]
     """Escape is not the only conforming keyboard method for leaving a component."""
     await page.goto(_file_url("modal_no_escape.html"))
@@ -247,7 +222,6 @@ async def test_modal_without_escape_is_not_automatically_a_trap(page) -> None:  
     assert findings == []
 
 
-@pytest.mark.asyncio
 async def test_untitled_iframe_fixture_is_not_a_keyboard_trap(page) -> None:  # type: ignore[no-untyped-def]
     """Frame naming is left to the DOM engines and not mapped to SC 2.1.2."""
     await page.goto(_file_url("iframe_no_exit.html"))
@@ -261,7 +235,6 @@ async def test_untitled_iframe_fixture_is_not_a_keyboard_trap(page) -> None:  # 
 # --------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
 async def test_probe_never_raises_on_quirky_page(page) -> None:  # type: ignore[no-untyped-def]
     """A pathological page (no focusables, weird markup) must not crash."""
     await page.set_content("<!doctype html><html><body><p>Just some text.</p></body></html>")

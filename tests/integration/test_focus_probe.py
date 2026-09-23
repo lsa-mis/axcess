@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.focus.base import RULE_FOCUS_OBSCURED, RULE_POSITIVE_TABINDEX
@@ -28,23 +29,12 @@ def _file_url(name: str) -> str:
 
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
     try:
@@ -54,7 +44,6 @@ async def page(browser):  # type: ignore[no-untyped-def]
         await ctx.close()
 
 
-@pytest.mark.asyncio
 async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-untyped-def]
     await page.goto(_file_url("clean.html"))
     findings = await FocusProbe().run(page)
@@ -63,7 +52,6 @@ async def test_clean_page_has_no_findings(page) -> None:  # type: ignore[no-unty
     )
 
 
-@pytest.mark.asyncio
 async def test_detects_element_under_fixed_header(page) -> None:  # type: ignore[no-untyped-def]
     await page.goto(_file_url("obscured.html"))
     findings = await FocusProbe().run(page)
@@ -77,7 +65,6 @@ async def test_detects_element_under_fixed_header(page) -> None:  # type: ignore
     assert flagged.to_repo_kwargs()["pipeline"] == "focus"
 
 
-@pytest.mark.asyncio
 async def test_flags_positive_tabindex_only(page) -> None:  # type: ignore[no-untyped-def]
     await page.goto(_file_url("tabindex.html"))
     findings = await FocusProbe().run(page)

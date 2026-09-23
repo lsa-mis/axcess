@@ -5,29 +5,25 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.axe import AxeAnalyzer
 
 pytest.importorskip("playwright.async_api")
-pytestmark = pytest.mark.integration
+# One browser per module (tests/integration/conftest.py), so the test runs on
+# the module's event loop. It still gets its own context from ``page``.
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio(loop_scope="module")]
 
 
-@pytest.fixture
-async def page():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    browser = await pw.chromium.launch(headless=True)
+@pytest_asyncio.fixture(loop_scope="module")
+async def page(browser):  # type: ignore[no-untyped-def]
     context = await browser.new_context()
     try:
         yield await context.new_page()
     finally:
         await context.close()
-        await browser.close()
-        await pw.stop()
 
 
-@pytest.mark.asyncio
 async def test_axe_runs_without_weakening_strict_content_security_policy(page) -> None:  # type: ignore[no-untyped-def]
     await page.set_content(
         "<!doctype html>"
