@@ -2,7 +2,7 @@
 
 The goldens under ``golden/`` pin what the FastAPI app exposes today so a
 refactor of ``create_app()`` can be shown to leave it unchanged. They are
-only ever rewritten on purpose: set ``AXCESS_UPDATE_GOLDEN=1`` and the tests
+only ever rewritten on purpose: set ``AUDIT_UPDATE_GOLDEN=1`` and the tests
 write what they observe instead of comparing, then fail, so an update run can
 never leave the suite green (and under ``CI`` they refuse to write at all). A
 missing golden is a failure, never a silent pass.
@@ -29,7 +29,7 @@ from typing import Any
 import pytest
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
-UPDATE_ENV = "AXCESS_UPDATE_GOLDEN"
+UPDATE_ENV = "AUDIT_UPDATE_GOLDEN"
 _MAX_DIFF_LINES = 200
 _INLINE_WIDTH = 100
 
