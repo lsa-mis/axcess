@@ -1,33 +1,31 @@
 /**
- * A single report's overview: progress while it runs, coverage and entry
- * points once it finishes.
+ * A report's own URL: progress while it runs, why it stopped if it failed,
+ * and the report itself once it finishes.
  *
  * This route has three faces, chosen by scan status. Running shows the
- * progress panel and a cancel control. Completed shows coverage and the
- * links into the evidence. Failed or interrupted shows why and offers a
- * retry. They are one route rather than three because the reader does not
- * navigate between them: a scan finishes underneath them while they watch.
+ * progress panel and a cancel control. Failed or interrupted shows why and
+ * offers a retry. Completed redirects to the Issues table, which is where a
+ * report opens: it used to have an Overview tab of its own here, and its
+ * numbers and coverage now sit above the table (see ``ReportSummary``). The
+ * redirect keeps every existing ``/scans/:id`` link working, and a scan that
+ * finishes while the reader watches lands them on its report.
  *
- * The mutations here are the report's lifecycle actions -- cancel, retry,
- * delete -- and each has to reconcile the cache by hand afterwards, since
- * they change records other screens are already showing.
+ * The mutations here are the scan's lifecycle actions -- cancel, retry --
+ * and each has to reconcile the cache by hand afterwards, since they change
+ * records other screens are already showing.
  */
-import { Link, useNavigate, useParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Navigate, useNavigate, useParams } from "react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Accessibility,
-  AlertOctagon,
   Clock3,
   FileOutput,
-  ArrowRight,
   Loader2,
   Pause,
   Play,
   Search,
   ShieldCheck,
   Square,
-  Trash2,
 } from "lucide-react";
 import { api } from "../api/client";
 import type {
@@ -36,17 +34,12 @@ import type {
   ScanMethodState,
   ScanProgress,
 } from "../api/types";
-import ReportHeader, { ReportMeta } from "../components/ReportHeader";
-// The same helper the topbar trail uses, so the two can never disagree.
-import { siteLabel } from "../components/ReportCrumb";
-import ExportMenu from "../components/ExportMenu";
-import MethodCoverageLedger from "../components/MethodCoverageLedger";
+import { BlockedScanNotice } from "../components/ReportSummary";
 import {
   Button,
   Card,
   LinkButton,
   PageHeader,
-  StatCard,
 } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { formatScanEta } from "../lib/scanProgress";
@@ -118,25 +111,6 @@ export default function ScanDetailRoute() {
       if (scan_id !== id) navigate(`/scans/${scan_id}`, { replace: true });
     },
   });
-  // Only for the counts on the workspace links, and only once the scan is
-  // finished: a running scan's issue list changes under the reader and is
-  // not worth the query.
-  const { data: issueSummary } = useQuery({
-    queryKey: ["issues", id, "workspace-summary"],
-    queryFn: () => api.listIssues(id),
-    enabled: Number.isFinite(id) && data?.status === "completed",
-  });
-  // Delete removes the cache entry rather than invalidating it: there is no
-  // record left to refetch, and an invalidation would send this screen to
-  // the server for a report that is gone.
-  const deleteScan = useMutation({
-    mutationFn: () => api.deleteScan(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["scans"] });
-      qc.removeQueries({ queryKey: ["scan", id] });
-      navigate("/scans", { replace: true });
-    },
-  });
 
   if (error) {
     return (
@@ -163,263 +137,81 @@ export default function ScanDetailRoute() {
     );
   }
 
-  const isComplete = data.status === "completed";
-  const issueOccurrences = issueSummary?.occurrence_counts.all_evidence ?? 0;
-  const issueGroups = issueSummary?.rows.length ?? 0;
-  const reviewedBackingFindings =
-    issueSummary?.rows
-      .filter((issue) => issue.review_lane !== "informational")
-      .reduce(
-        (total, issue) =>
-          total +
-          (issue.status_summary.in_progress ?? 0) +
-          (issue.status_summary.remediated ?? 0) +
-          (issue.status_summary.accepted_risk ?? 0) +
-          (issue.status_summary.false_positive ?? 0),
-        0,
-      ) ?? 0;
-  const rejectedBackingFindings =
-    issueSummary?.rows
-      .filter((issue) => issue.review_lane !== "informational")
-      .reduce(
-        (total, issue) => total + (issue.status_summary.false_positive ?? 0),
-        0,
-      ) ?? 0;
-  const observedRejectionRate = reviewedBackingFindings
-    ? (rejectedBackingFindings / reviewedBackingFindings) * 100
-    : null;
+  if (data.status === "completed") {
+    return <Navigate replace to={`/scans/${data.id}/issues`} />;
+  }
 
   return (
     <>
-      {/* A completed scan is a report, so it wears the report chrome: same
-          title/meta/actions/tabs as Issues and Verify changes. A scan that
-          never produced one keeps the plainer page header, there are no
-          other views of it to tab between. The "Compare" button is gone
-          because "Verify changes" is now a tab a few pixels below it. */}
-      {isComplete ? (
-        <ReportHeader
-          tabs
-          scanId={data.id}
-          previousScanId={data.previous_scan_id}
-          // "Overview" and not "Report #46": the topbar trail already names the
-          // report and the site, so repeating the number here spent the page's
-          // one loudest line on something the reader had just read.
-          title="Overview"
-          meta={
-            <ReportMeta
-              note=""
-              // Crawl counts lived here and measured the crawler rather than
-              // the audit: how many pages were fetched says nothing about what
-              // was found, and it was the first thing under the title. The
-              // page-level numbers below carry the findings instead.
-              // The site joins the completion time on the line already here
-              // rather than taking a row of its own. The topbar trail names it
-              // too, but the trail truncates, and it is absent from a
-              // screenshot, a print, or anything pasted into a ticket -- which
-              // is most of how this page leaves the app. The in-progress and
-              // failed headers below already show it, so a completed report
-              // was the one state that dropped it.
-              counts={[
-                siteLabel(data.seed_url),
-                data.finished_at ? `Completed ${formatCompleted(data.finished_at)}` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            />
-          }
-          actions={
-            <>
-              <ExportMenu scanId={data.id} />
-              <LinkButton to={`/scans/${data.id}/issues`} variant="primary">
-                Open Issue Groups
-                <ArrowRight className="h-4 w-4" aria-hidden />
-              </LinkButton>
-            </>
-          }
-        />
-      ) : (
-        <PageHeader title={`Scan #${data.id}`} subtitle={data.seed_url} />
-      )}
-
-      {deleteScan.error && (
-        <Card
-          className="mb-4 border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
-          role="alert"
-        >
-          Couldn&rsquo;t delete scan:{" "}
-          {deleteScan.error instanceof Error
-            ? deleteScan.error.message
-            : String(deleteScan.error)}
-        </Card>
-      )}
+      <PageHeader title={`Scan #${data.id}`} subtitle={data.seed_url} />
 
       {data.blocked && (
         <BlockedScanNotice scanId={data.id} blocked={data.blocked} />
       )}
 
-      {!isComplete ? (
-        <Card className="p-5">
-          {/* "No report was produced" was told to scans that had produced
-              thousands of findings across hundreds of pages, because it keyed
-              on the status rather than on whether anything was collected. A
-              stopped scan keeps everything it reached; what it cannot claim is
-              that the site was covered. Say that, and leave the evidence
-              reachable. */}
-          <h2 className="font-semibold text-fg">
-            {data.page_count > 0 ? "Partial report" : "No report was produced"}
-          </h2>
-          <p className="mt-1 text-sm text-fg-muted">
-            {data.page_count > 0 ? (
-              <>
-                This scan ended as <strong>{data.status}</strong> after{" "}
-                {data.page_count.toLocaleString()} page
-                {data.page_count === 1 ? "" : "s"}. Everything it reached is
-                saved and can be reviewed below; the rest of the site was not
-                visited, so this is not evidence of full coverage.
-              </>
-            ) : (
-              <>
-                This scan ended as <strong>{data.status}</strong> before any page
-                finished. No report evidence was created.
-              </>
-            )}
+      <Card className="p-5">
+        {/* "No report was produced" was told to scans that had produced
+            thousands of findings across hundreds of pages, because it keyed
+            on the status rather than on whether anything was collected. A
+            stopped scan keeps everything it reached; what it cannot claim is
+            that the site was covered. Say that, and leave the evidence
+            reachable. */}
+        <h2 className="font-semibold text-fg">
+          {data.page_count > 0 ? "Partial report" : "No report was produced"}
+        </h2>
+        <p className="mt-1 text-sm text-fg-muted">
+          {data.page_count > 0 ? (
+            <>
+              This scan ended as <strong>{data.status}</strong> after{" "}
+              {data.page_count.toLocaleString()} page
+              {data.page_count === 1 ? "" : "s"}. Everything it reached is
+              saved and can be reviewed below; the rest of the site was not
+              visited, so this is not evidence of full coverage.
+            </>
+          ) : (
+            <>
+              This scan ended as <strong>{data.status}</strong> before any page
+              finished. No report evidence was created.
+            </>
+          )}
+        </p>
+        {data.failure_reason && (
+          <p className="mt-3 rounded-xs border border-sev-critical/30 bg-sev-critical-bg p-3 text-sm text-sev-critical">
+            <strong>Why it failed:</strong> {data.failure_reason}
           </p>
-          {data.failure_reason && (
-            <p className="mt-3 rounded-xs border border-sev-critical/30 bg-sev-critical-bg p-3 text-sm text-sev-critical">
-              <strong>Why it failed:</strong> {data.failure_reason}
-            </p>
-          )}
-          {retryBalanced.error && (
-            <p className="mt-3 text-sm text-sev-critical" role="alert">
-              Couldn&rsquo;t restart this scan: {retryBalanced.error.message}
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => retryBalanced.mutate()}
-              disabled={retryBalanced.isPending}
-            >
-              {retryBalanced.isPending
-                ? "Restarting scan…"
-                : "Retry with balanced settings"}
-            </Button>
-            <LinkButton
-              to={`/scans/new?url=${encodeURIComponent(data.seed_url)}`}
-              variant="secondary"
-            >
-              Review settings first
+        )}
+        {retryBalanced.error && (
+          <p className="mt-3 text-sm text-sev-critical" role="alert">
+            Couldn&rsquo;t restart this scan: {retryBalanced.error.message}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => retryBalanced.mutate()}
+            disabled={retryBalanced.isPending}
+          >
+            {retryBalanced.isPending
+              ? "Restarting scan…"
+              : "Retry with balanced settings"}
+          </Button>
+          <LinkButton
+            to={`/scans/new?url=${encodeURIComponent(data.seed_url)}`}
+            variant="secondary"
+          >
+            Review settings first
+          </LinkButton>
+          {/* Without this the page said evidence "remains available" and
+              then offered no way to reach it, so the only route onward was
+              to run the scan again. */}
+          {data.page_count > 0 && (
+            <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
+              Review what was collected
             </LinkButton>
-            {/* Without this the page said evidence "remains available" and
-                then offered no way to reach it, so the only route onward was
-                to run the scan again. */}
-            {data.page_count > 0 && (
-              <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
-                Review what was collected
-              </LinkButton>
-            )}
-          </div>
-        </Card>
-      ) : (
-        <>
-          {/* One row of numbers, one ledger of methods. The page used to lead
-              with a banner restating the counts, then print Likely barriers,
-              Review leads, Pages crawled and Occurrences a second time in a
-              different tile style, then repeat "open the issues" at the
-              bottom under a button already in the header. */}
-          {/* Read left to right as the scan itself ran: how much was tested,
-              what that turned up, how those findings group, and how much of
-              the site only existed after a control was used. Barriers and
-              Review leads used to lead as two tiles; they are two lanes of the
-              same issue groups, and splitting them put a judgement call in
-              front of the reader before the size of the evidence. */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Pages Tested"
-              value={data.page_count.toLocaleString()}
-              hint={`${data.error_count.toLocaleString()} crawl errors`}
-              tone={data.error_count ? "major" : "default"}
-            />
-            <StatCard
-              label="Issues Found"
-              value={issueSummary ? issueOccurrences.toLocaleString() : "n/a"}
-            />
-            <StatCard
-              label="Issue Groups"
-              value={issueSummary ? issueGroups.toLocaleString() : "n/a"}
-            />
-            {/* Pages alone understate an application whose content mostly does
-                not exist until a control is used. */}
-            <StatCard
-              label="DOM States Found"
-              value={(data.dom_state_count ?? 0).toLocaleString()}
-              hint="Reached by operating controls"
-            />
-          </div>
-
-          <MethodCoverageLedger
-            scanId={data.id}
-            methods={data.methods_used}
-            rows={issueSummary?.rows}
-            className="mt-6"
-          />
-
-          <details className="mt-5 rounded-xs border border-border bg-surface p-4 shadow-card">
-            <summary className="min-h-target cursor-pointer py-2 font-semibold text-fg">
-              Expert tools and scan details
-            </summary>
-            <div className="border-t border-border pt-4">
-              <div className="flex flex-wrap gap-2">
-                <LinkButton to={`/scans/${data.id}/a11y`} variant="secondary">
-                  <Accessibility className="h-4 w-4" aria-hidden /> DOM engines
-                </LinkButton>
-                <LinkButton
-                  to={`/scans/${data.id}/findings`}
-                  variant="secondary"
-                >
-                  Image evidence ({data.finding_count})
-                </LinkButton>
-              </div>
-              <p className="mt-4 text-sm text-fg-muted">
-                Observed reviewer rejection rate:{" "}
-                <strong>
-                  {observedRejectionRate == null
-                    ? "not measured yet"
-                    : `${observedRejectionRate.toFixed(1)}%`}
-                </strong>
-                {observedRejectionRate != null &&
-                  ` (${rejectedBackingFindings} of ${reviewedBackingFindings} reviewed findings marked false positive)`}
-                . This is a result from this report, not a general
-                detector-accuracy claim.
-              </p>
-              <details className="mt-4 border-t border-border pt-3">
-                <summary className="min-h-target cursor-pointer py-2 text-sm font-semibold text-sev-critical">
-                  Danger zone
-                </summary>
-                <p className="text-sm text-fg-muted">
-                  Deleting removes this scan and its report evidence. Shared
-                  image blobs may remain.
-                </p>
-                <Button
-                  variant="ghost"
-                  disabled={deleteScan.isPending}
-                  className="mt-2 text-sev-critical hover:bg-sev-critical-bg"
-                  onClick={() => {
-                    const ok = window.confirm(
-                      `Delete scan #${data.id} (${data.seed_url})?\n\nThis permanently removes the scan, its pages, findings, and history. This cannot be undone.`,
-                    );
-                    if (ok) deleteScan.mutate();
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  {deleteScan.isPending ? "Deleting…" : "Delete report"}
-                </Button>
-              </details>
-            </div>
-          </details>
-        </>
-      )}
+          )}
+        </div>
+      </Card>
     </>
   );
 }
@@ -770,45 +562,4 @@ function ProgressStage({
       <p className="mt-2 text-xs text-fg-muted">{detail}</p>
     </div>
   );
-}
-function BlockedScanNotice({
-  scanId,
-  blocked,
-}: {
-  scanId: number;
-  blocked: NonNullable<ScanDetail["blocked"]>;
-}) {
-  return (
-    <Card className="mb-4 border-sev-critical/40 bg-sev-critical-bg p-4">
-      <div className="flex items-start gap-3">
-        <AlertOctagon
-          className="mt-0.5 h-5 w-5 text-sev-critical"
-          aria-hidden
-        />
-        <div className="text-sm">
-          <strong className="text-sev-critical">
-            Site URL returned HTTP {blocked.status_code}
-          </strong>
-          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. The crawler
-          could not read past the entry page. Try a{" "}
-          <Link to="/scans/new">new scan</Link>, or use an authorized
-          sign-in scan when the site requires authentication.
-          <span className="sr-only"> Report {scanId} is incomplete.</span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
-function formatCompleted(iso: string): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

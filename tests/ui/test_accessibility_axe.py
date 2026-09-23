@@ -178,7 +178,7 @@ async def test_protected_companion_route_has_no_axe_violations(
 @pytest.mark.parametrize(
     "suffix",
     ["", "/review", "/manual-checks", "/handoff"],
-    ids=["overview", "review", "manual", "handoff"],
+    ids=["report", "review", "manual", "handoff"],
 )
 async def test_expert_workspace_routes_have_no_axe_violations(
     live_server: tuple[str, int], suffix: str, new_page: Any
@@ -212,10 +212,10 @@ async def test_expert_workspace_reflows_without_document_overflow(
             })"""
         )
         assert widths["body"] <= widths["client"], f"{path}: {widths}"
-        if suffix in {"/issues", "/review", "/manual-checks", "/handoff"}:
-            assert widths["overflowX"] == "hidden", f"{path}: {widths}"
-        else:
-            assert widths["scroll"] <= widths["client"], f"{path}: {widths}"
+        # All of these land on the issue table ("" redirects there, as the
+        # legacy stage routes do), whose wide table scrolls inside its own
+        # region, never the document.
+        assert widths["overflowX"] == "hidden", f"{path}: {widths}"
 
 
 async def test_issue_card_answers_what_why_fix_and_where(
@@ -407,7 +407,7 @@ async def test_spa_navigation_sets_title_and_focuses_main(
     """Client-side route changes announce context instead of dropping focus."""
     base, scan_id = live_server
     page = await new_page()
-    await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/{scan_id}/diff", wait_until="networkidle")
     workspace = page.get_by_role("navigation", name="Report workspace")
     await workspace.get_by_role("link", name="Issues").click()
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
@@ -419,25 +419,52 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """A settled scan lands on the report with one clear output action."""
+    """A settled scan lands on its issue table, with the overview folded in.
+
+    There is no Overview tab any more: the report's URL redirects to Issues,
+    and the stat cards and scan coverage the overview carried sit above the
+    table, the coverage as one line that opens the full ledger.
+    """
     base, scan_id = live_server
     page = await new_page()
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+    await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+    await playwright_async.expect(
+        page.get_by_role("heading", name="Issues", exact=True, level=1)
+    ).to_be_visible()
+    workspace = page.get_by_role("navigation", name="Report workspace")
+    await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
+        ["Issues", "Verify changes"]
+    )
+    await playwright_async.expect(
+        workspace.get_by_role("link", name="Issues", exact=True)
+    ).to_have_attribute("aria-current", "page")
+    await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
+    await playwright_async.expect(page.get_by_text("Issue Groups", exact=True)).to_be_visible()
+    await playwright_async.expect(page.get_by_text("Pages Tested", exact=True)).to_be_visible()
+
+    # The coverage line counts the methods the scan recorded as run.
+    response = await page.request.get(f"{base}/api/scans/{scan_id}")
+    methods = (await response.json())["methods_used"]
+    ran = sum(method["state"] in {"checked", "partial"} for method in methods)
+    coverage = page.locator("summary").filter(has_text=f"{ran} of {len(methods)} checks ran")
+    await playwright_async.expect(coverage).to_contain_text("Details")
+    ledger = page.get_by_role("heading", name="What this scan actually checked")
+    await playwright_async.expect(ledger).to_be_hidden()
+    await coverage.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(ledger).to_be_visible()
     await playwright_async.expect(
         page.get_by_text("Click Through DOM States", exact=True)
     ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("heading", name="Overview", exact=True, level=1)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("link", name="Open Issue Groups")
-    ).to_be_visible()
-    await playwright_async.expect(page.get_by_text("Issue Groups", exact=True)).to_be_visible()
-    # Overview, Issues and Verify changes are three views of one
-    # report, so the tab bar is visible on all of them.
-    await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
-    ).to_be_visible()
+
+    # The subtitle names the report without repeating a stat card's count.
+    subtitle = page.locator("main h1 + p")
+    text = await subtitle.inner_text()
+    assert "issue groups" not in text and "occurrences" not in text, text
+    issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
+        assert not re.search(rf"\b{count}\b", text), (count, text)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(
@@ -574,7 +601,8 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/protected", "Protected companion"),
         (f"/app/scans/{scan_id}/protected/manual-checks", "Protected manual checks"),
         (f"/app/scans/{scan_id}/protected/issues", "Protected issue index"),
-        (f"/app/scans/{scan_id}", "Report overview"),
+        # A completed report's URL redirects to its issue table.
+        (f"/app/scans/{scan_id}", "Accessibility issues"),
         (f"/app/scans/{scan_id}/review", "Accessibility issues"),
         (f"/app/scans/{scan_id}/manual-checks", "Accessibility issues"),
         (f"/app/scans/{scan_id}/handoff", "Accessibility issues"),

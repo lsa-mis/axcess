@@ -439,7 +439,9 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
     [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
     [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
-    [/^\/scans\/\d+\/?$/, "Report overview"],
+    // Only running and failed scans render here; a completed report
+    // redirects to its issue table.
+    [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Finding evidence"],
     [/^\/tracking\/?$/, "Coverage tracking"],
   ];

@@ -51,10 +51,10 @@ async def test_report_links_and_review_lanes(
         await route.fulfill(json={**payload, "rows": shown})
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
+    # The report's own URL used to be its Overview tab. It opens on the
+    # issue table now, so old links land there instead of breaking.
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-    await playwright_async.expect(
-        page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)
-    ).to_have_count(0)
+    await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     reports = crumb.get_by_role("link", name="Reports", exact=True)
     await reports.focus()
@@ -435,6 +435,9 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
         assert [item["text"] for item in items] == ["Reports", f"example.com #{scan_id}"], items
         assert items[0]["link"] == "/app/scans", items
         _assert_current_is_plain_text(items)
+    # The tabs are the report's two views; Overview is gone.
+    tabs = page.get_by_role("navigation", name="Report workspace").get_by_role("link")
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Verify changes"])
 
 
 async def test_issue_evidence_trail_names_the_issue(
@@ -517,6 +520,70 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report workspace")
     ).to_have_count(0)
+
+
+async def test_report_opens_keyboard_only_in_reading_order(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Tab from the page top: breadcrumb, tabs, search, filters, then the table.
+
+    Every stop shows a focus indicator, and each group is reached in the
+    order it reads on screen.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+    await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+    # The route focuses <main> on arrival; start from the top of the
+    # document instead, the skip link, so the whole order is walked.
+    await page.get_by_role("link", name="Skip to main content").focus()
+    stops: list[dict[str, Any]] = []
+    for _ in range(40):
+        await page.keyboard.press("Tab")
+        stop = await page.evaluate(
+            r"""() => {
+                const el = document.activeElement;
+                const style = getComputedStyle(el);
+                const label = el.labels?.[0]?.innerText
+                    ?? el.getAttribute("aria-label")
+                    ?? el.innerText;
+                const landmark = el.closest("nav[aria-label]")?.getAttribute("aria-label")
+                    ?? (el.closest("table") ? "table" : null)
+                    ?? (el.getAttribute("role") === "region" ? "table-region" : null);
+                return {
+                    name: (label || "").replace(/\s+/g, " ").trim(),
+                    tag: el.tagName,
+                    group: landmark,
+                    visible: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0
+                        || style.boxShadow !== "none",
+                };
+            }"""
+        )
+        stops.append(stop)
+        if stop["group"] == "table":
+            break
+    names = [stop["name"] for stop in stops]
+
+    def first(predicate: Any) -> int:
+        found = next((i for i, stop in enumerate(stops) if predicate(stop)), None)
+        assert found is not None, stops
+        return found
+
+    order = [
+        first(lambda s: s["group"] == "Breadcrumb" and s["name"] == "Reports"),
+        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Issues"),
+        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Verify changes"),
+        first(lambda s: s["name"] == "Search issues"),
+        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Level"),
+        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Type"),
+        first(lambda s: s["group"] == "table-region"),
+        first(lambda s: s["group"] == "table"),
+    ]
+    assert order == sorted(order), names
+    # The current crumb is text, so it is not a tab stop.
+    assert f"example.com #{scan_id}" not in names, names
+    missing = [stop for stop in stops if not stop["visible"]]
+    assert not missing, missing
 
 
 async def test_issue_evidence_page_link_offers_the_way_back(

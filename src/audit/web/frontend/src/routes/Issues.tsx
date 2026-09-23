@@ -4,11 +4,12 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, ArrowUpDown, Info, Search } from "lucide-react";
 import { api } from "../api/client";
 import { Card, Select, withReturnTrail, type SelectOption } from "../components/ui";
-// The same helper the topbar trail and the overview use.
+// The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import { ReportExpertTools, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { useScanQuery } from "../hooks/useScanQuery";
 import type {
@@ -19,6 +20,10 @@ import type {
 
 /**
  * The primary report: every issue group as one row of a flat table.
+ *
+ * This is where a report opens. The numbers and scan coverage that used to
+ * be an Overview tab sit above the table (``ReportSummary``), and the expert
+ * tools sit closed below it, so the first thing on screen is the table.
  *
  * Each column is one of the facts the old right-hand evidence pane listed
  * for the selected issue (type, criterion, priority, spread, difficulty,
@@ -39,6 +44,7 @@ export default function IssuesRoute() {
   const lane: ReviewLane | "" = isReviewLane(rawLane) ? rawLane : "";
   const q = params.get("q") ?? "";
   const sort = parseSort(params.get("sort"));
+  const hasFilter = Boolean(conformance || lane || q);
 
   const scanQuery = useScanQuery(id);
   const issuesQuery = useQuery({
@@ -49,6 +55,14 @@ export default function IssuesRoute() {
     queryFn: () => api.listIssues(id, { conformance, review_lane: lane, q, sort: "priority_desc" }),
     placeholderData: (previous, query) => query?.queryKey[1] === id ? keepPreviousData(previous) : undefined,
     enabled: Number.isFinite(id),
+  });
+  // The summary above the table describes the whole report, so it needs the
+  // unfiltered rows. Unfiltered, the table's own response is exactly that;
+  // only a filtered table needs the second request.
+  const summaryQuery = useQuery({
+    queryKey: ["issues", id, "workspace-summary"],
+    queryFn: () => api.listIssues(id),
+    enabled: Number.isFinite(id) && hasFilter,
   });
 
   // Update against the live query string, not the one captured at render.
@@ -88,9 +102,9 @@ export default function IssuesRoute() {
 
   const scan = scanQuery.data;
   const data = issuesQuery.data;
-  const hasFilter = Boolean(conformance || lane || q);
+  const isComplete = scan.status === "completed";
+  const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
   const alfaCount = rows.filter((row) => row.pipeline === "alfa").length;
-  const occurrences = rows.reduce((total, row) => total + row.occurrence_count, 0);
 
   return (
     <>
@@ -101,26 +115,30 @@ export default function IssuesRoute() {
         title="Issues"
         meta={
           <ReportMeta
-            counts={
-              <>
-                {/* The site leads, as on the overview. This tab is reachable
-                    by its own URL, and like every other view it loses the
-                    topbar trail the moment it becomes a screenshot or a
-                    print -- which is most of how a finding gets quoted to
-                    the team that has to fix it. */}
-                {siteLabel(scan.seed_url)}
-                {" · "}
-                {rows.length === data.total_unfiltered
-                  ? `${data.total_unfiltered} issue groups`
-                  : `${rows.length} of ${data.total_unfiltered} issue groups`}
-                {" · "}
-                {occurrences} occurrences
-              </>
-            }
+            // No counts: the stat cards below carry them, and the same
+            // numbers twice in one screenful read as two different facts.
+            // The site leads because the topbar trail is gone the moment
+            // this becomes a screenshot or a print -- which is most of how
+            // a finding gets quoted to the team that has to fix it.
+            counts={[
+              siteLabel(scan.seed_url),
+              isComplete && scan.finished_at ? `Completed ${formatCompleted(scan.finished_at)}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           />
         }
         actions={<ExportMenu scanId={scan.id} />}
       />
+
+      {isComplete && (
+        <ReportSummary
+          scan={scan}
+          issueGroups={data.total_unfiltered}
+          occurrences={data.occurrence_counts.all_evidence}
+          rows={summaryRows}
+        />
+      )}
 
       {alfaCount > 0 && (
         <details className="mb-3 text-xs text-fg-muted">
@@ -145,12 +163,12 @@ export default function IssuesRoute() {
         </details>
       )}
 
-      {/* Filtering changed the table silently: the count line under the title
-          updated, but nothing announced it, so a screen-reader user typing in
-          the search box got no confirmation that anything had happened (SC
-          4.1.3). Visually hidden because the same sentence is already on
-          screen in the header — this is the same fact, routed to the people
-          the visual update skips. */}
+      {/* Filtering changed the table silently: the visible count updated,
+          but nothing announced it, so a screen-reader user typing in the
+          search box got no confirmation that anything had happened (SC
+          4.1.3). Visually hidden because the toolbar already shows the
+          filtered count — this is the same fact, routed to the people the
+          visual update skips. */}
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
@@ -160,6 +178,7 @@ export default function IssuesRoute() {
 
       <Card className="overflow-hidden">
         <IssueToolbar
+          shown={rows.length}
           totalUnfiltered={data.total_unfiltered}
           conformanceCounts={data.conformance_counts}
           laneCounts={data.review_lane_counts}
@@ -186,11 +205,14 @@ export default function IssuesRoute() {
           />
         )}
       </Card>
+
+      {isComplete && <ReportExpertTools scan={scan} rows={summaryRows} />}
     </>
   );
 }
 
 function IssueToolbar({
+  shown,
   totalUnfiltered,
   conformanceCounts,
   laneCounts,
@@ -201,6 +223,7 @@ function IssueToolbar({
   onParam,
   onClearFilters,
 }: {
+  shown: number;
   totalUnfiltered: number;
   conformanceCounts: Record<ConformanceLabel, number>;
   laneCounts: Record<ReviewLane, number>;
@@ -251,13 +274,19 @@ function IssueToolbar({
           onChange={(value) => onParam("type", value)}
         />
         {hasFilter && (
-          <button
-            type="button"
-            onClick={onClearFilters}
-            className="min-h-target rounded-xs border border-border-strong bg-surface px-3 text-sm font-semibold text-fg hover:bg-surface-muted"
-          >
-            Clear filters
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="min-h-target rounded-xs border border-border-strong bg-surface px-3 text-sm font-semibold text-fg hover:bg-surface-muted"
+            >
+              Clear filters
+            </button>
+            {/* The subtitle used to carry this; it now carries no counts. */}
+            <span className="text-sm tabular-nums text-fg-muted">
+              {shown} of {totalUnfiltered} shown
+            </span>
+          </>
         )}
       </div>
     </div>
@@ -737,4 +766,17 @@ function IssueSearch({ value, onChange }: { value: string; onChange: (value: str
     }}
     className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2 pl-10 pr-3 text-base text-fg focus:border-umich-blue focus:outline-none focus-visible:shadow-focus"
   />;
+}
+
+/** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
+function formatCompleted(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return at.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

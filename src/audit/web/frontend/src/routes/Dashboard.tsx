@@ -218,8 +218,8 @@ export default function DashboardRoute() {
         <p className="mt-4 max-w-3xl text-xs leading-relaxed text-fg-subtle">
           Axcess reports what its checks observed and where. Automated results
           are evidence for expert review, never a conformance decision, and a
-          method that did not run is not a passing result, each report&rsquo;s
-          overview lists exactly what was and was not checked.
+          method that did not run is not a passing result, each report lists
+          exactly what was and was not checked above its issue table.
         </p>
       )}
     </>
