@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Button } from "./ui";
 
@@ -33,6 +33,8 @@ export function usePagedRows<T>(
   pages: number;
   total: number;
   setPage: (page: number) => void;
+  /** Spread on the element around the table: keeps its height from page to page. */
+  hold: { ref: (node: HTMLElement | null) => void; style: { minHeight?: number } };
 } {
   const [params, setParams] = useSearchParams();
   const [localPage, setLocalPage] = useState(1);
@@ -86,8 +88,32 @@ export function usePagedRows<T>(
     );
   };
 
+  // The table keeps the height of its tallest page so far, so turning to a
+  // short last page does not pull the pager, and everything under it, up
+  // the screen. Rows vary in height (titles wrap), so the height is measured
+  // rather than padded with blank rows. A new filter or sort starts over.
+  const holder = useRef<HTMLElement | null>(null);
+  const [held, setHeld] = useState(0);
+  if (restart && held !== 0) setHeld(0);
+  const ref = useCallback((node: HTMLElement | null) => {
+    holder.current = node;
+  }, []);
+  useLayoutEffect(() => {
+    const node = holder.current;
+    if (!node || pages <= 1) return;
+    const height = Math.ceil(node.getBoundingClientRect().height);
+    if (height > held) setHeld(height);
+  }, [page, pages, rows, held]);
+
   const start = (page - 1) * TABLE_PAGE_SIZE;
-  return { pageRows: rows.slice(start, start + TABLE_PAGE_SIZE), page, pages, total, setPage };
+  return {
+    pageRows: rows.slice(start, start + TABLE_PAGE_SIZE),
+    page,
+    pages,
+    total,
+    setPage,
+    hold: { ref, style: pages > 1 && held ? { minHeight: held } : {} },
+  };
 }
 
 /**
@@ -103,6 +129,7 @@ export function TablePagination({
   total,
   setPage,
 }: {
+  hold?: unknown;
   /** The table's name, for the controls' accessible names ("Issues"). */
   label: string;
   /** What a row is, plural ("issue groups", "pages"). */

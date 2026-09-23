@@ -372,6 +372,8 @@ function DrillDownView({
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...paged.hold}>
           <table className="w-full text-sm">
             <caption className="sr-only">
               DOM-engine findings for SC {wcagSc}, sorted by impact
@@ -472,6 +474,7 @@ function DrillDownView({
               ))}
             </tbody>
           </table>
+          </div>
           <TablePagination label="Findings" noun="findings" {...paged} />
         </Card>
       )}

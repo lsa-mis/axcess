@@ -479,6 +479,8 @@ function IssueTable({
         tabIndex={0}
         className="overflow-x-auto focus:outline-none focus-visible:shadow-focus"
       >
+      {/* Holds the tallest page's height, so paging never moves the pager. */}
+      <div {...paged.hold}>
       <table className="w-full min-w-[64rem] text-sm">
         <caption className="sr-only">Accessibility issue groups</caption>
         <thead className="bg-surface-muted text-2xs text-fg-subtle">
@@ -550,6 +552,7 @@ function IssueTable({
           ))}
         </tbody>
       </table>
+      </div>
       </div>
       <TablePagination label="Issues" noun="issue groups" {...paged} />
     </>

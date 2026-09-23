@@ -205,6 +205,8 @@ export default function TrackingRoute() {
 
         <div id="tracker-content">
           <Card className="overflow-x-auto">
+            {/* Holds the tallest page's height, so paging never moves the pager. */}
+            <div {...criteria.hold}>
             <table className="w-full text-sm">
               <caption className="sr-only">
                 WCAG 2.2 A/AA coverage and AI roadmap
@@ -246,6 +248,7 @@ export default function TrackingRoute() {
                 ))}
               </tbody>
             </table>
+            </div>
             <TablePagination label="Criteria" noun="criteria" {...criteria} />
           </Card>
           {!isLoading && rows.length === 0 && (
@@ -269,6 +272,8 @@ export default function TrackingRoute() {
           (no Ollama); the {aiCount} AI pipelines need a local Ollama daemon.
         </p>
         <Card className="overflow-x-auto">
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...pipelines.hold}>
           <table className="w-full text-sm">
             <caption className="sr-only">
               Detection pipelines that run on a default crawl
@@ -319,6 +324,7 @@ export default function TrackingRoute() {
               ))}
             </tbody>
           </table>
+          </div>
           <TablePagination label="Detection pipelines" noun="pipelines" {...pipelines} />
         </Card>
       </section>

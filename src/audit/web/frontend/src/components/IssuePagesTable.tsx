@@ -219,6 +219,8 @@ export default function IssuePagesTable({
         {/* Keyboard users need focus on the overflow region to scroll the table. */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
         <div role="region" aria-label="Pages table" tabIndex={0} className="overflow-x-auto focus:outline-none focus-visible:shadow-focus">
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...paged.hold}>
           <table className="w-full min-w-[56rem] text-sm">
             <caption className="sr-only">Pages with the issue {row.title}</caption>
             <thead className="bg-surface-muted text-2xs text-fg-subtle">
@@ -382,6 +384,7 @@ export default function IssuePagesTable({
               })}
             </tbody>
           </table>
+          </div>
         </div>
         <TablePagination label="Pages with this issue" noun="pages" {...paged} />
         </>

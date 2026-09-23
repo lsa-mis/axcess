@@ -277,6 +277,8 @@ export default function FindingDetailRoute() {
             Appears on {data.occurrences.length} page
             {data.occurrences.length === 1 ? "" : "s"}
           </div>
+          {/* Holds the tallest page's height, so paging never moves the pager. */}
+          <div {...paged.hold}>
           <table className="w-full text-sm">
             <thead className="text-2xs font-semibold text-fg-subtle">
               <tr>
@@ -316,6 +318,7 @@ export default function FindingDetailRoute() {
               ))}
             </tbody>
           </table>
+          </div>
           <TablePagination label="Occurrences" noun="occurrences" {...paged} />
         </Card>
       )}

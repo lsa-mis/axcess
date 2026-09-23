@@ -287,6 +287,8 @@ function RuleGroupCard({
           />
 
           <div className="overflow-x-auto">
+            {/* Holds the tallest page's height, so paging never moves the pager. */}
+            <div {...paged.hold}>
             <table className="w-full text-sm">
               <thead className="bg-surface-muted text-2xs text-fg-subtle">
                 <tr>
@@ -307,6 +309,7 @@ function RuleGroupCard({
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
           <TablePagination label={`${group.rule_id} findings`} noun="findings" {...paged} />
         </div>

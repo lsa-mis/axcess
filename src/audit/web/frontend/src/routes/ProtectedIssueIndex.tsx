@@ -110,6 +110,8 @@ export default function ProtectedIssueIndexRoute() {
             </Card>
           ) : (
             <Card className="overflow-x-auto">
+              {/* Holds the tallest page's height, so paging never moves the pager. */}
+              <div {...paged.hold}>
               <table className="min-w-full text-sm">
                 <caption className="sr-only">Protected grouped automated issue leads</caption>
                 <thead className="bg-surface-muted text-2xs text-fg-subtle">
@@ -126,6 +128,7 @@ export default function ProtectedIssueIndexRoute() {
                   {paged.pageRows.map((group) => <IssueRow key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`} group={group} />)}
                 </tbody>
               </table>
+              </div>
               <TablePagination label="Protected issues" noun="issue groups" {...paged} />
             </Card>
           )}
