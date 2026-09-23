@@ -18,10 +18,16 @@ from pathlib import Path
 
 import pytest
 
+_SRC = Path(__file__).resolve().parents[2] / "src"
+
 
 def _run(code: str, *, tmp_path: Path, db_path: Path) -> subprocess.CompletedProcess[str]:
     env = {
         **os.environ,
+        # The child runs in tmp_path, so a relative PYTHONPATH (CI sets
+        # `src`) would no longer resolve, and an editable install would
+        # quietly supply some other checkout's code. Put this tree first.
+        "PYTHONPATH": os.pathsep.join(filter(None, [str(_SRC), os.environ.get("PYTHONPATH")])),
         "AUDIT_DB_PATH": str(db_path),
         "AUDIT_DATA_DIR": str(tmp_path / "data"),
         "AUDIT_BLOB_DIR": str(tmp_path / "blobs"),
