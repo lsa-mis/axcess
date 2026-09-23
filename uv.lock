@@ -134,7 +134,7 @@ desktop = [{ name = "pyinstaller", specifier = ">=6.16" }]
 dev = [
     { name = "mypy", specifier = ">=1.10" },
     { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23" },
+    { name = "pytest-asyncio", specifier = ">=1.0" },
     { name = "pytest-cov", specifier = ">=5.0" },
     { name = "respx", specifier = ">=0.21" },
     { name = "ruff", specifier = ">=0.5" },
