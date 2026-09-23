@@ -39,6 +39,8 @@ Cell styles are interned: each distinct font/fill/border/alignment/protection
 and named-style combination is stored once under a short content hash, and
 cells refer to that hash. An unrelated style change therefore does not
 renumber every other cell, and a diff points at the cells that changed.
+``dumps_fingerprint`` writes one line per object (a style, a sheet setting,
+a spreadsheet row of cells), so a golden stays small enough to review.
 
 The same fingerprint backs the unit-test goldens (``tests/unit/golden/*.xlsx.json``)
 and ``scripts/export_diff.py``. It lives under ``tests/support`` so both can
@@ -54,6 +56,7 @@ import hashlib
 import io
 import json
 import math
+import re
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -101,14 +104,17 @@ def fingerprint_xlsx(data: bytes) -> dict[str, Any]:
 
 
 def dumps_fingerprint(fingerprint: dict[str, Any]) -> str:
-    """Serialize a fingerprint as stable, line-oriented JSON.
+    """Serialize a fingerprint as stable, compact, line-oriented JSON.
 
-    Containers that hold only scalars (a cell, a style part, a merged-range
-    list) are written on one line; everything else is indented. The result
-    is valid JSON that parses back to ``fingerprint``, and a changed cell
+    One line per object: each workbook-level part, each entry of the style
+    table, and per sheet a line holding its title with every scalar or empty
+    part, then a line per remaining part (views, print setup, column widths,
+    images, ...). Cells, hyperlinks and comments get one line per spreadsheet
+    row. Only the layout is chosen here: the result is valid JSON that parses
+    back to exactly ``fingerprint``, and a changed cell, width or setting
     shows up as one changed line in a diff.
     """
-    return _emit(fingerprint, 0) + "\n"
+    return _emit_workbook(fingerprint) + "\n"
 
 
 def fingerprint_diff(
@@ -544,21 +550,80 @@ def _alignment(alignment: Any) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-def _is_flat(value: dict[str, Any] | list[Any]) -> bool:
-    items = value.values() if isinstance(value, dict) else value
-    return all(not isinstance(item, dict | list) for item in items)
+# Sheet parts whose entries start with a cell coordinate. They are written
+# one spreadsheet row per line, in this order, after the sheet's other parts.
+_ROW_PARTS = ("hyperlinks", "comments", "cells")
+_ROW_OF_COORDINATE = re.compile(r"[A-Z]+([0-9]+)")
 
 
-def _emit(value: Any, level: int) -> str:
-    if not isinstance(value, dict | list) or not value or _is_flat(value):
-        return json.dumps(value, ensure_ascii=False, sort_keys=True)
-    pad = "  " * (level + 1)
-    close = "  " * level
-    if isinstance(value, dict):
-        body = ",\n".join(
-            f"{pad}{json.dumps(key, ensure_ascii=False)}: {_emit(item, level + 1)}"
-            for key, item in sorted(value.items())
-        )
-        return "{\n" + body + "\n" + close + "}"
-    body = ",\n".join(f"{pad}{_emit(item, level + 1)}" for item in value)
-    return "[\n" + body + "\n" + close + "]"
+def _inline(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _member(key: str, value: Any) -> str:
+    return f"{json.dumps(key, ensure_ascii=False)}: {_inline(value)}"
+
+
+def _block(opening: str, lines: list[str], closing: str, indent: str) -> str:
+    return opening + "\n" + ",\n".join(indent + line for line in lines) + "\n" + closing
+
+
+def _emit_workbook(fingerprint: dict[str, Any]) -> str:
+    members = []
+    for key, value in sorted(fingerprint.items()):
+        if key == "cell_styles" and isinstance(value, dict) and value:
+            styles = [_member(name, style) for name, style in sorted(value.items())]
+            members.append(_block('"cell_styles": {', styles, "  }", "    "))
+        elif key == "sheets" and isinstance(value, list) and value:
+            sheets = [_emit_sheet(sheet) for sheet in value]
+            members.append(_block('"sheets": [', sheets, "  ]", "    "))
+        else:
+            members.append(_member(key, value))
+    return _block("{", members, "}", "  ")
+
+
+def _emit_sheet(sheet: Any) -> str:
+    """One sheet: its title and scalar parts on one line, then a line per part.
+
+    Empty parts ride on the title line. The rest get a line each, except the
+    per-cell parts, which get a line per spreadsheet row.
+    """
+    if not isinstance(sheet, dict):
+        return _inline(sheet)
+    head: list[str] = []
+    parts: list[str] = []
+    for key in sorted(sheet, key=lambda name: (name != "title", name)):
+        value = sheet[key]
+        if not isinstance(value, dict | list) or not value:
+            head.append(_member(key, value))
+        elif key not in _ROW_PARTS or not isinstance(value, list):
+            parts.append(_member(key, value))
+    for key in _ROW_PARTS:
+        value = sheet.get(key)
+        if isinstance(value, list) and value:
+            opening = f"{json.dumps(key, ensure_ascii=False)}: ["
+            parts.append(_block(opening, _row_lines(value), "      ]", "        "))
+    lines = [", ".join(head), *parts] if head else parts
+    return _block("{", lines, "    }", "      ")
+
+
+def _row_lines(entries: list[Any]) -> list[str]:
+    """Entries that share a spreadsheet row, and follow each other, share a line."""
+    lines: list[str] = []
+    previous: str | None = None
+    for entry in entries:
+        row = _row_of(entry)
+        if lines and row is not None and row == previous:
+            lines[-1] += ", " + _inline(entry)
+        else:
+            lines.append(_inline(entry))
+        previous = row
+    return lines
+
+
+def _row_of(entry: Any) -> str | None:
+    if isinstance(entry, list) and entry and isinstance(entry[0], str):
+        match = _ROW_OF_COORDINATE.fullmatch(entry[0])
+        if match is not None:
+            return match.group(1)
+    return None
