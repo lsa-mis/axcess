@@ -27,7 +27,7 @@ def _run(code: str, *, tmp_path: Path, db_path: Path) -> subprocess.CompletedPro
         "AUDIT_BLOB_DIR": str(tmp_path / "blobs"),
         "AUDIT_LOG_DIR": str(tmp_path / "logs"),
     }
-    return subprocess.run(
+    return subprocess.run(  # noqa: S603 - this interpreter, test-authored code
         [sys.executable, "-c", textwrap.dedent(code)],
         cwd=tmp_path,
         env=env,
