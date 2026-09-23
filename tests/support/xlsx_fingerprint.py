@@ -3,17 +3,37 @@
 An .xlsx file is a zip whose bytes change on every save (member timestamps,
 ``docProps/core.xml`` created/modified), so two renders of the same workbook
 never compare equal byte for byte. This module parses the workbook back with
-openpyxl and reduces it to a JSON-serializable dict that holds everything a
-reader of the workbook can observe and nothing that varies between saves:
+openpyxl and reduces it to a JSON-serializable dict of what a reader of the
+workbook can observe, minus what varies between saves. It holds:
 
 * per sheet, in workbook order: title, sheet state, whether it is the active
-  sheet, tab color and gridline visibility;
-* every non-empty cell (a value, or a non-default style) with its value,
-  data type, number format and a style reference;
+  sheet, sheet properties (tab color, outline and fit-to-page settings),
+  sheet views (gridlines, zoom, selected tab, selection and active cell,
+  panes), default row and column sizes, and sheet protection;
+* every non-empty cell (a value, or a non-default style) with its value
+  (rich text runs included), data type, number format and a style
+  reference; cell comments (text and author);
 * hyperlinks (target, location, tooltip, display), merged ranges, freeze
-  panes, the auto-filter range, data validations, embedded images, column
-  widths and row heights;
-* workbook-level defined names and the named-style list.
+  panes, the auto-filter range, data validations, conditional formatting
+  (ranges, rules and their differential styles), Excel tables, embedded
+  images (anchor, displayed size, bytes), charts (type and anchor), column
+  widths and row heights with their hidden flags and outline levels;
+* print setup: print area, print titles, page setup, print options,
+  margins, headers and footers, manual page breaks;
+* sheet-scoped and workbook-level defined names, the named-style list,
+  workbook protection, workbook views, calculation settings, custom document
+  properties, and the core document properties except the save-time ones.
+
+Deliberately left out, because it varies between saves or is not what a
+reader observes: zip member order, timestamps and compression;
+``docProps/core.xml`` created, modified and lastModifiedBy; ``docProps/app.xml``;
+internal numbering (shared-string order, the cell-format and differential
+style tables, relationship ids), which the content they point at replaces.
+Also left out, because openpyxl does not read it back: comment box size and
+position, theme XML, the calculation chain, VBA, pivot tables, slicers,
+shapes and form controls, sparklines and other ``extLst`` extensions,
+printer-settings parts, and chart content beyond type and anchor. A change
+to any of those would pass this fingerprint unnoticed.
 
 Cell styles are interned: each distinct font/fill/border/alignment/protection
 and named-style combination is stored once under a short content hash, and
@@ -38,19 +58,24 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.cell.rich_text import CellRichText
+from openpyxl.descriptors.serialisable import Serialisable
 from openpyxl.utils import column_index_from_string, get_column_letter
 
 #: Bumped whenever the fingerprint shape changes, so a golden recorded by an
 #: older helper fails loudly instead of comparing unlike structures.
-FINGERPRINT_VERSION = 1
+FINGERPRINT_VERSION = 2
 
 # One pixel is 9525 EMU in DrawingML; openpyxl anchors images in EMU.
 _EMU_PER_PIXEL = 9525
 
+# Core document properties openpyxl stamps at save time.
+_SAVE_TIME_PROPERTIES = frozenset({"created", "modified", "lastModifiedBy"})
+
 
 def fingerprint_xlsx(data: bytes) -> dict[str, Any]:
     """Return the semantic fingerprint of the workbook in ``data``."""
-    workbook = load_workbook(io.BytesIO(data))
+    workbook = load_workbook(io.BytesIO(data), rich_text=True)
     styles: dict[str, Any] = {}
     active = workbook.active
     sheets = [_sheet(ws, is_active=ws is active, styles=styles) for ws in workbook.worksheets]
@@ -59,6 +84,14 @@ def fingerprint_xlsx(data: bytes) -> dict[str, Any]:
         "sheet_names": [ws.title for ws in workbook.worksheets],
         "defined_names": _defined_names(workbook.defined_names),
         "named_styles": sorted(_named_style_names(workbook)),
+        "properties": _plain(workbook.properties, skip=_SAVE_TIME_PROPERTIES),
+        "custom_properties": [
+            [prop.name, type(prop).__name__, _value(prop.value)]
+            for prop in workbook.custom_doc_props.props
+        ],
+        "protection": _plain(workbook.security),
+        "workbook_views": _plain(list(workbook.views)),
+        "calculation": _plain(workbook.calculation),
         "sheets": sheets,
         # Keys are written sorted; this one sorts ahead of "sheets", so a
         # changed style definition leads a (possibly truncated) diff instead
@@ -126,7 +159,10 @@ def fingerprint_diff(
 def _sheet(ws: Any, *, is_active: bool, styles: dict[str, Any]) -> dict[str, Any]:
     cells: list[list[Any]] = []
     hyperlinks: list[list[Any]] = []
+    comments: list[list[Any]] = []
     for _position, cell in sorted(ws._cells.items()):
+        if cell.comment is not None:
+            comments.append([cell.coordinate, cell.comment.text, cell.comment.author])
         link = cell.hyperlink
         if link is not None:
             hyperlinks.append(
@@ -149,13 +185,16 @@ def _sheet(ws: Any, *, is_active: bool, styles: dict[str, Any]) -> dict[str, Any
                 _style_key(cell, styles),
             ]
         )
-    tab_color = ws.sheet_properties.tabColor
     return {
         "title": ws.title,
         "state": ws.sheet_state,
         "active": is_active,
-        "tab_color": _color(tab_color),
-        "show_grid_lines": ws.sheet_view.showGridLines,
+        "properties": _plain(ws.sheet_properties),
+        "views": _plain(list(ws.views.sheetView)),
+        "format": _plain(ws.sheet_format),
+        "protection": _plain(ws.protection),
+        "defined_names": _defined_names(ws.defined_names),
+        "print": _print_setup(ws),
         "freeze_panes": ws.freeze_panes,
         "auto_filter": ws.auto_filter.ref,
         "merged": [
@@ -168,8 +207,12 @@ def _sheet(ws: Any, *, is_active: bool, styles: dict[str, Any]) -> dict[str, Any
         "columns": _columns(ws),
         "rows": _rows(ws),
         "data_validations": _data_validations(ws),
+        "conditional_formatting": _conditional_formatting(ws),
+        "tables": _tables(ws),
         "images": _images(ws),
+        "charts": _charts(ws),
         "hyperlinks": hyperlinks,
+        "comments": comments,
         "cells": cells,
     }
 
@@ -186,17 +229,88 @@ def _columns(ws: Any) -> dict[str, list[Any]]:
         first = dim.min or column_index_from_string(key)
         last = dim.max or first
         for index in range(first, last + 1):
-            widths[index] = [dim.width, bool(dim.hidden)]
+            widths[index] = [dim.width, bool(dim.hidden), dim.outline_level or 0]
     return {get_column_letter(index): value for index, value in sorted(widths.items())}
 
 
 def _rows(ws: Any) -> dict[str, list[Any]]:
+    """``[height, hidden, outline level]`` per row that sets any of them."""
     out: dict[str, list[Any]] = {}
     for index, dim in sorted(ws.row_dimensions.items()):
-        if dim.height is None and not dim.hidden:
+        if dim.height is None and not dim.hidden and not dim.outline_level:
             continue
-        out[str(index)] = [dim.height, bool(dim.hidden)]
+        out[str(index)] = [dim.height, bool(dim.hidden), dim.outline_level or 0]
     return out
+
+
+def _print_setup(ws: Any) -> dict[str, Any]:
+    return {
+        "area": ws.print_area,
+        "title_rows": ws.print_title_rows,
+        "title_cols": ws.print_title_cols,
+        "page_setup": _plain(ws.page_setup),
+        "options": _plain(ws.print_options),
+        "margins": _plain(ws.page_margins),
+        # Each header/footer part in Excel's own "&L...&C...&R..." encoding,
+        # which carries the text and its font codes.
+        "header_footer": {
+            **_plain(ws.HeaderFooter),
+            **{name: str(getattr(ws.HeaderFooter, name)) for name in ws.HeaderFooter.__elements__},
+        },
+        "row_breaks": [[brk.id, brk.min, brk.max, brk.man] for brk in ws.row_breaks.brk],
+        "col_breaks": [[brk.id, brk.min, brk.max, brk.man] for brk in ws.col_breaks.brk],
+    }
+
+
+def _conditional_formatting(ws: Any) -> list[dict[str, Any]]:
+    """Ranges and rules; ``dxfId`` is an index, so the style it names is kept instead."""
+    formats = []
+    for formatting in ws.conditional_formatting:
+        formats.append(
+            {
+                "sqref": " ".join(sorted(str(ref) for ref in formatting.sqref.ranges)),
+                "rules": [
+                    {**_plain(rule, skip=frozenset({"dxfId"})), "dxf": _plain(rule.dxf)}
+                    for rule in formatting.rules
+                ],
+            }
+        )
+    return sorted(formats, key=lambda item: json.dumps(item, sort_keys=True))
+
+
+def _tables(ws: Any) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for name, table in sorted(ws.tables.items()):
+        out[name] = {
+            "ref": table.ref,
+            "display_name": table.displayName,
+            "header_rows": table.headerRowCount,
+            "totals_rows": table.totalsRowCount,
+            "columns": [column.name for column in table.tableColumns],
+            "style": _plain(table.tableStyleInfo),
+            "auto_filter": table.autoFilter.ref if table.autoFilter else None,
+        }
+    return out
+
+
+def _charts(ws: Any) -> list[dict[str, Any]]:
+    charts = []
+    for chart in ws._charts:
+        anchor = chart.anchor
+        marker = getattr(anchor, "_from", None)
+        charts.append(
+            {
+                "type": type(chart).__name__,
+                "anchor": (
+                    anchor
+                    if isinstance(anchor, str)
+                    else f"{get_column_letter(marker.col + 1)}{marker.row + 1}"
+                    if marker is not None
+                    else None
+                ),
+            }
+        )
+    return sorted(charts, key=lambda item: json.dumps(item, sort_keys=True))
 
 
 def _data_validations(ws: Any) -> list[dict[str, Any]]:
@@ -295,6 +409,12 @@ def _value(value: Any) -> Any:
     """A JSON-safe value that keeps int / float / str / bool distinct."""
     if value is None or isinstance(value, bool | int | str):
         return value
+    if isinstance(value, CellRichText):
+        return {
+            "rich_text": [
+                run if isinstance(run, str) else [run.text, _plain(run.font)] for run in value
+            ]
+        }
     if isinstance(value, float):
         return value if math.isfinite(value) else {"float": repr(value)}
     if isinstance(value, datetime | date | time):
@@ -302,6 +422,21 @@ def _value(value: Any) -> Any:
     if isinstance(value, timedelta):
         return {"timedelta": value.total_seconds()}
     return {type(value).__name__: str(value)}
+
+
+def _plain(obj: Any, *, skip: frozenset[str] = frozenset()) -> Any:
+    """Every attribute and child element of an openpyxl object, recursively.
+
+    Walking the class's own ``__attrs__`` / ``__elements__`` lists picks up
+    every field openpyxl reads, so a setting nobody thought to list here
+    (a zoom level, a protection flag) is still compared.
+    """
+    if isinstance(obj, Serialisable):
+        names = dict.fromkeys([*obj.__attrs__, *obj.__elements__])
+        return {name: _plain(getattr(obj, name, None)) for name in names if name not in skip}
+    if isinstance(obj, list | tuple):
+        return [_plain(item) for item in obj]
+    return _value(obj)
 
 
 def _style_key(cell: Any, styles: dict[str, Any]) -> str:

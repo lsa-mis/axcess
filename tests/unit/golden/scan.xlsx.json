@@ -1,4 +1,5 @@
 {
+  "calculation": {"calcCompleted": null, "calcId": 124519, "calcMode": null, "calcOnSave": null, "concurrentCalc": null, "concurrentManualCount": null, "forceFullCalc": null, "fullCalcOnLoad": true, "fullPrecision": null, "iterate": null, "iterateCount": null, "iterateDelta": null, "refMode": null},
   "cell_styles": {
     "0390ed71e5e0": {
       "alignment": {"horizontal": null, "indent": 0.0, "justify_last_line": null, "reading_order": 0.0, "relative_indent": 0.0, "shrink_to_fit": null, "text_rotation": 0, "vertical": "top", "wrap_text": true},
@@ -577,9 +578,12 @@
       "protection": {"hidden": false, "locked": true}
     }
   },
+  "custom_properties": [],
   "defined_names": {},
-  "fingerprint_version": 1,
+  "fingerprint_version": 2,
   "named_styles": ["Hyperlink", "Normal"],
+  "properties": {"category": null, "contentStatus": null, "creator": "openpyxl", "description": null, "identifier": null, "keywords": null, "language": null, "lastPrinted": null, "revision": null, "subject": null, "title": null, "version": null},
+  "protection": {"lockRevision": null, "lockStructure": null, "lockWindows": null, "revisionsAlgorithmName": null, "revisionsHashValue": null, "revisionsPassword": null, "revisionsPasswordCharacterSet": null, "revisionsSaltValue": null, "revisionsSpinCount": null, "workbookAlgorithmName": null, "workbookHashValue": null, "workbookPassword": null, "workbookPasswordCharacterSet": null, "workbookSaltValue": null, "workbookSpinCount": null},
   "sheet_names": ["Summary", "Issues Overview", "I01 Images of text have no alt", "I02 Image (unclassified), missi", "I03 Logo image, adequate alt", "Page Hotspots", "Page References", "DOM States", "Who's Affected", "Coverage & Method", "Test Tracking", "Manual Review Evidence"],
   "sheets": [
     {
@@ -629,24 +633,82 @@
         ["A31", "Manual only", "s", "General", "0390ed71e5e0"],
         ["B31", 26, "n", "General", "35f8c4bb6bf4"]
       ],
+      "charts": [],
       "columns": {
-        "A": [40.0, false],
-        "B": [58.0, false]
+        "A": [40.0, false, 0],
+        "B": [58.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": null,
       "hyperlinks": [
         ["B5", "http://example.com/", null, null, null]
       ],
       "images": [],
       "merged": ["A1:B1", "A2:B2", "A4:B4", "A10:B10", "A17:B17", "A23:B23", "A25:B25", "A27:B27"],
-      "rows": {
-        "2": [36.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [36.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Summary"
+      "tables": {},
+      "title": "Summary",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": null,
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": null, "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -694,20 +756,25 @@
         ["H11", 1, "n", "General", "ef0ea631039f"],
         ["I11", "Open instances", "s", "General", "e6f5ed3ddee3"]
       ],
+      "charts": [],
       "columns": {
-        "A": [8.0, false],
-        "B": [46.0, false],
-        "C": [12.0, false],
-        "D": [17.5, false],
-        "E": [19.13, false],
-        "F": [15.38, false],
-        "G": [11.0, false],
-        "H": [9.0, false],
-        "I": [22.0, false]
+        "A": [8.0, false, 0],
+        "B": [46.0, false, 0],
+        "C": [12.0, false, 0],
+        "D": [17.5, false, 0],
+        "E": [19.13, false, 0],
+        "F": [15.38, false, 0],
+        "G": [11.0, false, 0],
+        "H": [9.0, false, 0],
+        "I": [22.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [
         {"allow_blank": true, "error": null, "error_style": null, "error_title": null, "formula1": "\"Not Started,Reviewing,In Progress,Resolved,Accepted Risk,Not an Issue\"", "formula2": null, "operator": null, "prompt": null, "prompt_title": null, "show_dropdown": false, "show_error_message": false, "show_input_message": false, "sqref": "F9:F11", "type": "list"}
       ],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A9",
       "hyperlinks": [
         ["A1", "http://example.com/", null, null, null],
@@ -717,13 +784,66 @@
       ],
       "images": [],
       "merged": ["A1:I1", "A2:I2", "A3:I3", "A4:I4", "A5:I5"],
-      "rows": {
-        "5": [96.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "5": [96.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Issues Overview"
+      "tables": {},
+      "title": "Issues Overview",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A9", "xSplit": null, "ySplit": 8.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -769,15 +889,20 @@
         ["E17", "• Best path: replace the image with real HTML text styled in CSS so users can zoom, translate, and copy it.\n• Short-term fix: add an alt attribute matching the image's full visible text exactly.", "s", "General", "a88279a852e2"],
         ["F17", "With a screen reader, tab to each affected image, it should announce the visible text verbatim. Better: see real HTML text in the DOM where the image used to be.", "s", "General", "a88279a852e2"]
       ],
+      "charts": [],
       "columns": {
-        "A": [24.0, false],
-        "B": [34.0, false],
-        "C": [26.0, false],
-        "D": [40.0, false],
-        "E": [46.0, false],
-        "F": [34.0, false]
+        "A": [24.0, false, 0],
+        "B": [34.0, false, 0],
+        "C": [26.0, false, 0],
+        "D": [40.0, false, 0],
+        "E": [46.0, false, 0],
+        "F": [34.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": null,
       "hyperlinks": [
         ["A2", null, "'Issues Overview'!A1", null, "← Back to Issues Overview"],
@@ -787,11 +912,64 @@
       ],
       "images": [],
       "merged": ["A1:F1", "B4:F4", "B5:F5", "B6:F6", "B7:F7", "B8:F8", "B9:F9", "B10:F10", "B11:F11", "B12:F12"],
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
+      },
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
       "rows": {},
-      "show_grid_lines": null,
       "state": "visible",
-      "tab_color": null,
-      "title": "I01 Images of text have no alt"
+      "tables": {},
+      "title": "I01 Images of text have no alt",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": null,
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": null, "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -827,15 +1005,20 @@
         ["E14", null, "inlineStr", "General", "35f8c4bb6bf4"],
         ["F14", null, "inlineStr", "General", "35f8c4bb6bf4"]
       ],
+      "charts": [],
       "columns": {
-        "A": [24.0, false],
-        "B": [34.0, false],
-        "C": [26.0, false],
-        "D": [40.0, false],
-        "E": [46.0, false],
-        "F": [34.0, false]
+        "A": [24.0, false, 0],
+        "B": [34.0, false, 0],
+        "C": [26.0, false, 0],
+        "D": [40.0, false, 0],
+        "E": [46.0, false, 0],
+        "F": [34.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": null,
       "hyperlinks": [
         ["A2", null, "'Issues Overview'!A1", null, "← Back to Issues Overview"],
@@ -844,11 +1027,64 @@
       ],
       "images": [],
       "merged": ["A1:F1", "B4:F4", "B5:F5", "B6:F6", "B7:F7", "B8:F8", "B9:F9", "B10:F10"],
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
+      },
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
       "rows": {},
-      "show_grid_lines": null,
       "state": "visible",
-      "tab_color": null,
-      "title": "I02 Image (unclassified), missi"
+      "tables": {},
+      "title": "I02 Image (unclassified), missi",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": null,
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": null, "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -884,15 +1120,20 @@
         ["E14", null, "inlineStr", "General", "35f8c4bb6bf4"],
         ["F14", null, "inlineStr", "General", "35f8c4bb6bf4"]
       ],
+      "charts": [],
       "columns": {
-        "A": [24.0, false],
-        "B": [34.0, false],
-        "C": [26.0, false],
-        "D": [40.0, false],
-        "E": [46.0, false],
-        "F": [34.0, false]
+        "A": [24.0, false, 0],
+        "B": [34.0, false, 0],
+        "C": [26.0, false, 0],
+        "D": [40.0, false, 0],
+        "E": [46.0, false, 0],
+        "F": [34.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": null,
       "hyperlinks": [
         ["A2", null, "'Issues Overview'!A1", null, "← Back to Issues Overview"],
@@ -901,11 +1142,64 @@
       ],
       "images": [],
       "merged": ["A1:F1", "B4:F4", "B5:F5", "B6:F6", "B7:F7", "B8:F8", "B9:F9", "B10:F10"],
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
+      },
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
       "rows": {},
-      "show_grid_lines": null,
       "state": "visible",
-      "tab_color": null,
-      "title": "I03 Logo image, adequate alt"
+      "tables": {},
+      "title": "I03 Logo image, adequate alt",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": null,
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": null, "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -919,24 +1213,82 @@
         ["D4", "Findings shown", "s", "General", "23d8d1945d10"],
         ["A5", "No open findings pinned to specific pages.", "s", "General", "31b5c4357deb"]
       ],
+      "charts": [],
       "columns": {
-        "A": [60.0, false],
-        "B": [30.0, false],
-        "C": [16.0, false],
-        "D": [16.0, false]
+        "A": [60.0, false, 0],
+        "B": [30.0, false, 0],
+        "C": [16.0, false, 0],
+        "D": [16.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:D1", "A2:D2", "A5:D5"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Page Hotspots"
+      "tables": {},
+      "title": "Page Hotspots",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -985,17 +1337,22 @@
         ["G8", 1, "n", "General", "af93fd3d4689"],
         ["H8", "Not Started", "s", "General", "a88279a852e2"]
       ],
+      "charts": [],
       "columns": {
-        "A": [38.0, false],
-        "B": [29.0, false],
-        "C": [58.0, false],
-        "D": [30.0, false],
-        "E": [46.0, false],
-        "F": [38.0, false],
-        "G": [14.0, false],
-        "H": [24.0, false]
+        "A": [38.0, false, 0],
+        "B": [29.0, false, 0],
+        "C": [58.0, false, 0],
+        "D": [30.0, false, 0],
+        "E": [46.0, false, 0],
+        "F": [38.0, false, 0],
+        "G": [14.0, false, 0],
+        "H": [24.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [
         ["C5", "http://example.com/", null, null, null],
@@ -1008,13 +1365,66 @@
       ],
       "images": [],
       "merged": ["A1:H1", "A2:H2"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Page References"
+      "tables": {},
+      "title": "Page References",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -1029,25 +1439,83 @@
         ["E4", "Why it stopped", "s", "General", "23d8d1945d10"],
         ["A5", "No per-page control ledger was recorded for this scan. Treat per-page click coverage as unknown rather than zero.", "s", "General", "31b5c4357deb"]
       ],
+      "charts": [],
       "columns": {
-        "A": [58.0, false],
-        "B": [16.0, false],
-        "C": [18.0, false],
-        "D": [12.0, false],
-        "E": [44.0, false]
+        "A": [58.0, false, 0],
+        "B": [16.0, false, 0],
+        "C": [18.0, false, 0],
+        "D": [12.0, false, 0],
+        "E": [44.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:E1", "A2:E2", "A5:E5"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "DOM States"
+      "tables": {},
+      "title": "DOM States",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -1060,23 +1528,81 @@
         ["C4", "Across (page-instances)", "s", "General", "23d8d1945d10"],
         ["A5", "No ability metadata on the open issues.", "s", "General", "31b5c4357deb"]
       ],
+      "charts": [],
       "columns": {
-        "A": [44.0, false],
-        "B": [30.0, false],
-        "C": [24.0, false]
+        "A": [44.0, false, 0],
+        "B": [30.0, false, 0],
+        "C": [24.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:C1", "A2:C2", "A5:C5"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Who's Affected"
+      "tables": {},
+      "title": "Who's Affected",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -1421,26 +1947,84 @@
         ["E59", "axe checks for some live-region / role=status markup.", "s", "General", "35f8c4bb6bf4"],
         ["F59", "Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing.", "s", "General", "35f8c4bb6bf4"]
       ],
+      "charts": [],
       "columns": {
-        "A": [9.0, false],
-        "B": [34.0, false],
-        "C": [8.0, false],
-        "D": [17.0, false],
-        "E": [44.0, false],
-        "F": [44.0, false]
+        "A": [9.0, false, 0],
+        "B": [34.0, false, 0],
+        "C": [8.0, false, 0],
+        "D": [17.0, false, 0],
+        "E": [44.0, false, 0],
+        "F": [44.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:F1", "A2:F2"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Coverage & Method"
+      "tables": {},
+      "title": "Coverage & Method",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -1617,25 +2201,83 @@
         ["B59", "Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing.", "s", "General", "35f8c4bb6bf4"],
         ["C59", null, "inlineStr", "General", "ef0ea631039f"]
       ],
+      "charts": [],
       "columns": {
-        "A": [28.0, false],
-        "B": [70.0, false],
-        "C": [14.0, false]
+        "A": [28.0, false, 0],
+        "B": [70.0, false, 0],
+        "C": [14.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [
         {"allow_blank": true, "error": null, "error_style": null, "error_title": null, "formula1": "\"Pass,Fail,Needs follow-up,N/A,Not tested\"", "formula2": null, "operator": null, "prompt": null, "prompt_title": null, "show_dropdown": false, "show_error_message": false, "show_input_message": false, "sqref": "C5:C59", "type": "list"}
       ],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:C1", "A2:C2"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Test Tracking"
+      "tables": {},
+      "title": "Test Tracking",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     },
     {
       "active": false,
@@ -1652,27 +2294,88 @@
         ["G4", "Expert note", "s", "General", "23d8d1945d10"],
         ["A5", "No manual decisions have been recorded yet.", "s", "General", "31b5c4357deb"]
       ],
+      "charts": [],
       "columns": {
-        "A": [10.0, false],
-        "B": [34.0, false],
-        "C": [18.0, false],
-        "D": [42.0, false],
-        "E": [48.0, false],
-        "F": [48.0, false],
-        "G": [42.0, false]
+        "A": [10.0, false, 0],
+        "B": [34.0, false, 0],
+        "C": [18.0, false, 0],
+        "D": [42.0, false, 0],
+        "E": [48.0, false, 0],
+        "F": [48.0, false, 0],
+        "G": [42.0, false, 0]
       },
+      "comments": [],
+      "conditional_formatting": [],
       "data_validations": [],
+      "defined_names": {},
+      "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "freeze_panes": "A5",
       "hyperlinks": [],
       "images": [],
       "merged": ["A1:G1", "A2:G2", "A5:G5"],
-      "rows": {
-        "2": [42.0, false]
+      "print": {
+        "area": "",
+        "col_breaks": [],
+        "header_footer": {"alignWithMargins": null, "differentFirst": null, "differentOddEven": null, "evenFooter": "", "evenHeader": "", "firstFooter": "", "firstHeader": "", "oddFooter": "", "oddHeader": "", "scaleWithDoc": null},
+        "margins": {"bottom": 1.0, "footer": 0.5, "header": 0.5, "left": 0.75, "right": 0.75, "top": 1.0},
+        "options": {"gridLines": null, "gridLinesSet": null, "headings": null, "horizontalCentered": null, "verticalCentered": null},
+        "page_setup": {"blackAndWhite": null, "cellComments": null, "copies": null, "draft": null, "errors": null, "firstPageNumber": null, "fitToHeight": null, "fitToWidth": null, "horizontalDpi": null, "id": null, "orientation": null, "pageOrder": null, "paperHeight": null, "paperSize": null, "paperWidth": null, "scale": null, "useFirstPageNumber": null, "usePrinterDefaults": null, "verticalDpi": null},
+        "row_breaks": [],
+        "title_cols": null,
+        "title_rows": null
       },
-      "show_grid_lines": null,
+      "properties": {
+        "codeName": null,
+        "enableFormatConditionsCalculation": null,
+        "filterMode": null,
+        "outlinePr": {"applyStyles": null, "showOutlineSymbols": null, "summaryBelow": true, "summaryRight": true},
+        "pageSetUpPr": {"autoPageBreaks": null, "fitToPage": null},
+        "published": null,
+        "syncHorizontal": null,
+        "syncRef": null,
+        "syncVertical": null,
+        "tabColor": null,
+        "transitionEntry": null,
+        "transitionEvaluation": null
+      },
+      "protection": {"algorithmName": null, "autoFilter": true, "deleteColumns": true, "deleteRows": true, "formatCells": true, "formatColumns": true, "formatRows": true, "hashValue": null, "insertColumns": true, "insertHyperlinks": true, "insertRows": true, "objects": false, "password": null, "pivotTables": true, "saltValue": null, "scenarios": false, "selectLockedCells": false, "selectUnlockedCells": false, "sheet": false, "sort": true, "spinCount": null},
+      "rows": {
+        "2": [42.0, false, 0]
+      },
       "state": "visible",
-      "tab_color": null,
-      "title": "Manual Review Evidence"
+      "tables": {},
+      "title": "Manual Review Evidence",
+      "views": [
+        {
+          "colorId": null,
+          "defaultGridColor": null,
+          "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0},
+          "rightToLeft": null,
+          "selection": [
+            {"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}
+          ],
+          "showFormulas": null,
+          "showGridLines": null,
+          "showOutlineSymbols": null,
+          "showRowColHeaders": null,
+          "showRuler": null,
+          "showWhiteSpace": null,
+          "showZeros": null,
+          "tabSelected": null,
+          "topLeftCell": null,
+          "view": null,
+          "windowProtection": null,
+          "workbookViewId": 0,
+          "zoomScale": null,
+          "zoomScaleNormal": null,
+          "zoomScalePageLayoutView": null,
+          "zoomScaleSheetLayoutView": null,
+          "zoomToFit": null
+        }
+      ]
     }
+  ],
+  "workbook_views": [
+    {"activeTab": 0, "autoFilterDateGrouping": true, "firstSheet": 0, "minimized": false, "showHorizontalScroll": true, "showSheetTabs": true, "showVerticalScroll": true, "tabRatio": 600, "visibility": "visible", "windowHeight": null, "windowWidth": null, "xWindow": null, "yWindow": null}
   ]
 }
