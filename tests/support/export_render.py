@@ -2,10 +2,15 @@
 
 ``GET /api/scans/{id}/export/{fmt}`` in ``audit.web.server`` collects the scan
 once, dispatches to one renderer per format, and passes the result through
-``label_draft_export``. This helper calls the same public entry points in
-the same order. Only the inputs that would otherwise vary between runs are
-pinned: the UI base URL (the request's base URL in the route), the Markdown
-generation time, and the workbook's audit date.
+``label_draft_export``. This helper calls the same public entry points with
+the same arguments, and ``tests/ui/test_export_route_parity.py`` checks the
+result against a real download. The one difference in order is harmless:
+the route collects the scan before its readiness check and this helper
+checks first, but the check only reads the evaluation. Only the inputs that
+would otherwise vary between runs are pinned: the UI base URL (the request's
+base URL in the route), the Markdown generation time, and the workbook's
+audit date. The route always passes its blob store to the workbook renderer;
+pass ``blob_store`` to do the same, or the workbook embeds no screenshots.
 
 The draft/final disposition is forced rather than derived. The route only
 emits a draft when an expert evaluation is incomplete and a final artifact

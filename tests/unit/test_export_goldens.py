@@ -3,9 +3,11 @@
 These goldens exist so a refactor of the exporters (``audit.exports``, the
 workbook renderer, ``export_readiness`` draft labeling) can be proven
 output-identical rather than argued to be. Each export is rendered through
-``tests/support/export_render.py``, which calls the same entry points in the
-same order as ``GET /api/scans/{id}/export/{fmt}``, with the clock and base
-URL pinned to the values the older goldens were recorded with.
+``tests/support/export_render.py``, which calls the entry points
+``GET /api/scans/{id}/export/{fmt}`` calls, with the clock and base URL
+pinned to the values the older goldens were recorded with.
+``tests/ui/test_export_route_parity.py`` downloads the rich scan through the
+route itself and checks that the two agree.
 
 Text formats are compared byte for byte. Workbooks are compared through the
 semantic fingerprint in ``tests/support/xlsx_fingerprint.py`` (values, styles,
