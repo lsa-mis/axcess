@@ -20,9 +20,10 @@ import { useReportTrail } from "./ReportCrumb";
  * only reveal themselves on hover is a trail nobody clicks; the current step
  * is the one thing that is not a link, in plain text colour. Links have a
  * 44 px hit area; long titles truncate with the full text on hover and in
- * the DOM. On the view's own list page the line is just ``↳ Issues``: every
- * page under a tab carries the same line, and it is the page's visible title
- * (see ReportHeader), so the list gets one too.
+ * the DOM. On the view's own list page the line is just the title, ``Issues``,
+ * with the same curl leading into it at the same size: every page under a tab
+ * carries the same line, and it is the page's visible title (see
+ * ReportHeader), so the list gets one too.
  */
 export default function ReportSubTrail({ scanId, view }: { scanId: number; view: "issues" | "diff" }) {
   const { trail } = useReportTrail();
@@ -42,22 +43,27 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
       className="animate-drop-in mt-3 text-sm"
     >
       <ol className="flex min-w-0 flex-wrap items-center gap-x-0.5">
-        <li aria-hidden className="flex items-center pr-1.5 text-border-strong">
-          <CornerDownRight className="h-4 w-4" />
-        </li>
+        {/* On the view's own list page there is no path, only the title,
+            and the curl leads into it the same way (below). */}
+        {last > 0 && (
+          <li aria-hidden className="flex items-center pr-1.5 text-border-strong">
+            <CornerDownRight className="h-4 w-4" />
+          </li>
+        )}
         {crumbs.map((crumb, index) => (
           <Fragment key={`${crumb.to}-${index}`}>
-            {/* No chevron before a title on its own line: the path ends at
-                the last link, and a trailing chevron points at nothing. */}
-            {index > 0 && !(index === last && last > 0) && (
+            {/* No chevron before a title on its own line: the curl at the
+                start of that line (TrailCurl) is what leads into it. */}
+            {index > 0 && index !== last && (
               <li aria-hidden className="flex items-center text-border-strong">
                 <ChevronRight className="h-4 w-4" />
               </li>
             )}
             {/* With steps above it, the title takes a line of its own, under
-                the path, level with the content below, so it never wraps at an
+                the path, led into by the curl, so it never wraps at an
                 arbitrary point in the middle of the path. */}
-            <li className={index === last && last > 0 ? "min-w-0 basis-full" : "min-w-0"}>
+            <li className={index === last ? "flex min-w-0 basis-full items-center" : "min-w-0"}>
+              {index === last && <TrailCurl />}
               {index === last ? (
                 // The last step is the page's heading (the header draws no
                 // other, see ReportHeader), and names the page it shows when
@@ -68,7 +74,7 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
                 <h1
                   aria-current="page"
                   title={crumb.detail ? `${crumb.label}: ${crumb.detail}` : crumb.label}
-                  className={`flex max-w-[48rem] min-w-0 items-center gap-1.5 py-1 text-lg ${index === last && last > 0 ? "" : "px-1.5"} font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-xl`}
+                  className="flex max-w-[48rem] min-w-0 items-center gap-1.5 py-1 text-lg font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-xl"
                 >
                   <span className={crumb.detail ? "shrink-0 font-medium text-fg-muted" : "truncate"}>
                     {crumb.label}
@@ -100,5 +106,31 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
         ))}
       </ol>
     </nav>
+  );
+}
+
+/**
+ * A hand-drawn arrow from under the trail's corner glyph, down and round into
+ * the heading, so the path visibly leads on to the page it names. It draws
+ * itself in once (``trail-curl`` in styles.css) and is static under reduced
+ * motion. Stroke only and a shade darker than the chevrons, since it is the one mark
+ * that has to be noticed; hidden from assistive tech, which gets the path as
+ * words instead.
+ */
+function TrailCurl() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 28 30"
+      className="-mt-4 mr-1 h-[30px] w-7 shrink-0 text-fg-subtle"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path className="trail-curl-line" pathLength={1} d="M3 1 C 2 10, 4 20, 12 22 C 16 23, 20 22, 24 21" />
+      <path className="trail-curl-head" d="M19.8 17.6 L 24 21 L 20 24.8" />
+    </svg>
   );
 }
