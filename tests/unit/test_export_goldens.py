@@ -28,9 +28,11 @@ that predates this harness, ``scan_audit.md``, pins a different fixture
 beside it would read as its sibling. ``rich_scan`` pins the audit report.
 
 Refresh the new goldens with ``AUDIT_UPDATE_GOLDEN=1`` after a deliberate
-output change. A missing golden fails rather than being recorded, so one
-deleted or renamed during a refactor cannot quietly regenerate. The
-pre-existing goldens are never written from here.
+output change. Each test then writes what it rendered and fails, so an update
+run never passes, and under ``CI`` it refuses to write at all. A missing
+golden fails rather than being recorded, so one deleted or renamed during a
+refactor cannot quietly regenerate. The pre-existing goldens are never
+written from here.
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 import pytest
 from support.export_render import (
@@ -60,11 +62,30 @@ from audit.exports import xlsx_export
 from audit.web import issues
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
-UPDATE_GOLDEN = os.environ.get("AUDIT_UPDATE_GOLDEN") == "1"
+UPDATE_ENV = "AUDIT_UPDATE_GOLDEN"
 
 # Formats whose final golden predates this harness. Their finals are compared
 # against those files and never rewritten here.
 _EXISTING_FINALS = ("csv", "json", "jira", "markdown")
+
+
+def _updating() -> bool:
+    if os.environ.get(UPDATE_ENV) != "1":
+        return False
+    if os.environ.get("CI"):
+        pytest.fail(f"{UPDATE_ENV}=1 is set under CI; goldens are only rewritten locally.")
+    return True
+
+
+def _record(path: Path, content: bytes) -> NoReturn:
+    """Write a golden, then fail: an update run must never leave the suite green."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    pytest.fail(
+        f"Wrote {path.name}. Review `git diff tests/unit/golden`, then rerun without "
+        f"{UPDATE_ENV} to verify.",
+        pytrace=False,
+    )
 
 
 def _golden_bytes(rendered: str | bytes, export_format: str) -> bytes:
@@ -84,12 +105,11 @@ def _assert_matches_golden(rendered: str | bytes, export_format: str, name: str)
     """Compare bytes, not text: a bare ``\\r`` would not survive ``read_text``."""
     actual = _golden_bytes(rendered, export_format)
     path = GOLDEN_DIR / name
-    if UPDATE_GOLDEN:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(actual)
-    elif not path.exists():
+    if _updating():
+        _record(path, actual)
+    if not path.exists():
         pytest.fail(
-            f"Golden {name} is missing. Record it with AUDIT_UPDATE_GOLDEN=1 only if "
+            f"Golden {name} is missing. Record it with {UPDATE_ENV}=1 only if "
             "the export is new; a golden that went missing in a refactor must be restored."
         )
     expected = path.read_bytes()
@@ -99,12 +119,11 @@ def _assert_matches_golden(rendered: str | bytes, export_format: str, name: str)
         diff = fingerprint_diff(expected_fp, actual_fp, labels=(name, "rendered"))
         assert not diff, (
             f"Workbook fingerprint mismatch for {name}. Re-run with "
-            "AUDIT_UPDATE_GOLDEN=1 if the change was deliberate.\n" + "\n".join(diff)
+            f"{UPDATE_ENV}=1 if the change was deliberate.\n" + "\n".join(diff)
         )
         return
     assert actual == expected, (
-        f"Golden mismatch for {name}. Re-run with AUDIT_UPDATE_GOLDEN=1 if the change "
-        "was deliberate."
+        f"Golden mismatch for {name}. Re-run with {UPDATE_ENV}=1 if the change was deliberate."
     )
 
 
