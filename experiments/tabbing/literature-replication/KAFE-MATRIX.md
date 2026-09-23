@@ -1,6 +1,6 @@
 # KAFE's benchmark, all 48 Axcess detectors and KAFE's own result
 
-Generated 2026-09-19T15:36:51.760508+00:00 by `tools/kafe_matrix.py assemble`, from
+Generated 2026-09-23T00:53:05.466646+00:00 by `tools/kafe_matrix.py assemble`, from
 `derived/kafe_matrix.jsonl` (one checkpoint per subject).
 
 ## Provenance
@@ -46,12 +46,24 @@ replication scored, so the two sides are read on one denominator; the
 13 subjects Axcess could not put in front of it are named in
 control 2, not charged to KAFE.
 
-**Both ms columns are computed the same way on both sides.**
-`ms/button` is measured browser time divided by the number of controls probed —
-for Axcess the candidates it addressed, for KAFE their own
-`Size of All Visible Ctrl Nodes`. This is the unit KAFE's 300 ms cap is stated
-in. `ms/subject` is total measured time for one subject. KAFE's figures come
-from their `Detection` column, pooled the same way.
+**The two sides' ms columns are not measured the same way.** Only the
+arithmetic is shared: both are pooled, total time over total controls. What goes
+into it differs on both sides of the division.
+
+- **Axcess** `ms/button` is this harness's wall time for the detector's arm on
+  a subject — the `ms covers` column says what that includes — summed over the
+  scored subjects and divided by the candidates `collect_candidates` surfaced on
+  them. It is an amortised quotient, not latency measured one button at a time,
+  and it is headless Chromium under Playwright on one shared machine.
+- **KAFE** `ms/button` is their published `Detection` column divided by their
+  `Size of All Visible Ctrl Nodes`, whose node-selection code was not
+  published. It is also an amortised quotient, taken with their own instrument
+  on their 2019 Firefox 68 / Selenium setup, and nothing here re-timed it.
+
+Neither figure is measured per-button latency, and the two are comparable as
+orders of magnitude only. The 300 ms per-button ceiling is this project's
+constraint, not KAFE's. `ms/subject` is total time for one subject, pooled the
+same way on each side and subject to the same caveat.
 
 **The candidate universe is Axcess's own.** `data-probe` could only be placed on
 the elements `audit.analyzer.keyboard.kbdiff.candidates.collect_candidates`

@@ -49,6 +49,7 @@ import csv
 import json
 import pathlib
 import platform
+import re
 import statistics
 import sys
 import time
@@ -1408,6 +1409,46 @@ CAPDIAG = HERE / "derived" / "kafe_matrix_capdiag.json"
 # diagnosis that only ever ran once could not tell a property of the subject
 # from a property of the load, so the report states how far the repeats agree.
 CAPDIAG_REPEATS = sorted((HERE / "derived").glob("capdiag_repeat_*.json"))
+# Every run's printed verdicts, oldest first. Runs 1 and 2 wrote their JSON to
+# the path run 3 later overwrote, so this log is the only record of them.
+CAPDIAG_LOG = HERE / "derived" / "capdiag-runs.log"
+
+
+def capdiag_log_runs(path: pathlib.Path = CAPDIAG_LOG) -> list[dict[str, dict[str, Any]]]:
+    """Each capdiag run's per-subject reading, oldest first, read back from the log.
+
+    Only what every verdict line states is taken: whether the walk capped, at how
+    many presses it completed if it did not, and whether the verdict says focus
+    left the page. `write_report` checks these against the JSON of the runs that
+    do survive before relying on the ones that only exist here.
+    """
+    if not path.exists():
+        return []
+    header = re.compile(r"^runs? (\d+)(?: and (\d+))? of \d+,")
+    verdict = re.compile(r"^([a-z0-9_]+) {2,}(\S.*)$")
+    completed = re.compile(r"^terminates at (\d+) presses")
+    runs: list[dict[str, dict[str, Any]]] = []
+    section: list[dict[str, dict[str, Any]]] = []
+    for line in path.read_text().splitlines():
+        if match := header.match(line):
+            section = [{} for n in match.groups() if n]
+            runs.extend(section)
+            continue
+        match = verdict.match(line)
+        if not match or not section:
+            continue
+        subject, text = match.groups()
+        # A section holding two runs lists each subject once per run, in run order.
+        target = next((run for run in section if subject not in run), None)
+        if target is None:
+            continue
+        done = completed.match(text)
+        target[subject] = {
+            "capped": done is None,
+            "presses": int(done.group(1)) if done else None,
+            "leaves_page": "`document.hasFocus()` is false" in text,
+        }
+    return runs
 
 
 LOOP_TAIL = 60  # shortest trailing window examined, however short the period
@@ -1766,12 +1807,24 @@ replication scored, so the two sides are read on one denominator; the
 {attempted - scored} subjects Axcess could not put in front of it are named in
 control 2, not charged to KAFE.
 
-**Both ms columns are computed the same way on both sides.**
-`ms/button` is measured browser time divided by the number of controls probed —
-for Axcess the candidates it addressed, for KAFE their own
-`Size of All Visible Ctrl Nodes`. This is the unit KAFE's 300 ms cap is stated
-in. `ms/subject` is total measured time for one subject. KAFE's figures come
-from their `Detection` column, pooled the same way.
+**The two sides' ms columns are not measured the same way.** Only the
+arithmetic is shared: both are pooled, total time over total controls. What goes
+into it differs on both sides of the division.
+
+- **Axcess** `ms/button` is this harness's wall time for the detector's arm on
+  a subject — the `ms covers` column says what that includes — summed over the
+  scored subjects and divided by the candidates `collect_candidates` surfaced on
+  them. It is an amortised quotient, not latency measured one button at a time,
+  and it is headless Chromium under Playwright on one shared machine.
+- **KAFE** `ms/button` is their published `Detection` column divided by their
+  `Size of All Visible Ctrl Nodes`, whose node-selection code was not
+  published. It is also an amortised quotient, taken with their own instrument
+  on their 2019 Firefox 68 / Selenium setup, and nothing here re-timed it.
+
+Neither figure is measured per-button latency, and the two are comparable as
+orders of magnitude only. The 300 ms per-button ceiling is this project's
+constraint, not KAFE's. `ms/subject` is total time for one subject, pooled the
+same way on each side and subject to the same caveat.
 
 **The candidate universe is Axcess's own.** `data-probe` could only be placed on
 the elements `audit.analyzer.keyboard.kbdiff.candidates.collect_candidates`
@@ -1925,35 +1978,83 @@ def write_report(
     leaky = [
         s for s, r in diag_rows.items() if (r.get("walk") or {}).get("loop_leaves_the_page")
     ]
-    still = [s for s, r in diag_rows.items() if r.get("still_capped_at_ceiling")]
-    freed = [s for s, r in diag_rows.items() if r.get("still_capped_at_ceiling") is False]
+    json_runs = [capdiag, *(capdiag_repeats or [])] if capdiag else []
+    # Whether a walk caps is read over every run, including the ones that only
+    # survive in the log; the log is trusted only where it agrees with the JSON
+    # of every run that also has one.
+    log_runs = capdiag_log_runs()
+    if json_runs and len(log_runs) >= len(json_runs):
+        for logged, run in zip(log_runs[-len(json_runs):], json_runs):
+            for subject, row in (run.get("subjects") or {}).items():
+                seen = logged.get(subject) or {}
+                if seen.get("capped") != row.get("still_capped_at_ceiling") or (
+                    seen.get("capped") is False
+                    and seen.get("presses") != row.get("presses_at_ceiling")
+                ):
+                    raise ValueError(
+                        f"{CAPDIAG_LOG.name} disagrees with the capdiag JSON on {subject}"
+                    )
+        cap_runs = log_runs
+    else:
+        cap_runs = [
+            {
+                s: {
+                    "capped": r.get("still_capped_at_ceiling"),
+                    "presses": r.get("presses_at_ceiling"),
+                }
+                for s, r in (run.get("subjects") or {}).items()
+            }
+            for run in json_runs
+        ]
+    only_logged = len(cap_runs) - len(json_runs)
+
+    def capped_in(subject: str) -> int:
+        return sum(1 for run in cap_runs if (run.get(subject) or {}).get("capped"))
+
+    freed = sorted(s for s in diag_rows if cap_runs and capped_in(s) == 0)
+    split_cap = sorted(s for s in diag_rows if 0 < capped_in(s) < len(cap_runs))
+    still = sorted(s for s in diag_rows if s not in freed and s not in split_cap)
     if diag_rows and not freed:
         cap_note = (
-            "Raising the ceiling frees none of them, so every one of these "
-            "abstentions stands; what the re-walk adds is *why* each abstains. "
+            "No subject completes the walk at the higher ceiling in every run, so every one "
+            "of these abstentions stands; what the re-walk adds is *why* each abstains. "
         )
     elif freed:
-        names = ", ".join(f"`{s}`" for s in sorted(freed))
+        names = ", ".join(f"`{s}`" for s in freed)
         verb = "completes" if len(freed) == 1 else "complete"
         was = "was an abstention" if len(freed) == 1 else "were abstentions"
         cap_note = (
-            f"{len(freed)} of these ({names}) {verb} the walk at the higher ceiling and "
-            f"{was} only because the `focusable + {TAB_HEADROOM}` budget was too tight; "
-            f"{len(still)} still cap. The published numbers are unchanged either way — they "
-            f"were measured at the derived budget, and this diagnosis is not a re-score."
+            f"{len(freed)} of these ({names}) {verb} the walk at the higher ceiling in every "
+            f"run and {was} only because the `focusable + {TAB_HEADROOM}` budget was too "
+            f"tight; {len(still)} still cap. "
         )
     else:
         cap_note = ""
+    for subject in split_cap:
+        done = sorted(
+            run[subject]["presses"]
+            for run in cap_runs
+            if subject in run and not run[subject]["capped"]
+        )
+        cap_note += (
+            f"`{subject}` completed at the {(capdiag or {}).get('ceiling', 'n/a')}-press "
+            f"ceiling in {len(done)} of {len(cap_runs)} runs (at "
+            f"{', '.join(str(p) for p in done)} presses, against a "
+            f"{(diag_rows[subject] or {}).get('headroom_cap', '?')}-press budget) and capped "
+            f"in the other {capped_in(subject)}, so it is unstable rather than freed, and its "
+            f"line above is one reading of it, not a property of the subject. "
+        )
+    if diag_rows:
+        cap_note += (
+            "The published numbers are unchanged either way — they were measured at the "
+            "derived budget, and this diagnosis is not a re-score."
+        )
 
-    all_runs = [capdiag, *(capdiag_repeats or [])] if capdiag else []
-    if len(all_runs) > 1:
+    if len(cap_runs) > 1:
 
         def readings(subject: str, field: str) -> list[Any]:
-            return [(r["subjects"].get(subject) or {}).get(field) for r in all_runs]
+            return [(r["subjects"].get(subject) or {}).get(field) for r in json_runs]
 
-        split_cap = sorted(
-            s for s in diag_rows if len(set(readings(s, "still_capped_at_ceiling"))) > 1
-        )
         split_stops = sorted(
             s
             for s in diag_rows
@@ -1961,32 +2062,46 @@ def write_report(
         )
         agreed = sorted(s for s in diag_rows if s not in split_cap and s not in split_stops)
         cap_note += (
-            f"\n\nThe diagnosis was run {len(all_runs)} times over independent page loads, "
+            f"\n\nThe diagnosis was run {len(cap_runs)} times over independent page loads, "
             f"because one reading cannot separate a property of the subject from a property "
             f"of the load. "
         )
+        if only_logged > 0:
+            cap_note += (
+                f"The first {only_logged} wrote JSON that a later run overwrote, so their "
+                f"readings come from the verdict lines in `derived/capdiag-runs.log`, which "
+                f"agree with the JSON of the other {len(json_runs)} wherever both exist. "
+                f"Whether the walk caps is compared over all {len(cap_runs)}; named-stop "
+                f"counts only over the {len(json_runs)} whose JSON survives. "
+            )
         if agreed:
             cap_note += (
-                f"{len(agreed)} gave the same answer in all {len(all_runs)} "
+                f"{len(agreed)} gave the same answer in every run "
                 f"({', '.join(f'`{s}`' for s in agreed)}) — which is agreement across these "
                 f"runs, not a guarantee. "
             )
         if split_cap:
             cap_note += (
                 f"**{', '.join(f'`{s}`' for s in split_cap)} did not even agree on whether the "
-                f"walk caps**, so no verdict above should be read as a property of those "
-                f"subjects. "
+                f"walk caps**, so no verdict above should be read as a property of "
+                f"{'that subject' if len(split_cap) == 1 else 'those subjects'}. "
             )
         if split_stops:
             cap_note += (
-                f"{', '.join(f'`{s}`' for s in split_stops)} agreed on capping and on the "
-                f"shape of the walk but not on how many of its stops carry a probe id — the "
-                f"same identity instability §1.4 records. "
+                f"{', '.join(f'`{s}`' for s in split_stops)} agreed on capping but not on "
+                f"what the walk contains — how many of its stops carry a probe id differs "
+                f"between runs — the same identity instability §1.4 records. "
             )
         cap_note += (
             "Every run's output, earlier ones whose JSON a later run overwrote included, "
             "is in `derived/capdiag-runs.log`."
         )
+    also_leaky = {
+        s: [i + 1 for i, run in enumerate(cap_runs) if (run.get(s) or {}).get("leaves_page")]
+        for s in diag_rows
+        if s not in leaky
+    }
+    also_leaky = {s: runs for s, runs in also_leaky.items() if runs}
     if leaky:
         cap_note = cap_note.rstrip() + "\n\n" if cap_note else ""
         cap_note += (
@@ -2001,8 +2116,16 @@ def write_report(
             f"subjects are abstentions for an instrument reason, and **nothing here says whether "
             f"the site traps a keyboard user**. Deciding that needs a walker whose termination "
             f"test is `document.hasFocus()` rather than a null `activeElement`, which is a change "
-            f"to a frozen detector and out of scope for this run.\n\n"
+            f"to a frozen detector and out of scope for this run."
         )
+        for subject, runs in sorted(also_leaky.items()):
+            which = ", ".join(str(n) for n in runs)
+            cap_note += (
+                f" In the run{'s' if len(runs) > 1 else ''} where it capped with the "
+                f"`hasFocus` reading in place (run {which}), `{subject}` shows the same "
+                f"mechanism."
+            )
+        cap_note += "\n\n"
 
     text = f"""# KAFE matrix: report
 
@@ -2101,6 +2224,29 @@ arms' verdicts standing.
   hardware benchmarks, only as orders of magnitude, and every Axcess figure is
   wall time on one shared machine.
 
+### 1.7 The comparison runs in one direction only
+
+All {len(ALL_DETECTORS)} rows are Axcess detectors scored on KAFE's corpus. KAFE's detector was
+never scored on ours. Its row here is their **published output** —
+`artifacts/kafe_results_to_reproduce.csv`, their tool's real result on their own
+{c2["kafe_corpus"]} subjects, reconciled against their paper's Table 1 by Control 1 below — and
+not a local execution: their Java / Selenium 3.141.5 / Firefox 68 stack was not
+rebuilt, and by decision it will not be. The reverse direction is out of scope
+for this work, not queued behind it.
+
+One part of it could not be closed even if it were in scope. KAFE emits
+page-level labels; `fixtures`, `gds` and `ma11y` label elements. Running their
+binary against those corpora would still need a projection invented between two
+different units of truth, and that projection — not their detector — would
+decide the result.
+
+The asymmetry is not neutral, and it cuts both ways. Measuring our detectors on
+someone else's corpus against their published numbers is the harder and more
+exposed direction, and that is the direction taken. But it means nothing in this
+work independently validates **our** corpora: `edgecases` is shared-author and
+already carries no unbiased accuracy claim, and `fixtures` was authored here
+too. No outside tool has been scored on either.
+
 ## 2. Controls
 
 ### Control 1 — KAFE reproduction: {"PASS" if controls["control_1_kafe_reproduction"]["pass"] else "FAIL"}
@@ -2132,7 +2278,8 @@ Abstained during the run:
 
 {bullets([f"`{row['subject']}` — {row['reason']}" for row in c2["abstained_during_the_run"]])}
 
-Never attempted:
+Replayable, but with no result in `derived/kafe_matrix.jsonl` — not scored, and
+not counted as an abstention, because nothing was measured:
 
 {bullets([f"`{name}`" for name in c2["not_yet_attempted"]])}
 
@@ -2224,7 +2371,9 @@ Full permissive numbers: `derived/kafe_matrix_summary_permissive.json`.
   `ms covers` conventions match the existing matrix by construction.
   `ms/button` divides by the candidates that subject probed; `ms/subject` by the
   subjects measured. KAFE's two figures come from their `Detection` column over
-  their `Size of All Visible Ctrl Nodes`, pooled the same way.
+  their `Size of All Visible Ctrl Nodes`. The pooling arithmetic is the same on
+  both sides; the instrument, hardware, browser and control count are not, so
+  the two are comparable as orders of magnitude only (see `KAFE-MATRIX.md`).
 """
     REPORT_MD.write_text(text)
     return text

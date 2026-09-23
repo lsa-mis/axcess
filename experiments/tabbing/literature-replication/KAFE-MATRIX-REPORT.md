@@ -1,6 +1,6 @@
 # KAFE matrix: report
 
-Companion to `KAFE-MATRIX.md`. Generated 2026-09-19T15:36:51.760508+00:00.
+Companion to `KAFE-MATRIX.md`. Generated 2026-09-23T00:53:05.466646+00:00.
 Everything below is derived from `derived/kafe_matrix.jsonl`,
 `derived/kafe_matrix_summary.json` and `derived/kafe_matrix_controls.json`;
 no figure in this file is typed by hand.
@@ -63,11 +63,11 @@ counts below are the same measurement as `tab_stops` in the matrix:
 - `salesforce` — 5 named stops in 4000 presses; from press 9 focus leaves the page and re-enters on a 2-position orbit (`#el:body:42`, `#el:iframe:131`); **not decided** — see below
 - `spotify` — 7 named stops in 2645 presses; **completes** — terminates at 2645 presses; headroom was short by 2433
 
-1 of these (`spotify`) completes the walk at the higher ceiling and was an abstention only because the `focusable + 200` budget was too tight; 6 still cap. The published numbers are unchanged either way — they were measured at the derived budget, and this diagnosis is not a re-score.
+No subject completes the walk at the higher ceiling in every run, so every one of these abstentions stands; what the re-walk adds is *why* each abstains. `spotify` completed at the 4000-press ceiling in 3 of 5 runs (at 2472, 2502, 2645 presses, against a 212-press budget) and capped in the other 2, so it is unstable rather than freed, and its line above is one reading of it, not a property of the subject. The published numbers are unchanged either way — they were measured at the derived budget, and this diagnosis is not a re-score.
 
-The diagnosis was run 3 times over independent page loads, because one reading cannot separate a property of the subject from a property of the load. 5 gave the same answer in all 3 (`costco`, `dell`, `dpreview`, `salesforce`, `spotify`) — which is agreement across these runs, not a guarantee. `cnn`, `raise` agreed on capping and on the shape of the walk but not on how many of its stops carry a probe id — the same identity instability §1.4 records. Every run's output, earlier ones whose JSON a later run overwrote included, is in `derived/capdiag-runs.log`.
+The diagnosis was run 5 times over independent page loads, because one reading cannot separate a property of the subject from a property of the load. The first 2 wrote JSON that a later run overwrote, so their readings come from the verdict lines in `derived/capdiag-runs.log`, which agree with the JSON of the other 3 wherever both exist. Whether the walk caps is compared over all 5; named-stop counts only over the 3 whose JSON survives. 4 gave the same answer in every run (`costco`, `dell`, `dpreview`, `salesforce`) — which is agreement across these runs, not a guarantee. **`spotify` did not even agree on whether the walk caps**, so no verdict above should be read as a property of that subject. `cnn`, `raise` agreed on capping but not on what the walk contains — how many of its stops carry a probe id differs between runs — the same identity instability §1.4 records. Every run's output, earlier ones whose JSON a later run overwrote included, is in `derived/capdiag-runs.log`.
 
-5 of them (`cnn`, `costco`, `dpreview`, `raise`, `salesforce`) share one mechanism, and it is **not** a page defect. Their walk settles into a loop in which `document.hasFocus()` is false: Tab steps out of the page to the browser's own UI, and the next Tab re-enters at the position it left from rather than at the first stop. `compute_tab_order` means to end a walk exactly there — its comment calls it "focus left the document (browser chrome)" — but it detects that as `document.activeElement === null`, and `activeElement` falls back to `<body>` instead of going null, so the branch never fires and the budget runs out. These subjects are abstentions for an instrument reason, and **nothing here says whether the site traps a keyboard user**. Deciding that needs a walker whose termination test is `document.hasFocus()` rather than a null `activeElement`, which is a change to a frozen detector and out of scope for this run.
+5 of them (`cnn`, `costco`, `dpreview`, `raise`, `salesforce`) share one mechanism, and it is **not** a page defect. Their walk settles into a loop in which `document.hasFocus()` is false: Tab steps out of the page to the browser's own UI, and the next Tab re-enters at the position it left from rather than at the first stop. `compute_tab_order` means to end a walk exactly there — its comment calls it "focus left the document (browser chrome)" — but it detects that as `document.activeElement === null`, and `activeElement` falls back to `<body>` instead of going null, so the branch never fires and the budget runs out. These subjects are abstentions for an instrument reason, and **nothing here says whether the site traps a keyboard user**. Deciding that needs a walker whose termination test is `document.hasFocus()` rather than a null `activeElement`, which is a change to a frozen detector and out of scope for this run. In the run where it capped with the `hasFocus` reading in place (run 2), `spotify` shows the same mechanism.
 
 Where a terminal loop is named, the walk was observed a second time on
 a fresh page with the walker's own focus reader, and the loop is the positions
@@ -215,7 +215,8 @@ Abstained during the run:
 - `dpreview` — tab walk capped at 294 with 94 focusable elements
 - `cnn` — tab walk capped at 483 with 283 focusable elements
 
-Never attempted:
+Replayable, but with no result in `derived/kafe_matrix.jsonl` — not scored, and
+not counted as an abstention, because nothing was measured:
 
 - `craigslist`
 
@@ -345,4 +346,6 @@ Full permissive numbers: `derived/kafe_matrix_summary_permissive.json`.
   `ms covers` conventions match the existing matrix by construction.
   `ms/button` divides by the candidates that subject probed; `ms/subject` by the
   subjects measured. KAFE's two figures come from their `Detection` column over
-  their `Size of All Visible Ctrl Nodes`, pooled the same way.
+  their `Size of All Visible Ctrl Nodes`. The pooling arithmetic is the same on
+  both sides; the instrument, hardware, browser and control count are not, so
+  the two are comparable as orders of magnitude only (see `KAFE-MATRIX.md`).

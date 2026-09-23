@@ -1,0 +1,17 @@
+Finish step 4 of FINAL-REPORT-PROGRESS.md: regenerate the KAFE outputs from the generator you corrected. Read FINAL-REPORT-PROGRESS.md first.
+
+Your last session could not run `uv run`. The permission rule matches only a command that STARTS with `uv run`, so anything chained with `cd`, `&&`, `;`, pipes, or `python -c` needs approval that print mode can't give. Run each of these exactly as written, one per call, from this directory, with nothing added:
+
+1. uv run --offline --no-sync python -B -m tools.kafe_matrix controls
+2. uv run --offline --no-sync python -B -m tools.kafe_matrix assemble
+3. uv run --offline --no-sync python -B -m tools.kafe_matrix report
+4. uv run --offline --no-sync python -m pytest tests/test_capdiag.py -q
+
+Before step 1, confirm derived/kafe_matrix.jsonl still has 52 lines. A separate craigslist run may append a 53rd; if it has, stop and report rather than regenerate.
+
+After regenerating:
+- Check that every number in KAFE-MATRIX.md is unchanged from the committed version (`git diff`). Only prose may change: the "computed the same way" paragraph and the §1.3 capdiag text. If any number moved, stop and report it.
+- Check that FINAL-REPORT.md still agrees with the regenerated files, and update its §8.4 "pending regeneration" note to say regeneration was done.
+- Append a line to FINAL-REPORT-PROGRESS.md for each step.
+
+Boundaries: do not edit anything under src/audit/. Do not commit. Do not run `run` or `capdiag`, and do not re-run any subject or detector. If a premise is wrong, stop and report.

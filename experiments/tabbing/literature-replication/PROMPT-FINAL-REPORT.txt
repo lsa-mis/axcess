@@ -1,0 +1,8 @@
+You are writing the final report for the tabbing replication. Read BRIEF-FINAL-REPORT.md, then BRIEF-FINAL-REPORT-ADDENDUM.md (its "Update (20:30)" section overrides anything in it that says to wait for craigslist). Execute both.
+
+Progress must survive if this session dies (session limits have killed earlier runs):
+- Keep a running log in FINAL-REPORT-PROGRESS.md: after each step (hash check, regeneration, each correction, each report section), append one line saying what is done and which files changed.
+- Write FINAL-REPORT.md section by section, saving after each section, rather than composing it all at the end.
+- At the start, read FINAL-REPORT-PROGRESS.md if it exists and continue from the last completed step instead of starting over.
+
+Boundaries: do not edit anything under src/audit/. Do not commit. Do not re-run any subject or detector. A separate process may append a craigslist line to derived/kafe_matrix.jsonl while you work; follow the addendum's rules for that and never write to that file yourself. If a premise is wrong, stop and report it instead of working around it.

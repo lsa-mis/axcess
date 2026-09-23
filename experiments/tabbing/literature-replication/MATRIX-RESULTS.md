@@ -342,13 +342,14 @@ Published reference: no published reference; ground truth by construction. 7 tar
 | D10b-u upstream coverage set-difference (sequential keys, baselined) | 0 | 0 | 0 | 1 | 3 | — | 0.0% | — | 2219.8 | 951.3 | priced at its arm |
 
 > **Why C10–C16 are all zero on this corpus.** Each of C10–C16 is defined as
-> *C9 minus a dismissal rule*. C9 itself scores **0 TP with 3 abstentions**
-> here, because its filter stages (`inert`, `pointer-events:none`,
-> blocked-centre) cannot resolve the three elements D4/D5/D6 each find. Every
-> rule downstream therefore subtracts from an empty lead set and inherits the
-> zero. These rows measure **C9's abstention, not the rules themselves** — the
-> rules are untested on this corpus, which is different from having been tested
-> and found useless. The same cascade applies on `ma11y`.
+> *C9 minus a dismissal rule*. C9 itself scores **0 TP with 1 abstention**
+> here — the row's single unknown positive, on the corpus's one verified fault.
+> C3, C4 and C8 abstain on it the same way, while C1 and C2, which do not apply
+> those filter stages, find it. (Unlike on `gds`, D4/D5/D6 each miss it here
+> rather than find it.) Every rule downstream therefore subtracts from an empty
+> lead set and inherits the zero. These rows measure **C9's abstention, not the
+> rules themselves** — the rules are untested on this corpus, which is different
+> from having been tested and found useless. The same cascade applies on `gds`.
 
 ### edgecases — shared-author development corpus; NO unbiased accuracy claim
 
