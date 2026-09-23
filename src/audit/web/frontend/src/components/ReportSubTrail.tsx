@@ -20,20 +20,26 @@ import { useReportTrail } from "./ReportCrumb";
  * only reveal themselves on hover is a trail nobody clicks; the current step
  * is the one thing that is not a link, in plain text colour. Links have a
  * 44 px hit area; long titles truncate with the full text on hover and in
- * the DOM. Nothing renders on the tab's own list page, where the tab is the whole answer.
+ * the DOM. On the view's own list page the line is just ``↳ Issues``: every
+ * page under a tab carries the same line, and it is the page's visible title
+ * (see ReportHeader), so the list gets one too.
  */
 export default function ReportSubTrail({ scanId, view }: { scanId: number; view: "issues" | "diff" }) {
   const { trail } = useReportTrail();
   const root = `/scans/${scanId}/${view}`;
   const start = trail.findIndex((crumb) => crumb.to.split("?")[0] === root);
-  if (start < 0 || start >= trail.length - 1) return null;
+  if (start < 0) return null;
   const crumbs = trail.slice(start);
   const last = crumbs.length - 1;
+  const context = crumbs
+    .slice(0, last)
+    .map((crumb) => crumb.label)
+    .join(", ");
 
   return (
     <nav
       aria-label={`Where you are in ${view === "issues" ? "Issues" : "Verify changes"}`}
-      className="animate-drop-in mt-2 pl-3 text-sm"
+      className="animate-drop-in mt-3 text-sm"
     >
       <ol className="flex min-w-0 flex-wrap items-center gap-x-0.5">
         <li aria-hidden className="flex items-center pr-1.5 text-border-strong">
@@ -41,33 +47,41 @@ export default function ReportSubTrail({ scanId, view }: { scanId: number; view:
         </li>
         {crumbs.map((crumb, index) => (
           <Fragment key={`${crumb.to}-${index}`}>
-            {index > 0 && (
+            {/* No chevron before a title on its own line: the path ends at
+                the last link, and a trailing chevron points at nothing. */}
+            {index > 0 && !(index === last && last > 0) && (
               <li aria-hidden className="flex items-center text-border-strong">
                 <ChevronRight className="h-4 w-4" />
               </li>
             )}
-            <li className="min-w-0">
+            {/* With steps above it, the title takes a line of its own, under
+                the path, level with the content below, so it never wraps at an
+                arbitrary point in the middle of the path. */}
+            <li className={index === last && last > 0 ? "min-w-0 basis-full" : "min-w-0"}>
               {index === last ? (
-                // The last step names the page it shows when there is one
-                // (the inspector): ``Page inspector: “Find a Room”``. It is
-                // the view's title, so the view does not repeat it as a
-                // heading of its own (see Inspector).
-                <span
+                // The last step is the page's heading (the header draws no
+                // other, see ReportHeader), and names the page it shows when
+                // there is one: ``Page inspector: “Find a Room”``. A screen
+                // reader's heading list gets just this step, then the steps
+                // above it as context in words ("…, in Issues, <issue>"),
+                // rather than the whole trail with its chevrons.
+                <h1
                   aria-current="page"
                   title={crumb.detail ? `${crumb.label}: ${crumb.detail}` : crumb.label}
-                  className="flex max-w-[40rem] min-w-0 items-center gap-1.5 px-1.5 py-2 font-medium text-fg"
+                  className={`flex max-w-[48rem] min-w-0 items-center gap-1.5 py-1 text-lg ${index === last && last > 0 ? "" : "px-1.5"} font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-xl`}
                 >
-                  <span className="shrink-0">
+                  <span className={crumb.detail ? "shrink-0 font-medium text-fg-muted" : "truncate"}>
                     {crumb.label}
-                    {crumb.detail ? ":" : ""}
+                    {crumb.detail ? ": " : ""}
                   </span>
                   {crumb.detail && (
                     <>
-                      <FileText className="h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
-                      <span className="truncate font-semibold">“{crumb.detail}”</span>
+                      <FileText className="h-5 w-5 shrink-0 text-fg-muted" aria-hidden />
+                      <span className="truncate">“{crumb.detail}”</span>
                     </>
                   )}
-                </span>
+                  {context && <span className="sr-only">, in {context}</span>}
+                </h1>
               ) : (
                 <Link
                   to={crumb.to}

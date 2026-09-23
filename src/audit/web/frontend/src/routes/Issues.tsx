@@ -124,10 +124,10 @@ export default function IssuesRoute() {
                 {siteLabel(scan.seed_url)}
                 {" · "}
                 {rows.length === data.total_unfiltered
-                  ? `${data.total_unfiltered} issue groups`
-                  : `${rows.length} of ${data.total_unfiltered} issue groups`}
+                  ? `${data.total_unfiltered.toLocaleString()} issue groups`
+                  : `${rows.length.toLocaleString()} of ${data.total_unfiltered.toLocaleString()} issue groups`}
                 {" · "}
-                {occurrences} occurrences
+                {occurrences.toLocaleString()} occurrences
               </>
             }
           />

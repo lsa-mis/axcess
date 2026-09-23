@@ -559,11 +559,11 @@ async def test_actual_comparison_links_reach_stored_finding(
 async def test_inspector_trail_names_the_page_it_shows(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """The inspector's step in the trail carries the page title.
+    """The inspector's step in the trail is the page's heading.
 
-    It reads ``Page inspector: “<page title>”`` after the issue. The title is then
-    the view's heading, so it is not drawn a second time, but the h1 stays
-    for screen readers and heading navigation.
+    It reads ``Page inspector: “<page title>”`` after the issue, and it is
+    the page's only h1: a screen reader's heading list gets that step, then
+    the steps above it as context in words, not the whole trail.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -578,16 +578,11 @@ async def test_inspector_trail_names_the_page_it_shows(
     await inspect.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+/inspect\?"))
     sub = page.get_by_role("navigation", name="Where you are in Issues")
-    current = sub.locator("[aria-current=page]")
-    await playwright_async.expect(current).to_contain_text("Page inspector:")
-    heading = page.get_by_role("heading", level=1)
-    title = (await heading.text_content() or "").strip()
-    assert title
-    await playwright_async.expect(current).to_contain_text(f"“{title}”")
-    await playwright_async.expect(
-        sub.get_by_role("link", name="Issues", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        sub.get_by_role("link", name=row["title"], exact=True)
-    ).to_be_visible()
-    assert await heading.evaluate("el => el.getBoundingClientRect().width <= 1")
+    heading = sub.get_by_role("heading", level=1)
+    await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
+    await playwright_async.expect(heading).to_have_attribute("aria-current", "page")
+    await playwright_async.expect(heading).to_contain_text(re.compile(r"^Page inspector: “.+”"))
+    await playwright_async.expect(heading).to_contain_text(f", in Issues, {row['title']}")
+    for step in ("Issues", row["title"]):
+        link = sub.get_by_role("link", name=step, exact=True)
+        await playwright_async.expect(link).to_be_visible()

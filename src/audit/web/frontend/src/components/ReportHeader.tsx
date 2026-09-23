@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { useLocation } from "react-router";
+import { activeView } from "./ReportCrumb";
 import ReportWorkspaceNav from "./ReportWorkspaceNav";
 
 /**
@@ -27,7 +29,6 @@ export default function ReportHeader({
   meta,
   actions,
   tabs = true,
-  titleInTrail = false,
 }: {
   scanId: number;
   previousScanId: number | null;
@@ -36,13 +37,14 @@ export default function ReportHeader({
   actions?: ReactNode;
   /** Show the report's view tabs. Off on drill-downs (see above). */
   tabs?: boolean;
-  /**
-   * The trail under the tabs already shows the title (the inspector's page),
-   * so the heading stays for screen readers and heading navigation but is not
-   * drawn a second time.
-   */
-  titleInTrail?: boolean;
 }) {
+  const { pathname, search } = useLocation();
+  // Under Issues and Verify changes the trail beneath the tabs names where
+  // you are (``↳ Issues › <issue> › Page inspector: “<page>”``) and its last
+  // step is the page's h1 (see ReportSubTrail), so no second heading is drawn
+  // here. Overview has no trail and keeps its own title.
+  const view = tabs ? activeView(pathname, search) : "";
+  const titleInTrail = view === "issues" || view === "diff";
   return (
     <header className="mb-5">
       {/* Tabs first, title second. The tabs are the report's own navigation
@@ -52,17 +54,13 @@ export default function ReportHeader({
       {tabs && (
         <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
       )}
-      <div className={`${titleInTrail ? "mt-2" : "mt-5"} flex flex-wrap items-start justify-between gap-3`}>
+      <div className={`${titleInTrail ? "mt-0.5 items-center" : "mt-5 items-start"} flex flex-wrap justify-between gap-3`}>
         <div className="min-w-0">
-          <h1
-            className={
-              titleInTrail
-                ? "sr-only"
-                : "text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]"
-            }
-          >
-            {title}
-          </h1>
+          {!titleInTrail && (
+            <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
+              {title}
+            </h1>
+          )}
           {meta && (
             <p className={`${titleInTrail ? "" : "mt-1"} max-w-4xl text-sm leading-6 text-fg-muted`}>{meta}</p>
           )}

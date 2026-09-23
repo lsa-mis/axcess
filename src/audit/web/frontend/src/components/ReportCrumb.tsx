@@ -190,9 +190,9 @@ function trailFor(
     const query = params.toString();
     const self: Crumb = { label: match.view, to: `${pathname}${query ? `?${query}` : ""}` };
     if (onIssueItself && issueKey && scanId != null) self.issue = { scanId, key: issueKey };
-    // The inspector says which page it is showing, so the trail can carry the
-    // page's title and the view needs no second heading for it.
-    const inspected = Number(pathname.match(/^\/scans\/\d+\/pages\/(\d+)\/inspect\/?$/)?.[1]);
+    // The inspector and page evidence say which page they show, so the trail
+    // carries the page's title and the view needs no second heading for it.
+    const inspected = Number(pathname.match(/^\/scans\/\d+\/pages\/(\d+)(?:\/inspect)?\/?$/)?.[1]);
     if (scanId != null && Number.isFinite(inspected)) self.page = { scanId, pageId: inspected };
     add(self);
   }
