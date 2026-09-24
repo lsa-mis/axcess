@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>What Axcess checks — Axcess</title>
-<meta name="description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<title>What Axcess checks | Axcess</title>
+<meta name="description" content="What Axcess checks, which report group each result lands in, how it compares with Siteimprove and axe DevTools, and a searchable map of every WCAG 2.2 A and AA success criterion with what a person still needs to test.">
 <link rel="canonical" href="https://lsa-mis.github.io/axcess/coverage/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Axcess">
-<meta property="og:title" content="What Axcess checks — Axcess">
-<meta property="og:description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<meta property="og:title" content="What Axcess checks | Axcess">
+<meta property="og:description" content="What Axcess checks, which report group each result lands in, how it compares with Siteimprove and axe DevTools, and a searchable map of every WCAG 2.2 A and AA success criterion with what a person still needs to test.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/coverage/">
-<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/diagrams/report-groups.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
 
@@ -46,25 +46,95 @@
   <div class="wrap">
     <span class="eyebrow">Coverage</span>
     <h1>What Axcess checks, and what it <span class="hl">honestly can't</span></h1>
-    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define 55 Level A and AA success criteria. Axcess contributes evidence to 29 of them today. Every one of the 55 is listed below, including the 26 a person must test by hand, with the steps to do it.</p>
+    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define 55 Level A and AA success criteria. Axcess contributes evidence to 29 of them today. This page shows where each result lands and how Axcess compares with Siteimprove and axe DevTools. It then lists all 55 criteria, with test steps for the 26 that a person must test by hand.</p>
   </div>
 </section>
+
+<section class="soft" id="groups">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Report groups</span>
+      <h2>Every result lands in one of three groups</h2>
+      <p class="sub">The group tells you how certain a result is and what to do next. <a href="../faq/#glossary">The glossary defines each group.</a></p>
+    </div>
+    <div class="shot-frame">
+      <img class="shot" src="../assets/diagrams/report-groups.png" width="3200" height="1800"
+        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa &quot;cannot tell&quot; results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.">
+    </div>
+    <div class="lanes" style="margin-top:1.5rem">
+      <div class="lane lane-automated">
+        <span class="chip chip-automated">Barrier</span>
+        <h3>Confirm it, then fix it</h3>
+        <p>Comes from axe-core rule failures, including problems found after clicking, and from Siteimprove Alfa failures. Confirm it on the page, fix it, then rescan.</p>
+      </div>
+      <div class="lane lane-observed">
+        <span class="chip chip-partial">Needs review</span>
+        <h3>A person decides</h3>
+        <p>Comes from browser checks, the keyboard check, text in images whose alt text is missing or does not match, local AI checks, and Alfa “cannot tell” results. Test it on the page and record your decision.</p>
+      </div>
+      <div class="lane" style="border-top-color:#c2cad6">
+        <span class="chip chip-manual">Informational</span>
+        <h3>Nothing to fix</h3>
+        <p>Comes from image checks where the alt text already matches, and from older records kept for history. No action is needed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Compared with other tools</span>
+      <h2>Where Axcess fits next to Siteimprove and axe DevTools</h2>
+      <p class="sub">We use and like both. Siteimprove monitors whole sites from the cloud, and the axe DevTools browser extension checks the page in front of you. Axcess fills gaps: pages behind a sign-in, content behind a click, and checks that need a real browser or a person's judgement.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Axcess checks compared with Siteimprove and axe DevTools">
+      <table>
+        <caption class="vis-hidden">Axcess checks, what they catch, and whether Siteimprove or axe DevTools also catch them</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">What it catches</th><th scope="col">WCAG</th><th scope="col">Report group</th><th scope="col">Also caught by Siteimprove?</th><th scope="col">Also caught by axe DevTools?</th></tr></thead>
+        <tbody><tr><th scope="row">Rule engine (axe-core)</th><td>Machine-testable problems on every rendered page, such as missing text alternatives, unlabeled form fields, low text contrast, and ARIA errors. About 90 rules run at Level AA.</td><td>Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2</td><td>Barrier</td><td>Yes. Siteimprove checks the same kinds of problems with its own rule engine.</td><td>Yes. axe DevTools runs these same axe-core rules.</td></tr><tr><th scope="row">Click through menus, tabs, and dialogs</th><td>Problems that only appear after a control is used. Axcess operates each safe control, runs axe-core again on what appears, and records which control revealed each problem.</td><td>The same criteria as axe-core</td><td>Barrier</td><td>Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.</td><td>Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.</td></tr><tr><th scope="row">Reflow at phone width</th><td>Pages that need sideways scrolling at 320 CSS pixels wide.</td><td>1.4.10 (AA)</td><td>Needs review</td><td>No automated check found.</td><td>No automated check found.</td></tr><tr><th scope="row">Text cut off at 200% zoom</th><td>Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.</td><td>1.4.4 (AA)</td><td>Needs review</td><td>Partly. It flags pages that block zooming. It has also documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026, so ask Siteimprove whether it still runs.</td><td>Partly. axe-core flags pages that block zooming, not clipped text.</td></tr><tr><th scope="row">Text spacing</th><td>Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.</td><td>1.4.12 (AA)</td><td>Needs review</td><td>Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.</td><td>Partly. The same inline-style check.</td></tr><tr><th scope="row">Keyboard traps</th><td>Places where Tab and Shift+Tab both fail to move focus away. Reported at most once per page.</td><td>2.1.2 (A)</td><td>Needs review</td><td>No automated check found.</td><td>Only in the paid Keyboard guided test. No axe-core rule.</td></tr><tr><th scope="row">Focus checks</th><td>A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.</td><td>2.4.11 (AA), 2.4.3 (A)</td><td>Needs review</td><td>No automated check found.</td><td>Partly. axe-core flags positive tabindex as a best practice, and the paid Keyboard guided test reviews tab order. No rule found for focus hidden behind other content.</td></tr><tr><th scope="row">Target size</th><td>Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.</td><td>2.5.8 (AA)</td><td>Barrier</td><td>Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess checks only when Siteimprove Alfa runs at Level AAA.</td><td>Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on for Level AA scans.</td></tr><tr><th scope="row">Text inside images</th><td>Images that contain words, found with OCR and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.</td><td>1.4.5 (AA), 1.1.1 (A)</td><td>Needs review (Informational when the alt text already matches)</td><td>No automated images-of-text check found. Its open-source engine has an experimental rule that asks whether an image contains text. An on-demand AI check judges whether alt text matches the image.</td><td>No automated check found. A paid guided test reviews image alternatives.</td></tr><tr><th scope="row">Motion and reading order (optional)</th><td>Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.</td><td>1.4.2, 2.2.2, 1.3.2 (A)</td><td>Needs review</td><td>Partly. Its open-source engine has an autoplaying audio rule that asks a person to confirm how long the audio plays, and a best-practice rule flags blink and marquee. No reading-order check found.</td><td>Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.</td></tr><tr><th scope="row">AI language checks (optional)</th><td>Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.</td><td>2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)</td><td>Needs review</td><td>Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.</td><td>Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="grid grid-2" style="margin-top:1.5rem">
+      <article class="card"><h3>Pages behind a sign-in</h3><p>Axcess scans them after you sign in yourself, including single sign-on and two-factor steps. Siteimprove's help center describes crawling behind a login through a setup done by its support team, and points to an add-on for sites that use multi-factor sign-in. Its free browser extension checks signed-in pages one at a time in your own browser, and so does the axe DevTools extension.</p></article>
+      <article class="card"><h3>A second opinion from Siteimprove's engine</h3><p>Axcess can also run Siteimprove Alfa, the open-source engine behind Siteimprove's checks, on your computer. Each result keeps the name of the engine that found it, so you can compare them. Results can differ from what the Siteimprove platform reports, which adds its own reviews and settings.</p></article>
+    </div>
+    <p class="small" style="margin-top:1.25rem">Checked in September 2026 against public Siteimprove and Deque documentation and the open-source axe-core and Alfa code. “No automated check found” means we found none in their documentation, not that none can exist. Tools change quickly, so please <a href="https://github.com/lsa-mis/axcess/issues">open an issue on GitHub</a> if something here is out of date.</p>
+  </div>
+</section>
+
+<section class="soft" id="by-hand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Manual testing</span>
+      <h2>What you still need to test by hand</h2>
+      <p class="sub">These checks still need a person. See <a href="../faq/#axcess-and-manual-testing">Axcess and manual testing</a>.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></span><h3>Keyboard</h3><p>Use only the keyboard to reach and operate everything, with Tab, Shift+Tab, Enter, Space, the arrow keys, and Escape. Check that focus is always visible and moves in a sensible order. Axcess's keyboard check only looks for traps.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 22 19"/></svg></span><h3>Screen reader</h3><p>Listen to key pages and tasks with a screen reader such as NVDA, JAWS, or VoiceOver. Check that names, roles, headings, and announcements make sense in context.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg></span><h3>Real tasks</h3><p>Complete real tasks from start to finish, such as applying or registering, including error messages and time limits. Axcess does not submit forms or complete tasks on its own, apart from a search form you configure.</p></article>
+    </div>
+    <p style="margin-top:1.25rem">The criteria list below gives the manual steps for every WCAG success criterion. For guides and training, see <a href="https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html">LSA Accessibility's web accessibility resources</a> and <a href="https://accessibility.lsa.umich.edu/learn/training.html">LSA Accessibility training</a>.</p>
+  </div>
+</section>
+
 
 <section>
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">At a glance</span>
       <h2>29 of 55 criteria with Axcess evidence</h2>
-      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Product Roadmap screen, and the documentation can never disagree.</p>
+      <p class="sub">These numbers are generated from the coverage file the product itself reads, so they cannot drift from the code.</p>
     </div>
     <div class="covbar" role="img" aria-label="Of 55 criteria: 5 automated, 18 partly automated, 6 AI-assisted, 26 manual only."><span class="automated" style="width:9.1%"></span><span class="partial" style="width:32.7%"></span><span class="ai-assisted" style="width:10.9%"></span><span class="manual" style="width:47.3%"></span></div>
     <div class="legend" aria-hidden="true"><span><i style="background:var(--m-automated)"></i>Automated: 5</span><span><i style="background:var(--m-partial)"></i>Partly automated: 18</span><span><i style="background:var(--m-ai)"></i>AI-assisted lead: 6</span><span><i style="background:#c2cad6"></i>Manual only: 26</span></div>
     <div class="lanes lanes-4"><article class="lane lane-automated" style=""><span class="chip chip-automated">Automated</span><h3>5 criteria</h3><p>Axcess checks this reliably on its own. A person confirms it applies and reviews any remaining states.</p></article><article class="lane lane-observed" style=""><span class="chip chip-partial">Partly automated</span><h3>18 criteria</h3><p>Axcess catches the mechanical failures. A person tests the parts that need judgement.</p></article><article class="lane lane-ai" style=""><span class="chip chip-ai-assisted">AI-assisted lead</span><h3>6 criteria</h3><p>A local AI model flags likely problems as leads. A person confirms each one before it counts.</p></article><article class="lane lane-observed" style="border-top-color:#c2cad6"><span class="chip chip-manual">Manual only</span><h3>26 criteria</h3><p>Axcess has no check for this yet. The report gives you the steps to test it yourself.</p></article></div>
-    <div class="table-wrap" style="margin-top:1.75rem" tabindex="0">
+    <div class="table-wrap" style="margin-top:1.75rem" tabindex="0" role="region" aria-label="Coverage by WCAG conformance level">
       <table>
         <caption class="vis-hidden">Coverage by WCAG conformance level</caption>
         <thead><tr><th scope="col">Level</th><th scope="col">Criteria</th><th scope="col">Automated</th><th scope="col">Partly automated</th><th scope="col">AI-assisted</th><th scope="col">Manual only</th><th scope="col">With Axcess evidence</th></tr></thead>
-        <tbody><tr><td><b>Level A</b></td><td>31</td><td>2</td><td>11</td><td>4</td><td>14</td><td><b>17</b></td></tr><tr><td><b>Level AA</b></td><td>24</td><td>3</td><td>7</td><td>2</td><td>12</td><td><b>12</b></td></tr><tr><td><b>A + AA</b></td><td>55</td><td>5</td><td>18</td><td>6</td><td>26</td><td><b>29</b></td></tr></tbody>
+        <tbody><tr><th scope="row">Level A</th><td>31</td><td>2</td><td>11</td><td>4</td><td>14</td><td><b>17</b></td></tr><tr><th scope="row">Level AA</th><td>24</td><td>3</td><td>7</td><td>2</td><td>12</td><td><b>12</b></td></tr><tr><th scope="row">A + AA</th><td>55</td><td>5</td><td>18</td><td>6</td><td>26</td><td><b>29</b></td></tr></tbody>
       </table>
     </div>
     <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>&quot;Contributes evidence&quot; is not &quot;proves conformance&quot;.</strong> Even a fully automated criterion leaves a residual human judgement, which is why every card below has a <em>What a person still checks</em> section.</p></div></div>
@@ -118,7 +188,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags missing alt on img / area / input[type=image] and unlabelled SVGs; the image-of-text VLM separately flags pictures that are really text.</p></div>
           <div><h4>What a person still checks</h4><p>Whether the alt text that IS present is a meaningful equivalent, and the decorative-vs-informative call, needs a human.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Image text check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-1-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-1-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span><span role="listitem" class="chip chip-plain">Image text check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-2-1" data-method="ai-assisted" data-level="A" data-text="1.2.1 audio-only and video-only (prerecorded) a ai-assisted lead for &lt;audio&gt; elements, the semantic llm checks whether a transcript or text alternative is reachable (nearby &quot;transcript&quot; link / surrounding text). confirm the transcript is accurate and equivalent. video-only (silent video) can&#x27;t be detected from the dom, still a manual check. meaning check (local ai)">
@@ -131,7 +201,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>For &lt;audio&gt; elements, the semantic LLM checks whether a transcript or text alternative is reachable (nearby &quot;Transcript&quot; link / surrounding text).</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the transcript is accurate and equivalent. Video-only (silent video) can&#x27;t be detected from the DOM, still a manual check.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-2-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-2-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Meaning check (local AI)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-2-2" data-method="manual" data-level="A" data-text="1.2.2 captions (prerecorded) a manual only  play each video and confirm synchronized, accurate captions. auto-caption diffing (whisper) is on the roadmap. ">
@@ -196,7 +266,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks list, table-header, definition-list, required-ARIA-children and heading-structure markup on the rendered DOM.</p></div>
           <div><h4>What a person still checks</h4><p>Relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they&#x27;re also programmatic.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-3-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-3-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-3-2" data-method="ai-assisted" data-level="A" data-text="1.3.2 meaningful sequence a ai-assisted lead the visual probe screenshots the page and asks a local vision model whether the visual reading order matches the dom/source order (css can reorder content so screen readers hear a different sequence). confirm the model&#x27;s call by tabbing/reading with a screen reader. subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available. visual and motion check">
@@ -209,7 +279,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The visual probe screenshots the page and asks a local vision model whether the visual reading order matches the DOM/source order (CSS can reorder content so screen readers hear a different sequence).</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the model&#x27;s call by tabbing/reading with a screen reader. Subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-3-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-3-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Visual and motion check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-3-3" data-method="manual" data-level="A" data-text="1.3.3 sensory characteristics a manual only  read instructions for reliance on shape/size/location/sound alone (&quot;click the round button to the right&quot;), judgement only a human can make. ">
@@ -248,7 +318,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe validates that any autocomplete tokens used are valid.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm autocomplete IS present on fields collecting the user&#x27;s own info (name, email, address), missing autocomplete isn&#x27;t auto-detected.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-3-5-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-3-5-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-1" data-method="partial" data-level="A" data-text="1.4.1 use of color a partly automated axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). most colour-only meaning, form errors, chart series, required-field markers, status, needs a human to confirm a non-colour cue exists. rule engine (axe-core)">
@@ -261,7 +331,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags links distinguished from surrounding text by colour alone (a narrow heuristic).</p></div>
           <div><h4>What a person still checks</h4><p>Most colour-only meaning, form errors, chart series, required-field markers, status, needs a human to confirm a non-colour cue exists.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+          <div class="pipes"><span id="sc-1-4-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: low</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-2" data-method="partial" data-level="A" data-text="1.4.2 audio control a partly automated the visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. autoplay markup alone is not flagged. confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy. visual and motion check">
@@ -274,7 +344,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. Autoplay markup alone is not flagged.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-4-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Visual and motion check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-3" data-method="partial" data-level="AA" data-text="1.4.3 contrast (minimum) aa partly automated axe measures text/background contrast on the rendered dom against the 4.5:1 (3:1 large-text) thresholds. text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check. rule engine (axe-core)">
@@ -287,7 +357,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe measures text/background contrast on the rendered DOM against the 4.5:1 (3:1 large-text) thresholds.</p></div>
           <div><h4>What a person still checks</h4><p>Text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-4-3-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-3-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-4" data-method="automated" data-level="AA" data-text="1.4.4 resize text aa automated the responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container. confirm no loss of content or function across the full zoom range in your target browsers. zoom and reflow check">
@@ -300,7 +370,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm no loss of content or function across the full zoom range in your target browsers.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+          <div class="pipes"><span id="sc-1-4-4-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-4-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Zoom and reflow check</span></span><span>Confidence: high</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-5" data-method="ai-assisted" data-level="AA" data-text="1.4.5 images of text aa ai-assisted lead ocr + a local vision model judge whether each image is really rendered text rather than a photo/diagram. confirm flagged images aren&#x27;t the allowed exceptions (logos, or text that&#x27;s essential to a particular presentation). image text check">
@@ -313,7 +383,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>OCR + a local vision model judge whether each image is really rendered text rather than a photo/diagram.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm flagged images aren&#x27;t the allowed exceptions (logos, or text that&#x27;s essential to a particular presentation).</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Image text check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-1-4-5-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-5-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Image text check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-10" data-method="automated" data-level="AA" data-text="1.4.10 reflow aa automated the responsive probe loads each page at 320 css px and flags horizontal scrolling / overflow. confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use). zoom and reflow check">
@@ -326,7 +396,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The responsive probe loads each page at 320 CSS px and flags horizontal scrolling / overflow.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm no content or functionality is lost in the reflowed view (some loss can pass the geometry check but still fail in use).</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+          <div class="pipes"><span id="sc-1-4-10-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-10-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Zoom and reflow check</span></span><span>Confidence: high</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-11" data-method="manual" data-level="AA" data-text="1.4.11 non-text contrast aa manual only  check that ui component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. no reliable automated rule exists yet. ">
@@ -352,7 +422,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm no text is cut off or overlapping with the spacing applied.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Zoom and reflow check</span><span>· Confidence: high</span></div>
+          <div class="pipes"><span id="sc-1-4-12-checks">Checks involved:</span><span role="list" aria-labelledby="sc-1-4-12-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Zoom and reflow check</span></span><span>Confidence: high</span></div>
         </div>
       </details>
       <details class="crit" id="sc-1-4-13" data-method="manual" data-level="AA" data-text="1.4.13 content on hover or focus aa manual only  for tooltips/popovers triggered by hover/focus, confirm they&#x27;re dismissable, hoverable, and persistent. ">
@@ -384,7 +454,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard, the deepest part of this SC is manual.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Keyboard check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-1-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-1-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span><span role="listitem" class="chip chip-plain">Keyboard check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-1-2" data-method="partial" data-level="A" data-text="2.1.2 no keyboard trap a partly automated the keyboard probe emits a review lead only when the same observable element resists repeated tab and shift+tab exit attempts. it suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus. reproduce every lead and test components that appear after interaction. confirm whether arrow keys, escape, a close control, or a documented non-standard command lets the user leave before recording a failure. keyboard check">
@@ -397,7 +467,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The keyboard probe emits a review lead only when the same observable element resists repeated Tab and Shift+Tab exit attempts. It suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus.</p></div>
           <div><h4>What a person still checks</h4><p>Reproduce every lead and test components that appear after interaction. Confirm whether arrow keys, Escape, a close control, or a documented non-standard command lets the user leave before recording a failure.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Keyboard check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-1-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-1-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Keyboard check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-1-4" data-method="manual" data-level="A" data-text="2.1.4 character key shortcuts a manual only  if single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. ">
@@ -436,7 +506,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The visual probe measures actual playback advancement for visible video longer than five seconds without a detected control. It also records &lt;marquee&gt; as an expert-review lead.</p></div>
           <div><h4>What a person still checks</h4><p>CSS animations, auto-advancing carousels, and auto-updating regions aren&#x27;t auto-detected, confirm any content that moves &gt;5s can be paused, stopped, or hidden.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Visual and motion check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-2-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-2-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Visual and motion check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-3-1" data-method="manual" data-level="A" data-text="2.3.1 three flashes or below threshold a manual only  confirm nothing flashes more than three times per second. flash analysis is not implemented. ">
@@ -462,7 +532,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the skip link actually moves focus and works with the keyboard.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-4-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-2" data-method="automated" data-level="A" data-text="2.4.2 page titled a automated axe checks that every page has a non-empty &lt;title&gt;. confirm the title is descriptive and distinguishes the page (a light human check). rule engine (axe-core)">
@@ -475,7 +545,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks that every page has a non-empty &lt;title&gt;.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the title is descriptive and distinguishes the page (a light human check).</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: high</span></div>
+          <div class="pipes"><span id="sc-2-4-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: high</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-3" data-method="partial" data-level="A" data-text="2.4.3 focus order a partly automated the focus probe flags positive tabindex (wcag failure f44), a manual tab order that overrides the natural dom order and usually breaks the sequence. tab through the whole page and confirm the focus order preserves meaning and operability, the order can break without a positive tabindex (e.g. css-reordered columns), which still needs a human. focus check">
@@ -488,7 +558,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The focus probe flags positive tabindex (WCAG failure F44), a manual tab order that overrides the natural DOM order and usually breaks the sequence.</p></div>
           <div><h4>What a person still checks</h4><p>Tab through the whole page and confirm the focus order preserves meaning and operability, the order can break without a positive tabindex (e.g. CSS-reordered columns), which still needs a human.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Focus check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-4-3-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-3-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Focus check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-4" data-method="ai-assisted" data-level="A" data-text="2.4.4 link purpose (in context) a ai-assisted lead axe flags empty/unnamed links; the semantic llm judges whether the link text plus its context conveys where it goes. confirm the llm&#x27;s borderline calls (&quot;read more&quot;, icon links), it flags strong leads, not verdicts. rule engine (axe-core), meaning check (local ai)">
@@ -501,7 +571,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s borderline calls (&quot;read more&quot;, icon links), it flags strong leads, not verdicts.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-4-4-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-4-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span><span role="listitem" class="chip chip-plain">Meaning check (local AI)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-5" data-method="manual" data-level="AA" data-text="2.4.5 multiple ways aa manual only  confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. ">
@@ -527,7 +597,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags empty headings / unlabelled controls; the semantic LLM judges whether each heading actually describes the content it introduces.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s borderline heading calls, and check that form-control LABELS are descriptive, label descriptiveness is not yet AI-assisted.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-4-6-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-6-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span><span role="listitem" class="chip chip-plain">Meaning check (local AI)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-7" data-method="partial" data-level="AA" data-text="2.4.7 focus visible aa partly automated axe has limited checks for suppressed focus indicators. tab the whole page and confirm a clearly visible focus indicator on every interactive element, largely manual. rule engine (axe-core)">
@@ -540,7 +610,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe has limited checks for suppressed focus indicators.</p></div>
           <div><h4>What a person still checks</h4><p>Tab the whole page and confirm a clearly visible focus indicator on every interactive element, largely manual.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+          <div class="pipes"><span id="sc-2-4-7-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-7-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: low</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-4-11" data-method="partial" data-level="AA" data-text="2.4.11 focus not obscured (minimum) aa partly automated the live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic &quot;focus hidden behind the sticky header&quot; failure). confirm partial-overlap cases the centre-point check can miss, and tab through interactively, overlays that appear only after a click still need a human. focus check">
@@ -553,7 +623,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>The live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic &quot;focus hidden behind the sticky header&quot; failure).</p></div>
           <div><h4>What a person still checks</h4><p>Confirm partial-overlap cases the centre-point check can miss, and tab through interactively, overlays that appear only after a click still need a human.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Focus check</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-4-11-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-4-11-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Focus check</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-5-1" data-method="manual" data-level="A" data-text="2.5.1 pointer gestures a manual only  for any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. ">
@@ -592,7 +662,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe flags controls whose accessible name doesn&#x27;t contain the visible label text (label-content-name-mismatch).</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the visible text is fully contained in the accessible name for voice-control users.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-5-3-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-5-3-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-2-5-4" data-method="manual" data-level="A" data-text="2.5.4 motion actuation a manual only  if a function is triggered by device motion (shake/tilt), confirm a ui alternative and a way to disable motion actuation. ">
@@ -631,7 +701,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks interactive targets are at least 24x24 CSS px (with spacing).</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-2-5-8-checks">Checks involved:</span><span role="list" aria-labelledby="sc-2-5-8-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       </div>
@@ -650,7 +720,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks &lt;html&gt; has a present and valid lang attribute.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the declared language actually matches the page&#x27;s main content.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: high</span></div>
+          <div class="pipes"><span id="sc-3-1-1-checks">Checks involved:</span><span role="list" aria-labelledby="sc-3-1-1-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: high</span></div>
         </div>
       </details>
       <details class="crit" id="sc-3-1-2" data-method="partial" data-level="AA" data-text="3.1.2 language of parts aa partly automated axe validates lang attributes that are present on parts of the page. detecting foreign-language passages that are *missing* a lang attribute needs a human reader. rule engine (axe-core)">
@@ -663,7 +733,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe validates lang attributes that are present on parts of the page.</p></div>
           <div><h4>What a person still checks</h4><p>Detecting foreign-language passages that are *missing* a lang attribute needs a human reader.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+          <div class="pipes"><span id="sc-3-1-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-3-1-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: low</span></div>
         </div>
       </details>
       <details class="crit" id="sc-3-2-1" data-method="manual" data-level="A" data-text="3.2.1 on focus a manual only  confirm moving focus to a control doesn&#x27;t trigger an unexpected context change (auto-submit, new window). ">
@@ -754,7 +824,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks a programmatic label exists; the semantic LLM judges whether each control&#x27;s label/instructions are sufficient to know what to enter.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm the LLM&#x27;s sufficiency calls, and test real form submissions, error-time instructions (SC 3.3.x) still need a human.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span class="chip chip-plain">Meaning check (local AI)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-3-3-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-3-3-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span><span role="listitem" class="chip chip-plain">Meaning check (local AI)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-3-3-3" data-method="manual" data-level="AA" data-text="3.3.3 error suggestion aa manual only  trigger validation errors and confirm the page suggests how to fix them. ">
@@ -825,7 +895,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles).</p></div>
           <div><h4>What a person still checks</h4><p>Custom widgets&#x27; state changes (expanded, selected, checked) need a screen reader to confirm they&#x27;re announced.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: medium</span></div>
+          <div class="pipes"><span id="sc-4-1-2-checks">Checks involved:</span><span role="list" aria-labelledby="sc-4-1-2-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: medium</span></div>
         </div>
       </details>
       <details class="crit" id="sc-4-1-3" data-method="partial" data-level="AA" data-text="4.1.3 status messages aa partly automated axe checks for some live-region / role=status markup. confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing. rule engine (axe-core)">
@@ -838,7 +908,7 @@
         <div class="crit-body">
           <div><h4>What Axcess does</h4><p>axe checks for some live-region / role=status markup.</p></div>
           <div><h4>What a person still checks</h4><p>Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing.</p></div>
-          <div class="pipes"><span>Checks involved:</span><span class="chip chip-plain">Rule engine (axe-core)</span><span>· Confidence: low</span></div>
+          <div class="pipes"><span id="sc-4-1-3-checks">Checks involved:</span><span role="list" aria-labelledby="sc-4-1-3-checks" style="display:flex;flex-wrap:wrap;gap:.4rem"><span role="listitem" class="chip chip-plain">Rule engine (axe-core)</span></span><span>Confidence: low</span></div>
         </div>
       </details>
       </div>
@@ -879,7 +949,8 @@
           <li><a href="../how-it-works/">How it works</a></li>
           <li><a href="../coverage/">What it checks</a></li>
           <li><a href="../who-its-for/">Who it's for</a></li>
-          <li><a href="../faq/">Questions and glossary</a></li>
+          <li><a href="../faq/">Questions</a></li>
+          <li><a href="../faq/#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -887,6 +958,7 @@
         <ul>
           <li><a href="../get-started/">Get started</a></li>
           <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>

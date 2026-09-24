@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Get started with Axcess — Axcess</title>
+<title>Get started with Axcess | Axcess</title>
 <meta name="description" content="Install the desktop preview or run from source, then complete your first scan and read your first report.">
 <link rel="canonical" href="https://lsa-mis.github.io/axcess/get-started/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Axcess">
-<meta property="og:title" content="Get started with Axcess — Axcess">
+<meta property="og:title" content="Get started with Axcess | Axcess">
 <meta property="og:description" content="Install the desktop preview or run from source, then complete your first scan and read your first report.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/get-started/">
-<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/diagrams/report-groups.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
 
@@ -45,8 +45,8 @@
 <section class="hero hero-compact">
   <div class="wrap">
     <span class="eyebrow">Get started</span>
-    <h1>Your first scan in <span class="hl">about ten minutes</span></h1>
-    <p class="lede">Choose how to install, run one small scan, and read your first report. If you are not a developer, the desktop app is the path for you.</p>
+    <h1>Install Axcess and run <span class="hl">your first scan</span></h1>
+    <p class="lede">Install the desktop app, run a small scan of a public site, then try a site behind a sign-in. If you are not a developer, the desktop app is the path for you.</p>
   </div>
 </section>
 
@@ -60,15 +60,15 @@
       <article class="card card-accent">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>
         <h3>Desktop app (recommended)</h3>
-        <p>One app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
+        <p>One app that bundles everything: the workbench, the browser, both rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
           <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
-          <li>Development preview, published automatically from every change to the project</li>
-          <li>Free; no account or sign-in needed to download</li>
+          <li>A development preview, published automatically when the app changes</li>
+          <li>Free, with no account or sign-in needed to download</li>
         </ul>
         <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-macOS-AppleSilicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-x64-Setup.exe">Download for Windows</a></p>
         <p class="small" id="latest-release" data-latest-release="https://github.com/lsa-mis/axcess/releases/latest">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="https://github.com/lsa-mis/axcess/releases">the releases page</a>.</p>
-        <div style="margin-top:1rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>See <a href="#first-launch">the next section</a> for important installation instructions.</strong> Both macOS and Windows show a warning on first launch that you need to approve.</p></div></div>
+        <div style="margin-top:1rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> Both macOS and Windows show a warning on first launch that you need to approve.</p></div></div>
       </article>
       <article class="card">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>
@@ -80,11 +80,11 @@ make migrate           <span class="c"># local database</span>
 make alfa-install      <span class="c"># optional second engine</span>
 make frontend-build    <span class="c"># build the interface</span>
 make run               <span class="c"># open http://127.0.0.1:8765/app/</span></code></pre>
-        <p class="small">Full instructions, hosting for a small team, and troubleshooting are in <a href="https://github.com/lsa-mis/axcess/tree/main/docs">the documentation</a>.</p>
+        <p class="small">Contributor setup, quality checks, and team hosting are in <a href="https://github.com/lsa-mis/axcess/blob/main/CONTRIBUTING.md">the contributing guide</a> and <a href="https://github.com/lsa-mis/axcess/tree/main/docs">the documentation</a>.</p>
       </article>
     </div>
-    <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop App Installation Instructions</h3>
-    <p class="small" style="margin-bottom:1rem">Because the preview is not yet notarized or code-signed, macOS and Windows each show a warning the first time. The warning is expected for this build; you approve it once, and later launches open normally.</p>
+    <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
+    <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
@@ -105,13 +105,13 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Wait while Axcess installs. There are no setup screens and no administrator password is needed; it installs for your account only and opens by itself when it is done.</li>
+          <li>Wait while Axcess installs. There are no setup screens, and it opens by itself when it is done.</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
       </article>
     </div>
-    <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>Optional AI checks</strong> need a separately installed local Ollama service and downloaded models. Skip this at first; every browser-based check runs without it. <a href='../privacy/'>How the optional AI is kept local.</a></p></div></div>
+    <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a></p></div></div>
   </div>
 </section>
 
@@ -120,31 +120,35 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="section-head">
       <span class="eyebrow">Step 2</span>
       <h2>Run a small first scan</h2>
-      <p class="sub">Start with a public site you are authorized to test and a low page limit. You will have a report in a few minutes and a feel for the tool.</p>
+      <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Under <em>Choose the type of site you want to scan</em>, pick <em>Public website</em>.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, something like <code>https://www.example.edu/admissions/</code>. The scope preview will show that only pages under <em>/admissions/</em> will be visited. Leave <em>Crawl the entire host</em>, under Advanced settings, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>Open <em>Advanced settings</em> to find it. The other defaults are conservative and fine, and the browser-based checks need no AI. Expand <em>Default scan settings</em> if you want to see exactly which tests will run.</p>
-        <p class="tip">Want to see it work? Turn on "Show the scanning browser window" in advanced settings.</p></li>
-      <li><h3>Start the scan and watch</h3><p>You will see the current page, counts of pages discovered and tested, which checks ran, and an estimated finish time. You can stop at any point.</p></li>
+      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
+      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
+      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
     </ol>
   </div>
 </section>
 
-<section>
+<section id="sign-in">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Step 3</span>
-      <h2>Read your first report</h2>
+      <h2>Scan a site behind a sign-in</h2>
+      <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
-    <div class="grid grid-2">
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></span><h3>Start at the issue table</h3><p>Issues are grouped by cause and sorted by impact. Each row tells you what was detected, why it is an issue, the expected fix, and where exactly. Filter by the evidence lane if you want only deterministic failures first.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><h3>Open the evidence</h3><p>Click through to Page Evidence to see the element on the page, the snippet, and any screenshot. For findings revealed by clicking, it says which control revealed them.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg></span><h3>Record decisions</h3><p>Accept, reject as a false positive, mark remediated, or accept the risk, with a short rationale. Decisions are kept with the report and travel into exports.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></span><h3>Check the manual list</h3><p>The WCAG 2.2 A/AA review matrix shows which criteria still need a person, with the procedure for each. This is the honest half of the report.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg></span><h3>Export when ready</h3><p>Download the Excel workbook or the audit report from the handoff screen. If expert review is unfinished, the export is labelled DRAFT and you are told what is missing.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></span><h3>Rescan later</h3><p>After fixes land, scan the same address again. The comparison shows what is new, resolved, and still open.</p></article>
+    <ol class="steps">
+      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
+      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+    </ol>
+    <div class="grid grid-3" style="margin-top:1.5rem">
+      <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
 </section>
@@ -152,13 +156,30 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
 <section class="soft">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">Step 4</span>
+      <h2>Read your first report</h2>
+      <p class="sub">Every result lands in one of three groups: <strong>Barrier</strong>, <strong>Needs review</strong>, or <strong>Informational</strong>. <a href="../faq/#glossary">The glossary explains each one.</a></p>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></span><h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open <em>About</em> on any row for a quick summary.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><h3>Open the evidence</h3><p>An issue's full evidence record shows the pages, the element, the code snippet, and screenshots. For problems found after a click, it names the control, for example "After clicking “Open menu”."</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><h3>Check what actually ran</h3><p>The Overview tab shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg></span><h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Verify changes</em> to compare.</p></article>
+    </div>
+    <p style="margin-top:1.25rem">The full walkthrough, including every column and export, is in <a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your Axcess report</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
       <span class="eyebrow">Good to know</span>
       <h2>Before you scan</h2>
     </div>
     <div class="grid grid-3">
-      <article class="card"><h3>Authorization</h3><p>Only scan sites and accounts you are explicitly permitted to test. Axcess records when robots.txt is ignored, and refuses controls named sign out, delete, or unsubscribe.</p></article>
-      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one crawl per app at a time, matching its local single-writer database. Start the next scan when the first finishes.</p></article>
-      <article class="card"><h3>Time per page</h3><p>Rendering pages in a real browser and running several checks takes a few seconds per page. Advanced settings let you skip individual checks when speed matters more than coverage, and say what you lose.</p></article>
+      <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
+      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>
@@ -184,7 +205,8 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
           <li><a href="../how-it-works/">How it works</a></li>
           <li><a href="../coverage/">What it checks</a></li>
           <li><a href="../who-its-for/">Who it's for</a></li>
-          <li><a href="../faq/">Questions and glossary</a></li>
+          <li><a href="../faq/">Questions</a></li>
+          <li><a href="../faq/#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -192,6 +214,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <ul>
           <li><a href="../get-started/">Get started</a></li>
           <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>

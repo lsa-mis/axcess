@@ -21,6 +21,8 @@ from typing import Any
 
 import pytest
 
+from ._paging import all_pages_text
+
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
@@ -751,32 +753,31 @@ async def test_tracking_coverage_table_filters_and_sorts(
     await playwright_async.expect(automated).to_have_attribute("aria-pressed", "true")
     assert "method=automated" in page.url
     status_cells = matrix.locator("tbody tr td:nth-child(5)")
-    shown_labels = set(await status_cells.all_inner_texts())
+    shown_labels = set(await all_pages_text(page, status_cells, "Criteria"))
     assert shown_labels == {labels["automated"]}, shown_labels
 
     reset = methods.get_by_role("button", name=re.compile(r"^All"))
     await reset.click()
-    await playwright_async.expect(matrix.locator("tbody tr th[scope='row']")).to_have_count(
-        len(covered)
-    )
+    sc_cells = matrix.locator("tbody tr th[scope='row']")
+    # Ten rows a page; the pages together hold every covered criterion.
+    await playwright_async.expect(sc_cells).to_have_count(min(len(covered), 10))
+    assert len(await all_pages_text(page, sc_cells, "Criteria")) == len(covered)
 
     # Success criteria sort as numbers: 1.4.4 before 1.4.10.
     sc_header = matrix.get_by_role("columnheader", name="SC")
     await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "ascending")
-    ascending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+    ascending = await all_pages_text(page, sc_cells, "Criteria")
     assert ascending == sorted(ascending, key=lambda sc: tuple(int(part) for part in sc.split(".")))
 
     await sc_header.get_by_role("button").click()
     await playwright_async.expect(sc_header).to_have_attribute("aria-sort", "descending")
-    descending = await matrix.locator("tbody tr th[scope='row']").all_inner_texts()
+    descending = await all_pages_text(page, sc_cells, "Criteria")
     assert descending == list(reversed(ascending))
 
     # The manual-only long tail is its own group, and it is the rest of
     # the criteria — the two groups together account for all of them.
     await sections.get_by_role("button", name=re.compile(r"^Future Coverage")).click()
-    await playwright_async.expect(matrix.locator("tbody tr th[scope='row']")).to_have_count(
-        len(manual)
-    )
+    assert len(await all_pages_text(page, sc_cells, "Criteria")) == len(manual)
 
 
 async def test_tracking_page_stays_clean_while_filtered(

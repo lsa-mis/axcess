@@ -183,7 +183,7 @@ def _comparison(scan_id: int) -> dict[str, Any]:
         ],
         "total": 51,
         "page": 1,
-        "page_size": 50,
+        "page_size": 10,
     }
 
 
@@ -293,12 +293,12 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
     await next_page.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(
-        page.get_by_text("51 issue groups · Page 2 of 2", exact=True)
+        page.get_by_text("51 issue groups · Page 2 of 6", exact=True)
     ).to_be_visible()
     assert requests[-1]["category"] == ["changed"]
     assert requests[-1]["pipeline"] == ["alfa"]
     assert requests[-1]["page"] == ["2"]
-    assert requests[-1]["page_size"] == ["50"]
+    assert requests[-1]["page_size"] == ["10"]
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -517,9 +517,35 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     _assert_current_is_plain_text(items)
     # The report crumb goes back to the table the reader left, filter kept.
     assert items[1]["link"] == f"/app/scans/{scan_id}/issues?type={row['review_lane']}", items
+    await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report workspace")
     ).to_have_count(0)
+
+
+async def test_report_crumb_returns_to_the_searched_list(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The report crumb goes back to the list as the reviewer left it.
+
+    It points at the link the issue was opened from, so a search typed into
+    the list survives the round trip through an issue.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    query = row["title"].split()[0]
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?q={quote(query)}", wait_until="networkidle")
+    table = page.get_by_role("table", name="Accessibility issue groups")
+    await table.get_by_role("rowheader").get_by_role("link", name=row["title"]).first.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues/[^?]+\?"))
+    crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    back = crumb.get_by_role("link", name=f"example.com #{scan_id}")
+    await playwright_async.expect(back).to_be_visible()
+    await back.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues\?q="))
+    assert parse_qs(urlparse(page.url).query)["q"] == [query]
 
 
 async def test_report_opens_keyboard_only_in_reading_order(

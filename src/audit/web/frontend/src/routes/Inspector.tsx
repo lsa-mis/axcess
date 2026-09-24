@@ -472,6 +472,16 @@ export default function InspectorRoute() {
   const { page: pageInfo, render } = data;
   const displayTitle = pageInfo.title || pageInfo.url;
   const liveUrl = pageInfo.url;
+  const status = render.status_code != null && render.status_code !== 200 ? ` (${render.status_code})` : "";
+  const renderNote = !render.ok
+    ? "Could not render live"
+    : render.source === "stored"
+      ? status
+        ? `Stored render${status}`
+        : null
+      : render.source === "state"
+        ? `Captured state${status}`
+        : `Live render${status}`;
 
   return (
     <>
@@ -480,24 +490,24 @@ export default function InspectorRoute() {
         previousScanId={scanData?.previous_scan_id ?? null}
         title={displayTitle}
         meta={
-          <ReportMeta
-            counts={
-              render.ok
-                ? `${
-                    render.source === "stored"
-                      ? "Stored render"
-                      : render.source === "state"
-                        ? "Captured state"
-                        : "Live render"
-                  } (${render.status_code})`
-                : "Could not render live"
-            }
-            note={
-              pageInfo.captured_at
-                ? `${pageInfo.url} · captured ${new Date(pageInfo.captured_at).toLocaleString()}`
-                : pageInfo.url
-            }
-          />
+          // The URL is the part worth a line: an issue's pages often share a
+          // title ("Find a Room") and differ only in their query string. The
+          // render is only mentioned when it is not the stored evidence at
+          // its usual 200, which is what a reader assumes they are looking at.
+          renderNote ? (
+            <ReportMeta counts={renderNote} note={pageInfo.url} />
+          ) : (
+            <span
+              className="break-all text-fg-subtle"
+              title={
+                pageInfo.captured_at
+                  ? `Captured ${new Date(pageInfo.captured_at).toLocaleString()}`
+                  : undefined
+              }
+            >
+              {pageInfo.url}
+            </span>
+          )
         }
         actions={
           <ExternalLinkButton
