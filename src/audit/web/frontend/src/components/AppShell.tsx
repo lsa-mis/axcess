@@ -14,7 +14,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
-import { LinkButton } from "./ui";
+import { Button, LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
@@ -36,12 +36,13 @@ interface NavItem {
 }
 
 /**
- * Nav lists DESTINATIONS only. "New scan" is an action, not a place,
- * it lives in the topbar as the single global CTA, never in the nav.
- * (Earlier versions had it in both places plus per-page header buttons:
- * three simultaneous "New scan" affordances per screen.) Search and
- * feedback are actions too: they sit in the sidebar beside the nav, not
- * inside it, so the landmark still lists only places.
+ * Nav lists DESTINATIONS only. "New scan" is an action, not a place: it is
+ * the single global CTA at the top of the sidebar (the top bar on a phone,
+ * where the sidebar is hidden), never in the nav. (Earlier versions had it
+ * in several places plus per-page header buttons: three simultaneous
+ * "New scan" affordances per screen.) Search and feedback are actions too:
+ * they sit in the sidebar beside the nav, not inside it, so the landmark
+ * still lists only places.
  */
 const NAV: NavItem[] = [
   {
@@ -81,9 +82,9 @@ function readSidebarPref(): boolean {
 }
 
 /**
- * App shell: UMich-Blue sidebar with Maize accent for the active item, and
- * search and feedback; topbar with the breadcrumb + the single global
- * "New scan" CTA; skip-link for a11y, main content area.
+ * App shell: UMich-Blue sidebar with Maize accent for the active item, the
+ * single global "New scan" CTA, search and feedback; topbar with the
+ * breadcrumb; skip-link for a11y, main content area.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
@@ -201,7 +202,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** One sidebar row, shared by the nav links and the two actions beside them. */
+/**
+ * The sidebar's two kinds of control look different on purpose, the way Zen's
+ * sidebar sets its button tiles apart from its tab list. New scan and Search
+ * are actions: two button tiles side by side at the top, in the app's own
+ * button styles. The places below them are flat full-width rows, one of
+ * which is lit as where you are.
+ */
+const SIDEBAR_TILE = "h-12 w-full px-2";
+
+/** One sidebar row, shared by the nav links and the feedback link. */
 const SIDEBAR_ROW =
   "group relative flex min-h-target w-full items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]";
 const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue";
@@ -216,18 +226,47 @@ const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-
  * URL-prefill contract, so there is no supported way to attach the current
  * page, and guessing at one could put a scanned URL into a third-party form.
  */
+/**
+ * The one "Create New Scan" action. Scan type is chosen on the new-scan page,
+ * so this stays mode-neutral: the shell never makes users pick a workflow
+ * before they have seen the explanation for each option. On that page it is
+ * shown but inert, since it would lead where the reader already is.
+ */
+function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?: string }) {
+  const { pathname } = useLocation();
+  const onNewScanForm = pathname === "/scans/new";
+  return (
+    <LinkButton
+      to="/scans/new"
+      variant={onNewScanForm ? "ghost" : "primary"}
+      size="md"
+      className={cn(className, onNewScanForm && "pointer-events-none opacity-50")}
+      aria-disabled={onNewScanForm || undefined}
+      tabIndex={onNewScanForm ? -1 : undefined}
+      aria-label="Create New Scan"
+      title="Create a new accessibility scan"
+    >
+      <Plus className="h-5 w-5 shrink-0" aria-hidden />
+      {/* "New scan" fits half the sidebar; the accessible name and tooltip
+          keep the full phrase, which contains these words (SC 2.5.3). */}
+      {!iconOnly && <span>New scan</span>}
+    </LinkButton>
+  );
+}
+
 function SearchAction({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
       onClick={onSearch}
       aria-label="Search everything (Cmd+K)"
       title="Search everything (Cmd/Ctrl+K)"
-      className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
+      className={SIDEBAR_TILE}
     >
       <Search className="h-5 w-5 shrink-0" aria-hidden />
       {!collapsed && <span>Search</span>}
-    </button>
+    </Button>
   );
 }
 
@@ -303,10 +342,19 @@ function Sidebar({
           )}
         </button>
       </div>
-      <div className={cn("pt-5", collapsed ? "px-2" : "px-3")}>
+      {/* Actions first, as one row of button tiles: New scan (filled, the
+          primary action) beside Search. Collapsed, the rail is too narrow for
+          two, so they stack as icon-only tiles. */}
+      <div
+        className={cn(
+          "grid gap-2 pt-5",
+          collapsed ? "grid-cols-1 px-2" : "grid-cols-2 px-3",
+        )}
+      >
+        <NewScanAction iconOnly={collapsed} className={SIDEBAR_TILE} />
         <SearchAction collapsed={collapsed} onSearch={onSearch} />
       </div>
-      <nav className={cn("flex-1 pb-5 pt-1", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("flex-1 pb-5 pt-4", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -321,11 +369,17 @@ function Sidebar({
                   // min-h-target keeps every nav row at 44px for SC 2.5.5,
                   // and the slightly larger icon (h-5) plus base text reads
                   // as a primary surface, not a sub-list of links.
+                  // The current place is a white card, the way Zen marks its
+                  // selected tab: lighter than the sidebar, no outline. It was
+                  // filled blue, which is the New scan button's colour, so the
+                  // place you were in read as another button. No border keeps
+                  // it apart from the bordered Search button, and the bar on
+                  // its edge marks it by shape as well as by colour.
                   className={cn(
                     SIDEBAR_ROW,
                     collapsed ? "justify-center px-2" : "px-3",
                     active
-                      ? "bg-umich-blue text-fg-inverse shadow-[0_6px_18px_rgba(0,39,76,0.18)]"
+                      ? "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue"
                       : SIDEBAR_ROW_IDLE,
                   )}
                 >
@@ -349,9 +403,10 @@ function Sidebar({
  * <route name>", which restated the <h1> sitting a few pixels below it,
  * two orientation lines saying the same thing, neither of which said
  * *which report* you were in. The breadcrumb above each page title is now
- * the single answer to "where am I", and this bar carries it plus the one
- * action that belongs on every screen. Search and feedback moved to the
- * sidebar.
+ * the single answer to "where am I", and on a desktop that is all this bar
+ * carries: "Create New Scan", search and feedback live in the sidebar. On a
+ * phone the sidebar is hidden, so the bar keeps the brand, the menu button
+ * and the new-scan action.
  */
 function TopBar({
   mobileNavOpen,
@@ -360,8 +415,6 @@ function TopBar({
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
 }) {
-  const { pathname } = useLocation();
-  const onNewScanForm = pathname === "/scans/new";
   return (
     <header
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
@@ -396,23 +449,8 @@ function TopBar({
       <div className="hidden min-w-0 md:block">
         <ReportCrumb />
       </div>
-      {/* Scan type is chosen on the new-scan page. Keep one global action in
-          the shell so the header does not make users choose a workflow before
-          they have seen the explanation for each option. */}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        <LinkButton
-          to="/scans/new"
-          variant={onNewScanForm ? "ghost" : "primary"}
-          size="md"
-          className={cn(onNewScanForm && "pointer-events-none opacity-50")}
-          aria-disabled={onNewScanForm || undefined}
-          tabIndex={onNewScanForm ? -1 : undefined}
-          aria-label="Create New Scan"
-          title="Create a new accessibility scan"
-        >
-          <Plus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Create New Scan</span>
-        </LinkButton>
+      <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
+        <NewScanAction iconOnly />
       </div>
     </header>
   );
