@@ -18,6 +18,7 @@ import { LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -92,6 +93,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const previousPath = useRef(pathname);
   const routeLabel = routeTitle(pathname);
   const reportMatch = reportRouteMatch(pathname);
+
+  // Two-finger swipe back/forward in the desktop app, which has no browser
+  // gesture of its own; a no-op in a browser tab, which does.
+  useSwipeNavigation();
 
   // Cmd/Ctrl+K opens the search-everything palette anywhere in the app.
   useEffect(() => {

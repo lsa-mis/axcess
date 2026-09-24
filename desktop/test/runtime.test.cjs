@@ -4,6 +4,7 @@ const path = require("node:path");
 const {
   contentSecurityPolicy,
   desktopEnvironment,
+  historyStepFor,
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
@@ -174,4 +175,12 @@ test("a startup failure without detail keeps the generic message", () => {
 test("a signal-killed backend is named as such", () => {
   const details = startupFailureDetails({ exitCode: "SIGKILL" });
   assert.equal(details.reason, "The local service was stopped by signal SIGKILL.");
+});
+
+test("mouse back/forward side buttons step through history, nothing else does", () => {
+  assert.equal(historyStepFor("browser-backward"), "back");
+  assert.equal(historyStepFor("browser-forward"), "forward");
+  for (const command of ["media-play-pause", "browser-refresh", "volume-up", "", undefined]) {
+    assert.equal(historyStepFor(command), null, String(command));
+  }
 });
