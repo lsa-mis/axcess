@@ -649,18 +649,33 @@ async def test_header_uses_one_mode_neutral_new_scan_action(
     await playwright_async.expect(page.get_by_role("tablist", name="Scan type")).to_be_visible()
 
 
-async def test_header_offers_one_external_feedback_link(
+async def test_sidebar_offers_search_and_one_external_feedback_link(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """Feedback is reachable from every screen and clearly leaves the app."""
+    """Search and feedback live in the sidebar, reachable from every screen.
+
+    They used to sit in the top bar, which now carries only the breadcrumb
+    and the one "Create New Scan" action.
+    """
     base, _scan_id = live_server
-    page = await new_page()
+    page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/", wait_until="networkidle")
 
-    feedback = page.get_by_role("banner").get_by_role(
-        "link", name="Give feedback (opens in a new tab)", exact=True
-    )
+    banner = page.get_by_role("banner")
+    await playwright_async.expect(
+        banner.get_by_role("button", name="Search everything")
+    ).to_have_count(0)
+    await playwright_async.expect(banner.get_by_role("link", name="Give feedback")).to_have_count(0)
+
+    sidebar = page.get_by_role("complementary", name="Primary")
+    search = sidebar.get_by_role("button", name="Search everything (Cmd+K)", exact=True)
+    await playwright_async.expect(search).to_be_visible()
+    await search.click()
+    await playwright_async.expect(page.get_by_role("dialog")).to_be_visible()
+    await page.keyboard.press("Escape")
+
+    feedback = sidebar.get_by_role("link", name="Give feedback (opens in a new tab)", exact=True)
     await playwright_async.expect(feedback).to_have_count(1)
     assert await feedback.get_attribute("href") == (
         "https://form.asana.com/?k=nRyyF2UKBYMXEj3v8CKCCA&d=939514425027676"
