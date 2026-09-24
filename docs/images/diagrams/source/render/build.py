@@ -1,4 +1,4 @@
-"""Render the Claude Design artboards to PNG files for the repo docs.
+r"""Render the Claude Design artboards to PNG files for the repo docs.
 
 All paths below are under docs/images/diagrams/source/. For each
 project/<Name>.dc.html this script:
