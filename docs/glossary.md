@@ -16,7 +16,7 @@ here: confirm the problem on the page, fix it, then [rescan](#rescan-comparison)
 
 A lead that a person must confirm before anyone calls it a barrier, found by a
 [browser check](#browser-check), the keyboard check, a [local AI
-model](#local-ai-model), or an Alfa "can't tell" result. Open the evidence, test
+model](#local-ai-model), or an Alfa "cannot tell" result. Open the evidence, test
 it on the page, and record your decision (the issue page calls this group
 "Needs confirmation" and the dashboard calls it "Review leads").
 

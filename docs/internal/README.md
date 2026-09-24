@@ -18,7 +18,7 @@ Every term is defined once, in the [glossary](../glossary.md).
 | [UI accessibility](ui-accessibility.md) | The accessibility contract for the Axcess review app itself. |
 | [Design principles](design-principles.md) | Universal Design and usability principles applied to the review app. |
 | [Personas](personas.md) | The people the product is designed for, and who it is not for. |
-| [Alfa evidence review](alfa-evidence-review.md) | An investigation into Siteimprove Alfa "can't tell" results and how to verify them. |
+| [Alfa evidence review](alfa-evidence-review.md) | An investigation into Siteimprove Alfa "cannot tell" results and how to verify them. |
 | [System design and coverage gap](system-design-and-coverage-gap.md) | A historical single-page design, kept for context. The architecture guide replaces it. |
 
 ## History and planning

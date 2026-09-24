@@ -540,7 +540,7 @@ which assistive technology is needed.
 
 ### 7.1 Keyboard-only operation (SC 2.1.1, 2.1.2, 2.4.3 deep)
 
-**What automation can't tell you**: whether every interactive control
+**What automation cannot tell you**: whether every interactive control
 is reachable via Tab, whether focus can ever get trapped in a custom
 widget (modal, autocomplete, carousel), whether the focus order
 matches the visual reading order, whether arrow-key navigation works
@@ -559,7 +559,7 @@ to bottom. Confirm:
 
 ### 7.2 Screen-reader experience (SC 1.3.1 deep, 1.3.2, 2.4.6 deep, 4.1.2 deep)
 
-**What automation can't tell you**: whether the document outline
+**What automation cannot tell you**: whether the document outline
 reads as a coherent page (not just "valid"), whether announcement
 order matches reading order, whether ARIA roles convey the actual
 semantic, whether the page's *meaning* is intact via the API tree.
@@ -581,7 +581,7 @@ What to confirm:
 
 ### 7.3 Vision-impairment simulations (SC 1.4.4, 1.4.10, 1.4.11 edges)
 
-**What automation can't tell you**: whether 200 % zoom causes content
+**What automation cannot tell you**: whether 200 % zoom causes content
 loss, whether reflow to 320 px works without two-axis scroll, whether
 custom focus rings have enough non-color contrast in odd surface
 combinations.
@@ -600,7 +600,7 @@ combinations.
 
 ### 7.4 Cognitive / readability load (SC 3.1.3, 3.1.4, 3.2.3, 3.2.4)
 
-**What automation can't tell you**: whether the language level matches
+**What automation cannot tell you**: whether the language level matches
 the audience, whether unusual words have definitions, whether
 abbreviations are expanded, whether the same affordance is named
 consistently across pages.
@@ -617,7 +617,7 @@ consistently across pages.
 
 ### 7.5 Time-based + motion (SC 1.4.2, 2.2.x, 2.3.x, 2.5.x)
 
-**What automation can't tell you**: whether auto-playing media has a
+**What automation cannot tell you**: whether auto-playing media has a
 pause control reachable by all input modes, whether timeouts can be
 extended, whether flashing content stays under three flashes per
 second, whether motion-based interactions have a non-motion
@@ -635,7 +635,7 @@ alternative.
 
 ### 7.6 Forms + error messages (SC 3.3.1, 3.3.3, 3.3.4, 3.3.7)
 
-**What automation can't tell you**: whether the error message
+**What automation cannot tell you**: whether the error message
 explains *what* went wrong and *what to do*, whether destructive /
 financial submissions have confirmation steps, whether prior-entered
 data isn't lost on validation failure.
@@ -652,7 +652,7 @@ data isn't lost on validation failure.
 
 ### 7.7 Captions + audio descriptions (SC 1.2.x)
 
-**What automation can't tell you**: whether captions are accurate,
+**What automation cannot tell you**: whether captions are accurate,
 synchronized, identify speakers, and convey relevant non-speech
 audio. Whether audio descriptions cover what's visually important.
 

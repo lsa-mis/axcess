@@ -59,7 +59,7 @@ Then use these guides:
   usability principles applied to the review app.
 - [Personas](./internal/personas.md): who the review app is designed for.
 - [Alfa evidence review](./internal/alfa-evidence-review.md): an investigation
-  into Siteimprove Alfa "can't tell" results and how to verify them.
+  into Siteimprove Alfa "cannot tell" results and how to verify them.
 - [System design and coverage gap](./internal/system-design-and-coverage-gap.md):
   an earlier design document, kept for history.
 - [Detection efficacy](../DETECTION_EFFICACY.md): the accuracy, speed, and

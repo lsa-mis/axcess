@@ -62,7 +62,7 @@ earlier builds are on the [releases page](https://github.com/lsa-mis/axcess/rele
 
 ## Read your report
 
-![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking; confirm and fix them. Needs review holds browser checks, the keyboard check, AI checks, and Alfa "can't tell" results; a person tests and decides. Informational holds records such as images whose alt text already matches; no action is needed.](./docs/images/diagrams/report-groups.png)
+![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.](./docs/images/diagrams/report-groups.png)
 
 Every result lands in one of three groups. Start with Barriers, test and decide
 on Needs review items, and leave Informational records alone.

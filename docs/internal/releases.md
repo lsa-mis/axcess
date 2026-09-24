@@ -8,7 +8,7 @@ the test gates, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## How a desktop release ships today
 
-![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS and Windows apps in parallel and publishes a GitHub release marked latest. Installed apps check for it on launch; Windows can update in place and macOS opens the new disk image.](../images/diagrams/release-flow.png)
+![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS and Windows apps in parallel and publishes a GitHub release marked latest. Installed apps check for it on launch; Windows can update in place and macOS opens the new disk image. No tests gate publishing and builds are not notarized; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
 
 In short: a merge to `main` that changes app code builds both installers and
 publishes them as the latest GitHub release, and installed copies offer that

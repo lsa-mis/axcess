@@ -19,7 +19,7 @@ folder of files, and the review app and exports read that evidence back as
 
 ## Where the code lives
 
-![Diagram of where the code lives: crawler, extractor, analyzer, synthesizer, database, web server and React app, exports, protected scan code, and rule files under src/audit, plus the desktop shell, the site generator, and the test suites.](../images/diagrams/code-map.png)
+![Diagram of where the code lives: crawler, extractor, analyzer, synthesizer, database, web server and React app, exports, protected scan code, and rule files under src/audit, plus top-level modules such as the command line, settings, blob store, and Alfa runner, and next to it the desktop shell, the site generator, and the test suites.](../images/diagrams/code-map.png)
 
 Scan code lives under `src/audit/`, one package per stage, and the YAML files
 that tune the checks live in `src/audit/rules/`. The desktop shell
@@ -331,7 +331,7 @@ Nothing is grouped at write time. `issues.list_issues` in
 
 - `_axe_issue_rows` groups `page_a11y_findings` by `(pipeline, rule_id)`
   through `a11y_queries.grouped_by_rule`. Alfa groups are also split by
-  outcome, so "failed" and "can't tell" never share a group.
+  outcome, so "failed" and "cannot tell" never share a group.
 - `_image_issue_rows` groups image findings by `(classification,
   alt_adequacy)` through `image_findings_queries.grouped_by_remediation`.
 
@@ -430,7 +430,7 @@ Axcess has two ways to scan pages behind a sign-in. They share browser code in
 
 ### Local login scan
 
-![Diagram of a login scan. You choose "Site with a login or 2FA", Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select "I'm signed in, start scan". Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends.](../images/diagrams/login-scan-flow.png)
+![Diagram of a login scan. You choose "Site with a login or 2FA", Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select "I'm signed in, start scan". Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends. Login scans need an HTTPS site whose address resolves to a public IP address.](../images/diagrams/login-scan-flow.png)
 
 You sign in yourself in a visible browser, and Axcess scans with that session
 without ever seeing your password. This is the [login scan](../glossary.md#login-scan)
@@ -483,7 +483,7 @@ kept for 7 days, and `audit protected-maintenance` runs the cleanup.
 
 ## Data and network boundary
 
-![Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files. Axcess connects to the website you scan, to an optional local AI service, and, in the desktop app, to GitHub once per launch to check for updates. It has no account, telemetry, or upload.](../images/diagrams/privacy-boundary.png)
+![Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files, and optional Ollama runs locally. Axcess connects to the website you scan and, in the desktop app, to GitHub once per launch to check for updates. Links such as "Rule docs" and "Give feedback" open in your browser only when you click them. It has no account, telemetry, or upload. Files are not encrypted, and deleting a report keeps its image and screenshot files.](../images/diagrams/privacy-boundary.png)
 
 Reports, stored pages, screenshots, images, and logs stay in local files.
 Axcess connects to the website you scan, to an optional AI service that

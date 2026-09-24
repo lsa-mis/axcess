@@ -43,9 +43,9 @@ PORTFOLIO = "https://reganmaharjan.com.np/"
 # Pixel sizes of the diagram PNGs in site/assets/diagrams/ (copied from
 # docs/images/diagrams/), so each <img> reserves its space before it loads.
 DIAGRAM_SIZES = {
-    "report-groups": (1600, 900),
-    "login-scan-flow": (1600, 900),
-    "privacy-boundary": (1600, 900),
+    "report-groups": (3200, 1800),
+    "login-scan-flow": (3200, 1800),
+    "privacy-boundary": (3200, 1800),
 }
 
 
@@ -597,7 +597,7 @@ def how_it_works(summ) -> str:
       <div class="lane lane-observed">
         <span class="chip chip-partial">Needs review</span>
         <h3>Browser checks and AI leads</h3>
-        <p>Measurements from the keyboard, focus, zoom, and motion checks, suggestions from a local AI model, and Alfa “can't tell” results. A person tests each one and records a decision.</p>
+        <p>Measurements from the keyboard, focus, zoom, and motion checks, suggestions from a local AI model, and Alfa “cannot tell” results. A person tests each one and records a decision.</p>
       </div>
       <div class="lane" style="border-top-color:#c2cad6">
         <span class="chip chip-manual">Informational</span>
@@ -947,7 +947,7 @@ def checks_sections() -> str:
     </div>
     <div class="shot-frame">
       <img class="shot" src="../assets/diagrams/report-groups.png" width="{DIAGRAM_SIZES["report-groups"][0]}" height="{DIAGRAM_SIZES["report-groups"][1]}"
-        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking; confirm and fix them. Needs review holds browser checks, the keyboard check, AI checks, and Alfa can't-tell results; a person tests and decides. Informational holds records such as images whose alt text already matches; no action is needed.">
+        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa &quot;cannot tell&quot; results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.">
     </div>
     <div class="lanes" style="margin-top:1.5rem">
       <div class="lane lane-automated">
@@ -958,7 +958,7 @@ def checks_sections() -> str:
       <div class="lane lane-observed">
         <span class="chip chip-partial">Needs review</span>
         <h3>A person decides</h3>
-        <p>Comes from browser checks, the keyboard check, local AI checks, and Alfa “can't tell” results. Test it on the page and record your decision.</p>
+        <p>Comes from browser checks, the keyboard check, local AI checks, and Alfa “cannot tell” results. Test it on the page and record your decision.</p>
       </div>
       <div class="lane" style="border-top-color:#c2cad6">
         <span class="chip chip-manual">Informational</span>
@@ -1310,7 +1310,7 @@ def privacy() -> str:
     </div>
     <div class="shot-frame" style="margin-bottom:1.5rem">
       <img class="shot" src="../assets/diagrams/privacy-boundary.png" width="{DIAGRAM_SIZES["privacy-boundary"][0]}" height="{DIAGRAM_SIZES["privacy-boundary"][1]}"
-        alt="Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files. Axcess connects to the website you scan, to an optional local AI service, and, in the desktop app, to GitHub once per launch to check for updates. It has no account, telemetry, or upload.">
+        alt="Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files, and optional Ollama runs locally. Axcess connects to the website you scan and, in the desktop app, to GitHub once per launch to check for updates. Links such as &quot;Rule docs&quot; and &quot;Give feedback&quot; open in your browser only when you click them. It has no account, telemetry, or upload. Files are not encrypted, and deleting a report keeps its image and screenshot files.">
     </div>
     <div class="boundary">
       <span class="tag">Stays on your computer</span>
@@ -1340,7 +1340,7 @@ def privacy() -> str:
     </div>
     <div class="shot-frame" style="margin-bottom:1.5rem">
       <img class="shot" src="../assets/diagrams/login-scan-flow.png" width="{DIAGRAM_SIZES["login-scan-flow"][0]}" height="{DIAGRAM_SIZES["login-scan-flow"][1]}"
-        alt="Diagram of a login scan. You choose Site with a login or 2FA, Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select I'm signed in, start scan. Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends.">
+        alt="Diagram of a login scan. You choose &quot;Site with a login or 2FA&quot;, Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select &quot;I'm signed in, start scan&quot;. Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends. Login scans need an HTTPS site whose address resolves to a public IP address.">
     </div>
     <ol class="steps">
       <li><h3>Choose "Site with a login or 2FA"</h3><p>Enter the HTTPS address of the page to scan after you sign in. It must be a site you are authorized to test.</p></li>
