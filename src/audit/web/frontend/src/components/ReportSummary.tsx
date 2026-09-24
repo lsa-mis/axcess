@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Accessibility, AlertOctagon, Trash2 } from "lucide-react";
+import { Accessibility, AlertOctagon, ChevronDown, Trash2 } from "lucide-react";
 import { api } from "../api/client";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
@@ -55,14 +55,22 @@ export function ReportSummary({
       </div>
 
       {/* Same shape as the ACT-rule disclosure below it: the summary is the
-          sentence, and the word styled as a link is where to press. */}
-      <details className="mb-3 mt-3 text-sm">
+          sentence, and the word styled as a link is where to press. The
+          chevron points down while closed and up while open, following the
+          element's own open state. */}
+      <details className="group mb-3 mt-3 text-sm">
         <summary className="inline-flex min-h-target cursor-pointer list-none items-center gap-1.5 rounded-xs text-fg-muted">
           <span className="tabular-nums">
             {ran} of {scan.methods_used.length} checks ran
           </span>
           <span aria-hidden className="text-border-strong">·</span>
-          <span className="font-semibold text-umich-blue underline underline-offset-2">Details</span>
+          <span className="inline-flex items-center gap-0.5 font-semibold text-umich-blue">
+            <span className="underline underline-offset-2">Details</span>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 transition-transform duration-150 group-open:rotate-180"
+              aria-hidden
+            />
+          </span>
         </summary>
         <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} className="mt-2" />
       </details>
