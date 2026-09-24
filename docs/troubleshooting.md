@@ -13,9 +13,9 @@ and the page title.
 - **403 with the title "Just a moment..."**: a Cloudflare bot check. Axcess
   opens pages in a real browser by default, but a heavier bot check can still
   block it. If you turned on **Fast crawl without a browser** (or used
-  `--static-only`), Axcess uses the browser only for pages that look like a
-  bot check or an app that needs scripts, so turn fast crawl off and scan
-  again.
+  `--static-only`), Axcess opens only some pages in the browser: those that
+  look like a bot check, or like an app that shows its content only through
+  scripts. Turn fast crawl off and scan again.
 - **403 with the title "Access Denied"**: a firewall that refuses automated
   visitors, so Axcess cannot scan the site as it is. Ask the site owner
   whether they can allow your scan.

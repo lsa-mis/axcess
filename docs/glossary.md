@@ -341,9 +341,9 @@ and search scans](spa-search-scans.md) explains how to set it up.
 
 ### Audit report
 
-The written report, a plain text file with headings (Markdown format), that you
-download as **Audit report** from the Export menu. The Excel workbook is a separate export, **Remediation workbook**, with
-one row per issue.
+The written report you download as **Audit report** from the Export menu. It is
+a plain text file with headings (Markdown format); the Excel workbook is a
+separate export, **Remediation workbook**, with one row per issue.
 
 ### Local-first
 
