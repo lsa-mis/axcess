@@ -2932,3 +2932,125 @@ To stay fair, these points should be worded as "no automated check found" or "re
 2. Exact current wording of help article 80000448387 on MFA crawling.
 3. Whether the axe DevTools free tier includes the WCAG standard selector (needed to run `target-size`).
 4. Whether Siteimprove still has a "Link text is too generic in its current context" check.
+
+#### Follow-up rows (13 to 17)
+
+Research date: 2026-09-24. All URLs accessed on 2026-09-24. Same evidence labels ([Fetched] and [Search excerpt]) and versions (axe-core 4.13.0, @siteimprove/alfa-rules 0.119.0) as above.
+
+**Alfa scan method [Fetched].** https://github.com/Siteimprove/alfa/blob/main/packages/alfa-rules/src/tsconfig.json lists 104 rule files (default `sia-r*`, experimental `sia-er*` and experimental `sia-r*` from `experimental.ts`, deprecated `sia-dr*`). I downloaded all 104 `rule.ts` files from `packages/alfa-rules/src/` and extracted every `Criterion.of(...)` inside each `requirements` array, ignoring commented-out lines. Criteria declared anywhere in Alfa: 1.1.1, 1.2.1, 1.2.2, 1.2.3, 1.2.5, 1.2.8, 1.3.1, 1.3.4, 1.3.5, 1.4.1, 1.4.2, 1.4.3, 1.4.4, 1.4.5, 1.4.6, 1.4.8, 1.4.9, 1.4.12, 2.1.1, 2.1.3, 2.2.1, 2.2.4, 2.4.2, 2.4.4, 2.4.6, 2.4.7, 2.4.9, 2.5.3, 2.5.5, 2.5.8, 3.1.1, 3.1.2, 3.2.5, 3.3.1, 4.1.1, 4.1.2. Result for this follow-up: **1.4.2 -> SIA-R50 only; 2.2.2, 2.4.3, 2.4.11, 2.4.12 and 1.3.2 -> no rule.** A text search of the same 104 files found `tabindex` only in SIA-R13 and SIA-R95 (both about iframes), `marquee` and `blink` only in SIA-R70, and `autoplay` only in SIA-R48, R49 and R50.
+
+**axe-core scan method [Fetched].** Tag search over https://github.com/dequelabs/axe-core/blob/master/doc/rule-descriptions.md (4.13): `wcag2411` -> none; `wcag2412` -> none; `wcag243` -> none; `wcag142` -> no-autoplay-audio; `wcag222` -> blink, marquee; `wcag132` -> none. Default behaviour, [Fetched] https://github.com/dequelabs/axe-core/blob/master/doc/API.md: "The default operation for axe.run is to run all rules except for rules with the "experimental" tag." Rules with `"enabled": false` in their JSON (WCAG 2.2, AAA, deprecated) are also off by default, as noted in the main notes.
+
+##### Summary table
+
+| # | Check | WCAG SC and level | Siteimprove | axe-core default (4.13.0) | axe DevTools extras | Confidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| 13 | Focused element hidden behind sticky or fixed content | 2.4.11 Focus Not Obscured (Minimum), AA (new in 2.2) | **Not automated (Siteimprove's own statement, 2024).** The WCAG 2.2 release article says only 2.5.8 of the nine new criteria was automated and the other eight are for manual testing. No Alfa rule declares 2.4.11 or 2.4.12. Nearby only: SIA-R65 focus indicator (2.4.7, question-based). | **No.** No rule tagged `wcag2411`. | **No evidence found** of a dedicated 2.4.11 check. The Keyboard IGT (Pro) evaluates each tab stop's focus indicator "presence, role, and visibility". A 2022 Deque blog said Focus Not Obscured tests "will be available in an upcoming version of axe DevTools Pro"; I could not confirm they shipped. | Medium |
+| 14 | Positive tabindex / illogical focus order | 2.4.3 Focus Order, A | **No evidence found.** No Alfa rule declares 2.4.3, and no Alfa rule (default, experimental or deprecated) checks for positive `tabindex`. | **Best practice only.** `tabindex` (tags `cat.keyboard, best-practice`; enabled, so it runs by default) flags `tabindex` greater than 0. It is not tagged `wcag243`. No rule is tagged `wcag243`. `focus-order-semantics` is experimental (disabled). | **Yes, guided (Pro).** The Keyboard IGT tabs through the natural tab order and records every tab stop for review ("focus order"). | High (Alfa, axe-core); Medium (products) |
+| 15 | Audio that autoplays for more than 3 s with no control | 1.4.2 Audio Control, A | **Partial (semi-automated).** SIA-R50 (Stable, composite of R48 and R49) maps to 1.4.2. It asks questions about audio duration and where the pause or stop control is. The control question is answered automatically when the element has a `controls` attribute. How the platform presents it was not confirmed. | **Needs review only.** `no-autoplay-audio` (enabled, `wcag2a, wcag142`, ACT 80f0bf) has `"reviewOnFail": true`, so failures come back as "Needs Review" rather than "Violation". | **No evidence found.** | High (rule sources); Medium (platform) |
+| 16 | Autoplaying video, marquee, blink, other moving content | 2.2.2 Pause, Stop, Hide, A | **Partial, best practice only.** SIA-R70 "No obsolete or deprecated elements are used" (BestPractice, Stable) flags rendered `<blink>` and `<marquee>` among other obsolete elements. It is not mapped to 2.2.2. No Alfa rule declares 2.2.2. **No evidence found** of checks for autoplaying video motion, CSS or JS animation, carousels or auto-updating content. | **Partial.** `blink` and `marquee` (both enabled, `wcag2a, wcag222`, issue type failure). No rule for autoplaying video motion, CSS animation, carousels or auto-updating content. | **No evidence found.** | High (rule sources) |
+| 17 | Visual order differs from DOM order | 1.3.2 Meaningful Sequence, A | **No evidence found.** No Alfa rule declares 1.3.2. | **No.** No rule tagged `wcag132`. | **No evidence found** of a DOM vs visual order check. The Keyboard IGT's tab-order review covers focusable elements only (the 2.4.3 angle). | Medium |
+
+##### 13. Focus Not Obscured (Minimum) (2.4.11, AA)
+
+WCAG text:
+
+- [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/22/focus-not-obscured-minimum.html (published at https://www.w3.org/TR/WCAG22/#focus-not-obscured-minimum): "Focus Not Obscured (Minimum) | AA | New | When a user interface component receives keyboard focus, the component is not entirely hidden due to author-created content."
+- [Fetched] https://github.com/w3c/wcag/blob/main/understanding/22/focus-not-obscured-minimum.html : "Typical types of content that can overlap focused items are sticky footers, sticky headers, and non-modal dialogs."
+
+(a) Siteimprove / Alfa: **Not automated, per Siteimprove.**
+
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001136439-april-9th-2024-siteimprove-now-includes-wcag-2-2-testing : "Of the nine new success criteria in WCAG 2.2, Siteimprove chose to automate only 2.5.8 (Target Size), because the remaining eight couldn't be automated in a reliable way"; "You can manually test for the eight remaining rules". (2.5.5, also automated then, is a WCAG 2.1 AAA criterion, so this does not conflict with the main notes.) I found no later Siteimprove statement adding 2.4.11.
+- Alfa scan: no rule declares 2.4.11 or 2.4.12.
+- Adjacent rule, not the same criterion. [Fetched] `packages/alfa-rules/src/sia-r65/rule.ts`: `requirements` 2.4.7, `Stability.Stable`, question `has-focus-indicator`. [Search excerpt] Siteimprove help title "Accessibility rule: Keyboard focus indicator is missing, explained": https://help.siteimprove.com/support/solutions/articles/80001050116-accessibility-rule-keyboard-focus-indicator-is-missing-explained
+
+(b) axe-core 4.13.0: **No.** No rule is tagged `wcag2411`, and the CHANGELOG has no entry for 2.4.11 or "obscured" (my search of https://github.com/dequelabs/axe-core/blob/master/CHANGELOG.md).
+
+(c) axe DevTools: **No evidence found** of a dedicated check.
+
+- [Fetched] https://github.com/dequelabs/axe-accessibility/blob/main/README.md (Deque's agent toolkit): "run the keyboard Intelligent Guided Test for focus order, focus traps, and focus visibility, which a static scan cannot see."
+- [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-keyboard/ : the IGT "automatically evaluates each recorded tab stop for focus indicator presence, role, and visibility". Whether "visibility" includes being covered by sticky content is not stated.
+- [Search excerpt] https://www.deque.com/blog/axe-core-4-5-first-wcag-2-2-support-and-more/ (2022): "Tests for criteria such as Focus Appearance and Focus Not Obscured will be available in an upcoming version of axe DevTools Pro." Not confirmed as shipped.
+- [Search excerpt] https://docs.deque.com/advanced-rules/1/en/welcome/ : Advanced Rules include `advanced/css-focus-visible` "to check if CSS was used to hide focus indicators". That is 2.4.7 territory, not 2.4.11.
+
+##### 14. Focus Order (2.4.3, A): positive tabindex
+
+WCAG text:
+
+- [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/focus-order.html : "If a web page can be navigated sequentially and the navigation sequences affect meaning or operation, focusable components receive focus in an order that preserves meaning and operability."
+- [Fetched] https://github.com/w3c/wcag/blob/main/techniques/failures/F44.html (Failure F44): "This document describes a failure that occurs when the tab order does not follow logical relationships and sequences in the content." A positive `tabindex` fails 2.4.3 only when it produces such an order. That explains why axe treats it as best practice rather than a WCAG failure.
+
+(a) Siteimprove / Alfa: **No evidence found.**
+
+- Alfa scan: no rule declares 2.4.3. `tabindex` appears only in SIA-R13 (iframe accessible name, 4.1.2) and SIA-R95 (iframe with interactive content not removed from the tab order, 2.1.1).
+- Searches of help.siteimprove.com for tabindex or focus-order rules returned no rule article.
+
+(b) axe-core 4.13.0: **Best practice only, enabled.**
+
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/tabindex.json : `"selector": "[tabindex]"`, `"tags": ["cat.keyboard", "best-practice"]`, description "Ensure tabindex attribute values are not greater than 0", help "Elements should not have tabindex greater than zero". There is no `"enabled": false`, so it runs by default.
+- No rule is tagged `wcag243`.
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/focus-order-semantics.json : tags include `"experimental"`, so it is disabled in axe-core by default. It checks roles of elements added to the focus order, not the order itself.
+
+(c) axe DevTools: **Yes, guided (Pro).**
+
+- [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-keyboard/ : "the Keyboard IGT kicks off its automated tabbing, which tabs through the page's natural tab order highlighting each tab stop along the way". Coverage listed as "tab order, focus indicators, missing tab stops, and keyboard traps".
+- [Fetched] axe-accessibility README quote above ("focus order").
+- The axe-core `tabindex` result also appears in the extension as a best-practice finding. The extension treats best practices as a filter setting ([Search excerpt] configuration docs: "Needs review, best practices, and WCAG level all work as filters"). Its default was not confirmed.
+
+##### 15. Audio Control (1.4.2, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/audio-control.html : "If any audio on a web page plays automatically for more than 3 seconds, either a mechanism is available to pause or stop the audio, or a mechanism is available to control audio volume independently from the overall system volume level."
+
+(a) Siteimprove / Alfa: **Partial (semi-automated).**
+
+- [Fetched] `packages/alfa-rules/src/sia-r50/rule.ts`: `Rule.Composite`, `requirements` 1.4.2 plus techniques G60, G170, G171, `tags: [Scope.Component, Stability.Stable]`, `composes: [R48, R49]`. Failing diagnostic: "The total duration of the autoplaying audio output of the element lasts longer than 3 seconds and no mechanism to pause or stop the audio is ..." (line continues in source).
+- [Fetched] `sia-r48/rule.ts` (technique G60, Stable): applies to elements with `autoplay`; asks questions `is-above-duration-threshold` ("... have a duration of more than 3 seconds?") and `is-below-audio-duration-threshold` ("... have a total audio duration of less than 3 seconds?").
+- [Fetched] `sia-r49/rule.ts` (technique G170, Stable): asks `audio-control-mechanism` ("Where is the mechanism that can pause or stop the audio of the ... element?"). The code comment says: "If the applicable `<video>` or `<audio>` element uses native controls we assume that the mechanism is the element itself."
+- [Search excerpt] https://alfa.siteimprove.com/rules/sia-r50 (title "`<audio>` or `<video>` avoids automatically playing audio"): the rule "checks that audio or video that plays automatically does not have audio that lasts for more than 3 seconds or has an audio control mechanism to stop or mute it."
+- **No evidence found** of a Siteimprove help article showing how this appears in the platform (for example as a potential issue).
+
+(b) axe-core 4.13.0: **Enabled, but returns "Needs Review" rather than violations.**
+
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/no-autoplay-audio.json : `"selector": "audio[autoplay], video[autoplay]"`, `"reviewOnFail": true`, `"preload": true`, tags `wcag2a, wcag142, ..., ACT`, `"actIds": ["80f0bf"]`, description "Ensure `<video>` or `<audio>` elements do not autoplay audio for more than 3 seconds without a control mechanism to stop or mute the audio". No `"enabled": false`.
+- [Fetched] API.md: "`reviewOnFail` ... Override the result of a rule to return "Needs Review" rather than "Violation" if the rule fails."
+- [Fetched] CHANGELOG: rule added in 3.5.0 (2020-02-04, "rule: no-autoplay-audio (#1946)"); "no-autoplay-audio: add reviewOnFail" in 4.5.0 (2022-10-17).
+- Scope limit: only `<audio>`/`<video>` elements with an `autoplay` attribute. Audio started by script (for example Web Audio or a later `play()` call) is outside the selector.
+
+(c) axe DevTools: **No evidence found** of an IGT or Advanced Rule for autoplaying audio.
+
+##### 16. Pause, Stop, Hide (2.2.2, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/pause-stop-hide.html : "For any moving, blinking or scrolling information that (1) starts automatically, (2) lasts more than five seconds, and (3) is presented in parallel with other content, there is a mechanism for the user to pause, stop, or hide it unless the movement, blinking, or scrolling is part of an activity where it is essential".
+
+(a) Siteimprove / Alfa: **Partial, and only as a best practice.**
+
+- Alfa scan: no rule declares 2.2.2.
+- [Fetched] `packages/alfa-rules/src/sia-r70/rule.ts`: `requirements: [BestPractice.of("no-deprecated-elements")]`, `tags: [Scope.Page, Stability.Stable]`. The deprecated list includes `"blink"` and `"marquee"`, and only rendered elements apply (`isRendered(device)`). Failing diagnostic: "The document contains deprecated elements".
+- [Search excerpt] Alfa page title "No obsolete or deprecated elements are used": https://alfa.siteimprove.com/rules/sia-r70 . Siteimprove help title "Accessibility rule: HTML element is deprecated or obsolete, explained": https://help.siteimprove.com/support/solutions/articles/80001058797-accessibility-rule-html-element-is-deprecated-or-obsolete-explained
+- **No evidence found** of Siteimprove checks for autoplaying video motion, CSS or JS animations, carousels or auto-updating regions.
+
+(b) axe-core 4.13.0: **Partial (legacy elements only).**
+
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/blink.json : `"selector": "blink"`, tags `wcag2a, wcag222, ...`, description "Ensure `<blink>` elements are not used", `"none": ["is-on-screen"]`. Enabled.
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/marquee.json : `"selector": "marquee"`, tags `wcag2a, wcag222, ...`, description "Ensure `<marquee>` elements are not used". Enabled.
+- No rule targets autoplaying `<video>` motion, CSS animations, carousels or live-updating content. `no-autoplay-audio` is about audio (1.4.2), not motion.
+
+(c) axe DevTools: **No evidence found** of an IGT or Advanced Rule for moving, blinking or auto-updating content.
+
+##### 17. Meaningful Sequence (1.3.2, A)
+
+WCAG text:
+
+- [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/meaningful-sequence.html : "When the sequence in which content is presented affects its meaning, a correct reading sequence can be programmatically determined."
+- [Fetched] https://github.com/w3c/wcag/blob/main/techniques/failures/F1.html (Failure F1): "This describes the failure condition that results when CSS, rather than structural markup, is used to modify the visual layout of the content, and the modified layout changes the meaning of the content."
+
+(a) Siteimprove / Alfa: **No evidence found.** No Alfa rule declares 1.3.2, and searches of help.siteimprove.com found no reading-order or meaningful-sequence rule.
+
+(b) axe-core 4.13.0: **No.** No rule is tagged `wcag132`.
+
+(c) axe DevTools: **No evidence found** of a check comparing visual order with DOM order. The Keyboard IGT's tab-order review (row 14) covers the order of focusable elements only. One search summary linked the Modal Dialog IGT to 1.3.2 without naming a source page, so it is not relied on here.
+
+##### Follow-up items to verify by hand
+
+5. Whether axe DevTools Pro ever shipped the Focus Not Obscured test promised in the 2022 axe-core 4.5 blog, and whether the Keyboard IGT's "visibility" evaluation covers focus hidden under sticky content.
+6. How the Siteimprove platform presents SIA-R50 (autoplay audio): as an issue, a potential issue with guided review, or not at all.
