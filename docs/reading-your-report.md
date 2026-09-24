@@ -98,7 +98,7 @@ changes** tabs. Its header holds the **Export** menu and **Open Issue Groups**.
 
 | Tile | What it counts |
 | --- | --- |
-| Pages Tested | Every page the scan recorded, including pages that answered with an error and pages that failed to load. Its hint counts crawl errors (pages that failed to load or could not be processed). Most of those are already counted in this number, not extra pages. |
+| Pages Tested | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Its hint shows the [crawl error](glossary.md#pages-not-reached) count, and most of those pages are already in this number. |
 | Issues Found | [Occurrences](glossary.md#occurrence) in every issue group, including Needs review and Informational, so it is not a count of confirmed problems. |
 | Issue Groups | Rows in the Issues table, across all three report groups. |
 | DOM States Found | [DOM states](glossary.md#dom-state) the scan reached by operating controls. |
@@ -146,8 +146,9 @@ until the expert decision is documented."
 
 1. **Report group card**: the group, an evidence confidence chip (high,
    medium, or low), and **Rule docs**. A one-line evidence summary follows,
-   such as "Deterministic axe-core rule failure; verify after remediation." It calls
-   Needs review "Needs confirmation" (the dashboard says "Review leads").
+   such as "Deterministic axe-core rule failure; verify after remediation." The
+   card calls Needs review "Needs confirmation" (the dashboard says "Review
+   leads").
 2. **Facts**: Criterion level, Priority, Pages affected, Occurrences,
    Difficulty, Responsibility, and Abilities affected.
 3. **Pages with this issue**: page title (opens the inspector), Page URL,

@@ -15,14 +15,17 @@ results, so start here: confirm the problem on the page, fix it, then
 
 ### Needs review
 
-A possible problem that a person must confirm before it counts as a
-[Barrier](#barrier), because a less certain check found it: a [browser
-check](#browser-check), the [keyboard trap](#keyboard-trap) check, a [motion
-check](#motion-check), text in an image whose [alt text](#alt-text) is missing
-or does not match, a [local AI model](#local-ai-model), or a [Siteimprove
-Alfa](#siteimprove-alfa) "cannot tell" result. Open the evidence, test it on
-the page, and record your decision; the issue page calls this group "Needs
-confirmation" and the dashboard calls it "Review leads".
+A possible problem, found by a less certain check, that a person must confirm
+before it counts as a [Barrier](#barrier). Open the evidence, test it on the
+page, and record your decision.
+
+- Found by: a [browser check](#browser-check), the [keyboard
+  trap](#keyboard-trap) check, a [motion check](#motion-check), image text whose
+  [alt text](#alt-text) is missing or does not match, a [local AI
+  model](#local-ai-model), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot
+  tell" result.
+- Also called: "Needs confirmation" on the issue page and "Review leads" on the
+  dashboard.
 
 ### Informational
 
@@ -71,12 +74,11 @@ field.
 
 ### Impact
 
-How badly a problem affects people, as reported by the check: critical,
-serious, moderate, or minor (for local AI checks, it reflects how confident the
-model is). Image checks use critical, major, minor, or info instead, and
-Siteimprove Alfa reports no impact, so the workbook and [audit
-report](#audit-report) convert everything to Critical, Serious, Moderate, or
-Minor and show Alfa results as Moderate.
+How badly a problem affects people: Critical, Serious, Moderate, or Minor (for
+local AI checks, this rating shows how confident the model is). Image checks say
+major for Serious and info for Minor, and the workbook and [audit
+report](#audit-report) show Siteimprove Alfa results, which have no rating, as
+Moderate.
 
 ### Priority
 
@@ -88,8 +90,8 @@ spread, a severe problem on a single page shows as Low, so check its impact too.
 
 Where a finding stands in review: new, reviewing, in progress, remediated
 (fixed), accepted risk (a known problem your team chose not to fix for now), or
-false positive, and the last four need a short reason. The Excel workbook uses
-the same words, except Not Started for new, Resolved for remediated, and Not an
+false positive. The last four need a short reason, and the Excel workbook uses
+the same words except Not Started for new, Resolved for remediated, and Not an
 Issue for false positive.
 
 ## WCAG terms
@@ -152,9 +154,9 @@ because they were outside the [scope](#scope).
 
 ### Scope
 
-The part of a site a scan may visit: pages on the same site under the address
-you start from (for example, everything under `www.example.edu/admissions/`),
-up to a page limit and a limit on how many links deep the [crawl](#crawl) goes.
+The part of a site a scan may visit: pages under the address you start from,
+such as everything under `www.example.edu/admissions/`. A page limit and a limit
+on how many links deep the [crawl](#crawl) goes also apply.
 
 ### DOM state
 
@@ -260,8 +262,9 @@ are never reported as [Barriers](#barrier).
 ### OCR
 
 Optical character recognition: software that reads text inside images. The
-desktop app includes the Tesseract OCR engine, and a source install needs
-Tesseract installed separately.
+desktop app includes the Tesseract OCR engine; if you [run Axcess from source
+code](https://github.com/lsa-mis/axcess#run-from-source), install Tesseract
+separately.
 
 ### Rendered page
 
@@ -338,8 +341,8 @@ and search scans](spa-search-scans.md) explains how to set it up.
 
 ### Audit report
 
-The narrative Markdown report you download as **Audit report** from the Export
-menu. The Excel workbook is a separate export, **Remediation workbook**, with
+The written report, a plain text file with headings (Markdown format), that you
+download as **Audit report** from the Export menu. The Excel workbook is a separate export, **Remediation workbook**, with
 one row per issue.
 
 ### Local-first

@@ -13,8 +13,9 @@ and the page title.
 - **403 with the title "Just a moment..."**: a Cloudflare bot check. Axcess
   opens pages in a real browser by default, but a heavier bot check can still
   block it. If you turned on **Fast crawl without a browser** (or used
-  `--static-only`), Axcess switches to the browser only when it spots a bot
-  check, so turn fast crawl off and scan again.
+  `--static-only`), Axcess uses the browser only for pages that look like a
+  bot check or an app that needs scripts, so turn fast crawl off and scan
+  again.
 - **403 with the title "Access Denied"**: a firewall that refuses automated
   visitors, so Axcess cannot scan the site as it is. Ask the site owner
   whether they can allow your scan.
@@ -38,8 +39,8 @@ and the page title.
   in the app, 500 on the command line) and **Max link depth** (10 by default).
 - **A new scan continued an old one.** If an earlier scan of the same address
   ended early (for example, Axcess closed mid-scan) and still had pages
-  waiting, starting that address again can continue the earlier report. It
-  drops queued pages that fall outside the new scope. A scan you stopped
+  waiting, starting that address again can continue the earlier report.
+  Axcess drops queued pages that fall outside the new scope. A scan you stopped
   with **Stop scan** is never continued. If you want a separate report and no
   longer need the earlier one, delete it first with **Delete** on the
   **Reports** list.

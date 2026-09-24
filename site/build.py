@@ -588,7 +588,7 @@ def how_it_works(summ) -> str:
       <article class="card">{icon("phone")}<h3>Zoom and reflow check</h3><p>Each page is squeezed to a phone-width view, zoomed to about 200%, and given wider text spacing to see whether anything is cut off or overlaps.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
       <article class="card">{icon("eye")}<h3>Focus check</h3><p>Finds keyboard focus hidden behind sticky headers or banners, and tab orders that were forced out of sequence.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
       <article class="card">{icon("click")}<h3>Click through states</h3><p>Axcess can open menus, tabs, and dialogs and re-run the rule engine on what appears. <a href="../faq/#will-it-break-anything">What it will and will not click.</a></p><p><span class="chip chip-automated">Deterministic</span></p></article>
-      <article class="card">{icon("image")}<h3>Image text check</h3><p>Built-in text recognition (OCR) finds <a href="../faq/#image-of-text">text inside images</a> and compares it with the alt text. An optional local vision model judges what the text is for.</p><p><span class="chip chip-partial">Mixed</span></p></article>
+      <article class="card">{icon("image")}<h3>Image text check</h3><p>Text recognition (OCR), included in the desktop app, finds <a href="../faq/#image-of-text">text inside images</a> and compares it with the alt text. An optional local vision model judges what the text is for.</p><p><span class="chip chip-partial">Mixed</span></p></article>
       <article class="card">{icon("play")}<h3>Visual and motion check</h3><p>Measures video and audio that autoplay without controls, records scrolling text, and, with a local vision model, compares the visual reading order to the order a screen reader would hear.</p><p><span class="chip chip-partial">Mixed</span></p></article>
       <article class="card">{icon("text")}<h3>Meaning check</h3><p>With a local language model, asks judgement questions a rule engine cannot: does this link make sense out of context? Does this heading describe its section? Is this form field explained well enough?</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
     </div>
@@ -789,28 +789,36 @@ def load_glossary() -> list[tuple[str, list[tuple[str, str]]]]:
     """Read docs/glossary.md as ``[(section, [(term, definition_html), ...]), ...]``.
 
     ``## Section`` headings group ``### Term`` headings, and each term's
-    definition is the paragraph that follows it. The site renders this file
+    definition is the paragraph that follows it, plus an optional short
+    ``- `` bullet list after that paragraph. The site renders this file
     instead of keeping its own copy, so the two cannot disagree.
     """
     sections: list[tuple[str, list[tuple[str, str]]]] = []
     term: str | None = None
     lines: list[str] = []
+    items: list[list[str]] = []
 
     def flush() -> None:
         if term is not None and sections and lines:
-            sections[-1][1].append((term, _inline_md(" ".join(lines))))
+            html = _inline_md(" ".join(lines))
+            if items:
+                html += '<ul style="margin:.5rem 0 0;padding-left:1.25rem">' + "".join(f"<li>{_inline_md(' '.join(i))}</li>" for i in items) + "</ul>"
+            sections[-1][1].append((term, html))
 
     for raw in GLOSSARY_FILE.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if line.startswith("### "):
             flush()
-            term, lines = line[4:].strip(), []
+            term, lines, items = line[4:].strip(), [], []
         elif line.startswith("## "):
             flush()
-            term, lines = None, []
+            term, lines, items = None, [], []
             sections.append((line[3:].strip(), []))
+        elif line.startswith("- ") and term is not None:
+            items.append([line[2:].strip()])
         elif line and not line.startswith("#") and term is not None:
-            lines.append(line)
+            # A wrapped bullet continues the last item; otherwise it is prose.
+            (items[-1] if items and raw.startswith("  ") else lines).append(line)
     flush()
     return sections
 
@@ -1336,7 +1344,7 @@ def privacy() -> str:
     <ul class="checks">
       <li>The sign-in window is a normal Chromium window with a fresh temporary profile.</li>
       <li>You type your password, passkey, or one-time code into the website, never into Axcess.</li>
-      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don’t store rendered pages</em>.</li>
+      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don&rsquo;t store rendered pages</em>.</li>
     </ul>
     <p style="margin-top:1rem"><a href="../get-started/#sign-in">Step by step: scan a site behind a sign-in.</a></p>
     <div style="margin-top:1.5rem">{callout("<strong>You stay in control of sign-in.</strong> Axcess only continues after you sign in yourself, so use accounts and sites you have permission to test.", "callout-maize", "lock")}</div>
@@ -1509,11 +1517,11 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
       <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
       <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I’m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
-      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don’t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
       <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
@@ -1590,7 +1598,7 @@ def faq(summ) -> str:
             ),
             q(
                 "How accurate is it?",
-                "<p>Every result carries its method and report group, so you can see how certain it is, and you can mark any result as a false positive with a reason. Only rule-engine failures are reported as Barriers; everything else waits for a person. The project also tests its checks against a set of made-up examples. That test is a safety rail, not a measure of accuracy on real sites. <a href=\"../privacy/#accuracy\">How we measure accuracy.</a></p>",
+                "<p>Every result carries its method and report group, so you can see how certain it is, and you can mark any result as a false positive with a reason. Only rule-engine failures are reported as Barriers; everything else waits for a person. The project also checks its results against a set of made-up examples, as a safety rail rather than a measure of accuracy on real sites. <a href=\"../privacy/#accuracy\">How we measure accuracy.</a></p>",
             ),
             q(
                 "How long does a scan take?",
