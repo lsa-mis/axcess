@@ -494,10 +494,12 @@ version-less links described in [The publish job](#the-publish-job).
   cannot offer its own fix.
 - **No way to measure update adoption beyond download counts.** See
   [Confirm adoption](#confirm-adoption).
-- **The review app does not show its own version.** On Windows only the
-  launcher log records it, apart from the update dialog when a newer release
-  is offered. On macOS, Electron's default **About Axcess** menu item may
-  show it; confirm that in the smoke test before you rely on it.
+- **The review app does not show its own version.** The code writes it to
+  the launcher log and shows it in the update dialog when a newer release is
+  offered. The operating system may show it too (Electron's default **About
+  Axcess** menu item on macOS, the installed app's properties on Windows);
+  neither was checked, so confirm them in the smoke test before you rely on
+  them.
 - **Some statements say more than the code does:**
   - The header comment in `desktop/src/updates.cjs` and a comment at the top
     of `.github/workflows/ci.yml` say every push to `main` publishes a

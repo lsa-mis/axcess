@@ -4,8 +4,10 @@ Run:  python3 docs/images/diagrams/source/render/boards.py
 Writes docs/images/diagrams/source/project/<Name>.dc.html and
 docs/images/diagrams/source/project/canvas.json.
 Every label here must match the code, like any other documentation claim.
-Each image's alt text lives in the docs that embed it (search the docs for the
-PNG file name); update it there when a diagram changes.
+Each image's alt text lives where the image is used: in the docs and, for the
+three site diagrams, in site/build.py (REPORT_GROUPS_ALT and two inline alt
+attributes). Find every use with `git grep -n "<png name>"` and update them all
+when a diagram changes.
 """
 
 from __future__ import annotations

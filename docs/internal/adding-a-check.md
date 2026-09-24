@@ -246,9 +246,10 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
     - That is a known bug today for responsive, focus, and visual rows. Their
       audit report cards lack the Manual and Automated verify lines and always
       show Medium confidence, even where the card says high (1.4.10, 1.4.12,
-      and 2.4.3). The issue page and the workbook's ticket fields are not
-      affected, because they use `_rule_meta_for` in `issues.py`, which
-      handles these pipelines. Until the bug is fixed, read verification steps
+      and 2.4.3). The issue page and the workbook's other ticket fields are
+      not affected, because they use `_rule_meta_for` in `issues.py`, which
+      handles these pipelines; the workbook's fix options are the exception
+      (see below). Until the bug is fixed, read verification steps
       for those issues on the issue page or in the workbook.
     - Alfa rows have no card on purpose: `_rule_meta_for` returns nothing for
       them either, and Alfa's own rule documentation is the remediation lead.
