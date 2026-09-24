@@ -2,16 +2,23 @@
 
 > **Historical (September 2026):** a point-in-time design and coverage
 > snapshot from the Phase 8 and 9 era, kept for maintainers who want the
-> background; do not use it to describe current Axcess. Out of date: it
-> counts three detection pipelines (Axcess now also has Siteimprove Alfa,
-> keyboard, responsive, focus, and visual checks, and a click-through probe
-> that reruns axe-core on content revealed by opening menus, tabs, and
-> dialogs), one semantic criterion (four are registered: 1.2.1, 2.4.4,
-> 2.4.6, and 3.3.2), and 50 A and AA criteria split 7 full, 11 partial, and
-> 32 manual (the current matrix has 55: 5 automated, 18 partial, 6
-> AI-assisted, and 26 manual); the Jinja templates, the `audit diff` and `audit ollama-serve`
-> commands, and the `j/k` and `?` shortcuts it mentions do not exist. For
-> current coverage see [coverage-tracker.md](../coverage-tracker.md), and
+> background. Do not use it to describe current Axcess.
+>
+> Out of date:
+>
+> - Pipelines: it counts three. Axcess now also has Siteimprove Alfa,
+>   keyboard, responsive, focus, and visual checks, and a click-through probe
+>   that reruns axe-core on content revealed by opening menus, tabs, and
+>   dialogs.
+> - Semantic criteria: it lists one. Four are registered: 1.2.1, 2.4.4,
+>   2.4.6, and 3.3.2.
+> - WCAG counts: it uses 50 A and AA criteria (7 full, 11 partial, 32
+>   manual). The current matrix has 55: 5 automated, 18 partial, 6
+>   AI-assisted, and 26 manual.
+> - Removed: the Jinja templates, the `audit diff` and `audit ollama-serve`
+>   commands, and the `j/k` and `?` shortcuts it mentions.
+>
+> For current coverage see [coverage-tracker.md](../coverage-tracker.md), and
 > for the current design see [architecture.md](architecture.md).
 
 This document is the single-page answer to three questions about the

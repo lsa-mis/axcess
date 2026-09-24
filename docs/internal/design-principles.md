@@ -2,13 +2,17 @@
 
 > **About this page (September 2026):** for contributors who design or
 > review changes to the Axcess review app. It was written when Axcess also
-> had a second, server-rendered Jinja UI, which has since been removed, so
-> the mentions of two parallel UIs, the Jinja help dialog, and mirroring
-> primitives in `static/styles.css` (which no longer exists) are out of
-> date. The `j/k` and `?` shortcuts, the `?` help dialog, and the Findings
-> shortcut footer described here do not exist in the current app (the
-> finding detail page has `0` to `5` status keys), and the list of "the
-> four `docs/` files" under Nielsen #10 predates the current docs.
+> had a second, server-rendered Jinja UI, which has since been removed.
+>
+> Out of date:
+>
+> - The mentions of two parallel UIs, the Jinja help dialog, and mirroring
+>   primitives in `static/styles.css`, which no longer exists.
+> - The `j/k` and `?` shortcuts, the `?` help dialog, and the Findings
+>   shortcut footer. None of them exist in the current app; the finding
+>   detail page has `0` to `5` status keys.
+> - The list of "the four `docs/` files" under Nielsen #10, which predates
+>   the current docs.
 
 Two frameworks, one product. This document maps both onto the actual
 UI of this tool: what we already do, where we know we fall short,

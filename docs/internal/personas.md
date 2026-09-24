@@ -2,15 +2,20 @@
 
 > **About this page (September 2026):** working assumptions, not research,
 > for contributors who make product and interface decisions. It was written
-> when Axcess checked only images of text (WCAG 1.4.5); the coverage matrix
-> now lists automated, partial, or AI-assisted checks for 29 of 55 WCAG 2.2
-> A and AA criteria, and Axcess has login scans and an optional shared
-> access token for hosted use, so the job to be done, the "roughly 80 %"
-> estimate, and "Auth. The tool runs on Sam's laptop" are out of date. Also
-> out of date: `tests/ui/test_keyboard_nav.py` and the `j/k` and `?`
-> shortcuts do not exist, and exports link page-level findings to
-> `/scans/{scan}/pages/{page}#finding-{id}` and only image findings to
-> `/findings/{id}`.
+> when Axcess checked only images of text (WCAG 1.4.5).
+>
+> Out of date:
+>
+> - Coverage: the coverage matrix now lists automated, partial, or
+>   AI-assisted checks for 29 of 55 WCAG 2.2 A and AA criteria, so the job
+>   to be done and the "roughly 80 %" estimate no longer hold.
+> - Access: Axcess now has login scans and an optional shared access token
+>   for hosted use, so "Auth. The tool runs on Sam's laptop" no longer holds.
+> - `tests/ui/test_keyboard_nav.py` and the `j/k` and `?` shortcuts do not
+>   exist.
+> - Export links: exports link page-level findings to
+>   `/scans/{scan}/pages/{page}#finding-{id}`, and only image findings to
+>   `/findings/{id}`.
 
 Personas are documented assumptions about the user. They're not
 research findings, and this document says so. They exist because every

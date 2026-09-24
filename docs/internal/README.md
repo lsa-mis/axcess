@@ -19,6 +19,9 @@ Every term is defined once, in the [glossary](../glossary.md).
 | [Design principles](design-principles.md) | Universal Design and usability principles applied to the review app. |
 | [Personas](personas.md) | The people the product is designed for, and who it is not for. |
 | [Alfa evidence review](alfa-evidence-review.md) | An investigation into Siteimprove Alfa "cannot tell" results and how to verify them. |
+| [Detection efficacy gates](../../DETECTION_EFFICACY.md) | The efficacy, efficiency, and scale gates, and how to run `make detection-evals`. |
+| [Precision corpus rules](../../tests/quality/README.md) | The labeled detection corpus behind `make quality-gate`: how to add samples and when to bump `corpus_version`. |
+| [Diagram sources](../images/diagrams/source/README.md) | Where the diagram sources live, and how to edit and render a diagram again. |
 | [System design and coverage gap](system-design-and-coverage-gap.md) | A historical single-page design, kept for context. The architecture guide replaces it. |
 
 ## History and planning
@@ -35,7 +38,3 @@ not as it is now.
 - [AGENTS.md](../../AGENTS.md): the contract for coding agents working in this
   repository. Its design for a conversation attached to one report is a plan,
   not a shipped feature.
-- [DETECTION_EFFICACY.md](../../DETECTION_EFFICACY.md): the efficacy,
-  efficiency, and scale gates, and how to run `make detection-evals`.
-- [tests/quality/README.md](../../tests/quality/README.md): the labeled
-  detection corpus behind `make quality-gate`, and how to update it.

@@ -2,16 +2,21 @@
 
 > **About this page (September 2026):** for contributors who change the
 > Axcess review app's own interface. It was written when Axcess also had a
-> second, server-rendered Jinja UI, which has since been removed, so the
-> "both UIs" rules, the parity section (section 7), the `static/styles.css`
-> references, and the baseline runner in `audits/baseline/` (which still
-> targets the removed Jinja routes) no longer apply. Also out of date: the
-> focus ring is now a 3 px `#00274C` ring (`boxShadow.focus` in
-> `tailwind.config.ts`), `tests/ui/test_accessibility_text_spacing.py` does
-> not exist, there are no `j/k` or `?` shortcuts (the finding detail page
-> has `0` to `5` status keys, and Ctrl or Cmd+K opens a search palette),
-> and the "Start crawl" and "Stop crawl" buttons are now "Start scan" and
-> "Stop scan".
+> second, server-rendered Jinja UI, which has since been removed.
+>
+> Out of date:
+>
+> - The Jinja UI is gone, so the "both UIs" rules, the parity section
+>   (section 7), and the `static/styles.css` references no longer apply.
+> - The baseline runner in `audits/baseline/` still targets the removed
+>   Jinja routes.
+> - The focus ring is now a 3 px `#00274C` ring (`boxShadow.focus` in
+>   `tailwind.config.ts`).
+> - `tests/ui/test_accessibility_text_spacing.py` does not exist.
+> - There are no `j/k` or `?` shortcuts. The finding detail page has `0` to
+>   `5` status keys, and Ctrl or Cmd+K opens a search palette.
+> - The "Start crawl" and "Stop crawl" buttons are now "Start scan" and
+>   "Stop scan".
 
 This document is the single source of truth for what "accessible" means
 in this codebase, why it means that, and how to keep it that way as the
@@ -96,7 +101,7 @@ thresholds against [`audits/contrast_helper.py`](../../audits/contrast_helper.py
 | Non-text UI elements (focus ring, control border, severity chip border) | **3.0:1** | 1.4.11 |
 
 **Source of truth: [`tailwind.config.ts`](../../src/audit/web/frontend/tailwind.config.ts)
-and [`static/styles.css`](../../src/audit/web/static/styles.css).** Every
+and `static/styles.css` (removed).** Every
 named color in those two files has been verified in
 `contrast_helper.py`'s `PAIRS` matrix. Adding a new color means adding
 a new row; the helper exits non-zero if any cell falls below the
@@ -158,7 +163,7 @@ secondary numerics below it. Both UIs implement this:
 * **SPA:** inline classes on the `<input>` in
   [`routes/NewScan.tsx`](../../src/audit/web/frontend/src/routes/NewScan.tsx).
 * **Jinja:** `.field-hero` / `.field-hero__label` rules in
-  [`static/styles.css`](../../src/audit/web/static/styles.css).
+  `static/styles.css` (removed).
 
 ### Correction to a Phase-2 claim
 

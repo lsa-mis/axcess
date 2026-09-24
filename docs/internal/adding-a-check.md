@@ -80,6 +80,25 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      the column rebuild in `0012_protected_image_pipeline.sql`, the latest
      widening, which lists every current value. The rollback deletes the new
      rows first, like `0012_protected_image_pipeline.rollback.sql`.
+   - Copying 0012 as it is fails on today's schema, with
+     `error in index idx_a11y_rule_lookup after drop column: no such column: pipeline`.
+     Migration `0029_hot_path_indexes.sql` added `idx_a11y_rule_lookup` on
+     `(scan_id, pipeline, rule_id, page_id)`, and SQLite will not drop a
+     column that an index names. 0012 drops only `idx_a11y_pipeline`.
+   - So in both the forward file and the rollback, start with
+     `DROP INDEX IF EXISTS idx_a11y_rule_lookup;` next to 0012's
+     `DROP INDEX IF EXISTS idx_a11y_pipeline;`. After the rebuild, recreate
+     both exactly as 0012 and 0029 define them:
+
+     ```sql
+     CREATE INDEX idx_a11y_pipeline ON page_a11y_findings(scan_id, pipeline);
+     CREATE INDEX idx_a11y_rule_lookup
+         ON page_a11y_findings(scan_id, pipeline, rule_id, page_id);
+     ```
+
+   - Before you write the migration, list the indexes that name `pipeline`,
+     in case a later migration added another:
+     `SELECT name, sql FROM sqlite_master WHERE tbl_name = 'page_a11y_findings' AND type = 'index' AND sql LIKE '%pipeline%';`
    - The [developer guide](developer-guide.md#add-a-migration) shows how to
      apply and roll back a migration safely. Tests pick it up on their own,
      and you can add a forward and rollback test like
@@ -106,6 +125,10 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
    - Write `_persist_<x>` with the `@_batched_writes` decorator, like
      `_persist_focus`. Call it from `_process_job` when `render_mode == "js"`
      and the flag is on.
+   - `_persist_focus` updates `focus_pages_probed` and `focus_findings_total`
+     on `CrawlSummary`, so add `<x>_pages_probed` and `<x>_findings_total`
+     next to them. Optionally, add a row for them to the end-of-crawl summary
+     table in `src/audit/cli.py`, next to "Pages focus-probed (SC 2.4.11)".
    - Add the flag to `config_json_for_scan`, so every scan records whether the
      check ran.
 5. **CLI and web toggles.**
@@ -115,10 +138,31 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      `api_create_scan`, `_build_crawl_config`, and the login scan request
      model `LocalLoginScanRequest` with the `CrawlConfig` built in
      `api_create_local_login_scan`.
-   - Protected scans build their own config in
-     `src/audit/web/protected_api.py` and run checks in the companion
-     (`src/audit/protected/companion.py`). Decide whether your check belongs
-     there; see [Protected scans](protected-scans.md).
+   - Login scans do not use `_LazyJs`, so step 4 does not reach them.
+     `_run_local_login_background` in `server.py` builds its own fetcher with
+     `run.session.create_shared_js_fetcher(...)`, which takes one parameter
+     per probe (`src/audit/protected/session.py`). Add a `<x>_probe`
+     parameter there, pass it on to `JsFetcher`, and pass the probe from
+     `_run_local_login_background`, gated on the config flag the way
+     `responsive_probe` is. If you only set the flag, the probe never runs in
+     a login scan, and nothing fails.
+   - Protected scans run only axe-core, Alfa, and the keyboard, responsive,
+     and focus probes, plus the protected image lead. They build their own
+     config in `src/audit/web/protected_api.py` and run checks in the
+     companion. If your check belongs there, every one of these closed lists
+     needs the new value, or its rows show as "unavailable" or are rejected:
+     - the probe build in `_ProtectedBrowserCrawler.crawl` and the index
+       rows in `_index_findings_from_result`, in
+       `src/audit/protected/companion.py`;
+     - `ProtectedIndexPipeline` in `src/audit/protected/models.py`;
+     - the source layer set in `_protected_issue_group_payload` in
+       `src/audit/web/protected_api.py`;
+     - `_PIPELINE_LABELS` in `src/audit/protected/export.py`;
+     - the `ProtectedIssueIndexGroup.source_layer` union in
+       `frontend/src/api/types.ts`, and `SOURCE_LABEL` in
+       `frontend/src/routes/ProtectedIssueIndex.tsx`;
+     - the protected pipeline enum in `tests/ui/golden/api_openapi.json`
+       (step 12 regenerates it).
    - Review app, under `src/audit/web/frontend/src/`: the `NewScanPayload`
      type in `api/types.ts`; `SETTING_KEYS`, `PUBLIC_DEFAULTS`,
      `LOGIN_POLICY`, `SwitchKey`, and `SWITCH_FIELDS` in
@@ -126,7 +170,8 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      label and hint in `SWITCHES` in `copy.ts`; the summaries in
      `DefaultSettingsCard.tsx` and `ScanSummaryCard.tsx`; and the retry
      settings in `routes/ScanDetail.tsx`. Searching the frontend for
-     `skip_focus` finds every spot.
+     `skip_focus` finds every spot except `copy.ts`, whose `SWITCHES` entry
+     is keyed `focus:`.
    - Choose each entry point's default on purpose. The raw API treats a
      missing `skip_<x>` field as "on".
 6. **Report group branch** in `src/audit/web/issues.py`. Do this in the same
@@ -150,6 +195,17 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
    - In `src/audit/rules/wcag_coverage.yaml`, update `method`, `pipelines`,
      and `confidence` for the criterion. The file's header explains each
      value.
+   - No written rule picks `method` and `confidence` for a browser probe, and
+     today's values differ. The responsive criteria (1.4.4, 1.4.10, and
+     1.4.12) are `automated` with `high` confidence, while the keyboard and
+     focus criteria (2.1.2, 2.4.3, and 2.4.11) are `partial` with `medium`,
+     although all of these rows land in Needs review. Agree on the values in
+     review, and never claim more than the probe can show.
+   - Three different fields are called confidence. The matrix `confidence`
+     here is what the public site's coverage page shows ("Confidence: high").
+     A card's `confidence_default` in `audit_report.yaml` is what the audit
+     report shows on the issue card. An issue's `evidence_confidence`, set
+     in `issues.py`, is what the review app shows on the issue page.
    - Add the name to `PIPELINES` in `src/audit/coverage_matrix.py`, or the
      loader rejects the matrix.
    - Update `SHIPPED_PIPELINE_SCS` in `tests/unit/test_coverage_matrix.py`.
@@ -159,21 +215,53 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
 9. **Methods used and rescan comparison.**
    - Add a row to `_methods_used` in `src/audit/web/server.py`. It feeds the
      Overview's "What this scan actually checked" card.
-   - In `src/audit/web/comparison.py`, extend the `Pipeline` literal and
-     `_FLAGS`, and `_COUNTERS` if you added a counter.
-10. **Frontend types and labels**, under `src/audit/web/frontend/src/`: the
-    `DetectionPipeline` union in `api/types.ts`, the pipeline labels in
-    `routes/PageEvidence.tsx`, and `METHOD_PIPELINE` in
-    `components/MethodCoverageLedger.tsx`.
+   - In `src/audit/web/comparison.py`, extend the `Pipeline` literal, the
+     `PIPELINES` tuple, and `_FLAGS`. Rows whose pipeline is not in
+     `PIPELINES` are silently left out of the rescan comparison.
+   - If you added a counter, add it to `_COUNTERS`. If you did not, add the
+     pipeline to the `{"focus", "visual"}` set in `_coverage`; otherwise
+     `_coverage` looks it up in `_COUNTERS` and raises `KeyError`.
+10. **Frontend types and labels**, under `src/audit/web/frontend/src/`:
+    - the `DetectionPipeline` union in `api/types.ts`;
+    - the pipeline labels in `routes/PageEvidence.tsx`;
+    - the `ScanMethodCoverage.key` union in `api/types.ts`, if you added a
+      row to `_methods_used`. It is a closed union, so add the key there
+      before `METHOD_PIPELINE`, or `make typecheck` fails;
+    - `METHOD_PIPELINE` in `components/MethodCoverageLedger.tsx`;
+    - `PIPELINES` in `routes/Diff.tsx`, the rescan comparison page's labels.
+      A missing entry falls back to the raw pipeline name.
 11. **Exports.**
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,
       `_PIPELINE_COVERAGE`, and the hard-coded pipeline tuples in the location
       query and in `_methods_line`.
+    - Also in `audit_report.py`, add an `<x>:` branch to `_meta_for_row` that
+      looks the card up by `row.wcag_sc` in `semantic_criteria`, like the
+      `keyboard:` branch. `_meta_for_row` handles only `axe:`, `semantic:`,
+      and `keyboard:` keys and sends every other key to the image cards,
+      where it finds nothing.
+    - That is a known bug today for responsive, focus, visual, and Alfa rows.
+      Their audit report cards have no "verify" steps and always show Medium
+      confidence, and the workbook's fix options for them are empty
+      (`fix_options_for` uses the same lookup). The issue page and the
+      workbook's other ticket fields are not affected, because they use
+      `_rule_meta_for` in `issues.py`, which does handle these pipelines. Until
+      the bug is fixed, read verification steps for those issues on the issue
+      page or in the workbook.
     - `_SOURCE_LABELS` in `jira_export.py` and in `markdown_report.py`.
     - The workbook reuses `_PIPELINE_LABEL`, so it needs no change of its own.
-12. **API goldens.** `tests/ui/golden/api_openapi.json` pins the pipeline
-    enums. Regenerate it with `AUDIT_UPDATE_GOLDEN=1`. That run writes the
-    golden and fails on purpose, so review the diff and run again without the
+12. **Goldens.** `tests/ui/golden/api_openapi.json` pins the pipeline
+    enums, and a new probe can also change the export goldens. Regenerate
+    them with:
+
+    ```bash
+    AUDIT_UPDATE_GOLDEN=1 uv run pytest tests/ui/test_api_surface.py \
+      tests/ui/test_api_contract.py tests/unit/test_export_goldens.py \
+      tests/unit/test_audit_report.py tests/unit/test_exports_csv_json.py \
+      tests/unit/test_exports_jira_markdown.py
+    ```
+
+    That run writes the goldens and fails on purpose (under `CI` it refuses to
+    write). Review the diff, then run the same tests again without the
     variable.
 13. **Tests and fixtures.**
     - Fixture pages in `tests/fixtures/site/<x>/`, with failing and clean
@@ -187,6 +275,13 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       that gap.
     - Optional: rows in `tests/support/rich_scan.py`, so the export goldens
       cover the pipeline. It seeds no focus, responsive, or visual rows today.
+    - A route test that the new toggle reaches `CrawlConfig`, because the raw
+      API treats a missing field as "on". Copy the `skip_focus` case in
+      `test_api_create_scan_respects_whole_host` in `tests/ui/test_routes.py`.
+    - Decide whether `tests/integration/test_crawl_end_to_end.py` should turn
+      the probe off. It turns the keyboard, responsive, focus, and visual
+      probes off explicitly, so a new probe that is on by default runs inside
+      that suite unless you add it there.
 14. **Precision corpus.**
     - Add the pipeline to the right layer in `_LAYER_PIPELINES` in
       `src/audit/quality_benchmark.py`, usually `behavioral`, or the loader
@@ -194,7 +289,9 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       `_REVIEW_ONLY_LAYERS` or `_FINDING_ONLY_LAYERS` to match `issues.py`;
       no test checks that for you.
     - Add labeled samples to `tests/quality/corpora/detection_precision_v1.json`
-      and bump `corpus_version`.
+      and bump `corpus_version`. Also update the corpus's `producers` entry
+      for the layer so it names your probe; today `behavioral` reads "Axcess
+      keyboard, responsive, focus, and deterministic motion probes".
     - Update the pinned version and pipeline set in
       `tests/quality/test_detection_precision_gate.py`.
     - Follow [the corpus rules](../../tests/quality/README.md): never relabel
@@ -208,12 +305,36 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
     `wcag_coverage.yaml` and `coverage_status.py`.
     - Add a display name for the pipeline to `PIPE_NAMES` in `site/build.py`
       and to `PIPELINE_NAMES` in `site/volume.py`.
-    - Update any copy on that page that lists the checks.
+    - Update the hand-written copy that lists the checks. It is spread over
+      several pages in `site/build.py`: `home()`, `how_it_works()` (the check
+      cards and the Needs review text), the `CHECKS` table that
+      `checks_sections()` renders (including its Siteimprove and axe
+      DevTools columns), and `faq()`.
     - Run `make site` and commit the regenerated `site/**/index.html`, as
       [Editing the public site](../../CONTRIBUTING.md#editing-the-public-site)
       explains.
 17. **These docs.** Add the check to both tables in
     [Detection pipelines](detection-pipelines.md).
+18. **Other docs that list the checks by hand.**
+    - [The coverage tracker](../coverage-tracker.md): its table of shipped
+      checks and its roadmap. `coverage_status.py` describes the same data
+      but does not generate this file.
+    - The list of checks in the [README](../../README.md).
+    - [Reading your report](../reading-your-report.md), which says the focus
+      and visual checks have no row under "What this scan actually checked".
+      Change it if you added a `_methods_used` row.
+    - The report groups diagram, if your check changes what a group holds.
+      Follow the [diagram sources guide](../images/diagrams/source/README.md),
+      then update its alt text everywhere it appears: `README.md`,
+      `docs/reading-your-report.md`, [Detection pipelines](detection-pipelines.md),
+      and `REPORT_GROUPS_ALT` in `site/build.py`.
+19. **Desktop build.** `desktop/backend.spec` lists the data folders the
+    packaged app includes, by hand. If your probe reads any file that is not
+    Python (JavaScript, JSON, or a prompt), add its folder to `datas` and
+    check a packaged build with `make desktop-backend`. Merging to `main`
+    publishes a desktop release with no CI gate, as
+    [Releases](releases.md#what-does-not-gate-a-release) explains, so get CI
+    and the browser suites green first.
 
 ## Adding axe rules or another engine
 

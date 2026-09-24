@@ -79,9 +79,12 @@ a browser check, or the UI, add the label so these suites run before merge.
 
 Other workflows:
 
-- `detection-evals.yml` runs the `make detection-evals` command on pull
-  requests and pushes to `main` that touch detection code, weekly, and on
-  demand.
+- `detection-evals.yml` runs the same evaluation as `make detection-evals` on
+  pull requests and pushes to `main` that touch detection, crawler, storage,
+  rules, or quality code (or the Makefile, `pyproject.toml`, `uv.lock`, or
+  `DETECTION_EFFICACY.md`), weekly, and on demand. It calls
+  `python -m audit.detection_evals` directly rather than `make`, so if you
+  change the Makefile target, change the workflow to match.
 - CI does not run the corpus scoring step of `make quality-gate`, but
   `tests/quality` runs in `python-tests`.
 - CI runs Python 3.13, and ruff and mypy target 3.11 (the minimum version).
@@ -122,8 +125,16 @@ for people too:
 - Never write that a scan proves WCAG conformance or legal compliance.
 - Code, tests, or CI cite these paths, so a file must stay at each one:
   `docs/hosting.md`, `docs/coverage-tracker.md`, `docs/protected-scans.md`,
-  `docs/architecture.md`, and `DETECTION_EFFICACY.md`. If content moves, leave
-  a short pointer behind, as `docs/architecture.md` does.
+  `docs/architecture.md`, `docs/accessibility.md`, and
+  `DETECTION_EFFICACY.md`. If content moves, leave a short pointer behind, as
+  `docs/architecture.md` does.
+- The diagrams in `docs/images/diagrams/` are rendered from source. To change
+  one, follow the
+  [diagram sources guide](docs/images/diagrams/source/README.md): edit the
+  source, render the PNG again, and update the image's alt text everywhere it
+  appears. Three of them are also copied to `site/assets/diagrams/`, and
+  `DIAGRAM_SIZES` in `site/build.py` holds their pixel sizes, so update it if
+  a size changes.
 
 ## Editing the public site
 

@@ -69,14 +69,14 @@ src/audit/
     queue.py                  enqueue, lease, complete, reclaim_expired
 
   exports/
-    collector.py              collect_scan: shared data for four formats
+    collector.py              collect_scan: shared data for every export
     csv_export.py
     json_export.py
     jira_export.py
     markdown_report.py        evidence inventory
     xlsx_export.py            remediation workbook
     audit_report.py           audit report (Markdown)
-    interaction_coverage.py   click-through coverage text for every export
+    interaction_coverage.py   click-through coverage text (workbook, audit report, Jira)
     webhook.py                env-gated webhook; nothing calls it yet
 
   web/
@@ -196,7 +196,7 @@ Useful `audit crawl` flags:
 | `--rps` | 2.0 | Maximum requests per second per host |
 | `--block TEXT` | Sign-out and delete patterns | Adds a URL substring never to visit. Repeatable. |
 | `--exclude PREFIX` | None | Adds a URL or path prefix never to visit. Repeatable. |
-| `--allow-session-ending-urls` | Off | Drops the built-in blocklist (`/logout`, `/delete`, `/remove`, `/signout`, `/sign-out`, `/log-out`) |
+| `--allow-session-ending-urls` | Off | Drops the built-in blocklist (`/logout`, `/delete`, `/remove`, `/signout`, `/sign-out`, `/log-out`) and ignores any `--block` patterns |
 | `--ignore-robots` | Off | Skips robots.txt, for authorized testing only |
 | `--static-only` | Off | Fetches without a browser and renders only script-only pages and bot challenges. The browser checks skip every page it does not render. |
 | `--skip-interaction` | Off | Skips the click-through check of menus, tabs, and dialogs |
@@ -243,6 +243,38 @@ The command line differs from the app's New scan form in a few ways:
    `src/audit/web/frontend/src/components/ExportMenu.tsx`.
 7. Record the golden files with `AUDIT_UPDATE_GOLDEN=1` (see
    [Testing](#testing)), review the diff, then run the tests again without it.
+
+### Final exports and the expert evaluation
+
+An export is final, not a [draft](../glossary.md#draft-export), only when the
+scan has a completed expert evaluation. The evaluation lives in the
+`evaluation_reports` table (migration `0009`), and `src/audit/evaluation.py`
+holds its logic.
+
+- `GET /api/scans/{id}/evaluation` reads the record, and
+  `PUT /api/scans/{id}/evaluation` updates it for a completed scan. The body
+  (`EvaluationUpdate` in `server.py`) holds the target standard and level,
+  purpose, included and excluded scope, sample description, reviewer,
+  methods note, limitations, and `status` (`draft`, `in_progress`, or
+  `completed`).
+- Setting `status` to `completed` returns 409 `evaluation_not_ready` with a
+  list of blockers until the reviewer, purpose, included scope, methods used,
+  and limitations are filled in, and every WCAG A and AA manual check has an
+  outcome with a rationale and none still needs follow-up.
+- A final export also needs every finding behind a Barrier or Needs review
+  issue to have a review status of in progress, remediated, accepted risk, or
+  false positive (`assess_public_export_readiness` in
+  `src/audit/web/export_readiness.py`). If anything is missing, the export
+  route returns 409 unless the request adds `?draft=acknowledged`, which
+  downloads a labeled draft instead.
+
+No screen in the review app calls these routes today. `api/client.ts` has
+`getEvaluation` and `updateEvaluation`, and client functions for the manual
+check routes (`GET /api/scans/{id}/manual-checks`,
+`PATCH /api/scans/{id}/manual-checks/{sc}`, and
+`POST /api/scans/{id}/manual-checks/{sc}/evidence`), but nothing uses them.
+The app's export menu always asks for a draft, so a final export is only
+possible by calling the API directly.
 
 ### Swap the OCR backend
 
@@ -305,7 +337,11 @@ src/audit/db/migrations/0030_<description>.rollback.sql
 
 Write standard SQLite in both. If you need to widen the
 `page_a11y_findings.pipeline` CHECK constraint, copy the column rebuild in
-`0004_keyboard_pipeline.sql`, because SQLite cannot alter a CHECK in place.
+`0012_protected_image_pipeline.sql`, which lists every current value, because
+SQLite cannot alter a CHECK in place. Drop and recreate both indexes on
+`pipeline` around it (`idx_a11y_pipeline` and `idx_a11y_rule_lookup`), or the
+rebuild fails. [Adding a check](adding-a-check.md#checklist-a-new-browser-probe)
+has the full recipe.
 
 Apply it with `make migrate`. The Makefile describes `make migrate-rollback`
 as rolling back the last migration, so try it on a scratch database rather

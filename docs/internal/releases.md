@@ -322,6 +322,12 @@ has to make because the workflow does not.
 4. If the publish job fails after creating the draft, the release stays a
    draft. Installed apps ignore drafts, so nobody is offered it. You can
    delete the leftover draft on the Releases page.
+5. For a failure that looks flaky, such as a packaging step or an upload,
+   try **Re-run failed jobs** on the same run first. A re-run keeps the run
+   number, so the version and tag stay `0.1.N`. The publish job creates a
+   draft only when none exists for the tag, uploads with `--clobber`, and
+   then publishes, so it completes the existing draft. Start a new run only
+   when the code has to change.
 
 ### Confirm the release
 
@@ -346,6 +352,9 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
 2. **Version.** Confirm the launcher log's "starting backend" line shows
    `version 0.1.N (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
+   The app has no screen that shows its own version. The update dialog says
+   "You are running 0.1.N (<short SHA>)", but only when it offers a newer
+   release, so support should ask a user for the launcher log line instead.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
 4. **Update from the previous release.** On a machine with the previous
@@ -356,6 +365,32 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
      `-arm64.dmg` from this repository's releases, and replace the app.
    - On both, check the version as in step 2 and confirm your earlier reports
      are still listed.
+
+### Confirm adoption
+
+Axcess has no telemetry, so the only signal that an update reached people is
+GitHub's download count for each release file. Record the counts before the
+release is pruned, because deleting a release deletes its counts:
+
+```bash
+gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.1.N \
+  --jq '.assets[] | [.name, .download_count] | @tsv'
+```
+
+Each file mostly counts one path. Anyone can also download any file from the
+Releases page, so treat the numbers as estimates:
+
+| File | Who downloads it |
+| --- | --- |
+| `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
+| `Axcess-0.1.N-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
+
+These counts miss people who never relaunch the app (there is no timer), apps
+whose check failed silently (for example, when GitHub rate-limits
+unauthenticated requests from a shared campus address), macOS users who
+download the disk image but never replace the app, and builds whose backend
+cannot start.
 
 ### Before an institutional rollout
 
@@ -451,6 +486,10 @@ version-less links described in [The publish job](#the-publish-job).
   of a bad release is a new, fixed release.
 - **A build that cannot start its backend never checks for updates**, so it
   cannot offer its own fix.
+- **No way to measure update adoption beyond download counts.** See
+  [Confirm adoption](#confirm-adoption).
+- **The app does not show its own version.** Only the launcher log records
+  it, apart from the update dialog when a newer release is offered.
 - **Some statements say more than the code does:**
   - The header comment in `desktop/src/updates.cjs` and a comment at the top
     of `.github/workflows/ci.yml` say every push to `main` publishes a

@@ -157,9 +157,11 @@ other checks are described in [Detection pipelines](detection-pipelines.md).
   parsed, but nothing calls `crawl_delay()`.
 - **`fetcher`**: `StaticFetcher` (httpx) returns every response as a
   `FetchResult`. Only true network errors raise.
-- **`js_fetcher`**: `JsFetcher` reuses one Chromium for the crawl and gives
-  each page a fresh `BrowserContext` at 1440 by 900. It waits for `load`, then
-  up to 2.5 seconds for network quiet by default.
+- **`js_fetcher`**: on a public scan, `JsFetcher` reuses one Chromium for the
+  crawl and gives each page a fresh `BrowserContext` at 1440 by 900. Login
+  scans and the protected companion reuse the signed-in context instead, and
+  login scans also reuse a fixed pool of tabs. It waits for `load`, then up to
+  2.5 seconds for network quiet by default.
 - **`render_detect`**: `is_js_only(body)` spots script-only shells, and
   `is_challenge_response(status, body)` spots bot challenges, which need a
   403, 429, or 503 status and a known marker.
@@ -180,8 +182,9 @@ other checks are described in [Detection pipelines](detection-pipelines.md).
 - **`downloader.ImageDownloader`** fetches image bytes, capped at 25 MiB, and
   writes them through the content-addressed `BlobStore`.
 - **`pipeline.process_page`** is the glue: extract, download (deduplicated by
-  content hash), upsert rows, run OCR, then the vision model, then record
-  inline SVG text.
+  content hash), upsert rows, and start OCR. While OCR runs, it records the
+  inline SVG text. Then it waits for OCR and runs the vision model on the text
+  candidates.
 
 ### Analyze layer (`audit.analyzer.ocr` and `audit.analyzer.vlm`)
 
@@ -290,8 +293,10 @@ Two things trip people up:
   the focus check prefixes its IDs.
 
 SQLite cannot change a CHECK constraint in place, so adding a value means
-rebuilding the column. `0004_keyboard_pipeline.sql` shows the pattern, and
-[Adding a check](adding-a-check.md) has the full recipe.
+rebuilding the column. `0012_protected_image_pipeline.sql` is the latest
+rebuild. A new one must also drop and recreate the index
+`idx_a11y_rule_lookup` from `0029_hot_path_indexes.sql`, or SQLite refuses to
+drop the column. [Adding a check](adding-a-check.md) has the full recipe.
 
 ### Content-addressed blobs
 
@@ -487,8 +492,8 @@ kept for 7 days, and `audit protected-maintenance` runs the cleanup.
 
 Reports, stored pages, screenshots, images, and logs stay in local files.
 Axcess connects to the website you scan, to an optional AI service that
-normally runs on your computer, and, in the desktop app, to GitHub once per
-launch to check for updates. This is what
+normally runs on your computer, and, in the desktop app, to GitHub to check
+for updates when the app window opens. This is what
 [local-first](../glossary.md#local-first) means in practice.
 
 ### What stays local
@@ -509,17 +514,20 @@ launch to check for updates. This is what
 | The website you scan, from the page inspector | Opening a stored page: the capture gets the page's URL as `<base href>`, so the reviewer's browser loads that site's stylesheets, fonts, and images live. Its scripts never run. With no stored capture, the server renders the page again in a throwaway browser. | `frontend/src/routes/Inspector.tsx`, `web/page_inspector.py` |
 | Sign-in and two-factor services | Login scans only, while you sign in | `protected/session.py`, `protected/egress.py` |
 | Ollama, if you use it | The vision model, the visual reading-order check, the AI language checks, and one model-list request when the New scan form opens. The default address is `http://localhost:11434` (`AUDIT_OLLAMA_BASE_URL`). Axcess never pulls a model. | `config.py`, `web/server.py` |
-| `api.github.com`, desktop app only | Once per launch, the update check. It is skipped when the app runs unpackaged in development and when `AXCESS_DISABLE_UPDATE_CHECK=1`, and nothing downloads without a click. | `desktop/src/updates.cjs`, `desktop/src/main.cjs` |
+| `api.github.com`, desktop app only | The update check, each time the app window opens (on macOS, also when the Dock icon reopens a closed window), until a newer release has been offered. It is skipped when the app runs unpackaged in development and when `AXCESS_DISABLE_UPDATE_CHECK=1`, and nothing downloads without a click. | `desktop/src/updates.cjs`, `desktop/src/main.cjs` |
 
 Public scans do not check that the Ollama address is on your computer; login
 scans do. Paths in the table are relative to `src/audit/` unless they start
 with `desktop/`.
 
-The review app's own interface loads no third-party assets. Its fonts are
+The review app's own interface makes no third-party requests. Its fonts are
 vendored in `src/audit/web/frontend/public/fonts/` and served from
 `/app/fonts/`, never from a CDN. The comment at the top of
-`src/audit/web/frontend/src/fonts.css` relies on this section, so keep both in
-step if you add any external asset.
+`src/audit/web/frontend/src/fonts.css` relies on this promise. Its wording is
+out of date: it cites `docs/architecture.md` and says the only runtime network
+call is to the site being audited, which the table above corrects. Update that
+comment the next time you change `fonts.css`, and keep both in step if you add
+any external asset.
 
 ### Working offline
 
