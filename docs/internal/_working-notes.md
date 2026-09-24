@@ -105,6 +105,20 @@ cited file unless a note says a command was run.
    priority, even when critical (`issues.py:1188-1199`), and the Issues table
    has no severity column.
 
+7. **Comparison items to re-check by hand** (vendor pages were blocked here):
+   whether Siteimprove still reports SIA-R83 "Text is clipped when resized";
+   the exact wording of Siteimprove help article 80000448387 on crawling sites
+   with multi-factor sign-in; whether the free axe DevTools tier can switch to
+   the WCAG 2.2 rule set; whether Siteimprove still has a "Link text is too
+   generic" check. See Appendix G, "Open items to verify by hand".
+8. **LSA manual testing links.** `accessibility.lsa.umich.edu` and
+   `accessibility.umich.edu` were blocked here, so the linked pages were found
+   by search only: LSA Web Accessibility resources
+   (https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html)
+   and LSA Accessibility training
+   (https://accessibility.lsa.umich.edu/learn/training.html). Confirm these
+   are the right destinations.
+
 ## Appendix A: Documentation inventory
 
 Source file: agent notes `inventory.md`, copied verbatim with headings demoted.
@@ -2619,3 +2633,302 @@ Every issue row gets one of three lanes (`issues.py:61-67`): `likely_barrier`, `
 - `grep`, `sed`, `cat`, `ls`, `find`, `wc` across the repo: read-only.
 - A one-off Python 3.11 in-memory render of `site/build.py` compared with the committed HTML, with `PYTHONDONTWRITEBYTECODE=1`: no files written.
 - Not run: `make test`, `make lint`, `make typecheck`, `make frontend-build`, `make quality-gate`, `make detection-evals`, and any `uv run` or `npm` command. These would install dependencies, which AGENTS.md puts behind approval.
+
+## Appendix G: Siteimprove and axe DevTools comparison evidence
+
+Source file: agent notes `comparison.md`, copied verbatim with headings demoted. Vendor pages were blocked by the network policy, so items marked [Search excerpt] need a manual re-check before any direct quote.
+
+### Axcess vs Siteimprove vs axe DevTools: evidence notes
+
+Research date: 2026-09-24. All URLs below were accessed on 2026-09-24.
+
+#### How to read these notes
+
+Two kinds of evidence are used, and each quote is labelled with one of them:
+
+- **[Fetched]**: I read the primary source text myself (GitHub source for axe-core, Siteimprove Alfa and the W3C WCAG repository, plus the npm registry). The quote is exact.
+- **[Search excerpt]**: The official page could not be opened from this research environment (the network egress policy blocked siteimprove.com, help.siteimprove.com, support.siteimprove.com, alfa.siteimprove.com, deque.com, docs.deque.com, dequeuniversity.com, www.w3.org and act-rules.github.io). The text comes from the web search tool's excerpt of that official page. It is usually close to the page wording but may be condensed, so treat it as "very likely" and re-check the page before publishing a direct quote.
+
+"No evidence found" means I searched and found nothing in current official documentation. It does not mean the tool definitely lacks the capability.
+
+Versions checked:
+
+- axe-core **4.13.0** (npm `latest`, published 2026-08-05). [Fetched] https://registry.npmjs.org/axe-core and https://github.com/dequelabs/axe-core/blob/master/CHANGELOG.md
+- @siteimprove/alfa-rules **0.119.0** (npm `latest`, published 2026-07-22). [Fetched] https://registry.npmjs.org/@siteimprove%2Falfa-rules
+
+#### Summary table
+
+| # | Check | WCAG SC and level | Siteimprove | axe-core default (4.13.0) | axe DevTools extras | Confidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Content clipped or lost at 200% zoom / text resize | 1.4.4 Resize Text, AA | **Partial / status unclear.** Help Center still documents an automated "Text is clipped when resized" rule (SIA-R83), but open-source Alfa deprecated SIA-R83 in 2026 ("too-strict interpretation of WCAG"). SIA-R47 (viewport meta must not block zoom) is active. | **Partial.** `meta-viewport` (enabled) only flags a viewport meta tag that disables zoom. No rule tests clipping at 200%. | No evidence found of an IGT or rule that tests clipping at 200%. | Medium (Alfa and axe-core parts: High) |
+| 2 | Horizontal scrolling or lost content at 320 CSS px | 1.4.10 Reflow, AA | **No evidence found** of an automated reflow check. Alfa source comments out a 1.4.10 mapping on SIA-R47. | **No.** No axe-core rule is tagged `wcag1410`. | No evidence found. | High (axe-core); Medium (others) |
+| 3 | Text spacing overrides cause clipping | 1.4.12 Text Spacing, AA | **Partial.** SIA-R91/R92/R93 flag inline `style` attributes that use `!important` letter spacing, word spacing or line height below the WCAG values. No evidence that it applies the spacing overrides and looks for clipping. | **Partial.** `avoid-inline-spacing` (enabled) flags `!important` letter-spacing, word-spacing or line-height set in `style` attributes. It does not apply the spacing and check for clipping. | No evidence found. | High |
+| 4 | Targets smaller than 24 by 24 CSS px | 2.5.8 Target Size (Minimum), AA (new in 2.2). 44 by 44 is 2.5.5 Target Size (Enhanced), AAA | **Yes.** Automated since 2024-04-09 when WCAG 2.2 is selected: SIA-R113 (24 px or spacing), plus SIA-R111 (44 px, AAA). | **Rule exists, disabled by default.** `target-size` has been `"enabled": false` since 4.5.0 (2022) and is still disabled in 4.13.0. It runs only if WCAG 2.2 rules are requested. No 44 px (2.5.5) rule. | The extension can be set to WCAG 2.2 AA, which runs `target-size`. Search excerpt of the docs says the default standard is WCAG 2.1 AA. | High (axe-core, Alfa); Medium (product defaults) |
+| 5 | Text inside images | 1.4.5 Images of Text, AA | **No evidence found** in the platform. Alfa has an **experimental** rule SIA-R118 that needs a human or AI answer to "does the image contain human-language text?". Siteimprove's on-demand AI "Contextual Image Analysis" judges alt text, not images of text. | **No.** No axe-core rule is tagged `wcag145`. | **No evidence found** of automated detection. Images IGT (Pro) asks about decorative vs informative and alt accuracy. Deque's manual issue library has an "image-of-text" issue type. | Medium |
+| 6 | Issues only visible after opening menus, dialogs, disclosures, tabs | Any SC | **No automatic interaction by the crawler.** It checks a static snapshot after onload. Users can capture states themselves with the Dynamic Content Checker extension (add-on) or script interactions with the Accessibility Code Checker. | **No.** axe-core docs: "Axe does not test hidden regions, such as inactive menus or modal windows." You must reveal them and scan again. | **User-driven.** Partial page scan of a selected region. IGTs are guided: the Modal Dialog IGT asks you to select the launcher and tries Escape to close; the Keyboard IGT tabs through the page automatically. No evidence of automatic exploration of all menus or tabs. | High (axe-core); Medium (products) |
+| 7 | Pages behind login, SSO, 2FA | n/a | **Crawler:** form logins via an authentication proxy set up by Siteimprove support (can take "days, or weeks"). MFA: search excerpts conflict. The most specific ones say the crawler "cannot crawl sites that use multi-factor authentication" and point to the Dynamic Content Checker add-on. VPN Connect exists for private networks. The free Accessibility Checker extension analyses "entirely within the browser" (so works on logged-in pages). | n/a (library runs in whatever page it is injected into) | **Extension** runs in the tester's own browser tab, so any login the tester completes (SSO, 2FA) is already handled, one page at a time. axe Monitor (crawler) supports Basic, NTLM, Kerberos, client certificates and login scripts. No evidence found about MFA in axe Monitor. | Medium |
+| 8 | Keyboard traps | 2.1.2 No Keyboard Trap, A | **No evidence found** of an automated check. No Alfa rule maps to 2.1.2. Help Center has an explanatory article only. | **No.** No rule is tagged `wcag212`. | **Yes (Pro).** Keyboard IGT auto-tabs through the page and "detects any keyboard traps, attempting to escape them automatically". | Medium |
+| 9 | Link purpose, vague "click here" links | 2.4.4 Link Purpose (In Context), A | **Partial.** SIA-R11: link has an accessible name. SIA-R81: identical names in the same context lead to the same resource (asks a question when unsure, so semi-automated). Third-party pages (2019) quote a Siteimprove check "Link text is too generic in its current context"; current status not confirmed. | **Partial.** `link-name` (enabled) checks only that a name exists. `identical-links-same-purpose` is AAA (2.4.9) and disabled by default. | **Yes, guided (Pro).** Interactive Elements IGT asks you to confirm the accessible name describes the element's purpose. | Medium |
+| 10 | Descriptive headings; labels or instructions for inputs | 2.4.6 Headings and Labels, AA; 3.3.2 Labels or Instructions, A | **Headings: Yes, opt-in AI.** SIA-R115 "Heading is not descriptive" is one of three AI-supported opt-in rules (Aug 2025). In Alfa it is experimental and question-based. **Labels:** SIA-R8 (form field has accessible name, mapped to 4.1.2). No rule mapped to 3.3.2 found. | **Headings: No** rule tagged `wcag246` (best-practice `empty-heading`, `heading-order`, `page-has-heading-one` only). **Labels: Partial.** `label` (enabled, 4.1.2) checks a label exists; `form-field-multiple-labels` (3.3.2, needs review); `label-title-only` best practice. | **Yes, guided (Pro).** Structure IGT asks whether each heading describes the content after it. Forms IGT tests labels. Advanced Rules `heading-markup` (AI) finds text that should be marked up as a heading. | Medium |
+| 11 | Audio or video transcript present | 1.2.1 Audio-only and Video-only (Prerecorded), A | **Partial (semi-automated).** SIA-R30 (audio) and SIA-R35 (video-only) ask questions; in the platform these become "Potential issues" with a guided review. | **No.** `audio-caption` (1.2.1) is deprecated and disabled. `video-caption` covers 1.2.2 captions, not transcripts. | No evidence found of a media IGT. | Medium |
+| 12 | Where scanning happens and where data goes | n/a | **Cloud SaaS.** Crawler runs on Siteimprove servers; "data harvested by the crawler is stored in Siteimprove's databases". Exception: the Accessibility Checker browser extension analyses in the browser. | Open source (MPL-2.0), runs inside the page's browser context. | **Local scan in the browser.** Results go to Deque when you save or share a test to an axe account. Usage data reporting is a setting. AI features (Advanced Rules, AI-assisted IGTs) use AI credits and have separate "AI-Powered Features" and "AI Data Sharing" settings. | Medium |
+
+#### What Siteimprove Alfa is
+
+- Open-source accessibility conformance testing engine by Siteimprove, MIT licensed. It replaced Siteimprove's proprietary engine and implements rules in the W3C ACT Rules Format.
+- [Fetched] https://github.com/Siteimprove/alfa (README): "Alfa is an open and standards-based accessibility conformance testing engine. ... Alfa is the result of distilling the best parts of Siteimprove's proprietary accessibility conformance testing engine, which Alfa has replaced, and implementing them on top of the open [Accessibility Conformance Testing (ACT) Rules Format]."
+- [Fetched] https://github.com/Siteimprove/alfa/blob/main/LICENSE.md: "The MIT License (MIT) ... Copyright (c) Siteimprove A/S". The `@siteimprove/alfa-rules` package.json declares `"license": "MIT"`, version 0.119.0.
+- [Fetched] README on page states and questions: the examples repo shows "how to interact with pages (e.g. open a menu) before running an audit; how to answer questions asked by Alfa (`cantTell` outcomes)". So interaction is scripted by the user, and question-based rules return `cantTell` unless someone (or something) answers.
+- Rule sets in the source (`packages/alfa-rules/src/`): default `rules.ts`, `experimental.ts` (ER8, ER87, R82, R98, R101, R109, R114, R115, R117, R118) and `deprecated.ts` (DR3, DR6, DR34, DR36, DR83). [Fetched] https://github.com/Siteimprove/alfa/tree/main/packages/alfa-rules/src
+
+axe-core license, for comparison: [Fetched] https://github.com/dequelabs/axe-core/blob/master/package.json: `"license": "MPL-2.0"`.
+
+#### General axe-core facts used below
+
+[Fetched] https://github.com/dequelabs/axe-core/blob/master/doc/rule-descriptions.md (4.13):
+
+- WCAG 2.2 section: "These rules are disabled by default, until WCAG 2.2 is more widely adopted and required."
+- AAA section: "These are disabled by default in axe-core."
+- Experimental section: "They are disabled by default in axe-core, but are enabled for the axe browser extensions."
+- Deprecated section: "Deprecated rules are disabled by default and will be removed in the next major release."
+
+[Fetched] https://github.com/dequelabs/axe-core/blob/master/doc/API.md:
+
+- "Axe does not test hidden regions, such as inactive menus or modal windows. To test those for accessibility, write tests that activate or render the regions visible and run the analysis again."
+- "`enabled` is `true` for rules that run by default when `axe.run()` is called with no options, and `false` for rules that are disabled by default (i.e. experimental and deprecated rules)."
+
+[Fetched] https://github.com/dequelabs/axe-core/blob/master/README.md: "With axe-core, you can find **on average 57% of WCAG issues automatically**."
+
+Tag search over rule-descriptions.md (4.13.0), done by me: `wcag144` -> meta-viewport; `wcag1410` -> none; `wcag1412` -> avoid-inline-spacing; `wcag145` -> none; `wcag212` -> none; `wcag244` -> area-alt, link-name; `wcag246` -> none; `wcag332` -> form-field-multiple-labels; `wcag121` -> audio-caption (deprecated); `wcag122` -> video-caption; `wcag258` -> target-size; `wcag255` -> none.
+
+#### General Siteimprove facts used below
+
+- Issues vs potential issues. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000448552-accessibility-reviewing-potential-issues : potential issues "are accessibility checks that require human review to determine whether they are true issues", reviewed through "an assisted review flow that will guide you step-by-step and ask clear, simple questions."
+- WCAG 2.2 in the platform. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001136439-april-9th-2024-siteimprove-now-includes-wcag-2-2-testing : WCAG 2.2 was added to automated checking on April 9th, 2024; "success criterion 2.5.8 Target Size (Minimum) (Level AA)" was added "as an automated testing rule", and Siteimprove "also took the opportunity to automate ... SC 2.5.5 Target Size (Level AAA)." Users select WCAG 2.2 to include it in their score.
+- AI-supported opt-in rules. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001183313-expanding-wcag-coverage-with-new-ai-supported-rules and https://help.siteimprove.com/support/solutions/articles/80001183260-august-2025-release-notes-accessibility-ai-assistant-increased-wcag-coverage-new-visual-identity : "three new accessibility rules powered by AI review"; excerpt names them as SIA-R114 (Page title is not descriptive), SIA-R115 (Heading is not descriptive) and SIA-R116 (Summary element missing an accessible name). Opt-in: "once adopted widely these rules will become part of the default Accessibility checks."
+
+---
+
+#### 1. Clipping or loss at 200% zoom / text resize (1.4.4 Resize Text, AA)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/resize-text.html (published at https://www.w3.org/TR/WCAG22/#resize-text): "Resize Text | AA | Except for captions and images of text, text can be resized without assistive technology up to 200 percent without loss of content or functionality."
+
+(a) Siteimprove: **Partial, current status unclear.**
+
+- Siteimprove Help Center documents the rule. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001015949-accessibility-rule-text-is-clipped-when-resized-explained : "The 'Text is clipped when resized' issue flagged by Siteimprove is referenced on their alfa site as rule SIA-R83", and "This check regularly fails due to a container element with the CSS declaration of overflow: hidden."
+- Siteimprove also publishes manual troubleshooting steps (browser zoom at 200% and text-only resize). [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001211065-how-to-troubleshoot-text-resizing-issues : "Using the browser's zoom feature at 200% will show text and user interface elements increase in size. If text is clipped or cut off, the result is a failure."
+- Open-source Alfa deprecated SIA-R83 in 2026. [Fetched] https://github.com/Siteimprove/alfa/blob/main/packages/alfa-rules/CHANGELOG.md (0.115.0): "**Breaking:** SIA-R83 is now deprecated and will be removed in a later version." [Fetched] `packages/alfa-rules/src/sia-dr83/rule.ts`: "This rule has been deprecated due to a too-strict interpretation of WCAG." (0.115.1 was published to npm 2026-05-29.) [Search excerpt] https://alfa.siteimprove.com/rules/sia-r83 : "This rule was based on a too strict interpretation of WCAG that has been clarified since. It is therefore considered deprecated and shouldn't be used."
+- Active related rule: SIA-R47 "<meta name="viewport"> elements do not prevent zoom". [Fetched] `packages/alfa-rules/src/sia-r47/rule.ts`: `requirements: [Criterion.of("1.4.4"), ...]`, tags Stable. [Search excerpt] https://alfa.siteimprove.com/rules/sia-r47 : content "must not specify the property user-scalable with a value of 'fixed' or specify the property maximum-scale with a value of less than 2."
+- Suggested wording: Siteimprove has had an automated clipping check (SIA-R83); its open-source engine deprecated that rule in 2026, so whether the platform still reports it should be confirmed with Siteimprove.
+
+(b) axe-core 4.13.0: **Partial.** `meta-viewport` is enabled (tags `wcag2aa, wcag144`). [Fetched] rule-descriptions.md: "Ensure `<meta name="viewport">` does not disable text scaling and zooming". `meta-viewport-large` is best practice ("can scale a significant amount"). No rule checks clipping when text is enlarged.
+
+(c) axe DevTools: **No evidence found** of an IGT or Advanced Rule for clipping at 200%.
+
+#### 2. Reflow at 320 CSS px (1.4.10 Reflow, AA)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/21/reflow.html : "Content can be presented without loss of information or functionality, and without requiring scrolling in two dimensions for: Vertical scrolling content at a width equivalent to 320 CSS pixels; ..."
+
+(a) Siteimprove: **No evidence found** of an automated reflow check. In Alfa, the 1.4.10 mapping on SIA-R47 is deliberately disabled. [Fetched] `sia-r47/rule.ts`: "// The 1.4.10 secondary mapping is missing in ACT rules ... // Criterion.of("1.4.10")," (commented out). Searches of help.siteimprove.com returned only general WCAG text for 1.4.10.
+
+(b) axe-core 4.13.0: **No.** No rule tagged `wcag1410` in rule-descriptions.md (my tag search above).
+
+(c) axe DevTools: **No evidence found.**
+
+#### 3. Text spacing overrides cause clipping (1.4.12 Text Spacing, AA)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/21/text-spacing.html : "no loss of content or functionality occurs by setting all of the following and by changing no other style property: Line height (line spacing) to at least 1.5 times the font size; ..."
+
+(a) Siteimprove: **Partial (the `!important` inline-style pattern only).**
+
+- [Fetched] `sia-r91/rule.ts`: `requirements: [Criterion.of("1.4.12"), ...]`, applicability `textWithInlinedImportantProperty(...)`, expectation `isWideEnough(target, device, property, threshold)`. R92 and R93 are the word-spacing and line-height versions (all Stable).
+- [Search excerpt] https://alfa.siteimprove.com/rules/sia-r91 : checks "that the style attribute is not used to prevent adjusting letter-spacing by using !important, except if it's at least 0.12 times the font size"; SIA-R92 word-spacing "at least 0.16 times"; SIA-R93 line-height "at least 1.5 times".
+- Platform help articles exist, e.g. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001058760-accessibility-rule-letter-spacing-does-not-meet-minimum-requirement-explained ("Letter spacing does not meet minimum requirement").
+- No evidence found that Siteimprove applies the spacing values and then looks for clipped or overlapping text.
+
+(b) axe-core 4.13.0: **Partial.** `avoid-inline-spacing`, enabled by default, tags `wcag21aa, wcag1412`, ACT rules 24afc2, 9e45ec, 78fd32.
+[Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/avoid-inline-spacing.json : `"selector": "[style]"`, `"all": ["important-letter-spacing", "important-word-spacing", "important-line-height"]`, description "Ensure that text spacing set through style attributes can be adjusted with custom stylesheets", help "Inline text spacing must be adjustable with custom stylesheets".
+What it actually checks: only elements that have a `style` attribute, and only whether letter-spacing, word-spacing or line-height are set there with `!important` (a spacing threshold was added in 4.5.0: CHANGELOG "avoid-inline-spacing: Add spacing threshold (#3533)"). It does not inject the 1.4.12 spacing values and does not detect clipping.
+
+(c) axe DevTools: **No evidence found** of a text-spacing IGT.
+
+#### 4. Target size (2.5.8 Target Size (Minimum), AA; 2.5.5 Target Size (Enhanced), AAA)
+
+W3C text:
+
+- [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/22/target-size-minimum.html (published at https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum): "Target Size (Minimum) | AA | New | The size of the target for pointer inputs is at least 24 by 24 CSS pixels, except when: Spacing ... Equivalent ... Inline ... User Agent Control ... Essential".
+- [Fetched] https://github.com/w3c/wcag/blob/main/understanding/22/target-size-minimum.html : "The requirement is for targets to be at least 24 by 24 CSS pixels in size. There are five exceptions" and "For important links/controls, consider aiming for the stricter 2.5.5 Target Size (Enhanced)."
+- [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/21/target-size-enhanced.html (published at https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced): "Target Size (Enhanced) | AAA | The size of the target for pointer inputs is at least 44 by 44 CSS pixels except when: Equivalent ... Inline ... User Agent Control ... Essential".
+- [Fetched] https://github.com/w3c/wcag/blob/main/understanding/21/target-size-enhanced.html : "What to do: Make custom targets at least 44 by 44 pixels."
+
+(a) Siteimprove: **Yes (automated).**
+
+- [Search excerpt] April 9th, 2024 release article (URL in General Siteimprove facts): 2.5.8 added "as an automated testing rule", plus automated 2.5.5.
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001211135-what-is-target-size-wcag-2-5-8- : requirements for clickable elements: "Size is 24x24px or Size + spacing gives 24px to nearby clickable elements."
+- [Fetched] `sia-r113/rule.ts`: `requirements: [Criterion.of("2.5.8")]`, `hasSufficientSize(24, device)`, and a spacing test: "we check that the 24 CSS pixel diameter circle of the target does not intersect another target or the circle of any other adjacent undersized targets." [Fetched] `sia-r111/rule.ts`: `requirements: [Criterion.of("2.5.5")]`, `hasSufficientSize(44, device)`. Both have a user-agent-controlled exception. CHANGELOG: R111 added in 0.73.0, R113 in 0.76.0.
+- [Search excerpt] https://alfa.siteimprove.com/rules/sia-r113 : applies to pointer targets "except if it is rendered on a line" and "assumes that the target does not have essential size."
+
+(b) axe-core: **Rule exists but is disabled by default.**
+
+- [Fetched] https://github.com/dequelabs/axe-core/blob/master/lib/rules/target-size.json : `"id": "target-size"`, `"enabled": false`, tags `["cat.sensory-and-visual-cues", "wcag22aa", "wcag258"]`, help "All touch targets must be 24px large, or leave sufficient space", checks `any: ["target-size", "target-offset"]`.
+- [Fetched] CHANGELOG 4.5.0 (2022-10-17): "**new rule:** Add WCAG 2.2 target-size rule (off by default) (#3616)". Still `enabled: false` in 4.13.0 (2026-08-05).
+- To run it: request the `wcag22aa` tag or enable the rule explicitly. No axe-core rule for 44 px / 2.5.5 (no `wcag255` tag).
+
+(c) axe DevTools: **Configurable, not default.**
+
+- [Search excerpt] https://www.deque.com/blog/axe-core-4-5-first-wcag-2-2-support-and-more/ : "The rule is off by default until WCAG 2.2 is more widely required, and to use this rule you will need to configure your axe products to use the WCAG 2.2 ruleset."
+- [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-configuration/ : "By default, axe DevTools currently tests according to the WCAG 2.1 AA standard, but you can change to one of several other WCAG rulesets, ADA section 508, Trusted Tester v5, EN 301 549, or RGAA." (Not confirmed whether the standard selector is in the free tier. A Deque blog excerpt about extension release 4.18.2 described this control as a Pro feature: https://www.deque.com/blog/axe-devtools-extension-updates-rules-standards-control-sign-in-up-within-the-extension-and-more/ .)
+
+#### 5. Images of text (1.4.5 Images of Text, AA)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/images-of-text.html : "If the technologies being used can achieve the visual presentation, text is used to convey information rather than images of text except for the following: Customizable ..."
+
+(a) Siteimprove: **No evidence found** of automated detection in the platform.
+
+- Alfa has an **experimental**, question-based rule. [Fetched] `packages/alfa-rules/src/experimental.ts` exports R118. [Fetched] `sia-r118/rule.ts`: `requirements: [Criterion.of("1.4.5"), Criterion.of("1.4.9"), ...]`, `tags: [Scope.Component, Stability.Experimental]`, first question `"does-image-contain-human-language-text"`, then `is-image-text-decorative`, `-essential`, `-incidental`, `-redundant`. Without an answer, Alfa returns `cantTell`.
+- Nearby but different feature: [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001188246-contextual-image-analysis : an on-demand AI check where "Each image-alt-text pair is then sent to an AI model trained to evaluate how closely the description matches the image content." This judges alt text quality, not images of text.
+
+(b) axe-core 4.13.0: **No.** No rule tagged `wcag145`.
+
+(c) axe DevTools: **No evidence found** of automated images-of-text detection.
+
+- Images IGT (Pro). [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt/ : Images IGT covers "whether an image is decorative or carries meaning, and whether its accessible name holds up."
+- Deque's issue library has a manual "image-of-text" issue. [Search excerpt] https://docs.deque.com/issue-help/1.0.0/en/image-of-text/ : "An image MUST NOT include informative text if an equivalent visual presentation of the text can be rendered using real text, unless the text is essential". This is issue guidance used in testing (for example axe Auditor), not an automated rule.
+- Deque does use OCR, but for form labels. [Search excerpt] https://www.deque.com/blog/deques-people-first-approach-to-computer-vision-in-axe-devtools/ : OCR is used "to generate the text associated with form labels".
+
+#### 6. Issues only visible after opening menus, dialogs, disclosures or tabs
+
+(a) Siteimprove: **The crawler does not interact. Users can capture states themselves.**
+
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001211321-can-siteimprove-accessibility-test-dynamic-content-for-accessibility- : "Siteimprove evaluates only a static snapshot of rendered content and does not check content that appears after user interaction"; "the crawler gets a static snapshot of the page after executing the onload scripts, and only checks that snapshot and nothing else."
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001215104-what-the-siteimprove-crawler-can-and-cannot-crawl : cannot crawl "content requiring interaction to be available, such as pages only available if searched for, and forms depending on fields being filled in."
+- Manual capture: [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001156378-dynamic-content : the Chrome extension lets you "capture, test, and track non-crawlable or dynamic content (like forms, booking flows, cart pages, and LMS training modules) through the new Snapshots feature". Another excerpt says it "is available as an add-on to your Siteimprove subscription".
+- Scripted: [Search excerpt] https://alfa.siteimprove.com/code-checker/getting-started/usage/cypress : in Cypress you can "use usual Cypress instructions to navigate through the page, opening menus or modals, etc." before auditing.
+
+(b) axe-core: **No automatic interaction.** [Fetched] API.md: "Axe does not test hidden regions, such as inactive menus or modal windows. To test those for accessibility, write tests that activate or render the regions visible and run the analysis again."
+
+(c) axe DevTools: **User-driven, with some automation inside guided tests.**
+
+- Partial page scan. [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-scanning/ : "clicking 'Partial Page Scan' will allow you to select a specific component or page area to run your scan within." The tester opens the menu or dialog first, then scans.
+- Modal Dialog IGT (Pro). [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-modal-dialog/ : you answer "Yes, my modal has a launcher" and are then "asked to select the modal's launcher"; "the IGT will attempt to close it automatically using the ESC key. If ESC did not dismiss the modal, you will be asked to dismiss it manually."
+- Keyboard IGT (Pro) tabs automatically (see check 8), but no evidence it opens menus or tabs on its own.
+- [Search excerpt] https://www.deque.com/blog/axe-devtools-extension-updates-test-your-whole-page-with-multi-run-intelligent-guided-testing/ : the extension lets you "test a whole page by running the same Intelligent Guided Test (IGT) multiple times" (the tester still sets up each state).
+
+#### 7. Pages behind a login, including SSO and 2FA
+
+(a) Siteimprove:
+
+- Crawler login. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000448387-can-siteimprove-crawl-an-intranet-and-other-non-public-sites- : "Siteimprove uses an authentication proxy as an authentication layer, and to establish a connection the login configuration needs to be customized by their technical support staff"; "configuring a login can take days, or weeks if it needs to be escalated to our development team"; "Siteimprove cannot crawl authentication implementations that utilize dynamic local storage values."
+- MFA: **search excerpts conflict, re-check the page before publishing.** Two excerpts of the same article say "Siteimprove cannot crawl sites that use multi-factor authentication" and point to the Dynamic Content Checker, which can "capture and analyze dynamic states ... such as forms, booking flows, SPAs, and content behind multi-factor authentication" as "an add-on". One earlier excerpt said MFA crawling is possible with special configuration. The first reading is the more specific one.
+- Other login routes named in excerpts: Citrix or Google login providers, IP allowlisting, and VPN Connect. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001189773-using-vpn-connect-with-siteimprove : "a secure tunnel between Siteimprove's data centers and your internal environment".
+- Browser extension. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000448491-siteimprove-accessibility-checker-browser-extension : "All analysis is done entirely within the browser, allowing secure evaluation of password-protected or non-public pages, multi-step forms, and dynamic content."
+- Note: "Siteimprove SSO" articles are about signing in to the Siteimprove platform, not about the crawler.
+
+(b) axe-core: n/a. It is a library that runs in whatever page it is injected into, so login is up to the host tool.
+
+(c) axe DevTools:
+
+- The browser extension runs in the tester's own browser tab (it is a DevTools panel), so any login the tester has completed, including SSO and 2FA, already applies. Coverage is one page (or state) at a time. [Search excerpt] Deque pricing page https://www.deque.com/axe/devtools/pricing/ as summarised by search: "The free Axe DevTools Extension only provides automated testing, and you can only test one page at a time." (Wording not confirmed on the page.)
+- axe Monitor (Deque's crawler product). [Search excerpt] https://docs.deque.com/monitor/8.7/en/advanced_scans/ : "Authentication options include Basic, NTLM, Kerberos, and Client Certificates, and other authentication types are also supported with scripting"; scripts can be set to run "before all other scripts" when the site requires login. **No evidence found** on MFA or 2FA for axe Monitor.
+- axe Auditor is a manual testing and audit-management tool. Its "Two-Factor Authentication" doc page is about signing in to Auditor, not scanning.
+
+#### 8. Keyboard traps (2.1.2 No Keyboard Trap, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/no-keyboard-trap.html : "If keyboard focus can be moved to a component of the page using a keyboard interface, then focus can be moved away from that component using only a keyboard interface".
+
+(a) Siteimprove: **No evidence found** of an automated check.
+
+- No Alfa rule declares 2.1.2 (my scan of every rule's `requirements` in `packages/alfa-rules/src/`: keyboard rules SIA-R84 and SIA-R95 map to 2.1.1 and 2.1.3).
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000448116-what-are-keyboard-traps- is explanatory ("A keyboard trap occurs when a user can get into a component ... but cannot get out"). It does not describe an automated check.
+- A third-party blog claimed the Siteimprove extension finds keyboard traps. I did not find this in official docs, so it is not used here.
+
+(b) axe-core 4.13.0: **No.** No rule tagged `wcag212`.
+
+(c) axe DevTools: **Yes, in a Pro guided test.**
+
+- [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-keyboard/ : "The Keyboard IGT will automatically tab through all elements and record all the tabstops"; it "checks for missing tab stops and detects any keyboard traps, attempting to escape them automatically."
+- [Search excerpt] Modal Dialog IGT "builds on the technology used in the keyboard tool to check for things such as keyboard traps".
+- Paid. [Search excerpt] https://docs.deque.com/auditor/2.27/en/automatedmanual/ : "IGT requires a Pro subscription".
+
+#### 9. Link purpose in context (2.4.4, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/link-purpose-in-context.html : "The purpose of each link can be determined from the link text alone or from the link text together with its programmatically determined link context, except where the purpose of the link would be ambiguous to users in general."
+
+(a) Siteimprove: **Partial.**
+
+- SIA-R11 "Links have an accessible name". [Fetched] `sia-r11/rule.ts`: requirements 2.4.4, 2.4.9, 4.1.2, Stable. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80001050610-sia-r11-link-without-a-text-alternative-explained : "This check makes sure that all types of links that assistive technology users might encounter have an accessible name."
+- SIA-R81 "Links with identical accessible names and context serve equivalent purpose". [Fetched] `sia-r81/rule.ts`: requirements 2.4.4 and 2.4.9, Stable; when the links point to different URLs it asks `Question.of("reference-equivalent-resources", ..., "Do the links resolve to equivalent resources?")`. So it is semi-automated (a potential issue until answered).
+- SIA-R41 is the 2.4.9 (AAA) version.
+- Generic wording ("click here"): third-party university pages quote a Siteimprove check "Link text is too generic in its current context", e.g. https://www.hawaii.edu/access/2019/04/17/38-link-text-is-too-generic-in-its-current-context/ (2019). **No evidence found** in current official docs or the current Alfa rule list, so its current status is unconfirmed.
+
+(b) axe-core 4.13.0: **Partial.** `link-name`, enabled, tags include `wcag244` and `wcag412`. [Fetched] `lib/rules/link-name.json`: passes if any of `has-visible-text`, `aria-label`, `aria-labelledby`, `non-empty-title`. So it checks that a name **exists**, not that it is descriptive. `identical-links-same-purpose` (`wcag2aaa`, `wcag249`) is `"enabled": false` and returns "needs review".
+
+(c) axe DevTools: **Yes, guided (Pro).** [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-interactive-elements/ : "You will be asked to confirm the Accessible Name accurately describes the interactive elements purpose."
+
+#### 10. Descriptive headings (2.4.6, AA) and labels or instructions (3.3.2, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/headings-and-labels.html : "Headings and labels describe topic or purpose." [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/labels-or-instructions.html : "Labels or instructions are provided when content requires user input."
+
+(a) Siteimprove:
+
+- **Headings: Yes, as an AI-supported opt-in rule.** SIA-R115 "Heading is not descriptive" (see General Siteimprove facts). [Fetched] `sia-r115/rule.ts`: `requirements: [Criterion.of("2.4.6"), ..., Technique.of("G130")]`, `Stability.Experimental`, `Question.of("is-heading-descriptive", target)`. In open-source Alfa the question needs an answer. In the platform Siteimprove supplies AI review. [Search excerpt] University of Iowa, 2026-04 (third party): https://webcommunity.sites.uiowa.edu/updates/2026/04/heading-not-descriptive reports false positives on person-name headings.
+- Structural heading rules (not 2.4.6): SIA-R53 "Headings are structured", SIA-R61 "document starts with level 1 heading", SIA-R78 "content between headings" (all `BestPractice` in source), SIA-R64 "Heading has non-empty accessible name" (1.3.1).
+- **Labels:** SIA-R8 form field has a non-empty accessible name. [Fetched] `sia-r8/rule.ts`: `requirements: [Criterion.of("4.1.2"), ...]`. **No evidence found** of a rule mapped to 3.3.2 (none in my scan of Alfa `requirements`).
+
+(b) axe-core 4.13.0:
+
+- Headings: **No** rule tagged `wcag246`. Best-practice rules only: `empty-heading` ("Ensure headings have discernible text"), `heading-order`, `page-has-heading-one`. `p-as-heading` is experimental (disabled in axe-core, enabled in the extensions per the rule-descriptions note).
+- Labels: **Partial.** `label` (enabled, `wcag2a, wcag412`): "Ensure every form element has a label" (presence only). `form-field-multiple-labels` (`wcag332`, needs review). `label-title-only` (best practice): "Ensure that every form element has a visible label and is not solely labeled using hidden labels, or the title or aria-describedby attributes".
+
+(c) axe DevTools:
+
+- Structure IGT (Pro). [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-structure/ : "you go through each heading and determine if the text is descriptive of the content that immediately follows it."
+- Forms IGT (Pro). [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-igt-forms/ : "you will be guided through the testing of the given field's label."
+- Advanced Rules (AI). [Search excerpt] https://docs.deque.com/advanced-rules/1/en/welcome/ : "heading-markup" finds headings missing heading markup; these rules "give a confidence rating for each issue they find, rather than a definitive pass or fail." This is about markup (1.3.1), not whether a heading is descriptive.
+
+#### 11. Audio and video transcript presence (1.2.1, A)
+
+WCAG text. [Fetched] https://github.com/w3c/wcag/blob/main/guidelines/sc/20/audio-only-and-video-only-prerecorded.html : "For prerecorded audio-only and prerecorded video-only media, the following are true, except when the audio or video is a media alternative for text and is clearly labeled as such".
+
+(a) Siteimprove: **Partial (semi-automated).**
+
+- [Fetched] `sia-r30/rule.ts`: `requirements: [Criterion.of("1.2.1"), ..., Technique.of("G158")]`, `composes: [R23, R29]` (audio transcript / media alternative, both question-based). `sia-r35/rule.ts`: 1.2.1 with techniques G159 and G166 (video-only).
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000448521-accessibility-does-siteimprove-check-for-captioning-on-videos-and-other-multimedia- : "The checks provided are semi-automated, which means that validating the issue requires a guided review." For a transcript, "your team can highlight to the Siteimprove crawler where it exists".
+
+(b) axe-core 4.13.0: **No.** `audio-caption` (`wcag121`) is in the Deprecated section, `"enabled": false`, and returns "needs review" only. `video-caption` (`wcag122`, enabled, "needs review") checks for a captions track (1.2.2), not a transcript.
+
+(c) axe DevTools: **No evidence found** of a media or transcript IGT (the IGTs listed are Keyboard, Interactive Elements, Modal Dialog, Images, Structure, Forms, Table).
+
+#### 12. Where scanning happens and where data goes
+
+(a) Siteimprove: **Cloud SaaS.**
+
+- [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000863869-the-siteimprove-scan-process and https://help.siteimprove.com/support/solutions/articles/80001215103-how-the-siteimprove-crawler-works : "The crawlers scan your website using Siteimprove servers from specific IP addresses with identifiable user agents"; "The data harvested by the crawler is stored in Siteimprove's databases"; results are "reported to Siteimprove's online platform".
+- Hosting region. [Search excerpt] https://help.siteimprove.com/support/solutions/articles/80000724285-siteimprove-analytics-data-flows-and-compliance : data centres in the EU (AWS Frankfurt) by default, US hosting optional. This article is about **Analytics**. Not confirmed for Accessibility crawl data.
+- Exceptions: the Accessibility Checker extension analyses in the browser (check 7). Dynamic Content Checker snapshots are stored in the account: [Search excerpt] "Automatically store captured snapshots and check their results in the 'Dynamic Content' section of your account".
+
+(b) axe-core: open-source library (MPL-2.0) that runs inside the page's JavaScript context. It has no network component of its own (it is embedded by the host tool).
+
+(c) axe DevTools extension: **scans locally in the browser. Data goes to Deque when you use account features.**
+
+- Saved and shared tests live in the axe account. [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-share/ : "Users need to be added to your axe account to access shared test results"; for non-enterprise single licences "these reports will be available to anyone with the link."
+- Usage data. [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-usage-data/ : the Usage Service is "deployed to Deque's AWS infrastructure"; users "may enable or disable ... using the Send Usage Data checkbox".
+- AI features. [Search excerpt] https://docs.deque.com/devtools-for-web/4/en/devtools-configuration/ : from extension v4.113.4, "AI-Powered Features" and "AI Data Sharing" are separate settings. [Search excerpt] https://docs.deque.com/devtools-server/4.0.0/en/ai-credits/ : "Credit-worthy features include Advanced Rules, AI-Assisted IGT analysis, and AI remediation guidance." This suggests those features process data on Deque's side, but I did not find an explicit data-flow statement.
+- Deployment. [Search excerpt] https://www.deque.com/axe/devtools/web-accessibility/ : axe DevTools for Web "can be deployed in SaaS, on-premise, or in private cloud environments."
+- **No evidence found** of an official Deque sentence saying page content "never leaves the browser" for automated scans. State the local-scan point as an inference from how the extension works, or verify with Deque.
+
+#### Checks that are clearly not stated as "misses"
+
+To stay fair, these points should be worded as "no automated check found" or "requires guided or manual testing", not "misses":
+
+- Reflow at 320 px (all three tools): no evidence of automation. Siteimprove and Deque both publish manual guidance.
+- Keyboard traps in Siteimprove: no evidence of automation. axe DevTools covers it only in the paid Keyboard IGT.
+- Images of text: neither vendor documents automated detection. Alfa has an experimental question-based rule.
+- Transcripts: Siteimprove offers a guided review. axe-core's only 1.2.1 rule is deprecated.
+
+#### Open items to verify by hand (pages blocked from this environment)
+
+1. Whether the Siteimprove platform still reports SIA-R83 "Text is clipped when resized" after Alfa deprecated it (help article 80001015949 vs alfa.siteimprove.com/rules/sia-r83).
+2. Exact current wording of help article 80000448387 on MFA crawling.
+3. Whether the axe DevTools free tier includes the WCAG standard selector (needed to run `target-size`).
+4. Whether Siteimprove still has a "Link text is too generic in its current context" check.
