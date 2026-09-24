@@ -43,7 +43,7 @@ On the **Issues** tab, select an issue's name to open its
 | --- | --- |
 | The page URL | **Pages with this issue** lists each page's title and URL, with **Open live page**. |
 | The selector and code | **Flagged element** shows up to three sample locations, each with its selector and highlighted HTML. A page's **Stored evidence** lists every result on that page, with **Selector for developers**. |
-| An image with text in it | For an [image of text](glossary.md#image-of-text), **Flagged element** names the image by its position on the page, such as Image occurrence 2 (above the fold), with its alt text. It has no selector or HTML. The page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), its alt text, and the text read from it. Search your code or content system for that image address. |
+| An image with text in it | For an [image of text](glossary.md#image-of-text), **Flagged element** names the image by its position on the page, such as Image occurrence 2 (above the fold), with its alt text if it has any. It has no selector or HTML. The page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
 | A screenshot | **Issue screenshots** links to circled screenshots when the scan captured them. Siteimprove Alfa results have none, because Alfa runs in a separate browser session. |
 | The page inspector | Select a page title in **Pages with this issue**. The inspector opens the stored page (or a fresh render if none was stored) with scripts off and the flagged elements highlighted, and **DOM source** shows the markup. |
 
