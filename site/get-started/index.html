@@ -11,7 +11,7 @@
 <meta property="og:title" content="Get started with Axcess | Axcess">
 <meta property="og:description" content="Install the desktop preview or run from source, then complete your first scan and read your first report.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/get-started/">
-<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/diagrams/report-groups.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
 
@@ -123,16 +123,16 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Under <em>Scan type</em>, choose <em>Public website</em>.</p></li>
+      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
       <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. Expand <em>Default scan settings</em> to see exactly which checks will run.</p>
+      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
         <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
       <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
     </ol>
   </div>
 </section>
 
-<section>
+<section id="sign-in">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Step 3</span>
@@ -148,7 +148,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
       <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don’t store rendered pages</em>. No password or reusable login is saved.</p></article>
-      <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. The AI language and motion checks are off, and image text checks stay off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
+      <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
 </section>
@@ -177,9 +177,9 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <h2>Before you scan</h2>
     </div>
     <div class="grid grid-3">
-      <article class="card"><h3>Authorization</h3><p>Only scan sites and accounts you are explicitly permitted to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
-      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one crawl at a time, matching its local single-writer database. Start the next scan when the first finishes.</p></article>
-      <article class="card"><h3>Speed and coverage</h3><p>Each page is rendered in a real browser and checked several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
+      <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
+      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>
