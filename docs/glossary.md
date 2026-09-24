@@ -197,8 +197,8 @@ to phone width or pressing Tab through it. Its results go to
 ### Local AI model
 
 An optional language or vision model that runs on your own computer through a
-free program called Ollama. Axcess never installs one for you, and every AI
-result goes to [Needs review](#needs-review).
+free program called Ollama. Axcess never installs one for you, and AI results
+are never reported as [Barriers](#barrier).
 
 ### OCR
 
