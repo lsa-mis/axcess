@@ -139,7 +139,9 @@ from its integrity-checked ASAR archive.
 
 ## Release work still required
 
-The build produces local, unsigned installers. Before institutional rollout:
+Without signing credentials, the build produces preview installers: macOS
+builds are ad-hoc signed (not Developer ID signed or notarized), and Windows
+builds are unsigned. Before institutional rollout:
 
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
@@ -151,15 +153,19 @@ The build produces local, unsigned installers. Before institutional rollout:
 - test installation, upgrade, rollback, database retention, and uninstall on
   each supported operating-system version.
 
-Do not distribute unsigned builds as a production U-M application.
+Do not distribute these preview builds as a production U-M application.
 
 ## Update channel
 
-Every push to `main` runs `desktop-build.yml`, which stamps the build as
-version `0.1.<run number>` (the git commit is recorded in the package's
-`config.buildCommit`) and publishes the macOS DMG and zip, the Windows
-`-Setup.exe`, and the Squirrel `RELEASES` and `.nupkg` files as GitHub Release
-`desktop-v0.1.<run number>`. Each release also carries version-less copies,
+`desktop-build.yml` runs on every push to `main` that changes `desktop/**`,
+`src/**`, `pyproject.toml`, `uv.lock`, or the workflow file itself, and it can
+also be started by hand. Each run stamps the build as version
+`0.1.<run number>` (the git commit is recorded in the package's
+`config.buildCommit`). On `main`, it then publishes the macOS DMG and zip, the
+Windows `-Setup.exe`, and the Squirrel `RELEASES` and `.nupkg` files as GitHub
+Release `desktop-v0.1.<run number>`.
+
+Each release also carries version-less copies,
 `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`, so the
 public site's download buttons can use the permanent links
 `https://github.com/lsa-mis/axcess/releases/latest/download/<name>`. The ten
@@ -168,10 +174,13 @@ always points at the most recent one and needs no GitHub sign-in. Workflow
 artifacts are not a public download channel: GitHub requires a signed-in user
 to fetch them and deletes them after 14 days.
 
-A packaged Axcess asks the GitHub API for the latest release once, after the
-workbench has loaded, and compares it with its own version. Nothing happens
-offline, on a rate-limited response, or when the build is current. When a newer
-build exists:
+Each time a packaged Axcess launches, it asks the GitHub API for the latest
+release after the workbench has loaded, and compares it with its own version.
+On macOS it also checks when the app is reopened with no window open. Once it
+has offered an update, it does not check again until the app restarts.
+
+Nothing happens offline, on a rate-limited response, or when the build is
+current. When a newer build exists:
 
 - **Windows** offers *Update now*. Electron's Squirrel updater downloads the
   new package from the release's asset directory and installs it in place; the

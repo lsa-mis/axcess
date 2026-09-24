@@ -1,6 +1,6 @@
 # Axcess coverage and feature tracker
 
-> Last reconciled: **2026-08-12** against the shipped code, WCAG matrix,
+> Last reconciled: **2026-09-24** against the shipped code, WCAG matrix,
 > semantic registry, migrations, desktop package, and release workflow.
 
 Axcess targets **WCAG 2.2 Level A and AA** for report coverage. It is an
@@ -93,6 +93,7 @@ requires manual reproduction.
 | Browser rendering | scan coverage counters | Executes JavaScript and exposes the live DOM for interaction checks. | A rendered page is not itself an accessibility pass. |
 | axe-core 4.10.2 | `axe` | Deterministic rendered-DOM rules at the selected WCAG level. | High-confidence rule evidence, but it covers only machine-testable conditions. |
 | Siteimprove Alfa | `alfa` | An independent ACT-rule evaluation with failed and cannot-tell outcomes. | Select axe, Alfa, or both. Alfa evidence is stored separately and does not inflate matrix counts simply because two engines overlap. |
+| Click-through [DOM states](./glossary.md#dom-state) | `axe` rows with `revealed_by`; per-page ledger in `scan_interaction_runs` | Opens menus, tabs, dialogs, and other controls on each rendered page, then re-runs axe-core on each new state a click reveals. | On by default; needs axe-core and browser rendering. Bounded per page (100 clicks, 20 per repeated control shape, depth 5, 120 seconds) and never operates controls named for destructive actions. Hover-only content, gestures, and states with no DOM change remain manual. |
 | Keyboard probe | `keyboard` | Tab/Shift+Tab exit evidence and Escape behavior for likely traps. | Conservative review leads; full keyboard operability is manual. |
 | Responsive and zoom probe | `responsive` | 320 CSS-pixel reflow, approximately 200% text zoom, and text-spacing overrides. | Geometry identifies likely clipping/loss; an expert determines user impact. |
 | Focus probe | `focus` | Positive `tabindex` and focus obscured by fixed/sticky overlays. | Full focus order and interaction-created overlays remain manual. |
@@ -100,19 +101,22 @@ requires manual reproduction.
 | Image analysis | `image` | Image discovery, Tesseract OCR, and local VLM classification. | OCR/VLM results are evidence, not a legal conclusion. |
 | Semantic review | `semantic` | Registered analyzers for 1.2.1, 2.4.4, 2.4.6, and 3.3.2. | Requires an explicitly configured local Ollama service; unsupported configured criteria are skipped and logged. |
 
-The standard public-scan profile renders pages and selects both DOM engines
-when Alfa is available. Advanced settings can choose axe-only, Alfa-only,
-both, static-only crawling, visible browser navigation, and whether to run
-image or interaction layers. Every report shows the number of pages or images
-actually checked—not merely that a feature was selected.
+The default public scan renders every page in a browser and runs axe-core as
+its rule engine. Under Advanced settings you can choose axe-core, Siteimprove
+Alfa, or both as the rule engine (Alfa must be installed), use **Fast crawl
+without a browser** with Alfa as the only engine, show the scanning browser
+window, and turn the image and click-through layers on or off. Every report
+shows the number of pages or images actually checked, not merely that a
+feature was selected.
 
 ## Authenticated-site coverage
 
 Axcess supports two manual sign-in models without collecting credentials:
 
-- **Local login/2FA scan:** a visible Playwright browser opens on the Axcess
-  computer, the auditor signs in directly, and the crawl reuses that live,
-  memory-only browser context after the auditor confirms the target page.
+- **Local login scan** (the **Site with a login or 2FA** tab): a visible
+  Chromium window opens on the Axcess computer, the auditor signs in directly,
+  and after the auditor confirms, the crawl continues with that signed-in
+  session, held only in memory.
 - **Managed protected scan:** an identity-gated, scan-bound companion model
   with stricter scope, retention, encryption, and permission controls.
 
@@ -145,13 +149,15 @@ outputs as evidence requiring proportionate expert review.
 
 ## Desktop distribution status
 
-The Electron work is published from `feature/electron-desktop` as an Apple
-Silicon macOS artifact. The package includes the React frontend, frozen
-FastAPI/Python backend, Playwright Chromium, axe-core, Siteimprove Alfa and its
-Node dependencies, Tesseract plus English OCR data, migrations, rule files,
-and the Excel report engine.
+Preview desktop builds are published from `main` as GitHub releases for Apple
+Silicon macOS and Windows x64. A push to `main` that changes app code starts
+the build, and a maintainer can also start it by hand. Each package includes
+the React frontend, frozen FastAPI/Python backend, Playwright Chromium,
+axe-core, Siteimprove Alfa and its Node dependencies, Tesseract plus English
+OCR data, migrations, rule files, and the Excel report engine.
 
-The packaging gate executes these components from inside the finished app:
+On both platforms, the packaging gate executes these components from inside
+the finished app:
 
 - Python backend and database migrations;
 - React assets;
@@ -161,14 +167,20 @@ The packaging gate executes these components from inside the finished app:
 - Tesseract OCR with English data;
 - Excel workbook generation.
 
-The current DMG is ad-hoc signed and is **not Apple-notarized**. Gatekeeper can
-therefore show “Apple could not verify Axcess is free of malware.” Production
-distribution still requires a Developer ID Application certificate, hardened
-runtime, Apple notarization, and a stapled ticket. Intel macOS, Windows, and
-Linux artifacts are not currently published.
+The current DMG is ad-hoc signed and is **not Apple-notarized**, so macOS
+warns on first launch that it could not verify the app. The Windows installer
+is not code-signed, so Windows warns on first launch too. The
+[get-started page](https://lsa-mis.github.io/axcess/get-started/) walks
+through approving both.
 
-Optional Ollama models are not bundled or downloaded silently. They remain a
-separately configured loopback-only dependency for AI-assisted checks.
+Production distribution still requires a Developer ID Application
+certificate, hardened runtime, Apple notarization, and a stapled ticket on
+macOS, and code signing on Windows. Intel macOS and Linux builds are not
+currently published.
+
+Optional Ollama models are not bundled or downloaded silently. AI-assisted
+checks use a separately installed Ollama service, on the same computer by
+default.
 
 ## Next coverage priorities
 
@@ -213,7 +225,8 @@ Implementation map:
 | Shipped feature and roadmap inventory | `src/audit/web/coverage_status.py` |
 | Semantic analyzers | `src/audit/analyzer/semantic/registry.py` and `analyzers/` |
 | axe and Alfa integration | `src/audit/analyzer/axe.py`, `src/audit/analyzer/alfa.py`, `src/audit/alfa_runner/` |
-| Interaction probes | `src/audit/analyzer/keyboard/`, `responsive/`, `focus/`, and `visual/` |
+| Browser probes | `src/audit/analyzer/keyboard/`, `responsive/`, `focus/`, and `visual/` |
+| Click-through DOM states | `src/audit/analyzer/interaction/`, migrations `0026_interaction_runs.sql` and `0028_page_dom_states.sql` |
 | Durable method counters | migration `0020_method_coverage.sql` and `audit.web.server._methods_used` |
 | Desktop dependency gate | `src/audit/desktop_server.py` and `desktop/scripts/verify-packaged.cjs` |
 | False-discovery-rate corpus | `tests/quality/corpora/detection_precision_v1.json` |
