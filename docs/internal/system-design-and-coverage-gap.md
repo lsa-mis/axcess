@@ -1,16 +1,37 @@
 # System Design + Coverage Gap
 
+> **Historical (September 2026):** a point-in-time design and coverage
+> snapshot from the Phase 8 and 9 era, kept for maintainers who want the
+> background. Do not use it to describe current Axcess.
+>
+> Out of date:
+>
+> - Pipelines: it counts three. Axcess now also has Siteimprove Alfa,
+>   keyboard, responsive, focus, and visual checks, and a click-through probe
+>   that reruns axe-core on content revealed by opening menus, tabs, and
+>   dialogs.
+> - Semantic criteria: it lists one. Four are registered: 1.2.1, 2.4.4,
+>   2.4.6, and 3.3.2.
+> - WCAG counts: it uses 50 A and AA criteria (7 full, 11 partial, 32
+>   manual). The current matrix has 55: 5 automated, 18 partial, 6
+>   AI-assisted, and 26 manual.
+> - Removed: the Jinja templates, the `audit diff` and `audit ollama-serve`
+>   commands, and the `j/k` and `?` shortcuts it mentions.
+>
+> For current coverage see [coverage-tracker.md](../coverage-tracker.md), and
+> for the current design see [architecture.md](architecture.md).
+
 This document is the single-page answer to three questions about the
 WCAG accessibility audit tool:
 
-1. **How is the system designed?** — components, data flow, schemas,
-   what the operator sees, where the code lives.
-2. **What does it actually detect, and how?** — per-pipeline behavior,
-   strengths, failure modes.
-3. **What is the gap to 100% WCAG manual-testing coverage?** — every
+1. **How is the system designed?** (components, data flow, schemas,
+   what the operator sees, where the code lives)
+2. **What does it actually detect, and how?** (per-pipeline behavior,
+   strengths, failure modes)
+3. **What is the gap to 100% WCAG manual-testing coverage?** (every
    Level A + AA success criterion classified as automated, partial, or
    manual-only, with the reason and what a human needs to do for the
-   ones we can't reach.
+   ones we can't reach)
 
 Read top to bottom for orientation. The coverage table in §6 and the
 manual test plan in §7 are the practical deliverables for an
@@ -20,11 +41,11 @@ still have to do myself, and how?"
 > **Honest framing.** This tool does not deliver WCAG conformance. No
 > automated tool does. Even the GenA11y LLM pipeline (peer-reviewed,
 > FSE 2025) tops out around **37 of WCAG 2.2's ~50 testable success
-> criteria** — about 60–70 % coverage at best. The remaining ~30–40 %
+> criteria**, about 60 to 70 % coverage at best. The remaining ~30 to 40 %
 > *require* human judgment: meaningful alt text, descriptive headings,
 > keyboard-trap detection in custom widgets, caption accuracy. Treat
-> a green run of this tool as "necessary, not sufficient" — see §7 for
-> the manual test plan that fills the rest.
+> a green run of this tool as "necessary, not sufficient" (see §7 for
+> the manual test plan that fills the rest).
 
 ---
 
@@ -36,7 +57,7 @@ still have to do myself, and how?"
 - [4. Data model](#4-data-model)
 - [5. Operator workflow](#5-operator-workflow)
 - [6. WCAG 2.2 A + AA criterion-by-criterion coverage](#6-wcag-22-a--aa-criterion-by-criterion-coverage)
-- [7. The gap to 100 % — what manual testing must add](#7-the-gap-to-100--what-manual-testing-must-add)
+- [7. The gap to 100 %: what manual testing must add](#7-the-gap-to-100--what-manual-testing-must-add)
 - [8. Recommended manual test plan](#8-recommended-manual-test-plan)
 - [9. References](#9-references)
 
@@ -129,8 +150,8 @@ still have to do myself, and how?"
 ```
 
 **Footprint**: ~60 Python source modules, ~30 React components (the only
-UI — the legacy Jinja/HTMX pages were retired), ~450 unit / integration
-tests. Local-first by design — every
+UI: the legacy Jinja/HTMX pages were retired), ~450 unit / integration
+tests. Local-first by design: every
 inference call routes through Ollama on the loopback (no cloud, no API
 costs). The Phase-2 transformation hardened the UI itself to WCAG 2.2
 AAA (the audit tool's own UI passes the audit it runs).
@@ -142,7 +163,7 @@ AAA (the audit tool's own UI passes the audit it runs).
 Each pipeline reaches a different *class* of WCAG defect. They compose;
 none replaces the others.
 
-### 2.1 axe-core (DOM, rule-based) — Phase 8
+### 2.1 axe-core (DOM, rule-based), Phase 8
 
 | Property | Value |
 |---|---|
@@ -150,34 +171,34 @@ none replaces the others.
 | Trigger | Every page rendered through Playwright (`js_fetcher.py`) |
 | Detection style | Deterministic rules over the live DOM |
 | WCAG SCs covered | ~13 (1.1.1 partial, 1.3.1 partial, 1.4.1, 1.4.3, 1.4.4 partial, 1.4.10, 2.4.3 partial, 2.4.4 syntactic, 2.4.7 partial, 2.5.5 partial, 2.5.8, 3.1.1, 4.1.2 syntactic) |
-| Best at | "Does this attribute exist?" — alt-attribute presence, `lang` on `<html>`, label/for pairing, contrast math, positive tabindex |
+| Best at | "Does this attribute exist?" (alt-attribute presence, `lang` on `<html>`, label/for pairing, contrast math, positive tabindex) |
 | Blind spot | *Meaning*. Cannot say whether an alt text is descriptive, whether a label is clear, whether a heading is meaningful. |
-| Precision | ~98–100 % on what it flags (axe is conservative) |
+| Precision | ~98 to 100 % on what it flags (axe is conservative) |
 
-### 2.2 OCR → VLM (image-of-text classification) — Phases 3 + 4
+### 2.2 OCR → VLM (image-of-text classification), Phases 3 + 4
 
 | Property | Value |
 |---|---|
 | Source | `src/audit/analyzer/ocr/` + `src/audit/analyzer/vlm/ollama.py` |
 | Trigger | Every image extracted from a page that passes the OCR "text-candidate" threshold (`confidence ≥ 60 % AND word_count ≥ 3`) |
 | Detection style | Tesseract OCR detects candidate text; local Qwen2-VL (or Moondream) classifies the image into `essential / informational / logo / decorative / no_meaningful_text` |
-| WCAG SCs covered | 1.4.5 (Images of Text) — *the* criterion no other open tool detects well |
+| WCAG SCs covered | 1.4.5 (Images of Text), *the* criterion no other open tool detects well |
 | Best at | Distinguishing intentional content-bearing text-in-image (a headline rendered as a JPEG) from decorative use (a logo, a stock photo with incidental text) |
 | Blind spot | Foreign-script OCR accuracy; very stylized fonts; OCR false positives on noisy images (VLM filters these but not perfectly) |
 | Precision | The legacy Qwen2-VL baseline measured ~85% on hand-labeled fixtures; Qwen3-VL must be re-baselined before publishing a precision claim. |
 
-### 2.3 Per-criterion LLM (semantic SCs) — Phase 9 (in progress)
+### 2.3 Per-criterion LLM (semantic SCs), Phase 9 (in progress)
 
 | Property | Value |
 |---|---|
 | Source | `src/audit/analyzer/semantic/` |
-| Trigger | After fetch, before persistence — one LLM call per (page × enabled criterion) |
+| Trigger | After fetch, before persistence: one LLM call per (page × enabled criterion) |
 | Detection style | Per-SC element extractor (selectolax) → per-SC prompt template → local Ollama text model → JSON parse → per-finding rows |
-| WCAG SCs covered today | **1** (SC 2.4.4 Link Purpose — pilot) |
+| WCAG SCs covered today | **1** (SC 2.4.4 Link Purpose, pilot) |
 | WCAG SCs planned (Phase 9.2) | +9 more: 2.4.9, 2.4.6, 2.4.10, 2.5.3, 3.3.2, 1.3.5, 1.3.1, 4.1.2, 1.1.1 |
 | Ultimate cap (Phase 9.4 calibration → ≥22 SCs) | Matches GenA11y's 37-SC static-detectable set |
-| Best at | The "is this meaningful?" judgments axe can't make — descriptive link text, label-in-name match, ARIA role coherence |
-| Blind spot | Probabilistic: 85–95 % precision depending on prompt + model. Costs ~1.5 s/call × N criteria × N pages. No multilingual calibration. |
+| Best at | The "is this meaningful?" judgments axe can't make: descriptive link text, label-in-name match, ARIA role coherence |
+| Blind spot | Probabilistic: 85 to 95 % precision depending on prompt + model. Costs ~1.5 s/call × N criteria × N pages. No multilingual calibration. |
 | Why local-only | At 10k pages × 10 criteria = 100k LLM calls. The same scan on OpenAI would cost ≈ $48k per GenA11y's numbers; on local Ollama it costs $0 marginal. |
 
 ### Pipeline boundaries
@@ -227,7 +248,7 @@ none replaces the others.
    _record_page(scan_id, url, html_hash) → upsert pages row
               │
               ▼
-   process_page() — image extraction
+   process_page(): image extraction
    ┌───────────────────────────────────────────────────────┐
    │   <img>, <picture>, srcset, computed background-image,│
    │   inline <svg><text> → ImageRef list                  │
@@ -311,7 +332,7 @@ duplicating rows (every upsert is idempotent on its natural key).
                      │  findings    │                  │                     │
                      │ (image       │                  │ id PK               │
                      │  pipeline    │                  │ page_id FK          │
-                     │  only —      │                  │ scan_id FK          │
+                     │  only,       │                  │ scan_id FK          │
                      │  SC 1.4.5)   │                  │ pipeline (axe|sem)  │
                      │              │                  │ criterion_sc        │
                      │ id PK        │                  │ rule_id             │
@@ -337,7 +358,7 @@ duplicating rows (every upsert is idempotent on its natural key).
                                   └──────────────────┘
 ```
 
-**Key dedupe identities** (idempotent upserts everywhere — re-running
+**Key dedupe identities** (idempotent upserts everywhere: re-running
 a crawl never produces duplicate rows):
 
 | Table | Natural key |
@@ -351,7 +372,7 @@ a crawl never produces duplicate rows):
 
 Why two finding tables? Image-of-text findings dedupe across pages by
 `content_hash` (one image shows up on N pages, gets one finding row).
-DOM/semantic findings are page-scoped — the same axe rule firing on
+DOM/semantic findings are page-scoped: the same axe rule firing on
 two pages is two findings. Different lifecycles → different tables;
 the Issues view unifies them at read time via
 `src/audit/web/issues.py`.
@@ -391,9 +412,9 @@ The unified **Issues view** at `/scans/:id/issues` is the operator's
 main entry point. Each card shows:
 
 - WCAG conformance badge (A / AA / AAA / BP)
-- Pipeline (axe / image / semantic — different glyphs)
+- Pipeline (axe / image / semantic, different glyphs)
 - Occurrence count + affected page count
-- Priority (severity × log(1+pages) — pinned in `web/issues.py`)
+- Priority (severity × log(1+pages), pinned in `web/issues.py`)
 - Status chips (`new / reviewing / in_progress / remediated / accepted_risk / false_positive`)
 - Expandable body with **what / why / how** drawn from
   `src/audit/rules/audit_report.yaml`
@@ -403,17 +424,17 @@ Bulk status: per-group select + Apply button changes status across
 many findings in one POST. Useful for closing-out N occurrences of
 the same root cause.
 
-Keyboard shortcuts on the detail pages: `j/k` next/prev, `0–5` set
+Keyboard shortcuts on the detail pages: `j/k` next/prev, `0` to `5` set
 status (`0`=new, `5`=false_positive), `?` show help. Verified in
 `tests/ui/test_accessibility_axe.py`.
 
 ### 5.3 Export
 
-`/scans/:id/export/{format}` — five formats:
+`/scans/:id/export/{format}` serves five formats:
 
 | Format | Audience | Notes |
 |---|---|---|
-| `audit` (Markdown) | Web team / stakeholders | The framework-shaped report — issue cards with fix steps, owner, effort, verification. **Lead with this one.** |
+| `audit` (Markdown) | Web team / stakeholders | The framework-shaped report: issue cards with fix steps, owner, effort, verification. **Lead with this one.** |
 | `csv` | Spreadsheets, scripts | Unified row shape with `finding_kind` discriminator |
 | `json` | Downstream pipelines | Schema v2, includes both finding kinds |
 | `jira` | Ticket import | One Jira issue per finding, with labels (`wcag-1-4-3`, `owner-dev`) and priority mapped from severity/impact |
@@ -430,14 +451,14 @@ tickets.
 Every Level A + AA success criterion in WCAG 2.2 (50 total), classified
 honestly. Conventions:
 
-- **✓ Full** — automated detection is reliable; minimal human review
+- **✓ Full:** automated detection is reliable; minimal human review
   needed.
-- **◐ Partial** — automation catches the syntactic case (attribute
+- **◐ Partial:** automation catches the syntactic case (attribute
   present? value valid?); a human still has to judge meaning.
-- **◯ Manual** — automation can't testably reach this. The tool may
+- **◯ Manual:** automation can't testably reach this. The tool may
   surface evidence (e.g. a screenshot at 200 % zoom) but the verdict
   is human.
-- **N/A** — out of scope for static analysis (live media / no auth).
+- **N/A:** out of scope for static analysis (live media / no auth).
 
 | SC | Level | Title | Coverage | How |
 |---|---|---|---|---|
@@ -445,55 +466,55 @@ honestly. Conventions:
 | 1.2.1 | A | Audio-only / Video-only (Prerecorded) | ◯ | Needs human review of transcript adequacy |
 | 1.2.2 | A | Captions (Prerecorded) | ◯ | Caption accuracy + sync requires human |
 | 1.2.3 | A | Audio Description / Media Alternative | ◯ | Human review |
-| 1.2.4 | AA | Captions (Live) | ◯ | Live media — out of scope for static crawl |
+| 1.2.4 | AA | Captions (Live) | ◯ | Live media, out of scope for static crawl |
 | 1.2.5 | AA | Audio Description (Prerecorded) | ◯ | Human review |
 | 1.3.1 | A | Info and Relationships | ◐ | axe catches list/heading misuse; Phase-9 LLM flags styled-div-as-heading; meaning judgment human |
-| 1.3.2 | A | Meaningful Sequence | ◯ | Reading order + DOM order + visual order alignment — needs human + assistive tech |
+| 1.3.2 | A | Meaningful Sequence | ◯ | Reading order + DOM order + visual order alignment, needs human + assistive tech |
 | 1.3.3 | A | Sensory Characteristics | ◯ | "Click the round button" type instructions need human review |
 | 1.3.4 | AA | Orientation | ◐ | CSS media-query check possible; not yet implemented |
 | 1.3.5 | AA | Identify Input Purpose | ◐ | Phase-9 LLM flags missing/wrong `autocomplete`; human checks intent |
 | 1.4.1 | A | Use of Color | ◐ | axe `link-in-text-block` flags color-only links; broader uses of color need human |
-| 1.4.2 | A | Audio Control | ◯ | Behavioral — needs interaction |
-| 1.4.3 | AA | Contrast (Minimum) | ✓ | axe `color-contrast` — deterministic 4.5:1 / 3:1 math |
+| 1.4.2 | A | Audio Control | ◯ | Behavioral, needs interaction |
+| 1.4.3 | AA | Contrast (Minimum) | ✓ | axe `color-contrast`, deterministic 4.5:1 / 3:1 math |
 | 1.4.4 | AA | Resize Text | ◐ | Tool captures 200 %-zoom screenshots; human verifies no clipping |
-| 1.4.5 | AA | Images of Text | ✓ | Full OCR + VLM pipeline — our flagship |
+| 1.4.5 | AA | Images of Text | ✓ | Full OCR + VLM pipeline, our flagship |
 | 1.4.10 | AA | Reflow | ◐ | Captures 320 px screenshot; human verifies no 2-axis scroll |
 | 1.4.11 | AA | Non-text Contrast | ✓ | axe + Phase-2 contrast helper covers focus rings, borders, severity chips |
 | 1.4.12 | AA | Text Spacing | ◐ | Test in `tests/ui/test_accessibility_text_spacing.py`; human re-verifies on third-party content |
-| 1.4.13 | AA | Content on Hover or Focus | ◯ | Tooltip + popover dismissability — behavioral, needs human |
-| 2.1.1 | A | Keyboard | ◯ | Custom-widget keyboard support — pure manual |
-| 2.1.2 | A | No Keyboard Trap | ◯ | Trap detection — pure manual |
+| 1.4.13 | AA | Content on Hover or Focus | ◯ | Tooltip + popover dismissability: behavioral, needs human |
+| 2.1.1 | A | Keyboard | ◯ | Custom-widget keyboard support, pure manual |
+| 2.1.2 | A | No Keyboard Trap | ◯ | Trap detection, pure manual |
 | 2.1.4 | A | Character Key Shortcuts | ◯ | Behavioral |
 | 2.2.1 | A | Timing Adjustable | ◐ | If no JS timers detected, presumed OK; human verifies any popup countdowns |
-| 2.2.2 | A | Pause, Stop, Hide | ◯ | Auto-playing animations / carousels — human checks pause control |
-| 2.3.1 | A | Three Flashes / Below Threshold | ◯ | Flash detection — out of scope; manual review |
+| 2.2.2 | A | Pause, Stop, Hide | ◯ | Auto-playing animations / carousels: human checks pause control |
+| 2.3.1 | A | Three Flashes / Below Threshold | ◯ | Flash detection: out of scope; manual review |
 | 2.4.1 | A | Bypass Blocks | ◐ | axe `skip-link` checks structural skip-link presence; human verifies it works |
 | 2.4.2 | A | Page Titled | ✓ | axe `document-title` |
 | 2.4.3 | A | Focus Order | ◐ | axe `tabindex` flags positive tabindex (likely-wrong); full order requires keyboard pass |
 | 2.4.4 | A | Link Purpose (In Context) | ◐ | axe `link-name` (syntactic); **Phase-9 LLM judges descriptiveness** |
-| 2.4.5 | AA | Multiple Ways | ◐ | Detect sitemap.xml + search box + nav — presence only |
+| 2.4.5 | AA | Multiple Ways | ◐ | Detect sitemap.xml + search box + nav (presence only) |
 | 2.4.6 | AA | Headings and Labels | ◐ | Phase-9 (planned) LLM for descriptiveness; manual fallback |
 | 2.4.7 | AA | Focus Visible | ◐ | axe partial (focus-visible CSS detection); human verifies under real interaction |
-| 2.4.11 | AA | Focus Not Obscured (Minimum) | ◯ | Sticky-header overlap with focused element — manual |
-| 2.5.1 | A | Pointer Gestures | ◯ | Multi-touch / drag gestures need single-pointer alternative — manual |
-| 2.5.2 | A | Pointer Cancellation | ◯ | Touch / mouse-up behavior — manual |
+| 2.4.11 | AA | Focus Not Obscured (Minimum) | ◯ | Sticky-header overlap with focused element, manual |
+| 2.5.1 | A | Pointer Gestures | ◯ | Multi-touch / drag gestures need single-pointer alternative, manual |
+| 2.5.2 | A | Pointer Cancellation | ◯ | Touch / mouse-up behavior, manual |
 | 2.5.3 | A | Label in Name | ◐ | **Phase-9 (planned)** LLM checks accessible-name ⊇ visible-label |
-| 2.5.4 | A | Motion Actuation | ◯ | Shake / tilt UI — manual |
-| 2.5.7 | AA | Dragging Movements | ◯ | Drag UI needs click alternative — manual |
+| 2.5.4 | A | Motion Actuation | ◯ | Shake / tilt UI, manual |
+| 2.5.7 | AA | Dragging Movements | ◯ | Drag UI needs click alternative, manual |
 | 2.5.8 | AA | Target Size (Minimum) | ✓ | axe `target-size` |
 | 3.1.1 | A | Language of Page | ✓ | axe `html-has-lang` |
 | 3.1.2 | AA | Language of Parts | ◐ | axe detects missing `lang` attr; correctness needs human |
-| 3.2.1 | A | On Focus | ◯ | No context-change-on-focus — behavioral |
-| 3.2.2 | A | On Input | ◯ | Behavioral — needs interaction |
-| 3.2.3 | AA | Consistent Navigation | ◯ | Cross-page consistency — manual |
-| 3.2.4 | AA | Consistent Identification | ◯ | Same affordance, same identifier — manual |
+| 3.2.1 | A | On Focus | ◯ | No context-change-on-focus, behavioral |
+| 3.2.2 | A | On Input | ◯ | Behavioral, needs interaction |
+| 3.2.3 | AA | Consistent Navigation | ◯ | Cross-page consistency, manual |
+| 3.2.4 | AA | Consistent Identification | ◯ | Same affordance, same identifier: manual |
 | 3.2.6 | A | Consistent Help | ◯ | Manual |
-| 3.3.1 | A | Error Identification | ◐ | Form error pattern detection — partial via aria-invalid presence |
+| 3.3.1 | A | Error Identification | ◐ | Form error pattern detection, partial via aria-invalid presence |
 | 3.3.2 | A | Labels or Instructions | ◐ | axe `label` (syntactic); **Phase-9 (planned)** LLM checks clarity |
-| 3.3.3 | AA | Error Suggestion | ◯ | Quality of error message — manual |
-| 3.3.4 | AA | Error Prevention (Legal, Financial, Data) | ◯ | Behavioral — manual |
-| 3.3.7 | A | Redundant Entry | ◯ | Behavioral — manual |
-| 3.3.8 | AA | Accessible Authentication (Minimum) | ◯ | Auth UX — manual |
+| 3.3.3 | AA | Error Suggestion | ◯ | Quality of error message, manual |
+| 3.3.4 | AA | Error Prevention (Legal, Financial, Data) | ◯ | Behavioral, manual |
+| 3.3.7 | A | Redundant Entry | ◯ | Behavioral, manual |
+| 3.3.8 | AA | Accessible Authentication (Minimum) | ◯ | Auth UX, manual |
 | 4.1.2 | A | Name, Role, Value | ◐ | axe (syntactic); **Phase-9 (planned)** LLM for ARIA coherence |
 
 **Summary**:
@@ -508,11 +529,11 @@ honestly. Conventions:
 In other words: **the tool helps with up to 64 % of WCAG 2.2 A + AA SCs
 after the full Phase-9 roadmap ships, and the remaining 36 % (≥18 SCs)
 genuinely require human testing.** This number aligns with the
-GenA11y paper (FSE 2025), which sets the same ceiling at ~60–70 %.
+GenA11y paper (FSE 2025), which sets the same ceiling at ~60 to 70 %.
 
 ---
 
-## 7. The gap to 100 % — what manual testing must add
+## 7. The gap to 100 %: what manual testing must add
 
 > Reality check: there is no path to 100 % via static analysis. The
 > WCAG Working Group explicitly states some criteria (e.g. SC 3.1.5
@@ -526,7 +547,7 @@ which assistive technology is needed.
 
 ### 7.1 Keyboard-only operation (SC 2.1.1, 2.1.2, 2.4.3 deep)
 
-**What automation can't tell you**: whether every interactive control
+**What automation cannot tell you**: whether every interactive control
 is reachable via Tab, whether focus can ever get trapped in a custom
 widget (modal, autocomplete, carousel), whether the focus order
 matches the visual reading order, whether arrow-key navigation works
@@ -541,11 +562,11 @@ to bottom. Confirm:
 - Custom widgets (date pickers, autocompletes, carousels) follow the
   ARIA Authoring Practices keyboard pattern for their role.
 
-**Time budget**: 30–60 min per page template.
+**Time budget**: 30 to 60 min per page template.
 
 ### 7.2 Screen-reader experience (SC 1.3.1 deep, 1.3.2, 2.4.6 deep, 4.1.2 deep)
 
-**What automation can't tell you**: whether the document outline
+**What automation cannot tell you**: whether the document outline
 reads as a coherent page (not just "valid"), whether announcement
 order matches reading order, whether ARIA roles convey the actual
 semantic, whether the page's *meaning* is intact via the API tree.
@@ -563,11 +584,11 @@ What to confirm:
 - Status changes (live regions) are announced.
 - Dynamic content (modals, toasts) is reached at the right time.
 
-**Time budget**: 60–120 min per page template, plus practice.
+**Time budget**: 60 to 120 min per page template, plus practice.
 
 ### 7.3 Vision-impairment simulations (SC 1.4.4, 1.4.10, 1.4.11 edges)
 
-**What automation can't tell you**: whether 200 % zoom causes content
+**What automation cannot tell you**: whether 200 % zoom causes content
 loss, whether reflow to 320 px works without two-axis scroll, whether
 custom focus rings have enough non-color contrast in odd surface
 combinations.
@@ -582,11 +603,11 @@ combinations.
   Display → Color Filters → Grayscale*. Confirm interactive
   elements are still identifiable without color.
 
-**Time budget**: 15–30 min per page template.
+**Time budget**: 15 to 30 min per page template.
 
 ### 7.4 Cognitive / readability load (SC 3.1.3, 3.1.4, 3.2.3, 3.2.4)
 
-**What automation can't tell you**: whether the language level matches
+**What automation cannot tell you**: whether the language level matches
 the audience, whether unusual words have definitions, whether
 abbreviations are expanded, whether the same affordance is named
 consistently across pages.
@@ -603,7 +624,7 @@ consistently across pages.
 
 ### 7.5 Time-based + motion (SC 1.4.2, 2.2.x, 2.3.x, 2.5.x)
 
-**What automation can't tell you**: whether auto-playing media has a
+**What automation cannot tell you**: whether auto-playing media has a
 pause control reachable by all input modes, whether timeouts can be
 extended, whether flashing content stays under three flashes per
 second, whether motion-based interactions have a non-motion
@@ -617,11 +638,11 @@ alternative.
 - For timeouts (session, form), confirm the user is warned and can
   extend.
 
-**Time budget**: 10–20 min per page that has media or timeouts.
+**Time budget**: 10 to 20 min per page that has media or timeouts.
 
 ### 7.6 Forms + error messages (SC 3.3.1, 3.3.3, 3.3.4, 3.3.7)
 
-**What automation can't tell you**: whether the error message
+**What automation cannot tell you**: whether the error message
 explains *what* went wrong and *what to do*, whether destructive /
 financial submissions have confirmation steps, whether prior-entered
 data isn't lost on validation failure.
@@ -638,7 +659,7 @@ data isn't lost on validation failure.
 
 ### 7.7 Captions + audio descriptions (SC 1.2.x)
 
-**What automation can't tell you**: whether captions are accurate,
+**What automation cannot tell you**: whether captions are accurate,
 synchronized, identify speakers, and convey relevant non-speech
 audio. Whether audio descriptions cover what's visually important.
 
@@ -654,11 +675,11 @@ information parity.
 
 Use this as the operator's checklist alongside the tool's automated
 output. The total time budget for a single page template, every
-family, is roughly **3–5 hours** of focused manual testing.
+family, is roughly **3 to 5 hours** of focused manual testing.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
-│  MANUAL TEST PLAN — per page template                                 │
+│  MANUAL TEST PLAN (per page template)                                 │
 │                                                                       │
 │  1. Run the automated audit                                           │
 │     $ audit crawl <url> --max-pages 1 --use-js                        │
@@ -674,7 +695,7 @@ family, is roughly **3–5 hours** of focused manual testing.
 │  3. Screen-reader pass               (~90 min)         → §7.2         │
 │     ☐ VoiceOver (macOS) OR NVDA (Windows).                            │
 │     ☐ Read-all (VO+A) end to end. Page makes sense.                   │
-│     ☐ Rotor (VO+U) — Landmarks, Headings, Links lists are coherent.   │
+│     ☐ Rotor (VO+U): Landmarks, Headings, Links lists are coherent.    │
 │     ☐ Form fields announce their purpose + state.                     │
 │     ☐ Live regions announce updates.                                  │
 │                                                                       │
@@ -722,38 +743,38 @@ family, is roughly **3–5 hours** of focused manual testing.
 
 **Internal**
 
-- `docs/accessibility.md` — the tool's *own* UI conformance contract
+- `docs/internal/ui-accessibility.md`: the tool's *own* UI conformance contract
   (WCAG 2.2 AAA across both Jinja + SPA)
-- `docs/architecture.md` — original Phase-0 architecture decisions
-- `docs/personas.md` — primary user (Sam, accessibility lead) +
+- `docs/architecture.md`: original Phase-0 architecture decisions
+- `docs/internal/personas.md`: primary user (Sam, accessibility lead) +
   secondary / non-personas
-- `docs/design-principles.md` — Universal Design × Nielsen mapped on
+- `docs/internal/design-principles.md`: Universal Design × Nielsen mapped on
   the actual code
-- `PLAN.md` (root) — current phase plan including Phase 9 semantic
+- `PLAN.md` (root): current phase plan including Phase 9 semantic
   pipeline build-out
-- `src/audit/rules/audit_report.yaml` — per-rule editorial copy
+- `src/audit/rules/audit_report.yaml`: per-rule editorial copy
   (what / why / how)
-- `src/audit/rules/analyzer_models.yaml` — per-criterion local-model
+- `src/audit/rules/analyzer_models.yaml`: per-criterion local-model
   picks
 
 **External**
 
 - W3C, *Web Content Accessibility Guidelines (WCAG) 2.2*, Recommendation
-  October 2023 — <https://www.w3.org/TR/WCAG22/>
+  October 2023, <https://www.w3.org/TR/WCAG22/>
 - He, Z., Huq, S. F., Malek, S., *Enhancing Web Accessibility:
-  Automated Detection of Issues with Generative AI*, FSE 2025 — the
-  paper this tool's Phase-9 semantic pipeline is modeled on
-- WebAIM, *The WebAIM Million* (annual report) — baseline data on
+  Automated Detection of Issues with Generative AI*, FSE 2025 (the
+  paper this tool's Phase-9 semantic pipeline is modeled on)
+- WebAIM, *The WebAIM Million* (annual report): baseline data on
   accessibility-defect prevalence in the top 1M sites
-- Deque, *axe-core rule documentation* —
+- Deque, *axe-core rule documentation*,
   <https://dequeuniversity.com/rules/axe/>
-- W3C, *ARIA Authoring Practices Guide* — keyboard patterns for
-  every common widget — <https://www.w3.org/WAI/ARIA/apg/>
+- W3C, *ARIA Authoring Practices Guide* (keyboard patterns for
+  every common widget), <https://www.w3.org/WAI/ARIA/apg/>
 
 ---
 
 > **One-line takeaway**: this tool covers up to ~64 % of WCAG 2.2 A + AA
 > success criteria automatically after the in-progress Phase 9
-> finishes; the remaining ~36 % require a 3–5 hour manual pass per
+> finishes; the remaining ~36 % require a 3 to 5 hour manual pass per
 > page template, following the checklist in §8. A green audit is
-> evidence of automated coverage — not of conformance.
+> evidence of automated coverage, not of conformance.

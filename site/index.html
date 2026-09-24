@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Axcess — local-first accessibility evidence</title>
-<meta name="description" content="Local-first accessibility evidence for websites. Scan a site you&#x27;re authorized to test, see what was found and why it matters, and hand your team a clear list of fixes. Everything stays on your computer.">
+<title>Axcess: local-first accessibility testing</title>
+<meta name="description" content="A free accessibility scanner that runs on your computer. Sign in yourself, including two-factor steps, and Axcess tests the pages behind the sign-in, opens menus and dialogs, and keeps the evidence on your machine.">
 <link rel="canonical" href="https://lsa-mis.github.io/axcess/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Axcess">
-<meta property="og:title" content="Axcess — local-first accessibility evidence">
-<meta property="og:description" content="Local-first accessibility evidence for websites. Scan a site you&#x27;re authorized to test, see what was found and why it matters, and hand your team a clear list of fixes. Everything stays on your computer.">
+<meta property="og:title" content="Axcess: local-first accessibility testing">
+<meta property="og:description" content="A free accessibility scanner that runs on your computer. Sign in yourself, including two-factor steps, and Axcess tests the pages behind the sign-in, opens menus and dialogs, and keeps the evidence on your machine.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/">
-<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
+<meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/diagrams/report-groups.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#00274C">
 
@@ -45,23 +45,23 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow">Local-first · WCAG 2.2 A/AA evidence · Free and open source</span>
-      <h1>Find accessibility barriers. <span class="hl">Keep the evidence.</span> Fix what matters.</h1>
-      <p class="lede">Axcess scans a website you're authorized to test, shows you exactly what it found and why it matters, and gives your team a clear list of fixes. Everything stays on your computer.</p>
+      <span class="eyebrow">Local-first, WCAG 2.2 A and AA, free and open source</span>
+      <h1>Test the pages behind the sign-in, <span class="hl">and keep the evidence at home.</span></h1>
+      <p class="lede">Axcess is a free accessibility scanner that runs on your computer. You sign in to the site yourself, including single sign-on and two-factor steps, and Axcess scans from there. The pages, screenshots, and findings stay on your machine.</p>
       <div class="cta">
-        <a class="btn btn-maize" href="how-it-works/">See how it works</a>
-        <a class="btn btn-ghost" href="get-started/">Get started</a>
+        <a class="btn btn-maize" href="get-started/">Get started</a>
+        <a class="btn btn-ghost" href="coverage/">See what Axcess checks</a>
       </div>
-      <p class="meta">Works with public sites and sites behind a login. Runs with <strong>no AI at all</strong>, or add a local model for the judgement calls. <strong>Nothing is uploaded.</strong></p>
+      <p class="meta">Works on public sites too. Runs with <strong>no AI at all</strong>, or add a local model for judgement calls. <strong>Nothing is uploaded.</strong></p>
     </div>
     <div aria-hidden="true">
       <div class="issue-card">
         <div class="chips">
           <span class="chip chip-plain"><span class="sc">1.4.3</span>&nbsp;Contrast (Minimum)</span>
           <span class="chip chip-level">Level AA</span>
-          <span class="chip chip-automated">Rule engine</span>
+          <span class="chip chip-automated">Barrier</span>
         </div>
-        <h3>Body text is too light to read against its background</h3>
+        <p style="color:var(--navy);font-size:1.08rem;font-weight:800;margin:0 0 .4rem">Body text is too light to read against its background</p>
         <dl>
           <dt>What</dt><dd>Grey paragraph text on 14 pages measures 3.1:1 against white. The minimum is 4.5:1.</dd>
           <dt>Why it matters</dt><dd>People with low vision, and anyone reading on a phone in sunlight, may not be able to read it.</dd>
@@ -76,22 +76,22 @@
 <section>
   <div class="wrap">
     <div class="section-head">
-      <span class="eyebrow">In one minute</span>
-      <h2>Scan. Review. Fix and verify.</h2>
-      <p class="sub">Axcess is organised around the way an accessibility professional actually works, from the first web address to the follow-up scan that proves a fix landed.</p>
+      <span class="eyebrow">The problem</span>
+      <h2>The pages that matter most are often the hardest to test</h2>
+      <p class="sub">Course sites, application portals, and department tools often sit behind a university sign-in with two-factor authentication. Much of their content only appears after someone opens a menu, a tab, or a dialog. Hosted crawlers usually need extra setup to sign in, and content behind a click is often missed by rule-based checkers.</p>
     </div>
     <ol class="steps steps-flow">
       <li>
-        <h3>Scan a site</h3>
-        <p>Paste a web address, set how many pages to visit, and watch the scan run in a real browser. Sign in yourself if the site is behind a login.</p>
+        <h3>Sign in yourself</h3>
+        <p>Axcess opens a normal browser window. You sign in directly with the site, and Axcess never sees your password or code.</p>
       </li>
       <li>
-        <h3>Review clear issues</h3>
-        <p>Every issue answers four questions: what is wrong, why it matters, what the fix looks like, and exactly where it is. Repeated problems are grouped so you fix the cause once.</p>
+        <h3>Axcess scans from there</h3>
+        <p>It visits the pages in the scope you set, opens menus, tabs, and dialogs, and runs its checks on every page it reaches.</p>
       </li>
       <li>
-        <h3>Hand off and verify</h3>
-        <p>Export an Excel workbook, a stakeholder report, or Jira tickets. Rescan later to see what is new, what is resolved, and what is still open.</p>
+        <h3>You get clear, local evidence</h3>
+        <p>Each issue shows what was found and exactly where, with fix guidance and rule documentation where they exist.</p>
       </li>
     </ol>
   </div>
@@ -100,80 +100,62 @@
 <section class="soft">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">What makes it different</span>
+      <h2>Built for the gaps other tools find hard to reach</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h3>Scans behind a sign-in</h3><p>The signed-in session lives only in memory and ends with the scan. No password or reusable login is saved.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 8 12 5-5 2-2 5z"/><path d="M4 4l2 2M4 10h2M10 4v2"/></svg></span><h3>Opens what visitors open</h3><p>Axcess clicks through menus, tabs, and dialogs, tests what appears, and tells you which button revealed each problem.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span><h3>Checks rule-based tools rarely automate</h3><p>It measures reflow at phone width, text cut off at 200% zoom or with wider text spacing, and keyboard traps, and it finds text inside images.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>Honest about certainty</h3><p>Every result is a Barrier, Needs review, or Informational, so you know what to fix now and what a person should confirm first. <a href="faq/#glossary">What the groups mean.</a></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></span><h3>A documented data boundary</h3><p>The privacy page lists what stays on your computer and the few things Axcess connects to. <a href="privacy/">Read what stays local.</a></p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></span><h3>Works alongside your other tools</h3><p>We use and like Siteimprove and axe DevTools. Axcess covers what is hard for them to reach. <a href="coverage/#compare">See the side-by-side comparison.</a></p></article>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
       <span class="eyebrow">The workbench</span>
       <h2>An evidence workbench, not a scorecard</h2>
-      <p class="sub">One score hides the details that make accessibility work actionable. Axcess keeps the page, the element, the screenshot, the rule, and the confidence level connected so anyone can check a claim for themselves.</p>
+      <p class="sub">One score hides the details that make accessibility work actionable. Axcess keeps the page, the element, the screenshot, the rule, and the level of certainty together, so anyone can check a result for themselves.</p>
     </div>
     <div class="shot-frame">
-      <img class="shot" src="assets/axcess-dashboard-redacted.png" width="1487" height="1058"
-        alt="The Axcess dashboard. A navy banner reads 'View 5 accessibility issue groups' with an 'Open issue table' button. Below are counters for completed scans, pages crawled, and image evidence, a list of recent scans (blurred), and a panel titled 'How Axcess works' listing: understand the issue, apply the expected fix, open the exact location.">
+      <img class="shot" src="assets/diagrams/report-groups.png" width="3200" height="1800"
+        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa &quot;cannot tell&quot; results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.">
     </div>
-    <p class="caption">The dashboard of the desktop app. Recent scan targets are blurred in this preview.</p>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Why teams trust it</span>
-      <h2>Honest by design</h2>
-      <p class="sub">Accessibility tools are easy to over-trust. Axcess is built to tell you what it saw, how sure it is, and what it could not check.</p>
-    </div>
-    <div class="stats" role="list">
-      <div class="stat" role="listitem"><b>29<small> of 55</small></b><span>WCAG 2.2 A/AA criteria where Axcess contributes evidence. The other 26 are labelled manual, with instructions.</span></div>
+    <p class="caption">The three report groups and the checks that feed each one. <a href="coverage/#groups">Read more about the report groups.</a></p>
+    <div class="stats" role="list" style="margin-top:1.75rem">
+      <div class="stat" role="listitem"><b>29<small> of 55</small></b><span>WCAG 2.2 A and AA success criteria where Axcess contributes evidence. The other 26 need a person, and each one comes with test steps.</span></div>
       <div class="stat" role="listitem"><b>0</b><span>Bytes of scan data sent to a cloud service. There is no telemetry and no account.</span></div>
-      <div class="stat" role="listitem"><b>AAA</b><span>The level Axcess holds its own interface to. Every screen is tested for keyboard, screen reader, zoom, and contrast.</span></div>
-      <div class="stat" role="listitem"><b>7</b><span>Independent checks per scan. 4 need only a browser; 3 can add a local AI model.</span></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:1.5rem">
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><h3>Evidence you can inspect</h3><p>Every finding links back to the page, the element, a snippet, and often a screenshot, stored locally with the scan. Nothing is a bare number.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>Clear about certainty</h3><p>A deterministic rule failure, a behaviour the browser observed, and an AI suggestion are never mixed. Each result says which method produced it and whether a person still needs to confirm it.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h3>Private by default</h3><p>Scans, screenshots, and reports live in a local database on your computer. Sites behind a login are scanned after you sign in yourself; Axcess never sees your password.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 8 12 5-5 2-2 5z"/><path d="M4 4l2 2M4 10h2M10 4v2"/></svg></span><h3>Built for real, modern websites</h3><p>Pages are rendered in a real browser, so single-page apps work. Axcess can also open menus, tabs, and dialogs to test the states a plain page load never shows.</p></article>
-    </div>
-  </div>
-</section>
-
-<section class="band">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">What you get</span>
-      <h2>Reports people can actually use</h2>
-      <p class="sub">The same local evidence becomes whatever your audience needs, from a triage table for you to a ticket for a developer to a summary for a director.</p>
-    </div>
-    <div class="grid grid-3">
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg></span><h3>Issue table</h3><p>One scan-scoped table that groups repeated problems and states both numbers plainly, for example 19 issue groups across 965 occurrences.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg></span><h3>Excel workbook</h3><p>The hand-off file: Summary, Issues, Page Hotspots, Who's Affected, Coverage, Test Tracking, and Manual Evidence sheets with clickable links.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg></span><h3>Stakeholder report</h3><p>Scope, methods, limitations, results, recommended actions, and verification steps, written for readers who will never open the tool.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span><h3>Tickets and data</h3><p>Jira-ready CSV, plain CSV, and JSON so findings drop straight into the tools your team already uses.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></span><h3>Rescan comparison</h3><p>Scan the same scope again and see what is new, what is resolved, and what is still open, instead of starting from zero.</p></article>
-      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg></span><h3>Draft protection</h3><p>A report exported before expert review is complete is clearly labelled DRAFT, so an unfinished list is never mistaken for a final audit.</p></article>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Who it's for</span>
-      <h2>Made for the people who do the work</h2>
-    </div>
-    <div class="grid grid-4">
-      <a class="card card-accent" href="who-its-for/#accessibility-lead" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Accessibility leads</h3><p>Triage hundreds of findings in one sitting, defend every verdict, and verify fixes on rescan.</p></a>
-      <a class="card card-accent" href="who-its-for/#editors-and-developers" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 22 19"/></svg></span><h3>Editors and developers</h3><p>Get a ticket that says what to change, where, and how you'll know it's done.</p></a>
-      <a class="card card-accent" href="who-its-for/#leadership" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><h3>Leadership</h3><p>See how thoroughly a site was evaluated and what to fix first, without a misleading score.</p></a>
-      <a class="card card-accent" href="who-its-for/#it-and-security" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></span><h3>IT and security</h3><p>Review a tool with no cloud dependency, no telemetry, and a documented data boundary.</p></a>
+      <div class="stat" role="listitem"><b>AAA</b><span>The level of axe-core rules that Axcess tests its own interface against.</span></div>
     </div>
   </div>
 </section>
 
 <section class="soft">
   <div class="wrap">
-    <div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>What Axcess is not.</strong> Axcess produces accessibility evidence for a qualified person to review. Automated and AI-assisted results do not prove WCAG conformance, legal compliance, or the accessibility of an entire website, and they do not replace testing with people who use assistive technology.</p></div>
+    <div class="section-head">
+      <span class="eyebrow">Who it's for</span>
+      <h2>Made for the people who do the work</h2>
+    </div>
+    <div class="grid grid-4">
+      <a class="card card-accent" href="who-its-for/#accessibility-lead" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><h3>Accessibility analysts</h3><p>Triage findings with evidence, pair them with manual testing, and verify fixes on a rescan.</p></a>
+      <a class="card card-accent" href="who-its-for/#editors-and-developers" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 22 19"/></svg></span><h3>Editors and developers</h3><p>See what to change, where it is, and how you will know it is done.</p></a>
+      <a class="card card-accent" href="who-its-for/#leadership" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><h3>Leadership</h3><p>See how thoroughly a site was checked and what to fix first, without a misleading score.</p></a>
+      <a class="card card-accent" href="who-its-for/#it-and-security" style="text-decoration:none"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></span><h3>IT and security</h3><p>Review a tool with no cloud dependency, no telemetry, and a documented data boundary.</p></a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>Evidence, not a verdict.</strong> Axcess gives you evidence to review. Its results can't prove WCAG conformance, legal compliance, or that a whole site is accessible, and they don't replace testing with people who use assistive technology.</p></div>
     <div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:2rem;align-items:center">
       <a class="btn btn-primary" href="get-started/">Get started</a>
-      <a class="btn btn-ghost" href="coverage/">Explore what it checks</a>
-      <a class="btn btn-ghost" href="about/">Read the story</a>
+      <a class="btn btn-ghost" href="coverage/">See what Axcess checks</a>
+      <a class="btn btn-ghost" href="faq/#glossary">Read the glossary</a>
     </div>
   </div>
 </section>
@@ -198,7 +180,8 @@
           <li><a href="how-it-works/">How it works</a></li>
           <li><a href="coverage/">What it checks</a></li>
           <li><a href="who-its-for/">Who it's for</a></li>
-          <li><a href="faq/">Questions and glossary</a></li>
+          <li><a href="faq/">Questions</a></li>
+          <li><a href="faq/#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -206,6 +189,7 @@
         <ul>
           <li><a href="get-started/">Get started</a></li>
           <li><a href="privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>

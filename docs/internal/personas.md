@@ -1,22 +1,39 @@
-# Personas — who we're building this for
+# Personas: who we're building this for
+
+> **About this page (September 2026):** working assumptions, not research,
+> for contributors who make product and interface decisions. It was written
+> when Axcess checked only images of text (WCAG 1.4.5).
+>
+> Out of date:
+>
+> - Coverage: the coverage matrix now lists automated, partial, or
+>   AI-assisted checks for 29 of 55 WCAG 2.2 A and AA criteria, so the job
+>   to be done and the "roughly 80 %" estimate no longer hold.
+> - Access: Axcess now has login scans and an optional shared access token
+>   for hosted use, so "Auth. The tool runs on Sam's laptop" no longer holds.
+> - `tests/ui/test_keyboard_nav.py` and the `j/k` and `?` shortcuts do not
+>   exist.
+> - Export links: exports link page-level findings to
+>   `/scans/{scan}/pages/{page}#finding-{id}`, and only image findings to
+>   `/findings/{id}`.
 
 Personas are documented assumptions about the user. They're not
 research findings, and this document says so. They exist because every
-design decision is made against an implicit user model — writing the
+design decision is made against an implicit user model. Writing the
 model down lets us *argue with it* instead of carrying around a
 private one each.
 
 > **Status.** Working assumptions, adopted in Phase 2. The discovery
-> audit ([`audits/discovery.md`](../audits/discovery.md) §3) flagged
+> audit ([`audits/discovery.md`](../../audits/discovery.md) §3) flagged
 > the absence of a persona doc and proposed Sam below as an explicit
 > assumption-of-record. Until we run user interviews this stands as the
-> design ground truth — and any decision that rests on it should cite
+> design ground truth, and any decision that rests on it should cite
 > the specific assumption it's relying on so we can revisit if the
 > assumption was wrong.
 
 ---
 
-## Primary: Sam — Accessibility Lead, U-M LSA
+## Primary: Sam (Accessibility Lead, U-M LSA)
 
 A composite of the kind of user the product was commissioned for: an
 in-house accessibility professional at a large university, responsible
@@ -35,16 +52,16 @@ exporting findings, comparing scans over time, learning the tool.
 
 ### Context of use
 
-* **Where:** Sam's laptop. Tool runs locally — no SaaS, no cloud
+* **Where:** Sam's laptop. Tool runs locally: no SaaS, no cloud
   account, no shared deployment. Often offline, often on a flaky
   network.
-* **When:** Triage sessions of 1–3 hours, frequently. Sam may be
-  staring at 100–2000 findings in one sitting.
+* **When:** Triage sessions of 1 to 3 hours, frequently. Sam may be
+  staring at 100 to 2000 findings in one sitting.
 * **What else is open:** the audited site in a separate browser tab,
   Siteimprove, a Jira board, sometimes a screen-sharing call with a
   content editor who has *not* used this tool before. The UI must
-  explain its own decisions — "why is this critical, what is a logo
-  classification" — without requiring Sam to swivel-chair into docs.
+  explain its own decisions ("why is this critical, what is a logo
+  classification") without requiring Sam to swivel-chair into docs.
 * **Pace:** mixed. Some findings are obvious 5-second triages
   ("clearly informational, alt is missing, mark new"). Some require
   reading the OCR text against the alt against the VLM rationale and
@@ -58,18 +75,18 @@ Sam is one of the following on any given day:
 
 | Disability | Likelihood | What changes for the UI |
 |---|---|---|
-| Color-vision deficiency (deuteranopia / protanopia) | ~8% of men of European descent — likely | Severity must never be conveyed by color alone. Check today: severity chips are colored *and* labeled in text; live-progress dot is colored *and* paired with a "Crawl in progress" string. ✅ |
-| Low vision (correctable with browser zoom + high contrast) | Realistic — Sam is reading small image-text and small alt strings all day | Reflow must work to 320px (✅, SPA hides sidebar; Jinja is single-column). Text must zoom to 200% without loss of function. Contrast must be AAA, not AA — see [`accessibility.md`](accessibility.md) §3. |
-| RSI / keyboard-preferred | Realistic — Sam clicks ~ten thousand times a week otherwise | Every action reachable via keyboard. Specifically: `j/k` for findings nav, `0–5` for status set, `?` for help, Tab + Enter for everything else. The Findings table is virtualized but j/k still drives selection; verified in `tests/ui/test_keyboard_nav.py`. |
-| Screen-reader primary user (NVDA / JAWS / VoiceOver) | Possible — Sam is an a11y professional and may be one themselves | Section headings must be in order (`<h1>` → `<h2>` → `<h3>`, no skips); breadcrumbs (`<nav aria-label="Breadcrumb">`) on every interior route; live regions used sparingly and politely; every form control labelled. AAA SC 1.4.8 (Visual Presentation), 2.4.10 (Section Headings), 1.3.5 (Identify Input Purpose) all bump in priority. |
+| Color-vision deficiency (deuteranopia / protanopia) | ~8% of men of European descent, likely | Severity must never be conveyed by color alone. Check today: severity chips are colored *and* labeled in text; live-progress dot is colored *and* paired with a "Crawl in progress" string. ✅ |
+| Low vision (correctable with browser zoom + high contrast) | Realistic: Sam is reading small image-text and small alt strings all day | Reflow must work to 320px (✅, SPA hides sidebar; Jinja is single-column). Text must zoom to 200% without loss of function. Contrast must be AAA, not AA (see [`ui-accessibility.md`](ui-accessibility.md) §3). |
+| RSI / keyboard-preferred | Realistic: Sam clicks ~ten thousand times a week otherwise | Every action reachable via keyboard. Specifically: `j/k` for findings nav, `0` to `5` for status set, `?` for help, Tab + Enter for everything else. The Findings table is virtualized but j/k still drives selection; verified in `tests/ui/test_keyboard_nav.py`. |
+| Screen-reader primary user (NVDA / JAWS / VoiceOver) | Possible: Sam is an a11y professional and may be one themselves | Section headings must be in order (`<h1>` → `<h2>` → `<h3>`, no skips); breadcrumbs (`<nav aria-label="Breadcrumb">`) on every interior route; live regions used sparingly and politely; every form control labelled. AAA SC 1.4.8 (Visual Presentation), 2.4.10 (Section Headings), 1.3.5 (Identify Input Purpose) all bump in priority. |
 | Cognitive load (situational) | Constant | UI must explain its own decisions in-product. Priority score formula visible on hover, severity glossary one click away, "Ignore robots.txt" warning treatment, Skip-OCR/Skip-VLM hints next to the toggle. |
 
 **Working assumption to revisit.** That Sam is a *power user* of the
 tool, not a first-time user. If wrong, we owe more onboarding (an
 empty-state on the Dashboard could become a guided tour, the New-Scan
-form could become a wizard). If right, we owe Sam efficiency —
+form could become a wizard). If right, we owe Sam efficiency:
 keyboard shortcuts, density, no hand-holding modal dialogs. The
-current build leans toward "power user" — Phase 4 instrumentation
+current build leans toward "power user". Phase 4 instrumentation
 will confirm or correct.
 
 ### What Sam needs from the UI, ranked
@@ -97,7 +114,7 @@ will confirm or correct.
 * Multi-tenancy. Same.
 * SaaS-style "team" features (comments on findings, assignees,
   watchers). Sam is the team.
-* Aggressive notifications. Sam knows when the scan is running — they
+* Aggressive notifications. Sam knows when the scan is running: they
   started it. The progress block is informational, not urgent.
 
 ---
@@ -105,7 +122,7 @@ will confirm or correct.
 ## Secondary: the editor receiving exported findings
 
 The person on the other end of Sam's export. Encounters the tool only
-indirectly — opens a Jira ticket, reads a Markdown report, never opens
+indirectly: opens a Jira ticket, reads a Markdown report, never opens
 the UI itself.
 
 ### Job to be done
@@ -120,13 +137,13 @@ the UI itself.
   Description, Priority, Labels" headers; the Markdown report leads
   with severity and the page URL.
 * **The deep-link from the export back to the local UI must be
-  explicit.** Editors will sometimes want to see the audited image —
+  explicit.** Editors will sometimes want to see the audited image:
   the export includes `http://localhost:8765/findings/{id}` so Sam can
   share their screen and walk through it.
 * **Plain language in remediation hints.** The hint that ships with a
   finding (`rules/remediation.yaml`) is read by the editor, not Sam.
   No internal jargon ("classification was VLM-essential, alt-adequacy
-  bucket was inadequate") — instead "this image contains text that
+  bucket was inadequate"). Instead: "this image contains text that
   isn't in the alt; add the text to alt and consider whether the
   image-of-text could become real text."
 
@@ -149,7 +166,7 @@ because:
   output and the discovery audits.
 * Documentation *is* the developer's UX. README, this doc,
   [`design-principles.md`](design-principles.md), the docblocks on
-  `components/ui.tsx`, the audit reports — all of it is read by the
+  `components/ui.tsx`, the audit reports: all of it is read by the
   next person who touches the code.
 
 What we owe the maintainer:
@@ -159,10 +176,10 @@ What we owe the maintainer:
   AAA-not-AA target) lives in a doc with the *why*, not just the
   *what*.
 * **Tests that explain themselves.** A failing axe test should make
-  the next developer's path obvious — the `_AXE_TAGS` constant in
+  the next developer's path obvious: the `_AXE_TAGS` constant in
   `tests/ui/test_accessibility_axe.py` is named, not magic.
 * **No silent regressions.** The five-gate process (see
-  [`accessibility.md`](accessibility.md) §2) means a regression fails
+  [`ui-accessibility.md`](ui-accessibility.md) §2) means a regression fails
   CI, not a quarterly audit.
 
 ---

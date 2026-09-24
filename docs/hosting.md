@@ -1,8 +1,8 @@
 # Hosting Axcess
 
-This tool was built **local-first**: a single-user app that binds to
-`127.0.0.1` with no authentication. That's the right default — but you
-can host it for yourself and a small team on an always-on machine with
+Axcess is [local-first](./glossary.md#local-first), and by default it runs as
+a single-user app on `127.0.0.1` with no sign-in. That's the right default,
+but you can host it for yourself and a small team on an always-on machine with
 a few minutes of setup. This is the runbook for that ("Path A").
 
 > **Before you expose it to anything beyond `localhost`, read the
@@ -18,13 +18,15 @@ a few minutes of setup. This is the runbook for that ("Path A").
   single process-global (`crawl_state` in `server.py`). If two people
   start scans at once, the second is rejected until the first finishes.
   Fine for a coordinating team; not multi-tenant. (Lifting this is
-  "Path B" — replacing the global with the per-scan job queue.)
-* **Heavy runtime.** Three of the four detection pipelines need a real
-  browser, so the host must have Playwright + chromium installed
-  (`make setup` does this). The image-of-text and semantic pipelines
-  additionally need an [Ollama](https://ollama.com) daemon with the
-  models pulled (`make fetch-models`); you can run without it (see
-  [Without Ollama](#running-without-ollama)).
+  "Path B": replacing the global with the per-scan job queue.)
+* **Heavy runtime.** Most checks need a real browser: axe-core and the
+  keyboard, focus, zoom, motion and click-through checks run only on pages
+  rendered in Chromium. So the host needs Playwright and Chromium installed
+  (`make setup` does this). The optional AI checks also need an
+  [Ollama](https://ollama.com) service with models pulled: `make fetch-models`
+  pulls the vision models, and `make fetch-analyzer-models` pulls the
+  recommended models for every AI check. You can run without Ollama (see
+  [Running without Ollama](#running-without-ollama)).
 * **It's a crawler.** Anyone with access can point it at any URL. Keep
   access restricted to people you trust.
 
@@ -35,7 +37,7 @@ a few minutes of setup. This is the runbook for that ("Path A").
 On the always-on machine, from the repo root:
 
 ```bash
-# 1. One-time setup (deps, chromium, data dirs) — if not already done.
+# 1. One-time setup (deps, chromium, data dirs), if not already done.
 make setup
 make migrate
 
@@ -57,15 +59,14 @@ http://<machine-LAN-ip>:8765/app/?token=<the-token>
 ```
 
 Find the machine's LAN IP with `ipconfig getifaddr en0` (macOS) or
-`hostname -I` (Linux). The `?token=…` only needs to be pasted **once** —
-the server sets a session cookie, so subsequent navigation works
-without it.
+`hostname -I` (Linux). The `?token=...` only needs to be pasted **once**:
+the server sets a session cookie, so later navigation works without it.
 
-A health check stays open without the token: `http://…:8765/health`.
+A health check stays open without the token: `http://<machine-LAN-ip>:8765/health`.
 
 ---
 
-## Reaching it off your network (Tailscale — recommended)
+## Reaching it off your network (Tailscale, recommended)
 
 For team members who aren't on the same LAN, the cleanest path on your
 own machine is [Tailscale](https://tailscale.com): a private mesh
@@ -88,15 +89,15 @@ reach it at:
 http://<machine-tailscale-name>:8765/app/?token=<the-token>
 ```
 
-Tailscale + the access token gives you two independent layers: the
+Tailscale plus the access token gives you two independent layers: the
 network is private, and even within it the token is required.
 
 > **Avoid raw public port-forwarding.** Opening `8765` on your router to
 > the internet exposes an unauthenticated-by-default crawler to the
 > world. If you genuinely need a public URL, use a
 > [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/)
-> with Cloudflare Access in front — that's closer to "Path C" territory
-> and out of scope for this quick-start.
+> with Cloudflare Access in front. That's closer to "Path C" territory
+> and out of scope for this quick start.
 
 ---
 
@@ -104,33 +105,35 @@ network is private, and even within it the token is required.
 
 | Layer | What it does | How |
 |---|---|---|
-| **Shared token** | Blocks every request without the token (except `/health`). | `export AUDIT_ACCESS_TOKEN=…` before `make serve`. No-op when unset. |
+| **Shared token** | Blocks every request without the token, except `/health` and the separate protected-scan APIs, which have their own checks. | `export AUDIT_ACCESS_TOKEN=...` before `make serve`. No-op when unset. |
 | **Private network** | Keeps the port off the public internet. | LAN-only, or Tailscale. |
 
 The token can be supplied three ways (the middleware checks all):
 
-* `?token=…` in the URL (sets a cookie so you only do this once),
-* an `X-Access-Token: …` request header (for API/CLI clients),
-* an `Authorization: Bearer …` header.
+* `?token=...` in the URL (sets a cookie so you only do this once),
+* an `X-Access-Token: ...` request header (for API/CLI clients),
+* an `Authorization: Bearer ...` header.
 
-The comparison is constant-time. The cookie is `HttpOnly` +
-`SameSite=Lax` and is a session cookie (clears when the browser closes).
+The comparison is constant-time. The cookie is `HttpOnly` and
+`SameSite=Lax`, and it is a session cookie (it clears when the browser
+closes).
 
 **This is deliberately a simple gate, not a multi-user auth system.**
 It stops a network-reachable instance from being wide open. It does
-*not* give people separate accounts, separate data, or audit logs —
+*not* give people separate accounts, separate data, or audit logs;
 that's Path B/C.
 
 ### Outbound links
 
 The app makes no outbound request of its own beyond the site being
-scanned and, when enabled, a loopback Ollama service. The one outbound
-*link* is **Send feedback** in the top bar, which opens a hosted Asana
-form in a new tab. It carries no scan data — the form receives only
-what the person types into it — and nothing happens until someone
+scanned and, when the AI checks are used, the Ollama service it is
+configured for (by default `http://localhost:11434`). The one outbound
+*link* is **Give feedback** in the top bar, which opens a hosted Asana
+form in a new tab. It carries no scan data (the form receives only
+what the person types into it), and nothing happens until someone
 clicks it. In the packaged desktop app the Electron shell hands
 http(s) links to the system browser rather than opening a window
-inside the app; see [`desktop-app.md`](./desktop-app.md).
+inside the app; see [Desktop app](./desktop-app.md).
 
 ## Protected authenticated scans are a separate deployment
 
@@ -138,6 +141,9 @@ The LAN/Tailscale and shared-token setup above is for **public scans only**.
 It does not authorize a person to view protected evidence or a companion to
 use an authenticated browser session. Do not enable protected scans on this
 quick-start deployment.
+
+Local login scans (the **Site with a login or 2FA** tab) are not available to
+team members either: they run only in a browser on the host machine itself.
 
 Protected scans require a U-M-approved identity-aware proxy with group claims,
 short-lived signed identity assertions, mTLS termination and certificate
@@ -149,45 +155,51 @@ Protected deployments must also set the administrator-owned
 `AUDIT_PROTECTED_KMS_VAULT_FACTORY` and schedule `audit protected-maintenance`
 with catch-up and failure alerting; this performs the required seven-day
 KMS-backed evidence crypto-erasure even when the web process has been offline.
-See the retention runbook in [Protected scans](./protected-scans.md#required-retention-maintenance).
+See the retention runbook in [Protected scans](./internal/protected-scans.md#required-retention-maintenance).
 
 Set `AUDIT_PROTECTED_PUBLIC_ORIGIN` to the exact external HTTPS origin served
 by that proxy. It is the authoritative browser Origin and companion-command
 origin for protected operations; Axcess does not derive either from `Host`,
-`Forwarded`, or `X-Forwarded-*` request headers. The proxy must strip all
-client-supplied protected identity/JTI/signature and companion-mTLS headers,
-then inject its verified values. It must mint a fresh high-entropy JTI/nonce
-and HMAC assertion for every state-changing protected browser request. On
-`/api/agents/*`, it must additionally HMAC-sign its verified mTLS assertion
-with the separate `AUDIT_PROTECTED_AGENT_PROXY_HMAC_SECRET`; Axcess rejects
-unsigned `X-SSL-Client-*` headers. See [Protected scans](./protected-scans.md)
+`Forwarded`, or `X-Forwarded-*` request headers.
+
+The proxy must strip all client-supplied protected identity/JTI/signature and
+companion-mTLS headers, then inject its verified values. It must mint a fresh
+high-entropy JTI/nonce and HMAC assertion for every state-changing protected
+browser request. On `/api/agents/*`, it must additionally HMAC-sign its
+verified mTLS assertion with the separate
+`AUDIT_PROTECTED_AGENT_PROXY_HMAC_SECRET`; Axcess rejects unsigned
+`X-SSL-Client-*` headers. See [Protected scans](./internal/protected-scans.md)
 for the exact method/path/timestamp/verification/fingerprint signing format.
 
-Read [Protected scans](./protected-scans.md) before deploying or piloting this
-mode. It contains the required proxy header-stripping rules, companion setup,
-read-only egress boundary, retention/crypto-erasure model, and manual WCAG
-3.3.8 authentication review. Run a staging pilot with the target owner and
+Read [Protected scans](./internal/protected-scans.md) before deploying or
+piloting this mode. It contains the required proxy header-stripping rules,
+companion setup, egress boundary, retention/crypto-erasure model, and manual
+WCAG 3.3.8 authentication review. Run a staging pilot with the target owner and
 U-M security team before approving a production target.
 
 ---
 
 ## Running without Ollama
 
-If you don't want to run the local LLM daemon (it needs multi-GB models
-and ideally a GPU), the tool still does plenty: axe-core, the
-keyboard-trap probe, and the responsive/zoom probe all run on just
-chromium. Start scans with the image-of-text + semantic pipelines off:
+You can skip the local AI service: its models are large downloads and add
+time to every page. Without it, Axcess still renders pages and runs axe-core,
+Siteimprove Alfa (if installed), the keyboard, focus, zoom, and click-through
+checks, and [OCR](./glossary.md#ocr) with Tesseract.
+
+In the New scan form, the switches that use a model are already off. You find
+them under Advanced settings, **Local AI**: **Review image text with a local
+vision model**, **Review wording with local AI**, and **Check motion and
+animation**. **Read text inside images (OCR)** stays on, because it needs no
+model. On the command line these checks are on by default, so turn them off:
 
 ```bash
-# CLI:
-uv run audit crawl https://example.com --skip-vlm --skip-ocr --skip-semantic
-
-# Or in the New Scan form, check "Skip VLM", "Skip OCR", and the
-# semantic pipeline is skipped automatically when no Ollama is reachable.
+uv run audit crawl https://example.com --skip-vlm --skip-semantic --skip-visual
 ```
 
-The scan-detail "Methods used" row will show those pipelines struck
-through, so anyone reading a report knows the coverage was partial.
+If Ollama isn't reachable when a scan starts, Axcess logs a warning and
+continues without those checks. The report's "What this scan actually checked"
+list shows whether the vision model and the wording check ran. The motion
+check has no row there, so note it separately when it was off.
 
 ---
 
@@ -195,20 +207,20 @@ through, so anyone reading a report knows the coverage was partial.
 
 `make serve` runs in the foreground. To keep it up across reboots:
 
-**macOS (launchd)** — create `~/Library/LaunchAgents/com.aa.serve.plist`
+**macOS (launchd):** create `~/Library/LaunchAgents/com.aa.serve.plist`
 pointing at a small wrapper script that exports `AUDIT_ACCESS_TOKEN` and
 runs `make serve` in the repo dir, then `launchctl load` it.
 
-**Linux (systemd user service)** — a `~/.config/systemd/user/aa.service`
-with `Environment=AUDIT_ACCESS_TOKEN=…`, `WorkingDirectory=<repo>`,
+**Linux (systemd user service):** a `~/.config/systemd/user/aa.service`
+with `Environment=AUDIT_ACCESS_TOKEN=...`, `WorkingDirectory=<repo>`,
 `ExecStart=/usr/bin/make serve`, then `systemctl --user enable --now aa`.
 
-**Simplest** — run it inside `tmux`/`screen` so it survives your SSH
+**Simplest:** run it inside `tmux`/`screen` so it survives your SSH
 session disconnecting:
 
 ```bash
 tmux new -s aa
-export AUDIT_ACCESS_TOKEN=…
+export AUDIT_ACCESS_TOKEN=...
 make serve
 # detach with Ctrl-b d; reattach with `tmux attach -t aa`
 ```
@@ -226,5 +238,6 @@ When one-crawl-at-a-time or the shared token stops being enough:
   controls on the crawler, and a hosted-GPU or cloud-LLM story to
   replace local Ollama.
 
-Both are real projects, not config changes — the local-first design is
-load-bearing. The quick-start above is the 95% case for a team.
+Both are real projects, not settings you can change, because much of Axcess
+depends on running on one computer. The quick start above covers what most
+teams need.

@@ -1,5 +1,10 @@
 # Alfa evidence investigation
 
+> **About this page (September 2026):** for maintainers who work on the Alfa
+> adapter or on how Axcess stores and shows engine evidence. It records the
+> Report 46 investigation and the regression tests that came out of it; a
+> September 2026 review found it current, and the tests it names still exist.
+
 The investigation found a reproducible contrast limitation in Alfa and separate
 defects in how Axcess retained and presented the result. These cases do not
 establish an overall accuracy score for either Alfa or axe.
