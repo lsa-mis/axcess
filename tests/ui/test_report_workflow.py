@@ -51,10 +51,10 @@ async def test_report_links_and_review_lanes(
         await route.fulfill(json={**payload, "rows": shown})
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
+    # The report's own URL used to be its Overview tab. It opens on the
+    # issue table now, so old links land there instead of breaking.
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-    await playwright_async.expect(
-        page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)
-    ).to_have_count(0)
+    await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     reports = crumb.get_by_role("link", name="Reports", exact=True)
     await reports.focus()
@@ -376,14 +376,80 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     assert sizes and all(height >= 44 for height in sizes), sizes
 
 
+async def _breadcrumb(page: Any) -> list[dict[str, Any]]:
+    """The one visible breadcrumb trail, item by item, as the DOM has it.
+
+    Asserts the WAI-ARIA breadcrumb structure on the way: exactly one visible
+    ``nav`` named "Breadcrumb" wrapping an ordered list, and no second trail
+    anywhere on the page.
+    """
+    crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    await playwright_async.expect(crumb).to_have_count(1)
+    # The second trail that hung under the tabs, named "Where you are in …".
+    await playwright_async.expect(
+        page.get_by_role("navigation", name=re.compile("^Where you are"))
+    ).to_have_count(0)
+    return await crumb.evaluate(
+        r"""nav => {
+            const list = nav.firstElementChild;
+            if (list?.tagName !== "OL") throw new Error("breadcrumb is not an ordered list");
+            return [...list.children].map(li => {
+                const link = li.querySelector("a");
+                const current = li.querySelector("[aria-current]");
+                return {
+                    tag: li.tagName,
+                    text: li.innerText.replace(/\s+/g, " ").trim(),
+                    link: link ? link.getAttribute("href") : null,
+                    current: current ? current.getAttribute("aria-current") : null,
+                    currentTag: current ? current.tagName : null,
+                    background: current ? getComputedStyle(current).backgroundColor : null,
+                };
+            });
+        }"""
+    )
+
+
+def _assert_current_is_plain_text(items: list[dict[str, Any]]) -> None:
+    """Only the last crumb is current, and it is text, not a link or a chip."""
+    *earlier, last = items
+    assert all(item["tag"] == "LI" for item in items), items
+    assert all(item["link"] and item["current"] is None for item in earlier), items
+    assert last["link"] is None, last
+    assert last["current"] == "page" and last["currentTag"] == "SPAN", last
+    assert last["background"] in {"rgba(0, 0, 0, 0)", "transparent"}, last
+
+
+async def test_report_breadcrumb_ends_at_the_report_on_its_views(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """``Reports > example.com #N``, and nothing after it, on Issues and Verify changes.
+
+    The lit tab says which view; "Issues" as a crumb as well was the third
+    time the word appeared on one screen.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    for suffix in ("/issues", "/diff"):
+        await page.goto(f"{base}/app/scans/{scan_id}{suffix}", wait_until="networkidle")
+        items = await _breadcrumb(page)
+        assert [item["text"] for item in items] == ["Reports", f"example.com #{scan_id}"], items
+        assert items[0]["link"] == "/app/scans", items
+        _assert_current_is_plain_text(items)
+    # The tabs are the report's two views; Overview is gone.
+    tabs = page.get_by_role("navigation", name="Report workspace").get_by_role("link")
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Verify changes"])
+
+
 async def test_issue_evidence_trail_names_the_issue(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """The trail's last chip is the issue itself, not the name of the view.
+    """The trail's last crumb is the issue itself, under the report.
 
     "Issue evidence" told the reader what kind of page they were on, which
     they could already see; which issue they were reading was the part only
-    the trail could carry once the title scrolled out of view.
+    the trail could carry once the title scrolled out of view. The issue
+    sits inside the report, so there are no report tabs here, and the
+    report crumb is the way back to the list.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -393,35 +459,76 @@ async def test_issue_evidence_trail_names_the_issue(
         f"{base}/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}",
         wait_until="networkidle",
     )
-    # The topbar stops at the tab; the issue itself is named under it,
-    # in the sub-trail, so the same thing is not said in two places.
+    await playwright_async.expect(
+        page.get_by_role("heading", name=row["title"], level=1)
+    ).to_be_visible()
+    items = await _breadcrumb(page)
+    # A deep link lands with the whole trail: the path alone proves the
+    # issue sits in this report, and "Issues" is never a crumb of its own.
+    assert [item["text"] for item in items] == [
+        "Reports",
+        f"example.com #{scan_id}",
+        row["title"],
+    ], items
+    _assert_current_is_plain_text(items)
+    await playwright_async.expect(
+        page.get_by_role("navigation", name="Report workspace")
+    ).to_have_count(0)
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    await playwright_async.expect(crumb.get_by_text("Issues", exact=True)).to_be_visible()
-    await playwright_async.expect(crumb.get_by_text(row["title"], exact=True)).to_have_count(0)
-    sub = page.get_by_role("navigation", name="Where you are in Issues")
-    await playwright_async.expect(sub.get_by_text(row["title"], exact=True)).to_be_visible()
-    # The list is the issue's parent, and the path alone proves it, so a deep
-    # link lands with the whole trail rather than a gap. The sub-trail starts
-    # at Issues, as a link, so the way back is the first step of the path
-    # being read, not only the lit tab above it.
-    steps = sub.get_by_role("listitem").filter(has_text=re.compile(r"\S"))
-    await playwright_async.expect(steps.first).to_have_text("Issues")
-    back = sub.get_by_role("link", name="Issues", exact=True)
-    await playwright_async.expect(back).to_have_count(1)
-    tab = page.get_by_role("navigation", name="Report workspace").get_by_role(
-        "link", name="Issues", exact=True
-    )
-    await playwright_async.expect(tab).to_have_attribute("aria-current", "page")
-    await back.click()
+    await crumb.get_by_role("link", name=f"example.com #{scan_id}").click()
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
 
 
-async def test_sub_trail_issues_link_returns_to_the_filtered_list(
+async def test_inspector_has_one_full_trail_and_no_report_tabs(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """The sub-trail's Issues link goes back to the list as the reviewer left it.
+    """Issues → an issue's pages → the inspector: one trail naming every step.
 
-    The crumb is the link the list was opened from, so a search typed into
+    There used to be two: the topbar stopped at "Issues" and a second trail
+    under the tabs carried the rest. The topbar now shows the whole path, and
+    the report tabs are gone from a page that is inside the report rather
+    than one of its views.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?type={row['review_lane']}")
+    table = page.get_by_role("table", name="Accessibility issue groups")
+    await table.get_by_role("link", name=f"with {row['title']}", exact=False).click()
+    await page.wait_for_url("**/pages?**")
+    await playwright_async.expect(
+        page.get_by_role("navigation", name="Report workspace")
+    ).to_have_count(0)
+    inspector = page.get_by_role("link", name="opens the in-app page inspector", exact=False)
+    await inspector.first.click()
+    await page.wait_for_url("**/inspect?**")
+    await playwright_async.expect(
+        page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    ).to_contain_text("Page inspector")
+    items = await _breadcrumb(page)
+    assert [item["text"] for item in items] == [
+        "Reports",
+        f"example.com #{scan_id}",
+        row["title"],
+        "Pages",
+        "Page inspector",
+    ], items
+    _assert_current_is_plain_text(items)
+    # The report crumb goes back to the table the reader left, filter kept.
+    assert items[1]["link"] == f"/app/scans/{scan_id}/issues?type={row['review_lane']}", items
+    await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
+    await playwright_async.expect(
+        page.get_by_role("navigation", name="Report workspace")
+    ).to_have_count(0)
+
+
+async def test_report_crumb_returns_to_the_searched_list(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The report crumb goes back to the list as the reviewer left it.
+
+    It points at the link the issue was opened from, so a search typed into
     the list survives the round trip through an issue.
     """
     base, scan_id = live_server
@@ -433,12 +540,76 @@ async def test_sub_trail_issues_link_returns_to_the_filtered_list(
     table = page.get_by_role("table", name="Accessibility issue groups")
     await table.get_by_role("rowheader").get_by_role("link", name=row["title"]).first.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues/[^?]+\?"))
-    sub = page.get_by_role("navigation", name="Where you are in Issues")
-    back = sub.get_by_role("link", name="Issues", exact=True)
+    crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    back = crumb.get_by_role("link", name=f"example.com #{scan_id}")
     await playwright_async.expect(back).to_be_visible()
     await back.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues\?q="))
     assert parse_qs(urlparse(page.url).query)["q"] == [query]
+
+
+async def test_report_opens_keyboard_only_in_reading_order(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Tab from the page top: breadcrumb, tabs, search, filters, then the table.
+
+    Every stop shows a focus indicator, and each group is reached in the
+    order it reads on screen.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+    await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+    # The route focuses <main> on arrival; start from the top of the
+    # document instead, the skip link, so the whole order is walked.
+    await page.get_by_role("link", name="Skip to main content").focus()
+    stops: list[dict[str, Any]] = []
+    for _ in range(40):
+        await page.keyboard.press("Tab")
+        stop = await page.evaluate(
+            r"""() => {
+                const el = document.activeElement;
+                const style = getComputedStyle(el);
+                const label = el.labels?.[0]?.innerText
+                    ?? el.getAttribute("aria-label")
+                    ?? el.innerText;
+                const landmark = el.closest("nav[aria-label]")?.getAttribute("aria-label")
+                    ?? (el.closest("table") ? "table" : null)
+                    ?? (el.getAttribute("role") === "region" ? "table-region" : null);
+                return {
+                    name: (label || "").replace(/\s+/g, " ").trim(),
+                    tag: el.tagName,
+                    group: landmark,
+                    visible: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0
+                        || style.boxShadow !== "none",
+                };
+            }"""
+        )
+        stops.append(stop)
+        if stop["group"] == "table":
+            break
+    names = [stop["name"] for stop in stops]
+
+    def first(predicate: Any) -> int:
+        found = next((i for i, stop in enumerate(stops) if predicate(stop)), None)
+        assert found is not None, stops
+        return found
+
+    order = [
+        first(lambda s: s["group"] == "Breadcrumb" and s["name"] == "Reports"),
+        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Issues"),
+        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Verify changes"),
+        first(lambda s: s["name"] == "Search issues"),
+        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Level"),
+        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Type"),
+        first(lambda s: s["group"] == "table-region"),
+        first(lambda s: s["group"] == "table"),
+    ]
+    assert order == sorted(order), names
+    # The current crumb is text, so it is not a tab stop.
+    assert f"example.com #{scan_id}" not in names, names
+    missing = [stop for stop in stops if not stop["visible"]]
+    assert not missing, missing
 
 
 async def test_issue_evidence_page_link_offers_the_way_back(
@@ -462,8 +633,8 @@ async def test_issue_evidence_page_link_offers_the_way_back(
     await playwright_async.expect(evidence).to_be_visible()
     await evidence.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+\?"))
-    sub = page.get_by_role("navigation", name="Where you are in Issues")
-    back = sub.get_by_role("link", name=row["title"], exact=True)
+    crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    back = crumb.get_by_role("link", name=row["title"], exact=True)
     await playwright_async.expect(back).to_be_visible()
     await back.click()
     await page.wait_for_url(f"**{issue_path}")
@@ -546,43 +717,16 @@ async def test_actual_comparison_links_reach_stored_finding(
     )
     await playwright_async.expect(page.locator(f"#{anchor}")).to_be_focused()
     # …and the trail names it, the only way back with no browser chrome.
+    # Page evidence sits inside the report, so it has no report tabs; the
+    # one trail carries the way back to the comparison instead.
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace").get_by_role(
-            "link", name="Verify changes", exact=True
-        )
-    ).to_have_attribute("aria-current", "page")
-    await playwright_async.expect(
-        page.get_by_role("navigation", name="Where you are in Verify changes")
-    ).to_contain_text("Page evidence")
-
-
-async def test_inspector_trail_names_the_page_it_shows(
-    live_server: tuple[str, int], new_page: Any
-) -> None:
-    """The inspector's step in the trail is the page's heading.
-
-    It reads ``Page inspector: “<page title>”`` after the issue, and it is
-    the page's only h1: a screen reader's heading list gets that step, then
-    the steps above it as context in words, not the whole trail.
-    """
-    base, scan_id = live_server
-    page = await new_page(viewport={"width": 1280, "height": 900})
-    response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
-    row = (await response.json())["rows"][0]
-    await page.goto(
-        f"{base}/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}",
-        wait_until="networkidle",
-    )
-    inspect = page.locator("a[href*='/inspect']").first
-    await playwright_async.expect(inspect).to_be_visible()
-    await inspect.click()
-    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+/inspect\?"))
-    sub = page.get_by_role("navigation", name="Where you are in Issues")
-    heading = sub.get_by_role("heading", level=1)
-    await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
-    await playwright_async.expect(heading).to_have_attribute("aria-current", "page")
-    await playwright_async.expect(heading).to_contain_text(re.compile(r"^Page inspector: “.+”"))
-    await playwright_async.expect(heading).to_contain_text(f", in Issues, {row['title']}")
-    for step in ("Issues", row["title"]):
-        link = sub.get_by_role("link", name=step, exact=True)
-        await playwright_async.expect(link).to_be_visible()
+        page.get_by_role("navigation", name="Report workspace")
+    ).to_have_count(0)
+    items = await _breadcrumb(page)
+    assert [item["text"] for item in items] == [
+        "Reports",
+        f"example.com #{new}",
+        "Verify changes",
+        "Page evidence",
+    ], items
+    _assert_current_is_plain_text(items)

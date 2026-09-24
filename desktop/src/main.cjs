@@ -14,6 +14,7 @@ const {
   OutputTail,
   contentSecurityPolicy,
   desktopEnvironment,
+  historyStepFor,
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
@@ -264,6 +265,19 @@ function createWindow() {
     event.preventDefault();
     const contents = window.webContents;
     contents.setZoomLevel(nextZoomLevel(contents.getZoomLevel(), action));
+  });
+  // Mouse back/forward side buttons (Windows and Linux; see historyStepFor).
+  // The app is a single-page app on browser history, so stepping the
+  // window's history walks its routes. A two-finger touchpad swipe is
+  // handled in the page itself (useSwipeNavigation), where it can tell a
+  // swipe from scrolling a wide table sideways.
+  window.on("app-command", (event, command) => {
+    const step = historyStepFor(command);
+    if (!step) return;
+    event.preventDefault();
+    const history = window.webContents.navigationHistory;
+    if (step === "back" && history.canGoBack()) history.goBack();
+    if (step === "forward" && history.canGoForward()) history.goForward();
   });
   window.once("ready-to-show", () => window.show());
   window.on("closed", () => {

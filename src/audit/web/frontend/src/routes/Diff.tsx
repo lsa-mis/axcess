@@ -58,6 +58,7 @@ export default function DiffRoute() {
   return (
     <>
       <ReportHeader
+        tabs
         scanId={id}
         previousScanId={data?.baseline?.id ?? scanQuery.data?.previous_scan_id ?? null}
         title="Verify changes"

@@ -14,10 +14,11 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
-import { ExternalLinkButton, LinkButton } from "./ui";
+import { LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -38,7 +39,9 @@ interface NavItem {
  * Nav lists DESTINATIONS only. "New scan" is an action, not a place,
  * it lives in the topbar as the single global CTA, never in the nav.
  * (Earlier versions had it in both places plus per-page header buttons:
- * three simultaneous "New scan" affordances per screen.)
+ * three simultaneous "New scan" affordances per screen.) Search and
+ * feedback are actions too: they sit in the sidebar beside the nav, not
+ * inside it, so the landmark still lists only places.
  */
 const NAV: NavItem[] = [
   {
@@ -78,9 +81,9 @@ function readSidebarPref(): boolean {
 }
 
 /**
- * App shell: UMich-Blue sidebar with Maize accent for the active item,
- * topbar with the product name + the single global "New scan" CTA,
- * skip-link for a11y, main content area.
+ * App shell: UMich-Blue sidebar with Maize accent for the active item, and
+ * search and feedback; topbar with the breadcrumb + the single global
+ * "New scan" CTA; skip-link for a11y, main content area.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
@@ -90,6 +93,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const previousPath = useRef(pathname);
   const routeLabel = routeTitle(pathname);
   const reportMatch = reportRouteMatch(pathname);
+
+  // Two-finger swipe back/forward in the desktop app, which has no browser
+  // gesture of its own; a no-op in a browser tab, which does.
+  useSwipeNavigation();
 
   // Cmd/Ctrl+K opens the search-everything palette anywhere in the app.
   useEffect(() => {
@@ -152,14 +159,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </a>
 
       <div className="flex min-h-screen items-start">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={toggleSidebar}
+          onSearch={() => setCommandOpen(true)}
+        />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
-            onSearch={() => setCommandOpen(true)}
           />
-          {mobileNavOpen && <MobileNav pathname={pathname} />}
+          {mobileNavOpen && (
+            <MobileNav pathname={pathname} onSearch={() => setCommandOpen(true)} />
+          )}
           {/* Sticky with the bar above it. Left in the scroll flow it slid
               under the sticky top bar, and a crumb that is half-covered is a
               target a thumb cannot reliably hit (SC 2.5.8) — it either sits
@@ -189,12 +201,60 @@ export default function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** One sidebar row, shared by the nav links and the two actions beside them. */
+const SIDEBAR_ROW =
+  "group relative flex min-h-target w-full items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]";
+const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue";
+
+/**
+ * Search and feedback: reachable from every screen, so they live in the
+ * shell. Search leads the sidebar, above the places it can take you;
+ * feedback closes it, out of the way of the work. Collapsed, both keep
+ * their full name on the control and in the tooltip.
+ *
+ * Feedback carries no scan context: Asana forms have no documented
+ * URL-prefill contract, so there is no supported way to attach the current
+ * page, and guessing at one could put a scanned URL into a third-party form.
+ */
+function SearchAction({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSearch}
+      aria-label="Search everything (Cmd+K)"
+      title="Search everything (Cmd/Ctrl+K)"
+      className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
+    >
+      <Search className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>Search</span>}
+    </button>
+  );
+}
+
+function FeedbackAction({ collapsed }: { collapsed: boolean }) {
+  return (
+    <a
+      href={FEEDBACK_FORM_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Give feedback (opens in a new tab)"
+      title="Give feedback (opens in a new tab)"
+      className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
+    >
+      <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>Give feedback</span>}
+    </a>
+  );
+}
+
 function Sidebar({
   collapsed,
   onToggle,
+  onSearch,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  onSearch: () => void;
 }) {
   const { pathname } = useLocation();
   return (
@@ -243,7 +303,10 @@ function Sidebar({
           )}
         </button>
       </div>
-      <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
+      <div className={cn("pt-5", collapsed ? "px-2" : "px-3")}>
+        <SearchAction collapsed={collapsed} onSearch={onSearch} />
+      </div>
+      <nav className={cn("flex-1 pb-5 pt-1", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -259,11 +322,11 @@ function Sidebar({
                   // and the slightly larger icon (h-5) plus base text reads
                   // as a primary surface, not a sub-list of links.
                   className={cn(
-                    "group relative flex min-h-target items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
+                    SIDEBAR_ROW,
                     collapsed ? "justify-center px-2" : "px-3",
                     active
                       ? "bg-umich-blue text-fg-inverse shadow-[0_6px_18px_rgba(0,39,76,0.18)]"
-                      : "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue",
+                      : SIDEBAR_ROW_IDLE,
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -274,6 +337,9 @@ function Sidebar({
           })}
         </ul>
       </nav>
+      <div className={cn("border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
+        <FeedbackAction collapsed={collapsed} />
+      </div>
     </aside>
   );
 }
@@ -283,17 +349,16 @@ function Sidebar({
  * <route name>", which restated the <h1> sitting a few pixels below it,
  * two orientation lines saying the same thing, neither of which said
  * *which report* you were in. The breadcrumb above each page title is now
- * the single answer to "where am I", and this bar carries only the two
- * actions that belong on every screen.
+ * the single answer to "where am I", and this bar carries it plus the one
+ * action that belongs on every screen. Search and feedback moved to the
+ * sidebar.
  */
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
-  onSearch,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
-  onSearch: () => void;
 }) {
   const { pathname } = useLocation();
   const onNewScanForm = pathname === "/scans/new";
@@ -328,41 +393,13 @@ function TopBar({
           Axcess
         </span>
       </div>
-      {/* Scan type is chosen on the new-scan page. Keep one global action in
-          the shell so the header does not make users choose a workflow before
-          they have seen the explanation for each option.
-
-          "Send feedback" sits beside it because feedback is worth asking for
-          from every screen, and a single fixed home is easier to find than a
-          per-page control. It carries no scan context: Asana forms have no
-          documented URL-prefill contract, so there is no supported way to
-          attach the current page, and guessing at one could put a scanned
-          URL into a third-party form. */}
       <div className="hidden min-w-0 md:block">
         <ReportCrumb />
       </div>
+      {/* Scan type is chosen on the new-scan page. Keep one global action in
+          the shell so the header does not make users choose a workflow before
+          they have seen the explanation for each option. */}
       <div className="ml-auto flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Search everything (Cmd+K)"
-          title="Search everything (Cmd/Ctrl+K)"
-          className="inline-flex min-h-target items-center gap-1.5 rounded-xs px-3 text-sm font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
-        >
-          <Search className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Search</span>
-        </button>
-        <ExternalLinkButton
-          href={FEEDBACK_FORM_URL}
-          variant="ghost"
-          size="md"
-          className="px-3"
-          aria-label="Give feedback (opens in a new tab)"
-          title="Give feedback (opens in a new tab)"
-        >
-          <MessageSquarePlus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Give feedback</span>
-        </ExternalLinkButton>
         <LinkButton
           to="/scans/new"
           variant={onNewScanForm ? "ghost" : "primary"}
@@ -381,37 +418,62 @@ function TopBar({
   );
 }
 
-function MobileNav({ pathname }: { pathname: string }) {
+/** The sidebar's stand-in below md: the same places, then the same two actions. */
+function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => void }) {
+  const action =
+    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold text-white no-underline hover:bg-white/10";
   return (
-    <nav
+    <div
       id="mobile-primary-nav"
-      aria-label="Primary"
       className="border-b border-border bg-umich-blue p-2 text-white shadow-card md:hidden"
     >
-      <ul className="grid grid-cols-3 gap-1">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = item.isActive(pathname);
-          return (
-            <li key={item.to}>
-              <Link
-                to={item.to}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
-                  active
-                    ? "bg-white text-umich-blue"
-                    : "text-white hover:bg-white/10",
-                )}
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-                <span>{item.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+      <nav aria-label="Primary">
+        <ul className="grid grid-cols-3 gap-1">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const active = item.isActive(pathname);
+            return (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
+                    active
+                      ? "bg-white text-umich-blue"
+                      : "text-white hover:bg-white/10",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <div className="mt-1 grid grid-cols-2 gap-1 border-t border-white/20 pt-1">
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label="Search everything (Cmd+K)"
+          className={action}
+        >
+          <Search className="h-4 w-4" aria-hidden />
+          <span>Search</span>
+        </button>
+        <a
+          href={FEEDBACK_FORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Give feedback (opens in a new tab)"
+          className={action}
+        >
+          <MessageSquarePlus className="h-4 w-4" aria-hidden />
+          <span>Give feedback</span>
+        </a>
+      </div>
+    </div>
   );
 }
 
@@ -439,7 +501,9 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
     [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
     [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
-    [/^\/scans\/\d+\/?$/, "Report overview"],
+    // Only running and failed scans render here; a completed report
+    // redirects to its issue table.
+    [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Finding evidence"],
     [/^\/tracking\/?$/, "Coverage tracking"],
   ];

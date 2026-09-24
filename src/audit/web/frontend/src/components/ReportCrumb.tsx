@@ -1,20 +1,25 @@
-import { Fragment } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { useQueries } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { api } from "../api/client";
+import { cn } from "../lib/cn";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /**
- * The topbar's orientation line for everything under a report.
+ * The topbar's orientation line for everything under a report, and the only
+ * breadcrumb trail on any page.
  *
- * ``Reports › lsa-mis.github.io/axcess › Issues``, where you are in the app,
- * which site's evidence you are reading, and which view of it. The last
- * segment tracks the tab, so the trail and the tabs never disagree.
+ * ``Reports › app.codegra.de #40 › Contrast (Minimum) › Pages › Page
+ * inspector``: where you are in the app, which report you are reading (one
+ * site can have several, so the number is part of the name), and the path
+ * from the report down to this page. On the report's own views, Issues and
+ * Verify changes, the trail ends at the report: the lit tab already says
+ * which view, and "Issues" as a crumb, a tab and a heading was the same word
+ * three times on one screen.
  *
  * Everything here is derived from the URL, so the trail is complete on the
  * first paint of a route rather than appearing once data lands. The scan
- * query only upgrades the middle crumb from "Report #46" to the site itself,
+ * query only upgrades the report crumb from "Report #46" to the site itself,
  * and it shares ``["scan", id]`` with the routes below, a cache hit, not a
  * second request.
  */
@@ -30,7 +35,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
   [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
   [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
-  [/^\/scans\/\d+\/?$/, "Overview"],
+  [/^\/scans\/\d+\/?$/, "Report"],
 ];
 
 /** Strip the scheme and trailing slash, the host and path are the identity. */
@@ -38,18 +43,8 @@ export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
-/**
- * One link in the trail. `issue` is set when the label should be that issue's
- * title; `page` when the step also names the page it shows (`detail`, the
- * page's title once it has loaded).
- */
-export type Crumb = {
-  label: string;
-  to: string;
-  issue?: { scanId: number; key: string };
-  page?: { scanId: number; pageId: number };
-  detail?: string;
-};
+/** One link in the trail. `issue` is set when the label should be that issue's title. */
+export type Crumb = { label: string; to: string; issue?: { scanId: number; key: string } };
 
 /** An in-app absolute path, or null. `<Link to>` follows a full URL off-site,
  *  which would let a crafted link put an attacker's destination inside the
@@ -190,10 +185,6 @@ function trailFor(
     const query = params.toString();
     const self: Crumb = { label: match.view, to: `${pathname}${query ? `?${query}` : ""}` };
     if (onIssueItself && issueKey && scanId != null) self.issue = { scanId, key: issueKey };
-    // The inspector and page evidence say which page they show, so the trail
-    // carries the page's title and the view needs no second heading for it.
-    const inspected = Number(pathname.match(/^\/scans\/\d+\/pages\/(\d+)(?:\/inspect)?\/?$/)?.[1]);
-    if (scanId != null && Number.isFinite(inspected)) self.page = { scanId, pageId: inspected };
     add(self);
   }
   return chain;
@@ -201,8 +192,7 @@ function trailFor(
 
 /**
  * The trail for the current location, with every issue crumb carrying its
- * title once it has loaded. Shared by the topbar trail and the sub-trail
- * under the report tabs, so the two can never disagree about where you are.
+ * title once it has loaded.
  */
 export function useReportTrail(): {
   match: ReturnType<typeof reportRouteMatch>;
@@ -231,82 +221,48 @@ export function useReportTrail(): {
     const index = distinct.findIndex((other) => other.scanId === issue.scanId && other.key === issue.key);
     return titleQueries[index]?.data?.row.title ?? null;
   };
-  // The page a step shows. Same key as the inspector's own page-evidence
-  // query, so on that route this is a cache hit, not a second request.
-  const pages = trail.flatMap((crumb) => (crumb.page ? [crumb.page] : []));
-  const pageQueries = useQueries({
-    queries: pages.map((page) => ({
-      queryKey: ["page-evidence", page.scanId, page.pageId],
-      queryFn: () => api.getPageEvidence(page.scanId, page.pageId),
-      enabled: match != null,
-    })),
-  });
-  const pageNameOf = (page: { scanId: number; pageId: number }): string | null => {
-    const index = pages.findIndex((other) => other.scanId === page.scanId && other.pageId === page.pageId);
-    const record = pageQueries[index]?.data?.page;
-    return record ? record.title || record.url_normalized : null;
-  };
   // Until a title lands the key (or the link's own label) holds the place, so
   // the trail is never empty and never jumps in length twice.
   const labelled = trail.map((crumb) => {
-    let next = crumb;
-    if (crumb.issue) {
-      const title = titleOf(crumb.issue);
-      if (title) next = { ...next, label: title };
-    }
-    if (crumb.page) {
-      const name = pageNameOf(crumb.page);
-      if (name) next = { ...next, detail: name };
-    }
-    return next;
+    if (!crumb.issue) return crumb;
+    const title = titleOf(crumb.issue);
+    return title ? { ...crumb, label: title } : crumb;
   });
   return { match, trail: labelled };
 }
 
-/**
- * The topbar's share of the trail: up to the report view, never past it.
- *
- * Inside Issues or Verify changes the drill-down crumbs (the issue, its
- * pages, the inspector) are printed under that tab by `ReportSubTrail`, so
- * the topbar stops at the tab — ``Reports › site › Issues`` — instead of
- * saying the same thing twice in two places. A page reached with no tab
- * context keeps its full trail here, because nothing else shows it.
- */
-function topbarTrail(trail: Crumb[], pathname: string, search: string): Crumb[] {
-  const view = activeView(pathname, search);
-  if (view !== "issues" && view !== "diff") return trail;
-  const scanId = reportRouteMatch(pathname)?.scanId;
-  const root = trail.findIndex((crumb) => crumb.to.split("?")[0] === `/scans/${scanId}/${view}`);
-  return root >= 0 ? trail.slice(0, root + 1) : trail;
+/** The report's own views: its URL, the issue table, and Verify changes. */
+function isReportView(pathname: string): boolean {
+  return /^\/scans\/\d+(?:\/issues|\/diff)?\/?$/.test(pathname);
 }
 
 /**
- * Which of the three views a location belongs to, or none.
+ * Split the trail into the report crumb's target and the crumbs after it.
  *
- * A drill-down is still part of the view it was opened from: an issue's pages
- * and the inspector reached through them belong to Issues, and a page opened
- * from Verify changes belongs there. The tabs therefore stay on every
- * drill-down with the right one lit, instead of disappearing (which lost the
- * way back) or lighting Overview (which was wrong). The view is read from the
- * path first, then from the `?origin=&back=&contextTo=` trail the link
- * carried; a page reached with neither marks nothing.
+ * The report and its issue table are one crumb: the report opens on Issues,
+ * so a crumb for the list would be the report a second time. Any link that
+ * carried the list as its origin (filters and all) becomes where the report
+ * crumb points, so the way back still lands on the table the reader left.
+ * On the report's own views nothing follows the report crumb at all.
  */
-export function activeView(pathname: string, search: string): "overview" | "issues" | "diff" | "" {
-  const params = new URLSearchParams(search);
-  const trail = [params.get("back") ?? "", params.get("contextTo") ?? ""].join(" ");
-  const origin = params.get("origin") ?? "";
-  if (/\/scans\/\d+\/issues(\/|$)/.test(pathname)) return "issues";
-  if (/\/scans\/\d+\/diff(\/|$)/.test(pathname)) return "diff";
-  if (/^\/scans\/\d+\/?$/.test(pathname)) return "overview";
-  if (/\/issues(\/|$|\?)/.test(trail) || origin === "Issues") return "issues";
-  if (/\/diff(\/|$|\?)/.test(trail) || origin === "Verify changes") return "diff";
-  return "";
+function reportTrail(
+  trail: Crumb[],
+  pathname: string,
+  scanId: number,
+): { reportTo: string; crumbs: Crumb[] } {
+  const listPath = `/scans/${scanId}/issues`;
+  const isReport = (crumb: Crumb) =>
+    samePath(crumb.to, listPath) || samePath(crumb.to, `/scans/${scanId}`);
+  const list = trail.find((crumb) => samePath(crumb.to, listPath));
+  return {
+    reportTo: list?.to ?? listPath,
+    crumbs: isReportView(pathname) ? [] : trail.filter((crumb) => !isReport(crumb)),
+  };
 }
 
 export default function ReportCrumb() {
-  const { pathname, search } = useLocation();
-  const { match, trail: full } = useReportTrail();
-  const labelled = topbarTrail(full, pathname, search);
+  const { match, trail } = useReportTrail();
+  const { pathname } = useLocation();
   // The same shared report-summary query the gate and the route use, so
   // the breadcrumb reads the site name from cache. It previously kept its
   // own `["scan", id]` entry, which meant a second request for the same
@@ -315,52 +271,70 @@ export default function ReportCrumb() {
   const scanQuery = useScanQuery(typeof match?.scanId === "number" ? match.scanId : 0);
   if (!match) return null;
 
-  const ancestors = labelled.slice(0, -1);
-  const view = labelled[labelled.length - 1]?.label ?? match.view;
   const seedUrl = scanQuery.data?.seed_url;
-  const middle = seedUrl ? siteLabel(seedUrl) : `Report #${match.scanId}`;
+  // A route with no report yet (New scan) has no report crumb: the trail is
+  // Reports and then the page itself.
+  const report =
+    match.scanId == null
+      ? null
+      : {
+          ...reportTrail(trail, pathname, match.scanId),
+          site: seedUrl ? siteLabel(seedUrl) : "Report",
+          id: match.scanId,
+        };
+  const crumbs = report ? report.crumbs : trail;
+  const ancestors = crumbs.slice(0, -1);
+  const current = crumbs[crumbs.length - 1];
 
+  // WAI-ARIA breadcrumb pattern: a navigation landmark named "Breadcrumb"
+  // around an ordered list, one item per crumb, the separators drawn inside
+  // the items (and hidden from assistive tech) so the list's length is the
+  // trail's, and the last item plain text marked ``aria-current="page"``.
+  // It used to be a filled chip, which looked like a button you could press.
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
-      <ol className="flex min-w-0 flex-wrap items-center gap-1">
-        <Crumb to="/scans">Reports</Crumb>
-        <Separator />
-        {/* The site is the middle crumb and links to the report's own
-            overview: from any view, one click gets back to the whole report.
-            A route with no report yet (New scan) skips straight to the chip. */}
-        {match.scanId != null && (
-          <>
-            <Crumb to={`/scans/${match.scanId}`} className="max-w-[18rem] truncate">
-              {middle}
+      <ol className="flex min-w-0 flex-wrap items-center gap-x-1">
+        <Crumb to="/scans" first>
+          Reports
+        </Crumb>
+        {report &&
+          (current ? (
+            <Crumb to={report.reportTo} title={`${report.site} #${report.id}`}>
+              <ReportName site={report.site} id={report.id} />
             </Crumb>
-            <Separator />
-          </>
-        )}
+          ) : (
+            <Current title={`${report.site} #${report.id}`}>
+              <ReportName site={report.site} id={report.id} />
+            </Current>
+          ))}
         {ancestors.map((ancestor) => (
-          <Fragment key={`${ancestor.label}-${ancestor.to}`}>
-            <Crumb to={ancestor.to} className="max-w-[12rem] truncate" title={ancestor.label}>
-              {ancestor.label}
-            </Crumb>
-            <Separator />
-          </Fragment>
-        ))}
-        <li className="min-w-0">
-          {/* The current view is a filled chip, not just bolder text: at a
-              glance the trail should show which of the report's views you are
-              standing in without being read word by word. */}
-          {/* An issue title is a sentence, not a view name, so the chip
-              truncates and keeps the whole title in `title` for a hover and
-              in the DOM for a screen reader. */}
-          <span
-            aria-current="page"
-            title={view}
-            className="inline-block max-w-[26rem] truncate rounded-full bg-umich-blue/10 px-2.5 py-1 text-xs font-semibold text-umich-blue"
+          <Crumb
+            key={`${ancestor.label}-${ancestor.to}`}
+            to={ancestor.to}
+            className="max-w-[12rem]"
+            title={ancestor.label}
           >
-            {view}
-          </span>
-        </li>
+            <span className="truncate">{ancestor.label}</span>
+          </Crumb>
+        ))}
+        {current && (
+          <Current title={current.label}>
+            <span className="truncate">{current.label}</span>
+          </Current>
+        )}
       </ol>
     </nav>
+  );
+}
+
+/** ``app.codegra.de #40``. The site truncates; the number never does, since
+ *  it is what tells two reports of one site apart. */
+function ReportName({ site, id }: { site: string; id: number }) {
+  return (
+    <>
+      <span className="truncate">{site}</span>
+      <span className="shrink-0 whitespace-pre tabular-nums"> #{id}</span>
+    </>
   );
 }
 
@@ -369,19 +343,25 @@ function Crumb({
   children,
   className,
   title,
+  first = false,
 }: {
   to: string;
   children: React.ReactNode;
   className?: string;
   /** Full text for a crumb the layout truncates (an issue title). */
   title?: string;
+  first?: boolean;
 }) {
   return (
-    <li className="min-w-0">
+    <li className="flex min-w-0 items-center">
+      {!first && <Separator />}
       <Link
         to={to}
         title={title}
-        className={`report-link block min-h-target content-center whitespace-nowrap px-2 py-2 font-semibold ${className ?? ""}`}
+        className={cn(
+          "report-link flex min-h-target min-w-0 max-w-[20rem] items-center whitespace-nowrap px-2 py-2 font-semibold",
+          className,
+        )}
       >
         {children}
       </Link>
@@ -389,10 +369,24 @@ function Crumb({
   );
 }
 
-function Separator() {
+/** Where you are: plain text, not a link and not a chip. An issue title is a
+ *  sentence, so it truncates and keeps the whole title in ``title`` for a
+ *  hover and in the DOM for a screen reader. */
+function Current({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <li aria-hidden className="flex shrink-0 items-center">
-      <ChevronRight className="h-3.5 w-3.5 text-border-strong" />
+    <li className="flex min-w-0 items-center">
+      <Separator />
+      <span
+        aria-current="page"
+        title={title}
+        className="flex min-w-0 max-w-[26rem] items-center whitespace-nowrap px-2 py-2 font-semibold text-fg"
+      >
+        {children}
+      </span>
     </li>
   );
+}
+
+function Separator() {
+  return <ChevronRight aria-hidden className="h-3.5 w-3.5 shrink-0 text-border-strong" />;
 }

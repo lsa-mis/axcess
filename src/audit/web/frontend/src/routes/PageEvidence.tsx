@@ -126,7 +126,8 @@ export default function PageEvidenceRoute() {
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
             No check reported a problem on this page. That is not the same as a pass, the
-            report overview lists which methods ran and which did not.
+            scan coverage above the report&rsquo;s issue table lists which methods ran and
+            which did not.
           </Card>
         ) : groups === null ? (
           <div className="space-y-3">

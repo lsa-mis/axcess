@@ -120,6 +120,20 @@ function zoomActionFor(input) {
   return null;
 }
 
+/**
+ * Which way an app command moves through history, or null.
+ *
+ * The desktop window has no browser toolbar, so the mouse's back and forward
+ * side buttons did nothing. Electron reports them as app commands on Windows
+ * and Linux (``browser-backward`` / ``browser-forward``); every other app
+ * command, media keys included, is left alone.
+ */
+function historyStepFor(command) {
+  if (command === "browser-backward") return "back";
+  if (command === "browser-forward") return "forward";
+  return null;
+}
+
 /** Zoom level after applying `action`, clamped to roughly 30%-500%. */
 function nextZoomLevel(current, action) {
   if (action === "reset") return 0;
@@ -185,6 +199,7 @@ module.exports = {
   OutputTail,
   contentSecurityPolicy,
   desktopEnvironment,
+  historyStepFor,
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,

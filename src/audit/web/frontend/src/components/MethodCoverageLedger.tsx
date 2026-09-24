@@ -44,6 +44,12 @@ const METHOD_PIPELINE: Partial<Record<ScanMethodCoverage["key"], IssueRow["pipel
   semantic: ["semantic"],
 };
 
+/** The methods that actually ran, fully or in part. The report's one-line
+ *  coverage summary and this ledger count the same set. */
+export function methodsRan(methods: ScanMethodCoverage[]): ScanMethodCoverage[] {
+  return methods.filter((method) => method.state === "checked" || method.state === "partial");
+}
+
 export default function MethodCoverageLedger({
   scanId,
   methods,
@@ -55,7 +61,7 @@ export default function MethodCoverageLedger({
   rows: IssueRow[] | undefined;
   className?: string;
 }) {
-  const ran = methods.filter((method) => method.state === "checked" || method.state === "partial");
+  const ran = methodsRan(methods);
 
   return (
     <Card className={cn("overflow-hidden", className)}>
