@@ -86,13 +86,15 @@ that it completed work.
 
 When a click opens a **modal** (`aria-modal="true"`, or a native `<dialog>`
 opened with `showModal()`), the probe explores inside it, then closes it and
-confirms it closed before touching the next control. It tries Escape first,
-then the dialog's own close control if its name is unambiguously a dismissal
-(`Close`, `Cancel`, `Dismiss`, `×`; never `OK`, `Done` or `Continue`, which
-on a confirmation dialog are the button that performs the action). A dialog
-that will not close **ends that page's exploration**: its overlay covers
-every remaining control, so continuing would record clicks that only landed
-on the overlay.
+confirms it closed before touching the next control. It tries Escape first.
+If that fails, it uses the dialog's own close control, but only when the name
+clearly means dismiss, such as `Close`, `Cancel`, `Dismiss`, or `×`. It does
+not count `OK`, `Done`, or `Continue` as a dismissal, because on a
+confirmation dialog those perform the action.
+
+A dialog that will not close **ends that page's exploration**: its overlay
+covers every remaining control, so continuing would record clicks that only
+landed on the overlay.
 
 The page's ledger row stores `dialogs_stuck`, the
 `dialog_not_dismissed` limit, and a reproduction note naming the dialog, the
@@ -107,17 +109,21 @@ reason. The consequence is that a dialog which *behaves* modally without
 declaring it is not recognized as one here; that gap is itself a defect worth
 fixing in the page.
 
-Per-page click-probe coverage is stored in `scan_interaction_runs`: the
-controls each page exposed (including ones a click revealed), how many
-distinct controls were operated, clicks dispatched, DOM states reached,
-controls refused by the blocked-label filter, and which bound (clicks,
-time, depth or repeated shapes) ended the sweep. The report's
-**Click Through DOM States** row shows these as
-"N of M controls operated", so a page whose controls were mostly refused or
-capped cannot read as a page that was fully exercised. Discovery is not
-coverage: a counted control was not necessarily operated. Reports written
-before this ledger existed show the page and state counts only, rather than
-a zero that would look like a finding.
+Axcess stores per-page click coverage in `scan_interaction_runs`:
+
+- the controls each page exposed, including ones a click revealed;
+- how many distinct controls were operated;
+- clicks dispatched;
+- DOM states reached;
+- controls refused by the blocked-label filter;
+- which bound (clicks, time, depth, or repeated shapes) ended the sweep.
+
+The report's **Click Through DOM States** row shows "N of M controls
+operated". That way a reader can tell when most controls on a page were
+refused or capped. Discovery is not coverage: a counted control was not
+necessarily operated. Reports written before this ledger existed show the
+page and state counts only, rather than a zero that would look like a
+finding.
 
 A configured search runs with the auditor's explicit authorization and is
 **not** subject to the automatic-click HTTP write guard; only out-of-scope

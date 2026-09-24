@@ -102,21 +102,24 @@ requires manual reproduction.
 | Semantic review | `semantic` | Registered analyzers for 1.2.1, 2.4.4, 2.4.6, and 3.3.2. | Requires an explicitly configured local Ollama service; unsupported configured criteria are skipped and logged. |
 
 The default public scan renders every page in a browser and runs axe-core as
-its rule engine. Under Advanced settings you can choose axe-core, Siteimprove
-Alfa, or both as the rule engine (Alfa must be installed), use **Fast crawl
-without a browser** with Alfa as the only engine, show the scanning browser
-window, and turn the image and click-through layers on or off. Every report
-shows the number of pages or images actually checked, not merely that a
-feature was selected.
+its rule engine. Under Advanced settings you can:
+
+- choose axe-core, Siteimprove Alfa, or both as the rule engine (Alfa must be
+  installed);
+- use **Fast crawl without a browser** with Alfa as the only engine;
+- show the scanning browser window;
+- turn the image and click-through layers on or off.
+
+Every report shows the number of pages or images actually checked, not merely
+that a feature was selected.
 
 ## Authenticated-site coverage
 
 Axcess supports two manual sign-in models without collecting credentials:
 
-- **Local login scan** (the **Site with a login or 2FA** tab): a visible
-  Chromium window opens on the Axcess computer, the auditor signs in directly,
-  and after the auditor confirms, the crawl continues with that signed-in
-  session, held only in memory.
+- **[Login scan](./glossary.md#login-scan)** (the **Site with a login or 2FA**
+  tab). The browser window opens on the Axcess computer, and the signed-in
+  session is held only in memory.
 - **Managed protected scan:** an identity-gated, scan-bound companion model
   with stricter scope, retention, encryption, and permission controls.
 

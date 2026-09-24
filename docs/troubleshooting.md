@@ -11,19 +11,19 @@ address fails, a red notice says "Site URL returned HTTP" with the status code
 and the page title.
 
 - **403 with the title "Just a moment..."**: a Cloudflare bot check. Axcess
-  already opens every page in a real browser, and it also switches to the
-  browser when it spots a bot check, but heavier checks can still stop it. If
-  you turned on **Fast crawl without a browser** (or used `--static-only`),
-  turn it off and scan again.
+  opens pages in a real browser by default, but a heavier bot check can still
+  block it. If you turned on **Fast crawl without a browser** (or used
+  `--static-only`), Axcess switches to the browser only when it spots a bot
+  check, so turn fast crawl off and scan again.
 - **403 with the title "Access Denied"**: a firewall that refuses automated
   visitors, so Axcess cannot scan the site as it is. Ask the site owner
   whether they can allow your scan.
 - **401, or a sign-in page**: the pages need a login. Start a new scan on the
   **Site with a login or 2FA** tab, sign in yourself in the browser window
   Axcess opens, then select **I'm signed in, start scan**. A
-  [login scan](./glossary.md#login-scan) needs an `https://` address, runs
-  only in Axcess on your own computer (not in a copy hosted for a team), and
-  works only for sites with public internet addresses.
+  [login scan](./glossary.md#login-scan) needs an `https://` address and a
+  site with a public internet address. It runs only in Axcess on your own
+  computer, not in a copy hosted for a team.
 - **404**: check the address for a typo.
 
 ## It's crawling too much or too little
@@ -37,17 +37,18 @@ and the page title.
   turn on **Crawl the entire host**. Also check **Max pages** (2,500 by default
   in the app, 500 on the command line) and **Max link depth** (10 by default).
 - **A new scan continued an old one.** If an earlier scan of the same address
-  was stopped or interrupted, starting that address again can continue the
-  earlier report instead of creating a new one. Queued pages that fall outside
-  the new scope are dropped. If you want a separate report and no longer need
-  the earlier one, delete it first with **Delete report** under **Danger
-  zone** on its scan page.
+  ended early (for example, Axcess closed mid-scan) and still had pages
+  waiting, starting that address again can continue the earlier report. It
+  drops queued pages that fall outside the new scope. A scan you stopped
+  with **Stop scan** is never continued. If you want a separate report and no
+  longer need the earlier one, delete it first with **Delete** on the
+  **Reports** list.
 
 ## The scan is stuck or very slow
 
 - **Stop it.** Select **Stop scan** on the scan page. Axcess marks the scan as
   interrupted, drops the pages still waiting in its queue, and keeps everything
-  it already collected. The API route is `POST /api/scans/<id>/cancel`.
+  it already collected.
 - **The site is struggling.** Lower **Requests per second** or **Parallel
   workers** under Advanced settings, **Speed and debugging**, then scan again.
   On the command line, lower `--rps`.

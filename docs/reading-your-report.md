@@ -43,21 +43,53 @@ On the **Issues** tab, select an issue's name to open its
 | --- | --- |
 | The page URL | **Pages with this issue** lists each page's title and URL, with **Open live page**. |
 | The selector and code | **Flagged element** shows up to three sample locations, each with its selector and highlighted HTML. A page's **Stored evidence** lists every result on that page, with **Selector for developers**. |
+| An image with text in it | For an [image of text](glossary.md#image-of-text), **Flagged element** names the image by its position on the page, such as Image occurrence 2 (above the fold), with its alt text. It has no selector or HTML. The page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), its alt text, and the text read from it. Search your code or content system for that image address. |
 | A screenshot | **Issue screenshots** links to circled screenshots when the scan captured them. Siteimprove Alfa results have none, because Alfa runs in a separate browser session. |
 | The page inspector | Select a page title in **Pages with this issue**. The inspector opens the stored page (or a fresh render if none was stored) with scripts off and the flagged elements highlighted, and **DOM source** shows the markup. |
 
-In **Why it matters, and how to fix it**, make the changes in **Expected
-behavior**, check the result against **Done when**, and confirm it with **How
-to verify**. **Rule docs** opens the rule's own documentation; start there
-when a rule has no written guidance yet.
+Open **Why it matters, and how to fix it**, which starts collapsed. For
+Needs review it is called **Why it matters, and what to check**. Make the
+changes in **Expected behavior**, check them against **Done when**, and confirm
+them with **How to verify** (**What to check to confirm** for Needs review).
+
+**Rule docs** sits at the top of the record, beside the evidence confidence
+chip, and appears only when the rule has its own documentation. Start there
+when the record has no written guidance.
 
 To reproduce a problem that appears only after a click:
 
-1. Find the note under the page name in **Flagged element**, such as
-   After clicking “Menu”.
-2. Use that control on the live page. For a nested state, the inspector's
-   **Page state** picker lists each step: After clicking “Menu” → “Settings”.
-3. Choose that state in **Page state** to see the markup the scan captured.
+1. Find the control's name under the page name in **Flagged element**, such
+   as After clicking “Menu”. The note names only the last control used. For a
+   page not among those samples, look in that page's **Stored evidence**,
+   which groups results under headings such as After clicking “Menu”.
+2. Select the page title in **Pages with this issue** to open the inspector,
+   then open **Page state**. The entry with a count, such as
+   After clicking “Menu” → “Settings” (2), lists every control in order and
+   shows the markup the scan captured.
+3. On the live page, use each control in that order, then find the element by
+   its selector.
+
+### If you have a ticket or a workbook row, not the app
+
+Reports stay where Axcess ran the scan, so you may get only an export.
+
+- **Jira ticket**: **Page** is the page address. **Target selector** and
+  **Failing HTML** locate the element, **To reproduce** names any control to
+  use first, and **Rule docs**, when present, links to the rule's
+  documentation. These tickets have no fix steps, so ask for the issue's
+  **Expected behavior** or use the workbook. A ticket for an image of text
+  instead lists **Image URL**, **OCR text**, any **Suggested fix**, and each
+  page under **Occurrences**.
+- **The "Review locally" link** in a ticket opens only where the Axcess app
+  that made the export is running, usually the analyst's computer.
+- **Workbook issue tab**: **Where** names the page, **Element** gives the
+  selector (or the image address), and **User action** says what to open
+  first. **What to fix** and **How to reproduce** are described under
+  [Exports](#exports). The **Page References** sheet links every affected page.
+
+For a nested state, **To reproduce** and **User action** name only the last
+control, like the note in the app. Ask the analyst for the full chain, which
+the inspector's **Page state** picker shows.
 
 ## The Overview tab
 
@@ -66,20 +98,20 @@ changes** tabs. Its header holds the **Export** menu and **Open Issue Groups**.
 
 | Tile | What it counts |
 | --- | --- |
-| Pages Tested | Every page the scan recorded, including pages that answered with an error. Its hint counts crawl errors: pages that failed to load or could not be processed. |
+| Pages Tested | Every page the scan recorded, including pages that answered with an error and pages that failed to load. Its hint counts crawl errors (pages that failed to load or could not be processed). Most of those are already counted in this number, not extra pages. |
 | Issues Found | [Occurrences](glossary.md#occurrence) in every issue group, including Needs review and Informational, so it is not a count of confirmed problems. |
 | Issue Groups | Rows in the Issues table, across all three report groups. |
 | DOM States Found | [DOM states](glossary.md#dom-state) the scan reached by operating controls. |
 
 **What this scan actually checked** lists each method, such as axe-core and
-Click Through DOM States, with a result and a state: Not selected, Waiting,
-Checking, Ran, Partly ran, Did not run, or Not recorded. Open a row for what it
-found and what it cannot prove. The focus and visual checks have no row here.
+Click Through DOM States. Each row shows a result and one of these states: Not
+selected, Waiting, Checking, Ran, Partly ran, Did not run, or Not recorded.
+Open a row for what it found and what it cannot prove. The focus and visual
+checks have no row here.
 
-The crawl error count says how many pages failed, not which ones. A page that
-answered with an error, such as "Sign-in required (HTTP 401)", counts as
-tested, and its **Stored evidence** shows that status. Pages skipped by
-robots.txt or outside the [scope](glossary.md#scope) are never listed.
+The crawl error count says how many pages failed, not which ones. See
+[pages not reached](glossary.md#pages-not-reached) for what the report does and
+does not list.
 
 ## The Issues tab
 
@@ -98,7 +130,7 @@ review, not a conformance verdict." The columns, in order:
 | Responsibility | Who usually makes the fix, such as Dev, Editor, or Designer; "n/a" for Informational rows. |
 | About | A short summary, described below. |
 
-Filter with **Search** (an issue name or WCAG criterion number), **Level** (A,
+Filter with the **Search issues** box (an issue name or WCAG criterion number), **Level** (A,
 AA, AAA, or Best practice), and **Type** (a report group).
 
 The table opens "Sorted by Priority, barriers first, then highest first":
@@ -113,8 +145,8 @@ until the expert decision is documented."
 ## The full evidence record
 
 1. **Report group card**: the group, an evidence confidence chip (high,
-   medium, or low), **Rule docs**, and a one-line evidence summary, such as
-   "Deterministic axe-core rule failure; verify after remediation." It calls
+   medium, or low), and **Rule docs**. A one-line evidence summary follows,
+   such as "Deterministic axe-core rule failure; verify after remediation." It calls
    Needs review "Needs confirmation" (the dashboard says "Review leads").
 2. **Facts**: Criterion level, Priority, Pages affected, Occurrences,
    Difficulty, Responsibility, and Abilities affected.
@@ -149,16 +181,24 @@ control with no readable name shows its tag, such as `<button>`.
 
 ## Recording decisions
 
-Every finding starts with the [status](glossary.md#status) new. Use reviewing
-while you check it, in progress once you confirm a real barrier and plan a
-fix, remediated when it is fixed, accepted risk when your team decides to
-accept it, and false positive when it is not a real problem. The last four need
-a reason, which the app saves in the finding's history but does not show again.
+Every finding starts with the [status](glossary.md#status) new. Then use:
 
-You cannot change status in the Issues table or the evidence record. Open
-**Overview**, expand **Expert tools and scan details**, and choose **DOM
-engines** (one finding, or **Group by rule** for a whole rule) or **Image
-evidence** (one image finding, or **Group by issue** for a whole group).
+- **Reviewing** while you check it.
+- **In progress** once you confirm a real barrier and plan a fix.
+- **Remediated** when it is fixed.
+- **Accepted risk** when your team decides to accept it.
+- **False positive** when it is not a real problem.
+
+The last four need a reason, which the app saves in the finding's history but
+does not show again.
+
+You cannot change status in the Issues table or the evidence record. Instead:
+
+1. Open **Overview**.
+2. Expand **Expert tools and scan details**.
+3. For page results, choose **DOM engines** (use **Group by rule** to change a
+   whole rule). For image results, choose **Image evidence** (use **Group by
+   issue** for a whole group).
 
 Remediated, accepted risk, and false positive results move to the audit
 report's Appendix A and leave the Jira CSV; a Needs review group marked in
@@ -172,24 +212,56 @@ formats. The last two need the API (`/api/scans/{id}/export/jira` or
 
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
-| Remediation workbook (`.xlsx`) | Assigning and tracking fixes | Summary; Issues Overview (ID, Issue, Severity, Conformance Level, Remediation Ownership, Status, Instances, Pages, Details); a tab per issue for the first 40 (#, Where, User action, Element, What to fix, How to reproduce); More Issues; Page Hotspots; Page References; DOM States; Who's Affected; Coverage & Method; Test Tracking; Manual Review Evidence |
-| Audit report (`.audit.md`) | A narrative report for stakeholders | Executive summary, Open barrier summary, Who is affected, Coverage and method, WCAG 2.2 A/AA coverage, Page hotspots, Remediation worklist by owner, Issue cards, Appendix A and B |
+| Remediation workbook (`.xlsx`) | Assigning and tracking fixes | A summary, an issue index, a tab per issue, and supporting sheets (listed below the table) |
+| Audit report (`.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
 | Issue table (`.csv`) | Filtering in a spreadsheet | One row per finding (per page for an image finding), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | Raw findings (`.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
 | Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per finding not marked remediated, accepted risk, or false positive |
 | Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including review leads |
 
-- **What to fix** exists only in the workbook. It repeats the issue's fix
-  steps (Expected behavior in the app) on every instance row, so it is not
-  advice about that one instance, and it is blank when the rule has none.
-  **How to reproduce** holds verification steps, not steps to reproduce.
+Remediation workbook sheets:
+
+- Summary
+- Issues Overview: ID, Issue, Severity, Conformance Level, Remediation
+  Ownership, Status, Instances, Pages, and Details
+- A tab per issue for the first 40 issues: #, Where, User action, Element,
+  What to fix, and How to reproduce
+- More Issues, which holds the rest when there are more than 40
+- Page Hotspots
+- Page References
+- DOM States
+- Who's Affected
+- Coverage & Method
+- Test Tracking
+- Manual Review Evidence
+
+Audit report sections:
+
+- Executive summary
+- Open barrier summary
+- Who is affected
+- Coverage and method
+- WCAG 2.2 A/AA coverage
+- Page hotspots
+- Remediation worklist by owner
+- Issue cards
+- Appendix A and B
+
+Notes on the exports:
+
+- **What to fix** exists only in the workbook. It copies the issue's fix
+  steps (**Expected behavior** in the app) onto every instance row. It is
+  general advice, not advice for that one instance, and it is blank when the
+  rule has none. **How to reproduce** holds verification steps, not steps to
+  reproduce.
 - Audit report issue cards cover open Barrier groups tied to a WCAG criterion
   and Needs review groups marked in progress; other open results, including
   review leads, go to Appendix B. The workbook Summary's "Likely-barrier"
   counts follow these cards, so they can differ from the Issues table.
 - The workbook's Issues Overview, the CSV, the JSON, and the Jira CSV have no
-  report group column, and the Jira CSV includes Needs review leads, so review
-  it before you import. Edits to a downloaded file never flow back to Axcess.
+  report group column. The Jira CSV also includes Needs review leads and
+  Informational records, so check it before you import. Edits to a
+  downloaded file never flow back to Axcess.
 
 ### Draft labels
 
@@ -197,9 +269,9 @@ Export menu downloads are labeled a [draft](glossary.md#draft-export) until
 the report's expert evaluation is complete and every Barrier and Needs review
 finding has a status other than new or reviewing. A draft has `_DRAFT` in its
 file name and a notice inside, such as a "DRAFT NOTICE" sheet or an "Axcess
-export state" CSV column. The app has no screen for the evaluation yet (only
-`PUT /api/scans/{id}/evaluation` completes it), so for now every Export menu
-download is a draft. The command-line `audit export` adds no draft label.
+export state" CSV column. The app has no screen for completing the evaluation
+yet, so for now every Export menu download is a draft. The command-line
+`audit export` adds no draft label.
 
 ## Verify changes after a fix
 
@@ -215,9 +287,8 @@ report for the same start address, counting issue groups, not findings.
 | No longer detected | Not found again with comparable checks. Confirm the fix on the page before marking it remediated. |
 | Cannot compare reliably | Missing evidence or different coverage prevents a reliable conclusion. Recheck the affected pages. |
 
-"No longer detected" is not proof of a fix (see
-[rescan comparison](glossary.md#rescan-comparison)), so read the **Comparison
-coverage** notes and confirm each fix on the page.
+Read the **Comparison coverage** notes before you trust a result. See
+[rescan comparison](glossary.md#rescan-comparison).
 
 ## Acting on findings
 
@@ -243,8 +314,10 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
   and [manual testing](glossary.md#manual-testing).
 - **Pages and states it never reached** (see
   [pages not reached](glossary.md#pages-not-reached)). A method marked Not
-  selected produced no evidence, and the click-through cannot reach hover-only
-  content, gestures, operating-system menus, closed shadow DOM, cross-origin
-  embeds, or states with no observable DOM change.
+  selected did not run, with one exception: the image row reads Not selected
+  whenever the vision model is off, although OCR image results can still
+  appear. The click-through cannot reach hover-only content, gestures,
+  operating-system menus, closed shadow DOM, cross-origin embeds, or states
+  with no observable DOM change.
 - **What axe-core could not decide.** Axcess keeps only axe-core's
   violations, not the results it marks as incomplete.

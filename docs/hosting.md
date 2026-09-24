@@ -1,7 +1,7 @@
 # Hosting Axcess
 
-Axcess was built [local-first](./glossary.md#local-first): a single-user app
-that binds to `127.0.0.1` with no authentication. That's the right default,
+Axcess is [local-first](./glossary.md#local-first), and by default it runs as
+a single-user app on `127.0.0.1` with no sign-in. That's the right default,
 but you can host it for yourself and a small team on an always-on machine with
 a few minutes of setup. This is the runbook for that ("Path A").
 
@@ -181,13 +181,13 @@ U-M security team before approving a production target.
 
 ## Running without Ollama
 
-If you don't want to run the local AI service (its models are large downloads
-and add time to every page), Axcess still does plenty without it: browser
-rendering, axe-core, Siteimprove Alfa (if installed), the keyboard, focus,
-zoom and click-through checks, and [OCR](./glossary.md#ocr) with Tesseract.
+You can skip the local AI service: its models are large downloads and add
+time to every page. Without it, Axcess still renders pages and runs axe-core,
+Siteimprove Alfa (if installed), the keyboard, focus, zoom, and click-through
+checks, and [OCR](./glossary.md#ocr) with Tesseract.
 
-In the New scan form, the switches under Advanced settings, **Local AI**, that
-use a model are already off by default: **Review image text with a local
+In the New scan form, the switches that use a model are already off. You find
+them under Advanced settings, **Local AI**: **Review image text with a local
 vision model**, **Review wording with local AI**, and **Check motion and
 animation**. **Read text inside images (OCR)** stays on, because it needs no
 model. On the command line these checks are on by default, so turn them off:
@@ -198,8 +198,8 @@ uv run audit crawl https://example.com --skip-vlm --skip-semantic --skip-visual
 
 If Ollama isn't reachable when a scan starts, Axcess logs a warning and
 continues without those checks. The report's "What this scan actually checked"
-list shows which methods ran, so anyone reading it knows the coverage was
-partial.
+list shows whether the vision model and the wording check ran. The motion
+check has no row there, so note it separately when it was off.
 
 ---
 
@@ -238,5 +238,6 @@ When one-crawl-at-a-time or the shared token stops being enough:
   controls on the crawler, and a hosted-GPU or cloud-LLM story to
   replace local Ollama.
 
-Both are real projects, not config changes: the local-first design is
-load-bearing. The quick start above is the 95% case for a team.
+Both are real projects, not settings you can change, because much of Axcess
+depends on running on one computer. The quick start above covers what most
+teams need.
