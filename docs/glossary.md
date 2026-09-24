@@ -112,10 +112,10 @@ many [DOM states](#dom-state) it reached. The report's Overview shows this under
 
 ### Pages not reached
 
-Pages the scan tried but could not test, such as pages that failed to load or
-needed a sign-in. The Overview counts these as crawl errors, but it does not
-list pages skipped because of robots.txt or because they were outside the
-[scope](#scope).
+Pages the scan tried but could not load. The Overview counts these as crawl
+errors, and a page that answered with an error such as "Sign-in required" is
+listed with that status instead. The report does not list pages skipped
+because of robots.txt or because they were outside the [scope](#scope).
 
 ### Scope
 
