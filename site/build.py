@@ -1326,7 +1326,7 @@ def privacy() -> str:
     <div class="outside">
       <div><strong>Connects to: the website you are scanning</strong><span>Axcess loads pages from the target site at the rate you set. Public scans respect robots.txt unless you say otherwise; login scans do not check it. Viewing a stored page later can also load that site's styles, fonts, and images.</span></div>
       <div><strong>Connects to: GitHub, for desktop updates</strong><span>Once per launch, the desktop app asks GitHub whether a newer version exists. That request carries no scan data, and setting <code>AXCESS_DISABLE_UPDATE_CHECK=1</code> turns it off.</span></div>
-      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
+      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no cloud AI. The <em>Give feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
     </div>
   </div>
 </section>
