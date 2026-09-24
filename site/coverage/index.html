@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>What Axcess checks — Axcess</title>
-<meta name="description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<title>What Axcess checks | Axcess</title>
+<meta name="description" content="What Axcess checks, which report group each result lands in, how it compares with Siteimprove and axe DevTools, and a searchable map of every WCAG 2.2 A and AA success criterion with what a person still needs to test.">
 <link rel="canonical" href="https://lsa-mis.github.io/axcess/coverage/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Axcess">
-<meta property="og:title" content="What Axcess checks — Axcess">
-<meta property="og:description" content="An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.">
+<meta property="og:title" content="What Axcess checks | Axcess">
+<meta property="og:description" content="What Axcess checks, which report group each result lands in, how it compares with Siteimprove and axe DevTools, and a searchable map of every WCAG 2.2 A and AA success criterion with what a person still needs to test.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/coverage/">
 <meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -46,16 +46,86 @@
   <div class="wrap">
     <span class="eyebrow">Coverage</span>
     <h1>What Axcess checks, and what it <span class="hl">honestly can't</span></h1>
-    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define 55 Level A and AA success criteria. Axcess contributes evidence to 29 of them today. Every one of the 55 is listed below, including the 26 a person must test by hand, with the steps to do it.</p>
+    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define 55 Level A and AA success criteria. Axcess contributes evidence to 29 of them today. This page explains where each result lands, how Axcess compares with Siteimprove and axe DevTools, and lists all 55 criteria, including the 26 a person must test by hand, with the steps to do it.</p>
   </div>
 </section>
+
+<section class="soft" id="groups">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Report groups</span>
+      <h2>Every result lands in one of three groups</h2>
+      <p class="sub">The group tells you how certain a result is and what to do next. <a href="../faq/#glossary">The glossary defines each group.</a></p>
+    </div>
+    <div class="shot-frame">
+      <img class="shot" src="../assets/diagrams/report-groups.png" width="1600" height="900"
+        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking; confirm and fix them. Needs review holds browser checks, the keyboard check, AI checks, and Alfa can't-tell results; a person tests and decides. Informational holds records such as images whose alt text already matches; no action is needed.">
+    </div>
+    <div class="lanes" style="margin-top:1.5rem">
+      <div class="lane lane-automated">
+        <span class="chip chip-automated">Barrier</span>
+        <h3>Confirm it, then fix it</h3>
+        <p>Comes from axe-core rule failures, including problems found after clicking, and from Siteimprove Alfa failures. Confirm it on the page, fix it, then rescan.</p>
+      </div>
+      <div class="lane lane-observed">
+        <span class="chip chip-partial">Needs review</span>
+        <h3>A person decides</h3>
+        <p>Comes from browser checks, the keyboard check, local AI checks, and Alfa “can't tell” results. Test it on the page and record your decision.</p>
+      </div>
+      <div class="lane" style="border-top-color:#c2cad6">
+        <span class="chip chip-manual">Informational</span>
+        <h3>Nothing to fix</h3>
+        <p>Records kept for transparency, such as images whose alt text already matches the words in them. No action is needed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Compared with other tools</span>
+      <h2>Where Axcess fits next to Siteimprove and axe DevTools</h2>
+      <p class="sub">We use and like both. Siteimprove monitors whole sites from the cloud, and axe DevTools checks the page in front of you. Axcess fills gaps: pages behind a sign-in, content behind a click, and checks that need a real browser or a person's judgement.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Axcess checks compared with Siteimprove and axe DevTools">
+      <table>
+        <caption class="vis-hidden">Axcess checks, what they catch, and whether Siteimprove or axe DevTools also catch them</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">What it catches</th><th scope="col">WCAG</th><th scope="col">Report group</th><th scope="col">Also caught by Siteimprove?</th><th scope="col">Also caught by axe DevTools?</th></tr></thead>
+        <tbody><tr><th scope="row">Rule engine (axe-core)</th><td>Machine-testable problems on every rendered page, such as missing text alternatives, unlabeled form fields, low text contrast, and ARIA errors. About 90 rules run at Level AA.</td><td>Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2</td><td>Barrier</td><td>Yes. Siteimprove checks the same kinds of problems with its own rule engine.</td><td>Yes. axe DevTools runs these same axe-core rules.</td></tr><tr><th scope="row">Click through menus, tabs, and dialogs</th><td>Problems that only appear after a control is used. Axcess operates each safe control, runs axe-core again on what appears, and records which control revealed each problem.</td><td>The same criteria as axe-core</td><td>Barrier</td><td>Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.</td><td>Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.</td></tr><tr><th scope="row">Reflow at phone width</th><td>Pages that need sideways scrolling at 320 CSS pixels wide.</td><td>1.4.10 (AA)</td><td>Needs review</td><td>No automated check found.</td><td>No automated check found.</td></tr><tr><th scope="row">Text cut off at 200% zoom</th><td>Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.</td><td>1.4.4 (AA)</td><td>Needs review</td><td>Partly. Siteimprove has documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026.</td><td>Partly. axe-core flags pages that block zooming, not clipped text.</td></tr><tr><th scope="row">Text spacing</th><td>Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.</td><td>1.4.12 (AA)</td><td>Needs review</td><td>Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.</td><td>Partly. The same inline-style check.</td></tr><tr><th scope="row">Keyboard traps</th><td>Places where Tab and Shift+Tab both fail to move focus away. Reported at most once per page.</td><td>2.1.2 (A)</td><td>Needs review</td><td>No automated check found.</td><td>Only in the paid Keyboard guided test. No axe-core rule.</td></tr><tr><th scope="row">Focus checks</th><td>A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.</td><td>2.4.11 (AA), 2.4.3 (A)</td><td>Needs review</td><td>No automated check found.</td><td>Partly. axe-core flags positive tabindex as a best practice. No rule for hidden focus.</td></tr><tr><th scope="row">Target size</th><td>Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.</td><td>2.5.8 (AA)</td><td>Barrier</td><td>Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess does not.</td><td>Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on for Level AA scans.</td></tr><tr><th scope="row">Text inside images</th><td>Images that contain words, found with OCR and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.</td><td>1.4.5 (AA), 1.1.1 (A)</td><td>Needs review</td><td>No automated check found. Its open-source engine has an experimental rule that needs a person to answer questions.</td><td>No automated check found. A paid guided test reviews image alternatives.</td></tr><tr><th scope="row">Motion and reading order (optional)</th><td>Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.</td><td>1.4.2, 2.2.2, 1.3.2 (A)</td><td>Needs review</td><td>Partly. It checks autoplaying audio (some cases ask a person to confirm) and flags blink and marquee. No reading-order check found.</td><td>Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.</td></tr><tr><th scope="row">AI language checks (optional)</th><td>Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.</td><td>2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)</td><td>Needs review</td><td>Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.</td><td>Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.</td></tr></tbody>
+      </table>
+    </div>
+    <div class="grid grid-2" style="margin-top:1.5rem">
+      <article class="card"><h3>Pages behind a sign-in</h3><p>Axcess scans them after you sign in yourself, including single sign-on and two-factor steps. Siteimprove's help center describes crawling behind a login through a setup done by its support team, and points to an add-on for sites that use multi-factor sign-in. The axe DevTools extension runs in your own signed-in browser, one page at a time.</p></article>
+      <article class="card"><h3>A second opinion from Siteimprove's engine</h3><p>Axcess can also run Siteimprove Alfa, the open-source engine behind Siteimprove's checks, on your computer. Each result keeps the name of the engine that found it, so you can compare them.</p></article>
+    </div>
+    <p class="small" style="margin-top:1.25rem">Checked in September 2026 against public Siteimprove and Deque documentation and the open-source axe-core and Alfa code. “No automated check found” means we found none in their documentation, not that none can exist. Tools change quickly, so please <a href="https://github.com/lsa-mis/axcess/issues">tell us</a> if something here is out of date.</p>
+  </div>
+</section>
+
+<section class="soft" id="by-hand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Manual testing</span>
+      <h2>What you still need to test by hand</h2>
+      <p class="sub">Axcess speeds up manual testing by pointing you to the right pages, elements, and states. It does not replace it. These checks still need a person.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></span><h3>Keyboard</h3><p>Use only the keyboard to reach and operate everything, with Tab, Shift+Tab, Enter, Space, the arrow keys, and Escape. Check that focus is always visible and moves in a sensible order. Axcess's keyboard check only looks for traps.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5A5 5 0 0 1 22 19"/></svg></span><h3>Screen reader</h3><p>Listen to key pages and tasks with a screen reader such as NVDA, JAWS, or VoiceOver. Check that names, roles, headings, and announcements make sense in context.</p></article>
+      <article class="card"><span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg></span><h3>Real tasks</h3><p>Complete real tasks from start to finish, such as applying or registering, including error messages and time limits. Axcess does not fill in or submit forms on its own.</p></article>
+    </div>
+    <p style="margin-top:1.25rem">The criteria list below gives the manual steps for every WCAG success criterion. For guides and training, see <a href="https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html">LSA Accessibility's web accessibility resources</a> and <a href="https://accessibility.lsa.umich.edu/learn/training.html">LSA Accessibility training</a>.</p>
+  </div>
+</section>
+
 
 <section>
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">At a glance</span>
       <h2>29 of 55 criteria with Axcess evidence</h2>
-      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Product Roadmap screen, and the documentation can never disagree.</p>
+      <p class="sub">These numbers are generated from the coverage file the product itself reads, so they cannot drift from the code.</p>
     </div>
     <div class="covbar" role="img" aria-label="Of 55 criteria: 5 automated, 18 partly automated, 6 AI-assisted, 26 manual only."><span class="automated" style="width:9.1%"></span><span class="partial" style="width:32.7%"></span><span class="ai-assisted" style="width:10.9%"></span><span class="manual" style="width:47.3%"></span></div>
     <div class="legend" aria-hidden="true"><span><i style="background:var(--m-automated)"></i>Automated: 5</span><span><i style="background:var(--m-partial)"></i>Partly automated: 18</span><span><i style="background:var(--m-ai)"></i>AI-assisted lead: 6</span><span><i style="background:#c2cad6"></i>Manual only: 26</span></div>
@@ -879,7 +949,8 @@
           <li><a href="../how-it-works/">How it works</a></li>
           <li><a href="../coverage/">What it checks</a></li>
           <li><a href="../who-its-for/">Who it's for</a></li>
-          <li><a href="../faq/">Questions and glossary</a></li>
+          <li><a href="../faq/">Questions</a></li>
+          <li><a href="../faq/#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -887,6 +958,7 @@
         <ul>
           <li><a href="../get-started/">Get started</a></li>
           <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>

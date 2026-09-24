@@ -20,6 +20,7 @@ Everything works without JavaScript.
 from __future__ import annotations
 
 import html
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,13 @@ DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-Setup.exe"
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
+# Pixel sizes of the diagram PNGs in site/assets/diagrams/ (copied from
+# docs/images/diagrams/), so each <img> reserves its space before it loads.
+DIAGRAM_SIZES = {
+    "report-groups": (1600, 900),
+    "login-scan-flow": (1600, 900),
+    "privacy-boundary": (1600, 900),
+}
 
 
 def e(s: object) -> str:
@@ -63,7 +71,7 @@ PAGES: tuple[Page, ...] = (
         "",
         "Home",
         "Axcess",
-        "Local-first accessibility evidence for websites. Scan a site you're authorized to test, see what was found and why it matters, and hand your team a clear list of fixes. Everything stays on your computer.",
+        "A free accessibility scanner that runs on your computer. Sign in yourself, including two-factor steps, and Axcess tests the pages behind the sign-in, opens menus and dialogs, and keeps the evidence on your machine.",
     ),
     Page(
         "how-it-works",
@@ -75,7 +83,7 @@ PAGES: tuple[Page, ...] = (
         "coverage",
         "Coverage",
         "What Axcess checks",
-        "An honest, searchable map of all 55 WCAG 2.2 A and AA success criteria: what Axcess checks for you and what a person still needs to test.",
+        "What Axcess checks, which report group each result lands in, how it compares with Siteimprove and axe DevTools, and a searchable map of every WCAG 2.2 A and AA success criterion with what a person still needs to test.",
     ),
     Page(
         "who-its-for",
@@ -99,7 +107,7 @@ PAGES: tuple[Page, ...] = (
         "faq",
         "FAQ",
         "Questions and glossary",
-        "Straight answers to common questions about Axcess, plus a plain-language glossary of the words you'll see in a report.",
+        "Straight answers to common questions about Axcess, plus the plain-language glossary of the words you'll see in a report.",
     ),
     Page(
         "volume",
@@ -212,9 +220,9 @@ def shell(page: Page, body: str) -> str:
 
     canonical = BASE_URL if page.slug == "" else f"{BASE_URL}{page.slug}/"
     full_title = (
-        "Axcess — local-first accessibility evidence"
+        "Axcess: local-first accessibility testing"
         if page.slug == ""
-        else f"{page.title} — Axcess"
+        else f"{page.title} | Axcess"
     )
     return f"""<!doctype html>
 <html lang="en" class="no-js">
@@ -270,7 +278,8 @@ def shell(page: Page, body: str) -> str:
           <li><a href="{href("how-it-works")}">How it works</a></li>
           <li><a href="{href("coverage")}">What it checks</a></li>
           <li><a href="{href("who-its-for")}">Who it's for</a></li>
-          <li><a href="{href("faq")}">Questions and glossary</a></li>
+          <li><a href="{href("faq")}">Questions</a></li>
+          <li><a href="{href("faq")}#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -278,6 +287,7 @@ def shell(page: Page, body: str) -> str:
         <ul>
           <li><a href="{href("get-started")}">Get started</a></li>
           <li><a href="{href("privacy")}">Privacy and trust</a></li>
+          <li><a href="{REPO}/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="{RELEASES}">Desktop releases</a></li>
           <li><a href="{DOCS}">Documentation</a></li>
         </ul>
@@ -380,29 +390,29 @@ def coverage_data():
 # ---------------------------------------------------------------------------
 
 
-def home(summ, shipped_ct: int, ai_ct: int) -> str:
+def home(summ) -> str:
     total, covered, manual = summ.total, summ.covered, summ.manual_only
     return f"""
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow">Local-first · WCAG 2.2 A/AA evidence · Free and open source</span>
-      <h1>Find accessibility barriers. <span class="hl">Keep the evidence.</span> Fix what matters.</h1>
-      <p class="lede">Axcess scans a website you're authorized to test, shows you exactly what it found and why it matters, and gives your team a clear list of fixes. Everything stays on your computer.</p>
+      <span class="eyebrow">Local-first · WCAG 2.2 A and AA · Free and open source</span>
+      <h1>Test the pages behind the sign-in, <span class="hl">and keep the evidence at home.</span></h1>
+      <p class="lede">Axcess is a free accessibility scanner that runs on your computer. You sign in to the site yourself, including single sign-on and two-factor steps, and Axcess scans from there. The pages, screenshots, and findings stay on your machine.</p>
       <div class="cta">
-        <a class="btn btn-maize" href="how-it-works/">See how it works</a>
-        <a class="btn btn-ghost" href="get-started/">Get started</a>
+        <a class="btn btn-maize" href="get-started/">Get started</a>
+        <a class="btn btn-ghost" href="coverage/">See what Axcess checks</a>
       </div>
-      <p class="meta">Works with public sites and sites behind a login. Runs with <strong>no AI at all</strong>, or add a local model for the judgement calls. <strong>Nothing is uploaded.</strong></p>
+      <p class="meta">Works on public sites too. Runs with <strong>no AI at all</strong>, or add a local model for judgement calls. <strong>Nothing is uploaded.</strong></p>
     </div>
     <div aria-hidden="true">
       <div class="issue-card">
         <div class="chips">
           <span class="chip chip-plain"><span class="sc">1.4.3</span>&nbsp;Contrast (Minimum)</span>
           <span class="chip chip-level">Level AA</span>
-          <span class="chip chip-automated">Rule engine</span>
+          <span class="chip chip-automated">Barrier</span>
         </div>
-        <h3>Body text is too light to read against its background</h3>
+        <p style="color:var(--navy);font-size:1.08rem;font-weight:800;margin:0 0 .4rem">Body text is too light to read against its background</p>
         <dl>
           <dt>What</dt><dd>Grey paragraph text on 14 pages measures 3.1:1 against white. The minimum is 4.5:1.</dd>
           <dt>Why it matters</dt><dd>People with low vision, and anyone reading on a phone in sunlight, may not be able to read it.</dd>
@@ -417,22 +427,22 @@ def home(summ, shipped_ct: int, ai_ct: int) -> str:
 <section>
   <div class="wrap">
     <div class="section-head">
-      <span class="eyebrow">In one minute</span>
-      <h2>Scan. Review. Fix and verify.</h2>
-      <p class="sub">Axcess is organised around the way an accessibility professional actually works, from the first web address to the follow-up scan that proves a fix landed.</p>
+      <span class="eyebrow">The problem</span>
+      <h2>The pages that matter most are often the hardest to test</h2>
+      <p class="sub">Course sites, application portals, and department tools often sit behind a university sign-in with two-factor authentication. Much of their content only appears after someone opens a menu, a tab, or a dialog. Hosted crawlers usually need extra setup to sign in, and content behind a click is often missed by rule-based checkers.</p>
     </div>
     <ol class="steps steps-flow">
       <li>
-        <h3>Scan a site</h3>
-        <p>Paste a web address, set how many pages to visit, and watch the scan run in a real browser. Sign in yourself if the site is behind a login.</p>
+        <h3>Sign in yourself</h3>
+        <p>Axcess opens a normal browser window. You sign in directly with the site, and Axcess never sees your password or code.</p>
       </li>
       <li>
-        <h3>Review clear issues</h3>
-        <p>Every issue answers four questions: what is wrong, why it matters, what the fix looks like, and exactly where it is. Repeated problems are grouped so you fix the cause once.</p>
+        <h3>Axcess scans from there</h3>
+        <p>It visits the pages in the scope you set, opens menus, tabs, and dialogs, and runs its checks on every page it reaches.</p>
       </li>
       <li>
-        <h3>Hand off and verify</h3>
-        <p>Export an Excel workbook, a stakeholder report, or Jira tickets. Rescan later to see what is new, what is resolved, and what is still open.</p>
+        <h3>You get clear, local evidence</h3>
+        <p>Each issue shows what was found and exactly where, with fix guidance and rule documentation where they exist. It all stays on your computer.</p>
       </li>
     </ol>
   </div>
@@ -441,80 +451,62 @@ def home(summ, shipped_ct: int, ai_ct: int) -> str:
 <section class="soft">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">What makes it different</span>
+      <h2>Built for the gaps other tools find hard to reach</h2>
+    </div>
+    <div class="grid grid-2">
+      <article class="card">{icon("lock")}<h3>Scans behind a sign-in</h3><p>Single sign-on and two-factor steps work because you complete them yourself. The session lives in memory, and no reusable login is saved.</p></article>
+      <article class="card">{icon("click")}<h3>Opens what visitors open</h3><p>Axcess clicks through menus, tabs, and dialogs, tests what appears, and tells you which button revealed each problem.</p></article>
+      <article class="card">{icon("phone")}<h3>Checks rule-based tools rarely automate</h3><p>It measures reflow at phone width, text cut off at 200% zoom or with wider text spacing, and keyboard traps, and it finds text inside images.</p></article>
+      <article class="card">{icon("shield")}<h3>Honest about certainty</h3><p>Every result is a Barrier, Needs review, or Informational, so you know what to fix now and what a person should confirm first. <a href="faq/#glossary">What the groups mean.</a></p></article>
+      <article class="card">{icon("server")}<h3>Your evidence stays local</h3><p>Reports, screenshots, and decisions live on your computer. There is no account, no telemetry, and no upload.</p></article>
+      <article class="card">{icon("layers")}<h3>Works alongside your other tools</h3><p>We use and like Siteimprove and axe DevTools. Axcess covers what is hard for them to reach. <a href="coverage/#compare">See the side-by-side comparison.</a></p></article>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
       <span class="eyebrow">The workbench</span>
       <h2>An evidence workbench, not a scorecard</h2>
-      <p class="sub">One score hides the details that make accessibility work actionable. Axcess keeps the page, the element, the screenshot, the rule, and the confidence level connected so anyone can check a claim for themselves.</p>
+      <p class="sub">One score hides the details that make accessibility work actionable. Axcess keeps the page, the element, the screenshot, the rule, and the level of certainty together, so anyone can check a result for themselves.</p>
     </div>
     <div class="shot-frame">
       <img class="shot" src="assets/axcess-dashboard-redacted.png" width="1487" height="1058"
         alt="The Axcess dashboard. A navy banner reads 'View 5 accessibility issue groups' with an 'Open issue table' button. Below are counters for completed scans, pages crawled, and image evidence, a list of recent scans (blurred), and a panel titled 'How Axcess works' listing: understand the issue, apply the expected fix, open the exact location.">
     </div>
     <p class="caption">The dashboard of the desktop app. Recent scan targets are blurred in this preview.</p>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Why teams trust it</span>
-      <h2>Honest by design</h2>
-      <p class="sub">Accessibility tools are easy to over-trust. Axcess is built to tell you what it saw, how sure it is, and what it could not check.</p>
-    </div>
-    <div class="stats" role="list">
-      <div class="stat" role="listitem"><b>{covered}<small> of {total}</small></b><span>WCAG 2.2 A/AA criteria where Axcess contributes evidence. The other {manual} are labelled manual, with instructions.</span></div>
+    <div class="stats" role="list" style="margin-top:1.75rem">
+      <div class="stat" role="listitem"><b>{covered}<small> of {total}</small></b><span>WCAG 2.2 A and AA success criteria where Axcess contributes evidence. The other {manual} need a person, and each one comes with test steps.</span></div>
       <div class="stat" role="listitem"><b>0</b><span>Bytes of scan data sent to a cloud service. There is no telemetry and no account.</span></div>
-      <div class="stat" role="listitem"><b>AAA</b><span>The level Axcess holds its own interface to. Every screen is tested for keyboard, screen reader, zoom, and contrast.</span></div>
-      <div class="stat" role="listitem"><b>{shipped_ct}</b><span>Independent checks per scan. {shipped_ct - ai_ct} need only a browser; {ai_ct} can add a local AI model.</span></div>
-    </div>
-    <div class="grid grid-2" style="margin-top:1.5rem">
-      <article class="card">{icon("pin")}<h3>Evidence you can inspect</h3><p>Every finding links back to the page, the element, a snippet, and often a screenshot, stored locally with the scan. Nothing is a bare number.</p></article>
-      <article class="card">{icon("shield")}<h3>Clear about certainty</h3><p>A deterministic rule failure, a behaviour the browser observed, and an AI suggestion are never mixed. Each result says which method produced it and whether a person still needs to confirm it.</p></article>
-      <article class="card">{icon("lock")}<h3>Private by default</h3><p>Scans, screenshots, and reports live in a local database on your computer. Sites behind a login are scanned after you sign in yourself; Axcess never sees your password.</p></article>
-      <article class="card">{icon("click")}<h3>Built for real, modern websites</h3><p>Pages are rendered in a real browser, so single-page apps work. Axcess can also open menus, tabs, and dialogs to test the states a plain page load never shows.</p></article>
-    </div>
-  </div>
-</section>
-
-<section class="band">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">What you get</span>
-      <h2>Reports people can actually use</h2>
-      <p class="sub">The same local evidence becomes whatever your audience needs, from a triage table for you to a ticket for a developer to a summary for a director.</p>
-    </div>
-    <div class="grid grid-3">
-      <article class="card">{icon("table")}<h3>Issue table</h3><p>One scan-scoped table that groups repeated problems and states both numbers plainly, for example 19 issue groups across 965 occurrences.</p></article>
-      <article class="card">{icon("sheet")}<h3>Excel workbook</h3><p>The hand-off file: Summary, Issues, Page Hotspots, Who's Affected, Coverage, Test Tracking, and Manual Evidence sheets with clickable links.</p></article>
-      <article class="card">{icon("doc")}<h3>Stakeholder report</h3><p>Scope, methods, limitations, results, recommended actions, and verification steps, written for readers who will never open the tool.</p></article>
-      <article class="card">{icon("download")}<h3>Tickets and data</h3><p>Jira-ready CSV, plain CSV, and JSON so findings drop straight into the tools your team already uses.</p></article>
-      <article class="card">{icon("refresh")}<h3>Rescan comparison</h3><p>Scan the same scope again and see what is new, what is resolved, and what is still open, instead of starting from zero.</p></article>
-      <article class="card">{icon("check")}<h3>Draft protection</h3><p>A report exported before expert review is complete is clearly labelled DRAFT, so an unfinished list is never mistaken for a final audit.</p></article>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Who it's for</span>
-      <h2>Made for the people who do the work</h2>
-    </div>
-    <div class="grid grid-4">
-      <a class="card card-accent" href="who-its-for/#accessibility-lead" style="text-decoration:none">{icon("person")}<h3>Accessibility leads</h3><p>Triage hundreds of findings in one sitting, defend every verdict, and verify fixes on rescan.</p></a>
-      <a class="card card-accent" href="who-its-for/#editors-and-developers" style="text-decoration:none">{icon("people")}<h3>Editors and developers</h3><p>Get a ticket that says what to change, where, and how you'll know it's done.</p></a>
-      <a class="card card-accent" href="who-its-for/#leadership" style="text-decoration:none">{icon("chart")}<h3>Leadership</h3><p>See how thoroughly a site was evaluated and what to fix first, without a misleading score.</p></a>
-      <a class="card card-accent" href="who-its-for/#it-and-security" style="text-decoration:none">{icon("server")}<h3>IT and security</h3><p>Review a tool with no cloud dependency, no telemetry, and a documented data boundary.</p></a>
+      <div class="stat" role="listitem"><b>AAA</b><span>The level of axe-core rules that Axcess tests its own interface against.</span></div>
     </div>
   </div>
 </section>
 
 <section class="soft">
   <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Who it's for</span>
+      <h2>Made for the people who do the work</h2>
+    </div>
+    <div class="grid grid-4">
+      <a class="card card-accent" href="who-its-for/#accessibility-lead" style="text-decoration:none">{icon("person")}<h3>Accessibility analysts</h3><p>Triage findings with evidence, pair them with manual testing, and verify fixes on a rescan.</p></a>
+      <a class="card card-accent" href="who-its-for/#editors-and-developers" style="text-decoration:none">{icon("people")}<h3>Editors and developers</h3><p>See what to change, where it is, and how you will know it is done.</p></a>
+      <a class="card card-accent" href="who-its-for/#leadership" style="text-decoration:none">{icon("chart")}<h3>Leadership</h3><p>See how thoroughly a site was checked and what to fix first, without a misleading score.</p></a>
+      <a class="card card-accent" href="who-its-for/#it-and-security" style="text-decoration:none">{icon("server")}<h3>IT and security</h3><p>Review a tool with no cloud dependency, no telemetry, and a documented data boundary.</p></a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
     {callout(HONESTY, "callout-maize", "warn")}
     <div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:2rem;align-items:center">
       <a class="btn btn-primary" href="get-started/">Get started</a>
-      <a class="btn btn-ghost" href="coverage/">Explore what it checks</a>
-      <a class="btn btn-ghost" href="about/">Read the story</a>
+      <a class="btn btn-ghost" href="coverage/">See what Axcess checks</a>
+      <a class="btn btn-ghost" href="faq/#glossary">Read the glossary</a>
     </div>
   </div>
 </section>
@@ -540,7 +532,7 @@ def how_it_works(summ) -> str:
     <ol class="steps">
       <li>
         <h3>Choose the site</h3>
-        <p>Pick a public website, or choose <em>Login or 2FA website</em> for a site that needs a sign-in. For a protected site, Axcess opens a visible browser window and you sign in yourself, with your password, passkey, or one-time code. Axcess never asks for any of them.</p>
+        <p>Pick a public website, or choose <em>Site with a login or 2FA</em> for a site that needs a sign-in. For a protected site, Axcess opens a visible browser window and you sign in yourself, with your password, passkey, or one-time code. Axcess never asks for any of them.</p>
         <p class="tip">Only scan sites you are authorized to test.</p>
       </li>
       <li>
@@ -581,7 +573,7 @@ def how_it_works(summ) -> str:
       <article class="card">{icon("phone")}<h3>Zoom and reflow check</h3><p>Each page is squeezed to a phone-width view, zoomed to about 200%, and given wider text spacing to see whether anything is cut off or overlaps.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
       <article class="card">{icon("eye")}<h3>Focus check</h3><p>Finds keyboard focus hidden behind sticky headers or banners, and tab orders that were forced out of sequence.</p><p><span class="chip chip-partial">Browser-observed</span></p></article>
       <article class="card">{icon("click")}<h3>Click through states</h3><p>Axcess can open menus, tabs, and dialogs and re-run the rule engine on what appears. It never clicks links, never presses anything named sign out, delete, or unsubscribe, and stops after a bounded number of clicks per page.</p><p><span class="chip chip-automated">Deterministic</span></p></article>
-      <article class="card">{icon("image")}<h3>Image text check</h3><p>Text hidden inside pictures is invisible to screen readers and cannot be resized. Built-in text recognition finds it; an optional local vision model judges whether the image is really just text.</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
+      <article class="card">{icon("image")}<h3>Image text check</h3><p>Text hidden inside pictures is invisible to screen readers and cannot be resized. Built-in text recognition finds it; an optional local vision model judges what the text is for.</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
       <article class="card">{icon("play")}<h3>Visual and motion check</h3><p>Measures video and audio that autoplay without controls, records scrolling text, and, with a local vision model, compares the visual reading order to the order a screen reader would hear.</p><p><span class="chip chip-partial">Mixed</span></p></article>
       <article class="card">{icon("text")}<h3>Meaning check</h3><p>With a local language model, asks judgement questions a rule engine cannot: does this link make sense out of context? Does this heading describe its section? Is this form field explained well enough?</p><p><span class="chip chip-ai">AI-assisted lead</span></p></article>
     </div>
@@ -594,26 +586,26 @@ def how_it_works(summ) -> str:
     <div class="section-head">
       <span class="eyebrow">Evidence before verdicts</span>
       <h2>How sure is each result?</h2>
-      <p class="sub">Not all findings are equally certain, and Axcess never pretends they are. Results travel in three separate lanes, and a lead can never silently become a confirmed barrier.</p>
+      <p class="sub">Not all findings are equally certain, and Axcess never pretends they are. Every result lands in one of three report groups, and only rule-engine failures become Barriers. <a href="../faq/#glossary">The glossary defines each group.</a></p>
     </div>
     <div class="lanes">
       <div class="lane lane-automated">
-        <span class="chip chip-automated">Likely barrier</span>
-        <h3>Deterministic rule failures</h3>
-        <p>A rule engine measured something on the rendered page and it failed. High confidence, though a person still verifies the fix.</p>
+        <span class="chip chip-automated">Barrier</span>
+        <h3>Rule-engine failures</h3>
+        <p>axe-core, or Siteimprove Alfa when you turn it on, failed a fixed rule on the rendered page, including after a click. Confirm it on the page, then fix it.</p>
       </div>
       <div class="lane lane-observed">
-        <span class="chip chip-partial">Review lead</span>
-        <h3>Browser-observed behaviour</h3>
-        <p>Axcess operated the page and saw something suspicious, such as focus that would not leave an element. The evidence is real; the interpretation needs an expert.</p>
+        <span class="chip chip-partial">Needs review</span>
+        <h3>Browser checks and AI leads</h3>
+        <p>Measurements from the keyboard, focus, zoom, and motion checks, suggestions from a local AI model, and Alfa “can't tell” results. A person tests each one and records a decision.</p>
       </div>
-      <div class="lane lane-ai">
-        <span class="chip chip-ai">Needs confirmation</span>
-        <h3>AI-assisted suggestions</h3>
-        <p>A local model made a judgement call. These are strong leads, clearly labelled, and always confirmed or rejected by a person before they count.</p>
+      <div class="lane" style="border-top-color:#c2cad6">
+        <span class="chip chip-manual">Informational</span>
+        <h3>Kept for transparency</h3>
+        <p>Records that are not problems, such as an image whose alt text already matches its words. There is nothing to fix.</p>
       </div>
     </div>
-    <div style="margin-top:1.5rem">{callout("<strong>Decisions are recorded, not just made.</strong> Each issue group can be accepted, rejected as a false positive, marked remediated, or kept open as an accepted risk, with a written rationale and a history of who decided what and when.", "", "check")}</div>
+    <div style="margin-top:1.5rem">{callout("<strong>Decisions are recorded, not just made.</strong> Each finding can be marked in progress, remediated, accepted risk, or false positive, and each of those decisions needs a short written reason.", "", "check")}</div>
   </div>
 </section>
 
@@ -627,7 +619,7 @@ def how_it_works(summ) -> str:
     <div class="grid grid-2">
       <article class="card"><h3>Routes are discovered by following real links</h3><p>Axcess follows links it can see on rendered pages, including app-style routes, and stays inside the scope you set. It does not guess private addresses or read application code.</p></article>
       <article class="card"><h3>States are counted separately from pages</h3><p>When Axcess opens a menu or dialog and tests what appears, it reports that as a DOM state alongside the page count, not folded into it. A page count alone would undersell an app; counting states as pages would oversell the crawl.</p></article>
-      <article class="card"><h3>Interaction is bounded and safe</h3><p>Links are never clicked by the probe. Controls named sign out, delete, remove, unsubscribe, or deactivate are refused. Each page is capped at 40 clicks and two levels of newly revealed controls.</p></article>
+      <article class="card"><h3>Interaction is bounded and safe</h3><p>Links are never clicked by the probe. Controls named sign out, delete, remove, unsubscribe, or deactivate are refused. Each page is capped at 100 clicks, 20 of any repeated control, and five levels of newly revealed controls.</p></article>
       <article class="card"><h3>Some things still need a person</h3><p>Hover-only content, gestures, operating-system menus, embedded third-party widgets, and states without a visible change on the page are outside what the probe can see. The report says so.</p></article>
     </div>
   </div>
@@ -638,14 +630,14 @@ def how_it_works(summ) -> str:
     <div class="section-head">
       <span class="eyebrow">Follow-up</span>
       <h2>Rescan and compare</h2>
-      <p class="sub">A fix is only real when a later scan shows it. Run the same scope again and Axcess lines the two reports up.</p>
+      <p class="sub">A fix is only real when a later scan shows it. Run the same scope again, open <em>Verify changes</em>, and Axcess lines the two reports up, issue group by issue group.</p>
     </div>
     <div class="grid grid-3">
-      <article class="card"><h3>New</h3><p>Barriers seen now that were not in the earlier scan.</p></article>
-      <article class="card"><h3>Resolved</h3><p>Barriers from the earlier scan that are no longer observed under the same scope and checks.</p></article>
-      <article class="card"><h3>Still open</h3><p>Barriers present in both scans, so the work is not finished yet.</p></article>
+      <article class="card"><h3>New</h3><p>Found only in the later report. Check whether it is a new barrier.</p></article>
+      <article class="card"><h3>Still detected or changed</h3><p>Found in both reports, either the same or with different locations, counts, or statuses. Changed does not always mean better.</p></article>
+      <article class="card"><h3>No longer detected</h3><p>Not found again with comparable checks. Confirm the fix on the page before you mark it remediated.</p></article>
     </div>
-    <p class="small" style="margin-top:1.25rem">"Not found this time" is not automatically "fixed". Axcess compares the same scope and methods, and a confirmed fix should still pass a retest or a human check.</p>
+    <p class="small" style="margin-top:1.25rem">When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed".</p>
   </div>
 </section>
 
@@ -772,6 +764,251 @@ def volume_section(vol: dict | None) -> str:
 """
 
 
+# ---------------------------------------------------------------------------
+# Glossary (single source: docs/glossary.md)
+# ---------------------------------------------------------------------------
+
+GLOSSARY_FILE = ROOT / "docs" / "glossary.md"
+GLOSSARY_URL = f"{REPO}/blob/main/docs/glossary.md"
+_INLINE_MD = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`")
+
+
+def _slug(text: str) -> str:
+    """GitHub's heading-anchor rule, so ``glossary.md#needs-review`` links work here too."""
+    return re.sub(r"[^\w\- ]", "", text.strip().lower()).replace(" ", "-")
+
+
+def _inline_md(text: str) -> str:
+    """Render the small Markdown subset the glossary uses: links, bold, and code."""
+    out: list[str] = []
+    pos = 0
+    for m in _INLINE_MD.finditer(text):
+        out.append(e(text[pos : m.start()]))
+        if m.group(1) is not None:
+            target = m.group(2)
+            if not target.startswith(("#", "http://", "https://")):
+                target = f"{REPO}/blob/main/docs/{target}"
+            out.append(f'<a href="{e(target)}">{e(m.group(1))}</a>')
+        elif m.group(3) is not None:
+            out.append(f"<strong>{e(m.group(3))}</strong>")
+        else:
+            out.append(f"<code>{e(m.group(4))}</code>")
+        pos = m.end()
+    out.append(e(text[pos:]))
+    return "".join(out)
+
+
+def load_glossary() -> list[tuple[str, list[tuple[str, str]]]]:
+    """Read docs/glossary.md as ``[(section, [(term, definition_html), ...]), ...]``.
+
+    ``## Section`` headings group ``### Term`` headings, and each term's
+    definition is the paragraph that follows it. The site renders this file
+    instead of keeping its own copy, so the two cannot disagree.
+    """
+    sections: list[tuple[str, list[tuple[str, str]]]] = []
+    term: str | None = None
+    lines: list[str] = []
+
+    def flush() -> None:
+        if term is not None and sections and lines:
+            sections[-1][1].append((term, _inline_md(" ".join(lines))))
+
+    for raw in GLOSSARY_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line.startswith("### "):
+            flush()
+            term, lines = line[4:].strip(), []
+        elif line.startswith("## "):
+            flush()
+            term, lines = None, []
+            sections.append((line[3:].strip(), []))
+        elif line and not line.startswith("#") and term is not None:
+            lines.append(line)
+    flush()
+    return sections
+
+
+# ---------------------------------------------------------------------------
+# What Axcess checks, compared with Siteimprove and axe DevTools
+# ---------------------------------------------------------------------------
+
+# Checked against public Siteimprove and Deque documentation and the
+# open-source axe-core and Alfa code in September 2026. "No automated check
+# found" means the documentation showed none, not that none can exist.
+# (check, what it catches, WCAG, report group, Siteimprove, axe DevTools)
+CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
+    (
+        "Rule engine (axe-core)",
+        "Machine-testable problems on every rendered page, such as missing text alternatives, unlabeled form fields, low text contrast, and ARIA errors. About 90 rules run at Level AA.",
+        "Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2",
+        "Barrier",
+        "Yes. Siteimprove checks the same kinds of problems with its own rule engine.",
+        "Yes. axe DevTools runs these same axe-core rules.",
+    ),
+    (
+        "Click through menus, tabs, and dialogs",
+        "Problems that only appear after a control is used. Axcess operates each safe control, runs axe-core again on what appears, and records which control revealed each problem.",
+        "The same criteria as axe-core",
+        "Barrier",
+        "Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.",
+        "Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.",
+    ),
+    (
+        "Reflow at phone width",
+        "Pages that need sideways scrolling at 320 CSS pixels wide.",
+        "1.4.10 (AA)",
+        "Needs review",
+        "No automated check found.",
+        "No automated check found.",
+    ),
+    (
+        "Text cut off at 200% zoom",
+        "Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.",
+        "1.4.4 (AA)",
+        "Needs review",
+        "Partly. Siteimprove has documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026.",
+        "Partly. axe-core flags pages that block zooming, not clipped text.",
+    ),
+    (
+        "Text spacing",
+        "Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.",
+        "1.4.12 (AA)",
+        "Needs review",
+        "Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.",
+        "Partly. The same inline-style check.",
+    ),
+    (
+        "Keyboard traps",
+        "Places where Tab and Shift+Tab both fail to move focus away. Reported at most once per page.",
+        "2.1.2 (A)",
+        "Needs review",
+        "No automated check found.",
+        "Only in the paid Keyboard guided test. No axe-core rule.",
+    ),
+    (
+        "Focus checks",
+        "A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.",
+        "2.4.11 (AA), 2.4.3 (A)",
+        "Needs review",
+        "No automated check found.",
+        "Partly. axe-core flags positive tabindex as a best practice. No rule for hidden focus.",
+    ),
+    (
+        "Target size",
+        "Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.",
+        "2.5.8 (AA)",
+        "Barrier",
+        "Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess does not.",
+        "Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on for Level AA scans.",
+    ),
+    (
+        "Text inside images",
+        "Images that contain words, found with OCR and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.",
+        "1.4.5 (AA), 1.1.1 (A)",
+        "Needs review",
+        "No automated check found. Its open-source engine has an experimental rule that needs a person to answer questions.",
+        "No automated check found. A paid guided test reviews image alternatives.",
+    ),
+    (
+        "Motion and reading order (optional)",
+        "Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.",
+        "1.4.2, 2.2.2, 1.3.2 (A)",
+        "Needs review",
+        "Partly. It checks autoplaying audio (some cases ask a person to confirm) and flags blink and marquee. No reading-order check found.",
+        "Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.",
+    ),
+    (
+        "AI language checks (optional)",
+        "Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.",
+        "2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)",
+        "Needs review",
+        "Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.",
+        "Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.",
+    ),
+)
+
+LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html"
+LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html"
+
+
+def checks_sections() -> str:
+    """The report groups, the comparison table, and what still needs a person."""
+    rows = "".join(
+        f'<tr><th scope="row">{e(check)}</th><td>{e(what)}</td><td>{e(sc)}</td><td>{e(group)}</td><td>{e(si)}</td><td>{e(axe)}</td></tr>'
+        for check, what, sc, group, si, axe in CHECKS
+    )
+    return f"""
+<section class="soft" id="groups">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Report groups</span>
+      <h2>Every result lands in one of three groups</h2>
+      <p class="sub">The group tells you how certain a result is and what to do next. <a href="../faq/#glossary">The glossary defines each group.</a></p>
+    </div>
+    <div class="shot-frame">
+      <img class="shot" src="../assets/diagrams/report-groups.png" width="{DIAGRAM_SIZES["report-groups"][0]}" height="{DIAGRAM_SIZES["report-groups"][1]}"
+        alt="Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking; confirm and fix them. Needs review holds browser checks, the keyboard check, AI checks, and Alfa can't-tell results; a person tests and decides. Informational holds records such as images whose alt text already matches; no action is needed.">
+    </div>
+    <div class="lanes" style="margin-top:1.5rem">
+      <div class="lane lane-automated">
+        <span class="chip chip-automated">Barrier</span>
+        <h3>Confirm it, then fix it</h3>
+        <p>Comes from axe-core rule failures, including problems found after clicking, and from Siteimprove Alfa failures. Confirm it on the page, fix it, then rescan.</p>
+      </div>
+      <div class="lane lane-observed">
+        <span class="chip chip-partial">Needs review</span>
+        <h3>A person decides</h3>
+        <p>Comes from browser checks, the keyboard check, local AI checks, and Alfa “can't tell” results. Test it on the page and record your decision.</p>
+      </div>
+      <div class="lane" style="border-top-color:#c2cad6">
+        <span class="chip chip-manual">Informational</span>
+        <h3>Nothing to fix</h3>
+        <p>Records kept for transparency, such as images whose alt text already matches the words in them. No action is needed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Compared with other tools</span>
+      <h2>Where Axcess fits next to Siteimprove and axe DevTools</h2>
+      <p class="sub">We use and like both. Siteimprove monitors whole sites from the cloud, and axe DevTools checks the page in front of you. Axcess fills gaps: pages behind a sign-in, content behind a click, and checks that need a real browser or a person's judgement.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Axcess checks compared with Siteimprove and axe DevTools">
+      <table>
+        <caption class="vis-hidden">Axcess checks, what they catch, and whether Siteimprove or axe DevTools also catch them</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">What it catches</th><th scope="col">WCAG</th><th scope="col">Report group</th><th scope="col">Also caught by Siteimprove?</th><th scope="col">Also caught by axe DevTools?</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    <div class="grid grid-2" style="margin-top:1.5rem">
+      <article class="card"><h3>Pages behind a sign-in</h3><p>Axcess scans them after you sign in yourself, including single sign-on and two-factor steps. Siteimprove's help center describes crawling behind a login through a setup done by its support team, and points to an add-on for sites that use multi-factor sign-in. The axe DevTools extension runs in your own signed-in browser, one page at a time.</p></article>
+      <article class="card"><h3>A second opinion from Siteimprove's engine</h3><p>Axcess can also run Siteimprove Alfa, the open-source engine behind Siteimprove's checks, on your computer. Each result keeps the name of the engine that found it, so you can compare them.</p></article>
+    </div>
+    <p class="small" style="margin-top:1.25rem">Checked in September 2026 against public Siteimprove and Deque documentation and the open-source axe-core and Alfa code. “No automated check found” means we found none in their documentation, not that none can exist. Tools change quickly, so please <a href="{REPO}/issues">tell us</a> if something here is out of date.</p>
+  </div>
+</section>
+
+<section class="soft" id="by-hand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Manual testing</span>
+      <h2>What you still need to test by hand</h2>
+      <p class="sub">Axcess speeds up manual testing by pointing you to the right pages, elements, and states. It does not replace it. These checks still need a person.</p>
+    </div>
+    <div class="grid grid-3">
+      <article class="card">{icon("keyboard")}<h3>Keyboard</h3><p>Use only the keyboard to reach and operate everything, with Tab, Shift+Tab, Enter, Space, the arrow keys, and Escape. Check that focus is always visible and moves in a sensible order. Axcess's keyboard check only looks for traps.</p></article>
+      <article class="card">{icon("people")}<h3>Screen reader</h3><p>Listen to key pages and tasks with a screen reader such as NVDA, JAWS, or VoiceOver. Check that names, roles, headings, and announcements make sense in context.</p></article>
+      <article class="card">{icon("check")}<h3>Real tasks</h3><p>Complete real tasks from start to finish, such as applying or registering, including error messages and time limits. Axcess does not fill in or submit forms on its own.</p></article>
+    </div>
+    <p style="margin-top:1.25rem">The criteria list below gives the manual steps for every WCAG success criterion. For guides and training, see <a href="{LSA_WEB_RESOURCES}">LSA Accessibility's web accessibility resources</a> and <a href="{LSA_TRAINING}">LSA Accessibility training</a>.</p>
+  </div>
+</section>
+"""
+
+
 def coverage(crit, summ, cov) -> str:
     total = summ.total
     bm = summ.by_method
@@ -867,16 +1104,17 @@ def coverage(crit, summ, cov) -> str:
   <div class="wrap">
     <span class="eyebrow">Coverage</span>
     <h1>What Axcess checks, and what it <span class="hl">honestly can't</span></h1>
-    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define {total} Level A and AA success criteria. Axcess contributes evidence to {summ.covered} of them today. Every one of the {total} is listed below, including the {summ.manual_only} a person must test by hand, with the steps to do it.</p>
+    <p class="lede">The Web Content Accessibility Guidelines (WCAG) 2.2 define {total} Level A and AA success criteria. Axcess contributes evidence to {summ.covered} of them today. This page explains where each result lands, how Axcess compares with Siteimprove and axe DevTools, and lists all {total} criteria, including the {summ.manual_only} a person must test by hand, with the steps to do it.</p>
   </div>
 </section>
+{checks_sections()}
 
 <section>
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">At a glance</span>
       <h2>{summ.covered} of {total} criteria with Axcess evidence</h2>
-      <p class="sub">These numbers are generated from the same file the product reads, so this page, the in-app Product Roadmap screen, and the documentation can never disagree.</p>
+      <p class="sub">These numbers are generated from the coverage file the product itself reads, so they cannot drift from the code.</p>
     </div>
     <div class="covbar" role="img" aria-label="Of {total} criteria: {bm["automated"]} automated, {bm["partial"]} partly automated, {bm["ai-assisted"]} AI-assisted, {bm["manual"]} manual only.">{bar}</div>
     <div class="legend" aria-hidden="true">{legend}</div>
@@ -1070,6 +1308,10 @@ def privacy() -> str:
       <span class="eyebrow">The boundary</span>
       <h2>What stays local and what connects out</h2>
     </div>
+    <div class="shot-frame" style="margin-bottom:1.5rem">
+      <img class="shot" src="../assets/diagrams/privacy-boundary.png" width="{DIAGRAM_SIZES["privacy-boundary"][0]}" height="{DIAGRAM_SIZES["privacy-boundary"][1]}"
+        alt="Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files. Axcess connects to the website you scan, to an optional local AI service, and, in the desktop app, to GitHub once per launch to check for updates. It has no account, telemetry, or upload.">
+    </div>
     <div class="boundary">
       <span class="tag">Stays on your computer</span>
       <div class="inner">
@@ -1082,8 +1324,9 @@ def privacy() -> str:
       </div>
     </div>
     <div class="outside">
-      <div><strong>Connects to: the website you are scanning</strong><span>Axcess necessarily loads pages from the target site, at the rate you set, respecting robots.txt unless you say otherwise.</span></div>
-      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no update checks that carry data, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
+      <div><strong>Connects to: the website you are scanning</strong><span>Axcess loads pages from the target site at the rate you set. Public scans respect robots.txt unless you say otherwise; login scans do not check it. Viewing a stored page later can also load that site's styles, fonts, and images.</span></div>
+      <div><strong>Connects to: GitHub, for desktop updates</strong><span>Once per launch, the desktop app asks GitHub whether a newer version exists. That request carries no scan data, and setting <code>AXCESS_DISABLE_UPDATE_CHECK=1</code> turns it off.</span></div>
+      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
     </div>
   </div>
 </section>
@@ -1093,14 +1336,18 @@ def privacy() -> str:
     <div class="section-head">
       <span class="eyebrow">Protected sites</span>
       <h2>Scanning behind a login without sharing your password</h2>
-      <p class="sub">Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in, it watches.</p>
+      <p class="sub">Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in, and it scans with that session.</p>
+    </div>
+    <div class="shot-frame" style="margin-bottom:1.5rem">
+      <img class="shot" src="../assets/diagrams/login-scan-flow.png" width="{DIAGRAM_SIZES["login-scan-flow"][0]}" height="{DIAGRAM_SIZES["login-scan-flow"][1]}"
+        alt="Diagram of a login scan. You choose Site with a login or 2FA, Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select I'm signed in, start scan. Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends.">
     </div>
     <ol class="steps">
-      <li><h3>Choose "Login or 2FA website"</h3><p>Enter the application address you are authorized to test and, if needed, the sign-in addresses it uses.</p></li>
-      <li><h3>Axcess opens a visible browser window</h3><p>This is a normal Chromium window on your screen.</p></li>
+      <li><h3>Choose "Site with a login or 2FA"</h3><p>Enter the HTTPS address of the page to scan after you sign in. It must be a site you are authorized to test.</p></li>
+      <li><h3>Axcess opens a visible browser window</h3><p>This is a normal Chromium window on your screen, with a fresh temporary profile.</p></li>
       <li><h3>You sign in directly with the website</h3><p>Password, passkey, push notification, one-time code, whatever the site requires. Nothing is typed into Axcess.</p></li>
-      <li><h3>Navigate to the approved page and confirm</h3><p>Select <em>I have signed in</em>. Axcess checks the page is inside the agreed scope.</p></li>
-      <li><h3>The scan uses that live session</h3><p>The session exists only in memory and ends with the scan. Login and identity-provider pages are not stored as evidence.</p></li>
+      <li><h3>Confirm and start</h3><p>Select <em>I’m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>The scan uses that live session</h3><p>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don’t store rendered pages</em>.</p></li>
     </ol>
     <div style="margin-top:1.5rem">{callout("<strong>This is not a way around authentication.</strong> Axcess only continues where you have already signed in, with accounts and sites you are explicitly authorized to test.", "callout-maize", "lock")}</div>
   </div>
@@ -1137,7 +1384,7 @@ def privacy() -> str:
         </tbody>
       </table>
     </div>
-    <p class="small" style="margin-top:1rem">Inside: a single SQLite database that is the source of truth, an <code>blobs</code> folder of image evidence, and local logs. Exported files are snapshots, not the record.</p>
+    <p class="small" style="margin-top:1rem">Inside: a single SQLite database that is the source of truth, a <code>blobs</code> folder of images and screenshots, and local logs. Logs include the addresses and titles of the pages scanned. Deleting a report keeps its image and screenshot files. Exported files are snapshots, not the record.</p>
   </div>
 </section>
 
@@ -1161,7 +1408,7 @@ def privacy() -> str:
       <h2>What Axcess claims about its own accuracy</h2>
     </div>
     <div class="grid grid-2">
-      <article class="card"><h3>A regression gate, not a marketing number</h3><p>A versioned, labelled test corpus requires fewer than 5% false discoveries and at least 80% recall for every detection layer before a change can ship. That stops a known detector from getting worse.</p></article>
+      <article class="card"><h3>A guardrail, not a marketing number</h3><p>A versioned, labelled test set must show fewer than 5% false discoveries and at least 80% recall for every detection layer. The set is synthetic and scores recorded results, so it guards the rules that decide what counts as a Barrier rather than measuring live detectors.</p></article>
       <article class="card"><h3>What that does not mean</h3><p>It is not a claim that every real website will see the same rate. A public real-world accuracy figure would need a representative held-out set reviewed independently by at least two accessibility experts, and the project says so in writing.</p></article>
     </div>
     <div style="margin-top:1.5rem">{callout(HONESTY, "callout-maize", "warn")}</div>
@@ -1175,8 +1422,8 @@ def get_started() -> str:
 <section class="hero hero-compact">
   <div class="wrap">
     <span class="eyebrow">Get started</span>
-    <h1>Your first scan in <span class="hl">about ten minutes</span></h1>
-    <p class="lede">Choose how to install, run one small scan, and read your first report. If you are not a developer, the desktop app is the path for you.</p>
+    <h1>Install Axcess and run <span class="hl">your first scan</span></h1>
+    <p class="lede">Install the desktop app, run a small scan of a public site, then try a site behind a sign-in. If you are not a developer, the desktop app is the path for you.</p>
   </div>
 </section>
 
@@ -1190,15 +1437,15 @@ def get_started() -> str:
       <article class="card card-accent">
         {icon("download")}
         <h3>Desktop app (recommended)</h3>
-        <p>One app that bundles everything: the workbench, the browser, the two rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
+        <p>One app that bundles everything: the workbench, the browser, both rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
           <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
-          <li>Development preview, published automatically from every change to the project</li>
-          <li>Free; no account or sign-in needed to download</li>
+          <li>A development preview, published automatically when the app changes</li>
+          <li>Free, with no account or sign-in needed to download</li>
         </ul>
         <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a></p>
         <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
-        <div style="margin-top:1rem">{callout('<strong>See <a href="#first-launch">the next section</a> for important installation instructions.</strong> Both macOS and Windows show a warning on first launch that you need to approve.', "callout-maize", "warn")}</div>
+        <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> Both macOS and Windows show a warning on first launch that you need to approve.', "callout-maize", "warn")}</div>
       </article>
       <article class="card">
         {icon("cpu")}
@@ -1210,11 +1457,11 @@ make migrate           <span class="c"># local database</span>
 make alfa-install      <span class="c"># optional second engine</span>
 make frontend-build    <span class="c"># build the interface</span>
 make run               <span class="c"># open http://127.0.0.1:8765/app/</span></code></pre>
-        <p class="small">Full instructions, hosting for a small team, and troubleshooting are in <a href="{DOCS}">the documentation</a>.</p>
+        <p class="small">Contributor setup, quality checks, and team hosting are in <a href="{REPO}/blob/main/CONTRIBUTING.md">the contributing guide</a> and <a href="{DOCS}">the documentation</a>.</p>
       </article>
     </div>
-    <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop App Installation Instructions</h3>
-    <p class="small" style="margin-bottom:1rem">Because the preview is not yet notarized or code-signed, macOS and Windows each show a warning the first time. The warning is expected for this build; you approve it once, and later launches open normally.</p>
+    <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
+    <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
@@ -1235,13 +1482,13 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Wait while Axcess installs. There are no setup screens and no administrator password is needed; it installs for your account only and opens by itself when it is done.</li>
+          <li>Wait while Axcess installs. There are no setup screens, and it opens by itself when it is done.</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
       </article>
     </div>
-    <div style="margin-top:1.5rem">{callout("<strong>Optional AI checks</strong> need a separately installed local Ollama service and downloaded models. Skip this at first; every browser-based check runs without it. <a href='../privacy/'>How the optional AI is kept local.</a>", "", "info")}</div>
+    <div style="margin-top:1.5rem">{callout("<strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a>", "", "info")}</div>
   </div>
 </section>
 
@@ -1250,14 +1497,14 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="section-head">
       <span class="eyebrow">Step 2</span>
       <h2>Run a small first scan</h2>
-      <p class="sub">Start with a public site you are authorized to test and a low page limit. You will have a report in a few minutes and a feel for the tool.</p>
+      <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Under <em>Choose the type of site you want to scan</em>, pick <em>Public website</em>.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, something like <code>https://www.example.edu/admissions/</code>. The scope preview will show that only pages under <em>/admissions/</em> will be visited. Leave <em>Crawl the entire host</em>, under Advanced settings, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>Open <em>Advanced settings</em> to find it. The other defaults are conservative and fine, and the browser-based checks need no AI. Expand <em>Default scan settings</em> if you want to see exactly which tests will run.</p>
-        <p class="tip">Want to see it work? Turn on "Show the scanning browser window" in advanced settings.</p></li>
-      <li><h3>Start the scan and watch</h3><p>You will see the current page, counts of pages discovered and tested, which checks ran, and an estimated finish time. You can stop at any point.</p></li>
+      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Under <em>Scan type</em>, choose <em>Public website</em>.</p></li>
+      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
+      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. Expand <em>Default scan settings</em> to see exactly which checks will run.</p>
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
     </ol>
   </div>
 </section>
@@ -1266,15 +1513,19 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Step 3</span>
-      <h2>Read your first report</h2>
+      <h2>Scan a site behind a sign-in</h2>
+      <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
-    <div class="grid grid-2">
-      <article class="card">{icon("table")}<h3>Start at the issue table</h3><p>Issues are grouped by cause and sorted by impact. Each row tells you what was detected, why it is an issue, the expected fix, and where exactly. Filter by the evidence lane if you want only deterministic failures first.</p></article>
-      <article class="card">{icon("pin")}<h3>Open the evidence</h3><p>Click through to Page Evidence to see the element on the page, the snippet, and any screenshot. For findings revealed by clicking, it says which control revealed them.</p></article>
-      <article class="card">{icon("check")}<h3>Record decisions</h3><p>Accept, reject as a false positive, mark remediated, or accept the risk, with a short rationale. Decisions are kept with the report and travel into exports.</p></article>
-      <article class="card">{icon("doc")}<h3>Check the manual list</h3><p>The WCAG 2.2 A/AA review matrix shows which criteria still need a person, with the procedure for each. This is the honest half of the report.</p></article>
-      <article class="card">{icon("sheet")}<h3>Export when ready</h3><p>Download the Excel workbook or the audit report from the handoff screen. If expert review is unfinished, the export is labelled DRAFT and you are told what is missing.</p></article>
-      <article class="card">{icon("refresh")}<h3>Rescan later</h3><p>After fixes land, scan the same address again. The comparison shows what is new, resolved, and still open.</p></article>
+    <ol class="steps">
+      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
+      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I’m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+    </ol>
+    <div class="grid grid-3" style="margin-top:1.5rem">
+      <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don’t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. The AI language and motion checks are off, and image text checks stay off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
 </section>
@@ -1282,23 +1533,41 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
 <section class="soft">
   <div class="wrap">
     <div class="section-head">
+      <span class="eyebrow">Step 4</span>
+      <h2>Read your first report</h2>
+      <p class="sub">Every result lands in one of three groups: <strong>Barrier</strong>, <strong>Needs review</strong>, or <strong>Informational</strong>. <a href="../faq/#glossary">The glossary explains each one.</a></p>
+    </div>
+    <div class="grid grid-2">
+      <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open <em>About</em> on any row for a quick summary.</p></article>
+      <article class="card">{icon("pin")}<h3>Open the evidence</h3><p>An issue's full evidence record shows the pages, the element, the code snippet, and screenshots. For problems found after a click, it names the control, for example "After clicking “Open menu”."</p></article>
+      <article class="card">{icon("eye")}<h3>Check what actually ran</h3><p>The Overview tab shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
+      <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Verify changes</em> to compare.</p></article>
+    </div>
+    <p style="margin-top:1.25rem">The full walkthrough, including every column and export, is in <a href="{REPO}/blob/main/docs/reading-your-report.md">Reading your Axcess report</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
       <span class="eyebrow">Good to know</span>
       <h2>Before you scan</h2>
     </div>
     <div class="grid grid-3">
-      <article class="card"><h3>Authorization</h3><p>Only scan sites and accounts you are explicitly permitted to test. Axcess records when robots.txt is ignored, and refuses controls named sign out, delete, or unsubscribe.</p></article>
-      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one crawl per app at a time, matching its local single-writer database. Start the next scan when the first finishes.</p></article>
-      <article class="card"><h3>Time per page</h3><p>Rendering pages in a real browser and running several checks takes a few seconds per page. Advanced settings let you skip individual checks when speed matters more than coverage, and say what you lose.</p></article>
+      <article class="card"><h3>Authorization</h3><p>Only scan sites and accounts you are explicitly permitted to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
+      <article class="card"><h3>One scan at a time</h3><p>Axcess runs one crawl at a time, matching its local single-writer database. Start the next scan when the first finishes.</p></article>
+      <article class="card"><h3>Speed and coverage</h3><p>Each page is rendered in a real browser and checked several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>
 """
 
 
-def faq() -> str:
+def faq(summ) -> str:
     def q(question: str, answer: str) -> str:
         return f'<details><summary>{question}</summary><div class="a">{answer}</div></details>'
 
+    total, covered, manual = summ.total, summ.covered, summ.manual_only
     faqs = "".join(
         [
             q(
@@ -1306,40 +1575,44 @@ def faq() -> str:
                 "<p>No. Axcess produces evidence for a qualified person to review. It does not certify WCAG conformance, prove legal compliance, or replace testing with people who use assistive technology. A qualified person can use Axcess evidence to complete a conformance report; Axcess will not generate one automatically.</p>",
             ),
             q(
+                "What do Barrier, Needs review, and Informational mean?",
+                '<p>They are the three report groups, and every result lands in one of them. The glossary below defines <a href="#barrier">Barrier</a>, <a href="#needs-review">Needs review</a>, and <a href="#informational">Informational</a>, and <a href="../coverage/#groups">What Axcess checks</a> shows which checks feed each group.</p>',
+            ),
+            q(
+                "How is Axcess different from Siteimprove or axe DevTools?",
+                '<p>We use and like both. Siteimprove monitors whole sites from the cloud, and axe DevTools checks the page in front of you. Axcess runs on your computer, scans behind a sign-in including two-factor steps, opens menus and dialogs by itself, and adds browser checks such as reflow and text spacing. <a href="../coverage/#compare">See the side-by-side comparison.</a></p>',
+            ),
+            q(
                 "Do I need AI to use it?",
-                "<p>No. The rule engines and the keyboard, zoom, focus, and interaction checks run with just the bundled browser. AI-assisted checks are optional, run on a local model you install yourself, and are clearly labelled as leads that need confirmation.</p>",
+                "<p>No. The rule engines and the keyboard, zoom, focus, and click-through checks run with just the bundled browser. AI-assisted checks are optional, run on a local model you install yourself, and are never reported as Barriers.</p>",
             ),
             q(
                 "Does any of my data go to the cloud?",
-                '<p>No. There is no account, no telemetry, and no upload. Evidence is stored in a local database on your computer. The only outbound connection is to the website you are scanning, plus an optional local AI service on the same machine. <a href="../privacy/">Read the privacy page.</a></p>',
+                '<p>No. There is no account, no telemetry, and no upload. Evidence is stored in a local database on your computer. Axcess connects to the website you are scanning and, if you install one, a local AI service on the same machine. The desktop app also checks GitHub once per launch for a newer version, and that request carries no scan data. <a href="../privacy/">Read the privacy page.</a></p>',
             ),
             q(
                 "Can it scan pages behind a login or two-factor sign-in?",
-                "<p>Yes. Axcess opens a visible browser window, you sign in directly with the website, and the scan continues using that live session. Axcess never asks for your password or code, and login pages are not stored as evidence. Use only accounts and sites you are authorized to test.</p>",
+                "<p>Yes. Axcess opens a browser window, you sign in directly with the website, and the scan continues with that session. Axcess never asks for your password or code. The site must use HTTPS and a public address. Use only accounts and sites you are authorized to test.</p>",
             ),
             q(
-                'What does "29 of 55 criteria" mean?',
-                '<p>WCAG 2.2 has 55 Level A and AA success criteria. Axcess has at least one check that contributes evidence for 29 of them. That does not mean those 29 are decided without a person, and it does not mean a site that passes them conforms. The remaining 26 are listed as manual, with the steps to test each one. <a href="../coverage/">See all 55.</a></p>',
-            ),
-            q(
-                "What is the difference between an issue group and an occurrence?",
-                "<p>An occurrence is one problem on one page, for example a missing image description on the home page. An issue group collects occurrences that share a cause and probably share a fix, for example the same broken template across 40 pages. The report shows both numbers so a large raw count never stands alone.</p>",
+                f'What does "{covered} of {total} criteria" mean?',
+                f'<p>WCAG 2.2 has {total} Level A and AA success criteria. Axcess has at least one check that contributes evidence for {covered} of them. That does not mean those {covered} are decided without a person, and it does not mean a site that passes them conforms. The remaining {manual} are listed as manual, with the steps to test each one. <a href="../coverage/">See all {total}.</a></p>',
             ),
             q(
                 "How accurate is it?",
-                "<p>A labelled test corpus requires fewer than 5% false discoveries and at least 80% recall for every detection layer before a change ships. That is a regression gate, not a real-world guarantee; the project states plainly that a public accuracy claim would need an independently reviewed corpus. Every finding also carries a confidence and a method, and you can reject any of them as a false positive with a recorded reason.</p>",
+                "<p>Every result carries its method and report group, so you can see how certain it is, and you can mark any result as a false positive with a reason. Only rule-engine failures are reported as Barriers; everything else waits for a person. The project also keeps a labelled test set that must show fewer than 5% false discoveries and at least 80% recall for each detection layer. That set is synthetic, so it is a guardrail, not a real-world accuracy figure.</p>",
             ),
             q(
                 "How long does a scan take?",
-                "<p>It depends on the number of pages and which checks you enable. Rendering each page in a real browser and running several checks takes a few seconds per page. A 25-page first scan usually finishes in a few minutes. Advanced settings let you skip individual checks and say exactly what coverage you lose.</p>",
+                "<p>It depends on how many pages you scan and which checks you turn on. Each page is rendered in a real browser and checked several ways, so start small, around 25 pages, and grow from there. Advanced settings let you turn off individual checks when speed matters more.</p>",
             ),
             q(
                 "Will it break anything on the site?",
-                "<p>Axcess only reads pages and, if you enable it, operates visible controls such as menus and tabs. It never clicks links during that probe, refuses anything named sign out, delete, remove, unsubscribe, or deactivate, reverses navigations, and caps clicks per page. Crawl speed is conservative by default and robots.txt is respected unless you choose otherwise.</p>",
+                "<p>Axcess reads pages and, unless you turn it off, operates visible controls such as menus and tabs. The click-through never follows links, refuses controls named sign out, delete, remove, unsubscribe, submit, or save, blocks form submissions and other changes while it clicks, undoes navigations, and caps clicks per page. It is a safety net, not a guarantee, so use a test or staging copy of a site when you can. Public scans respect robots.txt by default.</p>",
             ),
             q(
                 "Does it work on single-page apps built with React, Vue, or Angular?",
-                "<p>Yes. Pages are rendered in a real browser before testing, app-style routes are followed as separate pages, and the click-through probe can test menus and dialogs that only appear after interaction. Routes must be reachable by real links inside your scope; Axcess does not read application code to guess private addresses.</p>",
+                "<p>Yes. Pages are rendered in a real browser before testing, app-style routes are followed as separate pages, and the click-through can test menus and dialogs that only appear after interaction. Routes must be reachable by real links inside your scope; Axcess does not read application code to guess private addresses.</p>",
             ),
             q(
                 "Can several people use one Axcess?",
@@ -1356,101 +1629,19 @@ def faq() -> str:
         ]
     )
 
-    terms = [
-        (
-            "WCAG",
-            "The Web Content Accessibility Guidelines, the international standard for accessible websites. Version 2.2 is current. Levels A and AA are the usual legal and policy target.",
-        ),
-        (
-            "Success criterion",
-            "One testable requirement in WCAG, numbered like 1.4.3. There are 55 at Levels A and AA.",
-        ),
-        (
-            "Evidence",
-            "What a check actually observed: the page, the element, a snippet, a screenshot, the rule, and the method. Axcess keeps evidence attached to every result.",
-        ),
-        (
-            "Issue group",
-            "Occurrences that share a cause and probably share a fix, presented as one row in the issue table.",
-        ),
-        ("Occurrence", "One instance of a problem on one page, or in one DOM state."),
-        (
-            "Review lead",
-            "A result that needs a person to confirm it before it counts, such as a keyboard-trap observation or an AI suggestion.",
-        ),
-        (
-            "False positive",
-            "A result the reviewer has judged not to be a real barrier. Marking one records the reason and keeps the history.",
-        ),
-        (
-            "Rule engine",
-            "Software that checks a page against a fixed list of machine-testable rules. Axcess uses axe-core and, optionally, Siteimprove Alfa.",
-        ),
-        (
-            "axe-core",
-            "The most widely used open-source accessibility rule engine, made by Deque. It runs inside the rendered page.",
-        ),
-        (
-            "Alfa",
-            "Siteimprove's open-source rule engine, based on the W3C's ACT rule format. An independent second opinion.",
-        ),
-        (
-            "ACT rule",
-            "A W3C-standardised, precisely written accessibility test that different tools can implement the same way.",
-        ),
-        (
-            "Rendered page",
-            "A page after the browser has run its scripts and drawn it, which is what visitors actually see. Axcess tests rendered pages.",
-        ),
-        (
-            "DOM state",
-            "What the page looks like after a control is operated, for example after a menu opens. Axcess can test these states and counts them separately from pages.",
-        ),
-        (
-            "Scope",
-            "The part of a site a scan is allowed to visit, defined by the host and a path such as /admissions/, plus page and depth limits.",
-        ),
-        (
-            "OCR",
-            "Optical character recognition: software that reads text inside images. Axcess bundles Tesseract for this.",
-        ),
-        (
-            "Local AI model",
-            "A language or vision model that runs on your own computer through a service called Ollama. Optional, and never installed silently.",
-        ),
-        (
-            "Ollama",
-            "A free program for running AI models locally. Axcess talks to it only on the same machine.",
-        ),
-        (
-            "Images of text",
-            "WCAG 1.4.5. Text baked into a picture cannot be resized, restyled, or read by a screen reader. Finding these at scale was the original reason Axcess was built.",
-        ),
-        (
-            "Keyboard trap",
-            "WCAG 2.1.2. A place where keyboard focus enters a component and cannot leave, stranding people who do not use a mouse.",
-        ),
-        (
-            "Reflow",
-            "WCAG 1.4.10. Content should rearrange to fit a narrow screen without sideways scrolling.",
-        ),
-        (
-            "Rescan comparison",
-            "Running the same scope again and lining up the two reports: new, resolved, and still open.",
-        ),
-        (
-            "Local-first",
-            "The design principle that your data lives on your computer by default and only leaves it when you deliberately send it somewhere.",
-        ),
-    ]
-    glossary = "".join(f"<div><dt>{e(t)}</dt><dd>{e(d)}</dd></div>" for t, d in terms)
+    glossary = "".join(
+        f'<h3 style="margin:2rem 0 .75rem">{e(section)}</h3><dl class="glossary">'
+        + "".join(f'<div id="{_slug(term)}"><dt>{e(term)}</dt><dd>{definition}</dd></div>' for term, definition in terms)
+        + "</dl>"
+        for section, terms in load_glossary()
+    )
 
     return f"""
 <section class="hero hero-compact">
   <div class="wrap">
     <span class="eyebrow">Questions and glossary</span>
     <h1>Straight answers, <span class="hl">plain words</span></h1>
-    <p class="lede">The questions people ask before they trust a tool, and the vocabulary you will meet in an Axcess report.</p>
+    <p class="lede">The questions people ask before they trust a tool, and the words you will meet in an Axcess report.</p>
   </div>
 </section>
 
@@ -1469,8 +1660,9 @@ def faq() -> str:
     <div class="section-head">
       <span class="eyebrow">Glossary</span>
       <h2>Words you'll see in a report</h2>
+      <p class="sub">These definitions come from <a href="{GLOSSARY_URL}">the Axcess glossary</a> in the project documentation, so the site and the documentation always say the same thing.</p>
     </div>
-    <dl class="glossary">{glossary}</dl>
+{glossary}
   </div>
 </section>
 """
@@ -1585,16 +1777,14 @@ def about(summ) -> str:
 
 def render_all() -> dict[str, str]:
     crit, summ, cov = coverage_data()
-    shipped_ct = len(cov.SHIPPED)
-    ai_ct = sum(1 for p in cov.SHIPPED if p.needs_ai)
     bodies = {
-        "": home(summ, shipped_ct, ai_ct),
+        "": home(summ),
         "how-it-works": how_it_works(summ),
         "coverage": coverage(crit, summ, cov),
         "who-its-for": who_its_for(),
         "privacy": privacy(),
         "get-started": get_started(),
-        "faq": faq(),
+        "faq": faq(summ),
         "about": about(summ),
         "volume": volume_page(),
     }

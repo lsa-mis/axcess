@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy and trust — Axcess</title>
+<title>Privacy and trust | Axcess</title>
 <meta name="description" content="What stays on your computer, what Axcess connects to, and how it scans sites behind a login without ever seeing your password.">
 <link rel="canonical" href="https://lsa-mis.github.io/axcess/privacy/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Axcess">
-<meta property="og:title" content="Privacy and trust — Axcess">
+<meta property="og:title" content="Privacy and trust | Axcess">
 <meta property="og:description" content="What stays on your computer, what Axcess connects to, and how it scans sites behind a login without ever seeing your password.">
 <meta property="og:url" content="https://lsa-mis.github.io/axcess/privacy/">
 <meta property="og:image" content="https://lsa-mis.github.io/axcess/assets/axcess-dashboard-redacted.png">
@@ -56,6 +56,10 @@
       <span class="eyebrow">The boundary</span>
       <h2>What stays local and what connects out</h2>
     </div>
+    <div class="shot-frame" style="margin-bottom:1.5rem">
+      <img class="shot" src="../assets/diagrams/privacy-boundary.png" width="1600" height="900"
+        alt="Diagram of what stays on your computer. Reports, stored pages, screenshots, images, and logs stay in local files. Axcess connects to the website you scan, to an optional local AI service, and, in the desktop app, to GitHub once per launch to check for updates. It has no account, telemetry, or upload.">
+    </div>
     <div class="boundary">
       <span class="tag">Stays on your computer</span>
       <div class="inner">
@@ -68,8 +72,9 @@
       </div>
     </div>
     <div class="outside">
-      <div><strong>Connects to: the website you are scanning</strong><span>Axcess necessarily loads pages from the target site, at the rate you set, respecting robots.txt unless you say otherwise.</span></div>
-      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no update checks that carry data, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
+      <div><strong>Connects to: the website you are scanning</strong><span>Axcess loads pages from the target site at the rate you set. Public scans respect robots.txt unless you say otherwise; login scans do not check it. Viewing a stored page later can also load that site's styles, fonts, and images.</span></div>
+      <div><strong>Connects to: GitHub, for desktop updates</strong><span>Once per launch, the desktop app asks GitHub whether a newer version exists. That request carries no scan data, and setting <code>AXCESS_DISABLE_UPDATE_CHECK=1</code> turns it off.</span></div>
+      <div><strong>Connects to: nothing else</strong><span>No telemetry, no usage analytics, no cloud AI. The <em>Send feedback</em> button opens a form in your browser only when you choose to click it, and carries nothing about your scan. Any other external integration would require an explicit administrator decision.</span></div>
     </div>
   </div>
 </section>
@@ -79,14 +84,18 @@
     <div class="section-head">
       <span class="eyebrow">Protected sites</span>
       <h2>Scanning behind a login without sharing your password</h2>
-      <p class="sub">Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in, it watches.</p>
+      <p class="sub">Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in, and it scans with that session.</p>
+    </div>
+    <div class="shot-frame" style="margin-bottom:1.5rem">
+      <img class="shot" src="../assets/diagrams/login-scan-flow.png" width="1600" height="900"
+        alt="Diagram of a login scan. You choose Site with a login or 2FA, Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select I'm signed in, start scan. Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends.">
     </div>
     <ol class="steps">
-      <li><h3>Choose "Login or 2FA website"</h3><p>Enter the application address you are authorized to test and, if needed, the sign-in addresses it uses.</p></li>
-      <li><h3>Axcess opens a visible browser window</h3><p>This is a normal Chromium window on your screen.</p></li>
+      <li><h3>Choose "Site with a login or 2FA"</h3><p>Enter the HTTPS address of the page to scan after you sign in. It must be a site you are authorized to test.</p></li>
+      <li><h3>Axcess opens a visible browser window</h3><p>This is a normal Chromium window on your screen, with a fresh temporary profile.</p></li>
       <li><h3>You sign in directly with the website</h3><p>Password, passkey, push notification, one-time code, whatever the site requires. Nothing is typed into Axcess.</p></li>
-      <li><h3>Navigate to the approved page and confirm</h3><p>Select <em>I have signed in</em>. Axcess checks the page is inside the agreed scope.</p></li>
-      <li><h3>The scan uses that live session</h3><p>The session exists only in memory and ends with the scan. Login and identity-provider pages are not stored as evidence.</p></li>
+      <li><h3>Confirm and start</h3><p>Select <em>I’m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>The scan uses that live session</h3><p>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don’t store rendered pages</em>.</p></li>
     </ol>
     <div style="margin-top:1.5rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><p><strong>This is not a way around authentication.</strong> Axcess only continues where you have already signed in, with accounts and sites you are explicitly authorized to test.</p></div></div>
   </div>
@@ -123,7 +132,7 @@
         </tbody>
       </table>
     </div>
-    <p class="small" style="margin-top:1rem">Inside: a single SQLite database that is the source of truth, an <code>blobs</code> folder of image evidence, and local logs. Exported files are snapshots, not the record.</p>
+    <p class="small" style="margin-top:1rem">Inside: a single SQLite database that is the source of truth, a <code>blobs</code> folder of images and screenshots, and local logs. Logs include the addresses and titles of the pages scanned. Deleting a report keeps its image and screenshot files. Exported files are snapshots, not the record.</p>
   </div>
 </section>
 
@@ -147,7 +156,7 @@
       <h2>What Axcess claims about its own accuracy</h2>
     </div>
     <div class="grid grid-2">
-      <article class="card"><h3>A regression gate, not a marketing number</h3><p>A versioned, labelled test corpus requires fewer than 5% false discoveries and at least 80% recall for every detection layer before a change can ship. That stops a known detector from getting worse.</p></article>
+      <article class="card"><h3>A guardrail, not a marketing number</h3><p>A versioned, labelled test set must show fewer than 5% false discoveries and at least 80% recall for every detection layer. The set is synthetic and scores recorded results, so it guards the rules that decide what counts as a Barrier rather than measuring live detectors.</p></article>
       <article class="card"><h3>What that does not mean</h3><p>It is not a claim that every real website will see the same rate. A public real-world accuracy figure would need a representative held-out set reviewed independently by at least two accessibility experts, and the project says so in writing.</p></article>
     </div>
     <div style="margin-top:1.5rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>What Axcess is not.</strong> Axcess produces accessibility evidence for a qualified person to review. Automated and AI-assisted results do not prove WCAG conformance, legal compliance, or the accessibility of an entire website, and they do not replace testing with people who use assistive technology.</p></div></div>
@@ -175,7 +184,8 @@
           <li><a href="../how-it-works/">How it works</a></li>
           <li><a href="../coverage/">What it checks</a></li>
           <li><a href="../who-its-for/">Who it's for</a></li>
-          <li><a href="../faq/">Questions and glossary</a></li>
+          <li><a href="../faq/">Questions</a></li>
+          <li><a href="../faq/#glossary">Glossary</a></li>
         </ul>
       </div>
       <div>
@@ -183,6 +193,7 @@
         <ul>
           <li><a href="../get-started/">Get started</a></li>
           <li><a href="../privacy/">Privacy and trust</a></li>
+          <li><a href="https://github.com/lsa-mis/axcess/blob/main/docs/reading-your-report.md">Reading your report</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/releases">Desktop releases</a></li>
           <li><a href="https://github.com/lsa-mis/axcess/tree/main/docs">Documentation</a></li>
         </ul>
