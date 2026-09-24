@@ -25,17 +25,21 @@ together.
    - It needs Playwright's Chromium headless shell. `make setup` installs it
      with `uv run playwright install chromium`.
    - Find it with
-     `find ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -name headless_shell -type f 2>/dev/null`
-     (or look under `$PLAYWRIGHT_BROWSERS_PATH` if you set it), then set
-     `AXCESS_DIAGRAM_BROWSER` to that path.
+     `find ${PLAYWRIGHT_BROWSERS_PATH:-} ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -type f \( -name chrome-headless-shell -o -name headless_shell \) 2>/dev/null`
+     (newer Playwright names the binary `chrome-headless-shell`, older builds
+     `headless_shell`), then set `AXCESS_DIAGRAM_BROWSER` to that path.
    - The script's built-in default is a path on the machine that made the
      diagrams, not Playwright's default, so on your machine you will
      usually need the variable.
 4. If the change affects what a diagram shows, update its alt text everywhere
-   the image is used (search the docs for the file name; there is no separate
-   alt text file), and copy the report
-   groups, login scan, and privacy PNGs into `site/assets/diagrams/` and run
-   `make site`.
+   the image is used. There is no separate alt text file: run
+   `git grep -n "report-groups.png"` (with your PNG's name) to find every use,
+   including the root `README.md`. The site keeps the report groups alt text in
+   `REPORT_GROUPS_ALT` and the login scan and privacy alt text inline, all in
+   `site/build.py`.
+5. For the report groups, login scan, and privacy diagrams, copy the new PNG
+   into `site/assets/diagrams/`, update its pixel size in `DIAGRAM_SIZES` in
+   `site/build.py` if it changed, and run `make site`.
 
 | PNG | Artboard |
 | --- | --- |

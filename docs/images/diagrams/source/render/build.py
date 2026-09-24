@@ -15,7 +15,8 @@ Run:  python3 docs/images/diagrams/source/render/build.py [Name ...]
 The built-in SHELL default is a path on the machine that made the diagrams,
 not Playwright's default location. Install the shell with
 `uv run playwright install chromium` (or `make setup`), find it with
-`find ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -name headless_shell -type f`,
+`find ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -type f
+\( -name chrome-headless-shell -o -name headless_shell \)`,
 and set AXCESS_DIAGRAM_BROWSER to that path.
 """
 
