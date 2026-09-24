@@ -630,16 +630,35 @@ async def test_every_spa_route_has_an_accurate_document_title(
         assert await page.title() == f"{expected} · Axcess", path
 
 
-async def test_header_uses_one_mode_neutral_new_scan_action(
+async def test_sidebar_leads_with_one_mode_neutral_new_scan_action(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """The global CTA defers the public/login choice to the new-scan page."""
-    base, _scan_id = live_server
-    page = await new_page()
-    await page.goto(f"{base}/app/", wait_until="networkidle")
+    """The global CTA defers the public/login choice to the new-scan page.
 
-    action = page.get_by_role("banner").get_by_role("link", name="Create New Scan", exact=True)
+    On a desktop it is the first action in the sidebar and the top bar has
+    none; on a phone, where the sidebar is hidden, the top bar keeps it.
+    """
+    base, _scan_id = live_server
+    phone = await new_page(viewport={"width": 390, "height": 800})
+    await phone.goto(f"{base}/app/", wait_until="networkidle")
+    await playwright_async.expect(
+        phone.get_by_role("banner").get_by_role("link", name="Create New Scan", exact=True)
+    ).to_be_visible()
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/", wait_until="networkidle")
+    await playwright_async.expect(
+        page.get_by_role("link", name="Create New Scan", exact=True).filter(visible=True)
+    ).to_have_count(1)
+    await playwright_async.expect(
+        page.get_by_role("banner").get_by_role("link", name="Create New Scan").filter(visible=True)
+    ).to_have_count(0)
+    sidebar = page.get_by_role("complementary", name="Primary")
+    first_action = sidebar.locator("a, button").filter(visible=True).nth(1)
+    await playwright_async.expect(first_action).to_have_accessible_name("Create New Scan")
+
+    action = sidebar.get_by_role("link", name="Create New Scan", exact=True)
     await playwright_async.expect(action).to_have_count(1)
     href = await action.get_attribute("href")
     assert href is not None
@@ -657,8 +676,7 @@ async def test_sidebar_offers_search_and_one_external_feedback_link(
 ) -> None:
     """Search and feedback live in the sidebar, reachable from every screen.
 
-    They used to sit in the top bar, which now carries only the breadcrumb
-    and the one "Create New Scan" action.
+    They used to sit in the top bar, which now carries only the breadcrumb.
     """
     base, _scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
