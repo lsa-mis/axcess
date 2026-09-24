@@ -259,8 +259,8 @@ holds its logic.
   `completed`).
 - Setting `status` to `completed` returns 409 `evaluation_not_ready` with a
   list of blockers until the reviewer, purpose, included scope, methods used,
-  and limitations are filled in, and every WCAG A and AA manual check has an
-  outcome with a rationale and none still needs follow-up.
+  and limitations are filled in. Every WCAG A and AA manual check also needs
+  an outcome with a rationale, and none may still need follow-up.
 - A final export also needs every finding behind a Barrier or Needs review
   issue to have a review status of in progress, remediated, accepted risk, or
   false positive (`assess_public_export_readiness` in
@@ -273,8 +273,12 @@ No screen in the review app calls these routes today. `api/client.ts` has
 check routes (`GET /api/scans/{id}/manual-checks`,
 `PATCH /api/scans/{id}/manual-checks/{sc}`, and
 `POST /api/scans/{id}/manual-checks/{sc}/evidence`), but nothing uses them.
-The app's export menu always asks for a draft, so a final export is only
-possible by calling the API directly.
+So completing the evaluation and the manual checks needs the API today.
+
+The export menu always sends `?draft=acknowledged`, but that flag only matters
+while something is missing: once the evaluation is completed with no
+blockers, the same menu downloads a final export. The CLI's `audit export`
+skips this check and writes unlabeled files whatever the evaluation state.
 
 ### Swap the OCR backend
 

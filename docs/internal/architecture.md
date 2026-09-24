@@ -520,14 +520,15 @@ Public scans do not check that the Ollama address is on your computer; login
 scans do. Paths in the table are relative to `src/audit/` unless they start
 with `desktop/`.
 
-The review app's own interface makes no third-party requests. Its fonts are
+Apart from stored pages opened in the page inspector (see the table), the
+review app's own interface makes no third-party requests. Its fonts are
 vendored in `src/audit/web/frontend/public/fonts/` and served from
 `/app/fonts/`, never from a CDN. The comment at the top of
-`src/audit/web/frontend/src/fonts.css` relies on this promise. Its wording is
-out of date: it cites `docs/architecture.md` and says the only runtime network
-call is to the site being audited, which the table above corrects. Update that
-comment the next time you change `fonts.css`, and keep both in step if you add
-any external asset.
+`src/audit/web/frontend/src/fonts.css` relies on this promise, but its wording
+is out of date: it cites `docs/architecture.md` and says the only runtime
+network call is to the site being audited, which the table above corrects.
+Update that comment the next time you change `fonts.css`, and keep both in
+step if you add any external asset.
 
 ### Working offline
 

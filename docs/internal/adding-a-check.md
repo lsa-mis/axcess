@@ -138,8 +138,11 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      `api_create_scan`, `_build_crawl_config`, and the login scan request
      model `LocalLoginScanRequest` with the `CrawlConfig` built in
      `api_create_local_login_scan`.
-   - Login scans do not use `_LazyJs`, so step 4 does not reach them.
-     `_run_local_login_background` in `server.py` builds its own fetcher with
+   - Login scans hand `run_crawl` a ready-made fetcher, and `_LazyJs` uses an
+     injected fetcher as it is, so the probe you build in `run_crawl` never
+     reaches a login scan. The rest of step 4 (persistence, counters, and
+     `config_json_for_scan`) still applies.
+   - `_run_local_login_background` in `server.py` builds that fetcher with
      `run.session.create_shared_js_fetcher(...)`, which takes one parameter
      per probe (`src/audit/protected/session.py`). Add a `<x>_probe`
      parameter there, pass it on to `JsFetcher`, and pass the probe from
@@ -228,8 +231,9 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       row to `_methods_used`. It is a closed union, so add the key there
       before `METHOD_PIPELINE`, or `make typecheck` fails;
     - `METHOD_PIPELINE` in `components/MethodCoverageLedger.tsx`;
-    - `PIPELINES` in `routes/Diff.tsx`, the rescan comparison page's labels.
-      A missing entry falls back to the raw pipeline name.
+    - `PIPELINES` in `routes/Diff.tsx`, the rescan comparison page's labels
+      and its Detection method filter. A missing entry shows the raw pipeline
+      name as the label, and the pipeline is missing from the filter.
 11. **Exports.**
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,
       `_PIPELINE_COVERAGE`, and the hard-coded pipeline tuples in the location
@@ -239,14 +243,19 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       `keyboard:` branch. `_meta_for_row` handles only `axe:`, `semantic:`,
       and `keyboard:` keys and sends every other key to the image cards,
       where it finds nothing.
-    - That is a known bug today for responsive, focus, visual, and Alfa rows.
-      Their audit report cards have no "verify" steps and always show Medium
-      confidence, and the workbook's fix options for them are empty
-      (`fix_options_for` uses the same lookup). The issue page and the
-      workbook's other ticket fields are not affected, because they use
-      `_rule_meta_for` in `issues.py`, which does handle these pipelines. Until
-      the bug is fixed, read verification steps for those issues on the issue
-      page or in the workbook.
+    - That is a known bug today for responsive, focus, and visual rows. Their
+      audit report cards lack the Manual and Automated verify lines and always
+      show Medium confidence, even where the card says high (1.4.10, 1.4.12,
+      and 2.4.3). The issue page and the workbook's ticket fields are not
+      affected, because they use `_rule_meta_for` in `issues.py`, which
+      handles these pipelines. Until the bug is fixed, read verification steps
+      for those issues on the issue page or in the workbook.
+    - Alfa rows have no card on purpose: `_rule_meta_for` returns nothing for
+      them either, and Alfa's own rule documentation is the remediation lead.
+    - The workbook's fix options come from `fix_options_for`, which uses the
+      same `_meta_for_row` lookup. No `semantic_criteria` card has
+      `fix_options` today, so if you want workbook fix options for your check,
+      add them to its card as well as adding the `_meta_for_row` branch.
     - `_SOURCE_LABELS` in `jira_export.py` and in `markdown_report.py`.
     - The workbook reuses `_PIPELINE_LABEL`, so it needs no change of its own.
 12. **Goldens.** `tests/ui/golden/api_openapi.json` pins the pipeline
@@ -260,9 +269,12 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       tests/unit/test_exports_jira_markdown.py
     ```
 
-    That run writes the goldens and fails on purpose (under `CI` it refuses to
-    write). Review the diff, then run the same tests again without the
-    variable.
+    The API surface and contract tests and `test_export_goldens.py` write
+    their goldens and fail on purpose (under `CI` they refuse to write).
+    `test_audit_report.py`, `test_exports_csv_json.py`, and
+    `test_exports_jira_markdown.py` write theirs and pass, with no `CI`
+    guard. Either way, review `git diff tests/ui/golden tests/unit/golden`,
+    then run the same tests again without the variable.
 13. **Tests and fixtures.**
     - Fixture pages in `tests/fixtures/site/<x>/`, with failing and clean
       cases. The focus probe has `clean.html`, `obscured.html`, and

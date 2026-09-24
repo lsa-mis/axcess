@@ -20,12 +20,20 @@ together.
    match the code, like any other documentation claim.
 2. Regenerate the artboards: `python3 docs/images/diagrams/source/render/boards.py`.
 3. Render the PNGs: `python3 docs/images/diagrams/source/render/build.py`, or pass
-   board names (for example `ReportGroups`) to render only those. It needs a
-   Chromium headless shell; set `AXCESS_DIAGRAM_BROWSER` to its path if it is
-   not at the default Playwright location. It writes throwaway HTML files into
-   `render/`; delete them before you commit.
+   board names (for example `ReportGroups`) to render only those. It writes
+   throwaway HTML files into `render/`; delete them before you commit.
+   - It needs Playwright's Chromium headless shell. `make setup` installs it
+     with `uv run playwright install chromium`.
+   - Find it with
+     `find ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -name headless_shell -type f 2>/dev/null`
+     (or look under `$PLAYWRIGHT_BROWSERS_PATH` if you set it), then set
+     `AXCESS_DIAGRAM_BROWSER` to that path.
+   - The script's built-in default is a path on the machine that made the
+     diagrams, not Playwright's default, so on your machine you will
+     usually need the variable.
 4. If the change affects what a diagram shows, update its alt text everywhere
-   the image is used (search the docs for the file name), and copy the report
+   the image is used (search the docs for the file name; there is no separate
+   alt text file), and copy the report
    groups, login scan, and privacy PNGs into `site/assets/diagrams/` and run
    `make site`.
 

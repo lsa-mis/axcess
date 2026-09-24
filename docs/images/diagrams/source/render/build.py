@@ -1,16 +1,22 @@
 """Render the Claude Design artboards to PNG files for the repo docs.
 
-For each design/project/<Name>.dc.html this script:
+All paths below are under docs/images/diagrams/source/. For each
+project/<Name>.dc.html this script:
   1. removes the support.js line and the x-dc script block,
   2. unwraps <x-dc> and <helmet>, moving helmet's <style> into <head>,
   3. replaces the Google Fonts <link> with local @font-face rules that point
-     at the woff2 files downloaded into design/fonts/,
-  4. writes design/render/<Name>.html, and
-  5. screenshots it with the Playwright headless shell at 2x.
+     at the woff2 files in fonts/,
+  4. writes render/<Name>.html (a throwaway file; delete it before you
+     commit), and
+  5. screenshots it with Playwright's Chromium headless shell at 2x into
+     docs/images/diagrams/.
 
 Run:  python3 docs/images/diagrams/source/render/build.py [Name ...]
-Set AXCESS_DIAGRAM_BROWSER to a Chromium or headless-shell binary if yours
-lives elsewhere.
+The built-in SHELL default is a path on the machine that made the diagrams,
+not Playwright's default location. Install the shell with
+`uv run playwright install chromium` (or `make setup`), find it with
+`find ~/Library/Caches/ms-playwright ~/.cache/ms-playwright -name headless_shell -type f`,
+and set AXCESS_DIAGRAM_BROWSER to that path.
 """
 
 from __future__ import annotations

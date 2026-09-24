@@ -352,9 +352,12 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
 2. **Version.** Confirm the launcher log's "starting backend" line shows
    `version 0.1.N (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
-   The app has no screen that shows its own version. The update dialog says
-   "You are running 0.1.N (<short SHA>)", but only when it offers a newer
-   release, so support should ask a user for the launcher log line instead.
+   - The review app has no screen that shows the version. The update dialog
+     says "You are running 0.1.N (<short SHA>)", but only when it offers a
+     newer release, so support should ask a user for the launcher log line.
+   - On macOS, also open **Axcess > About Axcess** and note whether it shows
+     0.1.N. The desktop code never replaces Electron's default menu, which
+     should include that item, but nobody has checked it on a Mac yet.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
 4. **Update from the previous release.** On a machine with the previous
@@ -385,12 +388,15 @@ Releases page, so treat the numbers as estimates:
 | `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
 | `Axcess-0.1.N-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
 | `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
+| `Axcess-0.1.N-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
 
-These counts miss people who never relaunch the app (there is no timer), apps
-whose check failed silently (for example, when GitHub rate-limits
-unauthenticated requests from a shared campus address), macOS users who
-download the disk image but never replace the app, and builds whose backend
-cannot start.
+These counts miss:
+
+- people who never relaunch the app (there is no timer);
+- apps whose update check failed silently, for example when GitHub
+  rate-limits unauthenticated requests from a shared campus address;
+- macOS users who download the disk image but never replace the app;
+- builds whose backend cannot start.
 
 ### Before an institutional rollout
 
@@ -488,8 +494,10 @@ version-less links described in [The publish job](#the-publish-job).
   cannot offer its own fix.
 - **No way to measure update adoption beyond download counts.** See
   [Confirm adoption](#confirm-adoption).
-- **The app does not show its own version.** Only the launcher log records
-  it, apart from the update dialog when a newer release is offered.
+- **The review app does not show its own version.** On Windows only the
+  launcher log records it, apart from the update dialog when a newer release
+  is offered. On macOS, Electron's default **About Axcess** menu item may
+  show it; confirm that in the smoke test before you rely on it.
 - **Some statements say more than the code does:**
   - The header comment in `desktop/src/updates.cjs` and a comment at the top
     of `.github/workflows/ci.yml` say every push to `main` publishes a

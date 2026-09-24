@@ -1,8 +1,11 @@
 """Generate the six Axcess diagram artboards as Claude Design .dc.html files.
 
-Run:  python3 design/render/boards.py
-Writes design/project/<Name>.dc.html and design/project/canvas.json.
-Every label here was checked against the repo; see design/ALT.md.
+Run:  python3 docs/images/diagrams/source/render/boards.py
+Writes docs/images/diagrams/source/project/<Name>.dc.html and
+docs/images/diagrams/source/project/canvas.json.
+Every label here must match the code, like any other documentation claim.
+Each image's alt text lives in the docs that embed it (search the docs for the
+PNG file name); update it there when a diagram changes.
 """
 
 from __future__ import annotations
