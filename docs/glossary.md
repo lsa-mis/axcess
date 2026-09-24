@@ -8,28 +8,33 @@ again. If a word is missing or unclear, please open an issue.
 
 ### Barrier
 
-A result where a rule engine failed a fixed, machine-testable rule, such as an
-image with no text alternative. These are the most certain results, so start
-here: confirm the problem on the page, fix it, then [rescan](#rescan-comparison).
+A result where a [rule engine](#rule-engine) failed a fixed, machine-testable
+rule, such as an image with no [alt text](#alt-text). These are the most certain
+results, so start here: confirm the problem on the page, fix it, then
+[rescan](#rescan-comparison).
 
 ### Needs review
 
-A lead that a person must confirm before anyone calls it a barrier, found by a
-[browser check](#browser-check), the keyboard check, a [local AI
-model](#local-ai-model), or an Alfa "cannot tell" result. Open the evidence, test
-it on the page, and record your decision (the issue page calls this group
-"Needs confirmation" and the dashboard calls it "Review leads").
+A possible problem that a person must confirm before it counts as a
+[Barrier](#barrier), because a less certain check found it: a [browser
+check](#browser-check), the [keyboard trap](#keyboard-trap) check, a [motion
+check](#motion-check), text in an image whose [alt text](#alt-text) is missing
+or does not match, a [local AI model](#local-ai-model), or a [Siteimprove
+Alfa](#siteimprove-alfa) "cannot tell" result. Open the evidence, test it on
+the page, and record your decision; the issue page calls this group "Needs
+confirmation" and the dashboard calls it "Review leads".
 
 ### Informational
 
 A record kept for transparency, not a problem to fix, such as text in an image
-whose alt text already says the same words. You do not need to act on it.
+whose [alt text](#alt-text) already says the same words. You do not need to act
+on it.
 
 ## Issues and findings
 
 ### Finding
 
-One result a check recorded, with its page, element, and
+One result a check recorded, with its page, [element](#element), and
 [evidence](#evidence). Findings are the raw records behind the Issues table.
 
 ### Occurrence
@@ -41,14 +46,15 @@ column, and the Excel workbook calls them Instances.
 ### Issue group
 
 One row in the Issues table: every occurrence found by the same check (for
-images, the same kind of image with the same alt text problem). The Issues
-page shows the number of issue groups and occurrences side by side.
+images, the same kind of image with the same [alt text](#alt-text) problem). The
+Issues page shows the number of issue groups and occurrences side by side.
 
 ### Root cause
 
-The underlying reason a problem repeats, such as one template or stylesheet
-used on 40 pages. Axcess groups occurrences by the check that found them, not
-by root cause, so look for a shared source before fixing page by page.
+The underlying reason a problem repeats, such as one template or shared style
+file (stylesheet) used on 40 pages. Axcess groups occurrences by the check that
+found them, not by root cause, so look for a shared source before fixing page by
+page.
 
 ### Evidence
 
@@ -56,14 +62,21 @@ What a check actually recorded: the page, the element, a code snippet, often a
 screenshot, the rule, and the method. It stays with the report so anyone can
 check a result later.
 
+### Element
+
+One piece of a web page, such as a heading, image, link, button, or form
+field.
+
 ## Severity and priority
 
 ### Impact
 
 How badly a problem affects people, as reported by the check: critical,
-serious, moderate, or minor. Image findings use critical, major, minor, or info,
-and the workbook and audit report show every result as Critical, Serious,
-Moderate, or Minor.
+serious, moderate, or minor (for local AI checks, it reflects how confident the
+model is). Image checks use critical, major, minor, or info instead, and
+Siteimprove Alfa reports no impact, so the workbook and [audit
+report](#audit-report) convert everything to Critical, Serious, Moderate, or
+Minor and show Alfa results as Moderate.
 
 ### Priority
 
@@ -73,10 +86,11 @@ spread, a severe problem on a single page shows as Low, so check its impact too.
 
 ### Status
 
-Where a finding stands in review: new, reviewing, in progress, remediated,
-accepted risk, or false positive. The workbook shows these as Not Started,
-Reviewing, In Progress, Resolved, Accepted Risk, and Not an Issue, and the last
-four require a short reason.
+Where a finding stands in review: new, reviewing, in progress, remediated
+(fixed), accepted risk (a known problem your team chose not to fix for now), or
+false positive, and the last four need a short reason. The Excel workbook uses
+the same words, except Not Started for new, Resolved for remediated, and Not an
+Issue for false positive.
 
 ## WCAG terms
 
@@ -90,6 +104,18 @@ accessible web content. Axcess checks against WCAG 2.2.
 One testable requirement in WCAG, numbered like 1.4.3 (Contrast Minimum).
 WCAG 2.2 has 55 success criteria at Levels A and AA.
 
+### Alt text
+
+The written description of an image that [screen readers](#screen-reader) read
+aloud, and that appears if the image does not load. WCAG calls it a text
+alternative.
+
+### Conformance
+
+A page conforms to WCAG when it meets every success criterion at a chosen
+[conformance level](#conformance-level). A scan cannot prove conformance,
+because many success criteria need [manual testing](#manual-testing).
+
 ### Conformance level
 
 WCAG sorts success criteria into Level A (the minimum), AA (what most policies
@@ -98,9 +124,10 @@ can choose A or AAA when you start a scan.
 
 ### Best practice
 
-A rule-engine result that is good practice but not tied to a WCAG success
-criterion. Axcess labels it BP and still lists it with
-[Barriers](#barrier) when a rule engine found it.
+A result that is good practice but not tied to a WCAG success criterion,
+labeled BP. When a rule engine finds one, Axcess lists it with
+[Barriers](#barrier), so fix WCAG Barriers first and treat BP items as
+recommended.
 
 ## Coverage
 
@@ -110,23 +137,31 @@ What a scan actually checked: which pages it tested, which methods ran, and how
 many [DOM states](#dom-state) it reached. The report's Overview shows this under
 "What this scan actually checked."
 
+### Crawl
+
+How a scan moves through a site: Axcess starts at the address you give,
+follows links to find more pages, and tests each page in the [scope](#scope).
+
 ### Pages not reached
 
-Pages the scan tried but could not load. The Overview counts these as crawl
-errors, and a page that answered with an error such as "Sign-in required" is
-listed with that status instead. The report does not list pages skipped
-because of robots.txt or because they were outside the [scope](#scope).
+Pages the scan tried but could not load, which the Overview counts as
+[crawl](#crawl) errors; a page that answered with an error, such as "Sign-in
+required", is listed with that status instead. The report does not list pages
+skipped because the site asked scanners to stay out (its robots.txt file) or
+because they were outside the [scope](#scope).
 
 ### Scope
 
-The part of a site a scan may visit: the start address's host and path, such as
-`/admissions/`, plus limits on pages and link depth.
+The part of a site a scan may visit: pages on the same site under the address
+you start from (for example, everything under `www.example.edu/admissions/`),
+up to a page limit and a limit on how many links deep the [crawl](#crawl) goes.
 
 ### DOM state
 
-What a page looks like after a control is used, for example after a menu opens.
-Problems that appear only in such a state are labeled "After clicking" with the
-control's name, so you can reproduce them.
+What a page looks like after a control is used, for example after a menu opens
+(DOM is the browser's live copy of the page). Problems that appear only in such
+a state are labeled "After clicking" with the control's name, so you can
+reproduce them.
 
 ## Accuracy
 
@@ -154,15 +189,26 @@ can measure.
 ### Manual testing
 
 A person checks the site directly, for example using only a keyboard or
-listening with a screen reader. Many WCAG success criteria can only be judged
-this way.
+listening with a [screen reader](#screen-reader). Many WCAG success criteria
+can only be judged this way.
+
+### Screen reader
+
+Software that reads a page aloud, or shows it on a braille display, for people
+who are blind or have low vision. JAWS, NVDA, and VoiceOver are common screen
+readers.
+
+### Keyboard focus
+
+The item a keyboard user is on right now, usually shown with an outline.
+Pressing Tab moves focus to the next link, button, or form field.
 
 ### Axcess and manual testing
 
 Axcess speeds up manual testing by finding the machine-testable problems and
-pointing you to the pages, elements, and states that need a closer look. It
-does not replace manual testing, because many success criteria have no
-automated check at all; [What Axcess checks](https://lsa-mis.github.io/axcess/coverage/)
+pointing you to the pages, elements, and states that need a closer look. It does
+not replace manual testing, because many success criteria have no automated
+check at all; [What Axcess checks](https://lsa-mis.github.io/axcess/coverage/)
 lists them.
 
 ## Checks and tools
@@ -170,23 +216,26 @@ lists them.
 ### Rule engine
 
 Software that tests a page against a fixed list of machine-testable rules.
-Axcess runs [axe-core](#axe-core) on every scan and can also run
+Axcess runs [axe-core](#axe-core) by default and can also run, or instead run,
 [Siteimprove Alfa](#siteimprove-alfa).
 
 ### axe-core
 
-The open-source rule engine from Deque Systems. Axcess runs a bundled copy on
-every rendered page.
+The open-source rule engine from Deque Systems. By default, Axcess runs a
+bundled copy on every [rendered page](#rendered-page).
 
 ### Siteimprove Alfa
 
-Siteimprove's open-source rule engine, built on [ACT rules](#act-rule). Axcess
-can run it on your computer as an optional second engine.
+Siteimprove's open-source rule engine, built on [ACT rules](#act-rule), which
+Axcess can run on your computer alongside or instead of axe-core. When Alfa
+cannot decide a result by itself, it reports "cannot tell", and Axcess puts
+that result in [Needs review](#needs-review).
 
 ### ACT rule
 
-An accessibility test written in the W3C's Accessibility Conformance Testing
-format, precise enough that different tools can run it the same way.
+An accessibility test written in the Accessibility Conformance Testing format
+from the W3C (the group that publishes WCAG), precise enough that different
+tools can run it the same way.
 
 ### Browser check
 
@@ -194,16 +243,25 @@ A check that measures how a page behaves in a real browser, such as resizing it
 to phone width or pressing Tab through it. Its results go to
 [Needs review](#needs-review).
 
+### Motion check
+
+A check for audio that plays by itself with no control, and for autoplaying
+video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
+Its results go to [Needs review](#needs-review), and in the app it runs only
+when you turn on **Check motion and animation**.
+
 ### Local AI model
 
-An optional language or vision model that runs on your own computer through a
-free program called Ollama. Axcess never installs one for you, and AI results
+An optional AI model that reads text (a language model) or looks at images (a
+vision model), running on your own computer through a free program called
+Ollama. Axcess never installs one for you, and AI results
 are never reported as [Barriers](#barrier).
 
 ### OCR
 
-Optical character recognition: software that reads text inside images. Axcess
-includes the Tesseract OCR engine.
+Optical character recognition: software that reads text inside images. The
+desktop app includes the Tesseract OCR engine, and a source install needs
+Tesseract installed separately.
 
 ### Rendered page
 
@@ -214,18 +272,20 @@ visitors see. Axcess tests rendered pages by default.
 
 ### Image of text
 
-Text that is part of a picture instead of real text (WCAG 1.4.5). Screen
-readers cannot read it, and people cannot resize or restyle it.
+Text that is part of a picture instead of real text (WCAG 1.4.5). [Screen
+readers](#screen-reader) cannot read it, and people cannot resize or restyle it.
 
 ### Keyboard trap
 
-A spot where keyboard focus gets stuck and Tab or Shift+Tab cannot move it away
-(WCAG 2.1.2). People who do not use a mouse are stranded there.
+A spot where [keyboard focus](#keyboard-focus) gets stuck and Tab or Shift+Tab
+cannot move it away (WCAG 2.1.2). People who do not use a mouse are stranded
+there.
 
 ### Reflow
 
-Content should fit a screen 320 CSS pixels wide without scrolling sideways
-(WCAG 1.4.10).
+Content should fit a window 320 CSS pixels wide (about a small phone, or a
+desktop browser zoomed to 400%) without scrolling sideways (WCAG 1.4.10). A CSS
+pixel is the browser's unit of measure, not a physical dot on your screen.
 
 ### Resize text
 
@@ -239,36 +299,51 @@ paragraph spacing (WCAG 1.4.12).
 
 ### Focus not obscured
 
-A control that has keyboard focus should not be completely hidden behind
-something else on the page, such as a sticky header (WCAG 2.4.11).
+A control that has [keyboard focus](#keyboard-focus) should not be completely
+hidden behind something else on the page, such as a sticky header that stays
+on screen while you scroll (WCAG 2.4.11).
 
 ### Target size
 
 Buttons and links should be at least 24 by 24 CSS pixels, or have enough space
-around them (WCAG 2.5.8, Level AA). The stricter 44 by 44 pixel size is WCAG
-2.5.5, Level AAA, which Axcess does not check.
+around them (WCAG 2.5.8, Level AA). The stricter 44 by 44 CSS pixel size is
+WCAG 2.5.5, Level AAA, which Axcess checks only when Siteimprove Alfa runs at
+Level AAA.
 
 ## Using Axcess
 
 ### Login scan
 
 A scan of pages behind a sign-in. Axcess opens a browser window, you sign in
-yourself (including any two-factor step), and Axcess scans with that session
-without ever seeing your password.
+yourself (including any two-factor step), and Axcess then scans the site as
+you, signed in, without ever seeing your password.
 
 ### Rescan comparison
 
-Two reports of the same scope lined up, with each issue marked New, Still
-detected, Changed, No longer detected, or Cannot compare reliably. "No longer
-detected" is not proof of a fix, so confirm fixes on the page.
+Two reports of the same [scope](#scope) lined up, with each issue marked New,
+Still detected, Changed, No longer detected, or Cannot compare reliably. "No
+longer detected" is not proof of a fix, so confirm fixes on the page.
 
 ### Draft export
 
-An export made before expert review is finished. Axcess marks it DRAFT in the
-file name and inside the file.
+An export downloaded from the app before expert review is finished. The app
+marks it DRAFT in the file name and inside the file; command-line exports are
+not marked.
+
+### Configured search
+
+An optional scan setting, **Search to discover result pages**, that types a
+sample search you choose and tests the result pages it finds. [Single-page apps
+and search scans](spa-search-scans.md) explains how to set it up.
+
+### Audit report
+
+The narrative Markdown report you download as **Audit report** from the Export
+menu. The Excel workbook is a separate export, **Remediation workbook**, with
+one row per issue.
 
 ### Local-first
 
-Axcess stores your reports on your computer and has no account and no
-telemetry. It connects to the site you scan, and the desktop app checks GitHub
-for updates.
+Axcess stores your reports on your computer, has no account, and sends no usage
+data back to us (no telemetry). It connects to the site you scan, and the
+desktop app checks GitHub for updates.

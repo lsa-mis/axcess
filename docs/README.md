@@ -39,31 +39,5 @@ Then use these guides:
 
 ## Building and maintaining Axcess
 
-- [Contributing](../CONTRIBUTING.md): set up a development copy, run the
-  quality gates, and follow the documentation rules.
-- [Internal docs index](./internal/README.md): the map of maintainer docs.
-- [Architecture](./internal/architecture.md): how a scan flows through the
-  crawler, the checks, storage, and the review app.
-- [Developer guide](./internal/developer-guide.md): where the code lives, the
-  command-line tool, and recipes for common changes.
-- [Detection pipelines](./internal/detection-pipelines.md): every check, the
-  report group it feeds, and its false-positive safeguards.
-- [Adding a check](./internal/adding-a-check.md): how to add or tune a check.
-- [Releases](./internal/releases.md): desktop releases, auto-update, and
-  publishing the site.
-- [Protected scans](./internal/protected-scans.md): deploying the
-  off-by-default protected companion for hosted scans of signed-in pages.
-- [UI accessibility](./internal/ui-accessibility.md): the accessibility
-  standard the review app holds itself to, and how it is tested.
-- [Design principles](./internal/design-principles.md): Universal Design and
-  usability principles applied to the review app.
-- [Personas](./internal/personas.md): who the review app is designed for.
-- [Alfa evidence review](./internal/alfa-evidence-review.md): an investigation
-  into Siteimprove Alfa "cannot tell" results and how to verify them.
-- [System design and coverage gap](./internal/system-design-and-coverage-gap.md):
-  an earlier design document, kept for history.
-- [Detection efficacy](../DETECTION_EFFICACY.md): the accuracy, speed, and
-  scale gates for detectors, and how to run them.
-- [Agent guide](../AGENTS.md): the contract for coding agents working in this
-  repository.
-- [Original plan](../PLAN.md): the first build plan, kept for history.
+Read [Contributing](../CONTRIBUTING.md) to set up a development copy, and the
+[internal docs index](./internal/README.md) for every maintainer guide.
