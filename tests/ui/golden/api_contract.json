@@ -252,6 +252,8 @@
           "page_count": "integer",
           "pipeline": "string",
           "priority": "number",
+          "repeat_finding_ids": ["integer"],
+          "repeat_page_count": "integer",
           "responsibility": "string",
           "review_lane": "string",
           "status_summary": {
@@ -321,6 +323,8 @@
         "page_count": "integer",
         "pipeline": "string",
         "priority": "number",
+        "repeat_finding_ids": ["integer"],
+        "repeat_page_count": "integer",
         "responsibility": "string",
         "review_lane": "string",
         "status_summary": {
@@ -391,6 +395,8 @@
         "page_count": "integer",
         "pipeline": "string",
         "priority": "number",
+        "repeat_finding_ids": [],
+        "repeat_page_count": "integer",
         "responsibility": "string",
         "review_lane": "string",
         "status_summary": {"new": "integer"},
@@ -454,6 +460,8 @@
         "page_count": "integer",
         "pipeline": "string",
         "priority": "number",
+        "repeat_finding_ids": [],
+        "repeat_page_count": "integer",
         "responsibility": "string",
         "review_lane": "string",
         "status_summary": {
@@ -667,6 +675,7 @@
               "screenshot_hash": "null|string",
               "status": "string",
               "target_display": "absent|string",
+              "target_hash": "string",
               "target_selector": "string"
             }
           ],

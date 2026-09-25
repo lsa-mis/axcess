@@ -375,10 +375,15 @@ def _add_a11y_evidence(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) -
     DOM state with a screenshot, so locations carry both the null and the
     populated form; and an Alfa ``cant_tell`` outcome for the engine fields
     only Alfa fills. All on the home page, which the page endpoint reads.
+    The plain one repeats on a second page, as a shared component does, so
+    the issue row reports it once and carries the repeat in
+    ``repeat_finding_ids``.
     """
-    home = _page_ids(conn, scan_id)[0]
+    pages = _page_ids(conn, scan_id)
+    home = pages[0]
     screenshot_hash, _ = BlobStore(blob_dir).store(_pixel_png(color=(0, 0, 0)), "image/png")
     _add_label_violation(conn, scan_id=scan_id, page_id=home, element_id="contract")
+    _add_label_violation(conn, scan_id=scan_id, page_id=pages[1], element_id="contract")
     _add_label_violation(
         conn,
         scan_id=scan_id,
