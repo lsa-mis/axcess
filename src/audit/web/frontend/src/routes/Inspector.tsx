@@ -225,10 +225,11 @@ export default function InspectorRoute() {
    * cannot act on, and would keep the "not found" warning permanently lit no
    * matter which state they chose.
    *
-   * Load-state findings stay in scope while viewing a state: a revealed state
-   * is the page plus whatever the click added, so they are usually still there.
-   * The load view keeps every target, because explaining why the revealed ones
-   * are absent is the whole point of that screen.
+   * Each finding belongs to exactly one state, the one it was first seen in.
+   * A revealed state is the page plus whatever the click added, so load-state
+   * markup is usually still in it, but listing it again there presented one
+   * element once per state. It stays under "At page load" and the off-state
+   * count points the reviewer to it.
    */
   /**
    * The occurrences that belong to the document on screen.
@@ -240,12 +241,7 @@ export default function InspectorRoute() {
    * attaching evidence to a state that does not contain it.
    */
   const scopedFindings = useMemo(
-    () =>
-      activeStateKey
-        ? currentFindings.filter(
-            (f) => !f.revealed_state_key || f.revealed_state_key === activeStateKey,
-          )
-        : currentFindings.filter((f) => !f.revealed_state_key),
+    () => currentFindings.filter((f) => (f.revealed_state_key || null) === activeStateKey),
     [currentFindings, activeStateKey],
   );
 
@@ -259,14 +255,18 @@ export default function InspectorRoute() {
    * listed, with their counts, and "At page load" stays as the baseline the
    * others are read against.
    *
+   * An issue found only at page load is offered no revealed states at all:
+   * none of them holds an occurrence of it.
+   *
    * With nothing specific under review (no `?issue=` or `?selector=`), every
    * state is offered: then the picker is for exploring, not for locating.
    */
+  const reviewing = Boolean(issueKey || directSelector || directSnippet);
   const offeredStates = useMemo(() => {
     const all = data?.states ?? [];
-    if (findingStateKeys.size === 0) return all;
+    if (!reviewing) return all;
     return all.filter((state) => findingStateKeys.has(state.state_key));
-  }, [data?.states, findingStateKeys]);
+  }, [data?.states, findingStateKeys, reviewing]);
 
   /** Occurrences of this issue that were already present at page load. */
   const loadStateCount = useMemo(
@@ -284,12 +284,7 @@ export default function InspectorRoute() {
   }, [currentFindings]);
 
   const scopedTargets = useMemo(
-    () =>
-      activeStateKey
-        ? targets.filter(
-            (target) => !target.stateKey || target.stateKey === activeStateKey,
-          )
-        : targets.filter((target) => !target.stateKey),
+    () => targets.filter((target) => target.stateKey === activeStateKey),
     [targets, activeStateKey],
   );
   const offStateCount = targets.length - scopedTargets.length;
