@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
@@ -374,7 +374,9 @@ export default function InspectorRoute() {
     highlightRequest.current += 1;
     const request = highlightRequest.current;
     const html = documentHtml;
-    if (!showHighlights || !html || scopedTargets.length === 0) {
+    // Located even with highlights hidden: whether the flagged element is in
+    // this capture at all is labelled at the state picker either way.
+    if (!html || scopedTargets.length === 0) {
       setHighlight(null);
       return;
     }
@@ -383,11 +385,72 @@ export default function InspectorRoute() {
       if (request !== highlightRequest.current) return; // superseded
       setHighlight(buildHighlightedHtml(html, scopedTargets));
     });
-  }, [showHighlights, documentHtml, scopedTargets]);
+  }, [documentHtml, scopedTargets]);
 
   const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
   const highlightPending = showHighlights && hasTarget && highlight === null;
+
+  /**
+   * Which offered states' captures no longer hold their flagged elements.
+   *
+   * The picker labels every state, not only the one on screen, so each
+   * offered state's capture is fetched too (a stored document, never a live
+   * render) and run through the same matcher the highlight uses: a label and
+   * a highlight can never disagree. The queries share the on-screen query's
+   * key, so switching to a checked state is served from cache.
+   */
+  const checkedStates = useMemo(
+    () => (reviewing ? offeredStates.map((state) => state.state_key) : []),
+    [offeredStates, reviewing],
+  );
+  const stateCaptures = useQueries({
+    queries: checkedStates.map((key) => ({
+      queryKey: ["page-inspection", scan, page, key],
+      queryFn: () => api.getPageInspection(scan, page, key),
+      enabled: inspectEnabled,
+      retry: false,
+    })),
+  });
+  const captureVersions = stateCaptures.map((query) => query.dataUpdatedAt).join(",");
+  const [missingByState, setMissingByState] = useState<ReadonlyMap<string, MissingCount>>(
+    () => new Map(),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const captures = checkedStates.map((key, index) => [key, stateCaptures[index]?.data] as const);
+    scheduleIdle(() => {
+      if (cancelled) return;
+      const next = new Map<string, MissingCount>();
+      for (const [key, inspection] of captures) {
+        const stateTargets = targets.filter((target) => target.stateKey === key);
+        // A state that was never captured has its own message; there is no
+        // document to be missing anything from.
+        if (!inspection?.render.ok || !inspection.render.dom_html || !stateTargets.length) continue;
+        const html = prepareCapture(
+          inspection.render.dom_html,
+          inspection.render.final_url || inspection.page.url || null,
+        );
+        const found = countFound(html, stateTargets);
+        next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
+      }
+      setMissingByState(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // captureVersions stands in for stateCaptures, a new array every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureVersions, checkedStates, targets]);
+  /** Missing elements for one picker option; the state on screen uses its highlight. */
+  const missingFor = (key: string): MissingCount | undefined => {
+    if (key === (activeStateKey ?? "")) {
+      return highlight && !isFetching
+        ? { missing: highlight.total - highlight.found, total: highlight.total }
+        : undefined;
+    }
+    return missingByState.get(key);
+  };
 
   // Best-effort: if the sandbox permits contentDocument access, bring the
   // highlighted element into view. Never required, the outline is baked in.
@@ -566,6 +629,7 @@ export default function InspectorRoute() {
                 label: `At page load${
                   loadStateCount > 0 ? ` (${loadStateCount})` : ""
                 }`,
+                badge: <MissingChip count={missingFor("")} />,
               },
               ...offeredStates.map((state) => {
                 const count = occurrencesByState.get(state.state_key) ?? 0;
@@ -580,6 +644,7 @@ export default function InspectorRoute() {
                 return {
                   value: state.state_key,
                   label: `After clicking ${chain}${count > 0 ? ` (${count})` : ""}`,
+                  badge: <MissingChip count={missingFor(state.state_key)} />,
                 };
               }),
             ]}
@@ -942,6 +1007,44 @@ function keepCentered(target: HTMLElement): void {
 
 /** Result of baking the highlight into the srcdoc. */
 type HighlightResult = { srcDoc: string; found: number; total: number };
+
+/** A state's flagged elements that its capture does not hold, of how many. */
+type MissingCount = { missing: number; total: number };
+
+/**
+ * The picker's red "No longer here" chip, for a state whose capture does not
+ * hold the element it was flagged on. Plain words, since the chip is read as
+ * part of the option's name.
+ *
+ * The chip style is uppercase, and Chromium carries CSS text-transform into
+ * the accessibility tree, where some screen readers spell short capitalized
+ * words letter by letter. So the visible text is hidden from them and they
+ * get the same words in sentence case, with a comma so it does not run into
+ * the state's name.
+ */
+function MissingChip({ count }: { count: MissingCount | undefined }) {
+  if (!count || count.missing <= 0) return null;
+  const text =
+    count.missing === count.total
+      ? "No longer here"
+      : `${count.missing} of ${count.total} no longer here`;
+  return (
+    <span className="sev-chip sev-chip--critical shrink-0">
+      <span aria-hidden>{text}</span>
+      <span className="sr-only">{text}, </span>
+    </span>
+  );
+}
+
+/** How many of ``targets`` the matcher locates in ``html``, without re-serializing. */
+function countFound(html: string | null, targets: Target[]): number {
+  if (!html || targets.length === 0) return 0;
+  try {
+    return markTargets(new DOMParser().parseFromString(html, "text/html"), targets);
+  } catch {
+    return 0;
+  }
+}
 
 /** Ceiling on elements examined by one snippet-match walk, bounds the worst
  *  case on pathological pages while remaining far above any real page's size. */
