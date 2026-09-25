@@ -764,3 +764,42 @@ def test_page_level_target_detection_covers_alfa_document_targets() -> None:
     assert not issues_mod._is_page_level_target("#user_menu_modal")
     # Stored Alfa paths are not always strings; they must not crash grouping.
     assert not issues_mod._is_page_level_target('{"type":"element","path":["/html[1]"]}')
+
+
+def test_shared_hash_with_different_markup_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Probe hashes cover only the first 200 characters of markup.
+
+    Two elements that differ after that share a ``target_hash`` but are not
+    the same element; merging them would hide a real finding.
+    """
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET html_snippet = html_snippet || ' differs later' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.page_count == 2
+    assert len(row.repeat_finding_ids) == 1
+    assert row.repeat_page_count == 1
+
+
+def test_same_markup_under_a_different_selector_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET target_selector = '#other_modal' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.repeat_page_count == 1

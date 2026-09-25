@@ -1022,6 +1022,15 @@ def _is_page_level_target(raw_selector: Any) -> bool:
     )
 
 
+def _element_identity(finding: dict[str, Any]) -> tuple[str, str, str] | None:
+    """The exact stored identity of a finding's element, or None if it must not merge."""
+    target_hash = str(finding.get("target_hash") or "")
+    selector = finding.get("target_selector")
+    if not target_hash or _is_page_level_target(selector):
+        return None
+    return (target_hash, str(selector or ""), str(finding.get("html_snippet") or ""))
+
+
 def _first_instances(
     findings: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -1030,29 +1039,33 @@ def _first_instances(
     A site's shared header, menu, or dialog fails the same rule on every
     page it appears on. The crawler stores each of those rows (they are true
     observations), but reporting them all repeats one defect once per page.
-    ``target_hash`` is the (rule, target, markup) identity the crawler
-    already dedupes on within a page; across pages the finding on the first
-    page crawled, the lowest page id, stands for the element and the rest
-    are repeats. Page-level targets and rows without a hash never merge.
+
+    Two findings are the same element only on an exact match of the stored
+    ``target_hash``, selector, and markup. The hash alone is not enough: the
+    probes hash only the first 200 characters of markup and Alfa hashes an
+    identity string, so two different elements can share one. Across pages
+    the finding on the first page crawled, the lowest page id, stands for
+    the element and the rest are repeats. Page-level targets and rows
+    without a hash never merge.
     """
 
-    first_by_hash: dict[str, dict[str, Any]] = {}
+    first_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
     for finding in findings:
-        target_hash = str(finding.get("target_hash") or "")
-        if not target_hash or _is_page_level_target(finding.get("target_selector")):
+        identity = _element_identity(finding)
+        if identity is None:
             continue
-        current = first_by_hash.get(target_hash)
+        current = first_by_identity.get(identity)
         if current is None or (int(finding["page_id"]), int(finding["id"])) < (
             int(current["page_id"]),
             int(current["id"]),
         ):
-            first_by_hash[target_hash] = finding
-    first_ids = {int(f["id"]) for f in first_by_hash.values()}
+            first_by_identity[identity] = finding
+    first_ids = {int(f["id"]) for f in first_by_identity.values()}
     reported: list[dict[str, Any]] = []
     repeats: list[dict[str, Any]] = []
     for finding in findings:
-        target_hash = str(finding.get("target_hash") or "")
-        if target_hash in first_by_hash and int(finding["id"]) not in first_ids:
+        identity = _element_identity(finding)
+        if identity in first_by_identity and int(finding["id"]) not in first_ids:
             repeats.append(finding)
         else:
             reported.append(finding)
