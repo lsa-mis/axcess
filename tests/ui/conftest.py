@@ -254,3 +254,24 @@ async def new_page(browser: Browser) -> AsyncIterator[Callable[..., Awaitable[Pa
     finally:
         for context in contexts:
             await context.close()
+
+
+@pytest.fixture
+def choose_option() -> Callable[[Page, str, str], Awaitable[None]]:
+    """Pick ``value`` in the app's ``Select`` named ``label``, the way a pointer user does.
+
+    The app's dropdown is a custom combobox, not a native ``<select>``, so
+    Playwright's ``select_option`` does not apply. Options carry their raw
+    value in ``data-value``, so tests do not depend on option wording.
+    """
+
+    async def choose(page: Page, label: str, value: str) -> None:
+        box = page.get_by_role("combobox", name=label, exact=True)
+        await box.click()
+        list_id = await box.get_attribute("aria-controls")
+        await page.locator(f'[id="{list_id}"] [role="option"][data-value="{value}"]').click()
+        # The list closes under the pointer, leaving it over whatever was
+        # beneath the option; park it so no hover state leaks into the test.
+        await page.mouse.move(0, 0)
+
+    return choose

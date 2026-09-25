@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { createElement, forwardRef, useId, useState } from "react";
-import { ChevronDown, ChevronRight, ScanEye } from "lucide-react";
+import { createElement, forwardRef, useEffect, useId, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
@@ -665,22 +665,41 @@ export type SelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /**
+   * Shown before the label, in the list and in the closed box while chosen,
+   * such as a status chip. It is read as part of the option's name, so its
+   * meaning must be in its words, never in its color alone.
+   */
+  badge?: ReactNode;
 };
+
+/** How long a pause ends a type-to-find run, matching platform selects. */
+const TYPEAHEAD_RESET_MS = 500;
 
 /**
  * The app's dropdown for choosing a value.
  *
- * A native `<select>` wearing the same trigger as the Export disclosure, so
- * the two read as one family without pretending to be the same widget: Export
- * is four links that each do something, this holds a value that stays chosen
- * and drives the page.
+ * Built as the WAI-ARIA APG *select-only combobox*, drawn like the Export
+ * panel so every dropdown in the app reads as one family.
  *
- * Native on purpose. A hand-built listbox would let the open list match Export
- * too — it is OS-drawn here and cannot be styled — but that list is the part
- * you see for a moment, and the price is owning arrow keys, typeahead, focus
- * return, `aria-activedescendant`, and the touch picker, every one of which
- * the platform already does correctly. Custom listboxes are a routine source
- * of the defects this tool exists to find.
+ * This replaced a native `<select>`. The native control was kept for as long
+ * as it could be, because the platform gets keyboard, typeahead, and focus
+ * right for free and custom listboxes are a routine source of the defects
+ * this tool exists to find. It could not stay: its open list is drawn by the
+ * OS, so it can neither match Export nor carry a status chip on an option
+ * (the inspector marks page states whose element is gone). Everything the
+ * native control did is therefore owned here and pinned by browser tests:
+ *
+ * - Focus never leaves the trigger; the highlighted option is conveyed with
+ *   `aria-activedescendant`, and the trigger's text is the chosen value.
+ * - Closed: Down, Up, Enter, and Space open the list on the chosen option;
+ *   Home and End open it on the first or last; typing opens it on a match.
+ * - Open: Up and Down move, Home, End, Page Up, and Page Down jump, Enter and
+ *   Space choose, Escape closes without choosing, and Tab chooses the
+ *   highlighted option and moves on, as the APG pattern specifies. Typing
+ *   jumps to the next option starting with what was typed.
+ * - Pointer: clicking an option chooses it; clicking away or focus leaving
+ *   the trigger closes the list.
  *
  * `label` is always rendered and always associated. Pass `hideLabel` for a
  * control whose meaning is already obvious from its surroundings; the name
@@ -693,9 +712,8 @@ export type SelectOption = {
  * `aria-describedby`, so the explanation a sighted user reads before choosing
  * is announced to everyone else as part of the same control.
  *
- * Omit `value`/`onChange` for an uncontrolled select inside a `<form>`, where
- * `name` and `defaultValue` carry the value to submit. Forcing those to be
- * controlled would mean holding state the form already holds.
+ * `data-value` on the trigger and on each option carries the raw value, so
+ * tests and tooling can pick an option without depending on its wording.
  */
 export function Select({
   label,
@@ -705,29 +723,146 @@ export function Select({
   value,
   onChange,
   options,
-  children,
   id,
   className,
-  ...rest
-}: Omit<ComponentPropsWithoutRef<"select">, "onChange" | "children"> & {
+  disabled = false,
+  "aria-describedby": extraDescribedBy,
+}: {
   label: string;
   hideLabel?: boolean;
   stacked?: boolean;
   hint?: ReactNode;
-  /** Omit for an uncontrolled select; pair with `name`/`defaultValue`. */
-  value?: string;
-  onChange?: (value: string) => void;
-  /** Options as data. Ignored when `children` is given. */
-  options?: SelectOption[];
-  /** Raw `<option>`/`<optgroup>` markup, for lists data cannot express. */
-  children?: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  id?: string;
+  className?: string;
+  disabled?: boolean;
+  "aria-describedby"?: string;
 }) {
   const generated = useId();
-  const selectId = id ?? generated;
-  const hintId = `${selectId}-hint`;
-  const describedBy = [hint ? hintId : null, rest["aria-describedby"]]
-    .filter(Boolean)
-    .join(" ");
+  const triggerId = id ?? generated;
+  const hintId = `${triggerId}-hint`;
+  const listId = `${triggerId}-list`;
+  const labelId = `${triggerId}-label`;
+  const optionId = (index: number) => `${triggerId}-option-${index}`;
+  const describedBy = [hint ? hintId : null, extraDescribedBy].filter(Boolean).join(" ");
+
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const typeahead = useRef({ text: "", at: 0 });
+
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+  const enabled = (index: number) =>
+    index >= 0 && index < options.length && !options[index].disabled;
+  /** The nearest enabled option ``distance`` steps from ``from``, clamped. */
+  const move = (from: number, distance: number) => {
+    const direction = distance < 0 ? -1 : 1;
+    let target = from;
+    let remaining = Math.abs(distance);
+    for (let i = from + direction; i >= 0 && i < options.length && remaining > 0; i += direction) {
+      if (enabled(i)) {
+        target = i;
+        remaining -= 1;
+      }
+    }
+    return target;
+  };
+  const first = () => move(-1, 1);
+  const last = () => move(options.length, -1);
+
+  const openAt = (index: number) => {
+    setActive(enabled(index) ? index : first());
+    setOpen(true);
+  };
+  const choose = (index: number) => {
+    setOpen(false);
+    if (enabled(index) && options[index].value !== value) onChange(options[index].value);
+  };
+
+  /** The next option whose label starts with what has been typed. */
+  const findTyped = (key: string, from: number) => {
+    const now = Date.now();
+    const run = typeahead.current;
+    run.text = now - run.at > TYPEAHEAD_RESET_MS ? key : run.text + key;
+    run.at = now;
+    // Repeating one letter cycles through the options that start with it.
+    const repeated = [...run.text].every((char) => char === run.text[0]);
+    const needle = (repeated ? run.text[0] : run.text).toLowerCase();
+    const start = repeated || run.text.length === 1 ? from + 1 : from;
+    for (let offset = 0; offset < options.length; offset += 1) {
+      const index = (start + offset + options.length) % options.length;
+      if (enabled(index) && options[index].label.toLowerCase().startsWith(needle)) return index;
+    }
+    return -1;
+  };
+
+  useEffect(() => {
+    if (!open || active < 0) return;
+    document.getElementById(`${triggerId}-option-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, active, triggerId]);
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const { key } = event;
+    const printable = key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+    // Any other key ends a type-to-find run, so "n", Home, "i" finds "i".
+    if (!printable && !["Shift", "Control", "Alt", "Meta"].includes(key)) {
+      typeahead.current = { text: "", at: 0 };
+    }
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(key)) {
+        event.preventDefault();
+        openAt(selectedIndex);
+      } else if (key === "Home") {
+        event.preventDefault();
+        openAt(first());
+      } else if (key === "End") {
+        event.preventDefault();
+        openAt(last());
+      } else if (printable) {
+        const match = findTyped(key, selectedIndex);
+        if (match >= 0) openAt(match);
+      }
+      return;
+    }
+    // A space inside a type-to-find run is part of the text, not a choice.
+    const typing = Date.now() - typeahead.current.at <= TYPEAHEAD_RESET_MS;
+    if (key === "ArrowDown") {
+      event.preventDefault();
+      setActive(move(active, 1));
+    } else if (key === "ArrowUp") {
+      event.preventDefault();
+      if (event.altKey) choose(active);
+      else setActive(move(active, -1));
+    } else if (key === "Home") {
+      event.preventDefault();
+      setActive(first());
+    } else if (key === "End") {
+      event.preventDefault();
+      setActive(last());
+    } else if (key === "PageDown") {
+      event.preventDefault();
+      setActive(move(active, 10));
+    } else if (key === "PageUp") {
+      event.preventDefault();
+      setActive(move(active, -10));
+    } else if (key === "Enter" || (key === " " && !typing)) {
+      event.preventDefault();
+      choose(active);
+    } else if (key === "Escape") {
+      // Handled here, so a page-level Escape handler does not also fire.
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    } else if (key === "Tab") {
+      choose(active);
+    } else if (printable) {
+      const match = findTyped(key, active);
+      if (match >= 0) setActive(match);
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -737,7 +872,8 @@ export function Select({
       )}
     >
       <label
-        htmlFor={selectId}
+        id={labelId}
+        htmlFor={triggerId}
         className={cn(
           "shrink-0 font-semibold text-fg",
           stacked ? "text-xs text-fg-subtle" : "text-sm",
@@ -751,30 +887,92 @@ export function Select({
           {hint}
         </p>
       )}
-      {/* The chevron is drawn rather than left to the platform: `appearance:
-          none` is what lets the trigger match the Export button, and it takes
-          the native arrow with it. `pointer-events-none` keeps clicks on the
-          icon falling through to the select underneath. */}
       <div className="relative min-w-0">
-        <select
-          id={selectId}
-          value={value}
-          onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        <button
+          id={triggerId}
+          type="button"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
           aria-describedby={describedBy || undefined}
-          className="min-h-target w-full appearance-none truncate rounded-xs border border-border-strong bg-surface py-2.5 pl-3 pr-9 text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
-          {...rest}
+          data-value={value}
+          disabled={disabled}
+          onClick={() => (open ? setOpen(false) : openAt(selectedIndex))}
+          onKeyDown={onKeyDown}
+          // Clicks in the list keep focus here (see its onMouseDown), so a
+          // blur means focus really went elsewhere.
+          onBlur={() => setOpen(false)}
+          className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2.5 pl-3 pr-9 text-left text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {children ??
-            options?.map((option) => (
-              <option key={option.value} value={option.value} disabled={option.disabled}>
+          {/* Every option is laid out invisibly in the same cell, so the box
+              is as wide as its longest option, as a native select is, and
+              does not change width with each choice. */}
+          <span className="grid">
+            {options.map((option) => (
+              <span
+                key={option.value}
+                aria-hidden
+                className="invisible col-start-1 row-start-1 flex items-center gap-2 whitespace-nowrap"
+              >
+                {option.badge}
                 {option.label}
-              </option>
+              </span>
             ))}
-        </select>
+            <span className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
+              {selected?.badge}
+              <span className="truncate">{selected?.label ?? ""}</span>
+            </span>
+          </span>
+        </button>
         <ChevronDown
           className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
           aria-hidden
         />
+        {/* The Export panel's surface. Not focusable: focus stays on the
+            trigger, and mousedown is cancelled so clicking an option or the
+            scrollbar does not blur it. */}
+        <ul
+          id={listId}
+          role="listbox"
+          aria-labelledby={labelId}
+          hidden={!open}
+          onMouseDown={(event) => event.preventDefault()}
+          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface p-1.5 shadow-raised"
+        >
+          {options.map((option, index) => (
+            // Keyboard selection lives on the trigger, which keeps focus and
+            // points here with aria-activedescendant; options are never focused.
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+            <li
+              key={option.value}
+              id={optionId(index)}
+              role="option"
+              aria-selected={index === selectedIndex}
+              aria-disabled={option.disabled || undefined}
+              data-value={option.value}
+              onClick={() => enabled(index) && choose(index)}
+              onMouseMove={() => enabled(index) && index !== active && setActive(index)}
+              className={cn(
+                "flex min-h-target cursor-pointer items-center gap-2 rounded-2xs px-3 py-2 text-sm text-fg",
+                index === active && "bg-surface-muted outline outline-2 -outline-offset-2 outline-umich-blue",
+                index === selectedIndex && "font-semibold",
+                option.disabled && "cursor-not-allowed opacity-60",
+              )}
+            >
+              <Check
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  index === selectedIndex ? "text-umich-blue" : "invisible",
+                )}
+                aria-hidden
+              />
+              {option.badge}
+              <span>{option.label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

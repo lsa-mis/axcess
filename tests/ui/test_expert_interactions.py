@@ -102,24 +102,27 @@ async def test_issue_table_filters_are_keyboard_operable(
     await search.press("Tab")
     # The filter's visible caption is its accessible name; it no longer
     # carries a second, different one via aria-label.
-    await playwright_async.expect(page.get_by_label("Level", exact=True)).to_be_focused()
+    await playwright_async.expect(
+        page.get_by_role("combobox", name="Level", exact=True)
+    ).to_be_focused()
 
 
 async def test_cancelled_legacy_rationale_prompt_keeps_the_persisted_status(
     live_server: tuple[str, int],
     new_page: Any,
+    choose_option: Any,
 ) -> None:
     """Specialized legacy evidence remains safe even though it is not primary navigation."""
     base, _ = live_server
     page = await new_page()
     await page.goto(f"{base}/app/findings/1", wait_until="networkidle")
-    status = page.get_by_label("Status:")
-    persisted = await status.input_value()
-    await status.select_option("in_progress")
+    status = page.get_by_role("combobox", name="Status:")
+    persisted = await status.get_attribute("data-value")
+    await choose_option(page, "Status:", "in_progress")
     page.once(
         "dialog",
         lambda dialog: asyncio.create_task(dialog.dismiss()),
     )
     await page.get_by_role("button", name="Save", exact=True).click()
     await page.get_by_text("Status unchanged", exact=True).wait_for()
-    assert await status.input_value() == persisted
+    assert await status.get_attribute("data-value") == persisted

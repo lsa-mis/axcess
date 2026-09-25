@@ -223,6 +223,7 @@ async def test_expert_workspace_reflows_without_document_overflow(
 async def test_issue_card_answers_what_why_fix_and_where(
     live_server: tuple[str, int],
     new_page: Any,
+    choose_option: Any,
 ) -> None:
     """The report still answers what, why, fix, and location, one issue at a time.
 
@@ -234,7 +235,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await page.get_by_label("Type", exact=True).select_option("expert_review")
+    await choose_option(page, "Type", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issue groups")
     # Contains, not equals: the sorted header also carries its direction chip.
@@ -292,6 +293,7 @@ async def test_issue_table_fits_the_default_desktop_width(
 async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     live_server: tuple[str, int],
     new_page: Any,
+    choose_option: Any,
 ) -> None:
     """At 320px the page itself never scrolls sideways.
 
@@ -302,7 +304,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await page.get_by_label("Type", exact=True).select_option("expert_review")
+    await choose_option(page, "Type", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issue groups")
     await playwright_async.expect(issues).to_be_visible()
@@ -929,7 +931,10 @@ async def test_skip_link_reachable_by_tab(live_server: tuple[str, int], new_page
 
 @pytest.mark.parametrize("login", [False, True])
 async def test_search_settings_keyboard_and_axe(
-    live_server: tuple[str, int], login: bool, new_page: Any
+    live_server: tuple[str, int],
+    login: bool,
+    new_page: Any,
+    choose_option: Any,
 ) -> None:
     base, _ = live_server
     page = await new_page()
@@ -952,7 +957,7 @@ async def test_search_settings_keyboard_and_axe(
         await page.keyboard.press("Space")
     await page.get_by_role("button", name="Add search field", exact=True).click()
     await page.get_by_label("Field 2 label", exact=True).fill("Category")
-    await page.get_by_role("combobox", name="Field 2 type", exact=True).select_option("select")
+    await choose_option(page, "Field 2 type", "select")
     await page.get_by_label("Field 2 value", exact=True).fill("All reports")
     await page.get_by_role("checkbox", name=re.compile("^I authorize these search")).check()
     violations = await _run_axe(page)
