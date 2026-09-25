@@ -680,3 +680,126 @@ def test_responsive_issue_detail_resolves_pages(
     # Verify steps come through from the YAML card.
     assert detail.verify_manual
     assert detail.help_url and "w3.org" in detail.help_url
+
+
+def _seed_shared_element(conn: sqlite3.Connection, *, selector: str, rule_id: str) -> int:
+    """One scan whose three pages all fail ``rule_id`` on identical markup."""
+    cur = conn.execute(
+        "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+        "config_json) VALUES ('http://example.com/', 'completed', 3, 0, '{}')"
+    )
+    scan_id = int(cur.lastrowid or 0)
+    for index, path in enumerate(["", "my/", "notifications"]):
+        page_id = repo.upsert_page(
+            conn,
+            scan_id=scan_id,
+            url_normalized=f"http://example.com/{path}",
+            status_code=200,
+            title=f"Page {index}",
+            render_mode="js",
+            html_hash=str(index) * 64,
+        )
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings
+                (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+                 impact, help, help_url, target_selector, failure_summary,
+                 html_snippet, target_hash, status)
+            VALUES (?, ?, ?, '4.1.2', '4.1.2', 'A', 'serious',
+                'Dialogs must have an accessible name', 'https://example.invalid/rule',
+                ?, 'no name', '<div id="user_menu_modal" role="dialog">', 'same-hash', 'new')
+            """,
+            (page_id, scan_id, rule_id, selector),
+        )
+    return scan_id
+
+
+def test_element_repeated_across_pages_is_reported_once(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A shared component counts once, on its first page; raw rows remain."""
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 1
+    assert row.page_count == 1
+    assert row.high_confidence_occurrence_count == 1
+    assert row.status_summary["new"] == 1
+    assert len(row.finding_ids) == 1
+    assert len(row.repeat_finding_ids) == 2
+    assert row.repeat_page_count == 2
+    assert [loc.page_url for loc in row.locations] == ["http://example.com/"]
+    # Priority still reflects the three pages the component actually reaches.
+    assert row.priority == issues_mod._priority("serious", 3)
+
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, row.issue_key)
+    assert detail is not None
+    assert [p.page_url for p in detail.pages] == ["http://example.com/"]
+
+    stored = tmp_db.execute(
+        "SELECT COUNT(*) FROM page_a11y_findings WHERE scan_id = ?", (scan_id,)
+    ).fetchone()[0]
+    assert stored == 3
+
+
+def test_page_level_results_are_not_merged_across_pages(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A document-root target is a separate defect on every page."""
+    scan_id = _seed_shared_element(tmp_db, selector="html", rule_id="document-title")
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 3
+    assert row.page_count == 3
+    assert row.repeat_finding_ids == ()
+    assert row.repeat_page_count == 0
+
+
+def test_page_level_target_detection_covers_alfa_document_targets() -> None:
+    assert issues_mod._is_page_level_target('{"type":"document"}')
+    assert issues_mod._is_page_level_target('{"type":"element","path":"/html[1]/body[1]"}')
+    assert not issues_mod._is_page_level_target(
+        '{"type":"element","path":"/html[1]/body[1]/div[2]"}'
+    )
+    assert not issues_mod._is_page_level_target("#user_menu_modal")
+    # Stored Alfa paths are not always strings; they must not crash grouping.
+    assert not issues_mod._is_page_level_target('{"type":"element","path":["/html[1]"]}')
+
+
+def test_shared_hash_with_different_markup_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Probe hashes cover only the first 200 characters of markup.
+
+    Two elements that differ after that share a ``target_hash`` but are not
+    the same element; merging them would hide a real finding.
+    """
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET html_snippet = html_snippet || ' differs later' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.page_count == 2
+    assert len(row.repeat_finding_ids) == 1
+    assert row.repeat_page_count == 1
+
+
+def test_same_markup_under_a_different_selector_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET target_selector = '#other_modal' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.repeat_page_count == 1

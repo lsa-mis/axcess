@@ -21,7 +21,10 @@ playwright_async = pytest.importorskip("playwright.async_api")
 
 @pytest.mark.parametrize("width", [1280, 320])
 async def test_report_links_and_review_lanes(
-    live_server: tuple[str, int], width: int, new_page: Any
+    live_server: tuple[str, int],
+    width: int,
+    new_page: Any,
+    choose_option: Any,
 ) -> None:
     base, scan_id = live_server
     page = await new_page(viewport={"width": width, "height": 900})
@@ -91,7 +94,7 @@ async def test_report_links_and_review_lanes(
     # A pending search must preserve a filter changed during its debounce,
     # and the filter must not drop the term still sitting in the box.
     await search.fill("Decorative")
-    await page.get_by_label("Level", exact=True).select_option("A")
+    await choose_option(page, "Level", "A")
     await page.wait_for_url("**q=Decorative*")
     await playwright_async.expect(
         issues.get_by_role("rowheader").get_by_role(
@@ -106,7 +109,7 @@ async def test_report_links_and_review_lanes(
     # one lane, reads the way the cells do, and clears with the rest.
     await page.get_by_role("button", name="Clear filters").click()
     await page.wait_for_url(re.compile(r"/issues$"))
-    await page.get_by_label("Type", exact=True).select_option("expert_review")
+    await choose_option(page, "Type", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     await playwright_async.expect(
         issues.get_by_role("rowheader").get_by_role(
@@ -273,21 +276,21 @@ async def test_verify_changes_keyboard_filters_links_and_axe(
         page.get_by_text("Historical report coverage is incomplete.", exact=True)
     ).to_be_visible()
     await page.keyboard.press("Space")
-    category = page.get_by_label("Change category")
+    category = page.get_by_role("combobox", name="Change category")
     await category.focus()
     await page.keyboard.press("c")
     await page.keyboard.press("Enter")
-    await playwright_async.expect(category).to_have_value("changed")
+    await playwright_async.expect(category).to_have_attribute("data-value", "changed")
     await page.wait_for_function(
         "!document.querySelector('[aria-label=\"Compared issue groups\"]')"
         ".matches('[aria-busy=true]')"
     )
     await playwright_async.expect(category).to_be_focused()
-    method = page.get_by_label("Detection method")
+    method = page.get_by_role("combobox", name="Detection method")
     await method.focus()
     await page.keyboard.press("s")
     await page.keyboard.press("Enter")
-    await playwright_async.expect(method).to_have_value("alfa")
+    await playwright_async.expect(method).to_have_attribute("data-value", "alfa")
     next_page = page.get_by_role("button", name="Next page")
     await playwright_async.expect(next_page).to_be_enabled()
     await next_page.focus()
@@ -579,6 +582,7 @@ async def test_report_opens_keyboard_only_in_reading_order(
                 return {
                     name: (label || "").replace(/\s+/g, " ").trim(),
                     tag: el.tagName,
+                    role: el.getAttribute("role"),
                     group: landmark,
                     visible: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0
                         || style.boxShadow !== "none",
@@ -600,8 +604,8 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["group"] == "Report workspace" and s["name"] == "Issues"),
         first(lambda s: s["group"] == "Report workspace" and s["name"] == "Verify changes"),
         first(lambda s: s["name"] == "Search issues"),
-        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Level"),
-        first(lambda s: s["tag"] == "SELECT" and s["name"] == "Type"),
+        first(lambda s: s["role"] == "combobox" and s["name"] == "Level"),
+        first(lambda s: s["role"] == "combobox" and s["name"] == "Type"),
         first(lambda s: s["group"] == "table-region"),
         first(lambda s: s["group"] == "table"),
     ]

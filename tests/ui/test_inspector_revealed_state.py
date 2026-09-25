@@ -10,6 +10,7 @@ the whole point.
 from __future__ import annotations
 
 import gzip
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,8 @@ from audit.db.schema import connect
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
+
+playwright_async = pytest.importorskip("playwright.async_api")
 
 #: A selector that cannot match the stored capture, so the highlight pass
 #: always misses — which is the branch under test.
@@ -218,6 +221,116 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
 
     revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
     assert "#after-click" in revealed
-    # The load-state occurrence is still there: the click added markup, it did
-    # not remove the page underneath.
-    assert "#at-load" in revealed
+    # The load-state markup is usually still in the revealed document, but it
+    # is one finding: listing it again here presented one element per state.
+    assert "#at-load" not in revealed
+    assert "in another state" in revealed
+
+
+async def test_a_load_only_issue_is_not_offered_once_per_state(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A shared header image flagged at load, on a page whose menus opened states.
+
+    Every revealed state still contains the image, and the picker used to
+    offer each of them with the same stored evidence, so one element read as
+    three. None of those states holds an occurrence of the issue.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, _ = _seed_two_state_issue(db_path, scan_id)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "DELETE FROM page_a11y_findings WHERE page_id = ? AND target_selector = ?",
+            (page_id, "#after-click"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
+
+    assert "#at-load" in text
+    assert "After clicking" not in text
+    assert "in another state" not in text
+
+
+async def test_a_state_missing_its_element_is_labelled_at_the_picker(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The seeded state capture is an empty document, so its element is gone.
+
+    The finding stays listed; the picker says plainly that it is not here.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+
+    text = await _evidence_text(
+        new_page, live_server[0], scan_id, page_id, quote(state_key, safe="")
+    )
+
+    assert "#after-click" in text
+    assert "no longer here" in text.lower()
+
+
+async def test_a_state_holding_its_element_has_no_label(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE page_dom_states SET dom = ? WHERE page_id = ? AND state_key = ?",
+            (
+                gzip.compress(
+                    b'<!doctype html><html><body><a role="menuitem">#after-click</a></body></html>'
+                ),
+                page_id,
+                state_key,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    text = await _evidence_text(
+        new_page, live_server[0], scan_id, page_id, quote(state_key, safe="")
+    )
+
+    assert "The red outline marks the flagged element" in text
+    assert "no longer here" not in text.lower()
+
+
+async def test_the_open_list_marks_a_missing_state_while_viewing_another(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Every offered state is checked, not only the one on screen."""
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    url = (
+        f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+        "?issue=axe:aria-required-parent&state="
+    )
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="domcontentloaded")
+        picker = page.get_by_role("combobox", name="Page state")
+        await picker.click()
+        option = page.locator(f'[role="option"][data-value="{state_key}"]')
+        # The state's capture is fetched and checked in the background. The
+        # name is what a screen reader hears: sentence case, not the chip's
+        # uppercase styling, and separated from the state's own name.
+        await playwright_async.expect(option).to_have_accessible_name(
+            re.compile(r"^No longer here, After clicking"), timeout=10000
+        )
+    finally:
+        await page.context.close()

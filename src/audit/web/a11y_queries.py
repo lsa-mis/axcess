@@ -340,7 +340,7 @@ def grouped_by_rule(
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
                a.impact, a.help, a.help_url, a.target_selector,
                a.failure_summary, a.html_snippet, a.engine_evidence_json, a.status,
-               a.revealed_by, a.screenshot_hash,
+               a.revealed_by, a.screenshot_hash, a.target_hash,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
@@ -403,6 +403,10 @@ def grouped_by_rule(
                     "revealed_by": (str(r["revealed_by"]) if r["revealed_by"] else None),
                     "failure_summary": r["failure_summary"],
                     "html_snippet": r["html_snippet"],
+                    # The (rule, target, markup) identity the crawler already
+                    # dedupes on within a page. Equal hashes on two pages are
+                    # the same element, which the Issues view reports once.
+                    "target_hash": str(r["target_hash"] or ""),
                     "engine_evidence_json": r["engine_evidence_json"],
                     "status": str(r["status"]),
                     # Blob hash of the scan-time screenshot with the detected

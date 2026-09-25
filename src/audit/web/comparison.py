@@ -207,7 +207,9 @@ def _groups(conn: sqlite3.Connection, scan_id: int) -> dict[str, _Group]:
         if row.pipeline == "alfa":
             group.title = f"{row.wcag_name or 'ACT rule'} (Alfa {key.removeprefix('alfa:')})"
         group.issue_links.append(EvidenceLink(label=row.title, url=row.detail_url))
-        for finding_id in row.finding_ids:
+        # A comparison matches locations page by page, so it needs the
+        # cross-page repeats the report itself lists only once.
+        for finding_id in (*row.finding_ids, *row.repeat_finding_ids):
             ids[(row.pipeline, finding_id)] = key
 
     # The canonical projection's location samples are intentionally only three

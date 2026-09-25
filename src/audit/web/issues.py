@@ -32,6 +32,7 @@ What this module deliberately does NOT do:
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -242,6 +243,14 @@ class IssueRow:
     # First three unique locations only. The row's occurrence_count remains
     # the authoritative total; the issue detail retains the full evidence.
     locations: tuple[IssueLocation, ...] = ()
+    # The same element (equal rule, target, and markup) found again on later
+    # pages, typically a shared header, menu, or dialog. The row reports each
+    # element once, on the first page it was found, so the counts, statuses,
+    # locations, and ``finding_ids`` above exclude these repeats. Their ids
+    # and the extra pages they reached are kept here; the stored findings are
+    # unchanged.
+    repeat_finding_ids: tuple[int, ...] = ()
+    repeat_page_count: int = 0
 
 
 def list_issues(
@@ -518,58 +527,30 @@ def _pages_for_issue(
         "visual",
         "protected_image",
     ):
-        # All four DOM pipelines live in page_a11y_findings; the DB
-        # rule_id carries the discriminator: bare rule_id for axe
-        # ("color-contrast") and the dynamic probes
-        # ("keyboard-trap-stuck", "responsive-reflow-overflow"),
-        # ``semantic:<sc>`` for semantic. Our UI issue_key prefixes
-        # axe/keyboard/responsive with "<pipeline>:", strip that to
-        # recover the DB value; semantic's issue_key already matches
-        # the DB column exactly.
-        if row.pipeline == "semantic":
-            rule_id = row.issue_key
-            outcome: str | None = None
-        elif row.pipeline == "alfa":
-            rule_id, outcome = _alfa_rule_and_outcome(row.issue_key)
-        else:
-            rule_id = row.issue_key.split(":", 1)[1]
-            outcome = None
-        if row.pipeline == "alfa":
-            # Outcome is part of the public issue identity. Keep page counts,
-            # screenshots, and status summaries confined to that same
-            # evidence class; a failed row must never absorb cantTell pages.
-            rows = conn.execute(
-                """
-                SELECT p.id AS page_id,
-                       p.url_normalized AS page_url,
-                       p.title AS page_title,
-                       COUNT(*) AS occurrence_count,
-                       GROUP_CONCAT(a.status) AS statuses,
-                       GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
-                  FROM page_a11y_findings a
-                  JOIN pages p ON p.id = a.page_id
-                 WHERE a.scan_id = ? AND a.pipeline = 'alfa'
-                   AND a.rule_id = ? AND a.engine_outcome = ?
-                 GROUP BY p.id, p.url_normalized, p.title
-                """,
-                (scan_id, rule_id, outcome),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT p.id AS page_id,
-                       p.url_normalized AS page_url,
-                       p.title AS page_title,
-                       COUNT(*) AS occurrence_count,
-                       GROUP_CONCAT(a.status) AS statuses,
-                       GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
-                  FROM page_a11y_findings a
-                  JOIN pages p ON p.id = a.page_id
-                 WHERE a.scan_id = ? AND a.pipeline = ? AND a.rule_id = ?
-                 GROUP BY p.id, p.url_normalized, p.title
-                """,
-                (scan_id, row.pipeline, rule_id),
-            ).fetchall()
+        # Every DOM pipeline lives in page_a11y_findings. The row's
+        # ``finding_ids`` already name exactly this issue's evidence: one
+        # rule, one Alfa outcome subgroup (a failed row never absorbs
+        # cantTell pages), and only the first instance of an element that
+        # repeats across pages. Querying those ids keeps this table, the
+        # row's counts, and its screenshots describing the same records.
+        if not row.finding_ids:
+            return []
+        rows = conn.execute(
+            """
+            SELECT p.id AS page_id,
+                   p.url_normalized AS page_url,
+                   p.title AS page_title,
+                   COUNT(*) AS occurrence_count,
+                   GROUP_CONCAT(a.status) AS statuses,
+                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+              FROM page_a11y_findings a
+              JOIN pages p ON p.id = a.page_id
+             WHERE a.scan_id = ?
+               AND a.id IN (SELECT value FROM json_each(?))
+             GROUP BY p.id, p.url_normalized, p.title
+            """,
+            (scan_id, json.dumps(list(row.finding_ids))),
+        ).fetchall()
     else:
         # image pipeline: list every page that has at least one
         # `page_image` row pointing at an image that has a finding
@@ -705,6 +686,13 @@ def _axe_issue_rows(
         raw_rule_id = str(g["rule_id"])
         pipeline = str(g.get("pipeline") or "axe")
         finding_rows = list(g.get("findings", []))
+        reported, repeats = _first_instances(finding_rows)
+        reported_pages = {int(f["page_id"]) for f in reported}
+        repeat_pages = {int(f["page_id"]) for f in repeats} - reported_pages
+        reported_statuses = dict.fromkeys(g.get("status_breakdown") or {}, 0)
+        for finding in reported:
+            status = str(finding["status"])
+            reported_statuses[status] = reported_statuses.get(status, 0) + 1
         legacy_keyboard_observation = pipeline == "keyboard" and (
             raw_rule_id in {"keyboard-trap-modal-no-escape", "keyboard-trap-iframe"}
             or (
@@ -755,9 +743,8 @@ def _axe_issue_rows(
             wcag_level = None
             conformance = "BP"
             impact = "minor"
-        alfa_outcomes = dict(g.get("engine_outcomes") or {})
-        alfa_failed = int(alfa_outcomes.get("failed") or 0)
-        alfa_cant_tell = int(alfa_outcomes.get("cant_tell") or 0)
+        alfa_failed = sum(1 for f in reported if (f.get("engine_outcome") or "failed") == "failed")
+        alfa_cant_tell = sum(1 for f in reported if f.get("engine_outcome") == "cant_tell")
         alfa_description: str | None = None
         alfa_why_matters: str | None = None
         alfa_fix_steps: tuple[str, ...] = ()
@@ -948,7 +935,7 @@ def _axe_issue_rows(
             default_title = f"axe rule: {raw_rule_id}"
             review_lane = "likely_barrier"
             evidence_confidence = "high"
-            high_confidence_occurrences = int(g["violation_count"])
+            high_confidence_occurrences = len(reported)
             evidence_summary = "Deterministic axe-core rule failure; verify after remediation."
         out.append(
             IssueRow(
@@ -971,11 +958,13 @@ def _axe_issue_rows(
                 responsibility=(meta.get("owner") or "dev"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
-                occurrence_count=g["violation_count"],
-                page_count=g["page_count"],
-                priority=_priority(impact, g["page_count"]),
+                occurrence_count=len(reported),
+                page_count=len(reported_pages),
+                # Priority measures reach: a shared component that fails on
+                # every page is more urgent, not less, for being one element.
+                priority=_priority(impact, len(reported_pages | repeat_pages)),
                 impact=impact,
-                status_summary=dict(g.get("status_breakdown") or {}),
+                status_summary=reported_statuses,
                 # Deep-link to the dedicated Issue Detail view (the
                 # Siteimprove "page 2" shape, stat tiles, description,
                 # pages-with-issue table). The older grouped views
@@ -984,7 +973,7 @@ def _axe_issue_rows(
                 # once. For semantic findings we use the semantic: key
                 # so the detail route can also distinguish them later.
                 detail_url=f"/scans/{scan_id}/issues/{issue_key}",
-                finding_ids=tuple(int(f["id"]) for f in g.get("findings", [])),
+                finding_ids=tuple(int(f["id"]) for f in reported),
                 review_lane=review_lane,
                 evidence_confidence=evidence_confidence,
                 evidence_summary=evidence_summary,
@@ -1000,10 +989,87 @@ def _axe_issue_rows(
                 fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url") or g.get("help_url") or None,
-                locations=_a11y_location_samples(finding_rows, scan_id=scan_id),
+                locations=_a11y_location_samples(reported, scan_id=scan_id),
+                repeat_finding_ids=tuple(int(f["id"]) for f in repeats),
+                repeat_page_count=len(repeat_pages),
             )
         )
     return out
+
+
+# Targets that name the document rather than an element. A page-level result
+# (missing title, no main landmark, horizontal overflow) is a separate defect
+# on every page even though its locator and markup read the same everywhere.
+_PAGE_LEVEL_SELECTORS = frozenset({"", "html", "body", "head", ":root", "(unknown)"})
+_PAGE_LEVEL_ALFA_PATHS = frozenset({"/html[1]", "/html[1]/body[1]", "/html[1]/head[1]"})
+
+
+def _is_page_level_target(raw_selector: Any) -> bool:
+    selector = str(raw_selector or "").strip()
+    if selector.lower() in _PAGE_LEVEL_SELECTORS:
+        return True
+    if not selector.startswith("{"):
+        return False
+    try:
+        target = json.loads(selector)
+    except ValueError:
+        return False
+    if not isinstance(target, dict):
+        return False
+    path = target.get("path")
+    return target.get("type") == "document" or (
+        isinstance(path, str) and path in _PAGE_LEVEL_ALFA_PATHS
+    )
+
+
+def _element_identity(finding: dict[str, Any]) -> tuple[str, str, str] | None:
+    """The exact stored identity of a finding's element, or None if it must not merge."""
+    target_hash = str(finding.get("target_hash") or "")
+    selector = finding.get("target_selector")
+    if not target_hash or _is_page_level_target(selector):
+        return None
+    return (target_hash, str(selector or ""), str(finding.get("html_snippet") or ""))
+
+
+def _first_instances(
+    findings: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split one issue group's findings into first instances and repeats.
+
+    A site's shared header, menu, or dialog fails the same rule on every
+    page it appears on. The crawler stores each of those rows (they are true
+    observations), but reporting them all repeats one defect once per page.
+
+    Two findings are the same element only on an exact match of the stored
+    ``target_hash``, selector, and markup. The hash alone is not enough: the
+    probes hash only the first 200 characters of markup and Alfa hashes an
+    identity string, so two different elements can share one. Across pages
+    the finding on the first page crawled, the lowest page id, stands for
+    the element and the rest are repeats. Page-level targets and rows
+    without a hash never merge.
+    """
+
+    first_by_identity: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for finding in findings:
+        identity = _element_identity(finding)
+        if identity is None:
+            continue
+        current = first_by_identity.get(identity)
+        if current is None or (int(finding["page_id"]), int(finding["id"])) < (
+            int(current["page_id"]),
+            int(current["id"]),
+        ):
+            first_by_identity[identity] = finding
+    first_ids = {int(f["id"]) for f in first_by_identity.values()}
+    reported: list[dict[str, Any]] = []
+    repeats: list[dict[str, Any]] = []
+    for finding in findings:
+        identity = _element_identity(finding)
+        if identity in first_by_identity and int(finding["id"]) not in first_ids:
+            repeats.append(finding)
+        else:
+            reported.append(finding)
+    return reported, repeats
 
 
 def _image_issue_rows(
