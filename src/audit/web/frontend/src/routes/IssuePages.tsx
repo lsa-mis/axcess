@@ -108,6 +108,13 @@ export default function IssuePagesRoute() {
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>
           </h2>
+          {row.repeat_page_count > 0 && (
+            <p className="text-sm text-fg-muted">
+              The same element also appeared on {row.repeat_page_count} other page
+              {row.repeat_page_count === 1 ? "" : "s"}; it is listed once, on the first page
+              where it was found.
+            </p>
+          )}
         </div>
         <IssuePagesTable scanId={scan.id} issueKey={key} row={row} pages={pages} backTo={here} />
       </Card>

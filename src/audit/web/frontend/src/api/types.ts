@@ -713,6 +713,12 @@ export interface IssueRow {
   help_url: string | null;
   /** First three exact location samples; occurrence_count remains the total. */
   locations: IssueLocation[];
+  /** The same element found again on later pages. The row reports each
+   *  element once, on its first page, so the counts and finding_ids above
+   *  exclude these repeats; the stored findings are unchanged. */
+  repeat_finding_ids: number[];
+  /** Extra pages those repeats reached beyond the pages listed. */
+  repeat_page_count: number;
 }
 
 export interface IssueLocation {
