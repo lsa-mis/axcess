@@ -368,7 +368,7 @@ function HistoryTable({
               <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell numeric>{point.groups.toLocaleString()}</Cell>
               <Cell className="py-1">
-                <span className="flex flex-wrap gap-x-4">
+                <span className="flex flex-wrap justify-center gap-x-4">
                   {point.id !== currentId && point.id !== baselineId && (
                     <LinkButtonText to={compareHref(point, currentId, points)}>
                       Compare<span className="sr-only"> scan {point.id}</span> with this report

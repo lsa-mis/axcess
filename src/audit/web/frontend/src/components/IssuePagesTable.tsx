@@ -263,7 +263,7 @@ const IssuePageRow = memo(function IssuePageRow({
   );
   return (
     <Row index={index}>
-      <RowHeader className="font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
+      <RowHeader className="text-center font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] font-semibold text-fg">
         {/* The title opens the inspector with this issue outlined on the page. */}
         <Link
@@ -279,7 +279,7 @@ const IssuePageRow = memo(function IssuePageRow({
       <Cell numeric>
         {page.occurrence_count}
       </Cell>
-      <Cell className="whitespace-nowrap">
+      <Cell className="whitespace-nowrap text-center">
         {shots > 0 ? (
           <Link to={screenshotsPath} className="text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
@@ -290,7 +290,7 @@ const IssuePageRow = memo(function IssuePageRow({
         )}
       </Cell>
       {!isInformational && (
-        <Cell>
+        <Cell className="text-center">
           <div className="flex flex-wrap gap-1">
             {STATUS_LABELS_ORDER.map((s) => {
               const n = page.status_summary[s] ?? 0;

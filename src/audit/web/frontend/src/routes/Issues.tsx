@@ -674,10 +674,7 @@ function IssueTable({
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
-                // Other headings sit 6px in (2px cell + 4px button), the same
-                // inset as this table's tighter body cells, so each label
-                // starts directly above its values.
-                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : "px-0.5"}
+                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
               >
                 {column}
               </SortHeader>
@@ -724,8 +721,9 @@ const IssueTableRow = memo(function IssueTableRow({
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
   const pagesPath = withReturnTrail(`${detailPath}/pages`, "Issues", here);
   // Body cells are padded 1.5 rather than the shared 2, which is what keeps
-  // all nine columns in view beside the expanded sidebar at 1280 px.
-  const cell = "px-1.5";
+  // all nine columns in view beside the expanded sidebar at 1280 px. Every
+  // cell but the title is short, so it centres under its centred heading.
+  const cell = "px-1.5 text-center";
 
   return (
     <Row index={index}>
@@ -782,7 +780,7 @@ const IssueTableRow = memo(function IssueTableRow({
             the cell stays a number wide. */}
         <Link
           to={pagesPath}
-          className="flex min-h-target items-center text-umich-blue underline underline-offset-2"
+          className="flex min-h-target items-center justify-center text-umich-blue underline underline-offset-2"
         >
           {row.page_count} page{row.page_count === 1 ? "" : "s"}
           <span className="sr-only"> with {row.title}</span>

@@ -473,12 +473,12 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             </Cell>
             <Cell
               headers={grouped("completed")}
-              className={cn(groupCell, "whitespace-nowrap text-xs text-fg-muted")}
+              className={cn(groupCell, "whitespace-nowrap text-center text-xs text-fg-muted")}
               title={completed.finished_at ?? completed.started_at ?? undefined}
             >
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
-            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap")}>
+            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap text-center")}>
               <LinkButton
                 to={`/scans/${completed.id}`}
                 variant="secondary"
@@ -558,10 +558,10 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
           </span>
         )}
       </RowHeader>
-      <Cell>
+      <Cell className="text-center">
         <ScanStatusBadge value={scan.status} />
       </Cell>
-      <Cell className="whitespace-nowrap text-xs text-fg-muted" title={scan.started_at ?? undefined}>
+      <Cell className="whitespace-nowrap text-center text-xs text-fg-muted" title={scan.started_at ?? undefined}>
         {relativeTime(scan.started_at)}
       </Cell>
       <Cell numeric className="text-fg">
@@ -576,7 +576,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
       <Cell className="whitespace-nowrap py-1">
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <LinkButton
             to={`/scans/${scan.id}/issues`}
             variant="ghost"
@@ -601,8 +601,8 @@ function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; i
       <Cell className="text-fg-muted">{report.environment} · {report.data_classification}</Cell>
       <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
       <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
-      <Cell className="text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
-      <Cell className="py-1">
+      <Cell className="text-center text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
+      <Cell className="py-1 text-center">
         <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
           Open protected report
         </LinkButton>

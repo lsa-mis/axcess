@@ -301,7 +301,7 @@ export function SortHeader<K extends string>({
       scope="col"
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
-        "px-1 py-0.5 text-left font-semibold",
+        "px-1 py-0.5 text-center font-semibold",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
       )}
@@ -312,8 +312,8 @@ export function SortHeader<K extends string>({
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
           "group inline-flex min-h-target items-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
-          !words && "flex-wrap gap-x-1.5 gap-y-0.5",
-          "text-left",
+          !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
+          "text-center",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
@@ -335,9 +335,9 @@ export function SortHeader<K extends string>({
 }
 
 /**
- * A column header that does not sort. Its text lines up with a sorting
- * header's label: every heading is left-aligned, 8px in from the cell edge,
- * the same inset as the text in the cells under it.
+ * A column header that does not sort. Every heading, sorting or not, is
+ * centred over its column, so a row of headings reads as one even line
+ * whatever the widths of the columns under them.
  */
 export function ColumnHeader({
   className,
@@ -352,7 +352,7 @@ export function ColumnHeader({
   return (
     <th
       scope={scope}
-      className={cn("px-2 py-2 text-left font-semibold", className)}
+      className={cn("px-2 py-2 text-center font-semibold", className)}
       {...th}
     >
       {children}
@@ -405,9 +405,9 @@ export function RowHeader({
 }
 
 /**
- * A body cell. `numeric` sets it in tabular figures, on one line. It stays
- * left-aligned, like its heading, so a value sits directly under the heading
- * that names it.
+ * A body cell. `numeric` sets it in tabular figures, on one line, centred
+ * under its centred heading. Other cells stay left-aligned: running text
+ * such as a title or an address reads best from a straight left edge.
  */
 export function Cell({
   numeric = false,
@@ -419,7 +419,7 @@ export function Cell({
     <td
       className={cn(
         "px-2 py-2.5 align-middle",
-        numeric && "whitespace-nowrap tabular-nums",
+        numeric && "whitespace-nowrap text-center tabular-nums",
         className,
       )}
       {...td}
