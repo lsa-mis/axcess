@@ -1170,13 +1170,19 @@ async def test_search_settings_keyboard_and_axe(
     page = await new_page()
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
     if login:
-        await page.get_by_role("tab", name="Site with a login or 2FA", exact=True).focus()
+        login_tab = page.get_by_role("tab", name="Site with a login or 2FA", exact=True)
+        await login_tab.focus()
         await page.keyboard.press("Enter")
         await page.wait_for_url("**mode=login**")
+        # The form re-renders for the new mode; a key pressed before it has
+        # settled can land on a checkbox that is being replaced.
+        await playwright_async.expect(login_tab).to_have_attribute("aria-selected", "true")
     # Search discovery lives in the Coverage group, which is always open.
     toggle = page.get_by_role("checkbox", name=re.compile("^Search to discover result pages"))
     await toggle.focus()
+    await playwright_async.expect(toggle).to_be_focused()
     await page.keyboard.press("Space")
+    await playwright_async.expect(toggle).to_be_checked()
     await page.get_by_label("Field 1 label", exact=True).fill("Search reports")
     value = page.get_by_label("Field 1 value", exact=True)
     await value.focus()
