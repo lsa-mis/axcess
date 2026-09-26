@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { useQueries } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
@@ -9,8 +10,8 @@ import { useScanQuery } from "../hooks/useScanQuery";
  * The topbar's orientation line for everything under a report, and the only
  * breadcrumb trail on any page.
  *
- * ``Reports › app.codegra.de #40 › Contrast (Minimum) › Pages › Page
- * inspector``: where you are in the app, which report you are reading (one
+ * ``Reports › app.codegra.de #40 › Contrast (Minimum) › 12 affected pages ›
+ * Dashboard | Sage Campus``: where you are in the app, which report you are reading (one
  * site can have several, so the number is part of the name), and the path
  * from the report down to this page. On the report's own views, Issues and
  * Verify changes, the trail ends at the report: the lit tab already says
@@ -43,8 +44,24 @@ export function siteLabel(seedUrl: string): string {
   return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
-/** One link in the trail. `issue` is set when the label should be that issue's title. */
-export type Crumb = { label: string; to: string; issue?: { scanId: number; key: string } };
+/**
+ * What a crumb names, when it names one thing rather than a view.
+ *
+ * Every crumb says *which* thing it leads to: an issue by its title, a page
+ * by its title, an issue's page list by how many pages it has. A view name
+ * ("Page inspector", "Pages") says what kind of screen is behind the link,
+ * which the reader could already see; it does not say which one, and two
+ * different pages read the same. The label is resolved from data the routes
+ * already load, and until it lands the crumb holds a placeholder.
+ */
+export type CrumbSubject =
+  | { kind: "issue"; scanId: number; key: string }
+  | { kind: "issuePages"; scanId: number; key: string }
+  | { kind: "issuePageScreenshots"; scanId: number; key: string; pageId: number }
+  | { kind: "page"; scanId: number; pageId: number; view: "inspect" | "evidence" };
+
+/** One link in the trail. `subject` is set when the label should name that thing. */
+export type Crumb = { label: string; to: string; subject?: CrumbSubject };
 
 /** An in-app absolute path, or null. `<Link to>` follows a full URL off-site,
  *  which would let a crafted link put an attacker's destination inside the
@@ -100,6 +117,44 @@ function issueScopeKey(pathname: string): string | null {
   return key ? decodeURIComponent(key) : null;
 }
 
+/** The thing a route itself names, from its path alone. */
+function subjectFor(pathname: string): CrumbSubject | undefined {
+  const page = pathname.match(/^\/scans\/(\d+)\/pages\/(\d+)(\/inspect)?\/?$/);
+  if (page) {
+    return {
+      kind: "page",
+      scanId: Number(page[1]),
+      pageId: Number(page[2]),
+      view: page[3] ? "inspect" : "evidence",
+    };
+  }
+  const issue = pathname.match(
+    /^\/scans\/(\d+)\/issues\/([^/]+)(?:\/(pages)(?:\/(\d+)\/screenshots)?)?\/?$/,
+  );
+  if (!issue) return undefined;
+  const scanId = Number(issue[1]);
+  const key = decodeURIComponent(issue[2]);
+  if (issue[4]) return { kind: "issuePageScreenshots", scanId, key, pageId: Number(issue[4]) };
+  if (issue[3]) return { kind: "issuePages", scanId, key };
+  return { kind: "issue", scanId, key };
+}
+
+/** What a subject reads as before its data has loaded. */
+function placeholderFor(subject: CrumbSubject): string {
+  switch (subject.kind) {
+    case "issue":
+      return subject.key;
+    case "issuePages":
+      return "Affected pages";
+    case "issuePageScreenshots":
+      return `Screenshots on page ${subject.pageId}`;
+    case "page":
+      return subject.view === "inspect"
+        ? `Page ${subject.pageId}`
+        : `Stored evidence for page ${subject.pageId}`;
+  }
+}
+
 /** Deepest chain of `?back=` links the trail will unwind before giving up. */
 const MAX_DEPTH = 12;
 
@@ -143,7 +198,7 @@ function trailFor(
     const parentTrail = trailFor(parent.pathname, parent.params, depth + 1, [...seen, back]);
     if (parentTrail.length > 0) {
       // The link that opened this view named it; that name wins over the
-      // generic view name, but an issue route keeps upgrading to its title.
+      // generic view name, but a crumb with a subject still resolves to it.
       const last = parentTrail[parentTrail.length - 1];
       parentTrail[parentTrail.length - 1] = { ...last, label: originLabel, to: back };
       parentTrail.forEach(add);
@@ -161,7 +216,7 @@ function trailFor(
       add({
         label: issueKey,
         to: `/scans/${scanId}/issues/${encodeURIComponent(issueKey)}`,
-        issue: { scanId, key: issueKey },
+        subject: { kind: "issue", scanId, key: issueKey },
       });
     }
   }
@@ -175,24 +230,38 @@ function trailFor(
     const contextScan = reportRouteMatch(context.pathname)?.scanId ?? null;
     add(
       contextKey && contextScan != null
-        ? { label: contextKey, to: contextTo, issue: { scanId: contextScan, key: contextKey } }
+        ? {
+            label: contextKey,
+            to: contextTo,
+            subject: { kind: "issue", scanId: contextScan, key: contextKey },
+          }
         : { label: contextLabel, to: contextTo },
     );
   }
 
-  // 4. This location itself.
+  // 4. This location itself, named by what it shows when it shows one thing.
   if (match) {
     const query = params.toString();
-    const self: Crumb = { label: match.view, to: `${pathname}${query ? `?${query}` : ""}` };
-    if (onIssueItself && issueKey && scanId != null) self.issue = { scanId, key: issueKey };
-    add(self);
+    const subject = subjectFor(pathname);
+    add({
+      label: subject ? placeholderFor(subject) : match.view,
+      to: `${pathname}${query ? `?${query}` : ""}`,
+      subject,
+    });
   }
   return chain;
 }
 
+/** A page's title, or its address when it has none. */
+function pageName(title: string | null | undefined, url: string | null | undefined): string | null {
+  const trimmed = title?.trim();
+  if (trimmed) return trimmed;
+  return url ? siteLabel(url) : null;
+}
+
 /**
- * The trail for the current location, with every issue crumb carrying its
- * title once it has loaded.
+ * The trail for the current location, with every crumb that names one thing
+ * carrying that thing's name once it has loaded.
  */
 export function useReportTrail(): {
   match: ReturnType<typeof reportRouteMatch>;
@@ -202,31 +271,74 @@ export function useReportTrail(): {
   const [params] = useSearchParams();
   const match = reportRouteMatch(pathname);
   const trail = trailFor(pathname, params);
-  // Every issue the trail passes through needs its title. Same key and sort
-  // the issue routes use, so this is a cache hit rather than a second
-  // request for a title that is already on screen. Usually one issue, at
-  // most a handful.
-  const issues = trail.flatMap((crumb) => (crumb.issue ? [crumb.issue] : []));
-  const distinct = issues.filter(
-    (issue, index) => issues.findIndex((other) => other.scanId === issue.scanId && other.key === issue.key) === index,
-  );
-  const titleQueries = useQueries({
-    queries: distinct.map((issue) => ({
-      queryKey: ["issue-detail", issue.scanId, issue.key, "occurrences_desc"],
-      queryFn: () => api.getIssueDetail(issue.scanId, issue.key, "occurrences_desc"),
+  const subjects = trail.flatMap((crumb) => (crumb.subject ? [crumb.subject] : []));
+  // Every issue the trail passes through, for its title, page count, and the
+  // titles of its pages. Same key and sort the issue routes use, so this is a
+  // cache hit rather than a second request. Usually one issue.
+  const issueKeys = [
+    ...new Map(
+      subjects
+        .filter((subject) => subject.kind !== "page")
+        .map((subject) => [`${subject.scanId}:${subject.key}`, subject] as const),
+    ).values(),
+  ];
+  const issueQueries = useQueries({
+    queries: issueKeys.map((subject) => ({
+      queryKey: ["issue-detail", subject.scanId, subject.key, "occurrences_desc"],
+      queryFn: () => api.getIssueDetail(subject.scanId, subject.key, "occurrences_desc"),
       enabled: match != null,
     })),
   });
-  const titleOf = (issue: { scanId: number; key: string }): string | null => {
-    const index = distinct.findIndex((other) => other.scanId === issue.scanId && other.key === issue.key);
-    return titleQueries[index]?.data?.row.title ?? null;
+  // Pages the trail names directly. The same key the page evidence and
+  // inspector routes load, so on those routes this is read from cache.
+  const pageKeys = [
+    ...new Map(
+      subjects
+        .filter((subject) => subject.kind === "page")
+        .map((subject) => [`${subject.scanId}:${subject.pageId}`, subject] as const),
+    ).values(),
+  ];
+  const pageQueries = useQueries({
+    queries: pageKeys.map((subject) => ({
+      queryKey: ["page-evidence", subject.scanId, subject.pageId],
+      queryFn: () => api.getPageEvidence(subject.scanId, subject.pageId),
+      enabled: match != null,
+    })),
+  });
+  const issueDetail = (scanId: number, key: string) =>
+    issueQueries[issueKeys.findIndex((s) => s.scanId === scanId && s.key === key)]?.data;
+  const pageEvidence = (scanId: number, pageId: number) =>
+    pageQueries[pageKeys.findIndex((s) => s.scanId === scanId && s.pageId === pageId)]?.data;
+
+  const nameOf = (subject: CrumbSubject): string | null => {
+    switch (subject.kind) {
+      case "issue":
+        return issueDetail(subject.scanId, subject.key)?.row.title ?? null;
+      case "issuePages": {
+        const count = issueDetail(subject.scanId, subject.key)?.row.page_count;
+        return count == null ? null : `${count} affected page${count === 1 ? "" : "s"}`;
+      }
+      case "issuePageScreenshots": {
+        const page = issueDetail(subject.scanId, subject.key)?.pages.find(
+          (candidate) => candidate.page_id === subject.pageId,
+        );
+        const name = pageName(page?.page_title, page?.page_url);
+        return name ? `Screenshots on ${name}` : null;
+      }
+      case "page": {
+        const page = pageEvidence(subject.scanId, subject.pageId)?.page;
+        const name = pageName(page?.title, page?.url_normalized);
+        if (!name) return null;
+        return subject.view === "inspect" ? name : `Stored evidence for ${name}`;
+      }
+    }
   };
-  // Until a title lands the key (or the link's own label) holds the place, so
-  // the trail is never empty and never jumps in length twice.
+  // Until a name lands the placeholder (or the link's own label) holds the
+  // place, so the trail is never empty and never jumps in length twice.
   const labelled = trail.map((crumb) => {
-    if (!crumb.issue) return crumb;
-    const title = titleOf(crumb.issue);
-    return title ? { ...crumb, label: title } : crumb;
+    if (!crumb.subject) return crumb;
+    const name = nameOf(crumb.subject);
+    return name ? { ...crumb, label: name } : crumb;
   });
   return { match, trail: labelled };
 }
@@ -269,6 +381,10 @@ export default function ReportCrumb() {
   // record on every report page, and one that was not partitioned by
   // proxy identity.
   const scanQuery = useScanQuery(typeof match?.scanId === "number" ? match.scanId : 0);
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const [cap, setCap] = useState<number | null>(null);
+  const trailText = trail.map((crumb) => crumb.label).join("\n") + (scanQuery.data?.seed_url ?? "");
+  useLongestFirstCap(listRef, trailText, setCap);
   if (!match) return null;
 
   const seedUrl = scanQuery.data?.seed_url;
@@ -293,33 +409,29 @@ export default function ReportCrumb() {
   // It used to be a filled chip, which looked like a button you could press.
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
-      <ol className="flex min-w-0 flex-wrap items-center gap-x-1">
+      <ol ref={listRef} className="flex min-w-0 items-center gap-x-1 overflow-hidden">
         <Crumb to="/scans" first>
-          Reports
+          {/* The root is never cut: it is short, and it is not measured. */}
+          <span className="whitespace-nowrap">Reports</span>
         </Crumb>
         {report &&
           (current ? (
             <Crumb to={report.reportTo} title={`${report.site} #${report.id}`}>
-              <ReportName site={report.site} id={report.id} />
+              <ReportName site={report.site} id={report.id} cap={cap} />
             </Crumb>
           ) : (
             <Current title={`${report.site} #${report.id}`}>
-              <ReportName site={report.site} id={report.id} />
+              <ReportName site={report.site} id={report.id} cap={cap} />
             </Current>
           ))}
         {ancestors.map((ancestor) => (
-          <Crumb
-            key={`${ancestor.label}-${ancestor.to}`}
-            to={ancestor.to}
-            className="max-w-[12rem]"
-            title={ancestor.label}
-          >
-            <span className="truncate">{ancestor.label}</span>
+          <Crumb key={`${ancestor.label}-${ancestor.to}`} to={ancestor.to} title={ancestor.label}>
+            <CrumbText cap={cap}>{ancestor.label}</CrumbText>
           </Crumb>
         ))}
         {current && (
           <Current title={current.label}>
-            <span className="truncate">{current.label}</span>
+            <CrumbText cap={cap}>{current.label}</CrumbText>
           </Current>
         )}
       </ol>
@@ -327,41 +439,103 @@ export default function ReportCrumb() {
   );
 }
 
-/** ``app.codegra.de #40``. The site truncates; the number never does, since
- *  it is what tells two reports of one site apart. */
-function ReportName({ site, id }: { site: string; id: number }) {
+/** ``app.codegra.de #40``. The site can be cut like any long crumb; the
+ *  number never is, since it is what tells two reports of one site apart. */
+function ReportName({ site, id, cap }: { site: string; id: number; cap: number | null }) {
   return (
     <>
-      <span className="truncate">{site}</span>
+      <CrumbText cap={cap}>{site}</CrumbText>
       <span className="shrink-0 whitespace-pre tabular-nums"> #{id}</span>
     </>
   );
 }
 
+/**
+ * One line, and when it is full, the longest crumbs are cut first.
+ *
+ * The trail never wraps or scrolls. When it fits, nothing is cut. When it
+ * does not, one shared width cap is found (by water-filling) that makes the
+ * line fit exactly: every crumb shorter than the cap is left whole, and only
+ * crumbs longer than it are cut to it, with an ellipsis. So a short crumb
+ * such as the report name keeps every character while a long title gives
+ * up the width, and two long titles are cut to the same length.
+ *
+ * Cutting a short crumb to save a few pixels removes most of what it says;
+ * cutting the longest one removes the least. "Reports" is never cut. A cut
+ * crumb keeps its whole name in the DOM, so a screen reader reads it in
+ * full, and in ``title`` for a pointer hover.
+ */
+function useLongestFirstCap(
+  listRef: React.RefObject<HTMLOListElement | null>,
+  trailText: string,
+  setCap: (cap: number | null) => void,
+): void {
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const fit = () => {
+      const items = [...list.children] as HTMLElement[];
+      const texts = [...list.querySelectorAll<HTMLElement>("[data-crumb-text]")];
+      if (items.length === 0 || texts.length === 0) return;
+      // scrollWidth is a text's full width even while the cap cuts it.
+      const natural = texts.map((text) => text.scrollWidth);
+      const shown = texts.reduce((sum, text) => sum + text.getBoundingClientRect().width, 0);
+      const first = items[0].getBoundingClientRect();
+      const last = items[items.length - 1].getBoundingClientRect();
+      // Everything that is not measured text: "Reports", separators,
+      // padding, gaps, and the report number. It does not change with the cap.
+      const fixed = last.right - first.left - shown;
+      const budget = list.clientWidth - fixed - 1;
+      if (natural.reduce((sum, width) => sum + width, 0) <= budget) {
+        setCap(null);
+        return;
+      }
+      const sorted = [...natural].sort((a, b) => a - b);
+      let remaining = budget;
+      let cap = 0;
+      for (let index = 0; index < sorted.length; index += 1) {
+        const share = remaining / (sorted.length - index);
+        if (sorted[index] > share) {
+          cap = share;
+          break;
+        }
+        remaining -= sorted[index];
+      }
+      setCap(Math.max(MIN_CAP_PX, Math.floor(cap)));
+    };
+    fit();
+    // The line's width changes with the window, zoom, and text spacing, and a
+    // late web font changes every text's width.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    observer?.observe(list);
+    void document.fonts?.ready.then(fit);
+    return () => observer?.disconnect();
+  }, [listRef, trailText, setCap]);
+}
+
+/** Below this a cut crumb no longer says anything; the list clips instead. */
+const MIN_CAP_PX = 64;
+
+const CRUMB_TEXT = "min-w-0 px-2 py-2 font-semibold";
+
 function Crumb({
   to,
   children,
-  className,
   title,
   first = false,
 }: {
   to: string;
   children: React.ReactNode;
-  className?: string;
-  /** Full text for a crumb the layout truncates (an issue title). */
   title?: string;
   first?: boolean;
 }) {
   return (
-    <li className="flex min-w-0 items-center">
+    <li className="flex shrink-0 items-center">
       {!first && <Separator />}
       <Link
         to={to}
         title={title}
-        className={cn(
-          "report-link flex min-h-target min-w-0 max-w-[20rem] items-center whitespace-nowrap px-2 py-2 font-semibold",
-          className,
-        )}
+        className={cn("report-link flex min-h-target items-center", CRUMB_TEXT)}
       >
         {children}
       </Link>
@@ -369,21 +543,28 @@ function Crumb({
   );
 }
 
-/** Where you are: plain text, not a link and not a chip. An issue title is a
- *  sentence, so it truncates and keeps the whole title in ``title`` for a
- *  hover and in the DOM for a screen reader. */
+/** Where you are: plain text, not a link and not a chip. */
 function Current({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <li className="flex min-w-0 items-center">
+    <li className="flex shrink-0 items-center">
       <Separator />
       <span
         aria-current="page"
         title={title}
-        className="flex min-w-0 max-w-[26rem] items-center whitespace-nowrap px-2 py-2 font-semibold text-fg"
+        className={cn("flex min-h-target items-center text-fg", CRUMB_TEXT)}
       >
         {children}
       </span>
     </li>
+  );
+}
+
+/** One measured, cuttable crumb label. */
+function CrumbText({ children, cap }: { children: string; cap: number | null }) {
+  return (
+    <span data-crumb-text className="truncate" style={cap == null ? undefined : { maxWidth: cap }}>
+      {children}
+    </span>
   );
 }
 

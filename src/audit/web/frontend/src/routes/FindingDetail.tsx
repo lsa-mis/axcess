@@ -302,7 +302,7 @@ export default function FindingDetailRoute() {
                       scanId={data.scan_id}
                       pageUrl={o.page_url}
                       pageTitle={null}
-                      origin="Finding"
+                      origin={`Finding #${id}`}
                       context={`Finding ${id}`}
                       contextTo={`/findings/${id}`}
                       backTo={`/findings/${id}`}
