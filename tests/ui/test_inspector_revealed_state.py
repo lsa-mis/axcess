@@ -326,7 +326,7 @@ async def test_the_open_list_marks_a_missing_state_while_viewing_another(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(url, wait_until="domcontentloaded")
-        picker = page.get_by_role("combobox", name="Page state")
+        picker = page.get_by_role("combobox", name="Which view of the page")
         await picker.click()
         option = page.locator(f'[role="option"][data-value="{state_key}"]')
         # The state's capture is fetched and checked in the background. The

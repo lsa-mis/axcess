@@ -238,14 +238,14 @@ export default function InspectorRoute() {
    * Each finding belongs to exactly one state, the one it was first seen in.
    * A revealed state is the page plus whatever the click added, so load-state
    * markup is usually still in it, but listing it again there presented one
-   * element once per state. It stays under "At page load" and the off-state
+   * element once per state. It stays under "As the page loaded" and the off-state
    * count points the reviewer to it.
    */
   /**
    * The occurrences that belong to the document on screen.
    *
    * An issue can span several states, and the evidence list was showing all of
-   * them whichever state was selected: "At page load" listed markup that only
+   * them whichever state was selected: "As the page loaded" listed markup that only
    * exists after a click, and a revealed state listed occurrences belonging to
    * a different control. Both are the same mistake this view exists to stop —
    * attaching evidence to a state that does not contain it.
@@ -262,7 +262,7 @@ export default function InspectorRoute() {
    * an assignment dashboard has six. Opening one issue and being offered all
    * six says nothing about which of them holds it — five are about other
    * rules entirely. Only the states carrying an occurrence of this issue are
-   * listed, with their counts, and "At page load" stays as the baseline the
+   * listed, with their counts, and "As the page loaded" stays as the baseline the
    * others are read against.
    *
    * An issue found only at page load is offered no revealed states at all:
@@ -629,7 +629,7 @@ export default function InspectorRoute() {
               <p className="mt-2 text-2xs text-fg-muted">
                 To reach it by hand, open the live page and follow the steps in
                 the state list above. Switch back to{" "}
-                <span className="font-semibold">At page load</span> for the
+                <span className="font-semibold">As the page loaded</span> for the
                 markup this report does hold.
               </p>
             </>
@@ -655,15 +655,13 @@ export default function InspectorRoute() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
             id="inspect-state"
-            label="Page state"
+            label="Which view of the page"
             value={stateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
             options={[
               {
                 value: "",
-                label: `At page load${
-                  loadStateCount > 0 ? ` (${loadStateCount})` : ""
-                }`,
+                label: `As the page loaded${flaggedHere(loadStateCount)}`,
                 badge: <MissingChip count={missingFor("")} />,
               },
               ...offeredStates.map((state) => {
@@ -678,7 +676,7 @@ export default function InspectorRoute() {
                     : `“${state.revealed_by}”`;
                 return {
                   value: state.state_key,
-                  label: `After clicking ${chain}${count > 0 ? ` (${count})` : ""}`,
+                  label: `After clicking ${chain}${flaggedHere(count)}`,
                   badge: <MissingChip count={missingFor(state.state_key)} />,
                 };
               }),
@@ -1322,6 +1320,16 @@ function startTagMatches(raw: string, needle: string, snippet: string): boolean 
 function truncatedSnippetMatches(raw: string, needle: string): boolean {
   if (needle.length < TRUNCATED_SNIPPET_LENGTH) return false;
   return normalizeWhitespace(raw).startsWith(needle);
+}
+
+/**
+ * How many of this issue's occurrences a view of the page holds, in words:
+ * ": 19 flagged elements". A bare "(19)" left the reader to guess what was
+ * counted. Nothing is added when the view holds none.
+ */
+function flaggedHere(count: number): string {
+  if (count === 0) return "";
+  return `: ${count} flagged element${count === 1 ? "" : "s"}`;
 }
 
 /** The class every outlined element carries, so the frame can be walked in order. */

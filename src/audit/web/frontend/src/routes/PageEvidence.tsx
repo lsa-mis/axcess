@@ -71,7 +71,7 @@ export default function PageEvidenceRoute() {
   const withoutAlt = data.image_occurrences.filter((i) => i.alt_text === null).length;
 
   // Only group when a click actually revealed something: on a page where
-  // nothing was, a lone "At page load" heading would divide nothing.
+  // nothing was, a lone "As the page loaded" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
 
   return (
@@ -376,7 +376,7 @@ function groupByRevealingControl(findings: PageEvidenceFinding[]) {
     byControl.get(control)!.push(finding);
   }
   const groups: { key: string; label: string; findings: PageEvidenceFinding[] }[] = [];
-  if (atLoad.length > 0) groups.push({ key: "__load__", label: "At page load", findings: atLoad });
+  if (atLoad.length > 0) groups.push({ key: "__load__", label: "As the page loaded", findings: atLoad });
   for (const control of order) {
     groups.push({
       key: control,

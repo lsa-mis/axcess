@@ -169,8 +169,8 @@ first flagged after a control was used, the report names that control (here,
 
 | Where | What it says |
 | --- | --- |
-| A page's **Stored evidence** | Groups `At page load (N findings)`, then `After clicking “Menu” (N findings)` |
-| Page inspector, **Page state** picker | `At page load (N)` and `After clicking “Menu” → “Settings” (N)`, with the note `Captured during the scan, after the control was operated.` |
+| A page's **Stored evidence** | Groups `As the page loaded (N findings)`, then `After clicking “Menu” (N findings)` |
+| Page inspector, **Which view of the page** picker | `As the page loaded: N flagged elements` and `After clicking “Menu” → “Settings”: N flagged elements`, with the note `Captured during the scan, after the control was operated.` |
 | Workbook, **User action** column | `Open "Menu" on this page.` or `Load the page.` |
 | Audit report | `Seen after: activating "Menu" on this page.` |
 | Jira CSV | `To reproduce: Load the page, then activate "Menu".` or `Load the page.` |
