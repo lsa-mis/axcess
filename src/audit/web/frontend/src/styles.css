@@ -28,6 +28,10 @@
   --c-sev-minor-bg: 254 249 195;
   --c-sev-info: 31 41 55;
   --c-sev-info-bg: 229 231 235;
+  /* Something that ran or passed: 7.1:1 on its tint, 7.8:1 on white. The
+     label beside it always says it in words as well. */
+  --c-ok: 21 94 49;
+  --c-ok-bg: 220 252 231;
   --c-surface: 255 255 255;
   --c-surface-subtle: 247 249 252;
   --c-surface-muted: 241 244 248;
@@ -88,6 +92,8 @@
   --c-sev-minor-bg: 46 43 12;
   --c-sev-info: 229 231 235;
   --c-sev-info-bg: 42 50 61;
+  --c-ok: 134 239 172; /* 10.1:1 on its tint */
+  --c-ok-bg: 13 49 30;
   --c-surface: 17 26 38;
   --c-surface-subtle: 11 18 27;
   --c-surface-muted: 26 37 51;

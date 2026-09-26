@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Link } from "react-router";
-import { Check, ChevronRight, Minus } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATE, CLICK_THROUGH_STATES } from "../lib/labels";
 import { Card } from "./ui";
+import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion } from "./table/Table";
 import type {
   IssueRow,
   ScanMethodCoverage,
@@ -11,13 +11,14 @@ import type {
 } from "../api/types";
 
 /**
- * What this scan actually checked, a ledger, one row per method.
+ * What this scan actually checked, as a table: one row per check, with what
+ * it ran on, what it found, and what it does and does not prove, all in view.
  *
- * The previous treatment printed every method's label, description, result and
- * caveat as a permanent two-column grid of cards: nine paragraphs of hedging
- * on a page whose job is to say what happened. The caveats matter, so they are
- * kept in full, they just sit behind the row they qualify, where a reader
- * goes when they want to know what a method does and does not prove.
+ * It used to be a list of closed rows, each opened to read that check's
+ * description and caveat, so reading the whole ledger took a click per
+ * check. The caveats are the point of it (what a clean result does not
+ * prove), so they now sit in a column of their own. Row headers and column
+ * headers let a screen reader name the check and the column for every cell.
  */
 const METHOD_STATE_LABEL: Record<ScanMethodState, string> = {
   not_selected: "Not selected",
@@ -51,6 +52,8 @@ export function methodsRan(methods: ScanMethodCoverage[]): ScanMethodCoverage[] 
   return methods.filter((method) => method.state === "checked" || method.state === "partial");
 }
 
+const CAPTION = "What each check ran on and found, and what it does and does not prove.";
+
 export default function MethodCoverageLedger({
   scanId,
   methods,
@@ -64,28 +67,18 @@ export default function MethodCoverageLedger({
   /**
    * Inside a disclosure that already names the ledger and shows the count
    * (the report's notes accordion): drop the card and its heading, which
-   * would only repeat the disclosure's own, and keep the list.
+   * would only repeat the disclosure's own, and keep the table.
    */
   embedded?: boolean;
   className?: string;
 }) {
-  const ran = methodsRan(methods);
+  const table = <LedgerTable scanId={scanId} methods={methods} rows={rows} />;
 
   if (embedded) {
-    return (
-      <div className={className}>
-        <p className="text-sm text-fg-muted">
-          Open a row for what each check does and does not prove.
-        </p>
-        <ul className="mt-3 overflow-hidden rounded-xs border border-border">
-          {methods.map((method) => (
-            <MethodRow key={method.key} scanId={scanId} method={method} rows={rows} />
-          ))}
-        </ul>
-      </div>
-    );
+    return <div className={className}>{table}</div>;
   }
 
+  const ran = methodsRan(methods);
   return (
     <Card className={cn("overflow-hidden", className)}>
       <div className="px-4 pb-3 pt-4">
@@ -93,98 +86,125 @@ export default function MethodCoverageLedger({
           What this scan actually checked
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
-          {ran.length} of {methods.length} methods ran. Open a row for what it
-          does and does not prove.
+          {ran.length} of {methods.length} methods ran.
         </p>
       </div>
-      <ul className="border-t border-border">
-        {methods.map((method) => (
-          <MethodRow key={method.key} scanId={scanId} method={method} rows={rows} />
-        ))}
-      </ul>
+      {table}
     </Card>
   );
 }
 
+/**
+ * The ledger itself. Its caption is visible, and is the table's name. At
+ * narrow widths the table scrolls inside its own named region rather than
+ * pushing the page sideways.
+ */
+function LedgerTable({
+  scanId,
+  methods,
+  rows,
+}: {
+  scanId: number;
+  methods: ScanMethodCoverage[];
+  rows: IssueRow[] | undefined;
+}) {
+  // What ran leads, so the checks behind this report's evidence are the
+  // first rows read; the rest keep the server's order after them.
+  const ranKeys = new Set(methodsRan(methods).map((method) => method.key));
+  const ordered = [
+    ...methods.filter((method) => ranKeys.has(method.key)),
+    ...methods.filter((method) => !ranKeys.has(method.key)),
+  ];
+  return (
+    <TableRegion label="Checks in this scan">
+      <Table
+        caption={CAPTION}
+        captionClassName="px-2 pb-2 text-left text-sm text-fg-muted"
+        className="min-w-[40rem] rounded-xs border border-border"
+      >
+        <TableHead>
+          <tr>
+            <ColumnHeader>Check</ColumnHeader>
+            <ColumnHeader>Status</ColumnHeader>
+            <ColumnHeader>Result</ColumnHeader>
+            <ColumnHeader>What it proves, and its limits</ColumnHeader>
+          </tr>
+        </TableHead>
+        <tbody>
+          {ordered.map((method, index) => (
+            <MethodRow key={method.key} index={index} scanId={scanId} method={method} rows={rows} />
+          ))}
+        </tbody>
+      </Table>
+    </TableRegion>
+  );
+}
+
 function MethodRow({
+  index,
   scanId,
   method,
   rows,
 }: {
+  index: number;
   scanId: number;
   method: ScanMethodCoverage;
   rows: IssueRow[] | undefined;
 }) {
-  const [open, setOpen] = useState(false);
   const ran = method.state === "checked" || method.state === "partial";
   const found = findingsFor(method, rows);
+  // Top-aligned: the last column holds a paragraph, and every other cell
+  // should start on its first line rather than float in the middle of it.
+  const top = "align-top";
 
   return (
-    <li className="border-b border-border last:border-b-0">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className={cn(
-          "flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-muted/60",
-          open && "bg-surface-subtle",
-        )}
-      >
-        {/* The icon is a second, non-color signal for whether a method ran,
-            the chip alone would leave the state to a colour difference. */}
-        {ran ? (
-          <Check className="h-[18px] w-[18px] shrink-0 text-fg" aria-hidden />
-        ) : (
-          <Minus className="h-[18px] w-[18px] shrink-0 text-border-strong" aria-hidden />
-        )}
-        <span className={cn("min-w-0 flex-1 text-sm font-semibold", ran ? "text-fg" : "text-fg-subtle")}>
-          {method.label}
-        </span>
-        <span className="hidden shrink-0 text-sm tabular-nums text-fg-muted sm:block">
-          {ran ? method.result : "n/a"}
-        </span>
+    <Row index={index}>
+      <RowHeader className={cn(top, "w-[12rem]")}>
+        <span className={ran ? "text-fg" : "text-fg-muted"}>{method.label}</span>
+      </RowHeader>
+      <Cell className={cn(top, "whitespace-nowrap text-center")}>
         <StateChip state={method.state} />
-        <ChevronRight
-          className={cn(
-            "h-[18px] w-[18px] shrink-0 text-fg-subtle transition-transform duration-150",
-            open && "rotate-90",
-          )}
-          aria-hidden
-        />
-      </button>
-      <div hidden={!open} className="bg-surface-subtle px-4 pb-4 pl-[46px] pt-0">
-        <p className="max-w-[78ch] text-sm leading-relaxed text-fg-muted sm:hidden">
-          {ran ? method.result : "This method was not part of this scan."}
-        </p>
-        <p className="mt-1 max-w-[78ch] text-sm leading-relaxed text-fg-muted">
-          {method.description}
-        </p>
-        {found && (
-          <p className="mt-2 max-w-[78ch] text-sm font-medium text-fg">
-            {found.text}
-            {found.count > 0 && (
-              <>
-                {" "}
-                <Link
-                  to={`/scans/${scanId}/issues`}
-                  className="font-semibold text-umich-blue underline underline-offset-2"
-                >
-                  See them in Issues
-                </Link>
-              </>
+      </Cell>
+      {/* What it ran on, then what it found: one column, since a check
+          that did not run has neither. */}
+      <Cell className={cn(top, "w-[14rem] text-sm")}>
+        {!ran ? (
+          <span className="text-fg-muted">n/a</span>
+        ) : (
+          <>
+            <span className="block text-fg-muted">{method.result}</span>
+            {found && (
+              <span className="mt-1 block text-fg">
+                {found.text}
+                {found.count > 0 && (
+                  <>
+                    {" "}
+                    <Link
+                      to={`/scans/${scanId}/issues`}
+                      className="font-semibold text-umich-blue underline underline-offset-2"
+                    >
+                      See them in Issues
+                    </Link>
+                  </>
+                )}
+              </span>
             )}
-          </p>
+          </>
         )}
-        <p className="mt-2 max-w-[78ch] text-xs leading-relaxed text-fg-subtle">
+      </Cell>
+      <Cell className={cn(top, "min-w-[18rem]")}>
+        <p className="max-w-[70ch] text-sm leading-relaxed text-fg-muted">{method.description}</p>
+        <p className="mt-1.5 max-w-[70ch] text-xs leading-relaxed text-fg-muted">
+          <span className="font-semibold text-fg">Limits: </span>
           {method.caveat}
         </p>
-      </div>
-    </li>
+      </Cell>
+    </Row>
   );
 }
 
 /**
- * "and this is what we found" for one method.
+ * What one method found, under its result in the Result column.
  *
  * Detector methods answer with their own issue groups. ``interaction`` is the
  * exception worth spelling out: Click-Through does not detect
@@ -204,12 +224,9 @@ function findingsFor(
       row.locations.some((location) => location.revealed_by),
     );
     return revealed.length === 0
-      ? {
-          text: `Found: no issue in this report depends on a ${CLICK_THROUGH_STATE}.`,
-          count: 0,
-        }
+      ? { text: `No issue depends on a ${CLICK_THROUGH_STATE}.`, count: 0 }
       : {
-          text: `Found: ${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence in ${CLICK_THROUGH_STATES}.`,
+          text: `${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence in ${CLICK_THROUGH_STATES}.`,
           count: revealed.length,
         };
   }
@@ -218,21 +235,24 @@ function findingsFor(
   if (!pipelines) return null;
   const count = rows.filter((row) => pipelines.includes(row.pipeline)).length;
   return count === 0
-    ? { text: "Found: no issue groups.", count: 0 }
-    : {
-        text: `Found: ${count} issue group${count === 1 ? "" : "s"}.`,
-        count,
-      };
+    ? { text: "No issue groups.", count: 0 }
+    : { text: `${count} issue group${count === 1 ? "" : "s"}.`, count };
 }
 
+/**
+ * A check's state in words, with an icon as a second signal: a check mark
+ * on green for a check that ran, a dash for one that did not. Colour is the
+ * third signal, never the only one.
+ */
 function StateChip({ state }: { state: ScanMethodState }) {
   const ran = state === "checked" || state === "partial";
+  const Icon = ran ? Check : Minus;
   return (
     <span
       className={cn(
-        "hidden shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold sm:inline-block",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold",
         ran
-          ? "border-umich-blue/30 bg-umich-blue/10 text-umich-blue"
+          ? "border-ok/30 bg-ok-bg text-ok"
           : state === "running"
             ? "border-umich-maize/60 bg-umich-maize/15 text-fg"
             : state === "not_run"
@@ -240,6 +260,7 @@ function StateChip({ state }: { state: ScanMethodState }) {
               : "border-border bg-surface text-fg-muted",
       )}
     >
+      <Icon className="h-3 w-3 shrink-0" strokeWidth={3} aria-hidden />
       {METHOD_STATE_LABEL[state]}
     </span>
   );

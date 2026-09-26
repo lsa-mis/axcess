@@ -458,14 +458,19 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
         {data.coverage.length > 0 && (
           <>
             <h3 id="coverage-table-heading" className="mt-6 font-semibold">What each check covered</h3>
-            <table aria-labelledby="coverage-table-heading" className="mt-2 w-full max-w-3xl">
-              <thead>
-                <tr className="border-b border-border-strong">
-                  <th scope="col" className="py-2 pr-3 text-left font-semibold">Check</th>
-                  <th scope="col" className="px-3 py-2 text-left font-semibold">
+            {/* Ruled on every side: the eye follows a check across to both scans
+                without losing the row, as in the report's other tables. */}
+            <table
+              aria-labelledby="coverage-table-heading"
+              className="mt-2 w-full max-w-3xl border-collapse border border-border-strong text-sm"
+            >
+              <thead className="bg-surface-muted text-fg-muted">
+                <tr>
+                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">Check</th>
+                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
                     Scan {before} <span className="font-normal text-fg-muted">(before)</span>
                   </th>
-                  <th scope="col" className="py-2 pl-3 text-left font-semibold">
+                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
                     Scan {after} <span className="font-normal text-fg-muted">(after)</span>
                   </th>
                 </tr>
@@ -474,8 +479,8 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                 {data.coverage.map((pair) => {
                   const differs = methodDiffers(pair);
                   return (
-                    <tr key={pair.pipeline} className={cn("border-b border-border", differs && "bg-sev-major-bg")}>
-                      <th scope="row" className="py-2 pr-3 text-left align-top font-semibold">
+                    <tr key={pair.pipeline} className={cn(differs && "bg-sev-major-bg")}>
+                      <th scope="row" className="border border-border px-3 py-2 text-left align-top font-semibold">
                         {PIPELINES[pair.pipeline] ?? pair.pipeline}
                         {differs && (
                           <>
@@ -486,8 +491,8 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                           </>
                         )}
                       </th>
-                      <td className="px-3 py-2 align-top tabular-nums">{coverageText(pair.before)}</td>
-                      <td className="py-2 pl-3 align-top tabular-nums">{coverageText(pair.after)}</td>
+                      <td className="border border-border px-3 py-2 text-center align-top tabular-nums">{coverageText(pair.before)}</td>
+                      <td className="border border-border px-3 py-2 text-center align-top tabular-nums">{coverageText(pair.after)}</td>
                     </tr>
                   );
                 })}

@@ -53,6 +53,10 @@ const config: Config = {
           info: v("sev-info"),
           "info-bg": v("sev-info-bg"),
         },
+        ok: {
+          DEFAULT: v("ok"),
+          bg: v("ok-bg"),
+        },
         surface: {
           DEFAULT: v("surface"),
           subtle: v("surface-subtle"),
