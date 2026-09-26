@@ -478,9 +478,9 @@ def board_release() -> str:
     s2 = step("2", "wrench", "Build both apps",
               chips(["desktop-build.yml"])
               + "macOS (Apple Silicon) and Windows (x64) build in parallel, stamped "
-              + span(mono("0.1.&lt;run number&gt;", 18), white_space="nowrap") + ".")
+              + span(mono("0.60.&lt;run number&gt;", 18), white_space="nowrap") + ".")
     s3 = step("3", "package", "Publish job",
-              "Creates GitHub release " + mono("desktop-v0.1.N", 18) + ", marked latest. "
+              "Creates GitHub release " + mono("desktop-v0.60.N", 18) + ", marked latest. "
               "Adds version-less download names. Keeps the 10 newest.")
     s4 = step("4", "refresh", "App checks on launch",
               "The installed app asks GitHub for the latest release and offers a newer one.")

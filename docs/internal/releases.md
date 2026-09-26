@@ -98,15 +98,18 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
 ### Version numbers and tags
 
-- Each build stamps `desktop/package.json` with version `0.1.<run number>`,
+- Each build stamps `desktop/package.json` with version `0.60.<run number>`,
   using the workflow's `github.run_number`. The commit SHA goes into
   `config.buildCommit`.
-- The app shows both together, as `0.1.N (abc1234)`, in its update dialogs and
+- The app shows both together, as `0.60.N (abc1234)`, in its update dialogs and
   in the launcher log.
-- The release tag is `desktop-v0.1.N` and the release title is
-  `Axcess preview 0.1.N`.
-- In git, `desktop/package.json` stays at `0.1.0`, so every local build is
-  version `0.1.0`.
+- The release tag is `desktop-v0.60.N` and the release title is
+  `Axcess preview 0.60.N`.
+- In git, `desktop/package.json` stays at `0.60.0`, so every local build is
+  version `0.60.0`.
+- Before September 2026 the scheme was `0.1.<run number>`: tags up to
+  `desktop-v0.1.33` use it. `0.60.N` sorts above every one of them, so
+  installed copies still see the next release as newer.
 
 ### The publish job
 
@@ -116,7 +119,7 @@ repository secrets are involved.
 
 1. **Collect the installers.** It copies every `*.dmg`, `*.zip`,
    `*-Setup.exe`, `RELEASES`, and `*.nupkg` file from the two artifacts. It
-   stops if `Axcess-0.1.N-arm64.dmg`, `Axcess-0.1.N-Setup.exe`, or `RELEASES`
+   stops if `Axcess-0.60.N-arm64.dmg`, `Axcess-0.60.N-Setup.exe`, or `RELEASES`
    is missing.
 2. **Add version-less copies.** It adds `Axcess-macOS-AppleSilicon.dmg` and
    `Axcess-Windows-x64-Setup.exe` as copies of this build's installers. The
@@ -126,7 +129,7 @@ repository secrets are involved.
    always fetch the newest release. If you rename these files, change those
    constants and regenerate the site in the same pull request.
 3. **Create a draft, upload, then publish.** If no release exists for tag
-   `desktop-v0.1.N` yet, it creates one as a draft at the built commit. It
+   `desktop-v0.60.N` yet, it creates one as a draft at the built commit. It
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
@@ -243,7 +246,7 @@ release from the site.
 - Drafts and prereleases are ignored. So are tags that are not a plain dotted
   version, optionally prefixed with `desktop-v` or `v`.
 - The app offers a release only when its version is strictly newer, compared
-  as numbers (`0.1.10` is newer than `0.1.9`).
+  as numbers (`0.60.10` is newer than `0.60.9`).
 
 ### What people see on Windows
 
@@ -324,17 +327,17 @@ has to make because the workflow does not.
    delete the leftover draft on the Releases page.
 5. For a failure that looks flaky, such as a packaging step or an upload,
    try **Re-run failed jobs** on the same run first. A re-run keeps the run
-   number, so the version and tag stay `0.1.N`. The publish job creates a
+   number, so the version and tag stay `0.60.N`. The publish job creates a
    draft only when none exists for the tag, uploads with `--clobber`, and
    then publishes, so it completes the existing draft. Start a new run only
    when the code has to change.
 
 ### Confirm the release
 
-1. On the Releases page, confirm that "Axcess preview 0.1.N" is marked
+1. On the Releases page, confirm that "Axcess preview 0.60.N" is marked
    Latest and has these files:
-   - `Axcess-0.1.N-arm64.dmg` and the macOS `.zip`;
-   - `Axcess-0.1.N-Setup.exe`, `RELEASES`, and the `.nupkg` package;
+   - `Axcess-0.60.N-arm64.dmg` and the macOS `.zip`;
+   - `Axcess-0.60.N-Setup.exe`, `RELEASES`, and the `.nupkg` package;
    - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
@@ -350,13 +353,13 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    opens rather than the
    ["Axcess could not start" page](../desktop-app.md#axcess-could-not-start).
 2. **Version.** Confirm the launcher log's "starting backend" line shows
-   `version 0.1.N (<short SHA>)` for the new build. The desktop app guide
+   `version 0.60.N (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
    - The review app has no screen that shows the version. The update dialog
-     says "You are running 0.1.N (<short SHA>)", but only when it offers a
+     says "You are running 0.60.N (<short SHA>)", but only when it offers a
      newer release, so support should ask a user for the launcher log line.
    - On macOS, also open **Axcess > About Axcess** and note whether it shows
-     0.1.N. The desktop code never replaces Electron's default menu, which
+     0.60.N. The desktop code never replaces Electron's default menu, which
      should include that item, but nobody has checked it on a Mac yet.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
@@ -376,7 +379,7 @@ GitHub's download count for each release file. Record the counts before the
 release is pruned, because deleting a release deletes its counts:
 
 ```bash
-gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.1.N \
+gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.60.N \
   --jq '.assets[] | [.name, .download_count] | @tsv'
 ```
 
@@ -386,9 +389,9 @@ Releases page, so treat the numbers as estimates:
 | File | Who downloads it |
 | --- | --- |
 | `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
-| `Axcess-0.1.N-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-0.60.N-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
 | `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
-| `Axcess-0.1.N-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
+| `Axcess-0.60.N-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
 
 These counts miss:
 
@@ -431,7 +434,7 @@ A few things to know:
 
 - On Linux, `make desktop-package` stops at `make desktop-ocr`, because the
   OCR bundling script supports only macOS (Windows has its own script).
-- Local builds are version `0.1.0`, and local macOS builds are ad-hoc signed
+- Local builds are version `0.60.0`, and local macOS builds are ad-hoc signed
   unless you set the
   [signing variables](#settings-for-when-credentials-exist).
 - A packaged local build therefore offers the latest published release when

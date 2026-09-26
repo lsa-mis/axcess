@@ -21,7 +21,7 @@ def _plain(output: str) -> str:
 
 
 def test_package_version() -> None:
-    assert audit.__version__ == "0.1.0"
+    assert audit.__version__ == "0.60.0"
 
 
 def test_cli_help_runs() -> None:

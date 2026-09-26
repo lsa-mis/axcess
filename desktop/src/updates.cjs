@@ -2,7 +2,7 @@
  * Pure helpers behind the launch-time update check. Nothing here touches
  * Electron so the decisions can be unit-tested with plain Node.
  *
- * Every push to `main` publishes a GitHub Release tagged `desktop-v0.1.<run>`
+ * Every push to `main` publishes a GitHub Release tagged `desktop-v0.60.<run>`
  * (see .github/workflows/desktop-build.yml). The packaged app asks the GitHub
  * API for the latest release once per launch and compares it with its own
  * stamped version. What it can do with a newer release depends on the

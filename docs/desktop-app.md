@@ -160,10 +160,10 @@ Do not distribute these preview builds as a production U-M application.
 `desktop-build.yml` runs on every push to `main` that changes `desktop/**`,
 `src/**`, `pyproject.toml`, `uv.lock`, or the workflow file itself, and it can
 also be started by hand. Each run stamps the build as version
-`0.1.<run number>` (the git commit is recorded in the package's
+`0.60.<run number>` (the git commit is recorded in the package's
 `config.buildCommit`). On `main`, it then publishes the macOS DMG and zip, the
 Windows `-Setup.exe`, and the Squirrel `RELEASES` and `.nupkg` files as GitHub
-Release `desktop-v0.1.<run number>`.
+Release `desktop-v0.60.<run number>`.
 
 Each release also carries version-less copies,
 `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`, so the
@@ -193,7 +193,7 @@ current. When a newer build exists:
 
 The check is skipped for unpackaged development runs and whenever
 `AXCESS_DISABLE_UPDATE_CHECK=1` is set, which local packaged builds (always
-version `0.1.0`) may want. Only HTTPS asset downloads under this repository's
+version `0.60.0`) may want. Only HTTPS asset downloads under this repository's
 releases are ever handed to the system browser.
 
 For a release build on macOS, set `AXCESS_MAC_SIGN_IDENTITY` to the exact

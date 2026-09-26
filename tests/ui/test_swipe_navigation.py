@@ -16,7 +16,7 @@ playwright_async = pytest.importorskip("playwright.async_api")
 
 DESKTOP_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "axcess/0.1.0 Chrome/140.0.0.0 Electron/43.4.0 Safari/537.36"
+    "axcess/0.60.0 Chrome/140.0.0.0 Electron/43.4.0 Safari/537.36"
 )
 # Longer than the hook's gap between gestures, so the next wheel starts anew.
 GESTURE_GAP_MS = 400

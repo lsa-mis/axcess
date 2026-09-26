@@ -49,7 +49,7 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm version "0.60.${{ github.run_number }}" --no-git-tag-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -112,7 +112,7 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm version "0.60.${{ github.run_number }}" --no-git-tag-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -150,8 +150,8 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: 0.1.${{ github.run_number }}
-      TAG: desktop-v0.1.${{ github.run_number }}
+      VERSION: 0.60.${{ github.run_number }}
+      TAG: desktop-v0.60.${{ github.run_number }}
     steps:
       - uses: actions/download-artifact@v4
         with:

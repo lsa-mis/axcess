@@ -1,7 +1,7 @@
 {
   "name": "axcess-desktop",
   "productName": "Axcess",
-  "version": "0.1.0",
+  "version": "0.60.0",
   "description": "Local-first accessibility auditing workbench",
   "author": "Axcess contributors",
   "private": true,
