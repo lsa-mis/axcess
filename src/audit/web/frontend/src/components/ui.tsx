@@ -686,7 +686,7 @@ export function Checkbox({
  *   • Primary affordance: page title (or URL when title is missing) is the
  *     link, and it opens the IN-APP page/DOM inspector, it no longer sends
  *     the reviewer to the live site in a new tab. The inspector re-renders
- *     the page and (when ``selector``/``issue`` is supplied) circles the
+ *     the page and (when ``selector``/``issue`` is supplied) outlines the
  *     flagged element, and it shows the loaded DOM.
  *   • Secondary affordances (small, muted): "open live page ↗" for the rare
  *     case the reviewer wants the real site, and "stored evidence" for the
@@ -1087,7 +1087,7 @@ export function PageLink({
   pageTitle?: string | null;
   /** Show the raw URL as a microcopy line below the title. */
   showUrlBelow?: boolean;
-  /** Target selector to circle on the inspected page (when known directly). */
+  /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;

@@ -29,7 +29,7 @@ export const ISSUE_PAGES_VIEW = "Pages";
  * The in-app inspector for one page, pointed at this issue.
  *
  * ``issue`` is what makes the inspector highlight anything: without it the
- * Rendered page and DOM tabs show the page with nothing circled. The rest is
+ * Rendered page and DOM tabs show the page with nothing outlined. The rest is
  * the orientation the inspector's own trail and context chip read.
  */
 export function issueInspectorPath({
@@ -267,7 +267,7 @@ const IssuePageRow = memo(function IssuePageRow({
     <Row index={index}>
       <RowHeader className="px-3 text-right font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] px-3 font-semibold text-fg">
-        {/* The title opens the inspector with this issue circled on the page. */}
+        {/* The title opens the inspector with this issue outlined on the page. */}
         <Link
           to={issueInspectorPath({ scanId, pageId: page.page_id, issueKey, origin, backTo })}
           className="inline-flex items-baseline gap-1 text-umich-blue underline underline-offset-2"

@@ -174,7 +174,7 @@ const MAX_DEPTH = 12;
  * Two more sources fill any gap a link did not carry. A route scoped to one
  * issue proves its parents from the path alone (the issue list, then the
  * issue), so a bookmark or deep link lands with the whole trail. And the
- * inspector's `?contextTo=` names the issue or finding it is circling, so a
+ * inspector's `?contextTo=` names the issue or finding it is outlining, so a
  * page opened straight from the issue list still shows the issue between the
  * list and the page. Anything already in the chain is not added twice.
  */
@@ -222,7 +222,7 @@ function trailFor(
     }
   }
 
-  // 3. What the inspector is circling, when the chain did not pass through it.
+  // 3. What the inspector is outlining, when the chain did not pass through it.
   const contextTo = inAppPath(params.get("contextTo"));
   const contextLabel = params.get("context");
   if (contextTo && contextLabel && depth < MAX_DEPTH && !seen.includes(contextTo)) {
