@@ -143,29 +143,13 @@ export default function CompareRoute() {
 
       {data && !error && (
         <>
-          {data.baseline ? (
-            <Comparison
-              data={data}
-              total={history?.total ?? null}
-              previousId={scanQuery.data?.previous_scan_id ?? null}
-              change={change}
-              onChange={(next) => setParam("change", next)}
-            />
-          ) : (
-            <Card className="mb-5 p-4 text-sm leading-relaxed">
-              <h2 className="font-semibold">Nothing earlier to compare with</h2>
-              <p className="mt-1 text-fg-muted">
-                This is the first completed scan of this site. Scan the site again after fixing issues, then compare the two here.
-                {history && history.scans.length > 1 && " A later scan can be compared with this one from the trend below."}
-              </p>
-            </Card>
-          )}
-
+          {/* Trend first, the long view; then what changed since the
+              chosen scan, the table of it, and last the coverage notes. */}
           <Card className="mb-5 p-4" role="region" aria-labelledby="trend-heading">
             {historyQuery.error ? (
               <>
                 <h2 id="trend-heading" className="text-base font-semibold">Trend over time</h2>
-                <p className="mt-1 text-sm text-sev-critical" role="alert">The trend could not be loaded. The comparison above is unaffected.</p>
+                <p className="mt-1 text-sm text-sev-critical" role="alert">The trend could not be loaded. The comparison below is unaffected.</p>
               </>
             ) : !history ? (
               <>
@@ -186,6 +170,24 @@ export default function CompareRoute() {
               />
             )}
           </Card>
+
+          {data.baseline ? (
+            <Comparison
+              data={data}
+              total={history?.total ?? null}
+              previousId={scanQuery.data?.previous_scan_id ?? null}
+              change={change}
+              onChange={(next) => setParam("change", next)}
+            />
+          ) : (
+            <Card className="mb-5 p-4 text-sm leading-relaxed">
+              <h2 className="font-semibold">Nothing earlier to compare with</h2>
+              <p className="mt-1 text-fg-muted">
+                This is the first completed scan of this site. Scan the site again after fixing issues, then compare the two here.
+                {history && history.scans.length > 1 && " A later scan can be compared with this one from the trend above."}
+              </p>
+            </Card>
+          )}
 
           {data.baseline && (
             // Not a region of its own: the table's scroll region inside is
@@ -218,6 +220,13 @@ export default function CompareRoute() {
             <p className="mt-2 text-xs text-fg-muted">
               Showing the first {data.rows.length} of {data.total} issue groups.
             </p>
+          )}
+          {/* Last: the caveats behind the numbers above, read once the
+              reader has seen what changed. */}
+          {data.baseline && (
+            <div className="mt-5">
+              <CoverageNotes data={data} />
+            </div>
           )}
         </>
       )}
@@ -274,7 +283,7 @@ function Comparison({
             {unsure === data.changes.new + data.changes.resolved
               ? "these new and resolved groups"
               : `${unsure} of the new and resolved groups (marked in the table)`}{" "}
-            may come from what was scanned rather than from changes to the site. Confirm them on the page. The coverage notes say what differed.
+            may come from what was scanned rather than from changes to the site. Confirm them on the page. The coverage notes at the end of this page say what differed.
           </span>
         </p>
       )}
@@ -302,8 +311,6 @@ function Comparison({
           );
         })}
       </div>
-
-      <CoverageNotes data={data} />
     </>
   );
 }
