@@ -635,7 +635,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # Under the title, only when the evidence was captured: no site name, no
     # disclaimer line, and no ACT rule note among the notes.
     await playwright_async.expect(
-        page.get_by_text(re.compile(r"^Based on the scan (completed|started) "))
+        page.get_by_text(re.compile(r"^Based on the (report generated|scan started) "))
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)

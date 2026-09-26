@@ -98,9 +98,9 @@ the inspector's **Page state** list shows.
 
 ## The report summary
 
-A finished report opens on **Issues**. Under the title, "Based on the scan
-completed" gives the date and time the scan finished, and the **Export
-report** menu sits at the top right. One summary line above the table counts:
+A finished report opens on **Issues**. Under the title, "Based on the report
+generated" gives the date and time the scan finished, and the **Export
+report** menu sits at the top right. Four numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |

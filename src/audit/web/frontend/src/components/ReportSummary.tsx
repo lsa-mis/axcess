@@ -8,11 +8,12 @@ import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 
 /**
- * One number in the summary line: the value first, then what it counts.
- * The label is the ``dt`` and the value the ``dd``, so a screen reader reads
- * "Pages checked, 8"; CSS order puts the number first on screen. ``detail``
- * is a short aside in parentheses, and ``flag`` colors the number when it
- * needs attention (crawl errors), which the detail text also says.
+ * One number in the summary strip: the value large, what it counts under it,
+ * and one short sentence of explanation. The label is the ``dt`` and the value
+ * and explanation its ``dd``s, so a screen reader reads "Pages checked, 46,
+ * 0 errors while scanning"; CSS order puts the number first on screen.
+ * ``flag`` colours the number and the explanation when it needs attention
+ * (errors while scanning), which the explanation also says in words.
  */
 function SummaryStat({
   label,
@@ -22,18 +23,21 @@ function SummaryStat({
 }: {
   label: string;
   value: number;
-  detail?: string;
+  detail: string;
   flag?: boolean;
 }) {
   return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="order-2 text-fg-muted">
-        {label}
-        {detail && <span className="text-xs"> ({detail})</span>}
-      </dt>
-      <dd className={cn("order-1 text-xl font-semibold tabular-nums", flag ? "text-sev-major" : "text-umich-blue")}>
+    <div className="flex flex-col gap-1 bg-surface px-5 py-4">
+      <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
+      <dd
+        className={cn(
+          "order-1 text-3xl font-semibold leading-none tabular-nums",
+          flag ? "text-sev-major" : "text-umich-blue",
+        )}
+      >
         {value.toLocaleString()}
       </dd>
+      <dd className={cn("order-3 text-xs leading-5", flag ? "text-sev-major" : "text-fg-muted")}>{detail}</dd>
     </div>
   );
 }
@@ -74,25 +78,27 @@ export function ReportSummary({
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
       {/* Read left to right as the scan itself ran: how much was tested,
-          what that turned up, how those findings group, and how much of
-          the site only existed after a control was used. One compact line
-          rather than four cards, so the table starts higher on the screen.
-          Each term keeps its short explanation in parentheses. */}
-      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+          what that turned up, how those occurrences group, and how much of
+          the site only existed after a control was used. Four even cells,
+          each a number, its name and one sentence, rather than one run-on
+          line of text. The 1px gaps over the border colour draw the dividers
+          in any layout: four across on a wide screen, two by two on a narrow
+          one. */}
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xs border border-border bg-border lg:grid-cols-4">
         <SummaryStat
           label="Pages checked"
           value={scan.page_count}
           detail={`${scan.error_count.toLocaleString()} error${scan.error_count === 1 ? "" : "s"} while scanning`}
           flag={scan.error_count > 0}
         />
-        <SummaryStat label="Occurrences found" value={occurrences} detail="each place an issue appears" />
-        <SummaryStat label="Issues found" value={issueGroups} detail="kinds of problem, one per row below" />
+        <SummaryStat label="Occurrences found" value={occurrences} detail="Each place an issue appears" />
+        <SummaryStat label="Issues found" value={issueGroups} detail="Kinds of problem, one per row below" />
         {/* Pages alone understate an application whose content mostly does
             not exist until a control is used. */}
         <SummaryStat
           label={CLICK_THROUGH_STATES_LABEL}
           value={scan.dom_state_count ?? 0}
-          detail="reached by using controls, such as menus"
+          detail="Reached by using menus, tabs and other controls"
         />
       </dl>
 

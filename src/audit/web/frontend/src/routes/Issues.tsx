@@ -192,7 +192,7 @@ export default function IssuesRoute() {
   const basedOn = !isComplete
     ? null
     : scan.finished_at
-      ? `Based on the scan completed ${formatCompleted(scan.finished_at)}`
+      ? `Based on the report generated ${formatCompleted(scan.finished_at)}`
       : scan.started_at
         ? `Based on the scan started ${formatCompleted(scan.started_at)}`
         : null;
