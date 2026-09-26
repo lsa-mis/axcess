@@ -56,7 +56,18 @@ _AXE_TAGS = [
 
 
 async def _run_axe(page: Any) -> list[dict[str, Any]]:
-    """Return the list of axe violations for the current page."""
+    """Return the list of axe violations for the current page.
+
+    It waits for running CSS transitions first. axe measures the colours on
+    screen, and a tab or button still fading between two states (Tailwind's
+    ``transition-colors``, 150 ms) is neither: a test that clicks and then
+    checks quickly read a half-faded tab as a contrast failure. Endless
+    animations, such as a spinner, are not transitions and are not waited on.
+    """
+    await page.wait_for_function(
+        "() => document.getAnimations().every("
+        "(a) => !(a instanceof CSSTransition) || a.playState !== 'running')"
+    )
     await page.add_script_tag(content=_AXE_TEXT)
     result = await page.evaluate(
         """async (tags) => {

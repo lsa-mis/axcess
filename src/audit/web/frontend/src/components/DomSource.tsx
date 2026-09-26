@@ -298,7 +298,9 @@ export default function DomSource({
                   aria-hidden
                   className={cn(
                     "shrink-0 select-none pr-3 text-right",
-                    isCurrent ? "font-semibold text-fg" : "text-fg-subtle",
+                    // A flagged line's tint would leave the pale default
+                    // below the 7:1 the rest of the app keeps.
+                    isCurrent ? "font-semibold text-fg" : line.marked ? "text-fg-muted" : "text-fg-subtle",
                   )}
                   style={{ width: `${gutter + 2}ch` }}
                 >
