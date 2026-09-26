@@ -176,6 +176,9 @@ def test_credentials_in_the_address_are_removed() -> None:
         ("https://example.test/", "https://example.test/"),
         ("https://user@example.test:8443/x", "https://example.test:8443/x"),
         ("https://u:p@ss@example.test/", "https://example.test/"),
+        # urlsplit raises on these; the credentials must still go.
+        ("http://user:pw@[::1/x", "http://[::1/x"),
+        ("https://user:pw@exa]mple.test/a@b", "https://exa]mple.test/a@b"),
     ],
 )
 def test_strip_userinfo(raw: str, expected: str) -> None:

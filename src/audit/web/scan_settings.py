@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections.abc import Mapping
 from typing import Any, Literal
 from urllib.parse import urlsplit, urlunsplit
@@ -80,12 +81,19 @@ class ScanSettingsSnapshot(BaseModel):
     settings: ScanFormSettings
 
 
+# Scheme plus everything in the authority up to its last "@".
+_TEXTUAL_USERINFO = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#]*@")
+
+
 def strip_userinfo(url: str) -> str:
     """``url`` without any ``user:password@`` in its authority."""
     try:
         parts = urlsplit(url)
     except ValueError:
-        return url
+        # Too malformed to parse (a stray "[" or "]" in the host) can still
+        # carry credentials, so strip them as text instead of returning the
+        # address unchanged.
+        return _TEXTUAL_USERINFO.sub(r"\1", url)
     if "@" not in parts.netloc:
         return url
     return urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[1]))
