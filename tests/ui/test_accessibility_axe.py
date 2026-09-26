@@ -14,6 +14,7 @@ and target-size regressions fail here, not just AA.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import sqlite3
@@ -21,6 +22,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from PIL import Image
+
+from audit.blob_store import BlobStore
 
 from ._paging import all_pages_text
 
@@ -1158,3 +1162,57 @@ async def test_search_settings_keyboard_and_axe(
     await page.get_by_role("checkbox", name=re.compile("^I authorize these search")).check()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
+
+
+async def test_instance_screenshots_describe_the_outline_and_pass_axe(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """An issue's screenshots page says what the marker is, in text and alt text.
+
+    The marker is drawn into the stored PNG, so the caption and alt text are
+    the only way a reader who cannot see the image learns what it marks.
+    """
+    base, scan_id = live_server
+    db_path, blob_dir, _ = seeded_db
+    png = io.BytesIO()
+    Image.new("RGB", (240, 120), (255, 255, 255)).save(png, format="PNG")
+    screenshot_hash, _ = BlobStore(blob_dir).store(png.getvalue(), "image/png")
+    with sqlite3.connect(db_path) as conn:
+        (page_id,) = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings (
+                page_id, scan_id, rule_id, help, target_selector, target_hash,
+                status, created_at, updated_at, screenshot_hash, engine_outcome,
+                pipeline
+            ) VALUES (?, ?, 'color-contrast', 'Contrast (Minimum)', 'main p',
+                      'outline-caption', 'new', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                      ?, 'failed', 'axe')
+            """,
+            (page_id, scan_id, screenshot_hash),
+        )
+    page = await new_page()
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues/axe:color-contrast/pages/{page_id}/screenshots",
+            wait_until="networkidle",
+        )
+        await playwright_async.expect(
+            page.get_by_text(re.compile(r"^Instance 1 of \d+\."))
+        ).to_have_text(re.compile(r"The outline marks the detected location\.$"))
+        await playwright_async.expect(
+            page.get_by_role(
+                "img",
+                name=re.compile(
+                    r"^Issue instance 1 on .+\. An outline marks the detected location\.$"
+                ),
+            )
+        ).to_be_visible()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
