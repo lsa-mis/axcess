@@ -424,29 +424,35 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
     <>
       <Row index={index}>
         <RowHeader id={rowId} sticky className="min-w-52 max-w-xs py-1 font-normal">
-          <div className="flex items-start gap-1">
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-controls={expanded ? detailId : undefined}
-              aria-label={`${expanded ? "Hide" : "Show"} all ${site.scan_count} ${site.scan_count === 1 ? "scan" : "scans"} for ${label}`}
-              onClick={() => onToggle(site.site_url)}
-              className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg"
-            >
+          {/* The site's name toggles its scans too, not only the chevron:
+              the whole block is one button. Its name starts with what it
+              does and then reads the visible text, so a voice-control user
+              can say what they see (SC 2.5.3). */}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={expanded ? detailId : undefined}
+            onClick={() => onToggle(site.site_url)}
+            className="group flex w-full items-start gap-1 rounded-xs text-left hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
+          >
+            <span className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center text-fg-muted group-hover:text-fg">
               <ChevronRight
                 className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", expanded && "rotate-90")}
                 aria-hidden
               />
-            </button>
-            <div className="min-w-0 py-2">
-              <span className="block break-words font-semibold text-fg" title={site.site_url}>
+            </span>
+            <span className="min-w-0 py-2">
+              <span className="sr-only">
+                {`${expanded ? "Hide" : "Show"} all ${site.scan_count} ${site.scan_count === 1 ? "scan" : "scans"} for `}
+              </span>
+              <span className="block break-words font-semibold text-fg underline-offset-2 group-hover:underline" title={site.site_url}>
                 <BreakableUrl text={label} />
               </span>
               <span className="block text-xs text-fg-muted">
                 {site.completed_count} completed
               </span>
-            </div>
-          </div>
+            </span>
+          </button>
         </RowHeader>
         <Cell numeric className="text-fg">
           {site.scan_count.toLocaleString()}

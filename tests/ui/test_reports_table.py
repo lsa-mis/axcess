@@ -146,6 +146,14 @@ async def test_reports_table_keyboard_and_columns(
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
+    # The site's name is part of the toggle: clicking it closes and reopens
+    # the list, not only the chevron.
+    name = row.get_by_text(f"site{newest}.example", exact=True)
+    await name.click()
+    await playwright_async.expect(scans).to_have_count(0)
+    await name.click()
+    await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
+
     region = page.get_by_role("region", name="Public reports table")
     await region.focus()
     await page.keyboard.press("ArrowRight")
