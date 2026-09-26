@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 import pytest
 
+from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
 from .test_accessibility_axe import _render_violations, _run_axe
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
@@ -1089,25 +1090,30 @@ async def test_report_opens_keyboard_only_in_reading_order(
 
 
 async def test_issue_evidence_page_link_offers_the_way_back(
+    seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """Page evidence opened from Issues names Issues in the trail, and returns.
+    """Page evidence reached from an issue names the issue in the trail, and returns.
 
     The desktop app has no browser chrome, so the topbar trail is the only way
     back out of a drill-down. Before this, stored evidence was a dead end: the
     trail read ``Reports > site > Page evidence`` and nothing on the page led
-    back to the list the reviewer had been working through.
+    back to the list the reviewer had been working through. The issue's pages
+    table no longer links stored evidence itself; the way there is the page's
+    screenshots, which do.
     """
+    db_path, blob_dir, _ = seeded_db
     base, scan_id = live_server
+    add_screenshot_finding(db_path, blob_dir, scan_id)
     page = await new_page(viewport={"width": 1280, "height": 900})
     response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
-    row = (await response.json())["rows"][0]
+    row = next(r for r in (await response.json())["rows"] if r["issue_key"] == SCREENSHOT_ISSUE_KEY)
     issue_path = f"/app/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}"
     await page.goto(f"{base}{issue_path}", wait_until="networkidle")
-    evidence = page.get_by_role("link", name="stored evidence").first
-    await playwright_async.expect(evidence).to_be_visible()
-    await evidence.click()
+    await page.get_by_role("link", name=re.compile(r"^1 screenshot of this issue on ")).click()
+    await page.wait_for_url(re.compile(r"/pages/\d+/screenshots"))
+    await page.get_by_role("link", name="Stored evidence", exact=True).click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+\?"))
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     back = crumb.get_by_role("link", name=row["title"], exact=True)

@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ExternalLink, ScanEye } from "lucide-react";
+import { ScanEye } from "lucide-react";
 import { TablePagination, usePagedRows } from "./TablePagination";
 import {
   Cell,
@@ -17,7 +17,7 @@ import {
   TableStatus,
 } from "./table/Table";
 import { compareText, sortWords, type Sort, type SortKind } from "./table/sort";
-import { pageEvidencePath, withReturnTrail } from "./ui";
+import { withReturnTrail } from "./ui";
 import type { IssuePage, IssueRow } from "../api/types";
 
 /** The trail label for the pages view; ReportCrumb shows the same words. */
@@ -184,7 +184,7 @@ export default function IssuePagesTable({
         </TableEmpty>
       ) : (
         <TableRegion label="Pages table" paged={paged}>
-          <Table className="min-w-[56rem]" caption={`Pages with the issue ${row.title}`}>
+          <Table className="min-w-[44rem]" caption={`Pages with the issue ${row.title}`}>
             <TableHead>
               <tr>
                 <ColumnHeader align="right" className="w-10 whitespace-nowrap px-3">
@@ -197,8 +197,6 @@ export default function IssuePagesTable({
                 <SortHeader column="Page URL" kind="text" {...sortProps}>
                   Page URL
                 </SortHeader>
-                <ColumnHeader className="whitespace-nowrap px-3">Open live page</ColumnHeader>
-                <ColumnHeader className="whitespace-nowrap px-3">Stored evidence</ColumnHeader>
                 <SortHeader column="Occurrences" kind="number" align="right" {...sortProps}>
                   Occurrences
                 </SortHeader>
@@ -278,27 +276,6 @@ const IssuePageRow = memo(function IssuePageRow({
         </Link>
       </Cell>
       <Cell className="min-w-[14rem] max-w-md break-all px-3 text-xs text-fg-muted">{page.page_url}</Cell>
-      <Cell className="whitespace-nowrap px-3">
-        <a
-          href={page.page_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-umich-blue underline underline-offset-2"
-        >
-          Open live page
-          <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-          <span className="sr-only">, {label}, opens in a new tab</span>
-        </a>
-      </Cell>
-      <Cell className="whitespace-nowrap px-3">
-        <Link
-          to={pageEvidencePath({ scanId, pageId: page.page_id, origin, backTo })}
-          className="text-umich-blue underline underline-offset-2"
-        >
-          Stored evidence
-          <span className="sr-only"> for {label}</span>
-        </Link>
-      </Cell>
       <Cell numeric className="px-3">
         {page.occurrence_count}
       </Cell>
