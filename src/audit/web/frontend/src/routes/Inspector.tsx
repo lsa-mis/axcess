@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -378,6 +378,25 @@ export default function InspectorRoute() {
     return counts;
   }, [currentFindings]);
 
+  /**
+   * The page states other than the one on screen that hold occurrences, for
+   * the line under the picker: page load first, then each state in the
+   * picker's order. `key` is "" for page load, as in the picker.
+   */
+  const elsewhere = useMemo(() => {
+    const active = data?.render.state_key ?? null;
+    const out: { key: string; label: string; count: number }[] = [];
+    if (active && loadStateCount > 0) out.push({ key: "", label: "At page load", count: loadStateCount });
+    for (const state of offeredStates) {
+      const count = occurrencesByState.get(state.state_key) ?? 0;
+      if (count > 0 && state.state_key !== active) {
+        out.push({ key: state.state_key, label: `After clicking ${clickChain(state)}`, count });
+      }
+    }
+    return out;
+  }, [data?.render.state_key, loadStateCount, offeredStates, occurrencesByState]);
+  const elsewhereCount = elsewhere.reduce((total, state) => total + state.count, 0);
+
   const scopedTargets = useMemo(
     () => targets.filter((target) => target.stateKey === activeStateKey),
     [targets, activeStateKey],
@@ -723,13 +742,9 @@ export default function InspectorRoute() {
                 // nested state by hand means repeating every step. The count
                 // says where this issue actually is, so the reviewer picks a
                 // state instead of trying them.
-                const chain =
-                  state.path_labels.length > 0
-                    ? state.path_labels.map((name) => `“${name}”`).join(" → ")
-                    : `“${state.revealed_by}”`;
                 return {
                   value: state.state_key,
-                  label: `After clicking ${chain}${occurrencesHere(count)}`,
+                  label: `After clicking ${clickChain(state)}${occurrencesHere(count)}`,
                   badge: <MissingChip count={missingFor(state.state_key)} />,
                 };
               }),
@@ -752,6 +767,35 @@ export default function InspectorRoute() {
             )
           )}
         </div>
+      )}
+
+      {/* The picker shows one page state at a time, so occurrences in the
+          others were out of sight: nothing said a click had revealed more.
+          This line counts them and links to each state that holds some. */}
+      {elsewhere.length > 0 && (
+        <nav
+          aria-label="Other page states with occurrences"
+          className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xs border border-umich-blue/30 bg-umich-blue/5 px-3 py-2 text-sm"
+        >
+          <Layers className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+          <span className="font-semibold text-fg">
+            {elsewhereCount.toLocaleString()} more occurrence{elsewhereCount === 1 ? "" : "s"}{" "}
+            {activeStateKey
+              ? `in ${elsewhere.length === 1 ? "another page state" : "other page states"}:`
+              : `${elsewhereCount === 1 ? "appears" : "appear"} only after clicking:`}
+          </span>
+          {elsewhere.map((state) => (
+            <Link
+              key={state.key || "load"}
+              to={stateHref(state.key || null)}
+              replace
+              className="inline-flex min-h-target items-center rounded-full border border-umich-blue/40 bg-surface px-3 text-xs font-semibold text-umich-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              {state.label}
+              {occurrencesHere(state.count)}
+            </Link>
+          ))}
+        </nav>
       )}
 
       <Tabs
@@ -1402,6 +1446,26 @@ function truncatedSnippetMatches(raw: string, needle: string): boolean {
  * ": 19 occurrences". A bare "(19)" left the reader to guess what was
  * counted. Nothing is added when the page state holds none.
  */
+/**
+ * The controls clicked to reach a page state, in order: "“Menu” → “Help”".
+ * The whole chain, not just the last control, since reaching a nested state
+ * by hand means repeating every step. A control's name is its text, which
+ * for a card can run on ("Fellowships · FundedTeach For Nepal…"), so each
+ * name is cut at a word near 40 characters.
+ */
+function clickChain(state: { path_labels: string[]; revealed_by: string }): string {
+  const names = state.path_labels.length > 0 ? state.path_labels : [state.revealed_by];
+  return names.map((name) => `“${shortName(name)}”`).join(" → ");
+}
+
+function shortName(name: string, max = 40): string {
+  const text = name.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s·,.;:–-]+$/, "")}…`;
+}
+
 function occurrencesHere(count: number): string {
   if (count === 0) return "";
   return `: ${count.toLocaleString()} occurrence${count === 1 ? "" : "s"}`;
