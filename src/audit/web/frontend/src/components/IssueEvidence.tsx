@@ -102,8 +102,10 @@ export function IssueGuidanceDialog({
       onClose={onClose}
       // The dialog itself scrolls, not a box inside it: its close button is
       // focusable, so the scrolling area is reachable by keyboard (axe's
-      // scrollable-region-focusable), and the header stays pinned.
-      className="max-h-[90vh] w-[min(94vw,52rem)] overflow-y-auto rounded-xs border border-border bg-surface p-0 text-fg shadow-raised backdrop:bg-black/40"
+      // scrollable-region-focusable), and the header stays pinned. The
+      // scroll padding keeps a focused link from scrolling in under that
+      // header (SC 2.4.11).
+      className="max-h-[90vh] w-[min(94vw,52rem)] scroll-pt-28 overflow-y-auto rounded-xs border border-border bg-surface p-0 text-fg shadow-raised backdrop:bg-black/40"
     >
       <div className="sticky top-0 z-[1] flex items-start justify-between gap-4 border-b border-border bg-surface px-6 py-4">
         <div className="min-w-0">
