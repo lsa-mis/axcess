@@ -30,8 +30,7 @@ it; if not, mark it as a [false positive](#false-positive) with a short note.
   [local AI model](#local-ai-model) (such as link text, headings, labels, or an
   [image of text](#image-of-text) whose [alt text](#alt-text) is missing or does
   not match), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
-- Also called: "Needs confirmation" on the issue page and "Review leads" on the
-  dashboard.
+- Also called: "Needs confirmation" on the issue page.
 
 ### Informational
 

@@ -630,7 +630,7 @@ def how_it_works(summ) -> str:
       <h2>Rescan and compare</h2>
       <p class="sub">Run the same scope again and open <em>Compare scans</em> to see what is new, resolved and remaining, issue group by issue group.</p>
     </div>
-    <p>When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed". <a href="{REPO}/blob/main/docs/reading-your-report.md#verify-changes-after-a-fix">Read what each comparison result means.</a></p>
+    <p>When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed". <a href="{REPO}/blob/main/docs/reading-your-report.md#compare-scans-after-a-fix">Read what each comparison result means.</a></p>
   </div>
 </section>
 """

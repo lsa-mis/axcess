@@ -148,8 +148,8 @@ it.
 1. **What it is** (**Evidence summary** for Informational): the group, its
    evidence confidence (high, medium, or low), and **Rule docs**, then a
    one-line evidence summary, such as "Deterministic axe-core rule failure;
-   verify after remediation." It calls Needs review "Needs confirmation" (the
-   dashboard says "Review leads"). Then the facts (Criterion level, Priority,
+   verify after remediation." It calls Needs review "Needs confirmation". Then
+   the facts (Criterion level, Priority,
    Pages affected, Occurrences, and Abilities affected) and the rule's
    description.
 2. **How to fix it**, with **Done when** (for Needs review, **How to confirm
