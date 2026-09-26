@@ -526,15 +526,16 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     assert sizes and all(height >= 44 for height in sizes), sizes
 
 
-async def test_issue_table_recommended_order_is_grouped_and_headers_sort_flat(
+async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """The default order shows its type groups; every header sorts the same way.
+    """The default order is lane first, in one flat body; every header sorts the same way.
 
     Priority used to be the one header that grouped by type while the others
-    sorted flat. The grouping is now its own order, the default, with a
-    row-group header per type, and a header sort always has a way back.
+    sorted flat. The lane-first order is now its own order, the default. It
+    has no row-group header rows between the types: the Type cell names each
+    row's type, and the live status line reads the count of each.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -549,10 +550,19 @@ async def test_issue_table_recommended_order_is_grouped_and_headers_sort_flat(
             page.get_by_role("status").filter(has_text="Recommended order")
         ).to_be_visible()
         await playwright_async.expect(back).to_have_count(0)
-        labels = [re.sub(r"\s*\(.*$", "", text) for text in await group_headers.all_inner_texts()]
-        assert labels and labels == sorted(labels, key=lane_order.index), labels
-        # Each group is its own ``tbody``, opened by its header row.
-        assert await issues.locator("tbody").count() == len(labels)
+        await playwright_async.expect(group_headers).to_have_count(0)
+        assert await issues.locator("tbody").count() == 1
+        # Row header, then Type.
+        lanes = [
+            cell.strip()
+            for cell in await issues.locator("tbody tr > td:nth-child(2)").all_inner_texts()
+        ]
+        assert lanes and lanes == sorted(lanes, key=lane_order.index), lanes
+        await playwright_async.expect(
+            page.get_by_role("status").filter(has_text="issue groups shown")
+        ).to_have_text(
+            re.compile(r"issue groups shown: Barrier \d+, Needs review \d+, Informational \d+$")
+        )
         sorted_headers = issues.locator("thead th[aria-sort]:not([aria-sort='none'])")
         await playwright_async.expect(sorted_headers).to_have_count(0)
 
@@ -676,15 +686,14 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         "Alt Text"
     )
 
-    # Each lane's group header says what the lane means.
-    group_headers = table.locator("tbody th[scope='rowgroup']")
-    await playwright_async.expect(group_headers.first).to_contain_text(
-        "A rule failed deterministically"
-    )
-    await playwright_async.expect(group_headers.nth(1)).to_contain_text("A person must confirm it")
-    await playwright_async.expect(group_headers.nth(2)).to_contain_text("not a problem to fix")
+    # No row-group header rows split the types; the live status counts each.
+    await playwright_async.expect(table.locator("th[scope='rowgroup']")).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_role("status").filter(has_text="issue groups shown")
+    ).to_contain_text("Barrier")
 
-    # The glossary defines both sets of words, closed until asked for.
+    # The glossary defines both sets of words, closed until asked for, under
+    # real headings, each term drawn as the chip the table uses.
     glossary = page.get_by_role(
         "button", name="What Barrier, Needs review and the other labels mean", exact=True
     )
@@ -693,20 +702,20 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     await glossary.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(definitions).to_have_text(
-        [
-            "Barrier:",
-            "Needs review:",
-            "Informational:",
-            "WCAG:",
-            "Click-Through:",
-            "Alt Text:",
-        ]
+        ["Barrier", "Needs review", "Informational", "WCAG", "Click-Through", "Alt Text"]
     )
+    for heading in ("Type: how sure the evidence is", "Finding type: which checks found it"):
+        await playwright_async.expect(
+            page.get_by_role("heading", name=heading, level=3)
+        ).to_be_visible()
+    meanings = page.get_by_role("definition")
+    await playwright_async.expect(meanings.first).to_contain_text("A rule failed deterministically")
+    await playwright_async.expect(meanings.nth(1)).to_contain_text("A person must confirm it")
+    await playwright_async.expect(meanings.nth(2)).to_contain_text("not a problem to fix")
 
     # Every cell of a data row is vertically centred.
     alignments = await table.evaluate(
         """t => [...t.querySelectorAll('tbody tr')]
-            .filter(tr => !tr.querySelector("th[scope='rowgroup']"))
             .flatMap(tr => [...tr.children].map(c => getComputedStyle(c).verticalAlign))"""
     )
     assert alignments and set(alignments) == {"middle"}, set(alignments)
@@ -721,8 +730,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     # offers the detailed view the old bottom-of-report button led to.
     await choose_filter(page, "Finding type", "click_through")
     await page.wait_for_url("**finding_type=click_through*")
-    # Issue rows only: the lane group headers are row headers too. The URL
-    # changes before the filtered response lands, so wait for the rows.
+    # The URL changes before the filtered response lands, so wait for the rows.
     issue_rows = table.locator("tbody th[scope='row']")
     await playwright_async.expect(issue_rows).to_have_count(2)
     shown = await issue_rows.all_inner_texts()

@@ -255,7 +255,10 @@ export default function IssuesRoute() {
         {issuesQuery.isFetching
           ? "Updating issues…"
           : `${rows.length} of ${data.total_unfiltered} issue groups shown` +
-            (hasFilter ? ", filtered" : "")}
+            (hasFilter ? ", filtered" : "") +
+            // By type too, so a reader hears how many are barriers without
+            // walking the Type column.
+            (rows.length > 0 ? `: ${laneSummary(rows)}` : "")}
       </p>
 
       {/* No ``overflow-hidden``: it would clip the Filter menu's panel on a
@@ -316,7 +319,6 @@ export default function IssuesRoute() {
         ) : (
           <IssueTable
             scanId={scan.id}
-            rows={rows}
             paged={paged}
             here={here}
             sort={sort}
@@ -621,31 +623,14 @@ function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
 }
 
 /**
- * The rows of one page cut into runs of one lane each, for the group header
- * rows of the recommended order. A group that began on an earlier page is
- * marked ``continued``, so page 2 still says which group its rows belong to.
+ * How many shown rows are of each type, for the live status line: "Barrier
+ * 3, Needs review 7, Informational 2". Every type is named, zeros included,
+ * so the sentence reads the same way each time the filters change.
  */
-function laneGroups(
-  rows: IssueRow[],
-  pageRows: IssueRow[],
-): { lane: ReviewLane; count: number; continued: boolean; rows: IssueRow[] }[] {
+function laneSummary(rows: IssueRow[]): string {
   const counts: Partial<Record<ReviewLane, number>> = {};
   for (const row of rows) counts[row.review_lane] = (counts[row.review_lane] ?? 0) + 1;
-  const groups: { lane: ReviewLane; count: number; continued: boolean; rows: IssueRow[] }[] = [];
-  for (const row of pageRows) {
-    const last = groups[groups.length - 1];
-    if (last && last.lane === row.review_lane) {
-      last.rows.push(row);
-      continue;
-    }
-    groups.push({
-      lane: row.review_lane,
-      count: counts[row.review_lane] ?? 0,
-      continued: rows.find((candidate) => candidate.review_lane === row.review_lane) !== row,
-      rows: [row],
-    });
-  }
-  return groups;
+  return REVIEW_LANES.map((lane) => `${REVIEW_LANE_LABELS[lane]} ${counts[lane] ?? 0}`).join(", ");
 }
 
 /**
@@ -667,7 +652,6 @@ function laneGroups(
  */
 function IssueTable({
   scanId,
-  rows,
   paged,
   here,
   sort,
@@ -676,7 +660,6 @@ function IssueTable({
   regionRef,
 }: {
   scanId: number;
-  rows: IssueRow[];
   paged: Pick<ReturnType<typeof usePagedRows<IssueRow>>, "pageRows" | "page" | "pageSize" | "hold">;
   /** Where links out of the table return to. */
   here: string;
@@ -709,42 +692,16 @@ function IssueTable({
             ))}
           </tr>
         </TableHead>
-        {sort ? (
-          <tbody>
-            {paged.pageRows.map((row, index) => (
-              <IssueTableRow key={row.issue_key} scanId={scanId} row={row} index={offset + index} here={here} />
-            ))}
-          </tbody>
-        ) : (
-          // The recommended order shows its grouping instead of explaining
-          // it: one ``tbody`` per type, opened by a row-group header, so a
-          // low score under a higher one reads as the next group, and a
-          // screen reader names the group as the reader moves into it.
-          laneGroups(rows, paged.pageRows).map((group) => (
-            <tbody key={group.lane}>
-              <tr className="border-t border-border-strong bg-surface-muted">
-                <th scope="rowgroup" colSpan={VISIBLE_COLUMNS.length} className="px-2 py-1.5 text-left text-sm font-semibold text-fg">
-                  {/* Sticky, so the label stays in view while a narrow
-                      screen scrolls the table sideways under it. */}
-                  <span className="sticky left-2 inline-block max-w-[calc(100vw-5rem)]">
-                    {REVIEW_LANE_LABELS[group.lane]}{" "}
-                    <span className="font-normal tabular-nums text-fg-muted">
-                      ({group.count}){group.continued ? ", continued" : ""}
-                    </span>
-                    {/* What the group means, where the reader meets it. The
-                        same sentence is in the glossary above the table. */}
-                    <span className="ml-2 font-normal text-fg-muted">
-                      {REVIEW_LANE_HELP[group.lane]}
-                    </span>
-                  </span>
-                </th>
-              </tr>
-              {group.rows.map((row, index) => (
-                <IssueTableRow key={row.issue_key} scanId={scanId} row={row} index={index} here={here} />
-              ))}
-            </tbody>
-          ))
-        )}
+        {/* One flat body in every order. The recommended order used to break
+            into one row group per type, each opened by a header row; the Type
+            cell already names every row's type, so those rows only split the
+            table. The per-type counts they carried are announced instead, by
+            the visually hidden status line above the table. */}
+        <tbody>
+          {paged.pageRows.map((row, index) => (
+            <IssueTableRow key={row.issue_key} scanId={scanId} row={row} index={offset + index} here={here} />
+          ))}
+        </tbody>
       </Table>
     </TableRegion>
   );
@@ -799,7 +756,7 @@ const IssueTableRow = memo(function IssueTableRow({
         </Link>
       </RowHeader>
       <Cell className={cn(cell, "whitespace-nowrap")}>
-        <Tag tone={isInformational ? "neutral" : "flag"}>{REVIEW_LANE_LABELS[row.review_lane]}</Tag>
+        <LaneTag lane={row.review_lane} />
       </Cell>
       {/* May wrap: a mixed group's two pills stack when the table is tight. */}
       <Cell className={cell}>
@@ -864,17 +821,18 @@ const IssueTableRow = memo(function IssueTableRow({
   );
 });
 
-function Tag({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "flag" }) {
+/** A row's type as the table shows it; the glossary reuses it so the two match. */
+function LaneTag({ lane }: { lane: ReviewLane }) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-2xs px-2 py-0.5 text-2xs font-semibold",
-        tone === "flag"
-          ? "bg-sev-major-bg text-sev-major"
-          : "border border-border bg-surface-muted text-fg-muted",
+        lane === "informational"
+          ? "border border-border bg-surface-muted text-fg-muted"
+          : "bg-sev-major-bg text-sev-major",
       )}
     >
-      {children}
+      {REVIEW_LANE_LABELS[lane]}
     </span>
   );
 }
@@ -891,13 +849,17 @@ function FindingTypeCell({ row }: { row: IssueRow }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       {types.map((type) => (
-        <span
-          key={type}
-          className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
-        >
-          {FINDING_TYPE_LABELS[type]}
-        </span>
+        <FindingTypePill key={type} type={type} />
       ))}
+    </span>
+  );
+}
+
+/** One finding type as the table shows it; the glossary reuses it so the two match. */
+function FindingTypePill({ type }: { type: FindingType }) {
+  return (
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg">
+      {FINDING_TYPE_LABELS[type]}
     </span>
   );
 }
@@ -915,11 +877,11 @@ function IssueGlossary() {
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2">
         <GlossaryList
           heading="Type: how sure the evidence is"
-          items={REVIEW_LANES.map((key) => [REVIEW_LANE_LABELS[key], REVIEW_LANE_HELP[key]])}
+          items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
           heading="Finding type: which checks found it"
-          items={FINDING_TYPES.map((key) => [FINDING_TYPE_LABELS[key], FINDING_TYPE_HELP[key]])}
+          items={FINDING_TYPES.map((key) => ({ key, term: <FindingTypePill type={key} />, help: FINDING_TYPE_HELP[key] }))}
         />
       </div>
     </ReportNote>
@@ -953,15 +915,27 @@ function ActRuleNote({ count }: { count: number }) {
   );
 }
 
-function GlossaryList({ heading, items }: { heading: string; items: [string, string][] }) {
+/**
+ * One glossary list under a real heading (an h3 under the note's h2), so a
+ * screen-reader user can jump between the two lists. Each term is the same
+ * chip the table draws, above its definition rather than run into one line,
+ * so an entry reads on its own and reflows cleanly when zoomed.
+ */
+function GlossaryList({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: { key: string; term: ReactNode; help: string }[];
+}) {
   return (
     <div>
-      <p className="font-semibold text-fg">{heading}</p>
-      <dl className="mt-2 space-y-2">
-        {items.map(([term, help]) => (
-          <div key={term}>
-            <dt className="inline font-semibold text-fg">{term}: </dt>
-            <dd className="inline">{help}</dd>
+      <h3 className="text-sm font-semibold text-fg">{heading}</h3>
+      <dl className="mt-2 space-y-3">
+        {items.map(({ key, term, help }) => (
+          <div key={key}>
+            <dt>{term}</dt>
+            <dd className="mt-1">{help}</dd>
           </div>
         ))}
       </dl>
