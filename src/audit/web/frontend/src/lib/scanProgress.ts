@@ -30,3 +30,16 @@ function formatDuration(seconds: number): string {
 function unit(count: number, name: string): string {
   return `${count} ${name}${count === 1 ? "" : "s"}`;
 }
+
+/**
+ * How much of the scan is done, as a whole percent: the pages checked out of
+ * the pages found so far, and 100 once only the report is left to prepare.
+ * The scan finds more links as it goes, so the total can grow and the
+ * percent step back; the words beside it always say "found so far".
+ */
+export function checkedPercent(progress: ScanProgress | null | undefined): number {
+  if (!progress) return 0;
+  if (progress.stage === "preparing_report") return 100;
+  if (progress.discovered <= 0) return 0;
+  return Math.min(100, Math.floor((progress.completed / progress.discovered) * 100));
+}

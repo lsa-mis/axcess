@@ -1,10 +1,12 @@
 import { Link } from "react-router";
+import { checkedPercent } from "../lib/scanProgress";
 import { parseServerTime, serverDate } from "../lib/serverTime";
 import { ArrowRight } from "lucide-react";
 import type { ScanSummary, SiteGroup } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
 import { siteLabel, withoutUserinfo } from "./ReportCrumb";
 import { Card, LinkButton } from "./ui";
+import { useScanQuery } from "../hooks/useScanQuery";
 
 /**
  * The Reports page's lead card: which site was scanned last, named in the
@@ -28,22 +30,7 @@ export default function LastScannedSite({ sites }: { sites: SiteGroup[] }) {
 
   return (
     <div className="mb-6 space-y-3">
-      {running && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 border-umich-blue/30 bg-umich-blue/5 p-4">
-          <p className="flex items-center gap-2 text-sm text-fg">
-            <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-umich-maize motion-reduce:animate-none" aria-hidden />
-            <span className="break-all">
-              A scan of <strong>{siteLabel(running.seed_url)}</strong> is running now.
-            </span>
-          </p>
-          <Link
-            to={`/scans/${running.id}`}
-            className="text-sm font-semibold text-umich-blue underline underline-offset-2"
-          >
-            See its progress
-          </Link>
-        </Card>
-      )}
+      {running && <RunningScanBanner scan={running} />}
 
       {latest && (
         <section aria-label="Last scanned site">
@@ -78,6 +65,58 @@ export default function LastScannedSite({ sites }: { sites: SiteGroup[] }) {
     </div>
   );
 }
+
+/**
+ * The scan running now, with how far it has got, above the Last scanned card:
+ * a percent first, then the page counts it comes from. It refreshes while the
+ * scan runs. The bar is decoration: the sentence above says the same in words.
+ */
+function RunningScanBanner({ scan }: { scan: ScanSummary }) {
+  const { data } = useScanQuery(scan.id, { refetchInterval: PROGRESS_REFRESH_MS });
+  const progress = data?.progress;
+  const checked = progress?.completed ?? 0;
+  const found = progress?.discovered ?? 0;
+  const percent = checkedPercent(progress);
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-umich-blue/30 bg-umich-blue/5 p-4">
+      <div className="min-w-0 flex-1 basis-72">
+        <p className="flex items-center gap-2 text-sm text-fg">
+          <span
+            className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-umich-maize motion-reduce:animate-none"
+            aria-hidden
+          />
+          <span className="break-all">
+            Scanning <strong>{siteLabel(scan.seed_url)}</strong>
+            {found > 0 && (
+              <>
+                {" · "}
+                <strong className="tabular-nums">{percent}%</strong> checked
+                <span className="text-fg-muted">
+                  {" "}
+                  ({checked.toLocaleString()} of {found.toLocaleString()} pages found so far)
+                </span>
+              </>
+            )}
+          </span>
+        </p>
+        {found > 0 && (
+          <div className="mt-2 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-border" aria-hidden>
+            <div className="h-full rounded-full bg-umich-blue" style={{ width: `${percent}%` }} />
+          </div>
+        )}
+      </div>
+      <Link
+        to={`/scans/${scan.id}`}
+        className="text-sm font-semibold text-umich-blue underline underline-offset-2"
+      >
+        View progress<span className="sr-only"> of the scan of {siteLabel(scan.seed_url)}</span>
+      </Link>
+    </Card>
+  );
+}
+
+/** How often the banner refreshes its count while the scan runs. */
+const PROGRESS_REFRESH_MS = 3_000;
 
 /** Report ids increase with creation, so the highest completed id is newest. */
 function newestCompleted(sites: SiteGroup[]): ScanSummary | undefined {

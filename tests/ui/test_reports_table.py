@@ -257,11 +257,13 @@ async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> N
     ).to_have_attribute("href", "/app/scans/9/issues")
     # No findings summary, so the landing page never loads a report's issues.
     assert not any(re.fullmatch(r"/api/scans/\d+/issues", path) for path in api_paths), api_paths
+    # The running scan's banner names the site; its page count joins once the
+    # scan's own progress loads, which this test's stubbed API does not serve.
     await playwright_async.expect(
-        page.get_by_text("A scan of site3.example is running now.", exact=True)
+        page.get_by_text(re.compile(r"^Scanning site3\.example"))
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("link", name="See its progress", exact=True)
+        page.get_by_role("link", name="View progress of the scan of site3.example", exact=True)
     ).to_have_attribute("href", "/app/scans/20")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

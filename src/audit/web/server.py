@@ -62,7 +62,7 @@ from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
-from audit.crawler import url_policy
+from audit.crawler import live_progress, url_policy
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
 from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.db import repo
@@ -3512,6 +3512,12 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
         "ORDER BY id LIMIT 10",
         (scan_id,),
     ).fetchall()
+    waiting = conn.execute(
+        "SELECT json_extract(payload_json, '$.url') AS url FROM jobs "
+        "WHERE state = 'pending' AND json_extract(payload_json, '$.scan_id') = ? "
+        "ORDER BY id LIMIT ?",
+        (scan_id, _PROGRESS_WAITING_ROWS),
+    ).fetchall()
     image_count = conn.execute(
         "SELECT COUNT(DISTINCT pi.image_id) AS n FROM page_images pi "
         "JOIN pages p ON p.id = pi.page_id WHERE p.scan_id = ?",
@@ -3580,7 +3586,54 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
             }
             for r in in_flight
         ],
+        "page_checks": _page_checks(
+            scan_id,
+            checking=[str(r["url"]) for r in in_flight if r["url"] is not None],
+            waiting=[str(r["url"]) for r in waiting if r["url"] is not None],
+            recent=[str(r["url_normalized"]) for r in recent],
+        ),
     }
+
+
+# Rows in the progress page's pages-by-checks table, per kind of row.
+_PROGRESS_CHECKED_ROWS = 10
+_PROGRESS_WAITING_ROWS = 5
+
+
+def _page_checks(
+    scan_id: int, *, checking: list[str], waiting: list[str], recent: list[str]
+) -> list[dict[str, Any]]:
+    """One row per page for the progress table: pages being checked, then
+    the latest checked, then the next few waiting.
+
+    ``checks`` maps each check the crawl follows to its state on that page,
+    from ``live_progress``. It is empty when the crawl's process has nothing
+    for the page (a command-line scan, or a server restarted mid-scan); the
+    row then says only what the queue knows, and never claims a check ran.
+    """
+    tracked = {entry["url"]: entry for entry in live_progress.snapshot(scan_id)}
+    rows: list[dict[str, Any]] = []
+    for url in checking:
+        entry = tracked.get(url)
+        checks = entry["checks"] if entry is not None and not entry["finished"] else {}
+        rows.append({"url": url, "state": "checking", "checks": checks})
+    shown = set(checking)
+    finished = [entry for entry in reversed(tracked.values()) if entry["finished"]]
+    if finished:
+        for entry in finished:
+            if entry["url"] in shown:
+                continue
+            rows.append({"url": entry["url"], "state": "checked", "checks": entry["checks"]})
+            if sum(row["state"] == "checked" for row in rows) >= _PROGRESS_CHECKED_ROWS:
+                break
+    else:
+        # The pages table gets a page's row before its last checks run, so
+        # a page still being checked can be among the recent ones.
+        rows.extend(
+            {"url": url, "state": "checked", "checks": {}} for url in recent if url not in shown
+        )
+    rows.extend({"url": url, "state": "waiting", "checks": {}} for url in waiting)
+    return rows
 
 
 def _estimate_scan_eta(

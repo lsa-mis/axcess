@@ -33,6 +33,7 @@ from audit.analyzer.interaction import (
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
+from audit.crawler import live_progress
 from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.search import SearchExplorer
 from audit.crawler.url_policy import normalize
@@ -348,9 +349,10 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                axe_violations = await self._axe_analyzer.run(
-                    page, level=self._axe_level, version=self._wcag_version
-                )
+                with live_progress.check("axe"):
+                    axe_violations = await self._axe_analyzer.run(
+                        page, level=self._axe_level, version=self._wcag_version
+                    )
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe
@@ -361,7 +363,8 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                keyboard_traps = await self._keyboard_probe.run(page)
+                with live_progress.check("keyboard"):
+                    keyboard_traps = await self._keyboard_probe.run(page)
             # Responsive probe LAST, it resizes the viewport and
             # injects CSS, so every read-only/quiet-DOM consumer must
             # already be done. Probe never raises; restores viewport.
@@ -398,18 +401,19 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                interaction = await self._interaction_probe.run(
-                    page,
-                    baseline=axe_violations,
-                    # The probe photographs a revealed element while its state
-                    # is still open; the pass below runs after the sweep has
-                    # closed everything it opened. Passing the capture function
-                    # per call keeps the shared probe free of crawler details
-                    # and of per-page state.
-                    capture_screenshot=(
-                        self._capture_element if self._capture_screenshots else None
-                    ),
-                )
+                with live_progress.check("interaction"):
+                    interaction = await self._interaction_probe.run(
+                        page,
+                        baseline=axe_violations,
+                        # The probe photographs a revealed element while its
+                        # state is still open; the pass below runs after the
+                        # sweep has closed everything it opened. Passing the
+                        # capture function per call keeps the shared probe
+                        # free of crawler details and of per-page state.
+                        capture_screenshot=(
+                            self._capture_element if self._capture_screenshots else None
+                        ),
+                    )
                 interaction_evaluated = interaction.evaluated
 
             responsive_findings: list[ResponsiveFinding] = []
@@ -418,7 +422,8 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                responsive_findings = await self._responsive_probe.run(page)
+                with live_progress.check("responsive"):
+                    responsive_findings = await self._responsive_probe.run(page)
 
             # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes

@@ -234,9 +234,15 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       row to `_methods_used`. It is a closed union, so add the key there
       before `METHOD_PIPELINE`, or `make typecheck` fails;
     - `METHOD_PIPELINE` in `components/MethodCoverageLedger.tsx`;
-    - `PIPELINES` in `routes/Compare.tsx`, the method labels in the Compare scans
+    - `PIPELINES` in `routes/Compare.tsx`, the method labels in the Compare reports
       page's "What was checked in each report" notes and table. A missing entry shows
       the raw pipeline name as the label.
+    - `CHECK_NAME` in `components/ScanProgress.tsx`, if the check runs per page,
+      so the running scan's pages-by-checks table has a column for it. Mark its
+      run with `live_progress.check("<key>")` and list the key in
+      `_tracked_checks` in `crawler/orchestrator.py`.
+    - A card in `CHECK_CARDS` in `site/build.py`, keyed as in `_methods_used`:
+      the "What was checked" table links each row to `coverage/#check-<key>`.
 11. **Exports.**
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,
       `_PIPELINE_COVERAGE`, and the hard-coded pipeline tuples in the location

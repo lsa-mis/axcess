@@ -81,6 +81,26 @@ export interface ScanProgress {
     attempts: number;
     lease_until: string | null;
   }[];
+  /**
+   * The progress page's pages-by-checks rows: pages being checked, then the
+   * latest checked, then the next few waiting. Optional for a server that
+   * predates it.
+   */
+  page_checks?: ScanPageChecks[];
+}
+
+/** Where one check stands on one page of a running scan. */
+export type PageCheckState = "waiting" | "running" | "done" | "not_run";
+
+export interface ScanPageChecks {
+  url: string;
+  state: "checking" | "checked" | "waiting";
+  /**
+   * Each check the crawl follows, keyed as `ScanMethodCoverage.key`. Empty
+   * when the crawl's process has no record of the page (a command-line scan,
+   * or a restart): the row then has only the page's own state.
+   */
+  checks: Partial<Record<string, PageCheckState>>;
 }
 
 export interface ScanDetail extends ScanSummary {

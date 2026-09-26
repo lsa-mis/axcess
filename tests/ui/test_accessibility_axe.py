@@ -677,9 +677,13 @@ async def test_running_scan_shows_factual_pipeline_progress(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """Live progress names the URL and completed engines without a fake percent."""
+    """A running scan shows one bar, three steps, and a table of pages by checks.
+
+    The details (each check's totals, live updates) sit behind Show details,
+    and a background refresh must not move the reader's place or focus.
+    """
     base, scan_id = live_server
-    page = await new_page()
+    page = await new_page(viewport={"width": 1280, "height": 900})
     response = await page.request.get(f"{base}/api/scans/{scan_id}")
     assert response.ok
     payload = await response.json()
@@ -721,17 +725,36 @@ async def test_running_scan_shows_factual_pipeline_progress(
                         "fetched_at": "2026-08-11T12:00:00Z",
                     }
                 ],
+                "page_checks": [
+                    {
+                        "url": "https://example.test/admissions/apply/",
+                        "state": "checking",
+                        "checks": {"axe": "done", "alfa": "waiting", "keyboard": "running"},
+                    },
+                    {
+                        "url": "https://example.test/admissions/",
+                        "state": "checked",
+                        "checks": {"axe": "done", "alfa": "done", "keyboard": "not_run"},
+                    },
+                    {
+                        "url": "https://example.test/admissions/visit/",
+                        "state": "waiting",
+                        "checks": {},
+                    },
+                ],
             },
         }
     )
+    results = {
+        "axe": "6 pages checked so far",
+        "alfa": "5 pages checked so far",
+        "keyboard": "4 pages checked so far",
+    }
     for method in payload["methods_used"]:
-        if method["key"] == "alfa":
-            method["enabled"] = True
+        method["enabled"] = method["key"] in results
+        if method["key"] in results:
             method["state"] = "running"
-            method["result"] = "5 pages checked so far"
-        elif method["key"] == "axe":
-            method["state"] = "running"
-            method["result"] = "6 pages checked so far"
+            method["result"] = results[method["key"]]
 
     async def serve_running_scan(route: Any) -> None:
         await route.fulfill(
@@ -741,56 +764,88 @@ async def test_running_scan_shows_factual_pipeline_progress(
         )
 
     await page.route(f"**/api/scans/{scan_id}", serve_running_scan)
-    await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-    await playwright_async.expect(
-        page.get_by_role("heading", name="Scan in progress")
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("https://example.test/admissions/apply/", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("6 pages checked so far", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("5 pages checked so far", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("It does not reload the page or move your place on it", exact=False)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("40 seconds to 2 minutes for the pages found so far", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("Recently checked pages", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("Loaded successfully (HTTP 200)", exact=True)
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("Opened in a real browser", exact=True)
-    ).to_be_visible()
-
-    # A background data refresh must not reload, move the viewport, or
-    # steal focus from the operator's current control.
-    pause = page.get_by_role("button", name="Pause live updates")
-    await pause.focus()
-    await page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
-    scroll_before = await page.evaluate("window.scrollY")
-    navigations_before = await page.evaluate("performance.getEntriesByType('navigation').length")
-    await page.wait_for_timeout(2200)
-    assert await page.evaluate("window.scrollY") == scroll_before
-    assert await page.evaluate("document.activeElement?.textContent") == ("Pause live updates")
-    assert (
-        await page.evaluate("performance.getEntriesByType('navigation').length")
-        == navigations_before
-    )
-    await pause.click()
-    await playwright_async.expect(
-        page.get_by_text(
-            "Live updates paused. The scan continues in the background.",
-            exact=True,
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+        await playwright_async.expect(
+            page.get_by_role("heading", name="Scan in progress", level=1)
+        ).to_be_visible()
+        # The percent leads (7 of 12 is 58%, rounded down), with the counts
+        # it comes from beside it.
+        await playwright_async.expect(page.get_by_text("58%", exact=True)).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("checked · 7 of 12 pages found so far", exact=True)
+        ).to_be_visible()
+        await playwright_async.expect(page.get_by_text(re.compile(r"^Time left: \d"))).to_have_text(
+            "Time left: 40 seconds to 2 minutes for the pages found so far"
         )
-    ).to_be_visible()
+        steps = page.get_by_role("list", name="Scan steps").get_by_role("listitem")
+        await playwright_async.expect(steps).to_have_count(3)
+        # One current step, and it says so in words as well.
+        current = page.locator('[aria-current="step"]')
+        await playwright_async.expect(current).to_have_count(1)
+        await playwright_async.expect(current).to_contain_text("Check pages: In progress")
+        await playwright_async.expect(steps.nth(2)).to_contain_text("Prepare report: Waiting")
+        await playwright_async.expect(
+            page.get_by_role("button", name="Stop scan", exact=True)
+        ).to_be_visible()
+
+        table = page.get_by_role("table", name="Each page and where each check stands on it")
+        await playwright_async.expect(table.get_by_role("columnheader")).to_have_text(
+            ["Page", "Status", "Rule check (axe)", "Rule check (Alfa)", "Keyboard check"]
+        )
+
+        def row(path: str) -> Any:
+            return table.get_by_role("row").filter(
+                has=page.get_by_role("rowheader", name=path, exact=True)
+            )
+
+        await playwright_async.expect(row("/admissions/apply/").get_by_role("cell")).to_have_text(
+            ["Being checked", "Done", "Waiting", "Checking"]
+        )
+        await playwright_async.expect(row("/admissions/").get_by_role("cell")).to_have_text(
+            ["Checked", "Done", "Done", "Not run"]
+        )
+        await playwright_async.expect(row("/admissions/visit/").get_by_role("cell")).to_have_text(
+            ["Waiting", "Every check waits for this page."]
+        )
+
+        # Each check's totals are details: closed at first, then one click away.
+        show = page.get_by_role("button", name="Show details", exact=True)
+        await playwright_async.expect(show).to_have_attribute("aria-expanded", "false")
+        await playwright_async.expect(page.get_by_text("6 pages checked so far")).to_have_count(0)
+        await show.click()
+        hide = page.get_by_role("button", name="Hide details", exact=True)
+        await playwright_async.expect(hide).to_have_attribute("aria-expanded", "true")
+        for text in results.values():
+            await playwright_async.expect(page.get_by_text(text, exact=True)).to_be_visible()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+
+        # A background data refresh must not reload, move the viewport, or
+        # steal focus from the operator's current control.
+        pause = page.get_by_role("button", name="Pause live updates")
+        await pause.focus()
+        await page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+        scroll_before = await page.evaluate("window.scrollY")
+        navigations_before = await page.evaluate(
+            "performance.getEntriesByType('navigation').length"
+        )
+        await page.wait_for_timeout(2200)
+        assert await page.evaluate("window.scrollY") == scroll_before
+        assert await page.evaluate("document.activeElement?.textContent") == ("Pause live updates")
+        assert (
+            await page.evaluate("performance.getEntriesByType('navigation').length")
+            == navigations_before
+        )
+        await pause.click()
+        await playwright_async.expect(
+            page.get_by_text(
+                "Live updates paused. The scan continues in the background.",
+                exact=True,
+            )
+        ).to_be_visible()
+    finally:
+        await page.context.close()
 
 
 async def test_every_spa_route_has_an_accurate_document_title(

@@ -963,6 +963,13 @@ def test_api_running_scan_includes_in_flight_and_recent(
     assert progress["stage"] == "scanning"
     assert progress["rendered_pages"] == 0
     assert progress["static_pages"] == 1
+    # This process is not crawling it, so the table rows say only what the
+    # queue and the pages table know: no check is claimed for any page.
+    assert progress["page_checks"] == [
+        {"url": "http://x/in-flight", "state": "checking", "checks": {}},
+        {"url": "http://x/finished", "state": "checked", "checks": {}},
+        {"url": "http://x/queued", "state": "waiting", "checks": {}},
+    ]
     assert progress["eta"] == {
         "state": "estimating",
         "min_seconds": None,

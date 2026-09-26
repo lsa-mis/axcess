@@ -52,7 +52,7 @@ from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
-from audit.crawler import url_policy
+from audit.crawler import live_progress, url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
@@ -649,6 +649,7 @@ async def run_crawl(
             except Exception as exc:
                 log.warning("synthesize.failed", scan_id=scan_id, error=str(exc))
         _finalize_scan(conn, scan_id, summary)
+        live_progress.forget(scan_id)
         if ocr_pool is not None:
             ocr_pool.shutdown()
         if js_holder is not None:
@@ -1186,7 +1187,8 @@ async def _worker(ctx: _WorkerContext) -> None:
             continue
         ctx.in_flight += 1
         try:
-            await _process_job(ctx, job)
+            with live_progress.page(ctx.scan_id, str(job.payload["url"]), _tracked_checks(ctx)):
+                await _process_job(ctx, job)
             queue.complete(ctx.conn, job.id)
         except Exception as exc:  # record and move on
             log.warning("crawl.job_failed", id=job.id, error=str(exc))
@@ -1194,6 +1196,33 @@ async def _worker(ctx: _WorkerContext) -> None:
             ctx.summary.errors += 1
         finally:
             ctx.in_flight -= 1
+
+
+def _tracked_checks(ctx: _WorkerContext) -> list[str]:
+    """The checks the progress page follows for each page of this crawl.
+
+    Keyed as the report's method ledger keys them. A check listed here that
+    does not apply to a page (a browser check on a page that only loaded as
+    plain HTML) ends that page as not run.
+    """
+    config = ctx.config
+    checks: list[str] = []
+    if ctx.js is not None:
+        if config.axe_enabled:
+            checks.append("axe")
+        if config.keyboard_probe_enabled:
+            checks.append("keyboard")
+        if config.responsive_checks_enabled:
+            checks.append("responsive")
+        if config.interaction_checks_enabled and config.axe_enabled:
+            checks.append("interaction")
+    if ctx.alfa is not None:
+        checks.append("alfa")
+    if config.image_extraction_enabled and ctx.ocr is not None and ctx.vlm is not None:
+        checks.append("image")
+    if ctx.semantic_analyzers:
+        checks.append("semantic")
+    return checks
 
 
 def _page_limit_reached(ctx: _WorkerContext) -> bool:
@@ -1349,16 +1378,17 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         and result.is_ok
         and page_id is not None
     ):
-        extraction = await process_page(
-            ctx.conn,
-            page_id=page_id,
-            scan_id=ctx.scan_id,
-            page_url=result.url,
-            body=result.body,
-            downloader=ctx.downloader,
-            ocr=ctx.ocr,
-            vlm=ctx.vlm,
-        )
+        with live_progress.check("image"):
+            extraction = await process_page(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                page_url=result.url,
+                body=result.body,
+                downloader=ctx.downloader,
+                ocr=ctx.ocr,
+                vlm=ctx.vlm,
+            )
         ctx.summary.images_persisted += extraction.images_persisted
         ctx.summary.svg_text_hits += extraction.svg_text_hits
         ctx.summary.image_errors += extraction.errors
@@ -1393,9 +1423,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # never suggest both engines observed one identical DOM snapshot.
         if ctx.alfa is not None:
             try:
-                alfa_result = await ctx.alfa.run(
-                    result.url, level=ctx.config.axe_level, version=ctx.config.wcag_version
-                )
+                with live_progress.check("alfa"):
+                    alfa_result = await ctx.alfa.run(
+                        result.url, level=ctx.config.axe_level, version=ctx.config.wcag_version
+                    )
                 _persist_alfa(
                     ctx,
                     page_id=page_id,
@@ -1513,7 +1544,8 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # adding contrast / focus-visible analyzers will check
         # ``render_mode == 'js'`` themselves before running.
         if ctx.semantic_analyzers:
-            await _run_semantic(ctx, page_id=page_id, result=result)
+            with live_progress.check("semantic"):
+                await _run_semantic(ctx, page_id=page_id, result=result)
 
     if not result.is_html or not result.is_ok:
         return
