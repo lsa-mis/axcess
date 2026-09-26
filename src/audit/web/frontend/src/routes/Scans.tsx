@@ -274,7 +274,7 @@ export default function ScansRoute() {
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  <SortHeader column="scans" kind="number" rowSpan={2} align="right" wrap="words" className="align-bottom" {...sortProps}>
+                  <SortHeader column="scans" kind="number" rowSpan={2} wrap="words" className="align-bottom" {...sortProps}>
                     {SORT_LABELS.scans}
                   </SortHeader>
                   <ColumnHeader
@@ -293,7 +293,6 @@ export default function ScansRoute() {
                       column={column}
                       kind={SORT_KINDS[column]}
                       id={COLUMN_HEADER_IDS[column]}
-                      align={column === "completed" ? "left" : "right"}
                       wrap="words"
                       className={cn("bg-umich-blue/10", column === "pages" && "border-l-2 border-umich-blue")}
                       {...sortProps}
@@ -301,7 +300,7 @@ export default function ScansRoute() {
                       {SORT_LABELS[column]}
                     </SortHeader>
                   ))}
-                  <ColumnHeader id={COLUMN_HEADER_IDS.report} align="right" className="whitespace-nowrap bg-umich-blue/10">
+                  <ColumnHeader id={COLUMN_HEADER_IDS.report} className="whitespace-nowrap bg-umich-blue/10">
                     Report
                   </ColumnHeader>
                 </tr>
@@ -375,10 +374,10 @@ export default function ScansRoute() {
                       <ColumnHeader>Report</ColumnHeader>
                       <ColumnHeader>Status</ColumnHeader>
                       <ColumnHeader>Handling</ColumnHeader>
-                      <ColumnHeader align="right">Pages</ColumnHeader>
-                      <ColumnHeader align="right">Issue leads</ColumnHeader>
+                      <ColumnHeader>Pages</ColumnHeader>
+                      <ColumnHeader>Issue leads</ColumnHeader>
                       <ColumnHeader>Updated</ColumnHeader>
-                      <ColumnHeader align="right">Open</ColumnHeader>
+                      <ColumnHeader>Open</ColumnHeader>
                     </tr>
                   </TableHead>
                   <tbody>
@@ -479,7 +478,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             >
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
-            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap text-right")}>
+            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap")}>
               <LinkButton
                 to={`/scans/${completed.id}`}
                 variant="secondary"
@@ -523,10 +522,10 @@ function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
           <ColumnHeader>Report</ColumnHeader>
           <ColumnHeader>Status</ColumnHeader>
           <ColumnHeader>Started</ColumnHeader>
-          <ColumnHeader align="right">Pages</ColumnHeader>
-          <ColumnHeader align="right">Images with text</ColumnHeader>
-          <ColumnHeader align="right">{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
-          <ColumnHeader align="right">Actions</ColumnHeader>
+          <ColumnHeader>Pages</ColumnHeader>
+          <ColumnHeader>Images with text</ColumnHeader>
+          <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
+          <ColumnHeader>Actions</ColumnHeader>
         </tr>
       </TableHead>
       <tbody>
@@ -577,7 +576,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
       <Cell className="whitespace-nowrap py-1">
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           <LinkButton
             to={`/scans/${scan.id}/issues`}
             variant="ghost"
@@ -603,7 +602,7 @@ function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; i
       <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
       <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
       <Cell className="text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
-      <Cell className="py-1 text-right">
+      <Cell className="py-1">
         <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
           Open protected report
         </LinkButton>

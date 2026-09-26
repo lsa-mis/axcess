@@ -254,7 +254,6 @@ export function SortHeader<K extends string>({
   sort,
   onSort,
   kind = "text",
-  align = "left",
   chip,
   wrap = "chip",
   className,
@@ -265,7 +264,6 @@ export function SortHeader<K extends string>({
   sort: Sort<K> | null;
   onSort: (next: Sort<K>) => void;
   kind?: SortKind;
-  align?: "left" | "right";
   /** Words for the chip when the column's order is not plain text, number or date. */
   chip?: (sort: Sort<K>) => string;
   wrap?: "chip" | "words";
@@ -304,7 +302,6 @@ export function SortHeader<K extends string>({
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
         "px-1 py-0.5 text-left font-semibold",
-        align === "right" && "text-right",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
       )}
@@ -316,7 +313,7 @@ export function SortHeader<K extends string>({
         className={cn(
           "group inline-flex min-h-target items-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
           !words && "flex-wrap gap-x-1.5 gap-y-0.5",
-          align === "right" ? "justify-end text-right" : "text-left",
+          "text-left",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
@@ -337,15 +334,17 @@ export function SortHeader<K extends string>({
   );
 }
 
-/** A column header that does not sort. Its text lines up with a sorting header's label. */
+/**
+ * A column header that does not sort. Its text lines up with a sorting
+ * header's label: every heading is left-aligned, 8px in from the cell edge,
+ * the same inset as the text in the cells under it.
+ */
 export function ColumnHeader({
-  align = "left",
   className,
   children,
   scope = "col",
   ...th
 }: HeaderProps & {
-  align?: "left" | "right";
   scope?: "col" | "colgroup";
   className?: string;
   children: ReactNode;
@@ -353,7 +352,7 @@ export function ColumnHeader({
   return (
     <th
       scope={scope}
-      className={cn("px-2 py-2 font-semibold", align === "right" ? "text-right" : "text-left", className)}
+      className={cn("px-2 py-2 text-left font-semibold", className)}
       {...th}
     >
       {children}
@@ -405,7 +404,11 @@ export function RowHeader({
   );
 }
 
-/** A body cell. `numeric` right-aligns it in tabular figures, on one line. */
+/**
+ * A body cell. `numeric` sets it in tabular figures, on one line. It stays
+ * left-aligned, like its heading, so a value sits directly under the heading
+ * that names it.
+ */
 export function Cell({
   numeric = false,
   className,
@@ -416,7 +419,7 @@ export function Cell({
     <td
       className={cn(
         "px-2 py-2.5 align-middle",
-        numeric && "whitespace-nowrap text-right tabular-nums",
+        numeric && "whitespace-nowrap tabular-nums",
         className,
       )}
       {...td}

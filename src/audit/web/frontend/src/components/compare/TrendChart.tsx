@@ -351,8 +351,8 @@ function HistoryTable({
           <tr>
             <ColumnHeader>Scan</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
-            <ColumnHeader align="right">Occurrences</ColumnHeader>
-            <ColumnHeader align="right">Issue groups</ColumnHeader>
+            <ColumnHeader>Occurrences</ColumnHeader>
+            <ColumnHeader>Issue groups</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>
@@ -368,7 +368,7 @@ function HistoryTable({
               <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell numeric>{point.groups.toLocaleString()}</Cell>
               <Cell className="py-1">
-                <span className="flex flex-wrap justify-end gap-x-4">
+                <span className="flex flex-wrap gap-x-4">
                   {point.id !== currentId && point.id !== baselineId && (
                     <LinkButtonText to={compareHref(point, currentId, points)}>
                       Compare<span className="sr-only"> scan {point.id}</span> with this report

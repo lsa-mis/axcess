@@ -187,7 +187,7 @@ export default function IssuePagesTable({
           <Table className="min-w-[44rem]" caption={`Pages with the issue ${row.title}`}>
             <TableHead>
               <tr>
-                <ColumnHeader align="right" className="w-10 whitespace-nowrap px-3">
+                <ColumnHeader className="w-10 whitespace-nowrap">
                   <span aria-hidden="true">#</span>
                   <span className="sr-only">Row number</span>
                 </ColumnHeader>
@@ -197,7 +197,7 @@ export default function IssuePagesTable({
                 <SortHeader column="Page URL" kind="text" {...sortProps}>
                   Page URL
                 </SortHeader>
-                <SortHeader column="Occurrences" kind="number" align="right" {...sortProps}>
+                <SortHeader column="Occurrences" kind="number" {...sortProps}>
                   Occurrences
                 </SortHeader>
                 <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
@@ -263,8 +263,8 @@ const IssuePageRow = memo(function IssuePageRow({
   );
   return (
     <Row index={index}>
-      <RowHeader className="px-3 text-right font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
-      <Cell className="min-w-[12rem] px-3 font-semibold text-fg">
+      <RowHeader className="font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
+      <Cell className="min-w-[12rem] font-semibold text-fg">
         {/* The title opens the inspector with this issue outlined on the page. */}
         <Link
           to={issueInspectorPath({ scanId, pageId: page.page_id, issueKey, origin, backTo })}
@@ -275,11 +275,11 @@ const IssuePageRow = memo(function IssuePageRow({
           <span className="sr-only">, opens the in-app page inspector</span>
         </Link>
       </Cell>
-      <Cell className="min-w-[14rem] max-w-md break-all px-3 text-xs text-fg-muted">{page.page_url}</Cell>
-      <Cell numeric className="px-3">
+      <Cell className="min-w-[14rem] max-w-md break-all text-xs text-fg-muted">{page.page_url}</Cell>
+      <Cell numeric>
         {page.occurrence_count}
       </Cell>
-      <Cell className="whitespace-nowrap px-3">
+      <Cell className="whitespace-nowrap">
         {shots > 0 ? (
           <Link to={screenshotsPath} className="text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
@@ -290,7 +290,7 @@ const IssuePageRow = memo(function IssuePageRow({
         )}
       </Cell>
       {!isInformational && (
-        <Cell className="px-3">
+        <Cell>
           <div className="flex flex-wrap gap-1">
             {STATUS_LABELS_ORDER.map((s) => {
               const n = page.status_summary[s] ?? 0;

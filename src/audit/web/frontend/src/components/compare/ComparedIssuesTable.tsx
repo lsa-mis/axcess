@@ -239,7 +239,6 @@ export default function ComparedIssuesTable({
                     key={column}
                     column={column}
                     kind={SORT_KINDS[column]}
-                    align={column === "Before" || column === "After" ? "right" : "left"}
                     chip={column === "Change" ? changeChip : undefined}
                     {...sortProps}
                   >

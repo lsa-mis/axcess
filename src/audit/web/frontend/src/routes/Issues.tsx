@@ -682,10 +682,12 @@ function IssueTable({
                 key={column}
                 column={column}
                 kind={SORT_KINDS[column]}
-                align={column === "Pages" || column === "Occurrences" ? "right" : "left"}
                 sort={sort}
                 onSort={onSort}
-                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
+                // Other headings sit 6px in (2px cell + 4px button), the same
+                // inset as this table's tighter body cells, so each label
+                // starts directly above its values.
+                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : "px-0.5"}
               >
                 {column}
               </SortHeader>
@@ -790,7 +792,7 @@ const IssueTableRow = memo(function IssueTableRow({
             the cell stays a number wide. */}
         <Link
           to={pagesPath}
-          className="flex min-h-target items-center justify-end text-umich-blue underline underline-offset-2"
+          className="flex min-h-target items-center text-umich-blue underline underline-offset-2"
         >
           {row.page_count} page{row.page_count === 1 ? "" : "s"}
           <span className="sr-only"> with {row.title}</span>
