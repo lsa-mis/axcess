@@ -1,18 +1,17 @@
+import { useEffect, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertOctagon, AlertTriangle, ClipboardCheck, ExternalLink, Info, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ExternalLink, Info, X, type LucideIcon } from "lucide-react";
 import { api } from "../api/client";
-import { Card, Disclosure } from "./ui";
+import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
-import type { AbilityLabel, IssueRow } from "../api/types";
+import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
 
 /**
- * The full evidence for one issue group: what it is, why it matters, the fix,
- * the verification steps, and every affected page with its occurrences and
- * instance screenshots. This is the "issue evidence page" content, rendered
- * inline, both on the per-issue route (under a ReportHeader) and expanded
- * inside the Issues list, so a reviewer never has to leave the table to see
- * all occurrences.
+ * Every page one issue group affects, with its occurrences and instance
+ * screenshots: the body of the issue evidence page. What the issue is, the
+ * fix and how to verify it live in ``IssueGuidanceDialog``, opened from the
+ * page header, so the page itself leads with where the issue is.
  */
 export default function IssueEvidence({
   scanId,
@@ -50,177 +49,10 @@ export default function IssueEvidence({
     return <p className="px-4 py-6 text-sm text-fg-muted" role="status">Loading issue evidence…</p>;
   }
 
-  const { row, pages, description, why_matters, fix_steps, verify_manual,
-    verify_automated, acceptance, help_url } = data;
-  const lane = LANES[row.review_lane] ?? LANES.informational;
-  const isInformational = row.review_lane === "informational";
-  const isLead = row.review_lane === "expert_review";
-  const LaneIcon = lane.icon;
-
-  // What it is, the next step and the background each sit in their own
-  // disclosure, all closed on arrival, so the page opens on the issue's
-  // title and its pages and a reviewer opens only what they need. A lead is
-  // confirmed before anyone fixes it, so its checks are the next step and
-  // the fix goes in the background; a barrier is the other way round.
-  const verifySteps = [verify_manual, verify_automated].filter(Boolean) as string[];
-  const nextSteps = isInformational ? [] : isLead ? verifySteps : fix_steps;
-  const nextTitle = isLead ? "How to confirm it" : "How to fix it";
-  const hasBackground =
-    !!why_matters ||
-    (isLead ? fix_steps.length > 0 : verifySteps.length > 0) ||
-    (isLead && !!acceptance);
+  const { row, pages } = data;
 
   return (
     <div className="space-y-4 p-4">
-      <div className="space-y-3">
-        <Disclosure
-          id="issue-what"
-          title={isInformational ? "Evidence summary" : "What it is"}
-          headingLevel={2}
-        >
-          {/* The verdict leads the section and reads as a sentence, not a
-              badge: what this record is, what that means for how it may be
-              reported, and why the tool raised it. The icon and the words
-              carry the lane, so the tint is never the only signal. */}
-          <div className={`rounded-xs border border-l-4 p-3 ${lane.className}`}>
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="flex min-w-0 items-start gap-3">
-                <LaneIcon className={`mt-0.5 h-5 w-5 shrink-0 ${lane.iconClass}`} aria-hidden />
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-fg">{lane.label}</h3>
-                  <p className="mt-0.5 text-sm text-fg">{lane.meaning}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pl-8 text-xs sm:pl-0">
-                <span className="text-fg-muted">
-                  Evidence confidence:{" "}
-                  <span className="font-semibold text-fg">{capitalize(row.evidence_confidence)}</span>
-                </span>
-                {help_url && (
-                  <a
-                    href={help_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
-                  >
-                    Rule docs
-                    <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                    <span className="sr-only">opens in a new tab</span>
-                  </a>
-                )}
-              </div>
-            </div>
-            {row.evidence_summary && (
-              <p className="mt-3 pl-8 text-sm text-fg-muted">
-                <span className="font-semibold text-fg">Why it was flagged: </span>
-                {row.evidence_summary}
-              </p>
-            )}
-          </div>
-
-          {/* One strip of facts, read left to right: criterion, urgency,
-              spread, who fixes it. */}
-          <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 rounded-xs border border-border px-3 py-2">
-            {issueFacts(row, isInformational).map((fact) => (
-              <div key={fact.label} className="flex min-w-0 flex-col" title={fact.hint}>
-                <dt className="text-2xs font-medium text-fg-subtle">{fact.label}</dt>
-                <dd className="text-sm font-semibold tabular-nums text-fg">{fact.value}</dd>
-              </div>
-            ))}
-            {!isInformational && row.abilities_affected.length > 0 && (
-              <div className="flex min-w-0 flex-col">
-                <dt className="text-2xs font-medium text-fg-subtle">Abilities affected</dt>
-                <dd className="flex flex-wrap gap-1 pt-0.5">
-                  {row.abilities_affected.map((a: AbilityLabel) => (
-                    <span
-                      key={a}
-                      className="inline-block rounded-full border border-border bg-surface-muted px-2 py-0.5 text-2xs font-semibold"
-                      title={`Affects users with ${a} impairments`}
-                    >
-                      {capitalize(a)}
-                    </span>
-                  ))}
-                </dd>
-              </div>
-            )}
-          </dl>
-
-          <p className="mt-3 max-w-[75ch] text-sm leading-relaxed text-fg">
-            {description ? (
-              <RuleText text={description} />
-            ) : (
-              row.evidence_summary ||
-              "This is an automated evidence record. Review the affected pages below for the captured detail."
-            )}
-          </p>
-        </Disclosure>
-
-        {nextSteps.length > 0 && (
-          <Disclosure
-            id="issue-next"
-            title={nextTitle}
-            headingLevel={2}
-            icon={<ClipboardCheck className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />}
-          >
-            <ol className="max-w-[75ch] list-decimal space-y-1.5 pl-6 text-sm leading-relaxed text-fg">
-              {isLead
-                ? nextSteps.map((step, i) => <li key={i}>{step}</li>)
-                : nextSteps.map((step, i) => (
-                    <li
-                      key={i}
-                      // Steps include inline <code> / <em> from the YAML.
-                      // We trust YAML authors (it's our own rule book).
-                      dangerouslySetInnerHTML={{ __html: step }}
-                    />
-                  ))}
-              {isLead && (
-                <li className="font-semibold">
-                  Confirm the finding in page context before reporting it as a barrier.
-                </li>
-              )}
-            </ol>
-            {!isLead && acceptance && (
-              <p className="mt-2 max-w-[75ch] text-sm text-fg-muted">
-                <span className="font-semibold text-fg">Done when:</span> {acceptance}
-              </p>
-            )}
-          </Disclosure>
-        )}
-
-        {!isInformational && hasBackground && (
-          <Disclosure
-            id="issue-fix"
-            title={isLead ? "Why it matters, and how to fix it if confirmed" : "Why it matters, and how to verify the fix"}
-            headingLevel={2}
-          >
-            {why_matters && <p className="max-w-[75ch] text-sm text-fg-muted">{why_matters}</p>}
-            {isLead && fix_steps.length > 0 && (
-              <>
-                <h3 className="mt-3 text-2xs font-semibold text-fg-subtle">Expected behavior</h3>
-                <ol className="mt-1 max-w-[75ch] list-decimal space-y-1.5 pl-5 text-sm text-fg">
-                  {fix_steps.map((step, i) => (
-                    <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
-                  ))}
-                </ol>
-              </>
-            )}
-            {isLead && acceptance && (
-              <p className="mt-2 max-w-[75ch] text-sm text-fg-muted">
-                <span className="font-semibold text-fg">Done when:</span> {acceptance}
-              </p>
-            )}
-            {!isLead && verifySteps.length > 0 && (
-              <>
-                <h3 className="mt-3 text-2xs font-semibold text-fg-subtle">How to verify</h3>
-                <ul className="mt-1 max-w-[75ch] list-disc space-y-1.5 pl-5 text-sm text-fg">
-                  {verifySteps.map((step, i) => <li key={i}>{step}</li>)}
-                </ul>
-              </>
-            )}
-          </Disclosure>
-        )}
-      </div>
-
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border bg-surface-muted px-4 py-3">
           <h2 className="text-base font-semibold">
@@ -241,6 +73,271 @@ export default function IssueEvidence({
       </Card>
     </div>
   );
+}
+
+/**
+ * An issue's guidance, in a dialog opened from the top right of its page:
+ * what it is, the next step (the fix for a barrier, the checks for a lead),
+ * and why it matters with how to verify. Every section is open, so reading it
+ * takes one click, not one per section. A native modal ``<dialog>``, like
+ * Compare's terms: the browser traps focus, Escape closes it, and focus
+ * returns to the button that opened it.
+ */
+export function IssueGuidanceDialog({
+  open,
+  onClose,
+  detail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  detail: IssueDetail;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="issue-guidance-title"
+      aria-describedby="issue-guidance-subject"
+      onClose={onClose}
+      // The dialog itself scrolls, not a box inside it: its close button is
+      // focusable, so the scrolling area is reachable by keyboard (axe's
+      // scrollable-region-focusable), and the header stays pinned.
+      className="max-h-[90vh] w-[min(94vw,52rem)] overflow-y-auto rounded-xs border border-border bg-surface p-0 text-fg shadow-raised backdrop:bg-black/40"
+    >
+      <div className="sticky top-0 z-[1] flex items-start justify-between gap-4 border-b border-border bg-surface px-6 py-4">
+        <div className="min-w-0">
+          <h2 id="issue-guidance-title" className="text-xl font-semibold">Issue guidance</h2>
+          <p id="issue-guidance-subject" className="mt-0.5 text-base text-fg-muted">{detail.row.title}</p>
+        </div>
+        <Button type="button" variant="ghost" onClick={onClose} aria-label="Close issue guidance">
+          <X className="h-5 w-5" aria-hidden />
+        </Button>
+      </div>
+      <div className="px-6 py-6">
+        <IssueGuidance detail={detail} />
+      </div>
+    </dialog>
+  );
+}
+
+/**
+ * One at-a-glance fact: its name, its value large, and an optional short
+ * note under the value. A ``dt`` and one or two ``dd``s, so the pairing is
+ * announced, not just drawn.
+ */
+function FactTile({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
+  return (
+    <div className="rounded-xs border border-border bg-surface-subtle px-4 py-3">
+      <dt className="text-sm text-fg-muted">{label}</dt>
+      <dd className="mt-1 text-lg font-semibold tabular-nums leading-snug text-fg">{value}</dd>
+      {note && <dd className="mt-0.5 text-sm text-fg-muted">{note}</dd>}
+    </div>
+  );
+}
+
+/** One guidance section: a heading under the dialog's own h2, then its content. */
+function GuidanceSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-border pt-6 first:border-t-0 first:pt-0">
+      <h3 className="mb-3 text-lg font-semibold text-fg">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * "Done when" as a note of its own, labelled, so it reads as the finish line
+ * and a screen reader announces it by name rather than as one more line.
+ */
+function DoneWhen({ text }: { text: string }) {
+  return (
+    <div role="note" aria-label="Done when" className="mt-4 max-w-[70ch] rounded-xs border border-ok/30 bg-ok-bg px-4 py-3">
+      <p className="text-base leading-7 text-fg">
+        <span className="font-semibold text-ok">Done when: </span>
+        {text}
+      </p>
+    </div>
+  );
+}
+
+/** The guidance sections themselves, all expanded. */
+function IssueGuidance({ detail }: { detail: IssueDetail }) {
+  const { row, description, why_matters, fix_steps, verify_manual,
+    verify_automated, acceptance, help_url } = detail;
+  const lane = LANES[row.review_lane] ?? LANES.informational;
+  const isInformational = row.review_lane === "informational";
+  const isLead = row.review_lane === "expert_review";
+  const LaneIcon = lane.icon;
+
+  // A lead is confirmed before anyone fixes it, so its checks are the next
+  // step and the fix goes in the background; a barrier is the other way round.
+  const verifySteps = [verify_manual, verify_automated].filter(Boolean) as string[];
+  const nextSteps = isInformational ? [] : isLead ? verifySteps : fix_steps;
+  const nextTitle = isLead ? "How to confirm it" : "How to fix it";
+  const hasBackground =
+    !!why_matters ||
+    (isLead ? fix_steps.length > 0 : verifySteps.length > 0) ||
+    (isLead && !!acceptance);
+
+  return (
+    <div className="space-y-8">
+        <GuidanceSection title={isInformational ? "Evidence summary" : "What it is"}>
+          {/* The verdict leads the section and reads as a sentence, not a
+              badge: what this record is, what that means for how it may be
+              reported, and why the tool raised it. The icon and the words
+              carry the lane, so the tint is never the only signal. */}
+          <div className={`rounded-xs border border-l-4 p-4 ${lane.className}`}>
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <div className="flex min-w-0 items-start gap-3">
+                <LaneIcon className={`mt-0.5 h-5 w-5 shrink-0 ${lane.iconClass}`} aria-hidden />
+                <div className="min-w-0">
+                  <h4 className="text-base font-semibold text-fg">{lane.label}</h4>
+                  <p className="mt-1 text-base leading-7 text-fg">{lane.meaning}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pl-8 text-sm">
+                <span className="text-fg-muted">
+                  Evidence confidence:{" "}
+                  <span className="font-semibold text-fg">{capitalize(row.evidence_confidence)}</span>
+                </span>
+                {help_url && (
+                  <a
+                    href={help_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
+                  >
+                    Rule documentation
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="sr-only">, opens in a new tab</span>
+                  </a>
+                )}
+              </div>
+            </div>
+            {row.evidence_summary && (
+              <p className="mt-3 pl-8 text-base leading-7 text-fg">
+                <span className="font-semibold">Why it was flagged: </span>
+                {row.evidence_summary}
+              </p>
+            )}
+          </div>
+
+          {/* At a glance, four even tiles read left to right: the level
+              asked of the page, how soon to fix it, how far it spreads, and
+              who it shuts out. Each is a term and its value, so a screen
+              reader reads "Priority, High" and moves on. */}
+          <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <FactTile label="WCAG level" value={row.wcag_sc ? row.conformance : "n/a"} />
+            {!isInformational && (
+              <FactTile label="Priority" value={priorityTier(row.priority)} />
+            )}
+            <FactTile
+              label="Occurrences"
+              value={row.occurrence_count.toLocaleString()}
+              note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
+            />
+            {!isInformational && row.abilities_affected.length > 0 && (
+              <FactTile
+                label="Affects"
+                value={
+                  <span className="flex flex-wrap gap-1.5">
+                    {row.abilities_affected.map((a: AbilityLabel) => (
+                      <span
+                        key={a}
+                        className="inline-block rounded-full border border-border bg-surface px-2.5 py-0.5 text-sm font-semibold"
+                      >
+                        {capitalize(a)}
+                      </span>
+                    ))}
+                  </span>
+                }
+              />
+            )}
+            {!isInformational && !HIDDEN_ISSUE_FIELDS.has("Difficulty") && row.difficulty !== "Unknown" && (
+              <FactTile label="Difficulty" value={row.difficulty} />
+            )}
+            {!isInformational && !HIDDEN_ISSUE_FIELDS.has("Responsibility") && (
+              <FactTile label="Responsibility" value={capitalize(row.responsibility)} />
+            )}
+          </dl>
+          {!isInformational && (
+            <p className="mt-2 text-sm leading-6 text-fg-muted">
+              Priority weighs how severe the issue is by how many pages it touches. Fix sooner when both are high.
+            </p>
+          )}
+
+          <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
+            {description ? (
+              <RuleText text={description} />
+            ) : (
+              row.evidence_summary ||
+              "This is an automated evidence record. Review the affected pages below for the captured detail."
+            )}
+          </p>
+        </GuidanceSection>
+
+        {nextSteps.length > 0 && (
+          <GuidanceSection title={nextTitle}>
+            <ol className="max-w-[70ch] list-decimal space-y-1.5 pl-6 text-base leading-7 text-fg">
+              {isLead
+                ? nextSteps.map((step, i) => <li key={i}>{step}</li>)
+                : nextSteps.map((step, i) => (
+                    <li
+                      key={i}
+                      // Steps include inline <code> / <em> from the YAML.
+                      // We trust YAML authors (it's our own rule book).
+                      dangerouslySetInnerHTML={{ __html: step }}
+                    />
+                  ))}
+              {isLead && (
+                <li className="font-semibold">
+                  Confirm the finding in page context before reporting it as a barrier.
+                </li>
+              )}
+            </ol>
+            {!isLead && acceptance && (
+              <DoneWhen text={acceptance} />
+            )}
+          </GuidanceSection>
+        )}
+
+        {!isInformational && hasBackground && (
+          <GuidanceSection
+            title={isLead ? "Why it matters, and how to fix it if confirmed" : "Why it matters, and how to verify the fix"}
+          >
+            {why_matters && <p className="max-w-[70ch] text-base leading-7 text-fg">{why_matters}</p>}
+            {isLead && fix_steps.length > 0 && (
+              <>
+                <h4 className="mt-5 text-base font-semibold text-fg">Expected behavior</h4>
+                <ol className="mt-2 max-w-[70ch] list-decimal space-y-3 pl-6 text-base leading-7 text-fg">
+                  {fix_steps.map((step, i) => (
+                    <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
+                  ))}
+                </ol>
+              </>
+            )}
+            {isLead && acceptance && (
+              <DoneWhen text={acceptance} />
+            )}
+            {!isLead && verifySteps.length > 0 && (
+              <>
+                <h4 className="mt-5 text-base font-semibold text-fg">How to verify</h4>
+                <ul className="mt-2 max-w-[70ch] list-disc space-y-3 pl-6 text-base leading-7 text-fg">
+                  {verifySteps.map((step, i) => <li key={i}>{step}</li>)}
+                </ul>
+              </>
+            )}
+          </GuidanceSection>
+        )}
+    </div>
+  );
+
 }
 
 /**
@@ -309,39 +406,6 @@ function decodeEntities(value: string): string {
 }
 
 /** One label/value line in the issue's spec list. */
-type IssueFact = { label: string; value: string | number; hint?: string };
-
-/**
- * The issue's at-a-glance metadata, in reading order: what the criterion is,
- * how urgent it is, how far it spreads, and who fixes it. Entries that carry no
- * meaning for the record are dropped rather than shown empty, an informational
- * record has no priority, difficulty or owner because nothing is being asked of
- * anyone. Fields named in ``HIDDEN_ISSUE_FIELDS`` are left out for now.
- */
-function issueFacts(row: IssueRow, isInformational: boolean): IssueFact[] {
-  const facts: IssueFact[] = [
-    { label: "Criterion level", value: row.wcag_sc ? row.conformance : "n/a" },
-  ];
-  if (!isInformational) {
-    facts.push({
-      label: "Priority",
-      value: priorityTier(row.priority),
-      hint: "Severity × how many pages it touches. Fix sooner when both are high.",
-    });
-  }
-  facts.push(
-    { label: "Pages affected", value: row.page_count },
-    { label: "Occurrences", value: row.occurrence_count },
-  );
-  if (!isInformational && row.difficulty !== "Unknown") {
-    facts.push({ label: "Difficulty", value: row.difficulty });
-  }
-  if (!isInformational) {
-    facts.push({ label: "Responsibility", value: capitalize(row.responsibility) });
-  }
-  return facts.filter((fact) => !HIDDEN_ISSUE_FIELDS.has(fact.label));
-}
-
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }

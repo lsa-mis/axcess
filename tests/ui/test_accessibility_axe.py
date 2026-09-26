@@ -401,16 +401,26 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await first.click()
     await page.wait_for_url("**/issues/**")
     await playwright_async.expect(page.get_by_role("heading", name=title, level=1)).to_be_visible()
-    # What it is and why it matters, both closed on arrival; the lead's
-    # expert-decision caution sits inside What it is.
+    # The guidance opens from the top right, every section expanded at once;
+    # the lead's expert-decision caution sits under What it is.
+    guidance = page.get_by_role("button", name="Issue guidance", exact=True)
+    await guidance.click()
+    dialog = page.get_by_role("dialog", name="Issue guidance")
+    await playwright_async.expect(dialog).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("heading", name="What it is", exact=True)
+        dialog.get_by_role("heading", name="What it is", exact=True, level=3)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("heading", name=re.compile("^Why it matters"))
+        dialog.get_by_role("heading", name=re.compile("^Why it matters"), level=3)
     ).to_be_visible()
-    await page.get_by_role("button", name="What it is", exact=True).click()
-    await playwright_async.expect(page.get_by_text("expert decision", exact=False)).to_be_visible()
+    caution = dialog.get_by_text("expert decision", exact=False)
+    await playwright_async.expect(caution).to_be_visible()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    # Escape closes it and focus goes back to the button that opened it.
+    await page.keyboard.press("Escape")
+    await playwright_async.expect(dialog).to_be_hidden()
+    await playwright_async.expect(guidance).to_be_focused()
 
 
 async def test_issue_table_fits_the_default_desktop_width(
@@ -478,7 +488,9 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     ).to_be_attached()
     # The protected-identity context refreshes every 15 seconds even
     # on public report routes. That security check must not unmount a
-    # known-public table and reset the reader to the top.
+    # known-public table and reset the reader to the top. A short viewport
+    # keeps the page scrollable now that the guidance is in a dialog.
+    await page.set_viewport_size({"width": 320, "height": 240})
     await page.evaluate("window.scrollTo(0, 500)")
     scroll_position = await page.evaluate("window.scrollY")
     assert scroll_position > 0
@@ -521,8 +533,13 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         f"{base}/app/scans/{scan_id}/issues/image:logo_adequate",
         wait_until="networkidle",
     )
-    # The verdict sits inside the record's first section, closed on arrival.
-    await page.get_by_role("button", name="Evidence summary", exact=True).click()
+    # The verdict leads the guidance dialog, under Evidence summary.
+    await page.get_by_role("button", name="Issue guidance", exact=True).click()
+    await playwright_async.expect(
+        page.get_by_role("dialog", name="Issue guidance").get_by_role(
+            "heading", name="Evidence summary", exact=True
+        )
+    ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("heading", name="Informational evidence")
     ).to_be_visible()

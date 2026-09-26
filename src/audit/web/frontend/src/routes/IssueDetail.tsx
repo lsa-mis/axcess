@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useParams } from "react-router";
+import { BookOpenText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import ReportHeader from "../components/ReportHeader";
-import IssueEvidence from "../components/IssueEvidence";
-import { Card, EmptyState, LinkButton } from "../components/ui";
+import IssueEvidence, { IssueGuidanceDialog } from "../components/IssueEvidence";
+import { Button, Card, EmptyState, LinkButton } from "../components/ui";
 import ConformanceBadge from "../components/ConformanceBadge";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { REVIEW_LANE_LABELS } from "../lib/labels";
 
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
@@ -21,6 +24,7 @@ export default function IssueDetailRoute() {
   const key = decodeURIComponent(issueKey ?? "");
 
   const { data: scan, error: scanError } = useScanQuery(id);
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
   // Fetched once for the header title/meta; the same query key is reused by
   // <IssueEvidence>, so React Query serves both from one request.
   const { data: detail, error: detailError } = useQuery({
@@ -70,12 +74,33 @@ export default function IssueDetailRoute() {
             <span>{row?.title ?? key}</span>
           </span>
         }
+        // The type rides with the criterion, so a lead reads as one even
+        // with the guidance closed.
         meta={
-          row?.wcag_sc
-            ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}`
+          row
+            ? [
+                row.wcag_sc ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}` : "",
+                REVIEW_LANE_LABELS[row.review_lane],
+              ]
+                .filter(Boolean)
+                .join(" · ")
             : undefined
         }
+        // Top right, where Compare scans keeps its terms: one place on
+        // every report page for "explain this". A book, not Compare's
+        // question mark, so the two are not mistaken for each other.
+        actions={
+          detail && (
+            <Button type="button" onClick={() => setGuidanceOpen(true)} className="rounded-full">
+              <BookOpenText className="h-4 w-4" aria-hidden />
+              Issue guidance
+            </Button>
+          )
+        }
       />
+      {detail && (
+        <IssueGuidanceDialog open={guidanceOpen} onClose={() => setGuidanceOpen(false)} detail={detail} />
+      )}
       {/* The trail names the issue, not the kind of page it is, so evidence
           opened from here returns under the issue's own title. */}
       <IssueEvidence
