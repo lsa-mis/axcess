@@ -49,7 +49,7 @@ export default function ScopeLine({
     return (
       <p id={id} role="status" className="flex items-start gap-2 text-sm text-sev-critical">
         <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        <span>{data?.error ?? "Axcess could not work out what to scan from that address."}</span>
+        <span>{data?.error ?? "Axcess could not tell what to scan from this address. Check the address and try again."}</span>
       </p>
     );
   }
@@ -75,7 +75,7 @@ export default function ScopeLine({
             {data.auto_slash_added && (
               <span className="text-fg-muted">
                 {" "}
-                A trailing slash was added so a sibling path is not included by mistake.
+                Axcess added a slash (/) at the end, so nearby sections of the site are not included by mistake.
               </span>
             )}
           </>

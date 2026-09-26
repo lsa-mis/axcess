@@ -177,7 +177,7 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
    - The `skip_<x>` field of `ScanFormSettings`, and its line in
      `snapshot_from_config`, in `src/audit/web/scan_settings.py`. The
      snapshot is an allow-list, so a setting left out of it is not
-     prefilled when someone chooses "Edit settings and retry".
+     prefilled when someone chooses "Change settings first".
    - Choose each entry point's default on purpose. The raw API treats a
      missing `skip_<x>` field as "on".
 6. **Report group branch** in `src/audit/web/issues.py`. Do this in the same
@@ -234,8 +234,8 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       row to `_methods_used`. It is a closed union, so add the key there
       before `METHOD_PIPELINE`, or `make typecheck` fails;
     - `METHOD_PIPELINE` in `components/MethodCoverageLedger.tsx`;
-    - `PIPELINES` in `routes/Compare.tsx`, the method labels in the Compare
-      scans page's coverage notes and coverage table. A missing entry shows
+    - `PIPELINES` in `routes/Compare.tsx`, the method labels in the Compare scans
+      page's "What was checked in each report" notes and table. A missing entry shows
       the raw pipeline name as the label.
 11. **Exports.**
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,

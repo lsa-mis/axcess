@@ -82,14 +82,14 @@ async def test_previous_and_next_step_through_the_rendered_page(
             f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue={ISSUE_KEY}",
             wait_until="networkidle",
         )
-        group = page.get_by_role("group", name="Flagged elements on the page")
+        group = page.get_by_role("group", name="Flagged elements", exact=True)
         status = group.get_by_role("status")
         previous = group.get_by_role("button", name="Previous flagged element")
         following = group.get_by_role("button", name="Next flagged element")
         await playwright_async.expect(status).to_have_text("Flagged element 1 of 3")
         await playwright_async.expect(previous).to_be_disabled()
 
-        frame = page.frame_locator("iframe[title^='Re-rendered']")
+        frame = page.frame_locator("iframe[title^='Saved copy']")
 
         async def assert_on(n: int) -> None:
             await playwright_async.expect(status).to_have_text(f"Flagged element {n} of 3")

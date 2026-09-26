@@ -19,6 +19,7 @@ import {
 import { compareText, sortWords, type Sort, type SortKind } from "./table/sort";
 import { withReturnTrail } from "./ui";
 import type { IssuePage, IssueRow } from "../api/types";
+import { STATUS_LABEL } from "../lib/terms";
 
 /** The trail label for the pages view; ReportCrumb shows the same words. */
 // "Pages" and not "Pages with this issue": the trail already names the
@@ -79,8 +80,17 @@ const SORT_KINDS: Record<SortColumn, SortKind> = {
 };
 export const DEFAULT_PAGES_SORT: PagesSort = { column: "Occurrences", direction: "desc" };
 
+/** What each column header says. The column keys above stay as they are. */
+const COLUMN_LABEL: Record<SortColumn, string> = {
+  "Page title": "Page title",
+  "Page URL": "Page URL",
+  Occurrences: "Occurrences",
+  "Issue screenshots": "Screenshots",
+  Status: "Status",
+};
+
 function describeSort(sort: PagesSort): string {
-  return `${sort.column}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
+  return `${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
 /** Open work first: how many of a page's occurrences are not yet closed. */
@@ -125,7 +135,7 @@ function matches(page: IssuePage, needle: string): boolean {
 }
 
 /**
- * Every page an issue group appears on, one page per row, with a search box
+ * Every page an issue appears on, one page per row, with a search box
  * over title and URL and a sortable header on each fact column. It is the
  * same table whether it is read inline under the issue's evidence or on the
  * pages route the Issues table links to from its page count, so the two
@@ -170,7 +180,7 @@ export default function IssuePagesTable({
   return (
     <>
       <TableBar pager={<TablePagination label="Pages with this issue" noun="pages" {...paged} />}>
-        <TableSearch label="Search pages" placeholder="Search page title or URL" value={query} onChange={setQuery} />
+        <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
       </TableBar>
       <TableStatus>
         {needle ? `${visible.length} of ${pages.length} page${pages.length === 1 ? "" : "s"} match. ` : ""}
@@ -179,7 +189,7 @@ export default function IssuePagesTable({
       {visible.length === 0 ? (
         <TableEmpty>
           {pages.length === 0
-            ? "No pages are currently associated with this issue."
+            ? "No pages have this issue."
             : "No pages match that search."}
         </TableEmpty>
       ) : (
@@ -201,7 +211,7 @@ export default function IssuePagesTable({
                   Occurrences
                 </SortHeader>
                 <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
-                  Issue screenshots
+                  {COLUMN_LABEL["Issue screenshots"]}
                 </SortHeader>
                 {!isInformational && (
                   <SortHeader column="Status" kind="number" {...sortProps}>
@@ -272,7 +282,7 @@ const IssuePageRow = memo(function IssuePageRow({
         >
           <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span>{page.page_title?.trim() || <span className="font-normal">Untitled</span>}</span>
-          <span className="sr-only">, opens the in-app page inspector</span>
+          <span className="sr-only">, opens the saved copy with this issue marked</span>
         </Link>
       </Cell>
       <Cell className="min-w-[14rem] max-w-md break-all text-xs text-fg-muted">{page.page_url}</Cell>
@@ -286,7 +296,7 @@ const IssuePageRow = memo(function IssuePageRow({
             <span className="sr-only"> of this issue on {label}</span>
           </Link>
         ) : (
-          <span className="text-fg-muted">None captured</span>
+          <span className="text-fg-muted">No screenshots</span>
         )}
       </Cell>
       {!isInformational && (
@@ -306,7 +316,7 @@ const IssuePageRow = memo(function IssuePageRow({
                         "inline-block rounded-xs bg-surface-muted px-1.5 py-0.5 text-2xs text-fg-muted"
                   }
                 >
-                  {n} {s.replace(/_/g, " ")}
+                  {n} {STATUS_LABEL[s]}
                 </span>
               );
             })}

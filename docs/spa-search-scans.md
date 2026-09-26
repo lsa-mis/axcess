@@ -114,7 +114,7 @@ Axcess stores per-page click coverage in `scan_interaction_runs`:
 - the controls each page exposed, including ones a click revealed;
 - how many distinct controls were operated;
 - clicks dispatched;
-- views opened by clicking;
+- page states opened by clicking;
 - controls refused by the blocked-label filter;
 - which bound (clicks, time, depth, or repeated shapes) ended the sweep.
 

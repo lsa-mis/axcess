@@ -35,12 +35,17 @@ async def test_tracker_selection(client: TestClient, new_page: Any, choose_filte
 
     await page.route("**/*", respond)
     await page.goto("http://tracker.test/app/tracking", wait_until="networkidle")
-    matrix = page.get_by_role("table", name="WCAG 2.2 A/AA coverage and AI roadmap")
+    matrix = page.get_by_role(
+        "table",
+        name=(
+            "What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews"
+        ),
+    )
     criteria = payload["coverage"]["criteria"]
     expected_by_view = {
-        "Current Coverage": {c["sc"] for c in criteria if c["method"] != "manual"},
-        "Future Coverage": {c["sc"] for c in criteria if c["method"] == "manual"},
-        "AI Coverage": {item["wcag"] for item in payload["roadmap"]},
+        "Checked now": {c["sc"] for c in criteria if c["method"] != "manual"},
+        "Not checked yet": {c["sc"] for c in criteria if c["method"] == "manual"},
+        "AI reviews": {item["wcag"] for item in payload["roadmap"]},
     }
     expected_by_view["All"] = set().union(*expected_by_view.values())
     # Every section and the AI roadmap share one table; the Section group
@@ -48,14 +53,22 @@ async def test_tracker_selection(client: TestClient, new_page: Any, choose_filte
     # to the menu's button.
     filter_button = page.get_by_role("button", name=re.compile(r"^Filter\b"))
     views = {
-        "AI Coverage": "ai",
-        "Current Coverage": "current",
-        "Future Coverage": "future",
+        "AI reviews": "ai",
+        "Checked now": "current",
+        "Not checked yet": "future",
         "All": "",
     }
+    # The table's own status line, not the pager's ("Showing 1-10 of ...").
+    shown = page.get_by_role("status").filter(has_text=re.compile(r"^Showing \d+ of \d+ rows"))
     for label, value in views.items():
         await choose_filter(page, "Section", value)
         await playwright_async.expect(filter_button).to_be_focused()
+        # The status line names the chosen section in the Filter menu's words.
+        await playwright_async.expect(shown).to_have_text(
+            re.compile(rf"^Showing \d+ of \d+ rows · {re.escape(label)}$")
+            if value
+            else re.compile(r"^Showing \d+ of \d+ rows$")
+        )
         # Ten rows a page: read every page of the table.
         actual_scs = set(
             await all_pages_text(page, matrix.locator("tbody th[scope=row]"), "Criteria")
@@ -67,13 +80,13 @@ async def test_tracker_selection(client: TestClient, new_page: Any, choose_filte
         await page.evaluate("Promise.all(document.getAnimations().map((a) => a.finished))")
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
-    # The status sub-filter only exists inside AI Coverage, and it
+    # The Progress sub-filter only exists inside AI reviews, and it
     # survives a reload because it lives in the URL.
     await playwright_async.expect(
-        page.get_by_role("group", name="Status", exact=True, include_hidden=True)
+        page.get_by_role("group", name="Progress", exact=True, include_hidden=True)
     ).to_have_count(0)
     await choose_filter(page, "Section", "ai")
-    await choose_filter(page, "Status", "planned")
+    await choose_filter(page, "Progress", "planned")
     expected = sum(item["status"] == "planned" for item in payload["roadmap"])
     await playwright_async.expect(matrix.locator("tbody tr")).to_have_count(min(expected, 10))
     await page.reload(wait_until="networkidle")
@@ -81,7 +94,7 @@ async def test_tracker_selection(client: TestClient, new_page: Any, choose_filte
     # Leaving the section drops its sub-filter rather than carrying a
     # status that no coverage row could match.
     await choose_filter(page, "Section", "current")
-    current = expected_by_view["Current Coverage"]
+    current = expected_by_view["Checked now"]
     await playwright_async.expect(matrix.locator("tbody th[scope=row]")).to_have_count(
         min(len(current), 10)
     )

@@ -19,13 +19,13 @@ from .test_accessibility_axe import _AXE_TEXT, _render_violations
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 
-# Every setting group is an open card; only Speed and debugging folds away.
-_CARDS = ("Coverage", "Checks", "Local AI", "Limits and rule engine")
+# Every setting group is an open card; only Speed and browser window folds away.
+_CARDS = ("Pages to scan", "Checks", "AI checks on this computer", "Limits and rule check tool")
 
 
 async def _open_speed(page: Any) -> None:
-    """Expand Speed and debugging, the one group that starts collapsed."""
-    button = page.get_by_role("button", name="Speed and debugging", exact=True)
+    """Expand Speed and browser window, the one group that starts collapsed."""
+    button = page.get_by_role("button", name="Speed and browser window", exact=True)
     if await button.get_attribute("aria-expanded") != "true":
         await button.click()
 
@@ -52,14 +52,16 @@ async def _switch_label(switch: Any) -> str:
 
 # Each check switch and the short name the rail lists it by.
 _RAIL_NAME = {
-    "Click-Through: open menus, tabs and dialogs": "Click-Through (menus, tabs, dialogs)",
-    "Check for keyboard traps": "Keyboard traps",
-    "Check that focus is never hidden": "Focus never hidden",
-    "Check narrow screens and zoom": "Narrow screens and zoom",
-    "Read text inside images (OCR)": "Text in images (OCR)",
-    "Review image text with a local vision model": "Image text review (vision model)",
-    "Review wording with local AI": "Wording review (local AI)",
-    "Check motion and animation": "Motion and animation",
+    "Open menus, tabs, and pop-up windows (Click-Through)": (
+        "Opens menus and pop-up windows (Click-Through)"
+    ),
+    "Check for keyboard traps": "Keyboard check",
+    "Check that keyboard focus is never hidden": "Focus check",
+    "Check narrow screens and zoom": "Zoom and layout check",
+    "Read text inside images (OCR)": "Image text check",
+    "Compare image text with alt text (vision model)": "Vision model review",
+    "AI review of wording": "AI review",
+    "Check motion and animation": "Motion and reading-order check",
 }
 
 
@@ -108,19 +110,21 @@ async def test_url_hero_names_the_field_and_describes_the_scope(
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    url = page.get_by_role("textbox", name="Site URL", exact=True)
+    url = page.get_by_role("textbox", name="Website address", exact=True)
     await playwright_async.expect(url).to_be_focused()
     # The name is the label alone; help and scope are descriptions.
     described = await url.get_attribute("aria-describedby")
     assert described == "scan-url-help scan-url-scope"
     scope = page.locator("#scan-url-scope")
     # Before anything is typed it says where the answer will appear.
-    await playwright_async.expect(scope).to_have_text("Enter a site URL to see the scope.")
+    await playwright_async.expect(scope).to_have_text(
+        "Enter a website address to see what will be scanned."
+    )
 
     await url.fill("https://example.com/section")
     await playwright_async.expect(scope).to_contain_text("Will scan")
     await playwright_async.expect(scope).to_contain_text("example.com/section/")
-    await playwright_async.expect(scope).to_contain_text("A trailing slash was added")
+    await playwright_async.expect(scope).to_contain_text("Axcess added a slash (/) at the end")
     assert await scope.get_attribute("role") == "status"
 
 
@@ -138,10 +142,10 @@ async def test_empty_submit_is_announced_focused_and_linked(
     alert = page.get_by_role("alert")
     await playwright_async.expect(alert).to_be_visible()
     await playwright_async.expect(alert).to_be_focused()
-    url = page.get_by_role("textbox", name="Site URL", exact=True)
+    url = page.get_by_role("textbox", name="Website address", exact=True)
     assert await url.get_attribute("aria-invalid") == "true"
     assert "scan-url-error" in (await url.get_attribute("aria-describedby") or "")
-    await alert.get_by_role("link", name="Enter the page to start from.").click()
+    await alert.get_by_role("link", name="Enter a website address to start from.").click()
     await playwright_async.expect(url).to_be_focused()
     # Typing clears that line; the alert goes with it.
     await url.fill("https://example.com/")
@@ -155,23 +159,25 @@ async def test_fast_crawl_with_axe_blocks_start_with_an_inline_alert(
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    await page.get_by_role("textbox", name="Site URL", exact=True).fill("https://example.com/")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
     await _open_speed(page)
-    fast = page.get_by_role("switch", name=re.compile(r"^Fast crawl without a browser"))
+    fast = page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser"))
     await fast.check()
     # Rendered-page checks switch themselves off and say why.
     keyboard = page.get_by_role("switch", name=re.compile(r"^Check for keyboard traps"))
     await playwright_async.expect(keyboard).to_be_disabled()
     # Folded again: a failed submit must reopen it so the alert's link
     # lands on a visible switch.
-    speed = page.get_by_role("button", name="Speed and debugging", exact=True)
+    speed = page.get_by_role("button", name="Speed and browser window", exact=True)
     start = page.get_by_role("button", name="Start scan")
     await speed.click()
     await playwright_async.expect(speed).to_have_attribute("aria-expanded", "false")
     await start.click()
     await playwright_async.expect(speed).to_have_attribute("aria-expanded", "true")
     inline = page.locator("#scan-static-only-error")
-    await playwright_async.expect(inline).to_contain_text("cannot run with axe-core")
+    await playwright_async.expect(inline).to_contain_text("cannot run Rule check (axe)")
     assert await fast.get_attribute("aria-invalid") == "true"
     await playwright_async.expect(page.get_by_role("alert").first).to_be_focused()
     # And again on a second try with the same error.
@@ -193,14 +199,14 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await playwright_async.expect(
         summary.get_by_text("Default settings", exact=True)
     ).to_be_visible()
-    assert "Keyboard traps" in await _rail_items(summary, "Checks that run")
+    assert "Keyboard check" in await _rail_items(summary, "Checks that run")
     # The spoken digest is outside the summary and silent until something
     # changes, so reading the rail never hears it twice.
     digest = page.get_by_role("status").filter(has_text="Summary updated")
     await playwright_async.expect(digest).to_have_count(0)
     assert await summary.get_by_role("status").count() == 0
 
-    pages = page.get_by_role("spinbutton", name="Max pages")
+    pages = page.get_by_role("spinbutton", name="Maximum pages")
     await pages.fill("300")
     await playwright_async.expect(summary).to_contain_text("Up to 300 pages")
     await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
@@ -210,11 +216,11 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await keyboard.uncheck()
     # Off moves it from Checks that run to Not included.
     await playwright_async.expect(summary).to_contain_text("Customized")
-    assert "Keyboard traps" not in await _rail_items(summary, "Checks that run")
-    assert "Keyboard traps" in await _rail_items(summary, "Not included")
+    assert "Keyboard check" not in await _rail_items(summary, "Checks that run")
+    assert "Keyboard check" in await _rail_items(summary, "Not included")
 
     # Start, Cancel and Reset sit under the summary, in the form.
-    reset = page.locator("form").get_by_role("button", name="Reset to default")
+    reset = page.locator("form").get_by_role("button", name="Reset to default settings")
     await reset.click()
     await playwright_async.expect(
         summary.get_by_text("Default settings", exact=True)
@@ -231,7 +237,7 @@ async def test_form_targets_are_44px_and_axe_aaa_clean(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode={mode}", wait_until="networkidle")
     # A collapsed panel is hidden, so axe and the target check would skip
-    # every control in it: open Speed and debugging first.
+    # every control in it: open Speed and browser window first.
     await _open_speed(page)
     small = await page.evaluate(_SMALL_TARGETS)
     # Native checkboxes are 22px inside a 44px label row, which is the
@@ -241,7 +247,11 @@ async def test_form_targets_are_44px_and_axe_aaa_clean(
     assert not violations, _render_violations(violations)
 
     await page.set_viewport_size({"width": 375, "height": 812})
-    assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    # The settled layout must fit. The Scan type tabs' sliding indicator
+    # glides to its new place after a resize, so measure once it has landed.
+    await page.wait_for_function(
+        "document.documentElement.scrollWidth <= window.innerWidth", timeout=2000
+    )
 
 
 async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
@@ -269,21 +279,27 @@ async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
     await playwright_async.expect(
         summary.get_by_text("Default settings", exact=True)
     ).to_be_visible()
-    await playwright_async.expect(summary).to_contain_text("WCAG 2.1 AA, checked with axe-core")
+    await playwright_async.expect(summary).to_contain_text(
+        "WCAG 2.1 Level AA, checked with Rule check (axe)"
+    )
     checks_before = await _rail_items(summary, "Checks that run")
 
     await v22.check()
     await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
-    await playwright_async.expect(summary).to_contain_text("WCAG 2.2 AA, checked with axe-core")
+    await playwright_async.expect(summary).to_contain_text(
+        "WCAG 2.2 Level AA, checked with Rule check (axe)"
+    )
     # The version is a standard, not a check: nothing else in the list moves.
     assert await _rail_items(summary, "Checks that run") == checks_before
 
-    await page.get_by_role("textbox", name="Site URL", exact=True).fill("https://example.com/")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
     await page.get_by_role("button", name="Start scan").click()
     await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
     assert posted and posted[-1]["wcag_version"] == "2.2"
 
-    await page.locator("form").get_by_role("button", name="Reset to default").click()
+    await page.locator("form").get_by_role("button", name="Reset to default settings").click()
     await playwright_async.expect(v21).to_be_checked()
     await playwright_async.expect(
         summary.get_by_text("Default settings", exact=True)
@@ -303,9 +319,11 @@ async def test_settings_are_open_cards_and_only_speed_folds_away(
         await playwright_async.expect(
             page.get_by_role("group", name=name, exact=True)
         ).to_be_visible()
-    await playwright_async.expect(page.get_by_role("spinbutton", name="Max pages")).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("group", name="Rule engine", exact=True)
+        page.get_by_role("spinbutton", name="Maximum pages")
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_role("group", name="Rule check tool", exact=True)
     ).to_be_visible()
     # No second summary to keep in step with the rail.
     await playwright_async.expect(
@@ -315,14 +333,14 @@ async def test_settings_are_open_cards_and_only_speed_folds_away(
         page.get_by_role("region", name=re.compile(r"^Scan settings"))
     ).to_have_count(0)
 
-    speed = page.get_by_role("button", name="Speed and debugging", exact=True)
+    speed = page.get_by_role("button", name="Speed and browser window", exact=True)
     await playwright_async.expect(speed).to_have_attribute("aria-expanded", "false")
     panel = page.locator(f"#{await speed.get_attribute('aria-controls')}")
     await playwright_async.expect(panel).to_be_hidden()
     await speed.click()
     await playwright_async.expect(speed).to_have_attribute("aria-expanded", "true")
     await playwright_async.expect(
-        page.get_by_role("spinbutton", name="Requests per second")
+        page.get_by_role("spinbutton", name="Page requests per second")
     ).to_be_visible()
 
     # The actions sit in the rail at a wide width: Start is beside the
@@ -337,13 +355,25 @@ async def test_settings_are_open_cards_and_only_speed_folds_away(
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("Max pages", "", "Enter Max pages: a whole number from 1 to 10,000."),
-        ("Max pages", "0", "Max pages must be at least 1."),
-        ("Max pages", "10001", "Max pages can be at most 10,000 for a public website scan."),
-        ("Max pages", "2.5", "Max pages must be a whole number."),
-        ("Max link depth", "", "Enter Max link depth: a whole number from 1 to 20."),
-        ("Max link depth", "0", "Max link depth must be at least 1."),
-        ("Max link depth", "21", "Max link depth can be at most 20 for a public website scan."),
+        ("Maximum pages", "", "Maximum pages is empty. Enter a whole number from 1 to 10,000."),
+        ("Maximum pages", "0", "Maximum pages must be at least 1."),
+        (
+            "Maximum pages",
+            "10001",
+            "Maximum pages can be at most 10,000 for a public website scan.",
+        ),
+        ("Maximum pages", "2.5", "Maximum pages must be a whole number."),
+        (
+            "Maximum link depth",
+            "",
+            "Maximum link depth is empty. Enter a whole number from 1 to 20.",
+        ),
+        ("Maximum link depth", "0", "Maximum link depth must be at least 1."),
+        (
+            "Maximum link depth",
+            "21",
+            "Maximum link depth can be at most 20 for a public website scan.",
+        ),
     ],
 )
 async def test_limits_are_validated_by_name_with_their_range(
@@ -362,12 +392,14 @@ async def test_limits_are_validated_by_name_with_their_range(
 
     await page.route("**/api/scans", refuse)
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    await page.get_by_role("textbox", name="Site URL", exact=True).fill("https://example.com/")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
     box = page.get_by_role("spinbutton", name=field, exact=True)
     # The range is in the field's description before anything goes wrong.
     hint_id = (await box.get_attribute("aria-describedby") or "").split()[0]
     await playwright_async.expect(page.locator(f"#{hint_id}")).to_contain_text(
-        "A whole number from 1 to"
+        "Enter a whole number from 1 to"
     )
     await box.fill(value)
     # An emptied box stays empty; it does not snap back to 0.
@@ -390,9 +422,9 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    limits = page.get_by_role("group", name="Limits and rule engine", exact=True)
+    limits = page.get_by_role("group", name="Limits and rule check tool", exact=True)
     await playwright_async.expect(
-        limits.get_by_role("spinbutton", name="Max link depth")
+        limits.get_by_role("spinbutton", name="Maximum link depth")
     ).to_be_visible()
     await playwright_async.expect(
         limits.locator("span.rounded-full[class*='h-3.5']")
@@ -405,32 +437,33 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
         (
             "public",
             [
-                "Click-Through (menus, tabs, dialogs)",
-                "Keyboard traps",
-                "Focus never hidden",
-                "Narrow screens and zoom",
-                "Text in images (OCR)",
+                "Opens menus and pop-up windows (Click-Through)",
+                "Keyboard check",
+                "Focus check",
+                "Zoom and layout check",
+                "Image text check",
             ],
             [
-                "Entire host",
+                "Pages behind a sign-in",
+                "Whole website",
                 "Subdomains",
-                "Image text review (vision model)",
-                "Wording review (local AI)",
-                "Motion and animation",
+                "Vision model review",
+                "AI review",
+                "Motion and reading-order check",
             ],
         ),
         (
             "login",
             [
-                "Click-Through (menus, tabs, dialogs)",
-                "Keyboard traps",
-                "Narrow screens and zoom",
+                "Opens menus and pop-up windows (Click-Through)",
+                "Keyboard check",
+                "Zoom and layout check",
             ],
             [
                 "Pages on any other website",
-                "Entire approved host",
-                "Text in images (OCR)",
-                "Image text review (vision model)",
+                "Whole signed-in website",
+                "Image text check",
+                "Vision model review",
             ],
         ),
     ],
@@ -450,7 +483,9 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
     await page.goto(f"{base}/app/scans/new?mode={mode}", wait_until="networkidle")
     summary = page.get_by_role("complementary", name="What this scan will do")
 
-    await playwright_async.expect(summary).to_contain_text("WCAG 2.1 AA, checked with axe-core")
+    await playwright_async.expect(summary).to_contain_text(
+        "WCAG 2.1 Level AA, checked with Rule check (axe)"
+    )
     assert await _rail_items(summary, "Checks that run") == included
     assert await _rail_items(summary, "Not included") == left_out
 
@@ -458,7 +493,7 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
         """Every check switch sits on the rail's side its state says."""
         on = set(await _rail_items(summary, "Checks that run"))
         off = set(await _rail_items(summary, "Not included"))
-        for group in ("Checks", "Local AI"):
+        for group in ("Checks", "AI checks on this computer"):
             switches = page.get_by_role("group", name=group, exact=True).get_by_role("switch")
             for index in range(await switches.count()):
                 switch = switches.nth(index)
@@ -468,12 +503,12 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
 
     await agrees()
     if mode == "public":
-        # Fast crawl makes the browser checks impossible: they move to Not
+        # Fast scan makes the browser checks impossible: they move to Not
         # included even though their switches still read on.
         await _open_speed(page)
-        await page.get_by_role("switch", name=re.compile(r"^Fast crawl without a browser")).check()
-        await playwright_async.expect(summary).to_contain_text("HTML only, no browser")
-        assert "Keyboard traps" in await _rail_items(summary, "Not included")
+        await page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser")).check()
+        await playwright_async.expect(summary).to_contain_text("Page code (HTML) only, no browser")
+        assert "Keyboard check" in await _rail_items(summary, "Not included")
         await agrees()
 
 
@@ -513,26 +548,26 @@ async def test_a_stopped_scan_is_restarted_with_its_settings_and_no_credentials(
     )
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-    edit = page.get_by_role("link", name="Edit settings and retry")
+    edit = page.get_by_role("link", name="Change settings first")
     await playwright_async.expect(edit).to_have_attribute("href", re.compile(rf"from={scan_id}$"))
     await edit.click()
 
     await playwright_async.expect(
         page.get_by_role("status").filter(
-            has_text=re.compile(rf"Settings copied from scan #?{scan_id}\b")
+            has_text=re.compile(rf"Axcess copied the settings from scan #?{scan_id}\b")
         )
     ).to_be_visible()
-    url = page.get_by_role("textbox", name="Site URL", exact=True)
+    url = page.get_by_role("textbox", name="Website address", exact=True)
     await playwright_async.expect(url).to_have_value("https://recover.example.test/docs/")
     summary = page.get_by_role("complementary", name="What this scan will do")
     await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
     await playwright_async.expect(summary).to_contain_text("Up to 321 pages, 4 clicks deep")
-    assert "Keyboard traps" in await _rail_items(summary, "Not included")
-    await playwright_async.expect(page.get_by_role("spinbutton", name="Max pages")).to_have_value(
-        "321"
-    )
+    assert "Keyboard check" in await _rail_items(summary, "Not included")
     await playwright_async.expect(
-        page.get_by_role("switch", name=re.compile(r"^Crawl the entire host"))
+        page.get_by_role("spinbutton", name="Maximum pages")
+    ).to_have_value("321")
+    await playwright_async.expect(
+        page.get_by_role("switch", name=re.compile(r"^Scan the whole website"))
     ).to_be_checked()
     await playwright_async.expect(
         page.get_by_role("group", name="WCAG version").get_by_role("radio", name="2.2", exact=True)
@@ -572,26 +607,28 @@ async def test_a_login_scan_restarts_on_its_tab_with_confirmations_unticked(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
     # A login scan cannot be retried without someone signing in.
-    await playwright_async.expect(page.get_by_role("button", name="Quick retry")).to_have_count(0)
-    edit = page.get_by_role("link", name="Edit settings and retry")
+    await playwright_async.expect(
+        page.get_by_role("button", name="Scan again with faster settings")
+    ).to_have_count(0)
+    edit = page.get_by_role("link", name="Change settings first")
     await playwright_async.expect(edit).to_have_attribute("href", re.compile(r"mode=login"))
 
     # Even a link that names the wrong tab lands on the scan's own.
     await page.goto(f"{base}/app/scans/new?from={scan_id}", wait_until="networkidle")
     await page.wait_for_url("**mode=login**")
     await playwright_async.expect(
-        page.get_by_role("status").filter(has_text="Sign-in is never saved")
+        page.get_by_role("status").filter(has_text="Axcess never saves your sign-in")
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("textbox", name="Page to scan after you sign in")
+        page.get_by_role("textbox", name="Website address to scan after you sign in")
     ).to_have_value("https://portal.example.test/courses/")
     await playwright_async.expect(
-        page.get_by_role("checkbox", name=re.compile(r"^I have authorization"))
+        page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan"))
     ).not_to_be_checked()
     await _open_speed(page)
-    await playwright_async.expect(page.get_by_role("spinbutton", name="Max pages")).to_have_value(
-        "40"
-    )
+    await playwright_async.expect(
+        page.get_by_role("spinbutton", name="Maximum pages")
+    ).to_have_value("40")
     await playwright_async.expect(
         page.get_by_role("spinbutton", name="Signed-in tabs")
     ).to_have_value("3")
@@ -624,20 +661,22 @@ async def test_failed_scan_explains_both_retries(
     await page.route("**/api/scans", capture)
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
     assert "balanced" not in (await page.content()).lower()
-    quick = page.get_by_role("button", name="Quick retry")
+    quick = page.get_by_role("button", name="Scan again with faster settings")
     hint = page.locator(f"#{await quick.get_attribute('aria-describedby')}")
     await playwright_async.expect(hint).to_contain_text(
-        "does not reuse this scan\u2019s other settings"
+        "It keeps only this scan\u2019s address and its Web Content Accessibility"
+        " Guidelines (WCAG) version."
     )
-    edit = page.get_by_role("link", name="Edit settings and retry")
+    edit = page.get_by_role("link", name="Change settings first")
     edit_hint = page.locator(f"#{await edit.get_attribute('aria-describedby')}")
     await playwright_async.expect(edit_hint).to_contain_text("this scan\u2019s settings filled in")
 
     await quick.click()
     await playwright_async.expect(
-        page.get_by_role("alert").filter(has_text="Couldn\u2019t restart")
+        page.get_by_role("alert").filter(has_text="Axcess could not start this scan again")
     ).to_be_visible()
-    # Quick retry is the defaults with Click-Through off, on the same address.
+    # "Scan again with faster settings" is the defaults with Click-Through
+    # off, on the same address.
     assert posted[-1]["url"] == "https://retry.example.test/"
     assert posted[-1]["skip_interaction"] is True
     assert posted[-1]["max_pages"] == 2500

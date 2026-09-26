@@ -1,4 +1,5 @@
 import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
+import { serverDate } from "../lib/serverTime";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -46,9 +47,9 @@ import {
   FINDING_TYPE_LABELS,
   REVIEW_LANES,
   REVIEW_LANE_HELP,
-  REVIEW_LANE_LABELS,
   isFindingType,
 } from "../lib/labels";
+import { REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 import type {
   ConformanceLabel,
@@ -174,12 +175,13 @@ export default function IssuesRoute() {
   if (error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this issue table. The stored scan evidence is unchanged.
+        The Issues table could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
   if (!scanQuery.data || !issuesQuery.data) {
-    return <p className="text-sm text-fg-muted" role="status">Loading issue table…</p>;
+    return <p className="text-sm text-fg-muted" role="status">Loading issues…</p>;
   }
 
   const scan = scanQuery.data;
@@ -245,7 +247,7 @@ export default function IssuesRoute() {
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
-          : `${rows.length} of ${data.total_unfiltered} issue groups shown` +
+          : `${rows.length} of ${data.total_unfiltered} issues shown` +
             (hasFilter ? ", filtered" : "") +
             // By type too, so a reader hears how many are barriers without
             // walking the Type column.
@@ -266,7 +268,7 @@ export default function IssuesRoute() {
           onParam={setParam}
           onResetFilters={resetFilters}
           onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="issue groups" {...paged} />}
+          pager={<TablePagination label="Issues" noun="issues" {...paged} />}
         />
         {/* Only for exactly one finding type: the link names one view. */}
         {isFindingType(findingType) && (
@@ -305,7 +307,7 @@ export default function IssuesRoute() {
           <TableEmpty>
             {hasFilter
               ? "No issues match these filters. Clear a filter to see more results."
-              : "No issue groups were detected. Check scan coverage before drawing a conformance conclusion."}
+              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See what was checked, above this table."}
           </TableEmpty>
         ) : (
           <IssueTable
@@ -385,16 +387,17 @@ function IssueToolbar({
       options: [
         ...REVIEW_LANES.map((key) => ({
           value: key,
-          label: REVIEW_LANE_LABELS[key],
+          label: REVIEW_TYPE_LABEL[key],
           count: laneCounts[key] ?? 0,
         })),
       ],
     },
-    // A mixed WCAG and Click-Through group is listed under both, so these
-    // counts can add up to more than the whole table.
+    // A mixed WCAG and Click-Through issue is listed under both, so these
+    // counts can add up to more than the whole table. Named as its column
+    // is ("Found by"): "finding" is not an interface word.
     {
       key: "finding_type",
-      label: "Finding type",
+      label: COLUMN_LABEL["Finding type"],
       value: findingType,
       multiple: true,
       options: [
@@ -412,7 +415,7 @@ function IssueToolbar({
     <TableBar pager={pager} footer={<ActiveFilters items={active} onClear={onClearFilters} />}>
       <TableSearch
         label="Search issues"
-        placeholder="Search issue name or WCAG criterion"
+        placeholder="Search by issue name or WCAG number, such as 1.4.3"
         value={q}
         onChange={(value) => onParam("q", value)}
       />
@@ -445,6 +448,23 @@ const COLUMNS = [
   "Responsibility",
 ] as const;
 type SortColumn = (typeof COLUMNS)[number];
+/**
+ * What each column header says. The column keys above stay as they are:
+ * they are the ``?sort=`` vocabulary and ``HIDDEN_ISSUE_FIELDS``' names.
+ * "Finding type" reads "Found by", because "finding" is not an interface
+ * word (docs/plain-language.md).
+ */
+const COLUMN_LABEL: Record<SortColumn, string> = {
+  Issue: "Issue",
+  Type: "Type",
+  "Finding type": "Found by",
+  WCAG: "WCAG",
+  Priority: "Priority",
+  Pages: "Pages",
+  Occurrences: "Occurrences",
+  Difficulty: "Difficulty",
+  Responsibility: "Who fixes it",
+};
 /** The columns drawn: every one not hidden for now (see ``HIDDEN_ISSUE_FIELDS``). */
 const VISIBLE_COLUMNS = COLUMNS.filter((column) => !HIDDEN_ISSUE_FIELDS.has(column));
 const shows = (column: SortColumn) => !HIDDEN_ISSUE_FIELDS.has(column);
@@ -516,7 +536,7 @@ function describeSort(sort: SortState): string {
   if (!sort) {
     return "Recommended order: barriers first, then needs review, then informational, highest priority first in each";
   }
-  return `Sorted by ${sort.column}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
+  return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
 const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, expert_review: 1, informational: 2 };
@@ -568,7 +588,7 @@ function compareRows(a: IssueRow, b: IssueRow, column: SortColumn): number {
   }
 }
 
-/** Whether the cell reads "n/a" (see ``IssueTableRow``), so it has no value to sort by. */
+/** Whether the cell reads "Does not apply" (see ``IssueTableRow``), so it has no value to sort by. */
 function notApplicable(row: IssueRow, column: SortColumn): boolean {
   const informational = row.review_lane === "informational";
   switch (column) {
@@ -590,8 +610,8 @@ function notApplicable(row: IssueRow, column: SortColumn): boolean {
  * score only orders rows *within* a lane. That is the order a reviewer should
  * work in, which is why it is the default.
  *
- * A column sort is flat. A cell that reads "n/a" sorts after every value in
- * both directions, as an empty cell does in a spreadsheet: "n/a" is not a
+ * A column sort is flat. A cell that reads "Does not apply" sorts after every
+ * value in both directions, as an empty cell does in a spreadsheet: it is not a
  * low priority, so it must not open the "low → high" order.
  */
 function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
@@ -623,7 +643,7 @@ function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
 function laneSummary(rows: IssueRow[]): string {
   const counts: Partial<Record<ReviewLane, number>> = {};
   for (const row of rows) counts[row.review_lane] = (counts[row.review_lane] ?? 0) + 1;
-  return REVIEW_LANES.map((lane) => `${REVIEW_LANE_LABELS[lane]} ${counts[lane] ?? 0}`).join(", ");
+  return REVIEW_LANES.map((lane) => `${REVIEW_TYPE_LABEL[lane]} ${counts[lane] ?? 0}`).join(", ");
 }
 
 /**
@@ -663,8 +683,8 @@ function IssueTable({
 }) {
   const offset = (paged.page - 1) * paged.pageSize;
   return (
-    <TableRegion label="Issue table" paged={paged} busy={busy} regionRef={regionRef}>
-      <Table caption={`Accessibility issue groups. ${describeSort(sort)}.`}>
+    <TableRegion label="Issues table" paged={paged} busy={busy} regionRef={regionRef}>
+      <Table caption={`Accessibility issues. ${describeSort(sort)}.`}>
         <TableHead>
           <tr>
             {/* No ``whitespace-nowrap`` on a header: when nine columns are
@@ -679,7 +699,11 @@ function IssueTable({
                 onSort={onSort}
                 className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
               >
-                {column}
+                {column === "WCAG" ? (
+                  <abbr title="Web Content Accessibility Guidelines">WCAG</abbr>
+                ) : (
+                  COLUMN_LABEL[column]
+                )}
               </SortHeader>
             ))}
           </tr>
@@ -745,7 +769,7 @@ const IssueTableRow = memo(function IssueTableRow({
           className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
         >
           {row.title}
-          <span className="sr-only">, full evidence</span>
+          <span className="sr-only">, full details</span>
         </Link>
       </RowHeader>
       <Cell className={cn(cell, "whitespace-nowrap")}>
@@ -768,7 +792,7 @@ const IssueTableRow = memo(function IssueTableRow({
       </Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {isInformational ? (
-          <span className="text-fg-muted">n/a</span>
+          <span className="whitespace-normal text-fg-muted">Does not apply</span>
         ) : (
           // The band, not the score: "11.28" means nothing to a reader,
           // and two decimals invited comparing issues by hundredths. The
@@ -795,7 +819,7 @@ const IssueTableRow = memo(function IssueTableRow({
       {shows("Difficulty") && (
         <Cell className={cn(cell, "whitespace-nowrap")}>
           {isInformational || row.difficulty === "Unknown" ? (
-            <span className="text-fg-muted">n/a</span>
+            <span className="whitespace-normal text-fg-muted">Does not apply</span>
           ) : (
             row.difficulty
           )}
@@ -804,7 +828,7 @@ const IssueTableRow = memo(function IssueTableRow({
       {shows("Responsibility") && (
         <Cell className={cn(cell, "whitespace-nowrap")}>
           {isInformational ? (
-            <span className="text-fg-muted">n/a</span>
+            <span className="whitespace-normal text-fg-muted">Does not apply</span>
           ) : (
             capitalize(row.responsibility)
           )}
@@ -825,7 +849,7 @@ function LaneTag({ lane }: { lane: ReviewLane }) {
           : "bg-sev-major-bg text-sev-major",
       )}
     >
-      {REVIEW_LANE_LABELS[lane]}
+      {REVIEW_TYPE_LABEL[lane]}
     </span>
   );
 }
@@ -866,14 +890,17 @@ function FindingTypePill({ type }: { type: FindingType }) {
  */
 function IssueGlossary() {
   return (
-    <ReportNote id="report-labels" title="What Barrier, Needs review and the other labels mean">
+    <ReportNote
+      id="report-labels"
+      title={`What ${REVIEW_TYPE_LABEL.likely_barrier}, ${REVIEW_TYPE_LABEL.expert_review} and the other labels mean`}
+    >
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2">
         <GlossaryList
           heading="Type: how sure the evidence is"
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
-          heading="Finding type: which checks found it"
+          heading={`${COLUMN_LABEL["Finding type"]}: which group of checks found it`}
           items={FINDING_TYPES.map((key) => ({ key, term: <FindingTypePill type={key} />, help: FINDING_TYPE_HELP[key] }))}
         />
       </div>
@@ -927,13 +954,14 @@ function FindingTypeViewLink({
     findingType === "alt_text"
       ? {
           to: `/scans/${scanId}/findings`,
-          label: `Browse every image finding (${imageCount.toLocaleString()})`,
-          note: "One card per image, with its text, alternative and status.",
+          // The Images view's own name, as the image text check calls it.
+          label: `Images (${imageCount.toLocaleString()})`,
+          note: "One card per image, with the text found in it, its alt text, and its status.",
         }
       : {
           to: `/scans/${scanId}/a11y`,
-          label: "Browse findings by WCAG criterion",
-          note: "Every DOM-engine result, grouped by success criterion, with its page and element.",
+          label: "Rule check issues by WCAG criterion",
+          note: "Every occurrence from the rule checks (axe and Alfa), grouped by WCAG criterion, with its page and element.",
         };
   return (
     <p className="flex flex-wrap items-center gap-x-2 border-b border-border px-3 py-1 text-xs text-fg-muted">
@@ -961,7 +989,7 @@ function priorityTier(priority: number): "High" | "Medium" | "Low" {
 
 /** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
 function formatCompleted(iso: string): string {
-  const at = new Date(iso);
+  const at = serverDate(iso);
   if (Number.isNaN(at.getTime())) return iso;
   return at.toLocaleString(undefined, {
     day: "numeric",

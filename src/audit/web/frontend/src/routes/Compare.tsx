@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleHelp, Info, X } from "lucide-react";
 import { api } from "../api/client";
-import type { ComparisonChange, ComparisonCoverageState, ComparisonReport } from "../api/types";
+import type { ComparisonChange, ComparisonCoverageState, ComparisonReport, DetectionPipeline } from "../api/types";
 import { Button, Card } from "../components/ui";
 import ReportHeader from "../components/ReportHeader";
 import ChangeTag, { CHANGES } from "../components/compare/ChangeTag";
@@ -19,11 +19,11 @@ import TrendChart from "../components/compare/TrendChart";
 import { count, plural } from "../components/compare/format";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { CHECK_LABEL } from "../lib/terms";
 
-const PIPELINES: Record<string, string> = {
-  axe: "axe-core", alfa: "Siteimprove Alfa", keyboard: "Keyboard", responsive: "Responsive",
-  focus: "Focus", visual: "Visual", semantic: "Semantic", image: "Images",
-};
+// Each check by its shared interface name (terms.ts), keyed as the API names it.
+const PIPELINE_KEYS: DetectionPipeline[] = ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"];
+const PIPELINES: Record<string, string> = Object.fromEntries(PIPELINE_KEYS.map((key) => [key, CHECK_LABEL[key]]));
 
 const isChange = (value: string | null): value is ComparisonChange =>
   (CHANGES as string[]).includes(value ?? "");
@@ -119,7 +119,7 @@ export default function CompareRoute() {
         scanId={id}
         previousScanId={scanQuery.data?.previous_scan_id ?? null}
         title="Compare scans"
-        meta="What changed since an earlier scan of this site: new, resolved and remaining issues, plus the trend over time."
+        meta="What changed since an earlier scan of this site: new issues, issues still found, and issues no longer found. The trend shows how the site changed over time."
         actions={
           <Button type="button" onClick={() => setTermsOpen(true)} className="rounded-full">
             <CircleHelp className="h-4 w-4" aria-hidden />
@@ -136,7 +136,7 @@ export default function CompareRoute() {
 
       {error && (
         <Card className="mb-4 p-4 text-sm text-sev-critical" role="alert">
-          {error instanceof Error ? error.message : "The comparison could not be loaded."}{" "}
+          {error instanceof Error ? error.message : "The comparison could not load. Try again later."}{" "}
           <Link className="report-link" to={`/scans/${id}/issues`}>Return to issues</Link>
         </Card>
       )}
@@ -150,7 +150,7 @@ export default function CompareRoute() {
             {historyQuery.error ? (
               <>
                 <h2 id="trend-heading" className="text-base font-semibold">Trend over time</h2>
-                <p className="mt-1 text-sm text-sev-critical" role="alert">The trend could not be loaded. The comparison below is unaffected.</p>
+                <p className="mt-1 text-sm text-sev-critical" role="alert">The trend could not load. Try again later. The comparison below still works.</p>
               </>
             ) : !history ? (
               <>
@@ -160,7 +160,7 @@ export default function CompareRoute() {
             ) : history.scans.length < 2 ? (
               <>
                 <h2 id="trend-heading" className="text-base font-semibold">Trend over time</h2>
-                <p className="mt-1 text-sm text-fg-muted">One completed scan so far. The trend appears once the site has been scanned again.</p>
+                <p className="mt-1 text-sm text-fg-muted">This site has one completed scan so far. The trend appears after you scan the site again.</p>
               </>
             ) : (
               <TrendChart
@@ -184,18 +184,18 @@ export default function CompareRoute() {
             <Card className="mb-5 p-4 text-sm leading-relaxed">
               <h2 className="font-semibold">Nothing earlier to compare with</h2>
               <p className="mt-1 text-fg-muted">
-                This is the first completed scan of this site. Scan the site again after fixing issues, then compare the two here.
-                {history && history.scans.length > 1 && " A later scan can be compared with this one from the trend above."}
+                This is the first completed scan of this site. Scan the site again after you fix issues, then compare the two here.
+                {history && history.scans.length > 1 && " To compare a later scan with this one, choose it in the trend above."}
               </p>
             </Card>
           )}
 
           {data.baseline && (
             // Not a region of its own: the table's scroll region inside is
-            // already the "Compared issue groups" landmark. Nothing clips
+            // already the "Compared issues" landmark. Nothing clips
             // it either: the Filter menu's panel hangs below the table's bar.
             <Card>
-              <h2 className="sr-only">Compared issue groups</h2>
+              <h2 className="sr-only">Compared issues</h2>
               <ComparedIssuesTable
                 rows={rows}
                 counts={{ ...data.changes, all: data.rows.length }}
@@ -219,7 +219,7 @@ export default function CompareRoute() {
           )}
           {data.baseline && data.rows.length < data.total && (
             <p className="mt-2 text-xs text-fg-muted">
-              Showing the first {data.rows.length} of {data.total} issue groups.
+              Showing the first {data.rows.length} of {data.total} issues.
             </p>
           )}
           {/* Last: the caveats behind the numbers above, read once the
@@ -257,7 +257,7 @@ function Comparison({
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <p className="font-semibold">
           Comparing this report with{" "}
-          <Link className="report-link" to={`/scans/${baseline.id}/issues`}>scan {baseline.id}</Link>
+          <Link className="report-link" to={`/scans/${baseline.id}/issues`}>report #{baseline.id}</Link>
         </p>
         {total !== null && (
           <span className="rounded-full border border-border bg-surface-muted px-3 py-1 text-xs font-semibold">
@@ -268,11 +268,11 @@ function Comparison({
           {settings.length === 0
             ? "Same site, same settings."
             : `Same site, but ${count(settings.length, "scan setting")} ${settings.length === 1 ? "differs" : "differ"}.`}{" "}
-          Click a number to filter.
+          Choose a number to filter the table.
         </p>
         {previousId !== null && previousId !== baseline.id && (
           <Link className="report-link" to={`/scans/${data.current.id}/compare?compare_to=${previousId}`}>
-            Compare with the previous scan, {previousId}, instead
+            Compare with the previous report (Report #{previousId}) instead
           </Link>
         )}
       </div>
@@ -280,11 +280,11 @@ function Comparison({
         <p className="mb-3 flex max-w-4xl items-start gap-2 rounded-xs border border-sev-major/30 bg-sev-major-bg px-3 py-2 text-sm text-sev-major">
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
-            The checks or pages differed between these scans, so{" "}
+            The checks or pages were different in these two scans. So{" "}
             {unsure === data.changes.new + data.changes.resolved
-              ? "these new and resolved groups"
-              : `${unsure} of the new and resolved groups (marked in the table)`}{" "}
-            may come from what was scanned rather than from changes to the site. Confirm them on the page. The coverage notes at the end of this page say what differed.
+              ? "the new issues and the issues no longer found"
+              : `${unsure} of the new issues and issues no longer found (marked in the table)`}{" "}
+            may come from what was scanned, not from changes to the site. Check them on the page. &ldquo;What was checked in each report&rdquo;, at the end of this page, says what was different.
           </span>
         </p>
       )}
@@ -307,7 +307,7 @@ function Comparison({
               <span className="mt-2 block text-3xl font-semibold leading-none tabular-nums text-fg">
                 {data.changes[key].toLocaleString()}
               </span>
-              <span className="sr-only"> {plural(data.changes[key], "issue group")}</span>
+              <span className="sr-only"> {plural(data.changes[key], "issue")}</span>
             </button>
           );
         })}
@@ -318,13 +318,17 @@ function Comparison({
 
 type CoveragePair = ComparisonReport["coverage"][number];
 
-/** A check's coverage in words, the same in the table and the differences. */
+/**
+ * What a check ran on, in words, the same in the table and the differences.
+ * The state words are the report's "What this scan checked" words: Ran,
+ * Partly ran, Not recorded, Not selected.
+ */
 function coverageText(coverage: ComparisonCoverageState): string {
-  if (coverage.state === "disabled") return "Off";
+  if (coverage.state === "disabled") return "Not selected";
   if (coverage.checked === null) return "Not recorded";
   if (coverage.state === "unknown") return `Tried on ${coverage.checked} of ${coverage.total} pages`;
-  if (coverage.state === "complete") return `All ${coverage.total} pages`;
-  return `${coverage.checked} of ${coverage.total} pages`;
+  if (coverage.state === "complete") return `Ran on all ${coverage.total} pages`;
+  return `Partly ran on ${coverage.checked} of ${coverage.total} pages`;
 }
 
 // Page totals differ whenever the page sets do, which a note already says.
@@ -332,9 +336,9 @@ const methodDiffers = ({ before, after }: CoveragePair) =>
   before.state !== after.state || before.checked !== after.checked;
 
 const LEGEND: Array<[string, string]> = [
-  ["Tried on", "the check started on these pages. Errors and limits within a page were not recorded."],
-  ["Not recorded", "the scan did not count the pages this check covered."],
-  ["Off", "the check was turned off in that scan’s settings."],
+  ["Tried on", "the check started on these pages. The scan did not record errors or limits within a page."],
+  ["Not recorded", "the scan did not count the pages this check ran on."],
+  ["Not selected", "the check was not chosen in that scan’s settings."],
 ];
 
 /**
@@ -358,7 +362,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
           body: (
             <>
               <strong>{count(data.settings_changed.length, "setting")}:</strong>{" "}
-              {data.settings_changed.map((name) => name.replaceAll("_", " ")).join(", ")}.
+              {data.settings_changed.map(settingName).join(", ")}.
             </>
           ),
         }]
@@ -368,8 +372,8 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
       body: (
         <>
           <strong>{PIPELINES[pair.pipeline] ?? pair.pipeline}:</strong>{" "}
-          {coverageText(pair.before).toLowerCase()} in scan {before},{" "}
-          {coverageText(pair.after).toLowerCase()} in scan {after}.
+          {coverageText(pair.before).toLowerCase()} in report #{before},{" "}
+          {coverageText(pair.after).toLowerCase()} in report #{after}.
         </>
       ),
     })),
@@ -378,7 +382,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
       body:
         note.scans.length === 1 ? (
           <>
-            <strong>Scan {note.scans[0]} only:</strong> {note.text}
+            <strong>Report #{note.scans[0]} only:</strong> {note.text}
           </>
         ) : (
           note.text
@@ -414,7 +418,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
             )}
             aria-hidden
           />
-          <span className="font-semibold">Coverage notes</span>
+          <span className="font-semibold">What was checked in each report</span>
           <span className="sr-only">:</span>{" "}
           {/* The verdict is in words, so its tint is never the only signal. */}
           <span
@@ -428,34 +432,34 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
             {verdict}
           </span>
           <span className="sr-only">.</span>{" "}
-          <span className="text-fg-muted">Read these before treating a resolved issue as fixed.</span>
+          <span className="text-fg-muted">Read these notes before you treat a missing issue as fixed.</span>
         </button>
       </h2>
       <div
         id="coverage-notes-panel"
         role="region"
-        aria-label="Coverage notes"
+        aria-label="What was checked in each report"
         hidden={!open}
         className="border-t border-border px-4 pb-5 pt-4 text-sm leading-relaxed"
       >
         <p className="flex max-w-3xl items-start gap-2">
           <Info className="mt-1 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
           <span>
-            Resolved means the later scan did not find the issue again. That is not proof of a fix: confirm it on the page
-            before you mark it remediated.
+            No longer found means the later scan did not find the issue again. That is not proof of a fix. Check the page
+            yourself before you mark the issue Fixed.
           </span>
         </p>
 
         <h3 className="mt-5 font-semibold">What differs between the scans</h3>
         {differences.length === 0 ? (
           <p className="mt-1 max-w-3xl">
-            Nothing. Both scans used the same settings and checked the same pages with the same checks, so a change in the
-            table is more likely to come from the site than from what was scanned.
+            Nothing. Both scans used the same settings, pages, and checks. So a change in the table most likely comes from
+            the site, not from what was scanned.
           </p>
         ) : (
           <>
             <p className="mt-1 max-w-3xl text-fg-muted">
-              These can make an issue look new or resolved when the site did not change.
+              These can make an issue look new or no longer found when the site did not change.
             </p>
             <ul className="mt-2 max-w-3xl list-disc space-y-1.5 pl-5">
               {differences.map((item) => <li key={item.key}>{item.body}</li>)}
@@ -476,10 +480,10 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                 <tr>
                   <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">Check</th>
                   <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
-                    Scan {before} <span className="font-normal text-fg-muted">(before)</span>
+                    Report #{before} <span className="font-normal text-fg-muted">(before)</span>
                   </th>
                   <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
-                    Scan {after} <span className="font-normal text-fg-muted">(after)</span>
+                    Report #{after} <span className="font-normal text-fg-muted">(after)</span>
                   </th>
                 </tr>
               </thead>
@@ -536,6 +540,42 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
   );
 }
 
+/**
+ * A changed setting by the name the New scan form gives it. The server sends
+ * the stored key ("keyboard_probe_enabled"); a reader should never see that.
+ */
+const SETTING_NAMES: Record<string, string> = {
+  alfa_enabled: CHECK_LABEL.alfa,
+  axe_enabled: CHECK_LABEL.axe,
+  keyboard_probe_enabled: CHECK_LABEL.keyboard,
+  responsive_checks_enabled: CHECK_LABEL.responsive,
+  focus_checks_enabled: CHECK_LABEL.focus,
+  visual_checks_enabled: CHECK_LABEL.visual,
+  semantic_enabled: CHECK_LABEL.semantic,
+  ocr_enabled: CHECK_LABEL.image,
+  vlm_enabled: "Image text check (vision model)",
+  image_extraction_enabled: "Images on pages",
+  interaction_checks_enabled: "Click-Through",
+  axe_level: "WCAG level",
+  wcag_version: "WCAG version",
+  max_pages: "Maximum pages",
+  max_depth: "Maximum link depth",
+  whole_host: "Whole website",
+  allow_subdomains: "Subdomains",
+  ignore_robots: "robots.txt",
+  browser_only: "Use a browser for every page",
+  js_eager: "Use a browser for every page",
+  store_rendered_html: "Save page copies",
+  search: "Search",
+  rps: "Pages per second",
+  browser_headless: "Show the browser",
+  resumable: "Resume after a stop",
+};
+
+function settingName(key: string): string {
+  return SETTING_NAMES[key] ?? key.replaceAll("_", " ");
+}
+
 /** The page's vocabulary. A native modal dialog, like the shortcuts list. */
 function TermsDialog({
   open,
@@ -549,17 +589,17 @@ function TermsDialog({
   currentId: number;
 }) {
   const ref = useModalDialog(open);
-  const earlier = baselineId !== null ? `scan ${baselineId}` : "the earlier scan";
-  const later = `scan ${currentId}`;
+  const earlier = baselineId !== null ? `report #${baselineId}` : "the earlier report";
+  const later = `report #${currentId}`;
   const terms: Array<[ComparisonChange | "group" | "occurrence", string, string]> = [
     ["new", "New", `Found in ${later} but not in ${earlier}. Check whether it is a new barrier.`],
     [
       "resolved",
-      "Resolved",
-      `Found in ${earlier} but not detected again in ${later}. That is not proof of a fix: confirm it on the page before you mark it remediated, especially where the checks differed between the scans.`,
+      "No longer found",
+      `Found in ${earlier}, but not found again in ${later}. That is not proof of a fix. Check the page yourself before you mark the issue Fixed, especially if the checks were different in the two scans.`,
     ],
-    ["remaining", "Remaining", "Found in both scans. Its number of occurrences can still go up or down."],
-    ["group", "Issue group", "One accessibility rule, or one kind of image problem, with every place it was found."],
+    ["remaining", "Still found", "Found in both scans. Its number of occurrences can still go up or down."],
+    ["group", "Issue", "One accessibility rule, or one kind of image problem, with every place it was found."],
     ["occurrence", "Occurrence", "One place an issue was found, counted as the Issues table counts it: an element repeated across pages counts once."],
   ];
   return (
@@ -584,7 +624,8 @@ function TermsDialog({
         ))}
       </dl>
       <p className="border-t border-border px-5 py-3 text-xs text-fg-muted">
-        These are changes in recorded evidence, not a conformance verdict. Review statuses track your team’s decisions separately.
+        This page shows changes in what the scans found. It does not show whether the site meets the Web Content
+        Accessibility Guidelines (WCAG). Statuses record your team’s decisions, separately from the scans.
       </p>
     </dialog>
   );

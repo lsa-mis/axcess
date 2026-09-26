@@ -9,10 +9,12 @@ the two in step.
 
 "Click-Through" is the one name for the feature that operates a page's
 controls (menus, tabs, dialogs, disclosures) and re-checks the content they
-reveal. What it reaches is a "view opened by clicking": plain words anyone
-can follow. Earlier copy called these "DOM states", "interaction states",
-"click-through DOM state discovery" and "Click-Through states"; none of those
-should reach a reader.
+reveal. What it reaches is a "page state opened by clicking", in the term
+docs/plain-language.md sets for how a page looked at one moment. Earlier copy
+called these "DOM states", "interaction states", "click-through DOM state
+discovery", "Click-Through states" and "views opened by clicking"; none of
+those should reach a reader. src/audit/web/frontend/src/lib/labels.ts mirrors
+these words.
 """
 
 from __future__ import annotations
@@ -27,13 +29,13 @@ CLICK_THROUGH = "Click-Through"
 # A page state reached by operating a control, in words that need no
 # glossary. Lower case, for use mid-sentence; a heading or a table column
 # uses CLICK_THROUGH_STATES_LABEL.
-CLICK_THROUGH_STATE = "view opened by clicking"
-CLICK_THROUGH_STATES = "views opened by clicking"
-CLICK_THROUGH_STATES_LABEL = "Views opened by clicking"
+CLICK_THROUGH_STATE = "page state opened by clicking"
+CLICK_THROUGH_STATES = "page states opened by clicking"
+CLICK_THROUGH_STATES_LABEL = "Page states opened by clicking"
 
 
 def click_through_states(count: int) -> str:
-    """``"1 view opened by clicking"`` / ``"3 views opened by clicking"``."""
+    """``"1 page state opened by clicking"`` / ``"3 page states opened by clicking"``."""
     return f"{count} {CLICK_THROUGH_STATE if count == 1 else CLICK_THROUGH_STATES}"
 
 
@@ -52,15 +54,16 @@ FINDING_TYPE_LABELS: dict[FindingType, str] = {
 
 FINDING_TYPE_HELP: dict[FindingType, str] = {
     "wcag": (
-        "Checked against WCAG rules in the page as it loaded: axe-core, Alfa, "
-        "the browser probes, and the semantic checks."
+        "Found at page load, by a rule check (axe or Alfa), a browser check such "
+        "as the keyboard check, or the AI review."
     ),
     "click_through": (
-        "Found only after operating a control (a menu, tab, dialog, or "
-        "disclosure). Reproduce it by using the control first."
+        "Found only in a page state opened by clicking a control, such as a menu, "
+        "tab, or dialog. Use that control first to see it."
     ),
     "alt_text": (
-        "Image evidence: text found in images and whether the alternative text says the same thing."
+        "Found by the image text check: text in an image, and whether its alt text "
+        "(what a screen reader reads) says the same."
     ),
 }
 
@@ -79,15 +82,16 @@ REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
 
 REVIEW_LANE_HELP: dict[ReviewLane, str] = {
     "likely_barrier": (
-        "A rule failed deterministically, so this is likely to block someone. "
-        "Fix it, then rescan to confirm."
+        "A check failed a fixed rule, so this is likely to block someone. "
+        "Fix it, then scan again to confirm the fix."
     ),
     "expert_review": (
-        "A lead from a browser probe, image analysis, or AI-assisted check. "
-        "A person must confirm it before it is reported as a barrier."
+        "A possible problem from a less certain check, such as the AI review or a "
+        "rule check that cannot tell. A person must confirm it before you report it "
+        "as a barrier."
     ),
     "informational": (
-        "Recorded for context, not a problem to fix, such as an image whose "
-        "alternative text already matches."
+        "Recorded for context, not a problem to fix, such as an image whose alt text "
+        "already says the same words."
     ),
 }

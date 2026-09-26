@@ -210,7 +210,7 @@ export default function DomSource({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-2xs text-fg-muted">
           {lines.length.toLocaleString()} lines
-          {truncated ? " (display capped; the capture continues past this point)" : ""}
+          {truncated ? " (only these lines are shown; the page code goes on past the last one)" : ""}
         </span>
         <span className="ml-auto flex flex-wrap gap-2">
           {markStarts.length > 0 && (
@@ -255,14 +255,14 @@ export default function DomSource({
           )}
           <Button type="button" size="sm" className="min-h-target" onClick={copy} aria-live="polite">
             {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-            {copied ? "Copied" : "Copy source"}
+            {copied ? "Copied" : "Copy page code"}
           </Button>
         </span>
       </div>
       <div
         ref={scrollRef}
         role="region"
-        aria-label="Loaded DOM source"
+        aria-label="Scrollable page code (DOM)"
         // Keyboard users need focus on the overflow region to scroll it.
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}

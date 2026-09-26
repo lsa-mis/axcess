@@ -202,7 +202,7 @@ export function TablePagination({
     <nav
       id={pagerId}
       tabIndex={-1}
-      aria-label={`${label} pagination`}
+      aria-label={`${label}: page controls`}
       className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2 rounded-xs focus:outline-none focus-visible:shadow-focus"
     >
       <p role="status" aria-live="polite" aria-atomic="true" className="text-sm text-fg-muted">

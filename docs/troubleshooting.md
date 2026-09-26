@@ -22,7 +22,7 @@ and the page title.
 - **401, or a sign-in page**: the pages need a login. Start a new scan on the
   **Site with a login or 2FA** tab, sign in yourself in the browser window
   Axcess opens, then select **I'm signed in, start scan**. A
-  [login scan](./glossary.md#login-scan) needs an `https://` address and a
+  [login scan](./glossary.md#sign-in-scan) needs an `https://` address and a
   site with a public internet address. It runs only in Axcess on your own
   computer, not in a copy hosted for a team.
 - **404**: check the address for a typo.

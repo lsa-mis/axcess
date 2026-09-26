@@ -1,4 +1,5 @@
 import { ENGINE, GROUPS, NUMBERS } from "./copy";
+import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import NumberField from "./NumberField";
 import PillGroup from "./PillGroup";
@@ -16,7 +17,7 @@ export default function LimitsGroup({ settings, update, policy, capabilities, er
   const errorFor = (field: "max_pages" | "max_depth") => errors.find((error) => error.field === field)?.message;
   const alfaOff = capabilities.alfa?.available === false;
   const alfaReason = alfaOff
-    ? `Siteimprove Alfa is unavailable: ${capabilities.alfa?.reason ?? "not installed"}.`
+    ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
     : undefined;
 
   return (

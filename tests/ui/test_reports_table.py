@@ -97,7 +97,7 @@ async def test_reports_table_keyboard_and_columns(
     )
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").nth(1).locator("th")).to_contain_text(
-        ["Pages", "Issues", "Images with text", "Views opened by clicking", "Completed", "Report"]
+        ["Pages", "Issues", "Images with text", "Page states", "Completed", "Report"]
     )
     completed = table.locator("thead tr").nth(1).locator("th").nth(4)
     await playwright_async.expect(completed).to_have_attribute("aria-sort", "descending")
@@ -111,9 +111,9 @@ async def test_reports_table_keyboard_and_columns(
         f"site{newest}.example"
     )
     headline_id = 7 + 2 * (newest - 1)
-    # The site's newest run was interrupted; the row shows only the completed
-    # one, and every grouped cell names the group.
-    await playwright_async.expect(row).not_to_contain_text("interrupted")
+    # The site's newest run was interrupted ("Stopped"); the row shows only
+    # the completed one, and every grouped cell names the group.
+    await playwright_async.expect(row).not_to_contain_text("Stopped")
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("2")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text("5")
@@ -141,8 +141,8 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(expanded).to_be_focused()
     scans = page.get_by_role("table", name=f"All scans for site{newest}.example, most recent first")
     await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
-    # Only the expanded list shows the interrupted run.
-    await playwright_async.expect(scans).to_contain_text("interrupted")
+    # Only the expanded list shows the interrupted run, as "Stopped".
+    await playwright_async.expect(scans).to_contain_text("Stopped")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -158,7 +158,7 @@ async def test_reports_table_keyboard_and_columns(
     await region.focus()
     await page.keyboard.press("ArrowRight")
     await playwright_async.expect(region).to_be_focused()
-    pagination = page.get_by_role("navigation", name="Public reports pagination")
+    pagination = page.get_by_role("navigation", name="Public reports: page controls")
     previous = pagination.get_by_role("button", name="Previous page of public reports")
     next_page = pagination.get_by_role("button", name="Next page of public reports")
     if site_count > 10:
@@ -216,7 +216,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(search).to_have_value("")
     await playwright_async.expect(site_rows).to_have_count(min(10, site_count))
 
-    link = scans.get_by_role("link", name=f"All issues for report {headline_id}")
+    link = scans.get_by_role("link", name=f"All issues for Report #{headline_id}")
     await link.focus()
     await playwright_async.expect(link).to_be_focused()
     await page.keyboard.press("Enter")

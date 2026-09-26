@@ -227,7 +227,7 @@ def test_api_scan_detail_reports_actual_method_coverage(
     assert methods["image"]["result"] == "No images found to analyze"
     assert methods["interaction"]["label"] == "Click-Through"
     assert methods["interaction"]["state"] == "checked"
-    assert methods["interaction"]["result"] == "2 pages checked; 5 views opened by clicking"
+    assert methods["interaction"]["result"] == "2 pages checked; 5 page states opened by clicking"
 
 
 def test_api_scan_detail_404(client: TestClient) -> None:

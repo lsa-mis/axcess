@@ -25,7 +25,7 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 expect = playwright_async.expect
 
-LABEL = "Status:"
+LABEL = "Change status to:"
 
 
 async def _status_select(new_page: Any, base: str) -> tuple[Any, Any]:
@@ -79,7 +79,7 @@ async def test_escape_closes_without_choosing(live_server: tuple[str, int], new_
     await expect(box).to_have_attribute("aria-expanded", "false")
     await expect(box).to_have_attribute("data-value", "new")
     # Nothing was staged, so there is nothing to save.
-    await expect(page.get_by_role("button", name="Save", exact=True)).to_be_disabled()
+    await expect(page.get_by_role("button", name="Save status", exact=True)).to_be_disabled()
     await expect(box).to_be_focused()
     await page.context.close()
 
@@ -91,9 +91,10 @@ async def test_typing_finds_an_option_and_home_returns_to_the_first(
     page, box = await _status_select(new_page, base)
 
     # Typing on the closed box opens it on the match.
+    # Options read their plain names, so "f" finds "Fixed" (remediated).
     await page.keyboard.press("f")
     await expect(box).to_have_attribute("aria-expanded", "true")
-    assert await _active_value(page, box) == "false_positive"
+    assert await _active_value(page, box) == "remediated"
     await page.keyboard.press("Home")
     assert await _active_value(page, box) == "new"
     await page.keyboard.press("i")
@@ -123,10 +124,10 @@ async def test_tab_chooses_the_highlighted_option_and_moves_on(
     await expect(box).not_to_be_focused()
     # "Moves on" means to the next control, Save, which the choice enabled;
     # "reviewing" needs no rationale, so Enter saves it straight away.
-    save = page.get_by_role("button", name="Save", exact=True)
+    save = page.get_by_role("button", name="Save status", exact=True)
     await expect(save).to_be_focused()
     await page.keyboard.press("Enter")
-    await expect(page.get_by_text("Status updated to reviewing", exact=True)).to_be_visible()
+    await expect(page.get_by_text("Status changed to Reviewing", exact=True)).to_be_visible()
     await expect(save).to_be_disabled()
     await page.context.close()
 
@@ -167,6 +168,6 @@ async def test_screen_readers_get_name_value_state_and_the_highlighted_option(
     await expect(listbox).to_be_visible()
     active = page.locator(f'[id="{await box.get_attribute("aria-activedescendant")}"]')
     await expect(active).to_have_role("option")
-    await expect(active).to_have_accessible_name("reviewing")
-    await expect(listbox.get_by_role("option", selected=True)).to_have_accessible_name("new")
+    await expect(active).to_have_accessible_name("Reviewing")
+    await expect(listbox.get_by_role("option", selected=True)).to_have_accessible_name("New")
     await page.context.close()

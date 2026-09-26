@@ -72,7 +72,8 @@ export function apiErrorMessage(status: number, body: string): string {
   } catch {
     // Not JSON (a proxy error page, an empty body). Fall through.
   }
-  return `${status}: ${body.slice(0, 200)}`;
+  const detail = body.trim().slice(0, 200);
+  return `Axcess could not complete this request (error ${status}). Try again later.${detail ? ` Details: ${detail}` : ""}`;
 }
 
 /**

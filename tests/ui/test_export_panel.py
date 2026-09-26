@@ -20,7 +20,12 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 expect = playwright_async.expect
 
-_FORMATS = ("Remediation workbook", "Audit report", "Issue table", "Raw findings")
+_FORMATS = (
+    "Issue list with fixes (Excel)",
+    "Written report (Markdown)",
+    "Occurrence list (CSV)",
+    "All report data (JSON)",
+)
 
 
 async def _open_by_keyboard(page: Any) -> Any:
@@ -39,8 +44,8 @@ async def test_panel_says_what_each_download_delivers(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await _open_by_keyboard(page)
 
-    panel = page.get_by_role("group", name=f"Export Scan {scan_id}")
-    await expect(panel.get_by_role("heading", name=f"Export Scan {scan_id}")).to_be_visible()
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    await expect(panel.get_by_role("heading", name=f"Export Report #{scan_id}")).to_be_visible()
     # Each link's name is its label alone; the format and the size are its
     # description, so a links list stays short.
     for name in _FORMATS:
@@ -50,8 +55,8 @@ async def test_panel_says_what_each_download_delivers(
         )
     # The seeded scan's expert review is unfinished.
     await expect(panel).to_contain_text("each file is marked DRAFT")
-    await expect(panel).to_contain_text("whatever the table\u2019s filters")
-    await expect(panel).to_contain_text("not a conformance verdict")
+    await expect(panel).to_contain_text("even if the table has filters on")
+    await expect(panel).to_contain_text("never prove")
 
     # Scoped to the panel: the rest of the page has its own axe coverage.
     await page.add_script_tag(content=_AXE_TEXT)
@@ -74,15 +79,15 @@ async def test_arrow_keys_move_between_downloads(
     trigger = await _open_by_keyboard(page)
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
-    await expect(link("Remediation workbook")).to_be_focused()
+    await expect(link("Issue list with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
-    await expect(link("Audit report")).to_be_focused()
+    await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("End")
-    await expect(link("Raw findings")).to_be_focused()
+    await expect(link("All report data (JSON)")).to_be_focused()
     await page.keyboard.press("ArrowUp")
-    await expect(link("Issue table")).to_be_focused()
+    await expect(link("Occurrence list (CSV)")).to_be_focused()
     await page.keyboard.press("Home")
-    await expect(link("Remediation workbook")).to_be_focused()
+    await expect(link("Issue list with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("Escape")
     await expect(trigger).to_be_focused()
     await expect(trigger).to_have_attribute("aria-expanded", "false")
@@ -95,7 +100,7 @@ async def test_download_reports_its_outcome_and_keeps_focus(
     page = await new_page(accept_downloads=True)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await _open_by_keyboard(page)
-    workbook = page.get_by_role("link", name="Remediation workbook", exact=True)
+    workbook = page.get_by_role("link", name="Issue list with fixes (Excel)", exact=True)
 
     async with page.expect_download() as download_info:
         await page.keyboard.press("Enter")
@@ -128,13 +133,15 @@ async def test_a_failed_download_is_reported_in_words(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_role("button", name="Export").click()
 
-    table = page.get_by_role("link", name="Issue table", exact=True)
+    table = page.get_by_role("link", name="Occurrence list (CSV)", exact=True)
     await table.click()
 
-    await expect(table).to_contain_text("Couldn\u2019t download. Export renderer crashed.")
-    announcement = page.get_by_role("status").filter(has_text="download the issue table")
+    await expect(table).to_contain_text(
+        "Axcess could not download this file. Export renderer crashed."
+    )
+    announcement = page.get_by_role("status").filter(has_text="could not download")
     await expect(announcement).to_have_text(
-        "Couldn\u2019t download the issue table. Export renderer crashed."
+        "Axcess could not download \u201cOccurrence list (CSV)\u201d. Export renderer crashed."
     )
     assert downloads == []
 
@@ -148,7 +155,7 @@ async def test_panel_stays_beside_the_content_when_the_header_wraps(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_role("button", name="Export").click()
 
-    panel = await page.get_by_role("group", name=f"Export Scan {scan_id}").bounding_box()
+    panel = await page.get_by_role("group", name=f"Export Report #{scan_id}").bounding_box()
     main = await page.locator("main").bounding_box()
     assert panel is not None and main is not None
     assert panel["x"] >= main["x"]
@@ -170,9 +177,10 @@ async def test_missing_sizes_are_explained_and_downloads_still_offered(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_role("button", name="Export").click()
 
-    panel = page.get_by_role("group", name=f"Export Scan {scan_id}")
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
     await expect(panel).to_contain_text(
-        "Couldn\u2019t check file sizes or draft status. The downloads still work."
+        "Axcess could not check the file sizes, or whether the files are drafts. "
+        "The downloads still work."
     )
     for name in _FORMATS:
         await expect(panel.get_by_role("link", name=name, exact=True)).to_be_visible()

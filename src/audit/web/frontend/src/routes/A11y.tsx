@@ -34,6 +34,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -111,7 +112,7 @@ export default function A11yRoute() {
   return (
     <>
       <PageHeader
-        title="WCAG DOM-engine findings"
+        title="Rule check issues by WCAG criterion"
         subtitle={scan.seed_url}
         actions={
           <>
@@ -126,7 +127,7 @@ export default function A11yRoute() {
               <ChevronRight className="h-4 w-4" aria-hidden />
             </LinkButton>
             <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
-              Image-of-text findings
+              Images (image text check)
               <ChevronRight className="h-4 w-4" aria-hidden />
             </LinkButton>
           </>
@@ -137,23 +138,23 @@ export default function A11yRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         <StatCard
-          label="Axe pages"
+          label="Pages checked (axe)"
           value={coverage.axe_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
         <StatCard
-          label="Alfa pages"
+          label="Pages checked (Alfa)"
           value={coverage.alfa_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
-        <StatCard label="Axe violations" value={coverage.axe_violations_total} />
-        <StatCard label="Alfa failed" value={coverage.alfa_failed_total} />
-        <StatCard label="Alfa review leads" value={coverage.alfa_cant_tell_total} />
+        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
+        <StatCard label="Needs review (Alfa)" value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
         <StatCard label="Level AA" value={rollup.by_level.AA} tone="major" />
         <StatCard label="Level AAA" value={rollup.by_level.AAA} tone="minor" />
         <StatCard
-          label="Best-practice"
+          label="Best practice"
           value={rollup.by_level.best_practice}
           tone="info"
         />
@@ -161,11 +162,11 @@ export default function A11yRoute() {
 
       {noDomPagesScanned ? (
         <EmptyState
-          title="No pages were evaluated by a DOM engine"
-          message="Start a new scan and select axe-core, Siteimprove Alfa, or both. Axe requires Axcess browser rendering; Alfa can also run when static-only crawl mode is selected."
+          title="No rule check ran in this scan"
+          message="Start a new scan and choose Rule check (axe), Rule check (Alfa), or both. The axe check needs Axcess to open pages in a browser. The Alfa check also works in static-only mode, where the scan reads page code without a browser."
           action={
             <LinkButton to="/scans/new" variant="primary">
-              New scan
+              Start a new scan
             </LinkButton>
           }
         />
@@ -182,8 +183,8 @@ export default function A11yRoute() {
         />
       ) : rollup.groups.length === 0 ? (
         <EmptyState
-          title="No retained WCAG DOM-engine findings"
-          message="The selected engine(s) returned no failed or expert-review outcomes. Manual review is still required before making a conformance claim."
+          title="The rule checks found no issues"
+          message="The rule checks you chose found nothing that failed or needs review. A person still needs to test the site by hand. Automated checks alone cannot show that a site meets WCAG."
         />
       ) : (
         <RollupView scanId={id} groups={rollup.groups} />
@@ -197,7 +198,7 @@ function ScopeBanner() {
     <Card
       className="mb-4 border-umich-blue/30 bg-umich-blue/5 p-4"
       role="note"
-      aria-label="What this view shows"
+      aria-label="What this page shows"
     >
       <div className="flex items-start gap-3">
         <Info
@@ -205,15 +206,17 @@ function ScopeBanner() {
           aria-hidden
         />
         <p className="text-sm text-fg">
-          <strong>What this view shows.</strong> Each finding retains its source:
-          <strong> axe-core</strong> or <strong> Siteimprove Alfa</strong>. Axe
-          evaluates deterministic browser rules. Alfa evaluates independent
-          <strong> ACT (Accessibility Conformance Testing) rules</strong> on its
-          own local browser capture. Each standardized ACT rule checks one
-          specific condition and can return pass, fail, or <code>cantTell</code>.
-          A failed rule is evidence about that condition, not proof that the whole
-          page or site fails WCAG. A <code>cantTell</code> result needs an expert
-          decision.
+          <strong>What this page shows.</strong> Each occurrence names the check
+          that found it: <strong>Rule check (axe)</strong> or{" "}
+          <strong>Rule check (Alfa)</strong>. Both test pages against fixed
+          rules. Alfa is a separate tool. It opens its own copy of each page in a
+          browser on this computer and uses standard test rules
+          (<strong>ACT, Accessibility Conformance Testing</strong>). Each rule
+          tests one thing, for example that an image has alt text. A rule can
+          pass, fail, or say it cannot tell (<code>cantTell</code>). A failed rule
+          shows a problem with that one thing. It does not prove that the whole
+          page or site fails the Web Content Accessibility Guidelines (WCAG).
+          When a rule cannot tell, a person needs to review it.
         </p>
       </div>
     </Card>
@@ -224,7 +227,7 @@ function RollupView({ scanId, groups }: { scanId: number; groups: A11ySCGroup[] 
   return (
     <div className="space-y-3">
       <h2 className="text-base font-semibold text-fg-subtle">
-        Failures by WCAG success criterion
+        Issues by WCAG criterion
       </h2>
       {groups.map((g) => (
         <SCGroupCard key={g.wcag_sc ?? "best-practice"} scanId={scanId} group={g} />
@@ -247,10 +250,10 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
               to={`/scans/${scanId}/a11y?${linkParams}`}
               className="text-umich-blue underline underline-offset-2"
             >
-              SC {group.wcag_sc}
+              WCAG {group.wcag_sc}
             </Link>
           ) : (
-            <span>Best-practice (no SC)</span>
+            <span>Best practice (no WCAG criterion)</span>
           )}
           {group.wcag_level && (
             <span className="ml-2 text-sm font-normal text-fg-muted">
@@ -260,7 +263,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
         </h3>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          violation{group.violation_count !== 1 ? "s" : ""} on{" "}
+          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -274,11 +277,12 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <code className="font-mono text-sm text-fg">{r.rule_id}</code>
               <span className="rounded-full bg-surface px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-                {r.pipeline === "alfa" ? "Siteimprove Alfa" : r.pipeline === "axe" ? "axe-core" : r.pipeline}
+                {CHECK_LABEL[r.pipeline] ?? r.pipeline}
               </span>
               {r.impact && <ImpactChip value={r.impact} />}
               <span className="text-xs text-fg-muted">
-                {r.violation_count} ×, on {r.page_count} page
+                {r.violation_count} occurrence{r.violation_count !== 1 ? "s" : ""} on{" "}
+                {r.page_count} page
                 {r.page_count !== 1 ? "s" : ""}
               </span>
             </div>
@@ -290,8 +294,9 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                 rel="noopener noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
               >
-                {r.pipeline === "alfa" ? "Alfa rule docs" : "rule docs"}{" "}
+                {r.pipeline === "alfa" ? "About this rule (Alfa)" : "About this rule"}{" "}
                 <ExternalLink className="h-3 w-3" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
               </a>
             )}
           </li>
@@ -323,7 +328,7 @@ function DrillDownView({
   // A new SC or status filter starts the table over at page 1.
   const paged = usePagedRows(drill, { resetKey: `${wcagSc}|${status}` });
   // The option labels carry the count so the triager can see at a glance
-  // how many findings sit in each bucket before choosing.
+  // how many occurrences sit in each status before choosing.
   const filters: FilterGroup[] = [
     {
       key: "status",
@@ -333,7 +338,7 @@ function DrillDownView({
         { value: "", label: "All" },
         ...STATUS_OPTIONS.map((s) => ({
           value: s,
-          label: s.replace(/_/g, " "),
+          label: STATUS_OPTION_LABEL[s],
           count: statusCounts[s] ?? 0,
         })),
       ],
@@ -343,10 +348,10 @@ function DrillDownView({
     <>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">
-          SC {wcagSc}
+          {wcagSc ? `WCAG ${wcagSc}` : "Best practice (no WCAG criterion)"}
           {group && (
             <span className="ml-2 text-sm font-normal text-fg-muted">
-              · {group.violation_count} violation
+              · {group.violation_count} occurrence
               {group.violation_count !== 1 ? "s" : ""} on {group.page_count}{" "}
               page{group.page_count !== 1 ? "s" : ""}
               {group.wcag_level && ` · Level ${group.wcag_level}`}
@@ -357,7 +362,7 @@ function DrillDownView({
           to={`/scans/${scanId}/a11y`}
           className="text-sm text-umich-blue underline underline-offset-2"
         >
-          ← Back to all SCs
+          ← Back to all WCAG criteria
         </Link>
       </div>
 
@@ -366,7 +371,7 @@ function DrillDownView({
           emptied the table is still there to undo. */}
       <Card>
         <TableBar
-          pager={<TablePagination label="Findings" noun="findings" {...paged} />}
+          pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />}
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
         >
           <FilterMenu
@@ -378,15 +383,15 @@ function DrillDownView({
         <TableStatus>
           {loading
             ? "Loading…"
-            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "finding" : "findings"}, sorted by impact.`}
+            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "occurrence" : "occurrences"}, most serious impact first.`}
         </TableStatus>
         {loading ? null : drill.length === 0 ? (
           <TableEmpty>
-            No drill-down rows
+            No occurrences
             {status && (
               <>
                 {" "}
-                matching status <strong>{status}</strong>.{" "}
+                have the status <strong>{STATUS_LABEL[status]}</strong>.{" "}
                 <button
                   type="button"
                   onClick={() => onStatusFilterChange("")}
@@ -396,18 +401,20 @@ function DrillDownView({
                 </button>
               </>
             )}
-            {!status && <> for this SC.</>}
+            {!status && <> for this WCAG criterion.</>}
           </TableEmpty>
         ) : (
-          <TableRegion label="DOM-engine findings table" paged={paged}>
-            <Table caption={`DOM-engine findings for SC ${wcagSc}, sorted by impact`}>
+          <TableRegion label="Rule check occurrences table" paged={paged}>
+            <Table
+              caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
+            >
               <TableHead>
                 <tr>
                   <ColumnHeader>Rule</ColumnHeader>
-                  <ColumnHeader>Source</ColumnHeader>
+                  <ColumnHeader>Check</ColumnHeader>
                   <ColumnHeader>Impact</ColumnHeader>
                   <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Target selector</ColumnHeader>
+                  <ColumnHeader>Element locator (CSS selector)</ColumnHeader>
                   <ColumnHeader>Status</ColumnHeader>
                 </tr>
               </TableHead>
@@ -427,14 +434,14 @@ function DrillDownView({
                       )}
                     </Cell>
                     <Cell className="text-xs text-fg-muted">
-                      {f.pipeline === "alfa" ? "Siteimprove Alfa" : f.pipeline === "axe" ? "axe-core" : f.pipeline}
+                      {CHECK_LABEL[f.pipeline] ?? f.pipeline}
                       {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
-                        <span className="mt-1 block">Needs expert review</span>
+                        <span className="mt-1 block">Needs review</span>
                       )}
                     </Cell>
                     <Cell>
                       {f.impact ? <ImpactChip value={f.impact} /> : (
-                        <span className="text-fg-muted">n/a</span>
+                        <span className="text-fg-muted">Does not apply</span>
                       )}
                     </Cell>
                     <Cell className="max-w-xs">
@@ -445,7 +452,7 @@ function DrillDownView({
                         pageTitle={f.page_title}
                         selector={f.target_selector}
                         snippet={f.html_snippet}
-                        origin="DOM-engine findings"
+                        origin="Rule check issues by WCAG criterion"
                         context={f.rule_id}
                         backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
                       />
@@ -459,7 +466,7 @@ function DrillDownView({
                       {f.html_snippet && (
                         <details className="mt-1">
                           <summary className="cursor-pointer text-2xs text-fg-muted">
-                            show HTML
+                            Show element code (HTML)
                           </summary>
                           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
                             {f.html_snippet}
@@ -467,7 +474,7 @@ function DrillDownView({
                         </details>
                       )}
                       <AlfaEvidenceNote evidence={f} />
-                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "DOM-engine findings", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open stored finding evidence</Link>
+                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
                       {f.failure_summary && (
                         <div className="mt-1 text-2xs text-fg-muted">
                           {f.failure_summary}
@@ -526,12 +533,12 @@ function StatusCell({
       <Select
         hideLabel
         id={`status-${findingId}`}
-        label={`Triage status for finding ${findingId}`}
+        label={`Status for occurrence ${findingId}`}
         value={current}
         onChange={(next) => {
           const rationale = requestStatusRationale(
             next as FindingStatus,
-            `finding #${findingId}`,
+            `occurrence #${findingId}`,
           );
           // Declining the rationale leaves the value where it was. The select
           // is controlled, so React restores it on the next render without the
@@ -540,15 +547,15 @@ function StatusCell({
           mutation.mutate({ next: next as FindingStatus, rationale });
         }}
         disabled={mutation.isPending}
-        options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
       />
       {mutation.isError ? (
         <span className="text-2xs text-sev-critical" role="alert">
-          Save failed
+          Status not saved. Try again.
         </span>
       ) : mutation.isSuccess ? (
         <span className="text-2xs text-fg-muted" role="status">
-          Saved
+          Status saved
         </span>
       ) : null}
     </div>

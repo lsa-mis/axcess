@@ -41,7 +41,7 @@ import { Button } from "./ui";
 const FORMATS: {
   format: ExportFormat;
   badge: string;
-  /** The badge's tint. The badge is decorative (the hint names the format),
+  /** The badge's tint. The badge is decorative (the label names the format),
    *  but its text still clears 7:1 on its tint in every theme. */
   tone: string;
   label: string;
@@ -51,29 +51,29 @@ const FORMATS: {
     format: "xlsx",
     badge: "XLSX",
     tone: "bg-umich-blue/10 text-umich-blue",
-    label: "Remediation workbook",
-    hint: "Excel · one row per issue, with fixes",
+    label: "Issue list with fixes (Excel)",
+    hint: "One row per issue, with how to fix it",
   },
   {
     format: "audit",
     badge: "MD",
     tone: "bg-sev-info-bg text-sev-info",
-    label: "Audit report",
-    hint: "Markdown · narrative report",
+    label: "Written report (Markdown)",
+    hint: "The whole report as readable text",
   },
   {
     format: "csv",
     badge: "CSV",
     tone: "bg-sev-minor-bg text-sev-minor",
-    label: "Issue table",
-    hint: "CSV · one row per occurrence",
+    label: "Occurrence list (CSV)",
+    hint: "One row for each place an issue appears",
   },
   {
     format: "json",
     badge: "JSON",
     tone: "bg-sev-major-bg text-sev-major",
-    label: "Raw findings",
-    hint: "JSON · full evidence payload",
+    label: "All report data (JSON)",
+    hint: "Every detail the scan saved, for developers",
   },
 ];
 
@@ -101,12 +101,12 @@ export default function ExportMenu({
   shownIssueGroups,
 }: {
   scanId: number;
-  /** The report's site, pages and issue groups, under the panel's heading,
+  /** The report's site, pages and issues, under the panel's heading,
    *  so the reader can see which report they are taking away. */
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Issue groups the table shows now; pass it only while a filter or a
+  /** Issues the table shows now; pass it only while a filter or a
    *  search narrows the table. */
   shownIssueGroups?: number;
 }) {
@@ -227,7 +227,7 @@ export default function ExportMenu({
 
   async function download(entry: (typeof FORMATS)[number]) {
     setDownloads((previous) => ({ ...previous, [entry.format]: { kind: "preparing" } }));
-    setAnnouncement(`Preparing the ${entry.label.toLowerCase()}…`);
+    setAnnouncement(`Preparing “${entry.label}”…`);
     try {
       const result = await api.downloadExport(scanId, entry.format);
       setDownloads((previous) => ({
@@ -241,7 +241,7 @@ export default function ExportMenu({
           ? error.message
           : "The Axcess server did not respond. Check that it is still running.";
       setDownloads((previous) => ({ ...previous, [entry.format]: { kind: "failed", message } }));
-      setAnnouncement(`Couldn’t download the ${entry.label.toLowerCase()}. ${message}`);
+      setAnnouncement(`Axcess could not download “${entry.label}”. ${message}`);
     }
   }
 
@@ -260,15 +260,15 @@ export default function ExportMenu({
   const facts = [
     site,
     pageCount === undefined ? "" : plural(pageCount, "page", "pages"),
-    issueGroups === undefined ? "" : plural(issueGroups, "issue group", "issue groups"),
+    issueGroups === undefined ? "" : plural(issueGroups, "issue", "issues"),
   ]
     .filter(Boolean)
     .join(" · ");
   const scopeNote =
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Includes all ${plural(issueGroups, "issue group", "issue groups")} and their statuses, ` +
+    ? `Includes all ${plural(issueGroups, "issue", "issues")} and their statuses, ` +
       `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-    : "Includes every issue and status in this report, whatever the table’s filters.";
+    : "Includes every issue and status in this report, even if the table has filters on.";
 
   return (
     <div ref={containerRef} className="relative">
@@ -286,7 +286,7 @@ export default function ExportMenu({
         ) : (
           <Download className="h-4 w-4" aria-hidden />
         )}
-        Export
+        Export report
         <ChevronDown
           className={cn("h-3.5 w-3.5 motion-safe:transition-transform", open && "rotate-180")}
           aria-hidden
@@ -313,7 +313,7 @@ export default function ExportMenu({
       >
         <div className="border-b border-border px-4 pb-3 pt-3.5">
           <h2 id={headingId} className="text-base font-semibold leading-6 text-fg">
-            Export Scan {scanId}
+            Export Report #{scanId}
           </h2>
           {facts && (
             <p className="mt-0.5 text-xs text-fg-muted [overflow-wrap:anywhere]">{facts}</p>
@@ -402,18 +402,19 @@ export default function ExportMenu({
             <p className="flex items-start gap-1 text-fg">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
               <span>
-                Couldn’t check file sizes or draft status. The downloads still work.
+                Axcess could not check the file sizes, or whether the files are drafts. The
+                downloads still work.
               </span>
             </p>
           )}
           {options.data?.draft && (
             <p className="font-semibold text-fg">
-              Expert review of this report isn’t finished, so each file is marked DRAFT.
+              An expert has not finished reviewing this report, so each file is marked DRAFT.
             </p>
           )}
           <p>
-            {scopeNote} Automated results are evidence for expert review, not a conformance
-            verdict.
+            {scopeNote} Automated results are for an expert to review. They never prove that a
+            site meets accessibility rules.
           </p>
         </div>
       </div>
@@ -443,7 +444,7 @@ function DownloadLine({ id, state }: { id: string; state: DownloadState }) {
     <span id={id} className="mt-0.5 flex items-start gap-1 text-xs text-sev-critical">
       <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>
-        Couldn’t download. {state.message} Choose it again to retry.
+        Axcess could not download this file. {state.message} To try again, choose the file again.
       </span>
     </span>
   );

@@ -27,6 +27,7 @@ import {
 import { requestStatusRationale } from "../statusDecision";
 import { usePreferences } from "../hooks/usePreferences";
 import { messageDuration } from "../lib/preferences";
+import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUSES: FindingStatus[] = [
   "new",
@@ -80,19 +81,19 @@ export default function FindingDetailRoute() {
     onSuccess: (_, { next }) => {
       qc.invalidateQueries({ queryKey: ["finding", id] });
       qc.invalidateQueries({ queryKey: ["findings"] });
-      showToast(`Status updated to ${next}`);
+      showToast(`Status changed to ${STATUS_LABEL[next]}`);
     },
     onError: () => {
       setStatus(data?.status ?? null);
-      showToast("Status not saved");
+      showToast("Status not saved. Try again.");
     },
   });
 
   const attemptSave = useCallback((next: FindingStatus) => {
-    const rationale = requestStatusRationale(next, `finding #${id}`);
+    const rationale = requestStatusRationale(next, `image #${id}`);
     if (rationale === null) {
       setStatus(data?.status ?? null);
-      showToast("Status unchanged");
+      showToast("Status not changed");
       return;
     }
     setStatus(next);
@@ -144,14 +145,14 @@ export default function FindingDetailRoute() {
       <PageHeader
         crumbs={[
           { label: "Reports", to: "/scans" },
-          { label: `Scan ${data.scan_id}`, to: `/scans/${data.scan_id}` },
-          { label: "Findings", to: `/scans/${data.scan_id}/findings` },
-          { label: `Finding #${data.id}` },
+          { label: `Report #${data.scan_id}`, to: `/scans/${data.scan_id}` },
+          { label: "Images", to: `/scans/${data.scan_id}/findings` },
+          { label: `Image #${data.id}` },
         ]}
         title={
           <div className="flex items-center gap-3">
             <SeverityChip value={data.severity} />
-            <span>Finding #{data.id}</span>
+            <span>Image #{data.id}</span>
           </div>
         }
         subtitle={
@@ -165,7 +166,7 @@ export default function FindingDetailRoute() {
             variant="secondary"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to findings
+            Back to images
           </LinkButton>
         }
       />
@@ -174,9 +175,10 @@ export default function FindingDetailRoute() {
         <Card className="flex items-center justify-center overflow-hidden bg-[repeating-conic-gradient(theme(colors.border.DEFAULT)_0_25%,transparent_0_50%)] [background-size:24px_24px]">
           {data.has_svg_text ? (
             <div className="p-8 text-center">
-              <strong className="text-fg">Inline SVG</strong>
+              <strong className="text-fg">Graphic in the page code (inline SVG)</strong>
               <p className="mt-1 text-sm text-fg-muted">
-                Embedded directly in the page, no image file stored.
+                It is part of the page itself, so Axcess has no image file to
+                show.
               </p>
             </div>
           ) : data.content_hash ? (
@@ -188,14 +190,14 @@ export default function FindingDetailRoute() {
               // (jsx-a11y/img-redundant-alt). The wider page chrome makes
               // it clear *why* the graphic is on screen; the alt only needs
               // to convey what it is.
-              alt="Audited graphic"
+              alt="Graphic under review"
               className="max-h-[480px] w-full bg-white object-contain"
               {...(data.width ? { width: data.width } : {})}
               {...(data.height ? { height: data.height } : {})}
             />
           ) : (
             <div className="p-8 text-sm text-fg-muted">
-              No image blob available
+              No saved image file
             </div>
           )}
         </Card>
@@ -203,30 +205,32 @@ export default function FindingDetailRoute() {
         <div className="flex flex-col gap-4">
           <Card className="p-4">
             <h2 className="mb-3 text-sm font-semibold text-fg-subtle">
-              Decision grid
+              What Axcess found
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <VerdictCell label="Image text (OCR)">
+              <VerdictCell label="Text read from image (OCR)">
                 {data.ocr_text ? (
                   <div className="whitespace-pre-wrap font-mono text-sm text-fg">
                     {data.ocr_text}
                     <div className="mt-1 text-xs text-fg-muted">
-                      confidence {Math.round(data.ocr_confidence ?? 0)}%
+                      Confidence: {Math.round(data.ocr_confidence ?? 0)}%
                     </div>
                   </div>
                 ) : (
-                  <em className="text-sm text-fg-subtle">no text detected</em>
+                  <em className="text-sm text-fg-subtle">No text found</em>
                 )}
               </VerdictCell>
-              <VerdictCell label="Alt attribute">
+              <VerdictCell label="Alt text">
                 <AltTag value={firstAlt} />
               </VerdictCell>
             </div>
             {(data.vlm_classification || data.vlm_rationale) && (
               <div className="mt-3">
-                <VerdictCell label="VLM classification">
+                <VerdictCell label="Image type, suggested by AI (vision model)">
                   <strong className="text-fg">
-                    {data.vlm_classification ?? "n/a"}
+                    {data.vlm_classification
+                      ? sentenceCase(data.vlm_classification)
+                      : "Not classified"}
                   </strong>
                   {data.vlm_rationale && (
                     <p className="mt-1 text-sm italic text-fg-muted">
@@ -248,7 +252,7 @@ export default function FindingDetailRoute() {
 
           <Card className="p-4">
             <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-fg-subtle">
-              <span>Triage status</span>
+              <span>Status</span>
               {toast && (
                 <span className="flex items-center gap-1">
                   <span
@@ -264,7 +268,7 @@ export default function FindingDetailRoute() {
                       onClick={() => setToast(null)}
                       className="inline-flex min-h-target items-center rounded-xs px-2 text-2xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
                     >
-                      Dismiss
+                      Dismiss message
                     </button>
                   )}
                 </span>
@@ -279,10 +283,10 @@ export default function FindingDetailRoute() {
             <div className="flex flex-wrap items-center gap-3">
               <Select
                 id="status-select"
-                label="Status:"
+                label="Change status to:"
                 value={status ?? data.status}
                 onChange={(next) => setStatus(next as FindingStatus)}
-                options={STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+                options={STATUSES.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
               />
               <Button
                 variant="primary"
@@ -290,13 +294,18 @@ export default function FindingDetailRoute() {
                 onClick={() => status && attemptSave(status)}
                 disabled={save.isPending || status === data.status}
               >
-                Save
+                Save status
               </Button>
             </div>
             <p className="mt-2 text-2xs text-fg-muted">
-              Or press: <kbd>0</kbd>=new <kbd>1</kbd>=reviewing{" "}
-              <kbd>2</kbd>=in_progress <kbd>3</kbd>=remediated{" "}
-              <kbd>4</kbd>=accepted_risk <kbd>5</kbd>=false_positive
+              Or press a number key:{" "}
+              {Object.entries(STATUS_KEY_MAP).map(([key, value], index) => (
+                <span key={key}>
+                  {index > 0 && ", "}
+                  <kbd>{key}</kbd> {STATUS_OPTION_LABEL[value]}
+                </span>
+              ))}
+              .
             </p>
           </Card>
         </div>
@@ -312,12 +321,12 @@ export default function FindingDetailRoute() {
             <TableBar pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />} />
           )}
           <TableRegion label="Occurrences table" paged={paged}>
-            <Table caption={`Occurrences of finding #${data.id}`}>
+            <Table caption={`Occurrences of image #${data.id}`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
                   <ColumnHeader>Alt text on that page</ColumnHeader>
-                  <ColumnHeader>Above fold</ColumnHeader>
+                  <ColumnHeader>Visible without scrolling</ColumnHeader>
                 </tr>
               </TableHead>
               <tbody>
@@ -329,8 +338,8 @@ export default function FindingDetailRoute() {
                         scanId={data.scan_id}
                         pageUrl={o.page_url}
                         pageTitle={null}
-                        origin={`Finding #${id}`}
-                        context={`Finding ${id}`}
+                        origin={`Image #${id}`}
+                        context={`Image ${id}`}
                         contextTo={`/findings/${id}`}
                         backTo={`/findings/${id}`}
                       />
@@ -339,7 +348,7 @@ export default function FindingDetailRoute() {
                       <AltTag value={o.alt_text} />
                     </Cell>
                     <Cell className="text-fg-muted">
-                      {o.above_fold ? "yes" : "no"}
+                      {o.above_fold ? "Yes" : "No"}
                     </Cell>
                   </Row>
                 ))}
@@ -350,6 +359,12 @@ export default function FindingDetailRoute() {
       )}
     </>
   );
+}
+
+/** A stored value as sentence-case words: "no_meaningful_text" -> "No meaningful text". */
+function sentenceCase(value: string): string {
+  const words = value.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function VerdictCell({

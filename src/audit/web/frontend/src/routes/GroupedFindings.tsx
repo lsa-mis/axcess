@@ -33,6 +33,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -101,7 +102,7 @@ export default function GroupedFindingsRoute() {
       value: status,
       options: [
         { value: "", label: "All" },
-        ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+        ...STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] })),
       ],
     },
   ];
@@ -109,11 +110,11 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Image-of-text findings, grouped by issue"
+        title="Images, grouped by issue"
         subtitle={scan.seed_url}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
-            Show flat table
+            Show all images in one table
             <ChevronRight className="h-4 w-4" aria-hidden />
           </LinkButton>
         }
@@ -129,21 +130,22 @@ export default function GroupedFindingsRoute() {
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
-            <strong>How this view groups findings.</strong> Findings are
-            bucketed by <code>(classification, alt&nbsp;adequacy)</code>,
-            the same pair our remediation rule book is keyed on. Everything
-            in one group has the <em>same recommended fix</em>, so you can
-            decide once per group instead of once per row. Expand a group
-            to see the individual images and the pages where each appears.
+            <strong>How this page groups images.</strong> Each group is one
+            issue. Axcess groups images by two things: the kind of image
+            (classification), and whether its alt text is good enough. Alt
+            text is the text a screen reader reads for an image. Every image
+            in a group has the <em>same suggested fix</em>, so you can decide
+            once for the whole group. Open a group to see its images and the
+            pages where each one appears.
           </p>
         </div>
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Findings" value={coverage.finding_count} />
-        <StatCard label="Issue groups" value={groups.length} />
+        <StatCard label="Images" value={coverage.finding_count} />
+        <StatCard label="Issues" value={groups.length} />
         <StatCard label="Occurrences" value={coverage.occurrence_total} />
-        <StatCard label="Pages crawled" value={coverage.page_count} />
+        <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
 
       {/* Status filter, URL-persistent, auto-applies on change. Same
@@ -160,7 +162,7 @@ export default function GroupedFindingsRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} issue {groups.length === 1 ? "group" : "groups"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "issue" : "issues"}.
         </TableStatus>
       </Card>
 
@@ -168,13 +170,13 @@ export default function GroupedFindingsRoute() {
         <EmptyState
           title={
             status
-              ? "No findings match this status filter"
-              : "No image-of-text findings"
+              ? "No images have this status"
+              : "No images with text to review"
           }
           message={
             status
-              ? "Clear the filter to see findings in other statuses."
-              : "Either none were detected on this scan, or synthesis didn't run yet."
+              ? "Clear the filters to see images with other statuses."
+              : "The image text check found none in this scan, or Axcess has not finished grouping them yet."
           }
         />
       ) : (
@@ -234,7 +236,7 @@ function GroupCard({
         </span>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.finding_count}</strong>{" "}
-          finding{group.finding_count !== 1 ? "s" : ""}
+          image{group.finding_count !== 1 ? "s" : ""}
           {" · "}
           <strong className="text-fg">{group.occurrence_count}</strong>{" "}
           occurrence{group.occurrence_count !== 1 ? "s" : ""}
@@ -263,13 +265,13 @@ function GroupCard({
               {(["critical", "major", "minor", "info"] as const)
                 .filter((s) => group.severity_breakdown[s])
                 .map((s) => `${s} (${group.severity_breakdown[s]})`)
-                .join(" · ") || "n/a"}
+                .join(" · ") || "None"}
             </span>
             <span>
               <strong className="text-fg">Status:</strong>{" "}
               {Object.entries(group.status_breakdown)
-                .map(([k, v]) => `${k} (${v})`)
-                .join(" · ") || "n/a"}
+                .map(([k, v]) => `${STATUS_LABEL[k as FindingStatus] ?? k} (${v})`)
+                .join(" · ") || "None"}
             </span>
           </div>
 
@@ -332,7 +334,7 @@ function BulkStatusBar({
   const onApply = () => {
     const rationale = requestStatusRationale(
       target,
-      `all ${findingIds.length} findings in "${groupLabel}"`,
+      `all ${findingIds.length} images in "${groupLabel}"`,
     );
     if (rationale === null) return;
     mutation.mutate({ next: target, rationale });
@@ -342,11 +344,11 @@ function BulkStatusBar({
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xs border border-border bg-surface-muted/40 px-3 py-2 text-sm">
       <Select
         id={`bulk-status-${findingIds[0] ?? "empty"}`}
-        label="Bulk status:"
+        label="New status for all:"
         value={target}
         onChange={(next) => setTarget(next as FindingStatus)}
         disabled={mutation.isPending || findingIds.length === 0}
-        options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
       />
       <Button
         type="button"
@@ -355,19 +357,19 @@ function BulkStatusBar({
         disabled={mutation.isPending || findingIds.length === 0}
       >
         {mutation.isPending
-          ? "Updating…"
-          : `Apply to all ${findingIds.length}`}
+          ? "Changing…"
+          : `Change status of all ${findingIds.length}`}
       </Button>
       {mutation.isSuccess && (
         <span className="text-xs text-fg-subtle" role="status">
-          Updated {mutation.data?.updated ?? 0}
+          Status changed for {mutation.data?.updated ?? 0}
         </span>
       )}
       {mutation.isError && (
         <span className="text-xs text-sev-critical" role="alert">
           {mutation.error instanceof Error
             ? mutation.error.message
-            : "Bulk update failed"}
+            : "Status not changed. Try again."}
         </span>
       )}
     </div>
@@ -389,7 +391,7 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
           <TableHead>
             <tr>
               <ColumnHeader>Image</ColumnHeader>
-              <ColumnHeader>OCR text</ColumnHeader>
+              <ColumnHeader>Text read from image (OCR)</ColumnHeader>
               <ColumnHeader>Severity</ColumnHeader>
               <ColumnHeader>Status</ColumnHeader>
               <ColumnHeader>Pages</ColumnHeader>
@@ -426,7 +428,7 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
             />
           </Link>
         ) : (
-          <span className="text-fg-muted">n/a</span>
+          <span className="text-fg-muted">No image</span>
         )}
       </Cell>
       <Cell>
@@ -439,12 +441,12 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
             </code>
             {finding.ocr_confidence !== null && (
               <div className="mt-1 text-2xs text-fg-muted">
-                confidence {Math.round(finding.ocr_confidence)}%
+                Confidence: {Math.round(finding.ocr_confidence)}%
               </div>
             )}
           </>
         ) : (
-          <span className="text-fg-muted">n/a</span>
+          <span className="text-fg-muted">No text found</span>
         )}
       </Cell>
       <Cell>
@@ -464,7 +466,7 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
           aria-expanded={showPages}
           className="text-xs text-umich-blue underline underline-offset-2"
         >
-          {showPages ? "▾" : "▸"} {finding.occurrences.length} page
+          <span aria-hidden>{showPages ? "▾" : "▸"}</span> {finding.occurrences.length} page
           {finding.occurrences.length !== 1 ? "s" : ""}
         </button>
         {showPages && (
@@ -494,20 +496,20 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
                   to={`/pages/${occ.page_id}`}
                   className="ml-2 text-2xs text-fg-muted underline underline-offset-2"
                 >
-                  view in audit
+                  Page details
                 </Link>
                 <span className="ml-2 text-fg-muted">
-                  alt=
+                  Alt text:{" "}
                   {occ.alt_text === null ? (
                     <em className="text-sev-critical">missing</em>
                   ) : occ.alt_text === "" ? (
-                    <em>&quot;&quot;</em>
+                    <em>empty (&quot;&quot;)</em>
                   ) : (
                     <>&ldquo;{occ.alt_text}&rdquo;</>
                   )}
                 </span>
                 {occ.above_fold && (
-                  <span className="ml-1 text-fg-muted">(above fold)</span>
+                  <span className="ml-1 text-fg-muted">(visible without scrolling)</span>
                 )}
               </li>
             ))}
@@ -517,7 +519,7 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
           to={`/findings/${finding.id}`}
           className="mt-1 block text-2xs text-umich-blue underline underline-offset-2"
         >
-          triage finding →
+          Review this image →
         </Link>
       </Cell>
     </Row>

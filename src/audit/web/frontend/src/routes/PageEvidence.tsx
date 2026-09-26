@@ -8,7 +8,8 @@ import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
-import type { PageEvidence } from "../api/types";
+import type { DetectionPipeline, PageEvidence } from "../api/types";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /** One row of a page's accessibility evidence. */
@@ -54,16 +55,16 @@ export default function PageEvidenceRoute() {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
         {error instanceof ApiError && error.status === 404 ? (
-          "This page is not part of the requested report."
+          "This page is not part of this report. Check the link, or go back to the Issues table."
         ) : (
           <>
-            Couldn&rsquo;t load this page&rsquo;s evidence:{" "}
+            This page&rsquo;s details could not load. Reload the page to try again. Details:{" "}
             {error instanceof Error ? error.message : String(error)}
           </>
         )}
       </Card>
     );
-  if (!scanData || !data) return <div className="text-fg-muted">Loading…</div>;
+  if (!scanData || !data) return <div className="text-fg-muted">Loading page details…</div>;
 
   const findings = data.a11y_findings;
   const needsDecision = findings.filter((f) => f.engine_outcome === "cant_tell").length;
@@ -71,7 +72,7 @@ export default function PageEvidenceRoute() {
   const withoutAlt = data.image_occurrences.filter((i) => i.alt_text === null).length;
 
   // Only group when a click actually revealed something: on a page where
-  // nothing was, a lone "As the page loaded" heading would divide nothing.
+  // nothing was, a lone "At page load" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
 
   return (
@@ -79,13 +80,13 @@ export default function PageEvidenceRoute() {
       <ReportHeader
         scanId={scan}
         previousScanId={scanData.previous_scan_id}
-        title={data.page.title || "Page evidence"}
+        title={data.page.title || "Page details"}
         meta={
           <ReportMeta
             counts={
               findings.length === 0
-                ? "No accessibility findings on this page"
-                : `${findings.length} finding${findings.length === 1 ? "" : "s"}` +
+                ? "No accessibility problems found on this page"
+                : `${findings.length} occurrence${findings.length === 1 ? "" : "s"}` +
                   ` · ${data.image_occurrences.length} image${data.image_occurrences.length === 1 ? "" : "s"} checked`
             }
             note={data.page.url_normalized}
@@ -95,18 +96,19 @@ export default function PageEvidenceRoute() {
 
       {findings.length > 0 && (
         <Card className="mb-5 p-4">
-          <h2 className="text-sm font-semibold text-fg">What we found on this page</h2>
+          <h2 className="text-sm font-semibold text-fg">What Axcess found on this page</h2>
           <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-fg-muted">
             {failed > 0 && (
               <li>
-                <strong className="font-semibold tabular-nums text-fg">{failed}</strong> check
-                {failed === 1 ? "" : "s"} the page did not pass
+                <strong className="font-semibold tabular-nums text-fg">{failed}</strong> occurrence
+                {failed === 1 ? "" : "s"} failed a check
               </li>
             )}
             {needsDecision > 0 && (
               <li>
                 <strong className="font-semibold tabular-nums text-fg">{needsDecision}</strong>{" "}
-                the engine could not decide, a person has to judge {needsDecision === 1 ? "it" : "them"}
+                {needsDecision === 1 ? "needs" : "need"} review: the rule check could not decide, so a
+                person must judge {needsDecision === 1 ? "it" : "them"}
               </li>
             )}
             {withoutAlt > 0 && (
@@ -121,13 +123,13 @@ export default function PageEvidenceRoute() {
 
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
-          {findings.length === 0 ? "Accessibility checks" : "Findings"}
+          {findings.length === 0 ? "Accessibility checks" : "Occurrences"}
         </h2>
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
-            No check reported a problem on this page. That is not the same as a pass, the
-            scan coverage above the report&rsquo;s issue table lists which methods ran and
-            which did not.
+            No check found a problem on this page. That does not mean the page passes,
+            because some checks may not have run. See what was checked, above the
+            report&rsquo;s Issues table.
           </Card>
         ) : groups === null ? (
           <div className="space-y-3">
@@ -142,7 +144,7 @@ export default function PageEvidenceRoute() {
                 <h3 className="mb-2 text-sm font-semibold text-fg">
                   {group.label}{" "}
                   <span className="font-normal text-fg-muted">
-                    ({group.findings.length} {group.findings.length === 1 ? "finding" : "findings"})
+                    ({group.findings.length} {group.findings.length === 1 ? "occurrence" : "occurrences"})
                   </span>
                 </h3>
                 <div className="space-y-3">
@@ -163,6 +165,9 @@ export default function PageEvidenceRoute() {
       {data.image_occurrences.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-2.5 text-base font-semibold text-fg">Images on this page</h2>
+          <p className="mb-2.5 text-sm text-fg-muted">
+            Alt text is the text a screen reader reads for an image.
+          </p>
           <div className="grid gap-3 lg:grid-cols-2">
             {data.image_occurrences.map((image) => (
               <Card key={image.occurrence_id} className="p-4">
@@ -175,7 +180,7 @@ export default function PageEvidenceRoute() {
                   >
                     Open the image
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                    <span className="sr-only"> in a new tab</span>
+                    <span className="sr-only">, opens in a new tab</span>
                   </a>
                   <AltChip alt={image.alt_text} />
                 </div>
@@ -186,8 +191,8 @@ export default function PageEvidenceRoute() {
                 ) : (
                   <p className="mt-2 text-sm text-fg-muted">
                     {image.alt_text === null
-                      ? "This image has no alt attribute, so a screen reader announces nothing in its place."
-                      : "Marked decorative (empty alt), so screen readers skip it."}
+                      ? "This image has no alt text (alt attribute), so a screen reader has nothing to read for it."
+                      : "Marked as decorative (empty alt text), so screen readers skip it."}
                   </p>
                 )}
                 {image.ocr_text && (
@@ -198,7 +203,7 @@ export default function PageEvidenceRoute() {
                 )}
                 {image.vlm_rationale && (
                   <p className="mt-2 text-sm text-fg-muted">
-                    <span className="font-semibold text-fg">What the local model saw:</span>{" "}
+                    <span className="font-semibold text-fg">What the local AI model saw:</span>{" "}
                     {image.vlm_rationale}
                   </p>
                 )}
@@ -224,8 +229,8 @@ export default function PageEvidenceRoute() {
             <dd className="text-fg">{renderModeLabel(data.page.render_mode)}</dd>
           </div>
           <div>
-            <dt className="font-semibold text-fg-muted">Fetched</dt>
-            <dd className="text-fg">{data.page.fetched_at ?? "n/a"}</dd>
+            <dt className="font-semibold text-fg-muted">Loaded at</dt>
+            <dd className="text-fg">{data.page.fetched_at ?? "Not recorded"}</dd>
           </div>
         </dl>
       </details>
@@ -248,7 +253,7 @@ function FindingCard({
       id={`finding-${finding.id}`}
       tabIndex={-1}
       className="scroll-mt-24 p-4"
-      aria-label={`Finding ${finding.id}: ${finding.help}`}
+      aria-label={`Occurrence ${finding.id}: ${finding.help}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -257,7 +262,7 @@ function FindingCard({
             {finding.wcag_sc ? `WCAG ${finding.wcag_sc}` : "Best practice"} ·{" "}
             {sourceLabel(finding.pipeline)}
             {finding.pipeline === "alfa" &&
-              ` · ${cantTell ? "could not be decided automatically" : "a standardized ACT test did not pass"}`}
+              ` · ${cantTell ? `${REVIEW_TYPE_LABEL.expert_review}: the rule check could not decide` : "failed a standard test rule (ACT rule)"}`}
           </p>
         </div>
         <StatusChip value={finding.status} />
@@ -291,7 +296,7 @@ function FindingCard({
         )}
         <details className="text-xs">
           <summary className="min-h-target cursor-pointer content-center text-fg-muted">
-            Selector for developers
+            Element locator (CSS selector), for developers
           </summary>
           <code className="mt-1 block max-w-full overflow-x-auto rounded-2xs border border-border bg-surface-muted px-2 py-1 text-xs text-fg">
             {location.raw}
@@ -304,12 +309,12 @@ function FindingCard({
           <img
             className="max-h-72 rounded-xs border border-border"
             src={blobUrl(finding.screenshot_hash)}
-            alt="Issue evidence captured during the scan. An outline marks the detected location."
+            alt="Screenshot of the issue. An outline marks where it was found."
             loading="lazy"
           />
           <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-muted">
             <ScanEye className="h-3.5 w-3.5" aria-hidden />
-            Captured during the scan. The outline marks the detected location.
+            Taken during the scan. The outline marks where it was found.
           </figcaption>
         </figure>
       ) : (
@@ -318,8 +323,8 @@ function FindingCard({
         <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-subtle">
           <ImageOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
           {finding.pipeline === "alfa"
-            ? "No screenshot: ACT rules are evaluated in a separate browser session, which the scan cannot photograph."
-            : "No screenshot was captured for this finding."}
+            ? "No screenshot: the rule check (Alfa) runs in a separate browser that Axcess cannot take pictures of."
+            : "Axcess did not take a screenshot of this occurrence."}
         </p>
       )}
     </Card>
@@ -341,16 +346,7 @@ function AltChip({ alt }: { alt: string | null }) {
 }
 
 function sourceLabel(pipeline: string): string {
-  return (
-    {
-      axe: "axe-core",
-      alfa: "Siteimprove Alfa",
-      keyboard: "keyboard probe",
-      responsive: "responsive & zoom probe",
-      focus: "focus probe",
-      visual: "visual probe",
-    }[pipeline] ?? pipeline
-  );
+  return CHECK_LABEL[pipeline as DetectionPipeline] ?? pipeline;
 }
 
 /** Findings split by the control that revealed them.
@@ -376,7 +372,7 @@ function groupByRevealingControl(findings: PageEvidenceFinding[]) {
     byControl.get(control)!.push(finding);
   }
   const groups: { key: string; label: string; findings: PageEvidenceFinding[] }[] = [];
-  if (atLoad.length > 0) groups.push({ key: "__load__", label: "As the page loaded", findings: atLoad });
+  if (atLoad.length > 0) groups.push({ key: "__load__", label: "At page load", findings: atLoad });
   for (const control of order) {
     groups.push({
       key: control,

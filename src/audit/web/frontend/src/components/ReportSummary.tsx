@@ -10,7 +10,7 @@ import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 /**
  * One number in the summary line: the value first, then what it counts.
  * The label is the ``dt`` and the value the ``dd``, so a screen reader reads
- * "Pages Tested, 8"; CSS order puts the number first on screen. ``detail``
+ * "Pages checked, 8"; CSS order puts the number first on screen. ``detail``
  * is a short aside in parentheses, and ``flag`` colors the number when it
  * needs attention (crawl errors), which the detail text also says.
  */
@@ -51,7 +51,7 @@ function SummaryStat({
  * it); undefined while it loads, which the ledger already handles.
  *
  * ``notes`` are the page's other closed explanations (what the table's
- * labels mean, what an ACT rule is), as ``ReportNote`` rows. They join the
+ * labels mean), as ``ReportNote`` rows. They join the
  * coverage row in one accordion, so the report's context reads as one short
  * list of things to open rather than loose sentences between the numbers
  * and the table.
@@ -76,32 +76,33 @@ export function ReportSummary({
       {/* Read left to right as the scan itself ran: how much was tested,
           what that turned up, how those findings group, and how much of
           the site only existed after a control was used. One compact line
-          rather than four cards, so the table starts higher on the screen. */}
+          rather than four cards, so the table starts higher on the screen.
+          Each term keeps its short explanation in parentheses. */}
       <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
         <SummaryStat
-          label="Pages Tested"
+          label="Pages checked"
           value={scan.page_count}
-          detail={`${scan.error_count.toLocaleString()} crawl error${scan.error_count === 1 ? "" : "s"}`}
+          detail={`${scan.error_count.toLocaleString()} error${scan.error_count === 1 ? "" : "s"} while scanning`}
           flag={scan.error_count > 0}
         />
-        <SummaryStat label="Issues Found" value={occurrences} />
-        <SummaryStat label="Issue Groups" value={issueGroups} />
+        <SummaryStat label="Occurrences found" value={occurrences} detail="each place an issue appears" />
+        <SummaryStat label="Issues found" value={issueGroups} detail="kinds of problem, one per row below" />
         {/* Pages alone understate an application whose content mostly does
             not exist until a control is used. */}
         <SummaryStat
           label={CLICK_THROUGH_STATES_LABEL}
           value={scan.dom_state_count ?? 0}
-          detail="menus, tabs and dialogs the scan opened"
+          detail="reached by using controls, such as menus"
         />
       </dl>
 
-      {/* Coverage leads the notes: whether the scan checked something comes
-          before what its labels mean. The count stays on the closed row, so
-          the fact is on screen without opening anything. */}
+      {/* What was checked leads the notes: whether the scan checked
+          something comes before what its labels mean. The count stays on
+          the closed row, so the fact is on screen without opening anything. */}
       <ReportNotes className="mt-6">
         <ReportNote
           id="report-coverage"
-          title="What this scan checked"
+          title="What was checked"
           meta={
             <span className="tabular-nums">
               {ran} of {scan.methods_used.length} checks ran
@@ -179,13 +180,12 @@ export function BlockedScanNotice({
         />
         <div className="text-sm">
           <strong className="text-sev-critical">
-            Site URL returned HTTP {blocked.status_code}
+            The website returned an error (HTTP {blocked.status_code})
           </strong>
-          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. The crawler
-          could not read past the entry page. Try a{" "}
-          <Link to="/scans/new">new scan</Link>, or use an authorized
-          sign-in scan when the site requires authentication.
-          <span className="sr-only"> Report {scanId} is incomplete.</span>
+          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. Axcess could
+          not get past the start page, so report {scanId} is incomplete.{" "}
+          <Link to="/scans/new">Start a new scan</Link>. If the site needs you
+          to sign in, and you have permission, use a sign-in scan.
         </div>
       </div>
     </Card>

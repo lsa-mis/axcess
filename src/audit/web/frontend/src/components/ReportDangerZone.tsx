@@ -33,15 +33,16 @@ export default function ReportDangerZone({ scan }: { scan: ScanDetail }) {
   });
 
   return (
-    <Card className="mt-8 border-sev-critical/40 p-4" role="region" aria-labelledby="danger-zone-heading">
-      <h2 id="danger-zone-heading" className="text-base font-semibold text-sev-critical">
-        Danger zone
+    <Card className="mt-8 border-sev-critical/40 p-4" role="region" aria-labelledby="delete-report-heading">
+      <h2 id="delete-report-heading" className="text-base font-semibold text-sev-critical">
+        Delete this report
       </h2>
       <p className="mt-1 max-w-[70ch] text-sm text-fg-muted">
-        Deleting removes this scan and its report evidence. Shared image blobs may remain.
+        Deleting removes this report and everything the scan saved for it. Image files that other
+        reports also use may stay in storage.
       </p>
       {running && (
-        <p className="mt-1 text-sm text-fg-muted">Cancel the running scan before deleting it.</p>
+        <p className="mt-1 text-sm text-fg-muted">Stop the scan before you delete this report.</p>
       )}
       <Button
         type="button"
@@ -51,9 +52,9 @@ export default function ReportDangerZone({ scan }: { scan: ScanDetail }) {
         onClick={() => {
           setError(null);
           const ok = confirmDestructive(
-            `Delete scan ${scan.id} (${scan.seed_url})?\n\n` +
-              "This permanently removes the scan, its pages, findings, and history. " +
-              "Shared image blobs may remain. This cannot be undone.",
+            `Delete report #${scan.id} (${scan.seed_url})?\n\n` +
+              "This removes the report for good, with its pages, issues, and history. " +
+              "Image files that other reports also use may stay in storage. You cannot undo this.",
           );
           if (ok) mutation.mutate();
         }}
@@ -63,7 +64,7 @@ export default function ReportDangerZone({ scan }: { scan: ScanDetail }) {
       </Button>
       {error && (
         <p className="mt-2 text-sm text-sev-critical" role="alert">
-          Couldn&rsquo;t delete this report: {error}
+          The report was not deleted. Try again. Details: {error}
         </p>
       )}
     </Card>

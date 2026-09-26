@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Minus, SlidersHorizontal } from "lucide-react";
 import type { ScopePreview } from "../../api/types";
 import { cn } from "../../lib/cn";
+import { CHECK_LABEL } from "../../lib/terms";
 import { RAIL_LABELS, SUMMARY } from "./copy";
 import type { Capabilities } from "./groupProps";
 import {
@@ -16,11 +17,7 @@ import {
 import type { ScopePreviewState } from "./useScopePreview";
 
 function engineName(engine: ScanSettings["scan_engine"]): string {
-  return engine === "both"
-    ? "axe-core and Siteimprove Alfa"
-    : engine === "alfa"
-      ? "Siteimprove Alfa"
-      : "axe-core";
+  return engine === "both" ? "Rule checks (axe and Alfa)" : engine === "alfa" ? CHECK_LABEL.alfa : CHECK_LABEL.axe;
 }
 
 type Line = { label: string; on: boolean };
@@ -135,23 +132,25 @@ export default function ScanSummaryCard({
 
   const coverage = [
     `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`,
-    login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Respects robots.txt",
+    login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Follows robots.txt",
     !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
     settings.static_only ? SUMMARY.htmlOnly : null,
-    settings.search ? "Searches the site for result pages" : null,
+    settings.search ? "Uses a search box to find more pages" : null,
   ].filter((part): part is string => Boolean(part));
 
   const running = checks.filter((line) => line.on).map((line) => line.label);
+  const skipsStorage = settings.skip_rendered_storage && !settings.static_only;
   const notIncluded = [
-    ...(login ? ["Pages on any other website"] : []),
+    login ? SUMMARY.noOtherSites : SUMMARY.noSignIn,
     ...scope.filter((line) => !line.on).map((line) => line.label),
     ...checks.filter((line) => !line.on).map((line) => line.label),
-    ...(settings.skip_rendered_storage && !settings.static_only ? [SUMMARY.noRenderedCopies] : []),
+    ...(skipsStorage ? [SUMMARY.noRenderedCopies] : []),
+    ...(skipsStorage && login ? [SUMMARY.noScreenshots] : []),
   ];
 
   const digest =
     `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep. ` +
-    `WCAG ${settings.wcag_version} ${settings.axe_level} with ${engine}. ` +
+    `${engine} against WCAG ${settings.wcag_version} Level ${settings.axe_level}. ` +
     `${running.length} ${running.length === 1 ? "check runs" : "checks run"}.`;
   const [spoken, setSpoken] = useState("");
   const lastDigest = useRef(digest);
@@ -198,7 +197,7 @@ export default function ScanSummaryCard({
                     : `${preview.data.host}${preview.data.path_prefix}`}
                 </dd>
                 <dd className="text-fg-muted">
-                  {preview.data.whole_host ? "Whole host" : "This section only"}
+                  {preview.data.whole_host ? "Whole website" : "This section only"}
                   {login ? ", after you sign in" : ", public pages"}
                 </dd>
               </>
@@ -217,11 +216,11 @@ export default function ScanSummaryCard({
 
           <Section term={SUMMARY.standard}>
             <dd className="mt-1 text-fg">
-              WCAG {settings.wcag_version} {settings.axe_level}, checked with {engine}
+              WCAG {settings.wcag_version} Level {settings.axe_level}, checked with {engine}
             </dd>
             {alfaUnavailable && (
               <dd className="mt-1.5 text-xs leading-5 text-sev-major">
-                Siteimprove Alfa is unavailable, so this scan runs with axe-core:{" "}
+                {CHECK_LABEL.alfa} is not available, so this scan uses {CHECK_LABEL.axe}. Reason:{" "}
                 {capabilities.alfa?.reason ?? "not installed"}.
               </dd>
             )}

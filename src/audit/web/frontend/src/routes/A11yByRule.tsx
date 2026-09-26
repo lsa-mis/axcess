@@ -42,6 +42,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -106,7 +107,7 @@ export default function A11yByRuleRoute() {
       value: status,
       options: [
         { value: "", label: "All" },
-        ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+        ...STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] })),
       ],
     },
   ];
@@ -114,11 +115,11 @@ export default function A11yByRuleRoute() {
   return (
     <>
       <PageHeader
-        title="WCAG DOM-engine findings, grouped by rule"
+        title="Rule check issues by rule"
         subtitle={scan.seed_url}
         actions={
           <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
-            Group by WCAG SC
+            Group by WCAG criterion
             <ChevronRight className="h-4 w-4" aria-hidden />
           </LinkButton>
         }
@@ -131,30 +132,30 @@ export default function A11yByRuleRoute() {
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
-            <strong>How this view groups findings.</strong> Findings are
-            grouped by source and rule ID, the <em>fixing</em>{" "}
-            axis. A rule like <code>color-contrast</code> failing 800
-            times is usually one CSS class on one template; seeing one
-            group of 800 tells you where one fix has the biggest payoff.{" "}
+            <strong>How this page groups issues.</strong> Each issue is one
+            rule from one check. This view helps you <em>plan fixes</em>. For
+            example, the <code>color-contrast</code> rule may fail 800 times.
+            Often one style (CSS class) in one page template causes all of
+            them, so one fix solves all 800. To report by requirement,{" "}
             <Link
               to={`/scans/${scan.id}/a11y`}
               className="text-umich-blue underline underline-offset-2"
             >
-              Group-by-SC
+              group by WCAG criterion
             </Link>{" "}
-            is the reporting axis, useful when stakeholders ask
-            &ldquo;which WCAG SCs are we failing?&rdquo;
+            instead. That view answers &ldquo;which WCAG criteria have
+            problems?&rdquo;
           </p>
         </div>
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Rule groups" value={groups.length} />
-        <StatCard label="Axe violations" value={coverage.axe_violations_total} />
-        <StatCard label="Alfa failed" value={coverage.alfa_failed_total} />
-        <StatCard label="Alfa review leads" value={coverage.alfa_cant_tell_total} />
+        <StatCard label="Issues" value={groups.length} />
+        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
+        <StatCard label="Needs review (Alfa)" value={coverage.alfa_cant_tell_total} />
         <StatCard
-          label="Pages scanned"
+          label="Pages checked (axe)"
           value={coverage.axe_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
@@ -173,7 +174,7 @@ export default function A11yByRuleRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} rule {groups.length === 1 ? "group" : "groups"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "issue" : "issues"}.
         </TableStatus>
       </Card>
 
@@ -181,15 +182,15 @@ export default function A11yByRuleRoute() {
         <EmptyState
           title={
             status
-              ? "No rule findings match this filter"
-              : "No DOM-engine findings to triage"
+              ? "No issues have this status"
+              : "The rule checks found no issues to review"
           }
           message={
             status
-              ? "Clear the filter to see findings in other statuses."
+              ? "Clear the filters to see issues with other statuses."
               : coverage.axe_pages_scanned === 0 && coverage.alfa_pages_scanned === 0
-                ? "No DOM engine ran on this scan, start a new scan and select axe-core, Alfa, or both."
-                : "The selected DOM engine(s) returned no retained findings. Manual review is still required for conformance."
+                ? "No rule check ran in this scan. Start a new scan and choose Rule check (axe), Rule check (Alfa), or both."
+                : "The rule checks you chose found nothing to keep. A person still needs to test the site by hand. Automated checks alone cannot show that a site meets WCAG."
           }
         />
       ) : (
@@ -239,11 +240,11 @@ function RuleGroupCard({
           )}
           {group.impact && <ImpactChip value={group.impact} />}
           <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-fg-muted">
-            {group.pipeline === "alfa" ? "Siteimprove Alfa" : group.pipeline === "axe" ? "axe-core" : group.pipeline}
+            {CHECK_LABEL[group.pipeline] ?? group.pipeline}
           </span>
           {group.pipeline === "alfa" && group.outcome_group && (
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${group.outcome_group === "failed" ? "bg-sev-critical-bg text-sev-critical" : "bg-sev-minor-bg text-sev-minor"}`}>
-              {group.outcome_group === "failed" ? "Standardized ACT test failed" : "Needs expert review (cannot tell)"}
+              {group.outcome_group === "failed" ? "Failed a standard test (ACT)" : "Needs review (Alfa cannot tell)"}
             </span>
           )}
           <code className="font-mono text-base font-semibold text-fg">
@@ -251,14 +252,14 @@ function RuleGroupCard({
           </code>
           {group.wcag_sc && (
             <span className="text-sm text-fg-muted">
-              SC {group.wcag_sc}
+              WCAG {group.wcag_sc}
               {group.wcag_level && ` · Level ${group.wcag_level}`}
             </span>
           )}
         </span>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          {group.pipeline === "alfa" ? "result" : "violation"}{group.violation_count !== 1 ? "s" : ""} on{" "}
+          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -274,7 +275,7 @@ function RuleGroupCard({
                   aria-hidden
                 />
                 <p className="text-sm text-fg">
-                  <strong>{group.pipeline === "alfa" ? "What Alfa reports:" : "What the engine reports:"}</strong> {group.help}
+                  <strong>{group.pipeline === "alfa" ? "What the Alfa rule says:" : "What the rule says:"}</strong> {group.help}
                   {group.help_url && (
                     <>
                       {" "}
@@ -284,7 +285,8 @@ function RuleGroupCard({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-umich-blue underline underline-offset-2"
                       >
-                        rule docs <ExternalLink className="h-3 w-3" aria-hidden />
+                        About this rule <ExternalLink className="h-3 w-3" aria-hidden />
+                        <span className="sr-only">(opens in a new tab)</span>
                       </a>
                     </>
                   )}
@@ -297,14 +299,18 @@ function RuleGroupCard({
             <strong className="text-fg">Status:</strong>{" "}
             {Object.entries(group.status_breakdown)
               .filter(([, v]) => v > 0)
-              .map(([k, v]) => `${k} (${v})`)
-              .join(" · ") || "n/a"}
+              .map(([k, v]) => `${STATUS_LABEL[k as FindingStatus] ?? k} (${v})`)
+              .join(" · ") || "None"}
           </div>
           {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
-              <strong className="text-fg">Expert review leads:</strong>{" "}
-              {group.engine_outcomes.cant_tell} Alfa <code>cantTell</code> outcome
-              {group.engine_outcomes.cant_tell === 1 ? " needs" : "s need"} manual confirmation; they are not conformance failures.
+              <strong className="text-fg">Needs review:</strong> For{" "}
+              {group.engine_outcomes.cant_tell} occurrence
+              {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
+              tell (<code>cantTell</code>) if the rule passed. A person needs to
+              check {group.engine_outcomes.cant_tell === 1 ? "it" : "them"}.{" "}
+              {group.engine_outcomes.cant_tell === 1 ? "It does" : "They do"} not
+              show that the page fails WCAG.
             </p>
           )}
 
@@ -315,14 +321,14 @@ function RuleGroupCard({
           />
 
           {paged.pages > 1 && (
-            <TableBar pager={<TablePagination label={`${group.rule_id} findings`} noun="findings" {...paged} />} />
+            <TableBar pager={<TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" {...paged} />} />
           )}
-          <TableRegion label={`${group.rule_id} findings table`} paged={paged}>
-            <Table caption={`${group.rule_id} findings`}>
+          <TableRegion label={`${group.rule_id} occurrences table`} paged={paged}>
+            <Table caption={`${group.rule_id} occurrences`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Target</ColumnHeader>
+                  <ColumnHeader>Element locator (CSS selector)</ColumnHeader>
                   <ColumnHeader>Status</ColumnHeader>
                 </tr>
               </TableHead>
@@ -367,7 +373,7 @@ function FindingRow({
           pageTitle={finding.page_title}
           selector={finding.target_selector}
           snippet={finding.html_snippet}
-          origin="DOM-engine rules"
+          origin="Rule check issues by rule"
           context={ruleId}
           backTo={`/scans/${scanId}/a11y/by-rule`}
         />
@@ -381,7 +387,7 @@ function FindingRow({
         {finding.html_snippet && (
           <details className="mt-1">
             <summary className="cursor-pointer text-2xs text-fg-muted">
-              show HTML
+              Show element code (HTML)
             </summary>
             <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
               {finding.html_snippet}
@@ -389,14 +395,14 @@ function FindingRow({
           </details>
         )}
         <AlfaEvidenceNote evidence={finding} />
-        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "DOM-engine rules", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>Open stored finding evidence</Link>
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>Open the evidence for this occurrence</Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}
           </div>
         )}
       </Cell>
-      <Cell className="text-xs">{finding.status}</Cell>
+      <Cell className="text-xs">{STATUS_LABEL[finding.status]}</Cell>
     </Row>
   );
 }
@@ -424,7 +430,7 @@ function RuleBulkBar({
   const onApply = () => {
     const rationale = requestStatusRationale(
       target,
-      `all ${findingIds.length} results for "${ruleId}"`,
+      `all ${findingIds.length} occurrences of "${ruleId}"`,
     );
     if (rationale === null) return;
     mutation.mutate({ next: target, rationale });
@@ -434,11 +440,11 @@ function RuleBulkBar({
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xs border border-border bg-surface-muted/40 px-3 py-2 text-sm">
       <Select
         id={`rule-bulk-${ruleId}`}
-        label="Bulk status:"
+        label="New status for all:"
         value={target}
         onChange={(next) => setTarget(next as FindingStatus)}
         disabled={mutation.isPending || findingIds.length === 0}
-        options={STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") }))}
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
       />
       <Button
         type="button"
@@ -447,19 +453,19 @@ function RuleBulkBar({
         disabled={mutation.isPending || findingIds.length === 0}
       >
         {mutation.isPending
-          ? "Updating…"
-          : `Apply to all ${findingIds.length}`}
+          ? "Changing…"
+          : `Change status of all ${findingIds.length}`}
       </Button>
       {mutation.isSuccess && (
         <span className="text-xs text-fg-subtle" role="status">
-          Updated {mutation.data?.updated ?? 0}
+          Status changed for {mutation.data?.updated ?? 0}
         </span>
       )}
       {mutation.isError && (
         <span className="text-xs text-sev-critical" role="alert">
           {mutation.error instanceof Error
             ? mutation.error.message
-            : "Bulk update failed"}
+            : "Status not changed. Try again."}
         </span>
       )}
     </div>

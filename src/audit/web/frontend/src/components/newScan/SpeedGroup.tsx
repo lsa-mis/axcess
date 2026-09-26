@@ -11,7 +11,7 @@ import SwitchRow from "./SwitchRow";
  * one switch that can make the form refuse to start: the conflict with
  * axe-core is shown on the switch itself, not only in the alert at the end.
  *
- * It renders inside the "Speed and debugging" disclosure, which already
+ * It renders inside the "Speed and browser window" disclosure, which already
  * shows its name, so the fieldset is `plain` and its legend is for a screen
  * reader only.
  */
@@ -67,7 +67,7 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
             label={SWITCHES.show_browser.label}
             hint={
               settings.static_only
-                ? "There is no browser to show during a Fast crawl."
+                ? "A fast scan does not use a browser, so there is nothing to show."
                 : SWITCHES.show_browser.hint
             }
           />

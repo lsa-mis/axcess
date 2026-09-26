@@ -20,7 +20,7 @@ import {
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
-import type { ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
+import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import LastScannedSite from "../components/LastScannedSite";
@@ -39,6 +39,16 @@ import {
   rowBand,
 } from "../components/table/Table";
 import { sortWords, type Sort, type SortKind } from "../components/table/sort";
+
+/** A sign-in scan's progress, in the same words as the public scan badges. */
+const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
+  awaiting_authentication: "Waiting for sign-in",
+  authentication_required: "Sign-in needed",
+  running: "Scanning",
+  completed: "Complete",
+  failed: "Failed",
+  interrupted: "Stopped",
+};
 
 /**
  * Reports list, one row per site. A site is a normalized seed scope, the
@@ -142,6 +152,9 @@ function sortSites(sites: SiteGroup[], { column, direction }: Sort<SortKey>): Si
 // One empty list, so the memoized views below do not recompute while loading.
 const NO_SITES: SiteGroup[] = [];
 
+/** How often Reports refreshes while a scan is running. */
+const RUNNING_REFRESH_MS = 5_000;
+
 export default function ScansRoute() {
   const [sort, setSort] = useState<Sort<SortKey>>({ column: "completed", direction: "desc" });
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -151,6 +164,13 @@ export default function ScansRoute() {
   const { data: sites = NO_SITES, isLoading, isError } = useQuery({
     queryKey: ["scans", "sites"],
     queryFn: api.listSites,
+    // While a scan runs, refresh so the list and the Last scanned card move on
+    // by themselves when it finishes; the desktop app gets no focus event to
+    // refetch on. Nothing running, nothing polled.
+    refetchInterval: (query) =>
+      query.state.data?.some((site) => site.scans.some((scan) => scan.status === "running"))
+        ? RUNNING_REFRESH_MS
+        : false,
   });
   const protectedIdentity = useProtectedIdentityContext();
   const protectedReports = useQuery({
@@ -210,7 +230,7 @@ export default function ScansRoute() {
           isLoading
             ? "Loading…"
             : isError
-              ? "Reports unavailable"
+              ? "Reports could not be loaded"
               : `${sites.length} ${sites.length === 1 ? "site" : "sites"} · ${scanTotal} ${scanTotal === 1 ? "scan" : "scans"}`
         }
       />
@@ -230,11 +250,11 @@ export default function ScansRoute() {
         <p role="status">Loading reports…</p>
       ) : sites.length === 0 && protectedScans.length === 0 ? (
         <EmptyState
-          title="No scans yet"
-          message="Point the crawler at a URL to start auditing."
+          title="No reports yet"
+          message="Start a scan to check a website. Axcess makes a report when the scan finishes."
           action={
             <LinkButton to="/scans/new" variant="primary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> Create New Scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> Start a new scan
             </LinkButton>
           }
         />
@@ -334,7 +354,7 @@ export default function ScansRoute() {
 
       {protectedIdentity.isChecking && (
         <p className="mt-4 text-sm text-fg-muted" aria-live="polite">
-          Checking protected-report access…
+          Checking access to sign-in scans…
         </p>
       )}
 
@@ -343,39 +363,40 @@ export default function ScansRoute() {
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h2 id="protected-reports-heading" className="text-lg font-semibold text-fg">
-                Protected reports
+                Sign-in scans
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
-                Your authorized reports only. Target locations and detailed evidence are not listed here.
+                This list shows only the reports you are allowed to see. It does not show site addresses or detailed evidence.
               </p>
             </div>
             <LinkButton to="/scans/new?mode=login" variant="secondary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> New login scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> New sign-in scan
             </LinkButton>
           </div>
           {protectedReports.isFetching ? (
             <p className="text-sm text-fg-muted" aria-live="polite">
-              Loading your protected reports…
+              Loading your sign-in scans…
             </p>
           ) : protectedScans.length === 0 ? (
             <Card className="p-5 text-sm text-fg-muted">
-              No protected reports yet. Start one only after the target owner has authorized
-              the scope and a least-privilege audit account is ready.
+              No sign-in scans yet. Before you start one, the site owner must approve which
+              pages you scan. You also need a test account with only the access the scan
+              needs (least privilege).
             </Card>
           ) : (
             <Card>
               {protectedPages.pages > 1 && (
-                <TableBar pager={<TablePagination label="Protected reports" noun="reports" {...protectedPages} />} />
+                <TableBar pager={<TablePagination label="Sign-in scans" noun="sign-in scans" {...protectedPages} />} />
               )}
-              <TableRegion label="Protected reports table" paged={protectedPages}>
-                <Table className="min-w-[58rem]" caption="Your protected reports, newest activity first">
+              <TableRegion label="Sign-in scans table" paged={protectedPages}>
+                <Table className="min-w-[58rem]" caption="Your sign-in scans, most recently updated first">
                   <TableHead>
                     <tr>
                       <ColumnHeader>Report</ColumnHeader>
                       <ColumnHeader>Status</ColumnHeader>
-                      <ColumnHeader>Handling</ColumnHeader>
+                      <ColumnHeader>Environment and data classification</ColumnHeader>
                       <ColumnHeader>Pages</ColumnHeader>
-                      <ColumnHeader>Issue leads</ColumnHeader>
+                      <ColumnHeader>Occurrences</ColumnHeader>
                       <ColumnHeader>Updated</ColumnHeader>
                       <ColumnHeader>Open</ColumnHeader>
                     </tr>
@@ -466,7 +487,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               <Link
                 to={`/scans/${completed.id}/issues`}
                 className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-                aria-label={`${(site.most_recent_completed_issue_count ?? 0).toLocaleString()} issues in report ${completed.id}`}
+                aria-label={`${(site.most_recent_completed_issue_count ?? 0).toLocaleString()} issues in Report #${completed.id}`}
               >
                 {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
               </Link>
@@ -556,7 +577,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
           title={scan.seed_url}
         >
-          <span className="sr-only">Open </span>scan {scan.id}
+          <span className="sr-only">Open </span>Report #{scan.id}
         </Link>
         {isHeadline && (
           <span className="ml-2 font-sans text-xs font-normal text-fg-muted">
@@ -587,7 +608,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
             to={`/scans/${scan.id}/issues`}
             variant="ghost"
             className="report-link"
-            aria-label={`All issues for report ${scan.id}`}
+            aria-label={`All issues for Report #${scan.id}`}
           >
             <ListChecks className="h-4 w-4" aria-hidden />
             All issues
@@ -603,14 +624,14 @@ function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; i
   return (
     <Row index={index}>
       <RowHeader className="whitespace-nowrap text-xs font-normal text-fg-muted"><ScanTag id={report.scan_id} /></RowHeader>
-      <Cell><span className="font-medium text-fg">{report.protection_status.replaceAll("_", " ")}</span></Cell>
+      <Cell><span className="font-medium text-fg">{PROTECTED_STATUS_LABEL[report.protection_status] ?? report.protection_status.replaceAll("_", " ")}</span></Cell>
       <Cell className="text-fg-muted">{report.environment} · {report.data_classification}</Cell>
       <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
       <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
       <Cell className="text-center text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
       <Cell className="py-1 text-center">
-        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
-          Open protected report
+        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open sign-in scan ${report.scan_id}`}>
+          Open sign-in scan
         </LinkButton>
       </Cell>
     </Row>
@@ -648,9 +669,9 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       <Button
         variant="ghost"
         disabled
-        title="Cancel the running scan before deleting it."
+        title="Stop the scan before you delete this report."
         className="text-fg-subtle"
-        aria-label={`Delete scan ${scan.id} (disabled, scan is running)`}
+        aria-label={`Delete report ${scan.id} (not available while the scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
         Delete
@@ -664,16 +685,16 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled={mutation.isPending}
         className="text-sev-critical hover:bg-sev-critical-bg"
-        aria-label={`Delete scan ${scan.id}`}
+        aria-label={`Delete report ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".
           // Message includes the scan ID and seed URL so the user knows
           // exactly which scan they're about to remove.
           const ok = confirmDestructive(
-            `Delete scan ${scan.id} (${scan.seed_url})?\n\n` +
-              "This permanently removes the scan, its pages, findings, and " +
-              "history. Image blobs are kept (they may be referenced by " +
-              "other scans). This cannot be undone.",
+            `Delete report #${scan.id} (${scan.seed_url})?\n\n` +
+              "This deletes the report for good, with its pages, issues, and " +
+              "history. You cannot undo this. Axcess keeps the saved image " +
+              "files, because other reports may use them.",
           );
           if (ok) mutation.mutate();
         }}

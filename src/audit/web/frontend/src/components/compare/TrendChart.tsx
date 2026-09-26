@@ -7,14 +7,14 @@ import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead } from "../table/T
 import { agoLong, count, plural } from "./format";
 
 type Measure = "occurrences" | "groups";
-const MEASURES: Record<Measure, string> = { occurrences: "Occurrences", groups: "Issue groups" };
+const MEASURES: Record<Measure, string> = { occurrences: "Occurrences", groups: "Issues" };
 
 const HEIGHT = 300;
 const MARGIN = { top: 40, right: 36, bottom: 60, left: 52 };
 /** Room between a point and the plot edge, so an end point's label is not clipped. */
 const INSET = 28;
-/** Narrowest gap between two x-axis labels ("Scan 10" over "34d ago"). */
-const LABEL_GAP = 72;
+/** Narrowest gap between two x-axis labels ("Report #10" over "34 days ago"). */
+const LABEL_GAP = 96;
 
 /**
  * Every completed scan of the site as one line, oldest to newest.
@@ -79,8 +79,8 @@ export default function TrendChart({
       </div>
       <p className="mt-3 text-xs font-semibold text-fg">
         {points.length < total
-          ? `Showing the ${points.length} most recent of ${total} completed scans, from scan ${first.id} to the most recent, scan ${last.id}.`
-          : `Showing ${count(points.length, "completed scan")}, from scan ${first.id} to the most recent, scan ${last.id}.`}
+          ? `Showing the ${points.length} most recent of ${total} completed scans, from report #${first.id} to the most recent, report #${last.id}.`
+          : `Showing ${count(points.length, "completed scan")}, from report #${first.id} to the most recent, report #${last.id}.`}
       </p>
 
       <Plot
@@ -97,13 +97,13 @@ export default function TrendChart({
       {/* The panel is not itself live: this line says what was chosen, once,
           without reading out the panel's buttons as well. */}
       <p role="status" className="sr-only">
-        {selected ? `Scan ${selected.id} selected: ${totalsSentence(selected)}` : ""}
+        {selected ? `Report #${selected.id} selected: ${totalsSentence(selected)}` : ""}
       </p>
       {selected && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xs border border-l-4 border-border border-l-umich-blue bg-surface-subtle px-4 py-3">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold">
-              Scan {selected.id} · {agoLong(selected.started_at)}
+              Report #{selected.id} · {agoLong(selected.started_at)}
               {selected.id === currentId && <span className="font-normal text-fg-muted"> · this report</span>}
               {selected.id === baselineId && <span className="font-normal text-fg-muted"> · compared with</span>}
             </h3>
@@ -112,11 +112,11 @@ export default function TrendChart({
           <CompareLink point={selected} points={points} currentId={currentId} baselineId={baselineId} />
           {selected.id !== currentId && (
             <LinkButton variant="primary" to={`/scans/${selected.id}/issues`}>
-              Open scan {selected.id} issues
+              Open report #{selected.id} issues
               <ArrowRight className="h-4 w-4" aria-hidden />
             </LinkButton>
           )}
-          <Button type="button" variant="ghost" onClick={closePanel} aria-label={`Close scan ${selected.id} details`}>
+          <Button type="button" variant="ghost" onClick={closePanel} aria-label={`Close report #${selected.id} details`}>
             <X className="h-5 w-5" aria-hidden />
           </Button>
         </div>
@@ -127,7 +127,7 @@ export default function TrendChart({
           <li className="inline-flex items-center gap-1.5"><Swatch kind="current" /> This report</li>
           {baselineId !== null && <li className="inline-flex items-center gap-1.5"><Swatch kind="baseline" /> Compared with</li>}
           <li className="inline-flex items-center gap-1.5"><Swatch kind="other" /> Other scans</li>
-          <li>Select a point (click, or Tab + Enter) for details.</li>
+          <li>To see details, select a point: click it, or press Tab and then Enter.</li>
         </ul>
         <Button type="button" aria-expanded={showTable} aria-controls={tableId} onClick={() => setShowTable((open) => !open)}>
           {showTable ? "Hide data table" : "Show as data table"}
@@ -244,7 +244,7 @@ function Plot({
               {labelled(i, point.id) && (
                 <>
                   <text x={x(i)} y={base + 24} textAnchor="middle" className={cn("fill-fg text-sm", point.id === currentId ? "font-bold" : "font-semibold")}>
-                    Scan {point.id}
+                    Report #{point.id}
                   </text>
                   <text x={x(i)} y={base + 43} textAnchor="middle" className="fill-fg-muted text-xs">
                     {relativeTime(point.started_at)}
@@ -270,7 +270,7 @@ function Plot({
               role="button"
               tabIndex={0}
               aria-pressed={isSelected}
-              aria-label={`Scan ${point.id}, ${agoLong(point.started_at)}: ${totalsSentence(point)}${isCurrent ? " This report." : isBaseline ? " Compared with." : ""}`}
+              aria-label={`Report #${point.id}, ${agoLong(point.started_at)}: ${totalsSentence(point)}${isCurrent ? " This report." : isBaseline ? " Compared with." : ""}`}
               onClick={() => onSelect(point.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -349,10 +349,10 @@ function HistoryTable({
       <Table caption="Completed scans of this site, oldest first">
         <TableHead>
           <tr>
-            <ColumnHeader>Scan</ColumnHeader>
+            <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
             <ColumnHeader>Occurrences</ColumnHeader>
-            <ColumnHeader>Issue groups</ColumnHeader>
+            <ColumnHeader>Issues</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>
@@ -360,7 +360,7 @@ function HistoryTable({
           {points.map((point, index) => (
             <Row key={point.id} index={index}>
               <RowHeader>
-                Scan {point.id}
+                Report #{point.id}
                 {point.id === currentId && <span className="font-normal text-fg-muted"> · this report</span>}
                 {point.id === baselineId && <span className="font-normal text-fg-muted"> · compared with</span>}
               </RowHeader>
@@ -371,12 +371,12 @@ function HistoryTable({
                 <span className="flex flex-wrap justify-center gap-x-4">
                   {point.id !== currentId && point.id !== baselineId && (
                     <LinkButtonText to={compareHref(point, currentId, points)}>
-                      Compare<span className="sr-only"> scan {point.id}</span> with this report
+                      Compare<span className="sr-only"> report #{point.id}</span> with this report
                     </LinkButtonText>
                   )}
                   {point.id !== currentId && (
                     <LinkButtonText to={`/scans/${point.id}/issues`}>
-                      Open<span className="sr-only"> scan {point.id}</span> issues
+                      Open<span className="sr-only"> report #{point.id}</span> issues
                     </LinkButtonText>
                   )}
                 </span>
@@ -418,7 +418,7 @@ function Swatch({ kind }: { kind: "current" | "baseline" | "other" }) {
 }
 
 function totalsSentence(point: SiteHistoryPoint): string {
-  return `${count(point.occurrences, "occurrence")} in ${count(point.groups, "issue group")}.`;
+  return `${count(point.occurrences, "occurrence")} in ${count(point.groups, "issue")}.`;
 }
 
 function trendSummary(
@@ -437,7 +437,7 @@ function trendSummary(
   const percent = ratio <= 5 ? ` (${Math.round(ratio * 100)}%)` : "";
   const direction =
     diff < 0 ? `down ${(-diff).toLocaleString()}${percent}` : diff > 0 ? `up ${diff.toLocaleString()}${percent}` : "unchanged";
-  return `${MEASURES[measure]} ${direction} from scan ${first.id} to scan ${last.id} across ${points.length} completed ${plural(points.length, "scan")}.`;
+  return `${MEASURES[measure]} ${direction} from report #${first.id} to report #${last.id} across ${points.length} completed ${plural(points.length, "scan")}.`;
 }
 
 /** Round axis steps (1, 2 or 5 times a power of ten), whole numbers only. */

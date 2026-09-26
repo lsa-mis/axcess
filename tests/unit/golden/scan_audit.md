@@ -63,7 +63,7 @@ _A “n/a” means this method produced no findings on this scan, it may have be
 
 ### Click-Through: content behind a click
 
-Click-Through reached 0 views opened by clicking across 0 page(s). Per-page control coverage was not recorded for this scan, so the share of controls operated is unknown.
+Click-Through reached 0 page states opened by clicking across 0 page(s). Per-page control coverage was not recorded for this scan, so the share of controls operated is unknown.
 
 - Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what Click-Through can reach and still require manual testing.
 - Click-Through findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.

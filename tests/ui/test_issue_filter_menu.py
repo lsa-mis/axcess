@@ -65,7 +65,7 @@ def enriched(seeded_db: tuple[Path, Path, int]) -> None:
 async def _open(page: Any, base: str, scan_id: int, query: str = "") -> None:
     await page.goto(f"{base}/app/scans/{scan_id}/issues{query}", wait_until="networkidle")
     await pw.expect(
-        page.get_by_role("table", name=re.compile("issue groups", re.I))
+        page.get_by_role("table", name=re.compile(r"^Accessibility issues", re.I))
     ).to_be_visible()
 
 
@@ -90,7 +90,7 @@ def _params(page: Any) -> dict[str, str]:
 
 async def _shown_keys(page: Any) -> set[str]:
     await page.wait_for_load_state("networkidle")
-    table = page.get_by_role("table", name=re.compile("issue groups", re.I))
+    table = page.get_by_role("table", name=re.compile(r"^Accessibility issues", re.I))
     hrefs = (
         await table.get_by_role("rowheader")
         .get_by_role("link")
@@ -132,7 +132,7 @@ async def test_menu_is_three_checkbox_groups_with_big_rows(enriched, live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
     await _open_menu(page)
-    for group in ("Level", "Type", "Finding type"):
+    for group in ("Level", "Type", "Found by"):
         fieldset = page.get_by_role("group", name=group, exact=True)
         await pw.expect(fieldset).to_be_visible()
         assert await fieldset.get_by_role("radio").count() == 0, group
@@ -208,11 +208,11 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
 
     # Across groups the filters combine (AND); within a group they widen (OR).
     await _box(page, "Level", "A").uncheck()
-    await _box(page, "Finding type", "click_through").check()
+    await _box(page, "Found by", "click_through").check()
     await page.wait_for_url(re.compile(r"finding_type=click_through"))
     ct = await _assert_matches_api(page, base, scan_id)
     assert ct == {"axe%3Abutton-name"}, ct
-    await _box(page, "Finding type", "alt_text").check()
+    await _box(page, "Found by", "alt_text").check()
     ct_or_alt = await _assert_matches_api(page, base, scan_id)
     assert ct < ct_or_alt, ct_or_alt
     await _box(page, "Type", "informational").check()
@@ -247,8 +247,8 @@ async def test_a_reload_and_an_old_single_value_link_keep_the_checks(
         ("Level", "A", True),
         ("Level", "AA", True),
         ("Level", "BP", False),
-        ("Finding type", "wcag", True),
-        ("Finding type", "alt_text", False),
+        ("Found by", "wcag", True),
+        ("Found by", "alt_text", False),
     ):
         check = pw.expect(_box(page, group, value))
         await (check.to_be_checked() if on else check.not_to_be_checked())
@@ -312,7 +312,7 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     await page.get_by_role("button", name="Clear all", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|type=", url))
     assert len(await _assert_matches_api(page, base, scan_id)) == 5
-    for group in ("Level", "Type", "Finding type"):
+    for group in ("Level", "Type", "Found by"):
         boxes = page.get_by_role("group", name=group, exact=True).get_by_role("checkbox")
         for i in range(await boxes.count()):
             await pw.expect(boxes.nth(i)).not_to_be_checked()
@@ -367,6 +367,6 @@ async def test_mobile_width_rows_still_one_target_tall(enriched, live_server, ne
             i,
             box,
         )
-    await _box(page, "Finding type", "alt_text").locator("xpath=ancestor::label[1]").click()
+    await _box(page, "Found by", "alt_text").locator("xpath=ancestor::label[1]").click()
     await page.wait_for_url(re.compile(r"finding_type=alt_text"))
     await _assert_matches_api(page, base, scan_id)

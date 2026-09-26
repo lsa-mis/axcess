@@ -52,7 +52,7 @@ export default function CoverageGroup({ settings, update, policy }: GroupProps) 
           onChange={(on) => update(switchPatch(settings, "skip_rendered_storage", on))}
           disabled={settings.static_only}
           label={SWITCHES.skip_rendered_storage.label}
-          hint={settings.static_only ? "A Fast crawl has no rendered pages to store." : SWITCHES.skip_rendered_storage.hint}
+          hint={settings.static_only ? "A fast scan has no saved copies to keep." : SWITCHES.skip_rendered_storage.hint}
         />
         {/* Search discovery reaches pages only a search box links to, so it
             decides how much of the site is visited. */}

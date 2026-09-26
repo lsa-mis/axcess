@@ -15,7 +15,7 @@ A scan starts at the crawler, which fetches each page in scope and renders it
 in Chromium. The checks run on the [rendered page](../glossary.md#rendered-page),
 their results are stored as [evidence](../glossary.md#evidence) in SQLite and a
 folder of files, and the review app and exports read that evidence back as
-[issue groups](../glossary.md#issue-group).
+[issue groups](../glossary.md#issue).
 
 ## Where the code lives
 
@@ -445,7 +445,7 @@ Axcess has two ways to scan pages behind a sign-in. They share browser code in
 ![Diagram of a login scan. You choose "Site with a login or 2FA", Axcess opens a visible browser, you sign in directly with the site including any two-factor step, then select "I'm signed in, start scan". Axcess moves the session in memory to its scanning browser, crawls from where you landed, and deletes the temporary browser profile when the scan ends. Login scans need an HTTPS site whose address resolves to a public IP address.](../images/diagrams/login-scan-flow.png)
 
 You sign in yourself in a visible browser, and Axcess scans with that session
-without ever seeing your password. This is the [login scan](../glossary.md#login-scan)
+without ever seeing your password. This is the [login scan](../glossary.md#sign-in-scan)
 that the desktop app offers.
 
 How it works:

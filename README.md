@@ -27,7 +27,7 @@ and the developers who fix what it finds.
 
 ## What makes it different
 
-- **[Scans behind a sign-in](./docs/glossary.md#login-scan).** You sign in
+- **[Scans behind a sign-in](./docs/glossary.md#sign-in-scan).** You sign in
   yourself in a normal browser window, including single sign-on (one shared
   sign-in page for many sites) and two-factor steps. Axcess never sees your
   password and saves no reusable login.

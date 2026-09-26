@@ -106,15 +106,18 @@ export function sortRows(rows: ComparisonRow[], sort: SortState): ComparisonRow[
 }
 
 /** The Change header's chip: its order is by kind of change, not A to Z. */
-const changeChip = (sort: SortState): string => (sort.direction === "asc" ? "new first" : "resolved first");
+const changeChip = (sort: SortState): string => (sort.direction === "asc" ? "new first" : "new last");
 
 function describeSort(sort: SortState): string {
   if (sort.column === "Change") {
     return sort.direction === "asc"
-      ? "Sorted by change: new, then remaining, then resolved, largest change first in each"
-      : "Sorted by change: resolved, then remaining, then new";
+      ? "Sorted by change: new, then still found, then no longer found, largest change first in each"
+      : "Sorted by change: no longer found, then still found, then new";
   }
-  return `Sorted by ${headerText(sort.column).toLowerCase()}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
+  const name = headerText(sort.column);
+  // "WCAG" stays in capitals mid-sentence.
+  const spoken = name.startsWith("WCAG") ? name : name.toLowerCase();
+  return `Sorted by ${spoken}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
 /**
@@ -127,9 +130,10 @@ export function parseChanges(raw: string | null): string {
 }
 
 function headerText(column: SortColumn, baselineId?: number, currentId?: number): string {
-  if (column === "Before") return baselineId ? `Before (scan ${baselineId})` : "Before";
-  if (column === "After") return currentId ? `After (scan ${currentId})` : "After";
+  if (column === "Before") return baselineId ? `Before (report #${baselineId})` : "Before";
+  if (column === "After") return currentId ? `After (report #${currentId})` : "After";
   if (column === "Difference") return "Change in occurrences";
+  if (column === "WCAG") return "WCAG criterion";
   return column;
 }
 
@@ -197,7 +201,7 @@ export default function ComparedIssuesTable({
       key: "change",
       label: "Change",
       value: change,
-      // Checkboxes: New and Resolved can be shown together; none is all.
+      // Checkboxes: New and No longer found can be shown together; none is all.
       multiple: true,
       options: CHANGES.map((key) => ({ value: key, label: CHANGE_LABEL[key], count: counts[key] })),
     },
@@ -208,7 +212,7 @@ export default function ComparedIssuesTable({
   return (
     <>
       <TableBar
-        pager={<TablePagination label="Compared issue groups" noun="issue groups" {...paged} />}
+        pager={<TablePagination label="Compared issues" noun="issues" {...paged} />}
         footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
       >
         <TableSearch label="Search issues" value={q} onChange={onQuery} />
@@ -221,17 +225,17 @@ export default function ComparedIssuesTable({
         />
       </TableBar>
       <TableStatus>
-        {describeSort(sort)}. {rows.length} of {counts.all} issue groups shown.
+        {describeSort(sort)}. {rows.length} of {counts.all} issues shown.
       </TableStatus>
       {rows.length === 0 ? (
         <TableEmpty>
           {counts.all === 0
-            ? "Neither scan recorded any issue groups."
-            : "No issue groups match. Clear the filters to see them all."}
+            ? "Neither scan found any issues."
+            : "No issues match. Clear the filters to see them all."}
         </TableEmpty>
       ) : (
-        <TableRegion label="Compared issue groups" paged={paged}>
-          <Table caption={`Issue groups in scan ${baselineId} and scan ${currentId}. ${describeSort(sort)}.`}>
+        <TableRegion label="Compared issues" paged={paged}>
+          <Table caption={`Issues in report #${baselineId} and report #${currentId}. ${describeSort(sort)}.`}>
             <TableHead>
               <tr>
                 {COLUMNS.map((column) => (

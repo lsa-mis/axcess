@@ -13,223 +13,224 @@
  */
 
 import { CLICK_THROUGH } from "../../lib/labels";
+import { CHECK_LABEL } from "../../lib/terms";
 
 export const TAB_PUBLIC = "Public website";
-export const TAB_LOGIN = "Site with a login or 2FA";
+export const TAB_LOGIN = "Site with a sign-in or two-step sign-in (2FA)";
 
 export const URL_COPY = {
   public: {
-    label: "Site URL",
+    label: "Website address",
     help:
-      "Start with https:// . The scan stays under this address’s path, so /section/ only follows that section.",
+      "Start with https://. The scan only visits pages under this address. For example, an address ending in /section/ scans only that section.",
     placeholder: "https://example.edu/section/",
   },
   login: {
-    label: "Page to scan after you sign in",
+    label: "Website address to scan after you sign in",
     help:
-      "Start with https:// and no query string. The scan stays under this address’s path and never leaves this website.",
+      "Start with https://. Leave out anything after a ? or #. The scan only visits pages under this address and never leaves this website.",
     placeholder: "https://umich.instructure.com/courses/",
   },
 } as const;
 
 export const GROUPS = {
   coverage: {
-    legend: "Coverage",
+    legend: "Pages to scan",
     description: "How much of the site to visit.",
   },
   checks: {
     legend: "Checks",
-    description: "What each page is tested for.",
+    description: "What Axcess tests on each page.",
   },
   localAi: {
-    legend: "Local AI",
+    legend: "AI checks on this computer",
     description:
-      "Runs on this computer only. Nothing is uploaded, and no model is downloaded automatically.",
+      "AI (artificial intelligence) runs on this computer only. Axcess uploads nothing and never downloads a model by itself.",
   },
   limits: {
-    legend: "Limits and rule engine",
+    legend: "Limits and rule check tool",
   },
   speed: {
-    legend: "Speed and debugging",
+    legend: "Speed and browser window",
     description:
-      "How hard the crawler works, and whether you can watch it.",
+      "How fast the scan runs, and whether you can watch it.",
   },
 } as const;
 
 /** Switch copy, keyed by the positive setting name used in `scanPolicy.ts`. */
 export const SWITCHES = {
   whole_host: {
-    label: "Crawl the entire host",
-    hint: "Ignores the path above; every page on the host is in scope.",
+    label: "Scan the whole website",
+    hint: "Ignores the path in the address above. Every page on this host (for example, lsa.umich.edu) is included.",
   },
   whole_host_login: {
-    label: "Crawl the entire approved host",
-    hint: "Ignores the path above, but never leaves the signed-in website.",
+    label: "Scan the whole signed-in website",
+    hint: "Ignores the path in the address above, but never leaves the website you sign in to.",
   },
   include_subdomain: {
     label: "Follow links to subdomains",
-    hint: "For example from lsa.umich.edu to events.lsa.umich.edu.",
+    hint: "A subdomain is an address that ends in this site’s name. For example, events.lsa.umich.edu is a subdomain of lsa.umich.edu.",
   },
   ignore_robots: {
     label: "Ignore the site’s robots.txt rules",
     hint:
-      "Visits pages the site asks crawlers to skip. Authorized testing only; the scan is flagged in its config and audit log.",
+      "A site’s robots.txt file lists pages it asks scanners to skip. This setting visits those pages anyway. Use it only when you have permission to test. Axcess records this choice in the scan settings and the activity log (audit log).",
   },
   click_through: {
-    label: `${CLICK_THROUGH}: open menus, tabs and dialogs`,
+    label: `Open menus, tabs, and pop-up windows (${CLICK_THROUGH})`,
     hint:
-      "Opens controls on each page and checks the content they reveal, then re-runs the checks there. Adds scan time. Never submits forms, pays, or subscribes.",
+      "Axcess opens controls on each page, then checks the content they show. This makes the scan take longer. It never submits forms, pays, or subscribes.",
   },
   keyboard: {
     label: "Check for keyboard traps",
-    hint: "Can you Tab into and back out of every control? Adds 1–3 seconds per page.",
+    hint: "A keyboard trap is a control you can Tab into but not back out of. Adds 1–3 seconds per page.",
   },
   focus: {
-    label: "Check that focus is never hidden",
+    label: "Check that keyboard focus is never hidden",
     hint:
-      "Catches keyboard focus tucked behind sticky headers and footers (SC 2.4.11). SC 2.4.11 is new in WCAG 2.2; a 2.1 scan reports it as best practice.",
+      "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
-    hint: "320 px wide, 200% zoom and wider text spacing (SC 1.4.4, 1.4.10, 1.4.12). Adds 1–2 seconds per page.",
+    hint: "Checks each page at 320 pixels wide, at 200% zoom, and with wider text spacing (WCAG 1.4.4, 1.4.10, 1.4.12). Adds 1–2 seconds per page.",
   },
   skip_rendered_storage: {
-    label: "Don’t store rendered pages",
+    label: "Don’t keep a saved copy of each page",
     hint:
-      "Keeps the report database smaller. The Page inspector then re-renders the live page on demand instead of opening the stored capture; findings and evidence are stored exactly as before.",
+      "Keeps the stored report smaller. The Page inspector then loads the live page when you open it, instead of the saved copy. Occurrences and their evidence are saved as usual.",
   },
   ocr: {
     label: "Read text inside images (OCR)",
     hint:
-      "Finds words drawn into pictures so they can be checked. Runs locally; no model needed.",
+      "Finds words drawn into pictures so Axcess can check them. Uses optical character recognition (OCR) on this computer. No AI model needed.",
   },
   vision: {
-    label: "Review image text with a local vision model",
+    label: "Compare image text with alt text (vision model)",
     hint:
-      "Judges whether an image’s alt text matches what it shows. Slower; only reviews images where OCR found text.",
+      "An AI model that looks at images (vision model) checks whether the alt text matches what the image shows. Alt text is the text a screen reader reads for an image. Slower. It only looks at images where text was found.",
   },
   semantic: {
-    label: "Review wording with local AI",
+    label: "AI review of wording",
     hint:
-      "A language model on this computer reads headings and links for meaning, not just markup. Results need an expert to confirm.",
+      "An AI language model on this computer reads headings and links for their meaning, not just their code. An expert must confirm each result.",
   },
   motion: {
     label: "Check motion and animation",
     hint:
-      "Flags flashing, autoplay and layout that only a screenshot shows.",
+      "Finds flashing, media that plays by itself (autoplay), and layout problems that only a screenshot shows.",
   },
   static_only: {
-    label: "Fast crawl without a browser",
+    label: "Fast scan without a browser",
     hint:
-      "Fetches page HTML only, 5–10× faster. Skips every check that needs a rendered page: axe-core, keyboard, zoom and focus.",
+      "Reads only the page code (HTML), 5–10 times faster. Skips every check that needs a browser: Rule check (axe), and the keyboard, zoom, and focus checks.",
   },
   show_browser: {
     label: "Show the scanning browser window",
     hint:
-      "Leave off to scan in the background while you use other apps. Closing the window stops browser-based checks.",
+      "Leave this off to scan in the background while you use other apps. If you close the window, the browser checks stop.",
   },
 } as const;
 
 export const NUMBERS = {
   max_pages: {
-    label: "Max pages",
+    label: "Maximum pages",
     hint: (max: number) =>
-      `The scan stops after this many pages, or sooner when it runs out of in-scope links. A whole number from 1 to ${max.toLocaleString()}.`,
+      `The scan stops after this many pages, or sooner when it finds no more pages to visit. Enter a whole number from 1 to ${max.toLocaleString()}.`,
   },
   max_depth: {
-    label: "Max link depth",
+    label: "Maximum link depth",
     hint: (max: number) =>
-      `How many clicks from the start page the scan follows. 1 is the start page and the pages it links to; 10 reaches nearly everything on most sites. A whole number from 1 to ${max}.`,
+      `How many clicks from the start page the scan follows. 1 means the start page and the pages it links to. 10 reaches almost every page on most sites. Enter a whole number from 1 to ${max}.`,
   },
   rps: {
-    label: "Requests per second",
+    label: "Page requests per second",
     hint:
-      "How quickly Axcess asks the site for pages. Higher is faster but adds load; raise it only with the site owner’s agreement.",
+      "How quickly Axcess asks the site for pages. Higher is faster but puts more load on the site. Raise it only if the site owner agrees.",
   },
   workers: {
-    label: "Parallel workers",
-    hint: "How many pages this computer works on at once. An M4 Pro can start at 8 and scale to 32.",
+    label: "Pages at once (workers)",
+    hint: "How many pages this computer works on at the same time. On a fast computer, such as an M4 Pro, start at 8 and go up to 32.",
   },
   workers_login: {
     label: "Signed-in tabs",
     hint:
-      "Concurrent tabs inside the same temporary signed-in browser. Two is recommended; four is the safety maximum.",
+      "How many tabs the temporary signed-in browser uses at once. Axcess recommends 2. The safe maximum is 4.",
   },
 } as const;
 
 export const STANDARD = {
   label: "Standard to check against",
   hint: (version: string) =>
-    `WCAG ${version}. AA is what most policies require; AAA adds the strictest rules, such as 7:1 contrast.`,
+    `Web Content Accessibility Guidelines (WCAG) ${version}. Most policies require Level AA. Level AAA adds the strictest rules, such as stronger color contrast (7:1).`,
 } as const;
 
 export const WCAG_VERSION = {
   label: "WCAG version",
-  hint: "2.1 is the current U-M standard. 2.2 adds newer criteria, such as focus not obscured and target size.",
+  hint: "2.1 is the current University of Michigan (U-M) standard. 2.2 adds newer WCAG criteria, for example that keyboard focus is never hidden and that buttons and links are big enough to tap (target size).",
 } as const;
 
 export const ENGINE = {
-  label: "Rule engine",
+  label: "Rule check tool",
   axe: {
-    label: "axe-core",
-    hint: "The standard checker. Runs in the browser Axcess already opened.",
+    label: "axe",
+    hint: "The standard rule check (axe-core). It runs in the browser Axcess already opened.",
   },
   alfa: {
-    label: "Siteimprove Alfa",
+    label: "Alfa",
     hint:
-      "An independent second checker using ACT rules — standard tests published by the W3C, one condition each. Slower.",
+      "A second, separate rule check (Siteimprove Alfa). It uses ACT rules (Accessibility Conformance Testing): standard tests published by the W3C (World Wide Web Consortium). Each test checks one thing. Slower.",
   },
   both: {
     label: "Both",
-    hint: "The most thorough option. Evidence from each engine is kept separately.",
+    hint: "The most thorough choice. Axcess keeps the results of each tool separate.",
   },
 } as const;
 
 export const FIXED_NOTE_LOGIN =
-  "Fixed for login scans: the scan stays on this exact website, respects robots.txt, always renders pages in a real browser, and runs at 1 request per second.";
+  "Sign-in scans always work this way: they stay on this exact website, respect robots.txt, open every page in a real browser, and ask for 1 page per second.";
 
 export const AUTHORIZATION = {
   label:
-    "I have authorization from the site owner and will use a least-privilege test account.",
+    "The site owner allows this scan, and I will sign in with a test account that has only the access it needs (least privilege).",
   hint:
-    "Required. You sign in yourself in a browser window on this computer; your password is typed into the site, never into Axcess. The session stays in memory and is destroyed when the scan ends.",
+    "Required. You sign in yourself, in a browser window on this computer. You type your password into the website, never into Axcess. Axcess keeps the session in memory only and deletes it when the scan ends.",
 } as const;
 
 export const IMAGE_ACK = {
-  label: "Store protected image-analysis evidence locally",
+  label: "Save images from signed-in pages, and their text, on this computer",
   hintOcr:
-    "Protected image blobs and extracted OCR text will be stored in this computer’s local Axcess evidence directory and database.",
+    "Axcess saves the images and the text it reads from them (OCR) in its folder and database on this computer.",
   hintVision:
-    "Protected image blobs, OCR text and vision-model rationale will be stored locally. Image data is sent only to the verified loopback Ollama endpoint.",
+    "Axcess saves the images, the text it reads from them, and the vision model’s explanations on this computer. It sends image data only to Ollama at a checked address on this same computer (loopback).",
 } as const;
 
 export const SUBMIT = {
-  public: { label: "Start scan", pending: "Starting scan…", note: "Watch progress or come back later; the report saves as it goes." },
+  public: { label: "Start scan", pending: "Starting scan…", note: "Watch the progress, or come back later. Axcess saves the report as it goes." },
   login: {
     label: "Open browser to sign in",
     pending: "Opening browser…",
-    note: "A window opens for you to sign in; the scan starts when you press “I’m signed in”.",
+    note: "A window opens for you to sign in. The scan starts when you press “I’m signed in”.",
   },
 } as const;
 
 export const ERRORS = {
   title: "The scan could not start",
-  lead: "Fix these before starting:",
-  urlEmpty: "Enter the page to start from.",
+  lead: "Fix these problems, then start the scan:",
+  urlEmpty: "Enter a website address to start from.",
   urlNotHttp: "Add https:// at the start. Axcess only scans web addresses.",
-  urlNotHttps: "Use https:// . Login scans only run over a secure connection.",
-  urlHasExtras: "Remove the query string, fragment or credentials from the address.",
+  urlNotHttps: "Start the address with https://. Sign-in scans only run over a secure connection.",
+  urlHasExtras: "Remove anything after a ? or #, and any user name or password, from the address.",
   staticWithAxe:
-    "Fast crawl without a browser cannot run with axe-core. Turn off Fast crawl, or choose Siteimprove Alfa as the rule engine.",
-  notAuthorized: "Confirm that the site owner authorized this accessibility scan.",
+    "Fast scan without a browser cannot run Rule check (axe). Turn off Fast scan, or choose Alfa as the rule check tool.",
+  notAuthorized: "Confirm that the site owner allows this accessibility scan.",
   imageAck:
-    "Confirm how protected images and extracted text will be stored before turning on image text reading.",
+    "Before you turn on reading text inside images, confirm where Axcess saves the images and their text.",
   limitEmpty: (label: string, min: number, max: number) =>
-    `Enter ${label}: a whole number from ${min} to ${max.toLocaleString()}.`,
+    `${label} is empty. Enter a whole number from ${min} to ${max.toLocaleString()}.`,
   limitWhole: (label: string) => `${label} must be a whole number.`,
   limitMin: (label: string, min: number) => `${label} must be at least ${min}.`,
   limitMax: (label: string, max: number, mode: "public" | "login") =>
-    `${label} can be at most ${max.toLocaleString()} for a ${mode === "login" ? "login" : "public website"} scan.`,
+    `${label} can be at most ${max.toLocaleString()} for a ${mode === "login" ? "sign-in" : "public website"} scan.`,
 } as const;
 
 /**
@@ -238,43 +239,59 @@ export const ERRORS = {
  */
 export const RECOVERY = {
   loading: (id: number) => `Loading the settings from scan ${id}…`,
-  loaded: (id: number) => `Settings copied from scan ${id}. Check them, then start the scan again.`,
+  loaded: (id: number) => `Axcess copied the settings from scan ${id}. Check them, then start the scan again.`,
   loadedLogin:
-    "Sign-in is never saved: you sign in again in the browser window, and confirm authorization again below.",
-  failed: (id: number) => `Couldn’t load the settings from scan ${id}, so the defaults are shown.`,
+    "Axcess never saves your sign-in. Sign in again in the browser window, and confirm again below that the site owner allows this scan.",
+  failed: (id: number) =>
+    `Axcess could not load the settings from scan ${id}. The form shows the default settings instead.`,
 } as const;
 
+/**
+ * The two ways back from a failed or stopped scan. "Scan again with faster
+ * settings" is `quickRetrySettings`: the defaults (vision model, AI review
+ * and the motion check off) with Click-Through off too.
+ */
 export const RETRY = {
-  edit: "Edit settings and retry",
+  edit: "Change settings first",
   editHint:
-    "Opens New scan with this scan’s settings filled in, so you can change what failed and start again. Sign-in is never saved.",
-  quick: "Quick retry",
-  quickPending: "Restarting scan…",
+    "Opens New scan with this scan’s settings filled in. Change what went wrong, then start the scan again. Axcess never saves your sign-in.",
+  quick: "Scan again with faster settings",
+  quickPending: "Starting the scan again…",
   quickHint:
-    "Scans the same address again right away with the default settings, with Click-Through off, to show quickly whether the site can be scanned. It does not reuse this scan’s other settings.",
+    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}), so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
 } as const;
 
 export const SUMMARY = {
   title: "What this scan will do",
-  site: "Site",
-  siteEmpty: "Enter a site URL to see the scope.",
-  coverage: "Coverage",
+  site: "Website",
+  siteEmpty: "Enter a website address to see what will be scanned.",
+  coverage: "Pages to scan",
   standard: "Standard",
   checks: "Checks that run",
   notIncluded: "Not included",
   nothingLeftOut: "Nothing: every option is on.",
-  /** Listed under Not included when the rendered-page copies are skipped. */
-  noRenderedCopies: "Stored copies of rendered pages",
-  /** A Coverage line during a Fast crawl. */
-  htmlOnly: "HTML only, no browser",
-  loginPrivacy: "Nothing is uploaded; the session cookie is discarded when the scan ends.",
+  /** Listed under Not included when the saved page copies are skipped. */
+  noRenderedCopies: "Saved copy of each page",
+  /**
+   * Also listed for a sign-in scan: its screenshots are cut from the same
+   * signed-in pages, so the one switch drops both (server.py, the
+   * capture_screenshots / store_rendered_html pair).
+   */
+  noScreenshots: "Screenshots of occurrences",
+  /** For a public scan: it never signs in. */
+  noSignIn: "Pages behind a sign-in",
+  /** For a sign-in scan: it never leaves the approved website. */
+  noOtherSites: "Pages on any other website",
+  /** A Pages to scan line during a Fast scan. */
+  htmlOnly: "Page code (HTML) only, no browser",
+  loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",
   localModels:
-    "Uses only models already installed in local Ollama; nothing is downloaded and no image leaves this computer. Ollama may load several GB into memory while analysis runs.",
+    "Uses only AI models already installed in Ollama on this computer. Axcess downloads nothing, and no image leaves this computer. Ollama may use several gigabytes (GB) of memory while it runs.",
   defaultState: "Default settings",
   customized: "Customized",
-  reset: "Reset to default",
+  reset: "Reset to default settings",
   footnote:
-    "Automated checks find roughly a third of accessibility problems. The report says what still needs a person.",
+    "Automated checks find only about a third of accessibility problems. The report shows what a person still needs to check.",
 } as const;
 
 /**
@@ -283,17 +300,17 @@ export const SUMMARY = {
  * switch it stands for carries the full explanation.
  */
 export const RAIL_LABELS = {
-  whole_host: "Entire host",
-  whole_host_login: "Entire approved host",
+  whole_host: "Whole website",
+  whole_host_login: "Whole signed-in website",
   include_subdomain: "Subdomains",
-  click_through: `${CLICK_THROUGH} (menus, tabs, dialogs)`,
-  keyboard: "Keyboard traps",
-  focus: "Focus never hidden",
-  responsive: "Narrow screens and zoom",
-  ocr: "Text in images (OCR)",
-  vision: "Image text review (vision model)",
-  semantic: "Wording review (local AI)",
-  motion: "Motion and animation",
+  click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
+  keyboard: CHECK_LABEL.keyboard,
+  focus: CHECK_LABEL.focus,
+  responsive: CHECK_LABEL.responsive,
+  ocr: CHECK_LABEL.image,
+  vision: "Vision model review",
+  semantic: CHECK_LABEL.semantic,
+  motion: CHECK_LABEL.visual,
 } as const;
 
 /**
@@ -302,6 +319,7 @@ export const RAIL_LABELS = {
  */
 export const CLICK_THROUGH_COPY = {
   /** Replaces the switch hint while the switch is disabled. */
-  unavailableStatic: `${CLICK_THROUGH} is unavailable with Fast crawl: opening controls needs a rendered page.`,
-  unavailableAlfa: `Choose axe-core or Both: ${CLICK_THROUGH} re-checks revealed content with axe-core.`,
+  unavailableStatic: "Not available with Fast scan. Opening controls needs a browser.",
+  unavailableAlfa:
+    "Choose axe or Both as the rule check tool. Axcess checks the content that opens with Rule check (axe).",
 } as const;

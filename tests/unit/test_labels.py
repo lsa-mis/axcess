@@ -27,7 +27,7 @@ from audit.web.server import _methods_used
 
 # Old user-facing names. Underscored keys (``dom_state_count``) are machine
 # fields, not prose, so they deliberately do not match. "Click-Through
-# states" was retired for "views opened by clicking", words anyone can follow.
+# states" was retired for "page states opened by clicking", words anyone can follow.
 _RETIRED = re.compile(
     r"dom[ -]states?|interaction states?|click[- ]?through states?", re.IGNORECASE
 )
@@ -53,11 +53,11 @@ def workbook_text(data: bytes) -> str:
 
 def test_labels_are_the_canonical_spelling() -> None:
     assert labels.CLICK_THROUGH == "Click-Through"
-    assert labels.CLICK_THROUGH_STATE == "view opened by clicking"
-    assert labels.CLICK_THROUGH_STATES == "views opened by clicking"
-    assert labels.CLICK_THROUGH_STATES_LABEL == "Views opened by clicking"
-    assert labels.click_through_states(1) == "1 view opened by clicking"
-    assert labels.click_through_states(3) == "3 views opened by clicking"
+    assert labels.CLICK_THROUGH_STATE == "page state opened by clicking"
+    assert labels.CLICK_THROUGH_STATES == "page states opened by clicking"
+    assert labels.CLICK_THROUGH_STATES_LABEL == "Page states opened by clicking"
+    assert labels.click_through_states(1) == "1 page state opened by clicking"
+    assert labels.click_through_states(3) == "3 page states opened by clicking"
 
 
 @pytest.fixture
@@ -104,7 +104,7 @@ def test_method_ledger_row_is_labelled_click_through() -> None:
     )
     method = next(item for item in methods if item["key"] == "interaction")
     assert method["label"] == labels.CLICK_THROUGH
-    assert "1 view opened by clicking" in method["result"]
+    assert "1 page state opened by clicking" in method["result"]
     for field in ("label", "result", "description", "caveat"):
         assert_reader_text_is_clean(str(method[field]), where=f"method {field}")
 
@@ -139,7 +139,7 @@ def test_interaction_coverage_sentences_say_click_through(coverage: InteractionC
 
 
 def test_ran_status_line_counts_click_through_states() -> None:
-    assert "reaching 5 views opened by clicking" in _RAN.status_line
+    assert "reaching 5 page states opened by clicking" in _RAN.status_line
 
 
 def test_cli_help_names_the_skip_interaction_feature() -> None:

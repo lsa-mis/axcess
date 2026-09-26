@@ -4,7 +4,7 @@
 > administrators who deploy the optional managed protected-scan mode, and for
 > auditors who run its companion. It is not about the **Site with a login or
 > 2FA** scan that runs on the same computer as Axcess (see
-> [Login scan](../glossary.md#login-scan)). The auditor workflow and the crawl
+> [Login scan](../glossary.md#sign-in-scan)). The auditor workflow and the crawl
 > and egress rules were corrected to match the code in September 2026; the
 > other sections were spot-checked, not re-verified line by line.
 

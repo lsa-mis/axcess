@@ -42,21 +42,21 @@ export default function IssueDetailRoute() {
   if (detailError) {
     return (
       <EmptyState
-        title="Evidence group not found"
+        title="Issue not found"
         message={
-          "This evidence group isn't part of the current report. It may have been " +
-          "resolved or the URL may be stale. Return to the issue table."
+          "This issue is not part of this report. It may have been fixed, " +
+          "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
           <LinkButton to={`/scans/${id}/issues`} variant="primary">
-            Back to issue table
+            Back to the Issues table
           </LinkButton>
         }
       />
     );
   }
   if (!scan) {
-    return <div className="text-fg-muted">Loading…</div>;
+    return <div className="text-fg-muted">Loading issue…</div>;
   }
 
   const row = detail?.row;
@@ -73,17 +73,22 @@ export default function IssueDetailRoute() {
             <span>{row?.title ?? key}</span>
           </span>
         }
-        // The type rides with the criterion, so a lead reads as one even
-        // with the guidance closed.
+        // The type rides with the criterion, so a "Needs review" issue reads
+        // as one even with the guidance closed. The word is the Issues
+        // table's (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
         meta={
-          row
-            ? [
-                row.wcag_sc ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}` : "",
-                issuePageLaneLabel(row.review_lane),
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : undefined
+          row ? (
+            <>
+              {row.wcag_sc && (
+                <>
+                  <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
+                  {row.wcag_name ? ` ${row.wcag_name}` : ""}
+                  {" · "}
+                </>
+              )}
+              {issuePageLaneLabel(row.review_lane)}
+            </>
+          ) : undefined
         }
         // Top right, where Compare scans keeps its terms: one place on
         // every report page for "explain this". A book, not Compare's

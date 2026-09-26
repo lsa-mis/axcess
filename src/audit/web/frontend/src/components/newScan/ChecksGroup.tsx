@@ -28,9 +28,9 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           value={settings.axe_level}
           onChange={(axe_level) => update({ axe_level })}
           options={[
-            { value: "A", label: "A" },
-            { value: "AA", label: "AA" },
-            { value: "AAA", label: "AAA" },
+            { value: "A", label: "Level A" },
+            { value: "AA", label: "Level AA" },
+            { value: "AAA", label: "Level AAA" },
           ]}
         />
         <PillGroup
@@ -59,7 +59,7 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           onChange={(on) => update(switchPatch(settings, "keyboard", on))}
           disabled={!rendered}
           label={SWITCHES.keyboard.label}
-          hint={rendered ? SWITCHES.keyboard.hint : "Needs a rendered page; turn off Fast crawl."}
+          hint={rendered ? SWITCHES.keyboard.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
         {!isFixed(policy, "skip_focus") && (
           <SwitchRow
@@ -67,7 +67,7 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
             onChange={(on) => update(switchPatch(settings, "focus", on))}
             disabled={!rendered}
             label={SWITCHES.focus.label}
-            hint={rendered ? SWITCHES.focus.hint : "Needs a rendered page; turn off Fast crawl."}
+            hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
           />
         )}
         <SwitchRow
@@ -75,7 +75,7 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           onChange={(on) => update(switchPatch(settings, "responsive", on))}
           disabled={!rendered}
           label={SWITCHES.responsive.label}
-          hint={rendered ? SWITCHES.responsive.hint : "Needs a rendered page; turn off Fast crawl."}
+          hint={rendered ? SWITCHES.responsive.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
       </SwitchList>
     </SettingsGroup>

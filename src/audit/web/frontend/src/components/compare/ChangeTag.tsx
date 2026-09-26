@@ -3,10 +3,15 @@ import { cn } from "../../lib/cn";
 
 export const CHANGES: ComparisonChange[] = ["new", "resolved", "remaining"];
 
+/**
+ * The words for each change. "No longer found", not "Resolved": the later
+ * scan not finding an issue does not prove it was fixed, and "Fixed" is a
+ * status (docs/plain-language.md).
+ */
 export const CHANGE_LABEL: Record<ComparisonChange, string> = {
   new: "New",
-  resolved: "Resolved",
-  remaining: "Remaining",
+  resolved: "No longer found",
+  remaining: "Still found",
 };
 
 /**

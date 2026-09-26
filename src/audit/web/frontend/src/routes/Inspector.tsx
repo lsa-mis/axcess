@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Loader2 } from "lucide-react";
@@ -17,7 +18,6 @@ import {
   Select,
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CLICK_THROUGH_STATE } from "../lib/labels";
 
 type TabId = "page" | "dom";
 
@@ -171,21 +171,107 @@ export default function InspectorRoute() {
   // Which state is on screen. In the URL like the view above it, so a link to
   // "the dialog on page 12" survives being sent to someone.
   //
-  // The default is the finding's own state rather than the page as it loaded:
+  // The default is where the issue can be seen, not the page as it loaded:
   // arriving here from a revealed finding and being shown a document that
-  // cannot contain it is the whole complaint. Only when every target agrees on
-  // one state, though -- an issue spanning several states has no single
-  // correct answer, so it opens on the load capture and the picker offers the
-  // rest.
+  // cannot contain it is the whole complaint. See ``autoState`` below.
   const findingStateKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const target of targets) if (target.stateKey) keys.add(target.stateKey);
     return keys;
   }, [targets]);
-  const defaultStateKey =
-    findingStateKeys.size === 1 && allTargetsRevealed
-      ? [...findingStateKeys][0]
-      : null;
+  const reviewing = Boolean(issueKey || directSelector || directSnippet);
+  const evidenceReady = !!pageEvidence || evidenceError;
+  /** Whether the page as it loaded holds any occurrence under review. */
+  const issueAtLoad = targets.some((target) => target.stateKey === null);
+  /** Every occurrence under review came after a click; page load holds none. */
+  const issueOnlyAfterClicks = reviewing && !issueAtLoad && findingStateKeys.size > 0;
+
+  /**
+   * Which states' captures no longer hold their flagged elements.
+   *
+   * Every state holding an occurrence of the issue under review is checked,
+   * not only the one on screen: the picker labels each of them, and the
+   * inspector opens on one that can actually be highlighted. Each capture is
+   * fetched (a stored document, never a live render) and run through the
+   * same matcher the highlight uses, so a label, the opening choice, and the
+   * highlight can never disagree. The queries share the on-screen query's
+   * key, so switching to a checked state is served from cache.
+   */
+  const checkedStates = useMemo(
+    () => (reviewing ? [...findingStateKeys] : []),
+    [findingStateKeys, reviewing],
+  );
+  const stateCaptures = useQueries({
+    queries: checkedStates.map((key) => ({
+      queryKey: ["page-inspection", scan, page, key],
+      queryFn: () => api.getPageInspection(scan, page, key),
+      enabled: inspectEnabled,
+      retry: false,
+    })),
+  });
+  const captureVersions = stateCaptures.map((query) => query.dataUpdatedAt).join(",");
+  // Stamped with the capture versions it was computed from, so "every check
+  // has finished" means for these captures, not for an earlier set.
+  const [checked, setChecked] = useState<{
+    versions: string;
+    missing: ReadonlyMap<string, MissingCount>;
+  }>(() => ({ versions: "", missing: new Map() }));
+  const missingByState = checked.missing;
+  useEffect(() => {
+    let cancelled = false;
+    const versions = captureVersions;
+    const captures = checkedStates.map((key, index) => [key, stateCaptures[index]?.data] as const);
+    scheduleIdle(() => {
+      if (cancelled) return;
+      const next = new Map<string, MissingCount>();
+      for (const [key, inspection] of captures) {
+        const stateTargets = targets.filter((target) => target.stateKey === key);
+        // A state that was never captured has its own message; there is no
+        // document to be missing anything from.
+        if (!inspection?.render.ok || !inspection.render.dom_html || !stateTargets.length) continue;
+        const html = prepareCapture(
+          inspection.render.dom_html,
+          inspection.render.final_url || inspection.page.url || null,
+        );
+        const found = countFound(html, stateTargets);
+        next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
+      }
+      setChecked({ versions, missing: next });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // captureVersions stands in for stateCaptures, a new array every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureVersions, checkedStates, targets]);
+  // Where to open when the URL does not say. An issue present at page load
+  // opens there. One found only after clicks opens on the first state (in
+  // the order the probe reached them) whose capture actually holds its
+  // element, so the reviewer lands on the defect highlighted rather than on
+  // a document that cannot contain it; if none does, on the first state
+  // that holds the issue at all. Undefined while that is still being worked
+  // out, and decided once per page and issue so the view never jumps.
+  const settled =
+    stateCaptures.every((query) => query.isSuccess || query.isError) &&
+    checked.versions === captureVersions;
+  const autoState: string | null | undefined = !evidenceReady
+    ? undefined
+    : !issueOnlyAfterClicks
+      ? null
+      : settled
+        ? (checkedStates.find((key) => {
+            const count = missingByState.get(key);
+            return count != null && count.missing < count.total;
+          }) ?? checkedStates[0])
+        : undefined;
+  const openingScope = [scan, page, issueKey, directSelector, directSnippet].join("\n");
+  const [opening, setOpening] = useState<{ scope: string; state: string | null } | null>(null);
+  useEffect(() => {
+    if (autoState !== undefined && opening?.scope !== openingScope) {
+      setOpening({ scope: openingScope, state: autoState });
+    }
+  }, [autoState, opening, openingScope]);
+  const defaultStateKey = opening?.scope === openingScope ? opening.state : autoState;
   const requestedState = params.get("state");
   const stateKey = requestedState ?? defaultStateKey;
 
@@ -195,7 +281,7 @@ export default function InspectorRoute() {
     // nothing.
     queryKey: ["page-inspection", scan, page, stateKey],
     queryFn: () => api.getPageInspection(scan, page, stateKey),
-    enabled: inspectEnabled,
+    enabled: inspectEnabled && stateKey !== undefined,
     retry: false,
     // Hold the document already on screen while the next one is fetched.
     // Without it a state the cache has not seen makes `isLoading` true, the
@@ -238,14 +324,14 @@ export default function InspectorRoute() {
    * Each finding belongs to exactly one state, the one it was first seen in.
    * A revealed state is the page plus whatever the click added, so load-state
    * markup is usually still in it, but listing it again there presented one
-   * element once per state. It stays under "As the page loaded" and the off-state
+   * element once per state. It stays under "At page load" and the off-state
    * count points the reviewer to it.
    */
   /**
    * The occurrences that belong to the document on screen.
    *
    * An issue can span several states, and the evidence list was showing all of
-   * them whichever state was selected: "As the page loaded" listed markup that only
+   * them whichever state was selected: "At page load" listed markup that only
    * exists after a click, and a revealed state listed occurrences belonging to
    * a different control. Both are the same mistake this view exists to stop —
    * attaching evidence to a state that does not contain it.
@@ -262,7 +348,7 @@ export default function InspectorRoute() {
    * an assignment dashboard has six. Opening one issue and being offered all
    * six says nothing about which of them holds it — five are about other
    * rules entirely. Only the states carrying an occurrence of this issue are
-   * listed, with their counts, and "As the page loaded" stays as the baseline the
+   * listed, with their counts, and "At page load" stays as the baseline the
    * others are read against.
    *
    * An issue found only at page load is offered no revealed states at all:
@@ -271,7 +357,6 @@ export default function InspectorRoute() {
    * With nothing specific under review (no `?issue=` or `?selector=`), every
    * state is offered: then the picker is for exploring, not for locating.
    */
-  const reviewing = Boolean(issueKey || directSelector || directSnippet);
   const offeredStates = useMemo(() => {
     const all = data?.states ?? [];
     if (!reviewing) return all;
@@ -328,12 +413,12 @@ export default function InspectorRoute() {
     if (!allTargetsRevealed) {
       return {
         whenNoneFound:
-          "Some of these were first flagged after a control was operated, so they " +
-          "may not be in this capture of the page as it loaded; the rest may have " +
-          "changed since the scan.",
+          "Some of these were first flagged after a click on a control. This copy " +
+          "shows the page at page load, so they may not be in it. The others " +
+          "may have changed since the scan.",
         whenSomeFound:
-          "the rest were either first flagged after a control was operated, or may " +
-          "have changed since the scan.",
+          "The others were first flagged after a click on a control, or the page " +
+          "may have changed since the scan.",
         certain: false,
       };
     }
@@ -346,9 +431,9 @@ export default function InspectorRoute() {
     return {
       whenNoneFound:
         `${one ? "This element was" : "These elements were"} first flagged after ` +
-        `activating ${list}. This capture is the page as it loaded, so ` +
+        `clicking ${list}. This copy shows the page at page load, so ` +
         `${one ? "it may not appear" : "they may not appear"} here.`,
-      whenSomeFound: `the rest were first flagged after activating ${list}, so they may not be in this capture.`,
+      whenSomeFound: `The others were first flagged after clicking ${list}, so they may not be in this copy.`,
       certain: true,
     };
   }, [allTargetsRevealed, revealingControls, targets.length, activeStateKey]);
@@ -399,59 +484,10 @@ export default function InspectorRoute() {
 
   const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
-  const highlightPending = showHighlights && hasTarget && highlight === null;
+  // Only what this view can hold: a view whose targets are all in other
+  // states has nothing to highlight, and must not wait for it forever.
+  const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
 
-  /**
-   * Which offered states' captures no longer hold their flagged elements.
-   *
-   * The picker labels every state, not only the one on screen, so each
-   * offered state's capture is fetched too (a stored document, never a live
-   * render) and run through the same matcher the highlight uses: a label and
-   * a highlight can never disagree. The queries share the on-screen query's
-   * key, so switching to a checked state is served from cache.
-   */
-  const checkedStates = useMemo(
-    () => (reviewing ? offeredStates.map((state) => state.state_key) : []),
-    [offeredStates, reviewing],
-  );
-  const stateCaptures = useQueries({
-    queries: checkedStates.map((key) => ({
-      queryKey: ["page-inspection", scan, page, key],
-      queryFn: () => api.getPageInspection(scan, page, key),
-      enabled: inspectEnabled,
-      retry: false,
-    })),
-  });
-  const captureVersions = stateCaptures.map((query) => query.dataUpdatedAt).join(",");
-  const [missingByState, setMissingByState] = useState<ReadonlyMap<string, MissingCount>>(
-    () => new Map(),
-  );
-  useEffect(() => {
-    let cancelled = false;
-    const captures = checkedStates.map((key, index) => [key, stateCaptures[index]?.data] as const);
-    scheduleIdle(() => {
-      if (cancelled) return;
-      const next = new Map<string, MissingCount>();
-      for (const [key, inspection] of captures) {
-        const stateTargets = targets.filter((target) => target.stateKey === key);
-        // A state that was never captured has its own message; there is no
-        // document to be missing anything from.
-        if (!inspection?.render.ok || !inspection.render.dom_html || !stateTargets.length) continue;
-        const html = prepareCapture(
-          inspection.render.dom_html,
-          inspection.render.final_url || inspection.page.url || null,
-        );
-        const found = countFound(html, stateTargets);
-        next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
-      }
-      setMissingByState(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // captureVersions stands in for stateCaptures, a new array every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captureVersions, checkedStates, targets]);
   /** Missing elements for one picker option; the state on screen uses its highlight. */
   const missingFor = (key: string): MissingCount | undefined => {
     if (key === (activeStateKey ?? "")) {
@@ -496,7 +532,7 @@ export default function InspectorRoute() {
   }, [scopedTargets]);
 
   // Which outlined element the reader is on, for Previous / Next in the
-  // Rendered page, as the Loaded DOM tab has. Back to the first whenever the
+  // saved copy, as the Page code (DOM) tab has. Back to the first whenever the
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
@@ -531,11 +567,11 @@ export default function InspectorRoute() {
   if (error) {
     return (
       <EmptyState
-        title="Can't inspect this page"
+        title="This page cannot be shown"
         message={
           error instanceof Error
             ? error.message
-            : "This page could not be inspected. It may belong to a running or login-protected report, or be outside the scan's scope."
+            : "Axcess could not show this page. The scan may still be running, the page may be from a sign-in scan, or the page may be outside the scan's scope."
         }
         action={
           <LinkButton
@@ -547,17 +583,25 @@ export default function InspectorRoute() {
             })}
             variant="primary"
           >
-            Back to stored page evidence
+            Back to page evidence
           </LinkButton>
         }
       />
+    );
+  }
+  if (stateKey === undefined) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-fg-muted" role="status">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        Finding the page state where this issue appears…
+      </div>
     );
   }
   if (isLoading || !data) {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-fg-muted" role="status">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        Rendering the page for inspection…
+        Getting the page ready…
       </div>
     );
   }
@@ -565,16 +609,20 @@ export default function InspectorRoute() {
   const { page: pageInfo, render } = data;
   const displayTitle = pageInfo.title || pageInfo.url;
   const liveUrl = pageInfo.url;
-  const status = render.status_code != null && render.status_code !== 200 ? ` (${render.status_code})` : "";
+  const status = render.status_code != null && render.status_code !== 200 ? ` (server code ${render.status_code})` : "";
   const renderNote = !render.ok
-    ? "Could not render live"
+    ? "Could not load the live page"
     : render.source === "stored"
       ? status
-        ? `Stored render${status}`
+        ? `Saved copy${status}`
         : null
       : render.source === "state"
-        ? `Captured state${status}`
-        : `Live render${status}`;
+        ? `Saved page state${status}`
+        : `Live page${status}`;
+  // What the first tab holds: a copy the scan saved, or the live page
+  // loaded just now because no copy was saved.
+  const copyName =
+    render.source === "stored" || render.source === "state" ? "Saved copy" : "Live page";
 
   return (
     <>
@@ -594,7 +642,7 @@ export default function InspectorRoute() {
               className="break-all text-fg-subtle"
               title={
                 pageInfo.captured_at
-                  ? `Captured ${new Date(pageInfo.captured_at).toLocaleString()}`
+                  ? `Saved ${serverDate(pageInfo.captured_at).toLocaleString()}`
                   : undefined
               }
             >
@@ -606,7 +654,7 @@ export default function InspectorRoute() {
           <ExternalLinkButton
             href={liveUrl}
             variant="secondary"
-            aria-label={`Open ${displayTitle} in a new tab`}
+            aria-label={`Open live page: ${displayTitle} (opens in a new tab)`}
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Open live page
@@ -623,24 +671,25 @@ export default function InspectorRoute() {
                   at page load, which is the one state the reviewer has just
                   said they do not want. */}
               <p className="text-sm font-semibold text-fg">
-                This {CLICK_THROUGH_STATE} was not captured
+                The scan did not save this page state
               </p>
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
-                To reach it by hand, open the live page and follow the steps in
-                the state list above. Switch back to{" "}
-                <span className="font-semibold">As the page loaded</span> for the
-                markup this report does hold.
+                To see it yourself, open the live page and click the controls
+                named in the Page state list above, in order. Or choose{" "}
+                <span className="font-semibold">At page load</span> to see the
+                page code this report saved.
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-fg">This page could not be re-rendered</p>
+              <p className="text-sm font-semibold text-fg">This page could not be shown again</p>
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
-                The stored scan evidence for this page is still available, use{" "}
-                <span className="font-semibold">Open live page</span> to view it
-                yourself, or return to the stored page evidence.
+                The evidence the scan saved for this page is still available. To
+                see the page yourself, use{" "}
+                <span className="font-semibold">Open live page</span>. Or go back
+                to the page evidence.
               </p>
             </>
           )}
@@ -655,14 +704,18 @@ export default function InspectorRoute() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Select
             id="inspect-state"
-            label="Which view of the page"
+            label="Page state"
             value={stateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
             options={[
               {
                 value: "",
-                label: `As the page loaded${flaggedHere(loadStateCount)}`,
-                badge: <MissingChip count={missingFor("")} />,
+                label: `At page load${occurrencesHere(loadStateCount)}`,
+                badge: issueOnlyAfterClicks ? (
+                  <IssueNotHereChip />
+                ) : (
+                  <MissingChip count={missingFor("")} />
+                ),
               },
               ...offeredStates.map((state) => {
                 const count = occurrencesByState.get(state.state_key) ?? 0;
@@ -676,7 +729,7 @@ export default function InspectorRoute() {
                     : `“${state.revealed_by}”`;
                 return {
                   value: state.state_key,
-                  label: `After clicking ${chain}${flaggedHere(count)}`,
+                  label: `After clicking ${chain}${occurrencesHere(count)}`,
                   badge: <MissingChip count={missingFor(state.state_key)} />,
                 };
               }),
@@ -688,12 +741,13 @@ export default function InspectorRoute() {
           {isFetching ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" role="status">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              Loading this state; the previous one is still shown.
+              Loading this page state. The previous one stays on screen until it
+              loads.
             </span>
           ) : (
             activeStateKey && (
               <span className="text-xs text-fg-muted">
-                Captured during the scan, after the control was operated.
+                The scan saved this page state after clicking the control.
               </span>
             )
           )}
@@ -702,27 +756,27 @@ export default function InspectorRoute() {
 
       <Tabs
         mode="nav"
-        label="How this page was rendered"
+        label="How to view this page"
         className="mb-4"
         replace
         value={tab}
         items={[
           {
             key: "page",
-            label: render.ok ? "Rendered page" : "Page",
+            label: render.ok ? copyName : "Page",
             to: viewHref("page"),
           },
           // "Loaded DOM" was accurate while the only document was the page as
           // it loaded. It can now be a state captured after a click, so the
           // name says what it shows rather than when it was taken.
-          { key: "dom", label: "DOM source", to: viewHref("dom") },
+          { key: "dom", label: "Page code (DOM)", to: viewHref("dom") },
         ]}
       />
 
       <div
         id="inspect-panel-page"
         role="region"
-        aria-label="Rendered page"
+        aria-label={render.ok ? copyName : "Page"}
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "page"}
       >
@@ -733,16 +787,16 @@ export default function InspectorRoute() {
                 {highlightPending
                   ? "Highlighting…"
                   : showHighlights && highlightedCount > 0
-                    ? `${highlightedCount} location${highlightedCount === 1 ? "" : "s"} highlighted`
-                    : "Rendered page"}
+                    ? `${highlightedCount} place${highlightedCount === 1 ? "" : "s"} highlighted`
+                    : copyName}
               </span>
               {!highlightPending && showHighlights && highlightedCount > 0 && (
                 // Previous / Next step through the outlined elements in
-                // document order, as in the Loaded DOM tab; the count between
+                // document order, as in the Page code (DOM) tab; the count between
                 // them says where you are.
                 <span
                   role="group"
-                  aria-label="Flagged elements on the page"
+                  aria-label="Flagged elements"
                   className="ml-auto inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
                 >
                   <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
@@ -797,7 +851,7 @@ export default function InspectorRoute() {
               ref={frameRef}
               srcDoc={srcDoc}
               onLoad={scrollToElement}
-              title={`Re-rendered ${displayTitle}`}
+              title={`${copyName}: ${displayTitle}`}
               sandbox="allow-same-origin"
               referrerPolicy="no-referrer"
               className="h-[75vh] w-full border-0 bg-white"
@@ -809,7 +863,7 @@ export default function InspectorRoute() {
               {!highlightPending && showHighlights && highlightedCount > 0 && (
                 <span>
                   {highlightedCount > 1
-                    ? `Red outlines mark the ${highlightedCount} flagged elements on this page; the one outlined in blue on yellow is the one you are on.`
+                    ? `Red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a thicker blue outline on yellow.`
                     : "The red outline marks the flagged element."}
                 </span>
               )}
@@ -819,10 +873,10 @@ export default function InspectorRoute() {
                 highlightedCount > 0 &&
                 highlightedCount < highlight.total && (
                   <span className="text-sev-major">
-                    {highlightedCount} of {highlight.total} flagged elements were
-                    found,{" "}
+                    Axcess found {highlightedCount} of {highlight.total} flagged
+                    elements.{" "}
                     {missingReason?.whenSomeFound ??
-                      "the rest may have changed since the scan."}
+                      "The others may have changed since the scan."}
                   </span>
                 )}
               {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
@@ -832,7 +886,7 @@ export default function InspectorRoute() {
                 // mix, something genuinely should have been matched.
                 <span className={missingReason?.certain ? undefined : "text-sev-major"}>
                   {missingReason?.whenNoneFound ??
-                    "The flagged element was not found in this capture, it may have changed since the scan."}
+                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
                 </span>
               )}
               {offStateCount > 0 && (
@@ -840,7 +894,8 @@ export default function InspectorRoute() {
                 // is: the picker is the only way to the rest of it.
                 <span>
                   {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this issue {offStateCount === 1 ? "is" : "are"} in another state.
+                  this issue {offStateCount === 1 ? "is" : "are"} in another page
+                  state. Choose it in the Page state list.
                 </span>
               )}
               {!showHighlights && hasScopedTarget && (
@@ -849,14 +904,14 @@ export default function InspectorRoute() {
               {!hasTarget && (
                 <span>
                   {render.source === "stored"
-                    ? "Shown from the scan capture, no element to mark on this finding."
-                    : "Rendered on demand, no element to mark on this finding."}
+                    ? "This is the copy the scan saved. This issue has no element to mark."
+                    : "Axcess loaded this page just now. This issue has no element to mark."}
                 </span>
               )}
               {!data.store_rendered_html && (
                 <span>
-                  This scan was run without storing rendered pages, the page is
-                  re-rendered live on demand.
+                  This scan did not save copies of pages, so Axcess loads the
+                  live page each time you open it.
                 </span>
               )}
             </div>
@@ -864,18 +919,18 @@ export default function InspectorRoute() {
                 the capture, not a status that changes, so it should not be
                 re-announced every time the highlight count updates. */}
             <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              The markup is the stored capture; its stylesheets, fonts and
-              images load from the live site now, so styling can differ from
-              how the page looked when it was scanned. The page&rsquo;s own scripts
-              never run here, so a flagged element the site would have revealed
-              with JavaScript is forced visible to be highlighted.
+              The page code shown here is a copy. Its styles, fonts, and images
+              load from the live site now, so the page can look different from
+              how it looked during the scan. The page&rsquo;s own scripts never
+              run here. So if the site would only show a flagged element with
+              JavaScript, Axcess makes it visible to highlight it.
             </p>
             {/* Below the page and closed: above it, the list pushed the page
                 the reviewer came to see out of view. */}
             {scopedFindings.length > 0 && (
               <Disclosure
                 id="inspect-evidence"
-                title="Stored evidence"
+                title="Evidence from the scan"
                 meta={`${scopedFindings.length} occurrence${scopedFindings.length === 1 ? "" : "s"}`}
                 className="rounded-none border-0 border-t"
               >
@@ -901,7 +956,7 @@ export default function InspectorRoute() {
                 </ul>
                 {scopedFindings.length > 3 && (
                   <p className="mt-1 text-2xs text-fg-muted">
-                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this state.
+                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this page state.
                   </p>
                 )}
               </Disclosure>
@@ -909,7 +964,7 @@ export default function InspectorRoute() {
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
-            {render.error || "The page could not be rendered."}
+            {render.error || "This page could not be shown."}
           </div>
         )}
       </div>
@@ -917,7 +972,7 @@ export default function InspectorRoute() {
       <div
         id="inspect-panel-dom"
         role="region"
-        aria-label="Loaded DOM"
+        aria-label="Page code (DOM)"
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "dom"}
       >
@@ -926,20 +981,20 @@ export default function InspectorRoute() {
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-2xs font-semibold text-fg-subtle">
                 <FileCode2 className="h-4 w-4" aria-hidden />
-                Loaded DOM, captured at render time
+                Page code (DOM), as the browser built it
               </p>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {hasScopedTarget && (
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
-                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
+                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the code below.`
                       : (missingReason?.whenNoneFound ??
-                        "The flagged markup was not found in this capture.")}
+                        "Axcess could not find the flagged element in this page code.")}
                   </span>
                 )}
                 {render.dom_truncated && (
                   <span className="text-2xs text-sev-major">
-                    Truncated for length (shown at 2,000,000 characters).
+                    Cut short: only the first 2,000,000 characters are shown.
                   </span>
                 )}
               </span>
@@ -955,8 +1010,8 @@ export default function InspectorRoute() {
         ) : (
           <div className="p-6 text-sm text-fg-muted">
             {render.dom_html
-              ? "No rendered HTML was captured."
-              : render.error || "The page could not be rendered."}
+              ? "No page code was saved."
+              : render.error || "This page could not be shown."}
           </div>
         )}
       </div>
@@ -1110,6 +1165,26 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
     <span className="sev-chip sev-chip--critical shrink-0">
       <span aria-hidden>{text}</span>
       <span className="sr-only">{text}, </span>
+    </span>
+  );
+}
+
+/**
+ * The picker's neutral "Issue not here" chip, for the page as it loaded when
+ * every occurrence under review came after a click. The option stays, as the
+ * baseline the other states are read against, but the issue is not in it.
+ *
+ * Literal words, not "For reference": that says the option is secondary but
+ * not why, and plain-language guidance asks for the fact itself. Neutral,
+ * not red, so it does not read as the "No longer here" problem: nothing is
+ * wrong with this capture. Screen readers get sentence case, as with
+ * ``MissingChip``.
+ */
+function IssueNotHereChip() {
+  return (
+    <span className="sev-chip shrink-0 bg-surface-muted text-fg-muted">
+      <span aria-hidden>Issue not here</span>
+      <span className="sr-only">Issue not here, </span>
     </span>
   );
 }
@@ -1323,13 +1398,13 @@ function truncatedSnippetMatches(raw: string, needle: string): boolean {
 }
 
 /**
- * How many of this issue's occurrences a view of the page holds, in words:
- * ": 19 flagged elements". A bare "(19)" left the reader to guess what was
- * counted. Nothing is added when the view holds none.
+ * How many of this issue's occurrences a page state holds, in words:
+ * ": 19 occurrences". A bare "(19)" left the reader to guess what was
+ * counted. Nothing is added when the page state holds none.
  */
-function flaggedHere(count: number): string {
+function occurrencesHere(count: number): string {
   if (count === 0) return "";
-  return `: ${count} flagged element${count === 1 ? "" : "s"}`;
+  return `: ${count.toLocaleString()} occurrence${count === 1 ? "" : "s"}`;
 }
 
 /** The class every outlined element carries, so the frame can be walked in order. */

@@ -67,7 +67,7 @@ export default function ReportHeader({
  */
 export function ReportMeta({
   counts,
-  note = "Evidence for expert review, not a conformance verdict.",
+  note = "Results for an expert to review. They do not prove that the site meets accessibility standards.",
 }: {
   counts: ReactNode;
   note?: string;

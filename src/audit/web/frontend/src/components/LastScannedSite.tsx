@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { parseServerTime, serverDate } from "../lib/serverTime";
 import { ArrowRight } from "lucide-react";
 import type { ScanSummary, SiteGroup } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
@@ -53,7 +54,7 @@ export default function LastScannedSite({ sites }: { sites: SiteGroup[] }) {
                 {latest.finished_at && (
                   <>
                     {" · "}
-                    <time dateTime={latest.finished_at} title={new Date(latest.finished_at).toLocaleString()}>
+                    <time dateTime={latest.finished_at} title={serverDate(latest.finished_at).toLocaleString()}>
                       {timeAgo(latest.finished_at)}
                     </time>
                   </>
@@ -90,7 +91,7 @@ function newestCompleted(sites: SiteGroup[]): ScanSummary | undefined {
 
 /** "2 hours ago", "yesterday": whole words, where `relativeTime` abbreviates. */
 function timeAgo(iso: string): string {
-  const seconds = (Date.parse(iso) - Date.now()) / 1000;
+  const seconds = (parseServerTime(iso) - Date.now()) / 1000;
   if (Number.isNaN(seconds)) return "";
   const format = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
   const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [

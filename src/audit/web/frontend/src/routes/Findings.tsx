@@ -23,6 +23,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { STATUS_OPTION_LABEL } from "../lib/terms";
 
 const SEVERITIES: Severity[] = ["critical", "major", "minor", "info"];
 const STATUSES: FindingStatus[] = [
@@ -43,6 +44,12 @@ const CLASSES: Classification[] = [
 
 const PAGE_SIZE = 200;
 const FINDINGS_PAGER_ID = "pager-findings";
+
+/** A stored value as sentence-case words: "no_meaningful_text" -> "No meaningful text". */
+function sentenceCase(value: string): string {
+  const words = value.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export default function FindingsRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -72,7 +79,7 @@ export default function FindingsRoute() {
     next.set("page", "1");
     setParams(next);
   };
-  const option = (value: string) => ({ value, label: value.replace(/_/g, " ") });
+  const option = (value: string) => ({ value, label: sentenceCase(value) });
   const filters: FilterGroup[] = [
     {
       key: "severity",
@@ -84,11 +91,14 @@ export default function FindingsRoute() {
       key: "status",
       label: "Status",
       value: filter.status ?? "",
-      options: [{ value: "", label: "All" }, ...STATUSES.map(option)],
+      options: [
+        { value: "", label: "All" },
+        ...STATUSES.map((value) => ({ value, label: STATUS_OPTION_LABEL[value] })),
+      ],
     },
     {
       key: "classification",
-      label: "Classification",
+      label: "Image type",
       value: filter.classification ?? "",
       options: [{ value: "", label: "All" }, ...CLASSES.map(option)],
     },
@@ -105,10 +115,10 @@ export default function FindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Findings"
+        title="Images"
         subtitle={
           data
-            ? `${data.total.toLocaleString()} total · showing ${rows.length}`
+            ? `${data.total.toLocaleString()} images · showing ${rows.length}`
             : "Loading…"
         }
         actions={
@@ -127,7 +137,7 @@ export default function FindingsRoute() {
             </LinkButton>
             <LinkButton to={`/scans/${id}`} variant="secondary">
               <ArrowLeft className="h-4 w-4" aria-hidden />
-              Back to scan {id}
+              Back to Report #{id}
             </LinkButton>
           </>
         }
@@ -147,8 +157,8 @@ export default function FindingsRoute() {
           pager={
             data && (
               <TablePagination
-                label="Findings"
-                noun="findings"
+                label="Images"
+                noun="images"
                 page={filter.page}
                 pages={data.total_pages}
                 total={data.total}
@@ -166,7 +176,7 @@ export default function FindingsRoute() {
         >
           <TableSearch
             label="Search"
-            placeholder="URL, alt, OCR…"
+            placeholder="Page address, alt text, or image text"
             value={filter.q ?? ""}
             onChange={(v) => setParam("q", v)}
           />
@@ -174,7 +184,7 @@ export default function FindingsRoute() {
         </TableBar>
         <TableStatus className={empty ? "border-b-0" : undefined}>
           {data
-            ? `${data.total.toLocaleString()} ${data.total === 1 ? "finding" : "findings"}.`
+            ? `${data.total.toLocaleString()} ${data.total === 1 ? "image" : "images"}.`
             : "Loading…"}
         </TableStatus>
         {!empty && <FindingsTable rows={rows} isLoading={isLoading} />}
@@ -182,8 +192,8 @@ export default function FindingsRoute() {
 
       {empty && (
         <EmptyState
-          title="No findings match"
-          message="Try clearing a filter or widening the search."
+          title="No images match"
+          message="Clear a filter or shorten your search."
         />
       )}
     </>
@@ -219,7 +229,7 @@ function FindingsTable({
   return (
     <div
       role="table"
-      aria-label="Findings"
+      aria-label="Images"
       aria-busy={isLoading}
       className="flex flex-col"
     >
@@ -229,9 +239,9 @@ function FindingsTable({
       >
         <span role="columnheader">Severity</span>
         <span role="columnheader">Image</span>
-        <span role="columnheader">OCR text</span>
-        <span role="columnheader">Alt</span>
-        <span role="columnheader">Classification</span>
+        <span role="columnheader">Text read from image (OCR)</span>
+        <span role="columnheader">Alt text</span>
+        <span role="columnheader">Image type</span>
         <span role="columnheader">Page</span>
         <span role="columnheader">Status</span>
       </div>
@@ -277,7 +287,7 @@ function FindingsTable({
                     />
                   ) : (
                     <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
-                      n/a
+                      No image
                     </span>
                   )}
                 </div>
@@ -290,14 +300,14 @@ function FindingsTable({
                       {f.ocr_text}
                     </span>
                   ) : (
-                    <span className="text-xs text-fg-subtle">n/a</span>
+                    <span className="text-xs text-fg-subtle">No text found</span>
                   )}
                 </div>
                 <div role="cell" className="min-w-0">
                   <AltTag value={f.sample_alt} />
                 </div>
                 <div role="cell" className="text-xs text-fg-muted">
-                  {f.vlm_classification ?? "n/a"}
+                  {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
                 </div>
                 <div role="cell" className="min-w-0">
                   {f.sample_page ? (
@@ -319,7 +329,7 @@ function FindingsTable({
                       <span className="sr-only">opens in a new tab</span>
                     </a>
                   ) : (
-                    <span className="text-xs text-fg-subtle">n/a</span>
+                    <span className="text-xs text-fg-subtle">Does not apply</span>
                   )}
                 </div>
                 <div role="cell">

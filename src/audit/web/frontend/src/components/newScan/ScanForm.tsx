@@ -27,7 +27,7 @@ import type { ScopePreview } from "../../api/types";
  * acknowledgement.
  *
  * Every group is an open card, so the first screen already shows what will
- * run and the rail beside it says it in words. Only "Speed and debugging"
+ * run and the rail beside it says it in words. Only "Speed and browser window"
  * is folded away; a failed submit that names Fast crawl opens it, so the
  * alert's link lands on a visible switch. Start, Cancel and Reset sit in
  * the rail, under the summary they act on.

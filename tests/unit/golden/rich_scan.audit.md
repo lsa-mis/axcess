@@ -69,24 +69,24 @@ _Alfa completed on 2 of 5 crawled page(s); its evidence is partial for this repo
 
 ### Click-Through: content behind a click
 
-Click-Through operated 12 of 16 control(s) across 2 page(s), reaching 5 views opened by clicking that a page load alone does not show. 2 finding(s) in this report were visible only after a control was operated.
+Click-Through operated 12 of 16 control(s) across 2 page(s), reaching 5 page states opened by clicking that a page load alone does not show. 2 finding(s) in this report were visible only after a control was operated.
 
 | Measure | Value |
 |---|---|
 | Pages probed | 2 |
 | Controls found | 16 |
 | Controls operated | 12 (75%) |
-| Views opened by clicking | 5 |
+| Page states opened by clicking | 5 |
 | Findings visible only after a click | 2 |
 | Controls refused as destructive | 0 |
 
-- 1 page(s) hit a bound before every control was operated, so their views opened by clicking are partially tested. They are listed below.
+- 1 page(s) hit a bound before every control was operated, so their page states opened by clicking are partially tested. They are listed below.
 - Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what Click-Through can reach and still require manual testing.
 - Click-Through findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.
 
 **Pages where the sweep stopped early**
 
-| Page | Controls operated | Views opened by clicking | Why it stopped |
+| Page | Controls operated | Page states opened by clicking | Why it stopped |
 |---|---|---|---|
 | https://example.org/ | 8 of 12 | 3 | reached the per-page click limit |
 

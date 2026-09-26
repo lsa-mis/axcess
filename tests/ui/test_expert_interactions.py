@@ -44,15 +44,15 @@ async def test_export_menu_offers_every_format_with_the_draft_label_in_urls(
     base, scan_id = live_server
     page = await new_page()
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    trigger = page.get_by_role("button", name="Export")
+    trigger = page.get_by_role("button", name="Export report")
     await playwright_async.expect(trigger).to_have_attribute("aria-expanded", "false")
     await trigger.click()
     await playwright_async.expect(trigger).to_have_attribute("aria-expanded", "true")
     for name, fmt in (
-        ("Remediation workbook", "xlsx"),
-        ("Audit report", "audit"),
-        ("Issue table", "csv"),
-        ("Raw findings", "json"),
+        ("Issue list with fixes (Excel)", "xlsx"),
+        ("Written report (Markdown)", "audit"),
+        ("Occurrence list (CSV)", "csv"),
+        ("All report data (JSON)", "json"),
     ):
         link = page.get_by_role("link", name=name)
         await playwright_async.expect(link).to_be_visible()
@@ -70,14 +70,14 @@ async def test_export_menu_closes_on_escape_and_returns_focus(
     base, scan_id = live_server
     page = await new_page()
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    trigger = page.get_by_role("button", name="Export")
+    trigger = page.get_by_role("button", name="Export report")
     await trigger.click()
     await playwright_async.expect(
-        page.get_by_role("link", name="Remediation workbook")
+        page.get_by_role("link", name="Issue list with fixes (Excel)")
     ).to_be_visible()
     await page.keyboard.press("Escape")
     await playwright_async.expect(
-        page.get_by_role("link", name="Remediation workbook")
+        page.get_by_role("link", name="Issue list with fixes (Excel)")
     ).to_be_hidden()
     await playwright_async.expect(trigger).to_be_focused()
 
@@ -117,13 +117,13 @@ async def test_cancelled_legacy_rationale_prompt_keeps_the_persisted_status(
     base, _ = live_server
     page = await new_page()
     await page.goto(f"{base}/app/findings/1", wait_until="networkidle")
-    status = page.get_by_role("combobox", name="Status:")
+    status = page.get_by_role("combobox", name="Change status to:")
     persisted = await status.get_attribute("data-value")
-    await choose_option(page, "Status:", "in_progress")
+    await choose_option(page, "Change status to:", "in_progress")
     page.once(
         "dialog",
         lambda dialog: asyncio.create_task(dialog.dismiss()),
     )
-    await page.get_by_role("button", name="Save", exact=True).click()
-    await page.get_by_text("Status unchanged", exact=True).wait_for()
+    await page.get_by_role("button", name="Save status", exact=True).click()
+    await page.get_by_text("Status not changed", exact=True).wait_for()
     assert await status.get_attribute("data-value") == persisted

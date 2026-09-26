@@ -92,10 +92,10 @@ async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
     text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
     assert REVEALING_CONTROL in text
-    assert "the page as it loaded" in text
+    assert "shows the page at page load" in text
     # Stops at "flagged": the probe records that a violation was first reported
     # after the control was operated, not that the element was absent before.
-    assert "first flagged after activating" in text
+    assert "first flagged after clicking" in text
     # The load capture is not stale, and saying so blames the site for a fact
     # about how the scan works.
     assert "changed since the scan" not in text
@@ -114,7 +114,7 @@ async def test_load_state_finding_still_reports_a_possible_change(
     # Nothing revealed this one, so it genuinely should have been in the
     # capture and drift is the honest explanation.
     assert "changed since the scan" in text
-    assert "the page as it loaded" not in text
+    assert "shows the page at page load" not in text
 
 
 async def test_a_mixed_issue_keeps_both_explanations_open(
@@ -133,11 +133,11 @@ async def test_a_mixed_issue_keeps_both_explanations_open(
 
     text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
-    assert "a control was operated" in text
+    assert "after a click on a control" in text
     assert "changed since the scan" in text
     # With drift still in play this is not the settled case, so it must not
     # claim a specific control accounts for the miss.
-    assert "first flagged after activating" not in text
+    assert "first flagged after clicking" not in text
 
 
 def _seed_two_state_issue(db_path: Path, scan_id: int) -> tuple[int, str]:
@@ -190,10 +190,17 @@ async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, s
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(url, wait_until="domcontentloaded")
-        await page.wait_for_timeout(2500)
+        # Wait for the document, not a fixed time: the seeded page has no
+        # stored capture, so page load is a live render of a few seconds.
+        await page.locator("#inspect-panel-page").wait_for(state="attached", timeout=30000)
+        # The highlight pass runs in requestIdleCallback.
+        await page.wait_for_timeout(1500)
         # The evidence list sits closed below the page; open it so its
-        # occurrences are part of the text.
-        await page.get_by_role("button", name="Stored evidence", exact=True).click()
+        # occurrences are part of the text. A view with none of the issue's
+        # occurrences has no list to open.
+        evidence = page.get_by_role("button", name="Evidence from the scan", exact=True)
+        if await evidence.count():
+            await evidence.click()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.
@@ -220,14 +227,14 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
     at_load = await _evidence_text(new_page, base, scan_id, page_id, "")
     assert "#at-load" in at_load
     assert "#after-click" not in at_load
-    assert "in another state" in at_load
+    assert "in another page state" in at_load
 
     revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
     assert "#after-click" in revealed
     # The load-state markup is usually still in the revealed document, but it
     # is one finding: listing it again here presented one element per state.
     assert "#at-load" not in revealed
-    assert "in another state" in revealed
+    assert "in another page state" in revealed
 
 
 async def test_a_load_only_issue_is_not_offered_once_per_state(
@@ -257,7 +264,7 @@ async def test_a_load_only_issue_is_not_offered_once_per_state(
 
     assert "#at-load" in text
     assert "After clicking" not in text
-    assert "in another state" not in text
+    assert "in another page state" not in text
 
 
 async def test_a_state_missing_its_element_is_labelled_at_the_picker(
@@ -326,7 +333,7 @@ async def test_the_open_list_marks_a_missing_state_while_viewing_another(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(url, wait_until="domcontentloaded")
-        picker = page.get_by_role("combobox", name="Which view of the page")
+        picker = page.get_by_role("combobox", name="Page state")
         await picker.click()
         option = page.locator(f'[role="option"][data-value="{state_key}"]')
         # The state's capture is fetched and checked in the background. The
@@ -337,3 +344,100 @@ async def test_the_open_list_marks_a_missing_state_while_viewing_another(
         )
     finally:
         await page.context.close()
+
+
+def _seed_revealed_only_issue(db_path: Path, scan_id: int) -> tuple[int, str, str]:
+    """One rule found only after clicks, in two states.
+
+    The first state's capture no longer holds its element (the site
+    re-rendered); the second state's does. Nothing is found at page load.
+    """
+    gone, kept = "https://x.test/|#menu|Profile", "https://x.test/|#help|Help"
+    conn = connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        page = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        for key, label, dom in (
+            (gone, "Profile", b"<!doctype html><html><body></body></html>"),
+            (
+                kept,
+                "Help",
+                b'<!doctype html><html><body><a role="menuitem">#in-help</a></body></html>',
+            ),
+        ):
+            conn.execute(
+                "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+                "path_labels, encoding, dom) VALUES (?, ?, ?, ?, ?, 'gzip', ?)",
+                (page["id"], scan_id, key, label, f'["{label}"]', gzip.compress(dom)),
+            )
+        for target, label, key in (("#in-profile", "Profile", gone), ("#in-help", "Help", kept)):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by, revealed_state_key) "
+                "VALUES (?, ?, 'aria-required-parent', '1.3.1', 'A', 'serious', "
+                "'Certain ARIA roles must be contained by particular parents', ?, "
+                "'bad parent', ?, ?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    target,
+                    '<a role="menuitem">' + target + "</a>",
+                    "hash" + target,
+                    label,
+                    key,
+                ),
+            )
+        conn.commit()
+        return int(page["id"]), gone, kept
+    finally:
+        conn.close()
+
+
+async def test_an_issue_found_only_after_clicks_opens_where_it_can_be_seen(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """No ?state=: open on the first state whose capture holds the element.
+
+    Landing on the page as it loaded showed a document that cannot contain
+    the defect, with a highlight that never finished. The first state here
+    has lost its element, so the inspector passes over it to the one that
+    has it, and says plainly that the issue is not in the page-load option.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, _, kept = _seed_revealed_only_issue(db_path, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+            "?issue=axe:aria-required-parent",
+            wait_until="domcontentloaded",
+        )
+        picker = page.get_by_role("combobox", name="Page state")
+        await playwright_async.expect(picker).to_have_attribute("data-value", kept, timeout=10000)
+        await playwright_async.expect(
+            page.get_by_text("The red outline marks the flagged element")
+        ).to_be_visible()
+        await picker.click()
+        load = page.locator('[role="option"][data-value=""]')
+        await playwright_async.expect(load).to_have_accessible_name(
+            re.compile(r"^Issue not here, At page load")
+        )
+    finally:
+        await page.context.close()
+
+
+async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id, _, _ = _seed_revealed_only_issue(db_path, scan_id)
+    text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
+    assert "Highlighting" not in text
+    assert "in another page state" in text

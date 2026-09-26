@@ -1,6 +1,6 @@
 """Deleting a report from the end of its own page.
 
-The danger zone asks before it acts. Cancelling the prompt keeps the report;
+The delete section asks before it acts. Cancelling the prompt keeps the report;
 accepting it deletes the scan and lands on Reports, where the report is gone.
 """
 
@@ -25,9 +25,11 @@ async def test_delete_report_asks_first_and_then_deletes(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        zone = page.get_by_role("region", name="Danger zone")
+        zone = page.get_by_role("region", name="Delete this report")
         await zone.scroll_into_view_if_needed()
-        await playwright_async.expect(zone).to_contain_text("Shared image blobs may remain.")
+        await playwright_async.expect(zone).to_contain_text(
+            "Image files that other reports also use may stay in storage."
+        )
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
         delete = zone.get_by_role("button", name="Delete report")
@@ -42,7 +44,7 @@ async def test_delete_report_asks_first_and_then_deletes(
         page.once("dialog", dismiss)
         await delete.click()
         await playwright_async.expect(page).to_have_url(f"{base}/app/scans/{scan_id}/issues")
-        assert prompts and f"Delete scan {scan_id}" in prompts[0], prompts
+        assert prompts and f"Delete report #{scan_id}" in prompts[0], prompts
         assert (await page.request.get(f"{base}/api/scans/{scan_id}")).ok
 
         # Accepted: the scan is deleted and Reports opens.

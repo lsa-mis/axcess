@@ -45,6 +45,7 @@ import {
 } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { formatScanEta } from "../lib/scanProgress";
+import { SCAN_STATUS_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 export default function ScanDetailRoute() {
@@ -74,10 +75,11 @@ export default function ScanDetailRoute() {
   // it does ("Retry with balanced settings" left readers asking whether
   // their settings were kept; they were not):
   //
-  // - "Edit settings and retry" opens New scan with this scan's own
+  // - "Change settings first" opens New scan with this scan's own
   //   settings filled in (`from=`), the path that keeps what they chose.
-  // - "Quick retry" re-submits the same address at once with the default
-  //   profile and Click-Through off (`quickRetrySettings`), which finishes
+  // - "Scan again with faster settings" re-submits the same address at
+  //   once with the default profile and Click-Through off
+  //   (`quickRetrySettings`), which finishes
   //   quickly enough to show whether the site can be scanned at all. It
   //   keeps the WCAG version the report was audited against. A login scan
   //   has no quick retry: it cannot run without someone signing in.
@@ -118,7 +120,7 @@ export default function ScanDetailRoute() {
       </Card>
     );
   }
-  if (isLoading || !data) return <div className="text-fg-muted">Loading…</div>;
+  if (isLoading || !data) return <div className="text-fg-muted">Loading the scan…</div>;
 
   if (data.status === "running") {
     return (
@@ -142,7 +144,7 @@ export default function ScanDetailRoute() {
 
   return (
     <>
-      <PageHeader title={`Scan ${data.id}`} subtitle={data.seed_url} />
+      <PageHeader title={`Report #${data.id}`} subtitle={data.seed_url} />
 
       {data.blocked && (
         <BlockedScanNotice scanId={data.id} blocked={data.blocked} />
@@ -161,16 +163,18 @@ export default function ScanDetailRoute() {
         <p className="mt-1 text-sm text-fg-muted">
           {data.page_count > 0 ? (
             <>
-              This scan ended as <strong>{data.status}</strong> after{" "}
+              This scan ended with the status{" "}
+              <strong>{SCAN_STATUS_LABEL[data.status]}</strong> after{" "}
               {data.page_count.toLocaleString()} page
-              {data.page_count === 1 ? "" : "s"}. Everything it reached is
-              saved and can be reviewed below; the rest of the site was not
-              visited, so this is not evidence of full coverage.
+              {data.page_count === 1 ? "" : "s"}. Axcess saved everything it
+              reached, and you can review it. The scan did not visit the rest
+              of the site, so this report does not cover the whole site.
             </>
           ) : (
             <>
-              This scan ended as <strong>{data.status}</strong> before any page
-              finished. No report evidence was created.
+              This scan ended with the status{" "}
+              <strong>{SCAN_STATUS_LABEL[data.status]}</strong> before any page
+              finished. Axcess did not create a report.
             </>
           )}
         </p>
@@ -181,7 +185,7 @@ export default function ScanDetailRoute() {
         )}
         {quickRetry.error && (
           <p className="mt-3 text-sm text-sev-critical" role="alert">
-            Couldn&rsquo;t restart this scan: {quickRetry.error.message}
+            Axcess could not start this scan again: {quickRetry.error.message}
           </p>
         )}
         {/* Each retry says in its own description what it keeps, so the
@@ -226,7 +230,7 @@ export default function ScanDetailRoute() {
           {data.page_count > 0 && (
             <li>
               <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
-                Review what was collected
+                Review what the scan found
               </LinkButton>
             </li>
           )}
@@ -267,16 +271,16 @@ function ScanProgressPanel({
             <h2 id="scan-progress-title" className="font-semibold text-fg">
               {isPreparing
                 ? "Preparing your report"
-                : "Discovering and testing pages"}
+                : "Finding and checking pages"}
             </h2>
           </div>
           <p className="mt-1 text-sm text-fg-muted">
-            Live data updates this panel without reloading the page or moving
-            your scroll position.
+            This panel updates by itself. It does not reload the page or move
+            your place on it.
           </p>
           <p className="mt-1 text-xs text-fg-muted">
-            The site can reveal more links during the crawl, so the ETA is a
-            range, not a fixed deadline.
+            Axcess can find more links as it scans, so the estimated time is a
+            range, not a promise.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -291,7 +295,7 @@ function ScanProgressPanel({
           <Button
             variant="danger"
             onClick={() => {
-              if (confirm("Stop this scan? Pending pages will be dropped."))
+              if (confirm("Stop this scan? Axcess will not check the pages that are still waiting."))
                 cancel.mutate();
             }}
             disabled={cancel.isPending}
@@ -309,8 +313,8 @@ function ScanProgressPanel({
         aria-atomic="true"
       >
         {isPreparing
-          ? "Page testing complete. Preparing report."
-          : `${progress?.discovered ?? 0} pages discovered, ${progress?.completed ?? 0} completed, ${progress?.leased ?? 0} in progress.`}
+          ? "Page checks finished. Preparing the report."
+          : `${progress?.discovered ?? 0} pages found, ${progress?.completed ?? 0} checked, ${progress?.leased ?? 0} being checked now.`}
       </div>
 
       <div
@@ -319,13 +323,13 @@ function ScanProgressPanel({
       >
         <ProgressStage
           icon={<Search className="h-5 w-5" aria-hidden />}
-          title="Discover pages"
+          title="Find pages"
           status={isPreparing ? "complete" : "active"}
-          detail={`${progress?.discovered ?? 0} discovered · ${progress?.pending ?? 0} queued`}
+          detail={`${progress?.discovered ?? 0} found · ${progress?.pending ?? 0} waiting`}
         />
         <ProgressStage
           icon={<ShieldCheck className="h-5 w-5" aria-hidden />}
-          title="Render and test"
+          title="Open and check pages"
           status={
             stage === "starting"
               ? "waiting"
@@ -333,7 +337,7 @@ function ScanProgressPanel({
                 ? "complete"
                 : "active"
           }
-          detail={`${progress?.completed ?? 0} completed · ${progress?.leased ?? 0} active`}
+          detail={`${progress?.completed ?? 0} checked · ${progress?.leased ?? 0} in progress`}
         />
         <ProgressStage
           icon={<FileOutput className="h-5 w-5" aria-hidden />}
@@ -341,8 +345,8 @@ function ScanProgressPanel({
           status={isPreparing ? "active" : "waiting"}
           detail={
             isPreparing
-              ? "Grouping evidence and recommendations"
-              : "Starts after the crawl settles"
+              ? "Grouping occurrences into issues and adding fixes"
+              : "Starts after all pages are checked"
           }
         />
         <ProgressStage
@@ -374,7 +378,7 @@ function ScanProgressPanel({
       <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <section aria-labelledby="current-work-title">
           <h3 id="current-work-title" className="font-semibold text-fg">
-            What Axcess is scanning
+            What Axcess is scanning now
           </h3>
           <div className="mt-3 min-h-[7.5rem]">
             {progress?.in_flight_pages.length ? (
@@ -397,10 +401,11 @@ function ScanProgressPanel({
                           {page.url}
                         </div>
                         <div className="mt-1 text-xs text-fg-muted">
-                          Fetching, rendering, and running selected checks ·
-                          depth {page.depth}
+                          Loading the page and running the checks you chose ·{" "}
+                          {page.depth} click{page.depth === 1 ? "" : "s"} from
+                          the start page
                           {page.attempts > 1
-                            ? ` · attempt ${page.attempts}`
+                            ? ` · try ${page.attempts}`
                             : ""}
                         </div>
                       </div>
@@ -411,7 +416,7 @@ function ScanProgressPanel({
             ) : (
               <p className="rounded-xs border border-border bg-surface-muted p-3 text-sm text-fg-muted">
                 {isPreparing
-                  ? "All queued pages are settled. Axcess is consolidating the report."
+                  ? "All pages are checked. Axcess is putting the report together."
                   : "Starting the first page…"}
               </p>
             )}
@@ -423,7 +428,7 @@ function ScanProgressPanel({
                 id="recent-pages-title"
                 className="py-2 text-sm font-semibold text-fg"
               >
-                Recently completed pages
+                Recently checked pages
               </h4>
               <ul className="max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-1 text-xs">
                 {progress.recent_pages.map((page) => (
@@ -465,11 +470,11 @@ function ScanProgressPanel({
 
         <section aria-labelledby="method-progress-title">
           <h3 id="method-progress-title" className="font-semibold text-fg">
-            Selected checks
+            Checks you chose
           </h3>
           <p className="mt-1 text-xs text-fg-muted">
-            Each row explains the method and reports completed work, not merely
-            configuration.
+            Each row says what the check does and how much work it has
+            finished.
           </p>
           <MethodCoverageList
             methods={enabledMethods}
@@ -477,8 +482,8 @@ function ScanProgressPanel({
             compact
           />
           <p className="mt-2 text-xs text-fg-muted">
-            Engine totals show completed evaluations; active pages appear after
-            their evidence is safely stored.
+            Totals count only finished checks. A page in progress is counted
+            after Axcess saves its results.
           </p>
         </section>
       </div>
@@ -522,7 +527,7 @@ function MethodCoverageList({
 }
 
 const METHOD_STATE_LABEL: Record<ScanMethodState, string> = {
-  not_selected: "Not selected",
+  not_selected: "Not chosen",
   waiting: "Waiting",
   running: "Checking",
   checked: "Checked",

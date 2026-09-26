@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { Check, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
-import { CLICK_THROUGH_STATE, CLICK_THROUGH_STATES } from "../lib/labels";
 import { Card } from "./ui";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion } from "./table/Table";
 import type {
@@ -11,8 +10,8 @@ import type {
 } from "../api/types";
 
 /**
- * What this scan actually checked, as a table: one row per check, with what
- * it ran on, what it found, and what it does and does not prove, all in view.
+ * What was checked, as a table: one row per check, with what it ran on,
+ * what it found, and what it can and cannot show, all in view.
  *
  * It used to be a list of closed rows, each opened to read that check's
  * description and caveat, so reading the whole ledger took a click per
@@ -52,7 +51,7 @@ export function methodsRan(methods: ScanMethodCoverage[]): ScanMethodCoverage[] 
   return methods.filter((method) => method.state === "checked" || method.state === "partial");
 }
 
-const CAPTION = "What each check ran on and found, and what it does and does not prove.";
+const CAPTION = "What each check ran on, what it found, and what it can and cannot show.";
 
 export default function MethodCoverageLedger({
   scanId,
@@ -83,10 +82,10 @@ export default function MethodCoverageLedger({
     <Card className={cn("overflow-hidden", className)}>
       <div className="px-4 pb-3 pt-4">
         <h2 className="text-base font-semibold tracking-[-0.015em] text-fg">
-          What this scan actually checked
+          What was checked
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
-          {ran.length} of {methods.length} methods ran.
+          {ran.length} of {methods.length} checks ran.
         </p>
       </div>
       {table}
@@ -127,7 +126,7 @@ function LedgerTable({
             <ColumnHeader>Check</ColumnHeader>
             <ColumnHeader>Status</ColumnHeader>
             <ColumnHeader>Result</ColumnHeader>
-            <ColumnHeader>What it proves, and its limits</ColumnHeader>
+            <ColumnHeader>What it can and cannot show</ColumnHeader>
           </tr>
         </TableHead>
         <tbody>
@@ -169,7 +168,7 @@ function MethodRow({
           that did not run has neither. */}
       <Cell className={cn(top, "w-[14rem] text-sm")}>
         {!ran ? (
-          <span className="text-fg-muted">n/a</span>
+          <span className="text-fg-muted">No result</span>
         ) : (
           <>
             <span className="block text-fg-muted">{method.result}</span>
@@ -183,7 +182,7 @@ function MethodRow({
                       to={`/scans/${scanId}/issues`}
                       className="font-semibold text-umich-blue underline underline-offset-2"
                     >
-                      See them in Issues
+                      See them in the Issues table
                     </Link>
                   </>
                 )}
@@ -206,7 +205,7 @@ function MethodRow({
 /**
  * What one method found, under its result in the Result column.
  *
- * Detector methods answer with their own issue groups. ``interaction`` is the
+ * Detector methods answer with their own issues. ``interaction`` is the
  * exception worth spelling out: Click-Through does not detect
  * anything itself, it just reaches markup that would otherwise be invisible to
  * the scan, so what it "found" is the evidence that only exists after a
@@ -224,9 +223,12 @@ function findingsFor(
       row.locations.some((location) => location.revealed_by),
     );
     return revealed.length === 0
-      ? { text: `No issue depends on a ${CLICK_THROUGH_STATE}.`, count: 0 }
+      ? {
+          text: "Found: no occurrence in this report appears only after a click.",
+          count: 0,
+        }
       : {
-          text: `${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence in ${CLICK_THROUGH_STATES}.`,
+          text: `Found: ${revealed.length} issue${revealed.length === 1 ? "" : "s"} with at least one occurrence that appears only after you use a control, such as a menu.`,
           count: revealed.length,
         };
   }
@@ -235,8 +237,11 @@ function findingsFor(
   if (!pipelines) return null;
   const count = rows.filter((row) => pipelines.includes(row.pipeline)).length;
   return count === 0
-    ? { text: "No issue groups.", count: 0 }
-    : { text: `${count} issue group${count === 1 ? "" : "s"}.`, count };
+    ? { text: "Found: no issues.", count: 0 }
+    : {
+        text: `Found: ${count} issue${count === 1 ? "" : "s"}.`,
+        count,
+      };
 }
 
 /**

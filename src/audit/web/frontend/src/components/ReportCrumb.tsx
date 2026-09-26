@@ -32,11 +32,11 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/compare\/?$/, "Compare scans"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
-  [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
-  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],
-  [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
-  [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
-  [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
+  [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
+  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+  [/^\/scans\/\d+\/findings\/?$/, "Images"],
+  [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
+  [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
   [/^\/scans\/\d+\/?$/, "Report"],
 ];
 
@@ -152,7 +152,7 @@ function placeholderFor(subject: CrumbSubject): string {
     case "page":
       return subject.view === "inspect"
         ? `Page ${subject.pageId}`
-        : `Stored evidence for page ${subject.pageId}`;
+        : `Page details for page ${subject.pageId}`;
   }
 }
 
@@ -330,7 +330,7 @@ export function useReportTrail(): {
         const page = pageEvidence(subject.scanId, subject.pageId)?.page;
         const name = pageName(page?.title, page?.url_normalized);
         if (!name) return null;
-        return subject.view === "inspect" ? name : `Stored evidence for ${name}`;
+        return subject.view === "inspect" ? name : `Page details for ${name}`;
       }
     }
   };
@@ -396,7 +396,8 @@ export default function ReportCrumb() {
       ? null
       : {
           ...reportTrail(trail, pathname, match.scanId),
-          site: seedUrl ? siteLabel(seedUrl) : "Report",
+          // Blank until the scan loads: the tag already says "Report #N".
+          site: seedUrl ? siteLabel(seedUrl) : "",
           id: match.scanId,
         };
   const crumbs = report ? report.crumbs : trail;
@@ -419,7 +420,7 @@ export default function ReportCrumb() {
           (current ? (
             <Crumb
               to={report.reportTo}
-              title={`${report.site} · scan ${report.id}`}
+              title={report.site ? `${report.site} · Report #${report.id}` : `Report #${report.id}`}
               className="group !no-underline"
             >
               <ReportName site={report.site} id={report.id} cap={cap} linked />

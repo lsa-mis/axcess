@@ -24,7 +24,7 @@ pipelines write rows to the `page_a11y_findings` table and tag each row with a
 | Focus | A focused control hidden behind a sticky or fixed header or overlay ([focus not obscured](../glossary.md#focus-not-obscured)), and elements with a positive `tabindex`. | 2.4.11 (AA) `focus-not-obscured`; 2.4.3 (A) `focus-order-positive-tabindex`. | `src/audit/analyzer/focus/` | `focus` | Needs review (`expert_review`). | Tests the first 150 focusable elements and the first 150 `[tabindex]` elements. Samples only the centre point of each element, and only when that point is inside the 1440 x 900 viewport. No model. |
 | Responsive | Sideways scrolling at 320 CSS px ([reflow](../glossary.md#reflow)), text cut off at about 200% zoom ([resize text](../glossary.md#resize-text)), and text cut off with wider spacing ([text spacing](../glossary.md#text-spacing)). | 1.4.10 (AA) `responsive-reflow-overflow`; 1.4.4 (AA) `responsive-text-clipped`; 1.4.12 (AA) `responsive-text-spacing-clipped`. | `src/audit/analyzer/responsive/` | `responsive` | Needs review (`expert_review`). | Reflow at 320 x 900 with an 8 px tolerance; zoom uses a 640 x 450 viewport as a stand-in for 200%. Clipping means more than 4 px hidden by `overflow: hidden`, skipping `text-overflow: ellipsis`. Up to 5 offenders per check and 2,000 elements scanned. Runs last because it resizes the viewport. |
 | Visual | Audio that plays by itself with no control, autoplaying video or `<marquee>` with no pause, and a visual reading order that differs from the DOM order. | 1.4.2 (A) `visual-autoplay-audio-no-control`; 2.2.2 (A) `visual-motion-no-pause`; 1.3.2 (A) `visual-meaningful-sequence`. | `src/audit/analyzer/visual/` | `visual` | Needs review (`expert_review`). Older markup-only motion rows: Informational. | Measures 350 ms of playback instead of trusting `autoplay` markup; audio must last over 3 seconds and video over 5, and every `<marquee>` is a lead. Reading order needs a reachable vision model: one screenshot and one call per page, up to 60 text blocks, at most one finding per page. No flashing (2.3.1) check exists, even though the New scan form hint mentions flashing. |
-| Interaction (click-through) | Problems that appear only after a control is used, such as an open menu, dialog, tab, or disclosure (a [view opened by clicking](../glossary.md#click-through)). | Whatever the axe rule maps to. | `src/audit/analyzer/interaction/` | `axe`, with `revealed_by` set to the operated control's name. | Barrier (`likely_barrier`), because the rows are axe rows. | Needs axe. Up to 100 clicks, 20 per repeated control shape, 5 levels deep, and 120 seconds per page. Only axe re-runs in a revealed state, and problems already present at load are not reported again. Skips controls with destructive names and blocks navigation, non-GET/HEAD/OPTIONS requests, and cross-origin requests. |
+| Interaction (click-through) | Problems that appear only after a control is used, such as an open menu, dialog, tab, or disclosure (a [DOM state](../glossary.md#page-state)). | Whatever the axe rule maps to. | `src/audit/analyzer/interaction/` | `axe`, with `revealed_by` set to the operated control's name. | Barrier (`likely_barrier`), because the rows are axe rows. | Needs axe. Up to 100 clicks, 20 per repeated control shape, 5 levels deep, and 120 seconds per page. Only axe re-runs in a revealed state, and problems already present at load are not reported again. Skips controls with destructive names and blocks navigation, non-GET/HEAD/OPTIONS requests, and cross-origin requests. |
 | Configured search journeys | Problems on search results pages that exist only after a query is entered. | Whatever the axe rule maps to. | `src/audit/crawler/search.py` | `axe`, with `revealed_by` set to `Configured search`. | Barrier (`likely_barrier`). | Runs only when the scan carries a confirmed search configuration (1 to 6 fields). Defaults to 3 result pages (at most 5) and 20 results (at most 50), within 120 seconds. Needs axe and browser rendering. |
 | [Image of text](../glossary.md#image-of-text): [OCR](../glossary.md#ocr), optional vision model, inline SVG text | Words inside images, how the alt text compares with them, and text drawn inside inline `<svg>`. | 1.4.5 (AA) for `essential` images; 1.1.1 (A) for `informational`, `logo`, and `decorative` images with missing alt; otherwise none (BP). Adequate and unclassified groups get no criterion. | `src/audit/extractor/` (including `svg_text.py`), `src/audit/analyzer/ocr/`, `src/audit/analyzer/vlm/`, `src/audit/synthesizer/` | None. Rows live in `images`, `page_images`, `analyses`, and `findings`; issue rows use `image`. | Adequate alt: Informational (`informational`). Otherwise Needs review (`expert_review`), with low confidence when unclassified. | Reads `<img>` and `<picture><source>` only (not CSS backgrounds or `<canvas>`), up to 25 MB per image. An OCR text candidate needs mean word confidence of at least 60 and at least 3 words; SVG and icon files are not OCR'd, and inline SVG text is flagged with no OCR or model. The vision model sees OCR candidates only, and alt adequacy is a string comparison, not a model. Synthesis writes the findings after a completed crawl. |
 | Semantic analyzers | Wording that rule engines cannot judge: audio with no transcript, vague link text, vague headings, and missing or vague form labels. | 1.2.1 (A), 2.4.4 (A), 2.4.6 (AA), 3.3.2 (A); rule id `semantic:<sc>`. | `src/audit/analyzer/semantic/` | `semantic` | Needs review (`expert_review`). | Reads the page HTML, so rows have no screenshots; per page it sends at most 40 audio elements, 50 links, 60 headings, and 50 form fields, and drops the rest with only a log line. The whole pass is skipped unless the text default model (`gemma2:9b`) is installed. Only 4 of the 11 default criteria have an analyzer. 2.4.4 drops low-confidence flags; the others keep them as `minor`. |
@@ -52,18 +52,18 @@ the toggle label on the New scan form.
 
 | Pipeline | CLI (`audit crawl`) | Web New scan form, "Public website" | Raw API (`POST /api/scans`) | Login scan (`POST /api/local-login-scans`) |
 | --- | --- | --- | --- | --- |
-| axe-core | On (`--skip-axe`, `--axe-level`) | On: Rule engine "axe-core" (the default) or "Both" | On unless `scan_engine` is `alfa` | On unless `scan_engine` is `alfa` |
-| Siteimprove Alfa | Not available | Off: choose "Siteimprove Alfa" or "Both" | Off: `scan_engine` `alfa` or `both` | Off: `scan_engine` `alfa` or `both` |
+| axe-core | On (`--skip-axe`, `--axe-level`) | On: Rule check tool "axe" (the default) or "Both" | On unless `scan_engine` is `alfa` | On unless `scan_engine` is `alfa` |
+| Siteimprove Alfa | Not available | Off: choose "Alfa" or "Both" | Off: `scan_engine` `alfa` or `both` | Off: `scan_engine` `alfa` or `both` |
 | Keyboard | On (`--skip-keyboard`) | On ("Check for keyboard traps") | On | On |
-| Focus | On (`--skip-focus`) | On ("Check that focus is never hidden") | On | Always on |
+| Focus | On (`--skip-focus`) | On ("Check that keyboard focus is never hidden") | On | Always on |
 | Responsive | On (`--skip-responsive`) | On ("Check narrow screens and zoom") | On | On |
 | Visual | On (`--skip-visual`); reading order also needs the vision model | Off ("Check motion and animation") | On | Always off |
-| Interaction | On (`--skip-interaction`) | On ("Click-Through: open menus, tabs and dialogs") | On | On |
-| Configured search journeys | Not available | Off ("Search to discover result pages") | Only with a `search` object | Only with a `search` object |
+| Interaction | On (`--skip-interaction`) | On ("Open menus, tabs, and pop-up windows (Click-Through)") | On | On |
+| Configured search journeys | Not available | Off ("Use a search box to find more pages") | Only with a `search` object | Only with a `search` object |
 | Image of text: OCR | On (`--skip-ocr`) | On ("Read text inside images (OCR)") | On | Off; turning it on needs an acknowledgement |
 | Image of text: inline SVG text | On | On | On | Only when OCR is on |
-| Image of text: vision model | On when Ollama has the model (`--skip-vlm`) | Off ("Review image text with a local vision model") | On when Ollama has the model | Off; needs OCR and an acknowledgement |
-| Semantic analyzers | On when Ollama has the model (`--skip-semantic`, `--semantic-criteria`) | Off ("Review wording with local AI") | On when Ollama has the model | Always off |
+| Image of text: vision model | On when Ollama has the model (`--skip-vlm`) | Off ("Compare image text with alt text (vision model)") | On when Ollama has the model | Off; needs OCR and an acknowledgement |
+| Semantic analyzers | On when Ollama has the model (`--skip-semantic`, `--semantic-criteria`) | Off ("AI review of wording") | On when Ollama has the model | Always off |
 | Protected image leads | Not produced | Not produced | Not produced | Not produced; protected scans only |
 
 Things that surprise people:
@@ -101,10 +101,10 @@ Every issue row gets exactly one report group, stored as `review_lane`:
 
 The group depends only on the pipeline, the rule id, the Alfa outcome, and the
 image classification and alt adequacy. A finding's
-[status](../glossary.md#status) never changes its group. The Issues table
-labels the groups Barrier, Needs review, and Informational; the issue page
-calls the middle group "Needs confirmation" and the dashboard calls it
-"Review leads".
+[status](../glossary.md#status) never changes its group. The Issues table,
+the issue page header, and the Issue guidance dialog all label the groups
+Barrier, Needs review, and Informational, the words of `REVIEW_TYPE_LABEL` in
+`src/audit/web/frontend/src/lib/terms.ts`.
 
 ### Where the code decides
 

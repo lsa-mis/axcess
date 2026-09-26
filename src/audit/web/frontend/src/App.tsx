@@ -51,7 +51,7 @@ const NotFoundRoute = lazy(() => import("./routes/NotFound"));
 export default function App() {
   return (
     <AppShell>
-      <Suspense fallback={<p className="py-8 text-sm text-fg-muted" role="status">Loading workspace…</p>}>
+      <Suspense fallback={<p className="py-8 text-sm text-fg-muted" role="status">Loading page…</p>}>
         <Routes>
         {/* The Dashboard (routes/Dashboard.tsx) is hidden for now: Reports
             is the landing page and leads with the most recent scan. */}

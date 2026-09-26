@@ -462,7 +462,9 @@ def test_missing_interaction_table_reports_incomplete_coverage(
     result = compare_reports(tmp_db, new)
 
     assert result.rows[0].category == "cannot_compare"
-    assert any("views opened by clicking" in message for message in result.rows[0].limitations)
+    assert any(
+        "page states opened by clicking" in message for message in result.rows[0].limitations
+    )
     coverage = next(pair for pair in result.coverage if pair.pipeline == "axe")
     assert coverage.before.state == "incomplete"
     assert coverage.after.state == "incomplete"
@@ -484,7 +486,9 @@ def test_unoperated_control_prevents_claiming_revealed_issue_disappeared(
         )
     result = compare_reports(tmp_db, new)
     assert result.rows[0].category == "cannot_compare"
-    assert any("views opened by clicking" in message for message in result.rows[0].limitations)
+    assert any(
+        "page states opened by clicking" in message for message in result.rows[0].limitations
+    )
     coverage = next(pair for pair in result.coverage if pair.pipeline == "axe")
     assert coverage.before.state == "complete"
     assert coverage.after.state == "incomplete"

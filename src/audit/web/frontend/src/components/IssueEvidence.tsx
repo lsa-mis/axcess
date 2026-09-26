@@ -7,9 +7,10 @@ import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
+import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
- * Every page one issue group affects, with its occurrences and instance
+ * Every page one issue affects, with its occurrences and their
  * screenshots: the body of the issue evidence page. What the issue is, the
  * fix and how to verify it live in ``IssueGuidanceDialog``, opened from the
  * page header, so the page itself leads with where the issue is.
@@ -42,12 +43,13 @@ export default function IssueEvidence({
   if (error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this issue&rsquo;s evidence. The stored scan data is unchanged.
+        This issue&rsquo;s details could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
   if (!data || isLoading) {
-    return <p className="px-4 py-6 text-sm text-fg-muted" role="status">Loading issue evidence…</p>;
+    return <p className="px-4 py-6 text-sm text-fg-muted" role="status">Loading issue details…</p>;
   }
 
   const { row, pages } = data;
@@ -184,7 +186,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
 
   return (
     <div className="space-y-8">
-        <GuidanceSection title={isInformational ? "Evidence summary" : "What it is"}>
+        <GuidanceSection title={isInformational ? "What Axcess found" : "What it is"}>
           {/* The verdict leads the section and reads as a sentence, not a
               badge: what this record is, what that means for how it may be
               reported, and why the tool raised it. The icon and the words
@@ -200,7 +202,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               </div>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pl-8 text-sm">
                 <span className="text-fg-muted">
-                  Evidence confidence:{" "}
+                  Confidence:{" "}
                   <span className="font-semibold text-fg">{capitalize(row.evidence_confidence)}</span>
                 </span>
                 {help_url && (
@@ -210,7 +212,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
                   >
-                    Rule documentation
+                    About this rule
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="sr-only">, opens in a new tab</span>
                   </a>
@@ -230,7 +232,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               who it shuts out. Each is a term and its value, so a screen
               reader reads "Priority, High" and moves on. */}
           <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <FactTile label="WCAG level" value={row.wcag_sc ? row.conformance : "n/a"} />
+            <FactTile label="WCAG level" value={wcagLevel(row)} />
             {!isInformational && (
               <FactTile label="Priority" value={priorityTier(row.priority)} />
             )}
@@ -260,12 +262,12 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               <FactTile label="Difficulty" value={row.difficulty} />
             )}
             {!isInformational && !HIDDEN_ISSUE_FIELDS.has("Responsibility") && (
-              <FactTile label="Responsibility" value={capitalize(row.responsibility)} />
+              <FactTile label="Who fixes it" value={capitalize(row.responsibility)} />
             )}
           </dl>
           {!isInformational && (
             <p className="mt-2 text-sm leading-6 text-fg-muted">
-              Priority weighs how severe the issue is by how many pages it touches. Fix sooner when both are high.
+              Priority is based on how serious the issue is and how many pages have it. Fix it sooner when both are high.
             </p>
           )}
 
@@ -274,7 +276,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               <RuleText text={description} />
             ) : (
               row.evidence_summary ||
-              "This is an automated evidence record. Review the affected pages below for the captured detail."
+              "Axcess recorded this automatically. See the pages with this issue for the details."
             )}
           </p>
         </GuidanceSection>
@@ -294,7 +296,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   ))}
               {isLead && (
                 <li className="font-semibold">
-                  Confirm the finding in page context before reporting it as a barrier.
+                  Look at the issue on the page itself before you report it as a barrier.
                 </li>
               )}
             </ol>
@@ -306,12 +308,12 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
 
         {!isInformational && hasBackground && (
           <GuidanceSection
-            title={isLead ? "Why it matters, and how to fix it if confirmed" : "Why it matters, and how to verify the fix"}
+            title={isLead ? "Why it matters, and how to fix it if it is confirmed" : "Why it matters, and how to test the fix"}
           >
             {why_matters && <p className="max-w-[70ch] text-base leading-7 text-fg">{why_matters}</p>}
             {isLead && fix_steps.length > 0 && (
               <>
-                <h4 className="mt-5 text-base font-semibold text-fg">Expected behavior</h4>
+                <h4 className="mt-5 text-base font-semibold text-fg">How it should work</h4>
                 <ol className="mt-2 max-w-[70ch] list-decimal space-y-3 pl-6 text-base leading-7 text-fg">
                   {fix_steps.map((step, i) => (
                     <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
@@ -324,7 +326,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             )}
             {!isLead && verifySteps.length > 0 && (
               <>
-                <h4 className="mt-5 text-base font-semibold text-fg">How to verify</h4>
+                <h4 className="mt-5 text-base font-semibold text-fg">How to test the fix</h4>
                 <ul className="mt-2 max-w-[70ch] list-disc space-y-3 pl-6 text-base leading-7 text-fg">
                   {verifySteps.map((step, i) => <li key={i}>{step}</li>)}
                 </ul>
@@ -338,41 +340,43 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
 }
 
 /**
- * How each review lane reads at the top of the record. The meaning line says
- * what the lane permits a reviewer to do with the finding, in words, so the
- * tint and icon are never the only cue.
- */
-/**
- * A lane's name as the issue page says it ("Needs confirmation" for a lead),
- * so the page header and the guidance dialog use one word for one thing.
+ * A type's name as the issue page says it: the Issues table's own word
+ * (``REVIEW_TYPE_LABEL``), so the page header, the guidance dialog and the
+ * table use one word for one thing.
  */
 export function issuePageLaneLabel(lane: IssueRow["review_lane"]): string {
   return (LANES[lane] ?? LANES.informational).label;
 }
 
+/**
+ * How each type reads at the top of the guidance. The meaning line says
+ * what the type lets a reviewer do with the issue, in words, so the tint
+ * and icon are never the only cue.
+ */
 const LANES: Record<
   IssueRow["review_lane"],
   { label: string; meaning: string; icon: LucideIcon; className: string; iconClass: string }
 > = {
   likely_barrier: {
-    label: "Barrier",
-    meaning: "Automated checks found a likely accessibility barrier. Fix it, then verify.",
+    label: REVIEW_TYPE_LABEL.likely_barrier,
+    meaning: "A check failed a fixed rule, so this is likely to block someone. Fix it, then test the fix.",
     icon: AlertOctagon,
     className: "border-umich-blue/30 border-l-umich-blue bg-umich-blue/5",
     iconClass: "text-umich-blue",
   },
   expert_review: {
-    label: "Needs confirmation",
+    label: REVIEW_TYPE_LABEL.expert_review,
     meaning:
-      "Not a confirmed barrier. Don\u2019t report it as one until the expert decision is documented.",
+      "Do not call this a confirmed barrier until an expert checks it and records the decision.",
     icon: AlertTriangle,
     className: "border-sev-major/40 border-l-sev-major bg-sev-major-bg",
     iconClass: "text-sev-major",
   },
   informational: {
-    label: "Informational evidence",
+    label: REVIEW_TYPE_LABEL.informational,
     meaning:
-      "No barrier was detected by this check. This record is read-only evidence retained for transparency.",
+      "This check found no barrier. Axcess keeps this record so you can see what it looked at. " +
+      "It is for information only, and you cannot change it.",
     icon: Info,
     className: "border-border border-l-fg-subtle bg-surface-muted",
     iconClass: "text-fg-muted",
@@ -410,7 +414,12 @@ function decodeEntities(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-/** One label/value line in the issue's spec list. */
+/** The WCAG level asked of the page, in words: "Level AA", "Best practice", or "Does not apply". */
+function wcagLevel(row: IssueRow): string {
+  if (!row.wcag_sc) return "Does not apply";
+  return row.conformance === "BP" ? "Best practice" : `Level ${row.conformance}`;
+}
+
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }

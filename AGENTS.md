@@ -189,6 +189,40 @@ route and an end-to-end test for keyboard-only use.
    server, model timeout, malformed tool output, and deleted scan. Existing
    report browsing must remain usable in every one of these cases.
 
+## Interface language
+
+Every word a user sees or hears must be accessible plain language. That
+covers labels, headings, buttons, hints, messages, tooltips, `aria-label`,
+`title`, `alt`, placeholders, and export names. Write to these four standards:
+
+| Standard | What it asks for |
+| --- | --- |
+| ISO 24495-1:2023 | Readers can find what they need, understand it, and use it, and the content is relevant to them. |
+| U.S. Federal Plain Language Guidelines | Lead with the main point. Short sentences, active voice, examples, tables for comparisons. |
+| WCAG 3.1.3, 3.1.4, 3.1.5 (Level AAA) | Explain unusual words, spell out abbreviations, and keep text at about lower-secondary reading level. |
+| W3C COGA, "Making Content Usable" | One idea per chunk, concrete examples, and the same word for the same thing everywhere. |
+
+Rules:
+
+1. Follow `docs/plain-language.md`. Its terms table decides the word for
+   each concept: "occurrence", not "finding" or "instance"; "fix", not
+   "remediate"; "page state", not "DOM state". Do not invent synonyms.
+2. Show statuses, issue types, check names, and scan statuses through the
+   shared labels in `src/audit/web/frontend/src/lib/terms.ts`, never raw
+   values such as `in_progress`. Add a label there rather than writing a
+   local one.
+3. Put the plain phrase first and keep a technical term in parentheses for
+   developers: "page code (DOM)", "element locator (CSS selector)".
+4. Never drop a limitation, privacy, or safety fact to make text shorter.
+   Say it more simply. Never claim that a scan proves a site meets WCAG.
+5. Keep text accurate to the code. If a statement in the interface does not
+   match what the code does, stop and report it rather than guessing.
+6. Keep accessibility intact: an element's accessible name must contain its
+   visible text (WCAG 2.5.3), and shorter or longer text must not break the
+   layout at 320 px or 1280 px.
+7. When you change wording, update the UI tests that pin it, without
+   weakening any assertion. Update `docs/glossary.md` if a term changes.
+
 ## Verification
 
 Run the narrowest relevant tests during development, then the appropriate

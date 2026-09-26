@@ -8,30 +8,31 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
 
 ### Added
 
-- **Compare scans** replaces Verify changes: New, Resolved and Remaining
-  issue groups since an earlier scan of the same site, a trend over every
-  completed scan, and coverage notes on what differed between the two.
+- **Compare scans** replaces Verify changes: New, No longer found and Still
+  found issues since an earlier report of the same site, a trend over every
+  completed report, and notes on what was checked in each.
 - **WCAG version**: scans check against WCAG 2.1 (the default, the current
   U-M standard) or 2.2, in New Scan and as `--wcag-version`.
 - **Reports grouped by site**, one row per site with its most recent
   completed scan, and a Last scanned card. The app opens on Reports.
-- **Retry with the same settings**: GET `/api/scans/{id}/settings`, "Edit
-  settings and retry" and "Quick retry" for a scan that failed or was stopped.
+- **Retry with the same settings**: GET `/api/scans/{id}/settings`, "Change
+  settings first" and "Scan again with faster settings" for a scan that failed
+  or was stopped.
 - **Settings** for how the app reads: theme, text size, contrast, colour
   vision, font and spacing, focus indicator, target size, table density, and
   confirmations and shortcuts; a keyboard shortcuts list; and an About page.
 - **Export panel** with the formats a report offers (GET
   `/api/scans/{id}/exports`).
-- **Issue filter menu** with finding types: WCAG, Click-Through and Alt Text.
+- **Issue filter menu**, including "Found by": WCAG, Click-Through and Alt Text.
 - **Issue guidance**: an issue's what it is, how to fix or confirm it, and
   why it matters open together in one dialog from the issue page.
 - **Previous / Next flagged element** on the inspector's rendered page.
-- **Delete report** in a danger zone at the end of the Issues page.
+- **Delete report**, in a "Delete this report" section at the end of the Issues page.
 - This changelog.
 
 ### Changed
 
-- Finding screenshots **outline the flagged element** instead of drawing a
+- Occurrence screenshots **outline the flagged element** instead of drawing a
   circle over it. Reports made before 0.60 keep their circles until the site
   is scanned again.
 - Every table uses one shared module: a top bar with search, one Filter
@@ -46,8 +47,8 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
   coverage notes last.
 - The issue pages table drops its Open live page and Stored evidence
   columns; both are one step away on a page's screenshots view.
-- The inspector's "Page state" picker is "Which view of the page", and its
-  counts say what they count ("As the page loaded: 19 flagged elements").
+- The inspector's "Page state" picker says what its counts count ("At page
+  load: 19 occurrences").
 - Clicking a site's name on Reports expands its scans.
 - The project version moves from 0.1.x to 0.60, and CI stamps desktop builds
   `0.60.<run number>`.
@@ -83,5 +84,7 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
 
 ### Docs
 
+- Merged with main's plain-language rewrite (PR #36): interface words follow
+  docs/plain-language.md and lib/terms.ts, and numbered reports read "Report #N".
 - Reading your report, the glossary, the developer guide (`--wcag-version`),
   Adding a check, and the release docs and diagram match the app as it is.

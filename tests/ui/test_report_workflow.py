@@ -69,7 +69,7 @@ async def test_report_links_and_review_lanes(
     await page.wait_for_url("**/app/scans")
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     # Every issue group is a row of one table, whatever lane it is in.
-    issues = page.get_by_role("table", name="Accessibility issue groups")
+    issues = page.get_by_role("table", name="Accessibility issues")
     # Scoped to the row header: the count link in the same row also
     # names the issue, because a link's purpose has to be clear from
     # its own name (SC 2.4.9).
@@ -340,14 +340,14 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
         page.get_by_role("heading", name="Compare scans", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace").get_by_role(
+        page.get_by_role("navigation", name="Report views").get_by_role(
             "link", name="Compare scans"
         )
     ).to_have_attribute("aria-current", "page")
     # One request for every group: the page sorts, filters and pages them.
     assert requests[-1]["page_size"] == ["500"]
-    status = page.get_by_role("status").filter(has_text="issue groups shown")
-    await playwright_async.expect(status).to_contain_text("12 of 12 issue groups shown")
+    status = page.get_by_role("status").filter(has_text="issues shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 issues shown")
 
     # A number is a filter, and says so by its pressed state. It is the
     # table's Change filter too, written out under the table's bar.
@@ -356,11 +356,11 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await new_card.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "true")
-    await playwright_async.expect(status).to_contain_text("1 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 issues shown")
     await playwright_async.expect(page.get_by_text("Filtered by Change: New")).to_be_visible()
     await page.keyboard.press("Enter")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "false")
-    await playwright_async.expect(status).to_contain_text("12 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 issues shown")
 
     # The table's Filter menu from the keyboard: Enter opens it, Tab reaches
     # the Change checkboxes, Space checks the focused one at once (the card
@@ -375,23 +375,23 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await playwright_async.expect(new_box).to_be_focused()
     await page.keyboard.press("Space")
     await playwright_async.expect(new_box).to_be_checked()
-    await playwright_async.expect(status).to_contain_text("1 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 issues shown")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "true")
     await page.keyboard.press("Escape")
     await playwright_async.expect(filter_button).to_be_focused()
     await playwright_async.expect(filter_button).to_have_attribute("aria-expanded", "false")
     await choose_filter(page, "Change", "")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "false")
-    await playwright_async.expect(status).to_contain_text("12 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 issues shown")
 
     search = page.get_by_role("searchbox", name="Search issues")
     await search.focus()
     await page.keyboard.type("contrast")
-    await playwright_async.expect(status).to_contain_text("1 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 issues shown")
     await page.wait_for_url(re.compile(r"[?&]q=contrast"))
     await page.keyboard.press("ControlOrMeta+a")
     await page.keyboard.press("Backspace")
-    await playwright_async.expect(status).to_contain_text("12 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 issues shown")
 
     issue_header = page.get_by_role("columnheader", name=re.compile(r"^Issue"))
     await issue_header.get_by_role("button").focus()
@@ -410,22 +410,22 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await playwright_async.expect(terms).to_be_focused()
 
     # A trend point opens its scan's panel; closing it returns to the point.
-    point = page.get_by_role("button", name=re.compile(r"^Scan 98,"))
+    point = page.get_by_role("button", name=re.compile(r"^Report #98,"))
     await point.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(point).to_have_attribute("aria-pressed", "true")
     await playwright_async.expect(
-        page.get_by_role("link", name="Open scan 98 issues")
+        page.get_by_role("link", name="Open report #98 issues")
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("link", name="Compare with this report")
     ).to_have_attribute("href", f"/app/scans/{scan_id}/compare?compare_to=98")
-    await page.get_by_role("button", name="Close scan 98 details").focus()
+    await page.get_by_role("button", name="Close report #98 details").focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(point).to_be_focused()
     await page.keyboard.press("ArrowRight")
     await playwright_async.expect(
-        page.get_by_role("button", name=re.compile(r"^Scan 99,"))
+        page.get_by_role("button", name=re.compile(r"^Report #99,"))
     ).to_be_focused()
 
     toggle = page.get_by_role("button", name="Show as data table")
@@ -436,23 +436,25 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     ).to_be_visible()
 
     # Closed, the notes still say how many differences there are.
-    coverage = page.get_by_role("button", name=re.compile(r"^Coverage notes"))
+    coverage = page.get_by_role("button", name=re.compile(r"^What was checked in each report"))
     await playwright_async.expect(coverage).to_have_attribute("aria-expanded", "false")
     await playwright_async.expect(coverage).to_contain_text("2 differences between the scans")
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(coverage).to_have_attribute("aria-expanded", "true")
-    notes = page.get_by_role("region", name="Coverage notes")
+    notes = page.get_by_role("region", name="What was checked in each report")
     for heading in ["What differs between the scans", "What each check covered"]:
         await playwright_async.expect(notes.get_by_role("heading", name=heading)).to_be_visible()
     await playwright_async.expect(
-        notes.get_by_role("listitem").filter(has_text=f"Scan {scan_id} only:")
+        notes.get_by_role("listitem").filter(has_text=f"Report #{scan_id} only:")
     ).to_contain_text("Errors were recorded")
-    # A method whose coverage differs says so in words, not only by its tint.
+    # A check whose coverage differs says so in words, not only by its tint.
     await playwright_async.expect(
-        notes.get_by_role("rowheader", name=re.compile(r"^Keyboard\s*,\s*Differs$"))
+        notes.get_by_role("rowheader", name=re.compile(r"^Keyboard check\s*,\s*Differs$"))
     ).to_be_visible()
-    await playwright_async.expect(notes.get_by_role("rowheader", name="axe-core")).to_be_visible()
+    await playwright_async.expect(
+        notes.get_by_role("rowheader", name="Rule check (axe)")
+    ).to_be_visible()
     await playwright_async.expect(
         notes.get_by_text("Historical report coverage is incomplete.", exact=True)
     ).to_be_visible()
@@ -465,7 +467,7 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     # Sorted A to Z it is on the second page, so find it first.
     await search.focus()
     await page.keyboard.type("contrast")
-    await playwright_async.expect(status).to_contain_text("1 of 12 issue groups shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 issues shown")
     # Chrome puts a space before the visually hidden words: "contrast , evidence".
     link = page.get_by_role(
         "link", name=re.compile(r"^Text contrast\s*, evidence in the later scan$")
@@ -495,6 +497,17 @@ async def test_finding_anchor_waits_for_scan_metadata(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/pages/1#finding-77", wait_until="networkidle")
     await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
+    # The finding's evidence says what is missing and where the element is.
+    # (These checks rode on the old Verify changes link to this page; Compare
+    # scans links to the issue instead, so they live here now.)
+    await playwright_async.expect(
+        page.get_by_text("Some details are missing.", exact=True)
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_text("Text in the first paragraph", exact=False)
+    ).to_be_visible()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
 
 
 async def test_issue_filters_announce_results_and_keep_large_targets(
@@ -512,8 +525,8 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     # The sort line is a status region of its own; this one reports
     # how many groups the filters left.
-    status = page.get_by_role("status").filter(has_text="issue groups shown")
-    await playwright_async.expect(status).to_contain_text("issue groups shown")
+    status = page.get_by_role("status").filter(has_text="issues shown")
+    await playwright_async.expect(status).to_contain_text("issues shown")
     search = page.get_by_label("Search issues")
     await search.fill("logo")
     await page.wait_for_url("**q=logo*")
@@ -541,7 +554,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Accessibility issue groups")
+    issues = page.get_by_role("table", name="Accessibility issues")
     group_headers = issues.locator("tbody th[scope='rowgroup']")
     back = page.get_by_role("button", name="Back to recommended order")
     lane_order = ["Barrier", "Needs review", "Informational"]
@@ -560,9 +573,9 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         ]
         assert lanes and lanes == sorted(lanes, key=lane_order.index), lanes
         await playwright_async.expect(
-            page.get_by_role("status").filter(has_text="issue groups shown")
+            page.get_by_role("status").filter(has_text="issues shown")
         ).to_have_text(
-            re.compile(r"issue groups shown: Barrier \d+, Needs review \d+, Informational \d+$")
+            re.compile(r"issues shown: Barrier \d+, Needs review \d+, Informational \d+$")
         )
         sorted_headers = issues.locator("thead th[aria-sort]:not([aria-sort='none'])")
         await playwright_async.expect(sorted_headers).to_have_count(0)
@@ -583,11 +596,12 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     await playwright_async.expect(
         page.get_by_role("status").filter(has_text="Sorted by Priority, highest first")
     ).to_be_visible()
-    # Flat, and "n/a" is not a low priority: it trails in both directions.
+    # Flat, and "Does not apply" is not a low priority: it trails in both
+    # directions.
     for direction in ("desc", "asc"):
-        # Row header, Type, Finding type, WCAG, then Priority.
+        # Row header, Type, Found by, WCAG, then Priority.
         cells = await issues.locator("tbody tr > td:nth-child(5)").all_inner_texts()
-        flags = [cell.strip() == "n/a" for cell in cells]
+        flags = [cell.strip() == "Does not apply" for cell in cells]
         assert flags == sorted(flags), (direction, cells)
         if direction == "desc":
             await priority.get_by_role("button").click()
@@ -597,7 +611,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     await page.wait_for_url(re.compile(r"/issues$"))
     await assert_recommended()
     # The pressed button is gone; focus lands on the table it reordered.
-    await playwright_async.expect(page.get_by_role("region", name="Issue table")).to_be_focused()
+    await playwright_async.expect(page.get_by_role("region", name="Issues table")).to_be_focused()
 
 
 async def test_issue_table_finding_types_help_text_and_middle_alignment(
@@ -661,10 +675,11 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    table = page.get_by_role("table", name="Accessibility issue groups")
+    table = page.get_by_role("table", name="Accessibility issues")
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
-    assert names[:4] == ["Issue", "Type", "Finding type", "WCAG"], names
+    # The Finding type column reads "Found by" ("finding" is not an interface word).
+    assert names[:4] == ["Issue", "Type", "Found by", "WCAG"], names
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(
@@ -690,7 +705,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     # No row-group header rows split the types; the live status counts each.
     await playwright_async.expect(table.locator("th[scope='rowgroup']")).to_have_count(0)
     await playwright_async.expect(
-        page.get_by_role("status").filter(has_text="issue groups shown")
+        page.get_by_role("status").filter(has_text="issues shown")
     ).to_contain_text("Barrier")
 
     # The glossary defines both sets of words, closed until asked for, under
@@ -708,13 +723,13 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     await playwright_async.expect(definitions).to_have_text(
         ["Barrier", "Needs review", "Informational", "WCAG", "Click-Through", "Alt Text"]
     )
-    for heading in ("Type: how sure the evidence is", "Finding type: which checks found it"):
+    for heading in ("Type: how sure the evidence is", "Found by: which group of checks found it"):
         await playwright_async.expect(
             page.get_by_role("heading", name=heading, level=3)
         ).to_be_visible()
     meanings = page.get_by_role("definition")
     for meaning in (
-        "A rule failed deterministically",
+        "A check failed a fixed rule",
         "A person must confirm it",
         "not a problem to fix",
     ):
@@ -726,7 +741,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
             .flatMap(tr => [...tr.children].map(c => getComputedStyle(c).verticalAlign))"""
     )
     assert alignments and set(alignments) == {"middle"}, set(alignments)
-    widths = await page.get_by_role("region", name="Issue table").evaluate(
+    widths = await page.get_by_role("region", name="Issues table").evaluate(
         "el => ({scroll: el.scrollWidth, client: el.clientWidth})"
     )
     assert widths["scroll"] <= widths["client"], widths
@@ -735,7 +750,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
 
     # The filter narrows to the type, counts a mixed row under both, and
     # offers the detailed view the old bottom-of-report button led to.
-    await choose_filter(page, "Finding type", "click_through")
+    await choose_filter(page, "Found by", "click_through")
     await page.wait_for_url("**finding_type=click_through*")
     # The URL changes before the filtered response lands, so wait for the rows.
     issue_rows = table.locator("tbody th[scope='row']")
@@ -745,12 +760,12 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         "Contrast inside an opened menu and on load",
         "Only behind a dialog",
     ], shown
-    wcag_view = page.get_by_role("link", name="Browse findings by WCAG criterion")
+    wcag_view = page.get_by_role("link", name="Rule check issues by WCAG criterion")
     await playwright_async.expect(wcag_view).to_have_attribute("href", f"/app/scans/{scan_id}/a11y")
-    await choose_filter(page, "Finding type", "alt_text")
+    await choose_filter(page, "Found by", "alt_text")
     await page.wait_for_url("**finding_type=alt_text*")
     await playwright_async.expect(
-        page.get_by_role("link", name=re.compile(r"^Browse every image finding"))
+        page.get_by_role("link", name=re.compile(r"^Images \(\d+\)$"))
     ).to_have_attribute("href", f"/app/scans/{scan_id}/findings")
     # The bottom of the report no longer carries an Expert tools section.
     await playwright_async.expect(
@@ -786,7 +801,7 @@ async def test_pager_arrows_are_named_and_look_unavailable_at_either_end(
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    pager = page.get_by_role("navigation", name="Issues pagination")
+    pager = page.get_by_role("navigation", name="Issues: page controls")
     previous = pager.get_by_role("button", name="Previous page of issues", exact=True)
     next_page = pager.get_by_role("button", name="Next page of issues", exact=True)
 
@@ -876,11 +891,13 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
     for suffix in ("/issues", "/compare"):
         await page.goto(f"{base}/app/scans/{scan_id}{suffix}", wait_until="networkidle")
         items = await _breadcrumb(page)
-        assert [item["text"] for item in items] == ["Reports", f"example.com scan {scan_id}"], items
+        assert [item["text"] for item in items] == ["Reports", f"example.com Report #{scan_id}"], (
+            items
+        )
         assert items[0]["link"] == "/app/scans", items
         _assert_current_is_plain_text(items)
     # The tabs are the report's two views; Overview is gone.
-    tabs = page.get_by_role("navigation", name="Report workspace").get_by_role("link")
+    tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
     await playwright_async.expect(tabs).to_have_text(["Issues", "Compare scans"])
 
 
@@ -911,15 +928,15 @@ async def test_issue_evidence_trail_names_the_issue(
     # issue sits in this report, and "Issues" is never a crumb of its own.
     assert [item["text"] for item in items] == [
         "Reports",
-        f"example.com scan {scan_id}",
+        f"example.com Report #{scan_id}",
         row["title"],
     ], items
     _assert_current_is_plain_text(items)
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    await crumb.get_by_role("link", name=f"example.com scan {scan_id}").click()
+    await crumb.get_by_role("link", name=f"example.com Report #{scan_id}").click()
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
 
 
@@ -942,13 +959,15 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
     row = (await response.json())["rows"][0]
     await page.goto(f"{base}/app/scans/{scan_id}/issues?type={row['review_lane']}")
-    table = page.get_by_role("table", name="Accessibility issue groups")
+    table = page.get_by_role("table", name="Accessibility issues")
     await table.get_by_role("link", name=f"with {row['title']}", exact=False).click()
     await page.wait_for_url("**/pages?**")
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
-    inspector = page.get_by_role("link", name="opens the in-app page inspector", exact=False)
+    inspector = page.get_by_role(
+        "link", name="opens the saved copy with this issue marked", exact=False
+    )
     await inspector.first.click()
     await page.wait_for_url("**/inspect?**")
     page_id = int(re.search(r"/pages/(\d+)/inspect", page.url)[1])
@@ -963,7 +982,7 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     items = await _breadcrumb(page)
     assert [item["text"] for item in items] == [
         "Reports",
-        f"example.com scan {scan_id}",
+        f"example.com Report #{scan_id}",
         row["title"],
         affected,
         page_name,
@@ -973,7 +992,7 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     assert items[1]["link"] == f"/app/scans/{scan_id}/issues?type={row['review_lane']}", items
     await playwright_async.expect(page.get_by_role("heading", level=1)).to_have_count(1)
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
 
 
@@ -991,11 +1010,11 @@ async def test_report_crumb_returns_to_the_searched_list(
     row = (await response.json())["rows"][0]
     query = row["title"].split()[0]
     await page.goto(f"{base}/app/scans/{scan_id}/issues?q={quote(query)}", wait_until="networkidle")
-    table = page.get_by_role("table", name="Accessibility issue groups")
+    table = page.get_by_role("table", name="Accessibility issues")
     await table.get_by_role("rowheader").get_by_role("link", name=row["title"]).first.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues/[^?]+\?"))
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    back = crumb.get_by_role("link", name=f"example.com scan {scan_id}")
+    back = crumb.get_by_role("link", name=f"example.com Report #{scan_id}")
     await playwright_async.expect(back).to_be_visible()
     await back.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues\?q="))
@@ -1014,13 +1033,13 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
         page.get_by_role("heading", name="Issues", exact=True, level=1)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
     await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
     await playwright_async.expect(
         page.get_by_role("heading", name="Nothing earlier to compare with")
     ).to_be_visible()
-    tabs = page.get_by_role("navigation", name="Report workspace").get_by_role("link")
+    tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
     await playwright_async.expect(tabs).to_have_text(["Issues", "Compare scans"])
 
 
@@ -1080,17 +1099,17 @@ async def test_report_opens_keyboard_only_in_reading_order(
 
     order = [
         first(lambda s: s["group"] == "Breadcrumb" and s["name"] == "Reports"),
-        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Issues"),
-        first(lambda s: s["group"] == "Report workspace" and s["name"] == "Compare scans"),
+        first(lambda s: s["group"] == "Report views" and s["name"] == "Issues"),
+        first(lambda s: s["group"] == "Report views" and s["name"] == "Compare scans"),
         first(lambda s: s["name"] == "Search issues"),
-        # One Filter menu holds Level, Type and Finding type.
+        # One Filter menu holds Level, Type and Found by.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter"),
         first(lambda s: s["group"] == "table-region"),
         first(lambda s: s["group"] == "table"),
     ]
     assert order == sorted(order), names
     # The current crumb is text, so it is not a tab stop.
-    assert f"example.com scan {scan_id}" not in names, names
+    assert f"example.com Report #{scan_id}" not in names, names
     missing = [stop for stop in stops if not stop["visible"]]
     assert not missing, missing
 
@@ -1103,11 +1122,11 @@ async def test_issue_evidence_page_link_offers_the_way_back(
     """Page evidence reached from an issue names the issue in the trail, and returns.
 
     The desktop app has no browser chrome, so the topbar trail is the only way
-    back out of a drill-down. Before this, stored evidence was a dead end: the
-    trail read ``Reports > site > Page evidence`` and nothing on the page led
-    back to the list the reviewer had been working through. The issue's pages
-    table no longer links stored evidence itself; the way there is the page's
-    screenshots, which do.
+    back out of a drill-down. Before this, the page's evidence was a dead end:
+    the trail read ``Reports > site > Page evidence`` and nothing on the page
+    led back to the list the reviewer had been working through. The issue's
+    pages table no longer links Page details itself; the way there is the
+    page's screenshots, which do.
     """
     db_path, blob_dir, _ = seeded_db
     base, scan_id = live_server
@@ -1119,7 +1138,7 @@ async def test_issue_evidence_page_link_offers_the_way_back(
     await page.goto(f"{base}{issue_path}", wait_until="networkidle")
     await page.get_by_role("link", name=re.compile(r"^1 screenshot of this issue on ")).click()
     await page.wait_for_url(re.compile(r"/pages/\d+/screenshots"))
-    await page.get_by_role("link", name="Stored evidence", exact=True).click()
+    await page.get_by_role("link", name="Page details", exact=True).click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+\?"))
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     back = crumb.get_by_role("link", name=row["title"], exact=True)
@@ -1180,7 +1199,7 @@ async def test_actual_comparison_links_reach_the_issue(
     target = row["after"]["evidence"][0]["url"]
     assert "#finding-" in target
     await page.goto(f"{base}/app/scans/{new}/compare", wait_until="networkidle")
-    coverage = page.get_by_role("button", name=re.compile(r"^Coverage notes"))
+    coverage = page.get_by_role("button", name=re.compile(r"^What was checked in each report"))
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(
@@ -1188,8 +1207,8 @@ async def test_actual_comparison_links_reach_the_issue(
     ).to_be_visible()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
-    # The group's title opens its issue in the later report, carrying the
-    # way back to this comparison for the topbar trail.
+    # The issue's title opens it in the later report, carrying the way back
+    # to this comparison for the topbar trail.
     issue_url = row["after"]["issues"][0]["url"]
     link = page.locator(f'a[href^="/app{issue_url}?"]')
     await link.focus()
@@ -1198,7 +1217,7 @@ async def test_actual_comparison_links_reach_the_issue(
     # Issue evidence sits inside the report, so it has no report tabs; the
     # one trail carries the way back to the comparison instead.
     await playwright_async.expect(
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
     await playwright_async.expect(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
@@ -1206,7 +1225,7 @@ async def test_actual_comparison_links_reach_the_issue(
     items = await _breadcrumb(page)
     assert [item["text"] for item in items][:3] == [
         "Reports",
-        f"example.com scan {new}",
+        f"example.com Report #{new}",
         "Compare scans",
     ], items
     assert items[2]["link"] and items[2]["link"].startswith(f"/app/scans/{new}/compare"), items
@@ -1266,7 +1285,7 @@ async def test_crumbs_stay_on_one_line_and_cut_the_longest_first(
     }"""
     for path, expected in (
         (f"/scans/{scan_id}/pages/{page_id}/inspect", long_title),
-        (f"/scans/{scan_id}/pages/{page_id}", f"Stored evidence for {long_title}"),
+        (f"/scans/{scan_id}/pages/{page_id}", f"Page details for {long_title}"),
     ):
         # The issue as context puts a second long crumb in the trail.
         url = f"{base}/app{path}?context=Issue&contextTo={quote(issue_path, safe='')}"

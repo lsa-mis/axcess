@@ -1,4 +1,6 @@
-/** "1 issue group", "7 issue groups". */
+import { parseServerTime } from "../../lib/serverTime";
+
+/** "1 issue", "7 issues". */
 export function count(n: number, noun: string): string {
   return `${n.toLocaleString()} ${plural(n, noun)}`;
 }
@@ -17,7 +19,7 @@ export function signed(n: number): string {
 /** "27 days ago", in words, for sentences; the axis uses the short "27d ago". */
 export function agoLong(iso: string | null): string {
   if (!iso) return "time not recorded";
-  const at = Date.parse(iso);
+  const at = parseServerTime(iso);
   if (Number.isNaN(at)) return "time not recorded";
   const hours = Math.max(0, Math.floor((Date.now() - at) / 3_600_000));
   if (hours < 1) return "less than an hour ago";
