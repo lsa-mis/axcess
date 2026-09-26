@@ -10,7 +10,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 - [The three report groups at a glance](#the-three-report-groups-at-a-glance)
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
-- [The Overview tab](#the-overview-tab)
+- [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
 - [The full evidence record](#the-full-evidence-record)
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
@@ -18,6 +18,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Exports](#exports)
 - [Compare scans after a fix](#compare-scans-after-a-fix)
 - [Acting on findings](#acting-on-findings)
+- [Delete a report](#delete-a-report)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
 
 ## The three report groups at a glance
@@ -41,20 +42,21 @@ On the **Issues** tab, select an issue's name to open its
 
 | You need | Where it is |
 | --- | --- |
-| The page URL | **Pages with this issue** lists each page's title and URL, with **Open live page**. |
-| The selector and code | A page's **Stored evidence** lists every result on that page, with **Selector for developers**. |
+| The page URL | **Pages with this issue** lists each page's title and URL. A page's **Issue screenshots** view links the live page and its **Stored evidence**. |
+| The selector and code | A page's **Stored evidence**, linked from its **Issue screenshots** view and from the inspector, lists every result on that page, with **Selector for developers**. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
 | A screenshot | **Issue screenshots** links to screenshots with the flagged element outlined, when the scan captured them. Siteimprove Alfa results have none, because Alfa runs in a separate browser session. |
-| The page inspector | Select a page title in **Pages with this issue**. The inspector opens the stored page (or a fresh render if none was stored) with scripts off and the flagged elements highlighted, and **DOM source** shows the markup. |
+| The page inspector | Select a page title in **Pages with this issue**. The inspector opens the stored page (or a fresh render if none was stored) with scripts off and the flagged elements outlined in red. **Previous** and **Next flagged element** step through them; the one you are on is outlined in blue on yellow. **DOM source** shows the markup. |
 
-The record's sections all start collapsed. Open **How to fix it** for the
-steps and **Done when**, then **Why it matters, and how to verify the fix** for
-**How to verify**. For Needs review, open **How to confirm it** first; the fix
-is under **Expected behavior** in **Why it matters, and how to fix it if
+**Issue guidance**, at the top right of the page, opens the issue's guidance
+in one dialog, every section open: **What it is**, **How to fix it** with
+**Done when**, and **Why it matters, and how to verify the fix** with **How to
+verify**. For Needs review, **How to confirm it** comes second, and the fix is
+under **Expected behavior** in **Why it matters, and how to fix it if
 confirmed**.
 
-**Rule docs** sits in **What it is**, beside the evidence confidence, and
-appears only when the rule has its own documentation. Start there when the
+**Rule documentation** sits in **What it is**, beside the evidence confidence,
+and appears only when the rule has its own documentation. Start there when the
 record has no written guidance.
 
 To reproduce a problem that appears only after a click:
@@ -63,9 +65,9 @@ To reproduce a problem that appears only after a click:
    such as After clicking “Menu”. The heading names only the last control
    used.
 2. Select the page title in **Pages with this issue** to open the inspector,
-   then open **Page state**. The entry with a count, such as
-   After clicking “Menu” → “Settings” (2), lists every control in order and
-   shows the markup the scan captured.
+   then open **Which view of the page**. The entry with a count, such as
+   After clicking “Menu” → “Settings”: 2 flagged elements, lists every control
+   in order and shows the markup the scan captured.
 3. On the live page, use each control in that order, then find the element by
    its selector.
 
@@ -89,25 +91,28 @@ Reports stay where Axcess ran the scan, so you may get only an export.
 
 For a nested state, **To reproduce** and **User action** name only the last
 control, like the note in the app. Ask the analyst for the full chain, which
-the inspector's **Page state** picker shows.
+the inspector's **Which view of the page** picker shows.
 
-## The Overview tab
+## The report summary
 
-A finished report opens on **Overview**, beside the **Issues** and **Verify
-changes** tabs. Its header holds the **Export** menu and **Open Issue Groups**.
+A finished report opens on **Issues**. Under the title, "Based on the scan
+completed" gives the time the evidence was captured, and the **Export** menu
+sits at the top right. One summary line above the table counts:
 
-| Tile | What it counts |
+| Number | What it counts |
 | --- | --- |
-| Pages Tested | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Its hint shows the [crawl error](glossary.md#pages-not-reached) count, and most of those pages are already in this number. |
+| Pages Tested | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Beside it, in brackets, is the [crawl error](glossary.md#pages-not-reached) count, and most of those pages are already in this number. |
 | Issues Found | [Occurrences](glossary.md#occurrence) in every issue group, including Needs review and Informational, so it is not a count of confirmed problems. |
 | Issue Groups | Rows in the Issues table, across all three report groups. |
 | Views opened by clicking | [Views](glossary.md#click-through) the scan reached by opening menus, tabs, dialogs, and other controls. |
 
-**What this scan actually checked** lists each method, such as axe-core and
-Click-Through. Each row shows a result and one of these states: Not
-selected, Waiting, Checking, Ran, Partly ran, Did not run, or Not recorded.
-Open a row for what it found and what it cannot prove. The focus and visual
-checks have no row here.
+**What this scan checked** is a table with one row per method, such as
+axe-core and Click-Through, and the methods that ran come first. **Status** is
+one of Not selected, Waiting, Checking, Ran, Partly ran, Did not run, or Not
+recorded, with a check mark for Ran and Partly ran. **Result** says what the
+method ran on and what it found, and **What it proves, and its limits** says
+what a clean result does and does not prove. The focus and visual checks have
+no row here.
 
 The crawl error count says how many pages failed, not which ones. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
@@ -133,31 +138,33 @@ AA, AAA, or Best practice), and **Type** (a report group).
 
 The table opens "Sorted by Priority, barriers first, then highest first":
 Barriers, then Needs review, then Informational, each by priority. Select
-another column header (not About) to re-sort; 10 issue groups show per page.
+another column header to re-sort. As the filters change, a screen reader hears
+how many issue groups show and how many of each type, such as "Barrier 3,
+Needs review 7, Informational 2".
 
-**About** opens What it is, Why it matters, Expected behavior, Done when, and
-Abilities affected, plus links to the **Full evidence record** and **Rule
-docs**. Needs review rows add "Do not describe this as a confirmed barrier
-until the expert decision is documented."
+Each issue's title opens its [full evidence record](#the-full-evidence-record).
 
 ## The full evidence record
 
-The first three sections start collapsed; select a section's name to open
-it.
+The page leads with **Pages with this issue**: page title (opens the
+inspector), Page URL, Occurrences, Issue screenshots, and status. Its header
+names the WCAG criterion and the issue's type; the page calls Needs review
+"Needs confirmation".
+
+**Issue guidance**, at the top right, opens a dialog with every section open:
 
 1. **What it is** (**Evidence summary** for Informational): the group, its
-   evidence confidence (high, medium, or low), and **Rule docs**, then a
-   one-line evidence summary, such as "Deterministic axe-core rule failure;
-   verify after remediation." It calls Needs review "Needs confirmation". Then
-   the facts (Criterion level, Priority,
-   Pages affected, Occurrences, and Abilities affected) and the rule's
+   evidence confidence (high, medium, or low), and **Rule documentation**, then
+   a one-line evidence summary, such as "Deterministic axe-core rule failure;
+   verify after remediation." Then the facts (WCAG level, Priority,
+   Occurrences across its pages, and who it affects) and the rule's
    description.
 2. **How to fix it**, with **Done when** (for Needs review, **How to confirm
    it**).
 3. **Why it matters, and how to verify the fix** (for Needs review, **Why it
    matters, and how to fix it if confirmed**).
-4. **Pages with this issue**: page title (opens the inspector), Page URL,
-   Open live page, Stored evidence, Occurrences, Issue screenshots, and status.
+
+Escape or the close button returns you to the page.
 
 ## The note that shows which button revealed a problem
 
@@ -286,16 +293,17 @@ report for the same start address, counting issue groups, not findings.
 | Resolved | Found in the earlier report but not detected again in this one. Confirm the fix on the page before marking it remediated. |
 | Remaining | Found in both reports. Its number of occurrences can still go up or down. |
 
-Each number is also a filter for the table of issue groups below it, which
-shows the occurrences before and after and the change between them. **Trend
-over time** plots every completed scan of the site. Select a point in the trend,
-or use **Show as data table**, to open that scan's issues or compare it with
-this report.
+The page opens with **Trend over time**, which plots every completed scan of
+the site. Select a point in the trend, or use **Show as data table**, to open
+that scan's issues or compare it with this report. Below it are the three
+numbers; each is also a filter for the table of issue groups under them, which
+shows the occurrences before and after and the change between them.
 
 When the checks, settings, or pages scanned differ between the two reports,
 the page says so above the numbers: a group can look new or resolved only
-because of what was scanned. Read the **Coverage notes** before you trust a
-result. See [rescan comparison](glossary.md#rescan-comparison).
+because of what was scanned. Read the **Coverage notes**, at the end of the
+page, before you trust a result. See
+[rescan comparison](glossary.md#rescan-comparison).
 
 ## Acting on findings
 
@@ -310,6 +318,14 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue on many pages, and route the fix to whoever owns it.
 4. **Rescan** and check your work in **Compare scans**.
+
+## Delete a report
+
+**Danger zone**, at the end of the Issues page, holds **Delete report**. It
+asks before it acts, unless **Ask before deleting** is off in Settings, and
+then removes the scan and its report evidence; image files that another scan
+also uses may remain. It cannot be undone. A running scan cannot be deleted:
+cancel it first.
 
 ## What the report cannot tell you
 
