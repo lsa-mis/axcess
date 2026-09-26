@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleHelp, Info, X } from "lucide-react";
@@ -547,13 +548,7 @@ function TermsDialog({
   baselineId: number | null;
   currentId: number;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+  const ref = useModalDialog(open);
   const earlier = baselineId !== null ? `scan ${baselineId}` : "the earlier scan";
   const later = `scan ${currentId}`;
   const terms: Array<[ComparisonChange | "group" | "occurrence", string, string]> = [

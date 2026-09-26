@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { Button } from "./ui";
 
 /** The global shortcuts, in the order the Settings page lists them. */
@@ -18,13 +18,7 @@ export const SHORTCUTS: ReadonlyArray<{ keys: string; action: string }> = [
  * to wherever it was when the dialog opened.
  */
 export default function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+  const ref = useModalDialog(open);
 
   return (
     <dialog

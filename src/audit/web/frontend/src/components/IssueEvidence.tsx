@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { useQuery } from "@tanstack/react-query";
 import { AlertOctagon, AlertTriangle, ExternalLink, Info, X, type LucideIcon } from "lucide-react";
 import { api } from "../api/client";
@@ -92,13 +93,7 @@ export function IssueGuidanceDialog({
   onClose: () => void;
   detail: IssueDetail;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+  const ref = useModalDialog(open);
   return (
     <dialog
       ref={ref}
