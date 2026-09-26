@@ -161,21 +161,107 @@ export default function InspectorRoute() {
   // Which state is on screen. In the URL like the view above it, so a link to
   // "the dialog on page 12" survives being sent to someone.
   //
-  // The default is the finding's own state rather than the page as it loaded:
+  // The default is where the issue can be seen, not the page as it loaded:
   // arriving here from a revealed finding and being shown a document that
-  // cannot contain it is the whole complaint. Only when every target agrees on
-  // one state, though -- an issue spanning several states has no single
-  // correct answer, so it opens on the load capture and the picker offers the
-  // rest.
+  // cannot contain it is the whole complaint. See ``autoState`` below.
   const findingStateKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const target of targets) if (target.stateKey) keys.add(target.stateKey);
     return keys;
   }, [targets]);
-  const defaultStateKey =
-    findingStateKeys.size === 1 && allTargetsRevealed
-      ? [...findingStateKeys][0]
-      : null;
+  const reviewing = Boolean(issueKey || directSelector || directSnippet);
+  const evidenceReady = !!pageEvidence || evidenceError;
+  /** Whether the page as it loaded holds any occurrence under review. */
+  const issueAtLoad = targets.some((target) => target.stateKey === null);
+  /** Every occurrence under review came after a click; page load holds none. */
+  const issueOnlyAfterClicks = reviewing && !issueAtLoad && findingStateKeys.size > 0;
+
+  /**
+   * Which states' captures no longer hold their flagged elements.
+   *
+   * Every state holding an occurrence of the issue under review is checked,
+   * not only the one on screen: the picker labels each of them, and the
+   * inspector opens on one that can actually be highlighted. Each capture is
+   * fetched (a stored document, never a live render) and run through the
+   * same matcher the highlight uses, so a label, the opening choice, and the
+   * highlight can never disagree. The queries share the on-screen query's
+   * key, so switching to a checked state is served from cache.
+   */
+  const checkedStates = useMemo(
+    () => (reviewing ? [...findingStateKeys] : []),
+    [findingStateKeys, reviewing],
+  );
+  const stateCaptures = useQueries({
+    queries: checkedStates.map((key) => ({
+      queryKey: ["page-inspection", scan, page, key],
+      queryFn: () => api.getPageInspection(scan, page, key),
+      enabled: inspectEnabled,
+      retry: false,
+    })),
+  });
+  const captureVersions = stateCaptures.map((query) => query.dataUpdatedAt).join(",");
+  // Stamped with the capture versions it was computed from, so "every check
+  // has finished" means for these captures, not for an earlier set.
+  const [checked, setChecked] = useState<{
+    versions: string;
+    missing: ReadonlyMap<string, MissingCount>;
+  }>(() => ({ versions: "", missing: new Map() }));
+  const missingByState = checked.missing;
+  useEffect(() => {
+    let cancelled = false;
+    const versions = captureVersions;
+    const captures = checkedStates.map((key, index) => [key, stateCaptures[index]?.data] as const);
+    scheduleIdle(() => {
+      if (cancelled) return;
+      const next = new Map<string, MissingCount>();
+      for (const [key, inspection] of captures) {
+        const stateTargets = targets.filter((target) => target.stateKey === key);
+        // A state that was never captured has its own message; there is no
+        // document to be missing anything from.
+        if (!inspection?.render.ok || !inspection.render.dom_html || !stateTargets.length) continue;
+        const html = prepareCapture(
+          inspection.render.dom_html,
+          inspection.render.final_url || inspection.page.url || null,
+        );
+        const found = countFound(html, stateTargets);
+        next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
+      }
+      setChecked({ versions, missing: next });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // captureVersions stands in for stateCaptures, a new array every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captureVersions, checkedStates, targets]);
+  // Where to open when the URL does not say. An issue present at page load
+  // opens there. One found only after clicks opens on the first state (in
+  // the order the probe reached them) whose capture actually holds its
+  // element, so the reviewer lands on the defect highlighted rather than on
+  // a document that cannot contain it; if none does, on the first state
+  // that holds the issue at all. Undefined while that is still being worked
+  // out, and decided once per page and issue so the view never jumps.
+  const settled =
+    stateCaptures.every((query) => query.isSuccess || query.isError) &&
+    checked.versions === captureVersions;
+  const autoState: string | null | undefined = !evidenceReady
+    ? undefined
+    : !issueOnlyAfterClicks
+      ? null
+      : settled
+        ? (checkedStates.find((key) => {
+            const count = missingByState.get(key);
+            return count != null && count.missing < count.total;
+          }) ?? checkedStates[0])
+        : undefined;
+  const openingScope = [scan, page, issueKey, directSelector, directSnippet].join("\n");
+  const [opening, setOpening] = useState<{ scope: string; state: string | null } | null>(null);
+  useEffect(() => {
+    if (autoState !== undefined && opening?.scope !== openingScope) {
+      setOpening({ scope: openingScope, state: autoState });
+    }
+  }, [autoState, opening, openingScope]);
+  const defaultStateKey = opening?.scope === openingScope ? opening.state : autoState;
   const requestedState = params.get("state");
   const stateKey = requestedState ?? defaultStateKey;
 
@@ -185,7 +271,7 @@ export default function InspectorRoute() {
     // nothing.
     queryKey: ["page-inspection", scan, page, stateKey],
     queryFn: () => api.getPageInspection(scan, page, stateKey),
-    enabled: inspectEnabled,
+    enabled: inspectEnabled && stateKey !== undefined,
     retry: false,
     // Hold the document already on screen while the next one is fetched.
     // Without it a state the cache has not seen makes `isLoading` true, the
@@ -261,7 +347,6 @@ export default function InspectorRoute() {
    * With nothing specific under review (no `?issue=` or `?selector=`), every
    * state is offered: then the picker is for exploring, not for locating.
    */
-  const reviewing = Boolean(issueKey || directSelector || directSnippet);
   const offeredStates = useMemo(() => {
     const all = data?.states ?? [];
     if (!reviewing) return all;
@@ -389,59 +474,10 @@ export default function InspectorRoute() {
 
   const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
-  const highlightPending = showHighlights && hasTarget && highlight === null;
+  // Only what this view can hold: a view whose targets are all in other
+  // states has nothing to highlight, and must not wait for it forever.
+  const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
 
-  /**
-   * Which offered states' captures no longer hold their flagged elements.
-   *
-   * The picker labels every state, not only the one on screen, so each
-   * offered state's capture is fetched too (a stored document, never a live
-   * render) and run through the same matcher the highlight uses: a label and
-   * a highlight can never disagree. The queries share the on-screen query's
-   * key, so switching to a checked state is served from cache.
-   */
-  const checkedStates = useMemo(
-    () => (reviewing ? offeredStates.map((state) => state.state_key) : []),
-    [offeredStates, reviewing],
-  );
-  const stateCaptures = useQueries({
-    queries: checkedStates.map((key) => ({
-      queryKey: ["page-inspection", scan, page, key],
-      queryFn: () => api.getPageInspection(scan, page, key),
-      enabled: inspectEnabled,
-      retry: false,
-    })),
-  });
-  const captureVersions = stateCaptures.map((query) => query.dataUpdatedAt).join(",");
-  const [missingByState, setMissingByState] = useState<ReadonlyMap<string, MissingCount>>(
-    () => new Map(),
-  );
-  useEffect(() => {
-    let cancelled = false;
-    const captures = checkedStates.map((key, index) => [key, stateCaptures[index]?.data] as const);
-    scheduleIdle(() => {
-      if (cancelled) return;
-      const next = new Map<string, MissingCount>();
-      for (const [key, inspection] of captures) {
-        const stateTargets = targets.filter((target) => target.stateKey === key);
-        // A state that was never captured has its own message; there is no
-        // document to be missing anything from.
-        if (!inspection?.render.ok || !inspection.render.dom_html || !stateTargets.length) continue;
-        const html = prepareCapture(
-          inspection.render.dom_html,
-          inspection.render.final_url || inspection.page.url || null,
-        );
-        const found = countFound(html, stateTargets);
-        next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
-      }
-      setMissingByState(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // captureVersions stands in for stateCaptures, a new array every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captureVersions, checkedStates, targets]);
   /** Missing elements for one picker option; the state on screen uses its highlight. */
   const missingFor = (key: string): MissingCount | undefined => {
     if (key === (activeStateKey ?? "")) {
@@ -516,6 +552,14 @@ export default function InspectorRoute() {
           </LinkButton>
         }
       />
+    );
+  }
+  if (stateKey === undefined) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-sm text-fg-muted" role="status">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        Finding the page state where this issue appears…
+      </div>
     );
   }
   if (isLoading || !data) {
@@ -629,7 +673,11 @@ export default function InspectorRoute() {
                 label: `At page load${
                   loadStateCount > 0 ? ` (${loadStateCount})` : ""
                 }`,
-                badge: <MissingChip count={missingFor("")} />,
+                badge: issueOnlyAfterClicks ? (
+                  <IssueNotHereChip />
+                ) : (
+                  <MissingChip count={missingFor("")} />
+                ),
               },
               ...offeredStates.map((state) => {
                 const count = occurrencesByState.get(state.state_key) ?? 0;
@@ -1032,6 +1080,26 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
     <span className="sev-chip sev-chip--critical shrink-0">
       <span aria-hidden>{text}</span>
       <span className="sr-only">{text}, </span>
+    </span>
+  );
+}
+
+/**
+ * The picker's neutral "Issue not here" chip, for the page as it loaded when
+ * every occurrence under review came after a click. The option stays, as the
+ * baseline the other states are read against, but the issue is not in it.
+ *
+ * Literal words, not "For reference": that says the option is secondary but
+ * not why, and plain-language guidance asks for the fact itself. Neutral,
+ * not red, so it does not read as the "No longer here" problem: nothing is
+ * wrong with this capture. Screen readers get sentence case, as with
+ * ``MissingChip``.
+ */
+function IssueNotHereChip() {
+  return (
+    <span className="sev-chip shrink-0 bg-surface-muted text-fg-muted">
+      <span aria-hidden>Issue not here</span>
+      <span className="sr-only">Issue not here, </span>
     </span>
   );
 }
