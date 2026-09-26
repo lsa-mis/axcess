@@ -355,7 +355,7 @@ you, signed in, without ever seeing your password.
 ### Rescan comparison
 
 Two reports of the same [scope](#scope) lined up on a report's **Compare
-scans** view, with each issue marked New, No longer found, or Still found. No
+reports** view, with each issue marked New, No longer found, or Still found. No
 longer found means only that the later scan did not find the issue again. It
 is not proof of a fix, so check the page yourself before you mark the issue
 Fixed.

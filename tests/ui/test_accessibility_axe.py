@@ -606,7 +606,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     and the stat cards and scan coverage the overview carried sit above the
     table, the coverage as one line that opens the full ledger.
     """
-    # Compare scans is a tab only once the site has an earlier report.
+    # Compare reports is a tab only once the site has an earlier report.
     with sqlite3.connect(seeded_db[0]) as conn:
         conn.execute(
             "INSERT INTO scans(seed_url,status,started_at,config_json) "
@@ -621,7 +621,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Compare scans"]
+        ["Issues", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)
@@ -819,7 +819,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by issue"),
         (f"/app/scans/{scan_id}/a11y", "Rule check issues by WCAG criterion"),
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
-        (f"/app/scans/{scan_id}/compare", "Compare scans"),
+        (f"/app/scans/{scan_id}/compare", "Compare reports"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
         ("/app/about", "About"),

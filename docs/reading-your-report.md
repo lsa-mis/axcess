@@ -16,7 +16,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
 - [Recording decisions](#recording-decisions)
 - [Exports](#exports)
-- [Compare scans after a fix](#compare-scans-after-a-fix)
+- [Compare reports after a fix](#compare-reports-after-a-fix)
 - [Acting on findings](#acting-on-findings)
 - [Delete a report](#delete-a-report)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
@@ -297,10 +297,10 @@ its file name and a notice inside, such as a "DRAFT NOTICE" sheet or an
 review yet, so for now every download from the **Export report** menu is a
 draft. The command-line `audit export` adds no draft label.
 
-## Compare scans after a fix
+## Compare reports after a fix
 
 After you publish fixes, scan the same site again with the same checks.
-**Compare scans** compares this report with the latest earlier completed
+**Compare reports** compares this report with the latest earlier completed
 report for the same start address, counting issues, not occurrences.
 
 | Change | What it means |
@@ -334,7 +334,7 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
 3. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue on many pages, and route the fix to whoever owns it.
-4. **Rescan** and check your work in **Compare scans**.
+4. **Rescan** and check your work in **Compare reports**.
 
 ## Delete a report
 

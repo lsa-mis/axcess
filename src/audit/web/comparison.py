@@ -22,7 +22,7 @@ from audit.wcag_version import stored_wcag_version
 from audit.web import image_findings_queries, issues
 
 Category = Literal["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"]
-# The plain presence of a group in each report, for the Compare scans page:
+# The plain presence of a group in each report, for the Compare reports page:
 # only in the later report, only in the earlier one, or in both. ``Category``
 # keeps the stricter reading of the same row (whether coverage supports it).
 Change = Literal["new", "resolved", "remaining"]
@@ -74,7 +74,7 @@ class Snapshot(BaseModel):
     # matching compares.
     occurrences: int
     # The same group as the Issues table counts it, each element once. What
-    # the Compare scans page shows, so its numbers match the report's.
+    # the Compare reports page shows, so its numbers match the report's.
     issue_occurrences: int
     pages: int
     statuses: dict[str, int]

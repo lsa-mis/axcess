@@ -90,7 +90,7 @@ export default function IssueDetailRoute() {
             </>
           ) : undefined
         }
-        // Top right, where Compare scans keeps its terms: one place on
+        // Top right, where Compare reports keeps its terms: one place on
         // every report page for "explain this". A book, not Compare's
         // question mark, so the two are not mistaken for each other.
         actions={

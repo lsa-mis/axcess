@@ -309,7 +309,7 @@ const ComparedRow = memo(function ComparedRow({
       <RowHeader className="min-w-[14rem] max-w-[28rem]">
         {link ? (
           <Link
-            to={withReturnTrail(link.url.replace(/^\/app(?=\/)/, ""), "Compare scans", backTo)}
+            to={withReturnTrail(link.url.replace(/^\/app(?=\/)/, ""), "Compare reports", backTo)}
             className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
           >
             {row.title}

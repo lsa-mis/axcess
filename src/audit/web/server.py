@@ -2243,7 +2243,7 @@ def create_app(
 
     @app.get("/api/scans/{scan_id:int}/history", response_model=SiteHistory)
     def api_scan_history(scan_id: int) -> SiteHistory:
-        """Completed reports of this report's site, for the Compare scans trend."""
+        """Completed reports of this report's site, for the Compare reports trend."""
         with get_conn() as conn:
             try:
                 return site_history(conn, scan_id)

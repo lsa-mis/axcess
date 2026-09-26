@@ -643,7 +643,7 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
     [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
-    [/^\/scans\/\d+\/compare\/?$/, "Compare scans"],
+    [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
     // Only running and failed scans render here; a completed report
     // redirects to its issue table.
     [/^\/scans\/\d+\/?$/, "Scan status"],

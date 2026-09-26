@@ -85,10 +85,10 @@ you install separately.
 If Ollama can't be reached when a scan starts, Axcess logs a warning and
 continues without those checks.
 
-## Compare scans has nothing to compare, or shows a surprise
+## Compare reports has nothing to compare, or shows a surprise
 
 A [rescan comparison](./glossary.md#rescan-comparison) lives on a report's
-**Compare scans** view. It compares the report with the latest earlier
+**Compare reports** view. It compares the report with the latest earlier
 completed report of the same start address.
 
 - **Nothing to compare.** The two start addresses must match. Letter case in
@@ -97,7 +97,7 @@ completed report of the same start address.
   different sites. Start the new scan from the same address as the old one.
 - **The wrong earlier report.** Select the earlier scan in **Trend over
   time** (or in its data table) and choose **Compare with this report**, or
-  add `?compare_to=<earlier report id>` to the Compare scans address
+  add `?compare_to=<earlier report id>` to the Compare reports address
   (`/app/scans/<new id>/compare`). Both reports must be completed and share
   a start address. Old `/diff` links still open the same comparison.
 - **The command-line image diff.** `audit crawl` picks the earlier scan for

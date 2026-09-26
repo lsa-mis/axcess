@@ -6,7 +6,7 @@ import Tabs from "./Tabs";
  *
  * These are two *views of the same report*, not two steps of a task. An
  * early numbered-pill treatment read as a wizard ("1 Overview → 2 Issues →
- * 3 Verify changes", as Compare scans was then called) and implied an order
+ * 3 Verify changes", as Compare reports was then called) and implied an order
  * and a completion state the report does not have. The segmented row below carries no sequence, and it is the
  * same `Tabs` component the inspector and the tracker use, so the same
  * control reads the same way everywhere in the app.
@@ -42,7 +42,7 @@ export const REPORT_VIEWS: readonly ReportView[] = [
   },
   {
     key: "compare",
-    label: "Compare scans",
+    label: "Compare reports",
     segment: "compare",
     // A site's first report has nothing earlier to compare with.
     available: (previousScanId) => previousScanId != null,

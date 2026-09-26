@@ -109,7 +109,7 @@ function LegacyReportRedirect() {
   return <Navigate replace to={`/scans/${scanId}/issues`} />;
 }
 
-/** "Verify changes" became Compare scans; a saved link keeps its baseline. */
+/** "Verify changes" became Compare reports; a saved link keeps its baseline. */
 function LegacyDiffRedirect() {
   const { scanId } = useParams<{ scanId: string }>();
   const { search } = useLocation();

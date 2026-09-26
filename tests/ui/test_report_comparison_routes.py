@@ -41,7 +41,7 @@ def test_comparison_api_and_chronological_predecessor(
     assert client.get(f"/api/scans/{current}").json()["previous_scan_id"] == old
     assert client.get(f"/api/scans/{old}/comparison").json()["baseline"] is None
     assert client.get(f"/api/scans/{current}/diff?compare_to={old}").status_code == 200
-    # The Compare scans page asks for every row at once.
+    # The Compare reports page asks for every row at once.
     full = client.get(f"/api/scans/{current}/comparison?page_size=500").json()
     assert full["page_size"] == 500 and set(full["changes"]) == {"new", "resolved", "remaining"}
     history = client.get(f"/api/scans/{current}/history")

@@ -1443,7 +1443,7 @@
     "/api/scans/{scan_id}/history": {
       "get": {
         "summary": "Api Scan History",
-        "description": "Completed reports of this report's site, for the Compare scans trend.",
+        "description": "Completed reports of this report's site, for the Compare reports trend.",
         "operationId": "api_scan_history_api_scans__scan_id__history_get",
         "parameters": [
           {

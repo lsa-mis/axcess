@@ -321,7 +321,7 @@ def _page_evidence(scan_id: int) -> dict[str, Any]:
 async def test_compare_scans_keyboard_filters_trend_and_axe(
     live_server: tuple[str, int], width: int, new_page: Any, choose_filter: Any
 ) -> None:
-    """Every control on Compare scans works from the keyboard alone."""
+    """Every control on Compare reports works from the keyboard alone."""
     base, scan_id = live_server
     page = await new_page(viewport={"width": width, "height": 900})
     requests: list[dict[str, list[str]]] = []
@@ -337,11 +337,11 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
     await playwright_async.expect(
-        page.get_by_role("heading", name="Compare scans", exact=True)
+        page.get_by_role("heading", name="Compare reports", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report views").get_by_role(
-            "link", name="Compare scans"
+            "link", name="Compare reports"
         )
     ).to_have_attribute("aria-current", "page")
     # One request for every group: the page sorts, filters and pages them.
@@ -881,7 +881,7 @@ def _assert_current_is_plain_text(items: list[dict[str, Any]]) -> None:
 async def test_report_breadcrumb_ends_at_the_report_on_its_views(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """``Reports > example.com [scan N]``, and nothing after it, on Issues and Compare scans.
+    """``Reports > example.com [scan N]``, and nothing after it, on Issues and Compare reports.
 
     The lit tab says which view; "Issues" as a crumb as well was the third
     time the word appeared on one screen.
@@ -898,7 +898,7 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
         _assert_current_is_plain_text(items)
     # The tabs are the report's two views; Overview is gone.
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare scans"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
 
 
 async def test_issue_evidence_trail_names_the_issue(
@@ -1024,7 +1024,7 @@ async def test_report_crumb_returns_to_the_searched_list(
 async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new_page: Any) -> None:
     """A site's first report has nothing to compare with, so no tab offers it.
 
-    A saved link to its Compare scans page still opens, with its tabs.
+    A saved link to its Compare reports page still opens, with its tabs.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -1040,7 +1040,7 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
         page.get_by_role("heading", name="Nothing earlier to compare with")
     ).to_be_visible()
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare scans"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
 
 
 async def test_report_opens_keyboard_only_in_reading_order(
@@ -1051,7 +1051,7 @@ async def test_report_opens_keyboard_only_in_reading_order(
     Every stop shows a focus indicator, and each group is reached in the
     order it reads on screen.
     """
-    # Compare scans is a tab only once the site has an earlier report.
+    # Compare reports is a tab only once the site has an earlier report.
     with sqlite3.connect(seeded_db[0]) as conn:
         conn.execute(
             "INSERT INTO scans(seed_url,status,started_at,config_json) "
@@ -1100,7 +1100,7 @@ async def test_report_opens_keyboard_only_in_reading_order(
     order = [
         first(lambda s: s["group"] == "Breadcrumb" and s["name"] == "Reports"),
         first(lambda s: s["group"] == "Report views" and s["name"] == "Issues"),
-        first(lambda s: s["group"] == "Report views" and s["name"] == "Compare scans"),
+        first(lambda s: s["group"] == "Report views" and s["name"] == "Compare reports"),
         first(lambda s: s["name"] == "Search issues"),
         # One Filter menu holds Level, Type and Found by.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter"),
@@ -1154,7 +1154,7 @@ async def test_actual_comparison_links_reach_the_issue(
     width: int,
     new_page: Any,
 ) -> None:
-    """Follow the real service's issue URL from Compare scans, and the way back."""
+    """Follow the real service's issue URL from Compare reports, and the way back."""
     db_path, _, old = seeded_db
     base, _ = live_server
     with sqlite3.connect(db_path) as conn:
@@ -1221,12 +1221,12 @@ async def test_actual_comparison_links_reach_the_issue(
     ).to_have_count(0)
     await playwright_async.expect(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    ).to_contain_text("Compare scans")
+    ).to_contain_text("Compare reports")
     items = await _breadcrumb(page)
     assert [item["text"] for item in items][:3] == [
         "Reports",
         f"example.com Report #{new}",
-        "Compare scans",
+        "Compare reports",
     ], items
     assert items[2]["link"] and items[2]["link"].startswith(f"/app/scans/{new}/compare"), items
     _assert_current_is_plain_text(items)

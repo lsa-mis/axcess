@@ -29,7 +29,7 @@ const isChange = (value: string | null): value is ComparisonChange =>
   (CHANGES as string[]).includes(value ?? "");
 
 /**
- * Compare scans: what changed between this report and an earlier scan of the
+ * Compare reports: what changed between this report and an earlier scan of the
  * same site, and how the site has trended across every completed scan.
  *
  * The page reads top down: which two scans, how many issue groups are new,
@@ -118,8 +118,8 @@ export default function CompareRoute() {
         tabs
         scanId={id}
         previousScanId={scanQuery.data?.previous_scan_id ?? null}
-        title="Compare scans"
-        meta="What changed since an earlier scan of this site: new issues, issues still found, and issues no longer found. The trend shows how the site changed over time."
+        title="Compare reports"
+        meta="What changed since an earlier report of this site: new issues, issues still found, and issues no longer found. The trend shows how the site changed over time."
         actions={
           <Button type="button" onClick={() => setTermsOpen(true)} className="rounded-full">
             <CircleHelp className="h-4 w-4" aria-hidden />
