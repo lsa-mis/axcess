@@ -14,6 +14,7 @@ import {
   StatCard,
   StatusChip,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   FindingStatus,
   FindingsGroup,
@@ -111,7 +112,7 @@ export default function GroupedFindingsRoute() {
     <>
       <PageHeader
         title="Images, grouped by issue"
-        subtitle={scan.seed_url}
+        subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
             Show all images in one table

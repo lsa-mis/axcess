@@ -21,6 +21,7 @@ import {
   Select,
   StatCard,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11yRuleGroup,
   A11yRuleGroupFinding,
@@ -116,7 +117,7 @@ export default function A11yByRuleRoute() {
     <>
       <PageHeader
         title="Rule check issues by rule"
-        subtitle={scan.seed_url}
+        subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
             Group by WCAG criterion

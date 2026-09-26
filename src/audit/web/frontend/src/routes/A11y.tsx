@@ -13,6 +13,7 @@ import {
   Select,
   StatCard,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11ySCGroup,
   AxeImpact,
@@ -113,7 +114,7 @@ export default function A11yRoute() {
     <>
       <PageHeader
         title="Rule check issues by WCAG criterion"
-        subtitle={scan.seed_url}
+        subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <>
             {/* Group-by-rule is the actionable cut (one rule, one fix

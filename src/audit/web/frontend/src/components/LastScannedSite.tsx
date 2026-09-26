@@ -3,7 +3,7 @@ import { parseServerTime, serverDate } from "../lib/serverTime";
 import { ArrowRight } from "lucide-react";
 import type { ScanSummary, SiteGroup } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
-import { siteLabel } from "./ReportCrumb";
+import { siteLabel, withoutUserinfo } from "./ReportCrumb";
 import { Card, LinkButton } from "./ui";
 
 /**
@@ -62,7 +62,7 @@ export default function LastScannedSite({ sites }: { sites: SiteGroup[] }) {
               </p>
               <h2
                 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-fg"
-                title={latest.seed_url}
+                title={withoutUserinfo(latest.seed_url)}
               >
                 <BreakableUrl text={site} />
               </h2>

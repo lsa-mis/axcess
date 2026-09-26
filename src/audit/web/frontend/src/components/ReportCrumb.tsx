@@ -40,9 +40,19 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/?$/, "Report"],
 ];
 
+/**
+ * ``url`` without any ``user:password@`` in its address. A start address may
+ * carry credentials for the crawler, and they are never shown: not in a
+ * label, a tooltip or a confirmation. Mirrors ``strip_userinfo`` in
+ * scan_settings.py, which does the same as text for an unparseable address.
+ */
+export function withoutUserinfo(url: string): string {
+  return url.replace(/^([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/?#]*@/, "$1");
+}
+
 /** Strip the scheme and trailing slash, the host and path are the identity. */
 export function siteLabel(seedUrl: string): string {
-  return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  return withoutUserinfo(seedUrl).replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
 /**

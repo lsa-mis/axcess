@@ -43,6 +43,7 @@ import {
   LinkButton,
   PageHeader,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { formatScanEta } from "../lib/scanProgress";
 import { SCAN_STATUS_LABEL } from "../lib/terms";
@@ -125,7 +126,7 @@ export default function ScanDetailRoute() {
   if (data.status === "running") {
     return (
       <>
-        <PageHeader title="Scan in progress" subtitle={data.seed_url} />
+        <PageHeader title="Scan in progress" subtitle={withoutUserinfo(data.seed_url)} />
         <ScanProgressPanel
           scan={data}
           progress={data.progress}
@@ -144,7 +145,7 @@ export default function ScanDetailRoute() {
 
   return (
     <>
-      <PageHeader title={`Report #${data.id}`} subtitle={data.seed_url} />
+      <PageHeader title={`Report #${data.id}`} subtitle={withoutUserinfo(data.seed_url)} />
 
       {data.blocked && (
         <BlockedScanNotice scanId={data.id} blocked={data.blocked} />

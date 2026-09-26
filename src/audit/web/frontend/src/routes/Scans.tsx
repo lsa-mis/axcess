@@ -17,6 +17,7 @@ import {
   ScanTag,
   relativeTime,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
@@ -100,9 +101,12 @@ const COLUMN_HEADER_IDS = {
 } as const;
 const TOTAL_COLUMNS = 8;
 
-/** `https://a.example/docs/` reads as `a.example/docs`; other schemes stay visible. */
+/**
+ * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
+ * visible. Any `user:password@` is dropped, as everywhere an address shows.
+ */
 export function siteLabel(siteUrl: string): string {
-  return siteUrl.replace(/^https:\/\//, "").replace(/\/$/, "");
+  return withoutUserinfo(siteUrl).replace(/^https:\/\//, "").replace(/\/$/, "");
 }
 
 /** The sortable value; null sorts last in either direction. */
@@ -466,7 +470,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               <span className="sr-only">
                 {`${expanded ? "Hide" : "Show"} all ${site.scan_count} ${site.scan_count === 1 ? "scan" : "scans"} for `}
               </span>
-              <span className="block break-words font-semibold text-fg underline-offset-2 group-hover:underline" title={site.site_url}>
+              <span className="block break-words font-semibold text-fg underline-offset-2 group-hover:underline" title={withoutUserinfo(site.site_url)}>
                 <BreakableUrl text={label} />
               </span>
               <span className="block text-xs text-fg-muted">
@@ -575,7 +579,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
         <Link
           to={`/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-          title={scan.seed_url}
+          title={withoutUserinfo(scan.seed_url)}
         >
           <span className="sr-only">Open </span>Report #{scan.id}
         </Link>
@@ -691,7 +695,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
           // Message includes the scan ID and seed URL so the user knows
           // exactly which scan they're about to remove.
           const ok = confirmDestructive(
-            `Delete report #${scan.id} (${scan.seed_url})?\n\n` +
+            `Delete report #${scan.id} (${siteLabel(scan.seed_url)})?\n\n` +
               "This deletes the report for good, with its pages, issues, and " +
               "history. You cannot undo this. Axcess keeps the saved image " +
               "files, because other reports may use them.",

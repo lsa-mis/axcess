@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { api } from "../api/client";
 import { confirmDestructive } from "../hooks/usePreferences";
 import type { ScanDetail } from "../api/types";
+import { siteLabel } from "./ReportCrumb";
 import { Button, Card } from "./ui";
 
 /**
@@ -52,7 +53,7 @@ export default function ReportDangerZone({ scan }: { scan: ScanDetail }) {
         onClick={() => {
           setError(null);
           const ok = confirmDestructive(
-            `Delete report #${scan.id} (${scan.seed_url})?\n\n` +
+            `Delete report #${scan.id} (${siteLabel(scan.seed_url)})?\n\n` +
               "This removes the report for good, with its pages, issues, and history. " +
               "Image files that other reports also use may stay in storage. You cannot undo this.",
           );
