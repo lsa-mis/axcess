@@ -36,6 +36,7 @@ import {
   type SortKind,
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
+import ReportDangerZone from "../components/ReportDangerZone";
 import { ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -318,6 +319,8 @@ export default function IssuesRoute() {
           />
         )}
       </Card>
+
+      <ReportDangerZone scan={scan} />
     </>
   );
 }
