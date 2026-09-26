@@ -300,7 +300,7 @@ export default function TrackingRoute() {
               <tbody>
                 {isLoading && (
                   <tr className="border-t border-border">
-                    <td className="px-2 py-2.5 text-fg-muted" colSpan={4}>
+                    <td className="px-4 py-3.5 text-fg-muted" colSpan={4}>
                       Loading…
                     </td>
                   </tr>

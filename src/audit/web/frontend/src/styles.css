@@ -407,14 +407,16 @@
   box-shadow: 0 0 0 8px rgb(var(--c-umich-maize)) !important;
 }
 
-/* Table density: the vertical padding of every data cell. */
+/* Table density: the vertical padding of every data cell. Default is the
+   cells' own padding (Table.tsx); Tight still leaves room between lines of
+   a wrapped cell, and Roomy adds a clear gap between rows. */
 :root[data-density="compact"] :is(td, th) {
-  padding-top: 0.3rem !important;
-  padding-bottom: 0.3rem !important;
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
 }
 :root[data-density="spacious"] :is(td, th) {
-  padding-top: 1rem !important;
-  padding-bottom: 1rem !important;
+  padding-top: 1.25rem !important;
+  padding-bottom: 1.25rem !important;
 }
 
 /* Animations off: no transition or animation anywhere, whatever the OS says. */

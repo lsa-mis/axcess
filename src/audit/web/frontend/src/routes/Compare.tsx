@@ -478,11 +478,11 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
             >
               <thead className="bg-surface-muted text-fg-muted">
                 <tr>
-                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">Check</th>
-                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">Check</th>
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">
                     Report #{before} <span className="font-normal text-fg-muted">(before)</span>
                   </th>
-                  <th scope="col" className="border border-border-strong px-3 py-2 text-center font-semibold">
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">
                     Report #{after} <span className="font-normal text-fg-muted">(after)</span>
                   </th>
                 </tr>
@@ -492,7 +492,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                   const differs = methodDiffers(pair);
                   return (
                     <tr key={pair.pipeline} className={cn(differs && "bg-sev-major-bg")}>
-                      <th scope="row" className="border border-border px-3 py-2 text-left align-top font-semibold">
+                      <th scope="row" className="border border-border px-4 py-3 text-left align-top font-semibold">
                         {PIPELINES[pair.pipeline] ?? pair.pipeline}
                         {differs && (
                           <>
@@ -503,8 +503,8 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                           </>
                         )}
                       </th>
-                      <td className="border border-border px-3 py-2 text-center align-top tabular-nums">{coverageText(pair.before)}</td>
-                      <td className="border border-border px-3 py-2 text-center align-top tabular-nums">{coverageText(pair.after)}</td>
+                      <td className="border border-border px-4 py-3 text-center align-top tabular-nums">{coverageText(pair.before)}</td>
+                      <td className="border border-border px-4 py-3 text-center align-top tabular-nums">{coverageText(pair.after)}</td>
                     </tr>
                   );
                 })}

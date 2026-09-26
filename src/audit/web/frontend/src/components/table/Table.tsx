@@ -301,7 +301,7 @@ export function SortHeader<K extends string>({
       scope="col"
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
-        "px-1 py-0.5 text-center font-semibold",
+        "px-3 py-1.5 text-center font-semibold",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
       )}
@@ -352,7 +352,7 @@ export function ColumnHeader({
   return (
     <th
       scope={scope}
-      className={cn("px-2 py-2 text-center font-semibold", className)}
+      className={cn("px-4 py-3 text-center font-semibold", className)}
       {...th}
     >
       {children}
@@ -393,7 +393,7 @@ export function RowHeader({
     <th
       scope="row"
       className={cn(
-        "px-2 py-2.5 text-left align-middle font-semibold",
+        "px-4 py-3.5 text-left align-middle font-semibold leading-6",
         sticky && "sticky left-0 z-[1] bg-inherit shadow-[inset_-1px_0_0_theme(colors.border.DEFAULT)]",
         className,
       )}
@@ -418,7 +418,7 @@ export function Cell({
   return (
     <td
       className={cn(
-        "px-2 py-2.5 align-middle",
+        "px-4 py-3.5 align-middle leading-6",
         numeric && "whitespace-nowrap text-center tabular-nums",
         className,
       )}
