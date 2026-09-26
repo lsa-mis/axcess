@@ -61,6 +61,7 @@ from audit.protected.models import (
     ProtectedWorkSpec,
 )
 from audit.protected.session import ManualAuthenticationError, ManualAuthenticationSession
+from audit.wcag_version import stored_wcag_version
 
 _MAX_PAGES = 10_000
 _MAX_DEPTH = 20
@@ -551,6 +552,7 @@ class _ProtectedBrowserCrawler:
         fetcher = self._session.create_shared_js_fetcher(
             axe_analyzer=axe,
             axe_level=_config_level(self._config),
+            wcag_version=stored_wcag_version(self._config),
             keyboard_probe=keyboard,
             responsive_probe=responsive,
             focus_probe=focus,
@@ -618,7 +620,10 @@ class _ProtectedBrowserCrawler:
                     if alfa is not None:
                         try:
                             alfa_result = await self._session.run_alfa(
-                                alfa, result.url, level=_config_level(self._config)
+                                alfa,
+                                result.url,
+                                level=_config_level(self._config),
+                                version=stored_wcag_version(self._config),
                             )
                             if alfa_result.authentication_required:
                                 # Alfa has an independent browser context.

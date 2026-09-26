@@ -125,7 +125,7 @@ while the page is still open, in a fixed order:
    reported twice.
 6. The responsive check, last, because it resizes the viewport and injects
    CSS.
-7. Circled element screenshots for the findings, up to 100 per page.
+7. Outlined element screenshots for the findings, up to 100 per page.
 8. The configured search journey, only on its entry page.
 
 Results travel back on `FetchResult` fields (`src/audit/crawler/fetcher.py`).

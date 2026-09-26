@@ -4,15 +4,17 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { Checkbox, PageHeader } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
-import { AUTHORIZATION, IMAGE_ACK } from "../components/newScan/copy";
+import { AUTHORIZATION, IMAGE_ACK, RECOVERY } from "../components/newScan/copy";
 import ScanForm from "../components/newScan/ScanForm";
 import ScanTypeTabs from "../components/newScan/ScanTypeTabs";
 import {
   applyPolicy,
   policyFor,
+  settingsFromSnapshot,
   toLocalLoginPayload,
   validateScan,
   type FieldError,
+  type FieldKey,
   type ScanMode,
   type ScanSettings,
 } from "../components/newScan/scanPolicy";
@@ -20,10 +22,25 @@ import { useScopePreview } from "../components/newScan/useScopePreview";
 
 const FIELD_IDS = {
   url: "scan-url",
+  max_pages: "scan-max-pages",
+  max_depth: "scan-max-depth",
   static_only: "scan-static-only",
   authorized: "scan-authorized",
   image_ack: "scan-image-ack",
 } as const;
+
+/** Which settings, when edited, settle each error the alert can list. */
+const ERROR_CLEARED_BY: Partial<Record<FieldKey, ReadonlyArray<keyof ScanSettings>>> = {
+  url: ["url"],
+  max_pages: ["max_pages"],
+  max_depth: ["max_depth"],
+  static_only: ["static_only", "scan_engine"],
+};
+
+function positiveId(raw: string | null): number | null {
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
 
 /**
  * Start a scan: two tabs, one form.
@@ -35,6 +52,13 @@ const FIELD_IDS = {
  * change re-keys the form so it drops in fresh with that mode's defaults.
  * Once a login scan has been created, `?scan=` hands over to the sign-in
  * flow, which is its own screen.
+ *
+ * `?from=<scan id>` starts again from a scan that failed or was stopped:
+ * its settings are fetched from the server and laid over the tab's
+ * defaults once. Only settings come back. Sign-in happens in the site's own
+ * window and is never stored, and the authorization and image-storage
+ * confirmations start unticked, because they are the person's to give for
+ * this run. Nothing here is kept in browser storage.
  */
 export default function NewScanRoute() {
   const navigate = useNavigate();
@@ -67,17 +91,44 @@ export default function NewScanRoute() {
   const [imageAck, setImageAck] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  const fromScanId = positiveId(searchParams.get("from"));
+  const previousSettings = useQuery({
+    queryKey: ["scan-settings", fromScanId],
+    queryFn: () => api.getScanSettings(fromScanId ?? 0),
+    enabled: fromScanId !== null,
+    retry: false,
+    staleTime: Infinity,
+  });
+  // Applied once per scan id and only on the tab the scan belongs to, after
+  // the tab-change reset above, so switching tabs by hand afterwards still
+  // starts that tab from its own defaults.
+  const appliedFrom = useRef<number | null>(null);
+  const snapshot = previousSettings.data;
+  useEffect(() => {
+    if (!snapshot || appliedFrom.current === snapshot.scan_id) return;
+    if (snapshot.mode !== mode) {
+      // A link that named the wrong tab: move to the scan's own tab first.
+      setSearchParams((previous) => {
+        const params = new URLSearchParams(previous);
+        params.delete("scan");
+        if (snapshot.mode === "login") params.set("mode", "login");
+        else params.delete("mode");
+        return params;
+      });
+      return;
+    }
+    appliedFrom.current = snapshot.scan_id;
+    setSettings(settingsFromSnapshot(snapshot, policyFor(mode)));
+    setErrors([]);
+  }, [snapshot, mode, setSearchParams]);
+
   const update = (patch: Partial<ScanSettings>) => {
     setSettings((previous) => applyPolicy({ ...previous, ...patch }, policy));
     // A field the alert named is being edited: drop its line so the alert
     // shrinks as the reader works through it.
     if (errors.length) {
       setErrors((previous) =>
-        previous.filter(
-          (error) =>
-            !(error.field === "url" && "url" in patch) &&
-            !(error.field === "static_only" && ("static_only" in patch || "scan_engine" in patch)),
-        ),
+        previous.filter((error) => !(ERROR_CLEARED_BY[error.field] ?? []).some((key) => key in patch)),
       );
     }
   };
@@ -177,6 +228,25 @@ export default function NewScanRoute() {
           </Link>
         )}
       </div>
+
+      {fromScanId !== null && !inHandoff && (
+        // Mounted before the fetch settles, so the result is announced.
+        <p
+          role="status"
+          className="mb-5 rounded-xs border border-umich-blue/30 bg-umich-blue/[0.04] px-4 py-3 text-sm text-fg"
+        >
+          {previousSettings.isError ? (
+            RECOVERY.failed(fromScanId)
+          ) : snapshot && snapshot.mode === mode ? (
+            <>
+              {RECOVERY.loaded(fromScanId)}
+              {mode === "login" && <> {RECOVERY.loadedLogin}</>}
+            </>
+          ) : (
+            RECOVERY.loading(fromScanId)
+          )}
+        </p>
+      )}
 
       {inHandoff ? (
         <LocalLoginScan showSteps={false} />

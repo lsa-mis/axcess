@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api } from "../api/client";
@@ -7,6 +8,15 @@ import {
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+} from "../components/table/Table";
 import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import type { ProtectedIssueIndexGroup } from "../api/types";
 
@@ -53,10 +63,12 @@ export default function ProtectedIssueIndexRoute() {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
   });
-  const groups = index.data?.groups ?? [];
-  const paged = usePagedRows(groups, {
-    resetKey: groups.map((group) => `${group.source_layer}:${group.rule_id}:${group.engine_outcome}`).join(","),
-  });
+  const groups = useMemo(() => index.data?.groups ?? [], [index.data]);
+  const resetKey = useMemo(
+    () => groups.map((group) => `${group.source_layer}:${group.rule_id}:${group.engine_outcome}`).join(","),
+    [groups],
+  );
+  const paged = usePagedRows(groups, { resetKey });
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return <p role="alert" className="text-sm text-sev-critical">This sign-in scan number is not valid. Check the address, or open the report from Reports.</p>;
@@ -122,27 +134,33 @@ export default function ProtectedIssueIndexRoute() {
               Complete the manual checks. Then review what was checked and what the checks cannot find.
             </Card>
           ) : (
-            <Card className="overflow-x-auto">
-              {/* Holds the tallest page's height, so paging never moves the pager. */}
-              <div {...paged.hold}>
-              <table className="min-w-full text-sm">
-                <caption className="sr-only">Sign-in scan issues, grouped by check and rule</caption>
-                <thead className="bg-surface-muted text-2xs text-fg-subtle">
-                  <tr>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Check</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Rule</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">WCAG criterion</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Result</th>
-                    <th scope="col" className="px-4 py-2 text-right font-semibold">Occurrences</th>
-                    <th scope="col" className="px-4 py-2 text-right font-semibold">Pages</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paged.pageRows.map((group) => <IssueRow key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`} group={group} />)}
-                </tbody>
-              </table>
-              </div>
-              <TablePagination label="Sign-in scan issues" noun="issues" {...paged} />
+            <Card>
+              {paged.pages > 1 && (
+                <TableBar pager={<TablePagination label="Sign-in scan issues" noun="issues" {...paged} />} />
+              )}
+              <TableRegion label="Sign-in scan issues table" paged={paged}>
+                <Table caption="Sign-in scan issues, grouped by check and rule">
+                  <TableHead>
+                    <tr>
+                      <ColumnHeader>Check</ColumnHeader>
+                      <ColumnHeader>Rule</ColumnHeader>
+                      <ColumnHeader>WCAG criterion</ColumnHeader>
+                      <ColumnHeader>Result</ColumnHeader>
+                      <ColumnHeader>Occurrences</ColumnHeader>
+                      <ColumnHeader>Pages</ColumnHeader>
+                    </tr>
+                  </TableHead>
+                  <tbody>
+                    {paged.pageRows.map((group, position) => (
+                      <IssueRow
+                        key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`}
+                        group={group}
+                        index={(paged.page - 1) * paged.pageSize + position}
+                      />
+                    ))}
+                  </tbody>
+                </Table>
+              </TableRegion>
             </Card>
           )}
           <p className="mt-4 text-sm text-fg-muted">
@@ -154,17 +172,17 @@ export default function ProtectedIssueIndexRoute() {
   );
 }
 
-function IssueRow({ group }: { group: ProtectedIssueIndexGroup }) {
+function IssueRow({ group, index }: { group: ProtectedIssueIndexGroup; index: number }) {
   const outcome = group.engine_outcome ?? group.impact;
   const result = outcome ? RESULT_LABEL[outcome] ?? outcome.replaceAll("_", " ") : REVIEW_TYPE_LABEL.expert_review;
   return (
-    <tr className="transition-colors hover:bg-surface-muted/60">
-      <td className="px-4 py-3 text-fg">{SOURCE_LABEL[group.source_layer]}</td>
-      <td className="px-4 py-3 font-mono text-xs text-fg">{group.rule_id}</td>
-      <td className="px-4 py-3 text-fg">{group.wcag_sc ? `${group.wcag_sc}${group.wcag_level ? ` (Level ${group.wcag_level})` : ""}` : "Does not apply"}</td>
-      <td className="px-4 py-3 text-fg">{result}</td>
-      <td className="px-4 py-3 text-right tabular-nums text-fg">{group.occurrence_count.toLocaleString()}</td>
-      <td className="px-4 py-3 text-right tabular-nums text-fg">{group.page_count.toLocaleString()}</td>
-    </tr>
+    <Row index={index}>
+      <Cell className="text-fg">{SOURCE_LABEL[group.source_layer]}</Cell>
+      <Cell className="font-mono text-xs text-fg">{group.rule_id}</Cell>
+      <Cell className="text-fg">{group.wcag_sc ? `${group.wcag_sc}${group.wcag_level ? ` (Level ${group.wcag_level})` : ""}` : "Does not apply"}</Cell>
+      <Cell className="text-fg">{result}</Cell>
+      <Cell numeric className="text-fg">{group.occurrence_count.toLocaleString()}</Cell>
+      <Cell numeric className="text-fg">{group.page_count.toLocaleString()}</Cell>
+    </Row>
   );
 }

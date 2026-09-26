@@ -20,6 +20,55 @@
       }
     ]
   },
+  "GET /api/sites": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "completed_count": "integer",
+        "most_recent": {
+          "dom_state_count": "integer",
+          "finding_count": "integer",
+          "finished_at": "null|string",
+          "id": "integer",
+          "page_count": "integer",
+          "seed_url": "string",
+          "started_at": "string",
+          "status": "string"
+        },
+        "most_recent_completed": {
+          "anyOf": [
+            "null",
+            {
+              "dom_state_count": "integer",
+              "finding_count": "integer",
+              "finished_at": "string",
+              "id": "integer",
+              "page_count": "integer",
+              "seed_url": "string",
+              "started_at": "string",
+              "status": "string"
+            }
+          ]
+        },
+        "most_recent_completed_issue_count": "integer|null",
+        "scan_count": "integer",
+        "scans": [
+          {
+            "dom_state_count": "integer",
+            "finding_count": "integer",
+            "finished_at": "null|string",
+            "id": "integer",
+            "page_count": "integer",
+            "seed_url": "string",
+            "started_at": "string",
+            "status": "string"
+          }
+        ],
+        "site_url": "string"
+      }
+    ]
+  },
   "GET /api/scans/{scan_id}": {
     "status": 200,
     "content_type": "application/json",
@@ -58,7 +107,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (running)": {
@@ -109,6 +159,13 @@
         "images_seen": "integer",
         "in_flight_pages": [{"attempts": "integer", "depth": "integer", "lease_until": "string", "url": "string"}],
         "leased": "integer",
+        "page_checks": [
+          {
+            "checks": {"axe": "absent|string", "keyboard": "absent|string"},
+            "state": "string",
+            "url": "string"
+          }
+        ],
         "pending": "integer",
         "recent_pages": [
           {
@@ -124,7 +181,8 @@
       },
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (blocked)": {
@@ -165,7 +223,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (failed)": {
@@ -206,7 +265,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (unknown scan)": {"status": 404, "content_type": "application/json", "body": {"detail": "string"}},
@@ -216,6 +276,7 @@
     "body": {
       "abilities_counts": {"cognition": "integer", "motor": "integer", "vision": "integer"},
       "conformance_counts": {"A": "integer", "AA": "integer", "AAA": "integer", "BP": "integer"},
+      "finding_type_counts": {"alt_text": "integer", "click_through": "integer", "wcag": "integer"},
       "occurrence_counts": {"all_evidence": "integer", "high_confidence": "integer"},
       "responsibility_counts": {"dev": "integer", "editor": "integer"},
       "review_lane_counts": {"expert_review": "integer", "informational": "integer", "likely_barrier": "integer"},
@@ -223,6 +284,7 @@
         {
           "abilities_affected": ["string"],
           "acceptance": "null|string",
+          "click_through_occurrence_count": "integer",
           "conformance": "string",
           "description": "null|string",
           "detail_url": "string",
@@ -230,6 +292,7 @@
           "evidence_confidence": "string",
           "evidence_summary": "string",
           "finding_ids": ["integer"],
+          "finding_types": ["string"],
           "fix_steps": ["string"],
           "help_url": "null|string",
           "high_confidence_occurrence_count": "integer",
@@ -294,6 +357,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
         "detail_url": "string",
@@ -301,6 +365,7 @@
         "evidence_confidence": "string",
         "evidence_summary": "string",
         "finding_ids": ["integer"],
+        "finding_types": ["string"],
         "fix_steps": ["string"],
         "help_url": "string",
         "high_confidence_occurrence_count": "integer",
@@ -366,6 +431,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
         "detail_url": "string",
@@ -373,6 +439,7 @@
         "evidence_confidence": "string",
         "evidence_summary": "string",
         "finding_ids": ["integer"],
+        "finding_types": ["string"],
         "fix_steps": ["string"],
         "help_url": "null",
         "high_confidence_occurrence_count": "integer",
@@ -431,6 +498,7 @@
       "row": {
         "abilities_affected": [],
         "acceptance": "null",
+        "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
         "detail_url": "string",
@@ -438,6 +506,7 @@
         "evidence_confidence": "string",
         "evidence_summary": "string",
         "finding_ids": ["integer"],
+        "finding_types": ["string"],
         "fix_steps": ["string"],
         "help_url": "string",
         "high_confidence_occurrence_count": "integer",
@@ -913,7 +982,10 @@
     "status": 200,
     "content_type": "application/json",
     "body": {
+      "after_totals": {"groups": "integer", "occurrences": "integer"},
       "baseline": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "before_totals": {"groups": "integer", "occurrences": "integer"},
+      "changes": {"new": "integer", "remaining": "integer", "resolved": "integer"},
       "counts": {
         "cannot_compare": "integer",
         "changed": "integer",
@@ -930,6 +1002,7 @@
       ],
       "current": {"id": "integer", "seed_url": "string", "started_at": "string"},
       "limitations": ["string"],
+      "notes": [{"differs": "boolean", "scans": ["integer"], "text": "string"}],
       "page": "integer",
       "page_size": "integer",
       "pipeline_counts": {"alfa": "integer", "axe": "integer", "image": "integer"},
@@ -937,6 +1010,7 @@
         {
           "after": {
             "evidence": [{"label": "string", "url": "string"}],
+            "issue_occurrences": "integer",
             "issues": [{"label": "string", "url": "string"}],
             "occurrences": "integer",
             "outcomes": {"cant_tell": "absent|integer", "failed": "absent|integer"},
@@ -948,6 +1022,7 @@
               "null",
               {
                 "evidence": [{"label": "string", "url": "string"}],
+                "issue_occurrences": "integer",
                 "issues": [{"label": "string", "url": "string"}],
                 "occurrences": "integer",
                 "outcomes": {"failed": "absent|integer"},
@@ -957,12 +1032,34 @@
             ]
           },
           "category": "string",
+          "change": "string",
+          "conformance": "string",
           "key": "string",
           "limitations": ["string"],
           "pipeline": "string",
-          "title": "string"
+          "title": "string",
+          "wcag_name": "string",
+          "wcag_sc": "null|string"
         }
       ],
+      "settings_changed": ["string"],
+      "total": "integer"
+    }
+  },
+  "GET /api/scans/{scan_id}/history": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "scans": [
+        {
+          "finished_at": "string",
+          "groups": "integer",
+          "id": "integer",
+          "occurrences": "integer",
+          "started_at": "string"
+        }
+      ],
+      "site_url": "string",
       "total": "integer"
     }
   },

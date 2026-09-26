@@ -4,6 +4,7 @@ import { useQueries } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { api } from "../api/client";
 import { cn } from "../lib/cn";
+import { ScanTag } from "./ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /**
@@ -14,13 +15,13 @@ import { useScanQuery } from "../hooks/useScanQuery";
  * Dashboard | Sage Campus``: where you are in the app, which report you are reading (one
  * site can have several, so the number is part of the name), and the path
  * from the report down to this page. On the report's own views, Issues and
- * Verify changes, the trail ends at the report: the lit tab already says
+ * Compare reports, the trail ends at the report: the lit tab already says
  * which view, and "Issues" as a crumb, a tab and a heading was the same word
  * three times on one screen.
  *
  * Everything here is derived from the URL, so the trail is complete on the
  * first paint of a route rather than appearing once data lands. The scan
- * query only upgrades the report crumb from "Report #46" to the site itself,
+ * query only upgrades the report crumb from "Report [scan 46]" to the site itself,
  * and it shares ``["scan", id]`` with the routes below, a cache hit, not a
  * second request.
  */
@@ -29,7 +30,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages"],
   [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
-  [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
+  [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
   [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
@@ -39,9 +40,19 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/?$/, "Report"],
 ];
 
+/**
+ * ``url`` without any ``user:password@`` in its address. A start address may
+ * carry credentials for the crawler, and they are never shown: not in a
+ * label, a tooltip or a confirmation. Mirrors ``strip_userinfo`` in
+ * scan_settings.py, which does the same as text for an unparseable address.
+ */
+export function withoutUserinfo(url: string): string {
+  return url.replace(/^([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/?#]*@/, "$1");
+}
+
 /** Strip the scheme and trailing slash, the host and path are the identity. */
 export function siteLabel(seedUrl: string): string {
-  return seedUrl.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  return withoutUserinfo(seedUrl).replace(/^https?:\/\//, "").replace(/\/+$/, "");
 }
 
 /**
@@ -173,7 +184,7 @@ const MAX_DEPTH = 12;
  * Two more sources fill any gap a link did not carry. A route scoped to one
  * issue proves its parents from the path alone (the issue list, then the
  * issue), so a bookmark or deep link lands with the whole trail. And the
- * inspector's `?contextTo=` names the issue or finding it is circling, so a
+ * inspector's `?contextTo=` names the issue or finding it is outlining, so a
  * page opened straight from the issue list still shows the issue between the
  * list and the page. Anything already in the chain is not added twice.
  */
@@ -221,7 +232,7 @@ function trailFor(
     }
   }
 
-  // 3. What the inspector is circling, when the chain did not pass through it.
+  // 3. What the inspector is outlining, when the chain did not pass through it.
   const contextTo = inAppPath(params.get("contextTo"));
   const contextLabel = params.get("context");
   if (contextTo && contextLabel && depth < MAX_DEPTH && !seen.includes(contextTo)) {
@@ -343,9 +354,9 @@ export function useReportTrail(): {
   return { match, trail: labelled };
 }
 
-/** The report's own views: its URL, the issue table, and Verify changes. */
+/** The report's own views: its URL, the issue table, and Compare reports. */
 function isReportView(pathname: string): boolean {
-  return /^\/scans\/\d+(?:\/issues|\/diff)?\/?$/.test(pathname);
+  return /^\/scans\/\d+(?:\/issues|\/compare)?\/?$/.test(pathname);
 }
 
 /**
@@ -395,7 +406,8 @@ export default function ReportCrumb() {
       ? null
       : {
           ...reportTrail(trail, pathname, match.scanId),
-          site: seedUrl ? siteLabel(seedUrl) : "Report",
+          // Blank until the scan loads: the tag already says "Report #N".
+          site: seedUrl ? siteLabel(seedUrl) : "",
           id: match.scanId,
         };
   const crumbs = report ? report.crumbs : trail;
@@ -416,11 +428,15 @@ export default function ReportCrumb() {
         </Crumb>
         {report &&
           (current ? (
-            <Crumb to={report.reportTo} title={`${report.site} #${report.id}`}>
-              <ReportName site={report.site} id={report.id} cap={cap} />
+            <Crumb
+              to={report.reportTo}
+              title={report.site ? `${report.site} · Report #${report.id}` : `Report #${report.id}`}
+              className="group !no-underline"
+            >
+              <ReportName site={report.site} id={report.id} cap={cap} linked />
             </Crumb>
           ) : (
-            <Current title={`${report.site} #${report.id}`}>
+            <Current title={`${report.site} · scan ${report.id}`}>
               <ReportName site={report.site} id={report.id} cap={cap} />
             </Current>
           ))}
@@ -439,13 +455,33 @@ export default function ReportCrumb() {
   );
 }
 
-/** ``app.codegra.de #40``. The site can be cut like any long crumb; the
- *  number never is, since it is what tells two reports of one site apart. */
-function ReportName({ site, id, cap }: { site: string; id: number; cap: number | null }) {
+/** ``app.codegra.de [scan 40]``. The site can be cut like any long crumb;
+ *  the scan tag never is, since it tells two reports of one site apart. The
+ *  space sits in text, not a margin, so the link's name is "site scan 40".
+ *  On the link only the site is underlined: an underline on the whole link
+ *  also ran under that space, a stray stub that butted into the tag. */
+function ReportName({
+  site,
+  id,
+  cap,
+  linked = false,
+}: {
+  site: string;
+  id: number;
+  cap: number | null;
+  linked?: boolean;
+}) {
   return (
     <>
-      <CrumbText cap={cap}>{site}</CrumbText>
-      <span className="shrink-0 whitespace-pre tabular-nums"> #{id}</span>
+      <CrumbText
+        cap={cap}
+        className={
+          linked ? "underline decoration-1 underline-offset-4 group-hover:decoration-2" : undefined
+        }
+      >
+        {site}
+      </CrumbText>
+      <span className="shrink-0 whitespace-pre"> <ScanTag id={id} /></span>
     </>
   );
 }
@@ -523,11 +559,13 @@ function Crumb({
   children,
   title,
   first = false,
+  className,
 }: {
   to: string;
   children: React.ReactNode;
   title?: string;
   first?: boolean;
+  className?: string;
 }) {
   return (
     <li className="flex shrink-0 items-center">
@@ -535,7 +573,7 @@ function Crumb({
       <Link
         to={to}
         title={title}
-        className={cn("report-link flex min-h-target items-center", CRUMB_TEXT)}
+        className={cn("report-link flex min-h-target items-center", CRUMB_TEXT, className)}
       >
         {children}
       </Link>
@@ -560,9 +598,17 @@ function Current({ children, title }: { children: React.ReactNode; title: string
 }
 
 /** One measured, cuttable crumb label. */
-function CrumbText({ children, cap }: { children: string; cap: number | null }) {
+function CrumbText({
+  children,
+  cap,
+  className,
+}: {
+  children: string;
+  cap: number | null;
+  className?: string;
+}) {
   return (
-    <span data-crumb-text className="truncate" style={cap == null ? undefined : { maxWidth: cap }}>
+    <span data-crumb-text className={cn("truncate", className)} style={cap == null ? undefined : { maxWidth: cap }}>
       {children}
     </span>
   );

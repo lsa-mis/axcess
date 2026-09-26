@@ -28,6 +28,7 @@
  * the view is closed.
  */
 import { useEffect, useRef, useState } from "react";
+import { parseServerTime, serverDate } from "../lib/serverTime";
 import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -101,7 +102,7 @@ const STATUS_COPY: Record<
 
 function displayTime(value: string | null): string {
   if (!value) return "Not recorded";
-  const date = new Date(value);
+  const date = serverDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -285,7 +286,7 @@ export default function ProtectedCompanionRoute() {
 
   useEffect(() => {
     if (!visiblePairing) return undefined;
-    const expiresAt = Date.parse(visiblePairing.expires_at);
+    const expiresAt = parseServerTime(visiblePairing.expires_at);
     const delay = Number.isFinite(expiresAt) ? Math.max(0, expiresAt - Date.now()) : 0;
     const timeout = window.setTimeout(() => {
       setPairing(null);

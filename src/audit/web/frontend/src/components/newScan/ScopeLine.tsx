@@ -1,5 +1,6 @@
 import { AlertOctagon, Check, Loader2 } from "lucide-react";
 import type { ScopePreview } from "../../api/types";
+import { SUMMARY } from "./copy";
 import type { ScopePreviewState } from "./useScopePreview";
 
 /**
@@ -9,8 +10,7 @@ import type { ScopePreviewState } from "./useScopePreview";
  * which told an expert what they already knew and told everyone else
  * nothing. This says it: "Will scan lsa.umich.edu/anthro/ and every page
  * under it." It is a status region, so a screen reader hears the answer as
- * it settles; idle renders nothing at all, so there is nothing to announce
- * before the user has typed.
+ * it settles; idle shows where that answer will appear.
  */
 export default function ScopeLine({
   id,
@@ -23,11 +23,19 @@ export default function ScopeLine({
   data: ScopePreview | null;
   afterSignIn?: boolean;
 }) {
-  if (state === "idle") return <p id={id} role="status" className="sr-only" />;
+  // Idle says where the answer will appear. It is there from the first
+  // render, so the status region has nothing to announce until it changes.
+  if (state === "idle") {
+    return (
+      <p id={id} role="status" className="text-sm font-semibold text-umich-blue">
+        {SUMMARY.siteEmpty}
+      </p>
+    );
+  }
 
   if (state === "checking") {
     return (
-      <p id={id} role="status" className="mt-1 flex items-start gap-2 text-sm text-fg-muted">
+      <p id={id} role="status" className="flex items-start gap-2 text-sm text-fg-muted">
         <Loader2
           className="mt-0.5 h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none"
           aria-hidden
@@ -39,7 +47,7 @@ export default function ScopeLine({
 
   if (state === "error" || !data) {
     return (
-      <p id={id} role="status" className="mt-1 flex items-start gap-2 text-sm text-sev-critical">
+      <p id={id} role="status" className="flex items-start gap-2 text-sm text-sev-critical">
         <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <span>{data?.error ?? "Axcess could not tell what to scan from this address. Check the address and try again."}</span>
       </p>
@@ -48,7 +56,7 @@ export default function ScopeLine({
 
   const tail = afterSignIn ? ", after you sign in." : ".";
   return (
-    <p id={id} role="status" className="mt-1 flex items-start gap-2 text-sm text-fg">
+    <p id={id} role="status" className="flex items-start gap-2 text-sm text-fg">
       <Check className="mt-0.5 h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
       <span>
         <strong>Will scan</strong>{" "}

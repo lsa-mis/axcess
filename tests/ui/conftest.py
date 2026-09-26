@@ -8,6 +8,7 @@ data via a live uvicorn server, and open their pages with ``new_page``.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 import time
@@ -272,6 +273,50 @@ def choose_option() -> Callable[[Page, str, str], Awaitable[None]]:
         await page.locator(f'[id="{list_id}"] [role="option"][data-value="{value}"]').click()
         # The list closes under the pointer, leaving it over whatever was
         # beneath the option; park it so no hover state leaks into the test.
+        await page.mouse.move(0, 0)
+
+    return choose
+
+
+@pytest.fixture
+def choose_filter() -> Callable[..., Awaitable[None]]:
+    """Make ``value`` the only choice in group ``group`` of a table's Filter menu.
+
+    See components/table/FilterMenu.tsx. Opens the menu if it is closed. In
+    a radio group it picks ``value``; in a checkbox group it checks
+    ``value`` and unchecks the rest, so a test reads the same either way.
+    ``""`` is "All": the radio of that name, or no box checked. Closes the
+    menu with Escape, as a keyboard user would, so it no longer covers the
+    table. Pass ``menu`` when a table names its button something other
+    than "Filter".
+    """
+    from playwright.async_api import expect
+
+    async def choose(page: Page, group: str, value: str, *, menu: str = "Filter") -> None:
+        # The button's name gains " 2 active" once filters apply.
+        button = page.get_by_role("button", name=re.compile(rf"^{re.escape(menu)}\b")).and_(
+            page.locator("[aria-controls][aria-expanded]")
+        )
+        if await button.get_attribute("aria-expanded") != "true":
+            await button.click()
+        panel = page.locator(f'[id="{await button.get_attribute("aria-controls")}"]')
+        fieldset = panel.get_by_role("group", name=group, exact=True)
+        # Click, then wait: the controls follow the table's state (often the
+        # URL, which the router updates after the click), so Playwright's
+        # `check()`, which reads the state at once, would fail.
+        boxes = fieldset.locator('input[type="checkbox"]')
+        if await boxes.count():
+            for index in range(await boxes.count()):
+                box = boxes.nth(index)
+                want = await box.get_attribute("data-value") == value
+                if await box.is_checked() != want:
+                    await box.click()
+                    await expect(box).to_be_checked(checked=want)
+        else:
+            radio = fieldset.locator(f'input[type="radio"][data-value="{value}"]')
+            await radio.click()
+            await expect(radio).to_be_checked()
+        await page.keyboard.press("Escape")
         await page.mouse.move(0, 0)
 
     return choose

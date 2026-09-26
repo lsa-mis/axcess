@@ -1,39 +1,30 @@
-import { CHECK_LABEL } from "../../lib/terms";
-import SearchSettings from "../SearchSettings";
-import { ENGINE, GROUPS, STANDARD, SWITCHES } from "./copy";
+import { CLICK_THROUGH_COPY, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
 import type { GroupProps } from "./groupProps";
 import PillGroup from "./PillGroup";
-import { isFixed, switchOn, switchPatch, type ScanSettings, type SwitchKey } from "./scanPolicy";
-import SettingsGroup from "./SettingsGroup";
+import { isFixed, switchOn, switchPatch } from "./scanPolicy";
+import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
 
-/** How many of the check switches are on, for the disclosure header. */
-export function checksCount(settings: ScanSettings, policy: GroupProps["policy"]) {
-  const keys: SwitchKey[] = ["keyboard", "focus", "responsive"];
-  const shown = keys.filter((key) => !(key === "focus" && isFixed(policy, "skip_focus")));
-  return { on: shown.filter((key) => switchOn(settings, key)).length, total: shown.length };
-}
-
 /**
- * What each page is tested for: the standard, the rule engine, and the
- * browser checks that need a rendered page. The search-discovery settings
- * belong here too: they exist so that pages only reachable through a
- * search box get checked at all.
+ * What each page is tested for: the standard (level and WCAG version),
+ * Click-Through, and the browser checks that need a rendered page. The rule
+ * engine is chosen beside the limits, in `LimitsGroup`.
  */
-export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
-  const alfaOff = capabilities.alfa?.available === false;
-  const alfaReason = alfaOff
-    ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
-    : undefined;
+export default function ChecksGroup({ settings, update, policy }: GroupProps) {
   const rendered = !settings.static_only;
+  const clickThroughBlocked = settings.static_only
+    ? CLICK_THROUGH_COPY.unavailableStatic
+    : settings.scan_engine === "alfa"
+      ? CLICK_THROUGH_COPY.unavailableAlfa
+      : null;
 
   return (
     <SettingsGroup id="checks" legend={GROUPS.checks.legend} description={GROUPS.checks.description}>
-      <div className="grid gap-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+      <div className="grid gap-5 sm:grid-cols-2">
         <PillGroup
           name="axe-level"
           label={STANDARD.label}
-          hint={STANDARD.hint}
+          hint={STANDARD.hint(settings.wcag_version)}
           value={settings.axe_level}
           onChange={(axe_level) => update({ axe_level })}
           options={[
@@ -43,27 +34,26 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           ]}
         />
         <PillGroup
-          name="scan-engine"
-          label={ENGINE.label}
-          hint={alfaReason}
-          value={settings.scan_engine}
-          onChange={(scan_engine) => {
-            const patch: Partial<ScanSettings> = { scan_engine };
-            // Alfa alone cannot re-check revealed content; axe or Both
-            // cannot run without a rendered page.
-            if (scan_engine === "alfa") patch.skip_interaction = true;
-            else if (settings.static_only) patch.static_only = false;
-            update(patch);
-          }}
+          name="wcag-version"
+          label={WCAG_VERSION.label}
+          hint={WCAG_VERSION.hint}
+          value={settings.wcag_version}
+          onChange={(wcag_version) => update({ wcag_version })}
           options={[
-            { value: "axe", label: ENGINE.axe.label, hint: ENGINE.axe.hint },
-            { value: "alfa", label: ENGINE.alfa.label, hint: ENGINE.alfa.hint, disabled: alfaOff },
-            { value: "both", label: ENGINE.both.label, hint: ENGINE.both.hint, disabled: alfaOff },
+            { value: "2.1", label: "2.1" },
+            { value: "2.2", label: "2.2" },
           ]}
         />
       </div>
 
-      <div className="-mx-2 grid gap-x-4 border-t border-border pt-4 sm:grid-cols-2">
+      <SwitchList>
+        <SwitchRow
+          checked={switchOn(settings, "click_through")}
+          onChange={(on) => update(switchPatch(settings, "click_through", on))}
+          disabled={clickThroughBlocked !== null}
+          label={SWITCHES.click_through.label}
+          hint={clickThroughBlocked ?? SWITCHES.click_through.hint}
+        />
         <SwitchRow
           checked={switchOn(settings, "keyboard")}
           onChange={(on) => update(switchPatch(settings, "keyboard", on))}
@@ -87,15 +77,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           label={SWITCHES.responsive.label}
           hint={rendered ? SWITCHES.responsive.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
-      </div>
-
-      <div className="-mx-2 border-t border-border pt-4">
-        <SearchSettings
-          value={settings.search}
-          onChange={(search) => update({ search })}
-          disabled={settings.static_only || settings.scan_engine === "alfa"}
-        />
-      </div>
+      </SwitchList>
     </SettingsGroup>
   );
 }

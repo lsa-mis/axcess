@@ -16,7 +16,7 @@ playwright_async = pytest.importorskip("playwright.async_api")
 
 DESKTOP_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "axcess/0.1.0 Chrome/140.0.0.0 Electron/43.4.0 Safari/537.36"
+    "axcess/0.60.0 Chrome/140.0.0.0 Electron/43.4.0 Safari/537.36"
 )
 # Longer than the hook's gap between gestures, so the next wheel starts anew.
 GESTURE_GAP_MS = 400
@@ -33,7 +33,7 @@ async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues_url = page.url
     table = page.get_by_role("table", name="Accessibility issues")
-    await table.get_by_role("rowheader").first.get_by_role("link").click()
+    await table.get_by_role("rowheader").get_by_role("link").first.click()
     await page.wait_for_url("**/issues/**")
     await page.get_by_role("heading", level=1).wait_for()
     # Over the page title: nothing there scrolls sideways.

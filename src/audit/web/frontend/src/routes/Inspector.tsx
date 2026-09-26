@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { serverDate } from "../lib/serverTime";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
-import { Card, EmptyState, ExternalLinkButton, LinkButton, pageEvidencePath, Select } from "../components/ui";
+import {
+  Button,
+  Card,
+  Disclosure,
+  EmptyState,
+  ExternalLinkButton,
+  LinkButton,
+  pageEvidencePath,
+  Select,
+} from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 type TabId = "page" | "dom";
@@ -368,6 +378,25 @@ export default function InspectorRoute() {
     return counts;
   }, [currentFindings]);
 
+  /**
+   * The page states other than the one on screen that hold occurrences, for
+   * the line under the picker: page load first, then each state in the
+   * picker's order. `key` is "" for page load, as in the picker.
+   */
+  const elsewhere = useMemo(() => {
+    const active = data?.render.state_key ?? null;
+    const out: { key: string; label: string; count: number }[] = [];
+    if (active && loadStateCount > 0) out.push({ key: "", label: "At page load", count: loadStateCount });
+    for (const state of offeredStates) {
+      const count = occurrencesByState.get(state.state_key) ?? 0;
+      if (count > 0 && state.state_key !== active) {
+        out.push({ key: state.state_key, label: `After clicking ${clickChain(state)}`, count });
+      }
+    }
+    return out;
+  }, [data?.render.state_key, loadStateCount, offeredStates, occurrencesByState]);
+  const elsewhereCount = elsewhere.reduce((total, state) => total + state.count, 0);
+
   const scopedTargets = useMemo(
     () => targets.filter((target) => target.stateKey === activeStateKey),
     [targets, activeStateKey],
@@ -497,10 +526,15 @@ export default function InspectorRoute() {
       try {
         const doc = frameRef.current?.contentDocument;
         if (doc) {
-          let el: Element | null = null;
+          // The first outlined element in document order, so the view and
+          // "Flagged element 1 of N" agree; the targets themselves when the
+          // highlights are hidden.
+          const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
+          marks.forEach((mark, i) => markCurrent(mark, i === 0));
+          let el: Element | null = marks[0] ?? null;
           for (const t of scopedTargets) {
-            el = findTargetElement(doc, t);
             if (el) break;
+            el = findTargetElement(doc, t);
           }
           const target = el as HTMLElement | null;
           if (!target?.scrollIntoView) return;
@@ -515,6 +549,26 @@ export default function InspectorRoute() {
     };
     tryScroll();
   }, [scopedTargets]);
+
+  // Which outlined element the reader is on, for Previous / Next in the
+  // saved copy, as the Page code (DOM) tab has. Back to the first whenever the
+  // frame's document changes.
+  const [pageMark, setPageMark] = useState(0);
+  useEffect(() => setPageMark(0), [srcDoc]);
+  const goToPageMark = (index: number) => {
+    const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
+    setPageMark(bounded);
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (!doc) return;
+      const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
+      marks.forEach((mark, i) => markCurrent(mark, i === bounded));
+      const target = marks[bounded];
+      if (target) keepCentered(target);
+    } catch {
+      // Opaque document: the outlines are baked in, only the stepping is lost.
+    }
+  };
 
   // The Loaded DOM tab locates the flagged elements in its own inert parse of
   // the capture and reports how many it found; the count feeds the header line
@@ -607,7 +661,7 @@ export default function InspectorRoute() {
               className="break-all text-fg-subtle"
               title={
                 pageInfo.captured_at
-                  ? `Saved ${new Date(pageInfo.captured_at).toLocaleString()}`
+                  ? `Saved ${serverDate(pageInfo.captured_at).toLocaleString()}`
                   : undefined
               }
             >
@@ -675,9 +729,7 @@ export default function InspectorRoute() {
             options={[
               {
                 value: "",
-                label: `At page load${
-                  loadStateCount > 0 ? ` (${loadStateCount})` : ""
-                }`,
+                label: `At page load${occurrencesHere(loadStateCount)}`,
                 badge: issueOnlyAfterClicks ? (
                   <IssueNotHereChip />
                 ) : (
@@ -690,13 +742,9 @@ export default function InspectorRoute() {
                 // nested state by hand means repeating every step. The count
                 // says where this issue actually is, so the reviewer picks a
                 // state instead of trying them.
-                const chain =
-                  state.path_labels.length > 0
-                    ? state.path_labels.map((name) => `“${name}”`).join(" → ")
-                    : `“${state.revealed_by}”`;
                 return {
                   value: state.state_key,
-                  label: `After clicking ${chain}${count > 0 ? ` (${count})` : ""}`,
+                  label: `After clicking ${clickChain(state)}${occurrencesHere(count)}`,
                   badge: <MissingChip count={missingFor(state.state_key)} />,
                 };
               }),
@@ -719,6 +767,35 @@ export default function InspectorRoute() {
             )
           )}
         </div>
+      )}
+
+      {/* The picker shows one page state at a time, so occurrences in the
+          others were out of sight: nothing said a click had revealed more.
+          This line counts them and links to each state that holds some. */}
+      {elsewhere.length > 0 && (
+        <nav
+          aria-label="Other page states with occurrences"
+          className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xs border border-umich-blue/30 bg-umich-blue/5 px-3 py-2 text-sm"
+        >
+          <Layers className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+          <span className="font-semibold text-fg">
+            {elsewhereCount.toLocaleString()} more occurrence{elsewhereCount === 1 ? "" : "s"}{" "}
+            {activeStateKey
+              ? `in ${elsewhere.length === 1 ? "another page state" : "other page states"}:`
+              : `${elsewhereCount === 1 ? "appears" : "appear"} only after clicking:`}
+          </span>
+          {elsewhere.map((state) => (
+            <Link
+              key={state.key || "load"}
+              to={stateHref(state.key || null)}
+              replace
+              className="inline-flex min-h-target items-center rounded-full border border-umich-blue/40 bg-surface px-3 text-xs font-semibold text-umich-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              {state.label}
+              {occurrencesHere(state.count)}
+            </Link>
+          ))}
+        </nav>
       )}
 
       <Tabs
@@ -749,38 +826,6 @@ export default function InspectorRoute() {
       >
         {render.ok && render.dom_html ? (
           <div>
-            {scopedFindings.length > 0 && (
-              <div className="border-b border-border bg-surface-muted/40 px-3 py-2">
-                <p className="text-2xs font-semibold text-fg-subtle">
-                  Evidence from the scan
-                </p>
-                <ul className="mt-1.5 space-y-2">
-                  {scopedFindings.slice(0, 3).map((f) => (
-                    <li key={f.id} className="text-xs">
-                      <p className="font-semibold text-fg">
-                        {f.help}
-                        <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
-                      </p>
-                      {f.target_selector && (
-                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
-                          {f.target_selector}
-                        </code>
-                      )}
-                      {f.html_snippet && (
-                        <pre className="mt-1 max-h-24 overflow-auto rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
-                          {f.html_snippet}
-                        </pre>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {scopedFindings.length > 3 && (
-                  <p className="mt-1 text-2xs text-fg-muted">
-                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this page state.
-                  </p>
-                )}
-              </div>
-            )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-muted/40 px-3 py-2">
               <span className="text-xs font-semibold text-fg-subtle">
                 {highlightPending
@@ -789,6 +834,46 @@ export default function InspectorRoute() {
                     ? `${highlightedCount} place${highlightedCount === 1 ? "" : "s"} highlighted`
                     : copyName}
               </span>
+              {!highlightPending && showHighlights && highlightedCount > 0 && (
+                // Previous / Next step through the outlined elements in
+                // document order, as in the Page code (DOM) tab; the count between
+                // them says where you are.
+                <span
+                  role="group"
+                  aria-label="Flagged elements"
+                  className="ml-auto inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
+                >
+                  <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
+                    {highlightedCount === 1
+                      ? "1 flagged element"
+                      : `Flagged element ${pageMark + 1} of ${highlightedCount}`}
+                  </span>
+                  {highlightedCount > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-target"
+                      aria-label="Previous flagged element"
+                      disabled={pageMark === 0}
+                      onClick={() => goToPageMark(pageMark - 1)}
+                    >
+                      <ChevronUp className="h-4 w-4" aria-hidden />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-target"
+                    aria-label={highlightedCount > 1 ? "Next flagged element" : "Jump to flagged element"}
+                    disabled={highlightedCount > 1 && pageMark === highlightedCount - 1}
+                    onClick={() => goToPageMark(highlightedCount > 1 ? pageMark + 1 : 0)}
+                  >
+                    <ChevronDown className="h-4 w-4" aria-hidden />
+                  </Button>
+                </span>
+              )}
               {hasTarget && (
                 <button
                   type="button"
@@ -821,8 +906,9 @@ export default function InspectorRoute() {
               )}
               {!highlightPending && showHighlights && highlightedCount > 0 && (
                 <span>
-                  The red outline marks the flagged element
-                  {highlightedCount > 1 ? ` (${highlightedCount} on this page)` : ""}.
+                  {highlightedCount > 1
+                    ? `Red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a thicker blue outline on yellow.`
+                    : "The red outline marks the flagged element."}
                 </span>
               )}
               {!highlightPending &&
@@ -883,6 +969,42 @@ export default function InspectorRoute() {
               run here. So if the site would only show a flagged element with
               JavaScript, Axcess makes it visible to highlight it.
             </p>
+            {/* Below the page and closed: above it, the list pushed the page
+                the reviewer came to see out of view. */}
+            {scopedFindings.length > 0 && (
+              <Disclosure
+                id="inspect-evidence"
+                title="Evidence from the scan"
+                meta={`${scopedFindings.length} occurrence${scopedFindings.length === 1 ? "" : "s"}`}
+                className="rounded-none border-0 border-t"
+              >
+                <ul className="space-y-2">
+                  {scopedFindings.slice(0, 3).map((f) => (
+                    <li key={f.id} className="text-xs">
+                      <p className="font-semibold text-fg">
+                        {f.help}
+                        <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
+                      </p>
+                      {f.target_selector && (
+                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
+                          {f.target_selector}
+                        </code>
+                      )}
+                      {f.html_snippet && (
+                        <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
+                          {f.html_snippet}
+                        </pre>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {scopedFindings.length > 3 && (
+                  <p className="mt-1 text-2xs text-fg-muted">
+                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this page state.
+                  </p>
+                )}
+              </Disclosure>
+            )}
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
@@ -1183,7 +1305,7 @@ function markTargets(doc: Document, targets: Target[]): number {
   locateByWalk(doc, unresolved, found);
   for (const el of found) {
     if (el instanceof HTMLElement) {
-      markElement(el, "#be001e", "rgba(190,0,30,0.12)");
+      markElement(el, FLAGGED_OUTLINE, FLAGGED_FILL);
     }
   }
   return found.size;
@@ -1319,8 +1441,63 @@ function truncatedSnippetMatches(raw: string, needle: string): boolean {
   return normalizeWhitespace(raw).startsWith(needle);
 }
 
+/**
+ * How many of this issue's occurrences a page state holds, in words:
+ * ": 19 occurrences". A bare "(19)" left the reader to guess what was
+ * counted. Nothing is added when the page state holds none.
+ */
+/**
+ * The controls clicked to reach a page state, in order: "“Menu” → “Help”".
+ * The whole chain, not just the last control, since reaching a nested state
+ * by hand means repeating every step. A control's name is its text, which
+ * for a card can run on ("Fellowships · FundedTeach For Nepal…"), so each
+ * name is cut at a word near 40 characters.
+ */
+function clickChain(state: { path_labels: string[]; revealed_by: string }): string {
+  const names = state.path_labels.length > 0 ? state.path_labels : [state.revealed_by];
+  return names.map((name) => `“${shortName(name)}”`).join(" → ");
+}
+
+function shortName(name: string, max = 40): string {
+  const text = name.replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s·,.;:–-]+$/, "")}…`;
+}
+
+function occurrencesHere(count: number): string {
+  if (count === 0) return "";
+  return `: ${count.toLocaleString()} occurrence${count === 1 ? "" : "s"}`;
+}
+
+/** The class every outlined element carries, so the frame can be walked in order. */
+const HIGHLIGHT_CLASS = "axcess-inspect-highlight";
+
+/** Every flagged element: a red outline over a faint red tint. */
+const FLAGGED_OUTLINE = "#be001e";
+const FLAGGED_FILL = "rgba(190,0,30,0.12)";
+/**
+ * The one the reader stepped to: UMich blue on a maize halo and fill. A
+ * thicker red ring on red was too close to tell apart; blue against yellow
+ * stays distinct for red- and green-weak eyes, and the thicker outline and
+ * the halo differ in shape too, so colour is not the only cue.
+ */
+const CURRENT_OUTLINE = "#00274c";
+const CURRENT_HALO = "#ffcb05";
+const CURRENT_FILL = "rgba(255,203,5,0.3)";
+
+/** Set the element the reader is on apart from the other flagged ones, or put it back. */
+function markCurrent(el: HTMLElement, current: boolean): void {
+  el.style.setProperty("outline-color", current ? CURRENT_OUTLINE : FLAGGED_OUTLINE, "important");
+  el.style.setProperty("outline-width", current ? "4px" : "3px", "important");
+  el.style.setProperty("outline-offset", current ? "-4px" : "-3px", "important");
+  el.style.setProperty("box-shadow", current ? `0 0 0 5px ${CURRENT_HALO}` : "none", "important");
+  el.style.setProperty("background-color", current ? CURRENT_FILL : FLAGGED_FILL, "important");
+}
+
 function markElement(el: HTMLElement, outlineColor: string, bg: string): void {
-  el.classList.add("axcess-inspect-highlight");
+  el.classList.add(HIGHLIGHT_CLASS);
   el.style.setProperty("outline", `3px solid ${outlineColor}`, "important");
   // Inset, not outset. A flagged element that fills an `overflow: hidden`
   // ancestor (the ubiquitous image-tile pattern: `w-full h-full` inside a

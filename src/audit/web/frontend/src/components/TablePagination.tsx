@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui";
+import { useTablePageSize } from "../hooks/usePreferences";
 
-/**
- * Every table in the app shows at most this many rows at a time. A long
- * table was one long scroll: "Pages with this issue" alone could list 1,200
- * pages, and the reader lost the column headers and their place in it.
+/*
+ * Every table in the app shows at most Settings > Rows per page rows at a
+ * time (10 by default). A long table was one long scroll: "Pages with this
+ * issue" alone could list 1,200 pages, and the reader lost the column
+ * headers and their place in it.
  */
-export const TABLE_PAGE_SIZE = 10;
 
 /**
  * The rows of `rows` on the current page, and the page state for
@@ -33,10 +35,16 @@ export function usePagedRows<T>(
   pages: number;
   total: number;
   setPage: (page: number) => void;
+  /** Rows per page, from Settings; row `i` on this page is number `(page - 1) * pageSize + i + 1`. */
+  pageSize: number;
   /** Spread on the element around the table: keeps its height from page to page. */
   hold: { ref: (node: HTMLElement | null) => void; style: { minHeight?: number } };
+  /** DOM id of this table's pager, unique even when a view draws the same table twice. */
+  pagerId: string;
 } {
   const [params, setParams] = useSearchParams();
+  const pageSize = useTablePageSize();
+  const pagerId = `pager-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const [localPage, setLocalPage] = useState(1);
   // The row set the current page belongs to. When the rows change because a
   // filter or the sort did, the table is on page 1 in that same render, not
@@ -68,7 +76,7 @@ export function usePagedRows<T>(
   }, [restart, local, param, params, setParams]);
 
   const total = rows.length;
-  const pages = Math.max(1, Math.ceil(total / TABLE_PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   const requested = restart ? 1 : local ? localPage : Number(params.get(param) ?? "1");
   const page = Math.min(Math.max(1, Number.isFinite(requested) ? Math.floor(requested) : 1), pages);
 
@@ -105,21 +113,58 @@ export function usePagedRows<T>(
     if (height > held) setHeld(height);
   }, [page, pages, rows, held]);
 
-  const start = (page - 1) * TABLE_PAGE_SIZE;
+  const start = (page - 1) * pageSize;
   return {
-    pageRows: rows.slice(start, start + TABLE_PAGE_SIZE),
+    pageRows: rows.slice(start, start + pageSize),
     page,
     pages,
     total,
     setPage,
+    pageSize,
     hold: { ref, style: pages > 1 && held ? { minHeight: held } : {} },
+    pagerId,
   };
 }
 
 /**
- * Previous/Next under a table, with where you are in words. Rendered only
- * when there is more than one page. The status line is announced politely,
- * so a screen reader hears the new range after a page turn.
+ * The page buttons to show: every page when there are few, otherwise the
+ * first, the last, and the current page with its neighbours, with a gap
+ * (`null`) wherever pages are skipped.
+ */
+export function pageItems(page: number, pages: number): (number | null)[] {
+  if (pages <= 7) return Array.from({ length: pages }, (_, index) => index + 1);
+  const start = Math.max(2, Math.min(page - 1, pages - 4));
+  const end = Math.min(pages - 1, Math.max(page + 1, 5));
+  const items: (number | null)[] = [1];
+  if (start > 2) items.push(null);
+  for (let n = start; n <= end; n += 1) items.push(n);
+  if (end < pages - 1) items.push(null);
+  items.push(pages);
+  return items;
+}
+
+/**
+ * Previous and Next are arrows only; their names say what they do ("Previous
+ * page of issues"). At either end the arrow is ``aria-disabled`` rather than
+ * ``disabled``: a native disabled button drops keyboard focus to the page
+ * the moment the reader reaches page 1, while this keeps focus where it was
+ * and still tells assistive technology the control does nothing. It has to
+ * *look* unavailable too, which the shared Button does not do for
+ * ``aria-disabled``, so the pager adds that here.
+ */
+const ARROW =
+  "min-w-target justify-center px-0 aria-disabled:cursor-not-allowed aria-disabled:border-border aria-disabled:bg-surface-muted aria-disabled:text-fg-subtle aria-disabled:opacity-60 aria-disabled:shadow-none aria-disabled:hover:border-border aria-disabled:hover:bg-surface-muted aria-disabled:active:translate-y-0";
+
+/**
+ * The pager in a table's top bar (`TableBar` in ./table/Table): a previous
+ * arrow, a button per page (with gaps once there are many), a next arrow,
+ * and where you are in words. It sits above the rows, so a reader learns
+ * the list continues before reading it, and the arrows stay in place as
+ * pages of different heights come and go. Rendered only when there is more
+ * than one page. The numbered buttons show at a glance that
+ * the list continues and how far; the current one is filled and carries
+ * `aria-current`. The status line is announced politely, so a screen
+ * reader hears the new range after a page turn.
  */
 export function TablePagination({
   label,
@@ -128,6 +173,9 @@ export function TablePagination({
   pages,
   total,
   setPage,
+  pageSize,
+  pagerId,
+  disabled = false,
 }: {
   hold?: unknown;
   /** The table's name, for the controls' accessible names ("Issues"). */
@@ -138,41 +186,73 @@ export function TablePagination({
   pages: number;
   total: number;
   setPage: (page: number) => void;
+  pageSize: number;
+  pagerId: string;
+  /** Hold every control while a server page is loading. */
+  disabled?: boolean;
 }) {
   if (pages <= 1) return null;
-  const first = (page - 1) * TABLE_PAGE_SIZE + 1;
-  const last = Math.min(page * TABLE_PAGE_SIZE, total);
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(page * pageSize, total);
+  const name = label.toLowerCase();
+  const go = (next: number) => {
+    if (!disabled && next >= 1 && next <= pages && next !== page) setPage(next);
+  };
   return (
     <nav
+      id={pagerId}
+      tabIndex={-1}
       aria-label={`${label}: page controls`}
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"
+      className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2 rounded-xs focus:outline-none focus-visible:shadow-focus"
     >
       <p role="status" aria-live="polite" aria-atomic="true" className="text-sm text-fg-muted">
         Showing {first.toLocaleString()}–{last.toLocaleString()} of {total.toLocaleString()} {noun} · Page{" "}
         {page} of {pages}
       </p>
-      <div className="flex gap-2">
-        <Button
-          variant="secondary"
-          aria-label={`Previous page of ${label.toLowerCase()}`}
-          aria-disabled={page === 1}
-          onClick={() => {
-            if (page > 1) setPage(page - 1);
-          }}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="secondary"
-          aria-label={`Next page of ${label.toLowerCase()}`}
-          aria-disabled={page === pages}
-          onClick={() => {
-            if (page < pages) setPage(page + 1);
-          }}
-        >
-          Next
-        </Button>
-      </div>
+      <ul className="flex flex-wrap items-center gap-2">
+        <li>
+          <Button
+            variant="secondary"
+            className={ARROW}
+            aria-label={`Previous page of ${name}`}
+            aria-disabled={disabled || page === 1}
+            onClick={() => go(page - 1)}
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </Button>
+        </li>
+        {pageItems(page, pages).map((item, index) =>
+          item === null ? (
+            <li key={`gap-${index}`} className="px-1 text-fg-muted" aria-hidden>
+              …
+            </li>
+          ) : (
+            <li key={item}>
+              <Button
+                variant={item === page ? "primary" : "secondary"}
+                className="min-w-target justify-center px-3 tabular-nums"
+                aria-label={`Page ${item} of ${name}`}
+                aria-current={item === page ? "page" : undefined}
+                aria-disabled={disabled || undefined}
+                onClick={() => go(item)}
+              >
+                {item}
+              </Button>
+            </li>
+          ),
+        )}
+        <li>
+          <Button
+            variant="secondary"
+            className={ARROW}
+            aria-label={`Next page of ${name}`}
+            aria-disabled={disabled || page === pages}
+            onClick={() => go(page + 1)}
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </Button>
+        </li>
+      </ul>
     </nav>
   );
 }

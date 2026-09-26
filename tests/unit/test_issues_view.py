@@ -803,3 +803,119 @@ def test_same_markup_under_a_different_selector_is_not_merged(
 
     assert row.occurrence_count == 2
     assert row.repeat_page_count == 1
+
+
+# --------------------------------------------------------------------------
+# Finding types (WCAG, Click-Through, Alt Text).
+# --------------------------------------------------------------------------
+
+
+def _mark_revealed(conn: sqlite3.Connection, rule_id: str, *, first_only: bool = False) -> None:
+    """Record findings as reached by Click-Through (operating a control)."""
+    ids = [
+        int(row[0])
+        for row in conn.execute(
+            "SELECT id FROM page_a11y_findings WHERE rule_id = ? ORDER BY id", (rule_id,)
+        )
+    ]
+    for finding_id in ids[:1] if first_only else ids:
+        conn.execute(
+            "UPDATE page_a11y_findings SET revealed_by = 'Open menu', "
+            "revealed_state_key = 'nav|button|Open menu' WHERE id = ?",
+            (finding_id,),
+        )
+
+
+def test_finding_types_default_to_wcag_and_alt_text(tmp_db: sqlite3.Connection) -> None:
+    """Load-state DOM findings are WCAG; image findings are Alt Text."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    for row in rows:
+        if row.pipeline == "image":
+            assert row.finding_types == ("alt_text",)
+        else:
+            assert row.finding_types == ("wcag",)
+        assert row.click_through_occurrence_count == 0
+
+
+def test_click_through_only_group_is_click_through(tmp_db: sqlite3.Connection) -> None:
+    """Every occurrence behind a control: the group is Click-Through alone."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "image-alt")
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.issue_key == "axe:image-alt")
+    assert row.finding_types == ("click_through",)
+    assert row.click_through_occurrence_count == row.occurrence_count == 1
+
+
+def test_mixed_group_is_both_wcag_and_click_through_without_splitting(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A rule seen at load and behind a click stays one row, of both types.
+
+    Splitting it would change the issue key, statuses, and cross-scan
+    comparison; the row says how many occurrences needed a click instead.
+    """
+    scan_id = _seed_two_pipelines(tmp_db)
+    before = {r.issue_key for r in issues_mod.list_issues(tmp_db, scan_id)}
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    assert {r.issue_key for r in rows} == before
+    contrast = next(r for r in rows if r.issue_key == "axe:color-contrast")
+    assert contrast.finding_types == ("wcag", "click_through")
+    assert contrast.occurrence_count == 2
+    assert contrast.click_through_occurrence_count == 1
+
+
+def test_finding_type_filter_and_breakdown(tmp_db: sqlite3.Connection) -> None:
+    """The filter matches any of a row's types; a mixed row counts under each."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    counts = issues_mod.finding_type_breakdown(rows)
+    assert counts == {"wcag": 2, "click_through": 1, "alt_text": 1}
+
+    click = issues_mod.list_issues(tmp_db, scan_id, finding_type="click_through")
+    assert [r.issue_key for r in click] == ["axe:color-contrast"]
+    wcag = {r.issue_key for r in issues_mod.list_issues(tmp_db, scan_id, finding_type="wcag")}
+    assert wcag == {"axe:color-contrast", "axe:image-alt"}
+    alt = issues_mod.list_issues(tmp_db, scan_id, finding_type="alt_text")
+    assert alt and all(r.pipeline == "image" for r in alt)
+    # No filter, no narrowing.
+    assert len(issues_mod.list_issues(tmp_db, scan_id, finding_type=None)) == len(rows)
+
+
+def test_lane_and_finding_type_filters_take_several_values(tmp_db: sqlite3.Connection) -> None:
+    """A list widens a filter: a row passes on any of the values, as ``conformance`` does."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    types = ["click_through", "alt_text"]
+    several = issues_mod.list_issues(tmp_db, scan_id, finding_type=types)
+    assert {r.issue_key for r in several} == {
+        r.issue_key for r in rows if set(r.finding_types) & set(types)
+    }
+    assert "axe:image-alt" not in {r.issue_key for r in several}
+
+    lanes = {r.review_lane for r in rows}
+    assert len(lanes) > 1, lanes
+    kept = sorted(lanes)[:-1]
+    by_lane = issues_mod.list_issues(tmp_db, scan_id, review_lane=kept)
+    assert {r.issue_key for r in by_lane} == {r.issue_key for r in rows if r.review_lane in kept}
+    # A single string still reads as one value, not as its characters.
+    one = issues_mod.list_issues(tmp_db, scan_id, review_lane=kept[0])
+    assert {r.review_lane for r in one} == {kept[0]}
+    # An empty list is no filter.
+    assert len(issues_mod.list_issues(tmp_db, scan_id, finding_type=[])) == len(rows)
+
+
+def test_protected_image_leads_are_alt_text() -> None:
+    """Protected image-of-text leads sit beside DOM findings but are image evidence."""
+    assert issues_mod._dom_finding_types("protected_image", 3, 0) == ("alt_text",)
+    assert issues_mod._dom_finding_types("axe", 3, 0) == ("wcag",)
+    assert issues_mod._dom_finding_types("axe", 3, 3) == ("click_through",)
+    assert issues_mod._dom_finding_types("alfa", 3, 1) == ("wcag", "click_through")

@@ -106,7 +106,7 @@ its rule engine. Under Advanced settings you can:
 
 - choose axe-core, Siteimprove Alfa, or both as the rule engine (Alfa must be
   installed);
-- use **Fast crawl without a browser** with Alfa as the only engine;
+- use **Fast scan without a browser** with Alfa as the only engine;
 - show the scanning browser window;
 - turn the image and click-through layers on or off.
 
@@ -117,9 +117,9 @@ that a feature was selected.
 
 Axcess supports two manual sign-in models without collecting credentials:
 
-- **[Login scan](./glossary.md#sign-in-scan)** (the **Site with a login or 2FA**
-  tab). The browser window opens on the Axcess computer, and the signed-in
-  session is held only in memory.
+- **[Sign-in scan](./glossary.md#sign-in-scan)** (the **Site with a sign-in or
+  two-step sign-in (2FA)** tab). The browser window opens on the Axcess
+  computer, and the signed-in session is held only in memory.
 - **Managed protected scan:** an identity-gated, scan-bound companion model
   with stricter scope, retention, encryption, and permission controls.
 

@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { parseServerTime } from "../lib/serverTime";
 import { createElement, forwardRef, useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
@@ -17,6 +18,26 @@ export function StatusChip({ value }: { value: FindingStatus }) {
   return (
     <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted">
       {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/**
+ * A report's number as a small tinted tag, "Report #6", the form
+ * docs/plain-language.md uses for a numbered report. The word says what is
+ * numbered; a bare "#6" did not. The tint is translucent so the tag still
+ * shows on a hovered row or link; the transparent border draws in forced
+ * colors.
+ */
+export function ScanTag({ id, className }: { id: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded-2xs border border-transparent bg-fg/[0.08] px-1.5 font-sans text-2xs font-semibold tabular-nums",
+        className,
+      )}
+    >
+      Report #{id}
     </span>
   );
 }
@@ -279,6 +300,7 @@ export function LinkButton({
 }: LinkButtonProps) {
   return (
     <Link
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -320,6 +342,7 @@ export function DownloadLink({
 }: DownloadLinkProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -366,6 +389,7 @@ export function ExternalLinkButton({
 }: ExternalLinkButtonProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -404,6 +428,8 @@ export function Disclosure({
   title,
   headingLevel = 2,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
   icon,
   meta,
   className,
@@ -413,6 +439,13 @@ export function Disclosure({
   title: string;
   headingLevel?: 2 | 3;
   defaultOpen?: boolean;
+  /**
+   * Controlled mode, for a parent that must open the panel itself (a form
+   * whose error alert links to a field inside it). Omit both to let the
+   * disclosure keep its own state.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   icon?: ReactNode;
   /**
    * A short status shown at the right end of the header row ("3 of 4 on").
@@ -423,7 +456,13 @@ export function Disclosure({
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (update: (value: boolean) => boolean) => {
+    const next = update(open);
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const buttonId = `${id}-button`;
   const panelId = `${id}-panel`;
 
@@ -650,7 +689,7 @@ export function Checkbox({
  *   • Primary affordance: page title (or URL when title is missing) is the
  *     link, and it opens the IN-APP page/DOM inspector, it no longer sends
  *     the reviewer to the live site in a new tab. The inspector re-renders
- *     the page and (when ``selector``/``issue`` is supplied) circles the
+ *     the page and (when ``selector``/``issue`` is supplied) outlines the
  *     flagged element, and it shows the loaded DOM.
  *   • Secondary affordances (small, muted): "open live page ↗" for the rare
  *     case the reviewer wants the real site, and "stored evidence" for the
@@ -1051,7 +1090,7 @@ export function PageLink({
   pageTitle?: string | null;
   /** Show the raw URL as a microcopy line below the title. */
   showUrlBelow?: boolean;
-  /** Target selector to circle on the inspected page (when known directly). */
+  /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;
@@ -1162,7 +1201,7 @@ export function PageLink({
  */
 export function relativeTime(iso: string | null): string {
   if (!iso) return "Not recorded";
-  const ts = Date.parse(iso);
+  const ts = parseServerTime(iso);
   if (Number.isNaN(ts)) return "Not recorded";
   const ago = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"} ago`;
   const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));

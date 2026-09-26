@@ -1,7 +1,7 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
+  Info,
   LayoutDashboard,
-  ListChecks,
   Menu,
   MessageSquarePlus,
   PanelLeftClose,
@@ -9,9 +9,10 @@ import {
   Plus,
   Radar,
   Search,
+  Settings,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
 import { Button, LinkButton } from "./ui";
@@ -19,6 +20,9 @@ import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
 import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
+import { setPreference, usePreferences } from "../hooks/usePreferences";
+import PreferenceEffects from "./PreferenceEffects";
+import ShortcutsDialog from "./ShortcutsDialog";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -45,12 +49,7 @@ interface NavItem {
  * still lists only places.
  */
 const NAV: NavItem[] = [
-  {
-    to: "/",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    isActive: (p) => p === "/",
-  },
+  // The Dashboard is hidden for now; "/" redirects to Reports.
   {
     // ``Scans`` highlights for any /scans/* route INCLUDING the new-scan
     // form (it's contextually part of the scans section now that it has
@@ -63,22 +62,21 @@ const NAV: NavItem[] = [
     isActive: (p) =>
       p === "/scans" || p.startsWith("/scans/") || p.startsWith("/findings/"),
   },
-  {
-    to: "/tracking",
-    label: "Product roadmap",
-    icon: ListChecks,
-    isActive: (p) => p === "/tracking",
-  },
+  // The Product roadmap (/tracking) is hidden from the nav for now; the
+  // route still resolves for anyone with the direct link.
 ];
 
-/** Remember the sidebar collapse across sessions; fail soft when storage is
- * unavailable (private mode / test environment). */
-function readSidebarPref(): boolean {
-  try {
-    return localStorage.getItem("axcess.sidebar.collapsed") === "1";
-  } catch {
-    return false;
-  }
+/** Alt+1..3, in this order (Settings > Keyboard lists the same). */
+const PLACE_SHORTCUTS: Record<string, string> = {
+  Digit1: "/scans",
+  Digit2: "/about",
+  Digit3: "/settings",
+};
+
+/** A single-character shortcut must never fire while someone is typing. */
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
 /**
@@ -89,8 +87,13 @@ function readSidebarPref(): boolean {
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarPref);
+  const prefs = usePreferences();
+  const sidebarCollapsed = prefs.sidebar === "collapsed";
+  const shortcutsOn = prefs.shortcuts === "on";
+  const navigate = useNavigate();
   const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [sidebarNote, setSidebarNote] = useState("");
   const previousPath = useRef(pathname);
   const routeLabel = routeTitle(pathname);
   const reportMatch = reportRouteMatch(pathname);
@@ -99,30 +102,59 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // gesture of its own; a no-op in a browser tab, which does.
   useSwipeNavigation();
 
-  // Cmd/Ctrl+K opens the search-everything palette anywhere in the app.
+  // The rail's state is the Settings > Sidebar preference, so the toggle here
+  // and the setting there are one value.
+  const toggleSidebar = useCallback(
+    () => setPreference("sidebar", sidebarCollapsed ? "open" : "collapsed"),
+    [sidebarCollapsed],
+  );
+
+  // Cmd/Ctrl+K opens the search-everything palette anywhere in the app;
+  // Cmd/Ctrl+B shows or hides the sidebar; Alt+1..3 go to the three places
+  // and "?" lists them. All of it can be turned off in Settings, for readers
+  // whose assistive tech wants the keys.
   useEffect(() => {
+    if (!shortcutsOn) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && (event.key === "k" || event.key === "K")) {
         event.preventDefault();
         setCommandOpen((was) => !was);
+        return;
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        (event.key === "b" || event.key === "B")
+      ) {
+        // Below `md` the sidebar is not drawn at all (the top bar's menu
+        // stands in for it), so the key would flip an invisible setting.
+        if (!window.matchMedia("(min-width: 768px)").matches) return;
+        event.preventDefault();
+        toggleSidebar();
+        // The button says its state through aria-expanded, but a shortcut
+        // leaves focus where it was, so nothing else would tell a screen
+        // reader user the key did anything.
+        setSidebarNote(sidebarCollapsed ? "Sidebar shown" : "Sidebar hidden");
+        return;
+      }
+      if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+        // `code`, not `key`: on a Mac, Alt+1 types "¡".
+        const to = PLACE_SHORTCUTS[event.code];
+        if (to) {
+          event.preventDefault();
+          navigate(to);
+        }
+        return;
+      }
+      if (event.key === "?" && !event.metaKey && !event.ctrlKey && !isTyping(event.target)) {
+        event.preventDefault();
+        setShortcutsOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      try {
-        localStorage.setItem("axcess.sidebar.collapsed", next ? "1" : "0");
-      } catch {
-        // Storage unavailable (private mode / tests), the toggle still works
-        // for the session, it just won't persist.
-      }
-      return next;
-    });
-  };
+  }, [navigate, shortcutsOn, sidebarCollapsed, toggleSidebar]);
 
   useEffect(() => {
     document.title = `${routeLabel} · Axcess`;
@@ -163,6 +195,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
+          toggleShortcut={shortcutsOn}
           onSearch={() => setCommandOpen(true)}
         />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
@@ -183,6 +216,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>
+          <div className="sr-only" role="status">
+            {sidebarNote}
+          </div>
           <main
             id="main"
             tabIndex={-1}
@@ -198,6 +234,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onClose={() => setCommandOpen(false)}
         scanId={reportMatch?.scanId ?? null}
       />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <PreferenceEffects />
     </div>
   );
 }
@@ -215,6 +253,15 @@ const SIDEBAR_TILE = "h-12 w-full px-2";
 const SIDEBAR_ROW =
   "group relative flex min-h-target w-full items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]";
 const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue";
+/**
+ * The current place is a white card, the way Zen marks its selected tab:
+ * lighter than the sidebar, no outline. It was filled blue, which is the New
+ * scan button's colour, so the place you were in read as another button. No
+ * border keeps it apart from the bordered Search button, and the bar on its
+ * edge marks it by shape as well as by colour.
+ */
+const SIDEBAR_ROW_ACTIVE =
+  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue";
 
 /**
  * Search and feedback: reachable from every screen, so they live in the
@@ -286,13 +333,54 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/**
+ * About and Settings are places, but reference ones: they sit at the foot of
+ * the sidebar with feedback rather than among the working sections, so the
+ * nav above stays the places the work happens.
+ */
+const FOOT_PLACES = [
+  { to: "/about", label: "About", name: "About Axcess", icon: Info },
+  { to: "/settings", label: "Settings", name: "Settings", icon: Settings },
+] as const;
+
+function FootLink({
+  place,
+  collapsed,
+  active,
+}: {
+  place: (typeof FOOT_PLACES)[number];
+  collapsed: boolean;
+  active: boolean;
+}) {
+  const Icon = place.icon;
+  return (
+    <Link
+      to={place.to}
+      aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? place.name : undefined}
+      title={collapsed ? place.name : undefined}
+      className={cn(
+        SIDEBAR_ROW,
+        collapsed ? "justify-center px-2" : "px-3",
+        active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
+      )}
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>{place.label}</span>}
+    </Link>
+  );
+}
+
 function Sidebar({
   collapsed,
   onToggle,
+  toggleShortcut,
   onSearch,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** Whether Cmd/Ctrl+B toggles it (keyboard shortcuts are on). */
+  toggleShortcut: boolean;
   onSearch: () => void;
 }) {
   const { pathname } = useLocation();
@@ -303,7 +391,7 @@ function Sidebar({
         // uses the standard foreground ramp rather than the inverse one: at the
         // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
         // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,#F8FAFC_0%,#F1F4F8_52%,#E6EBF2_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,rgb(var(--c-sidebar-1))_0%,rgb(var(--c-sidebar-2))_52%,rgb(var(--c-sidebar-3))_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
         collapsed ? "w-16" : "w-64",
       )}
       aria-label="Primary"
@@ -331,7 +419,11 @@ function Sidebar({
             collapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
           }
           aria-expanded={!collapsed}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-keyshortcuts={toggleShortcut ? "Meta+B Control+B" : undefined}
+          title={
+            (collapsed ? "Expand sidebar" : "Collapse sidebar") +
+            (toggleShortcut ? " (⌘/Ctrl+B)" : "")
+          }
           onClick={onToggle}
           className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted transition-colors hover:bg-umich-blue/10 hover:text-umich-blue"
         >
@@ -369,18 +461,10 @@ function Sidebar({
                   // min-h-target keeps every nav row at 44px for SC 2.5.5,
                   // and the slightly larger icon (h-5) plus base text reads
                   // as a primary surface, not a sub-list of links.
-                  // The current place is a white card, the way Zen marks its
-                  // selected tab: lighter than the sidebar, no outline. It was
-                  // filled blue, which is the New scan button's colour, so the
-                  // place you were in read as another button. No border keeps
-                  // it apart from the bordered Search button, and the bar on
-                  // its edge marks it by shape as well as by colour.
                   className={cn(
                     SIDEBAR_ROW,
                     collapsed ? "justify-center px-2" : "px-3",
-                    active
-                      ? "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue"
-                      : SIDEBAR_ROW_IDLE,
+                    active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -391,8 +475,11 @@ function Sidebar({
           })}
         </ul>
       </nav>
-      <div className={cn("border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
+      <div className={cn("space-y-1 border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
         <FeedbackAction collapsed={collapsed} />
+        {FOOT_PLACES.map((place) => (
+          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to} />
+        ))}
       </div>
     </aside>
   );
@@ -417,7 +504,7 @@ function TopBar({
 }) {
   return (
     <header
-      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
+      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
@@ -459,14 +546,14 @@ function TopBar({
   );
 }
 
-/** The sidebar's stand-in below md: the same places, then the same two actions. */
+/** The sidebar's stand-in below md: the same places, then search, about, settings and feedback. */
 function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => void }) {
   const action =
-    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold text-white no-underline hover:bg-white/10";
+    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold text-fg-inverse no-underline hover:bg-white/10";
   return (
     <div
       id="mobile-primary-nav"
-      className="border-b border-border bg-umich-blue p-2 text-white shadow-card md:hidden"
+      className="border-b border-border bg-umich-blue p-2 text-fg-inverse shadow-card md:hidden"
     >
       <nav aria-label="Primary">
         <ul className="grid grid-cols-3 gap-1">
@@ -481,8 +568,8 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
                   className={cn(
                     "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
                     active
-                      ? "bg-white text-umich-blue"
-                      : "text-white hover:bg-white/10",
+                      ? "bg-surface text-umich-blue"
+                      : "text-fg-inverse hover:bg-white/10",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
@@ -503,6 +590,21 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
           <Search className="h-4 w-4" aria-hidden />
           <span>Search</span>
         </button>
+        {FOOT_PLACES.map((place) => {
+          const Icon = place.icon;
+          const active = pathname === place.to;
+          return (
+            <Link
+              key={place.to}
+              to={place.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(action, active && "bg-surface text-umich-blue hover:bg-surface")}
+            >
+              <Icon className="h-4 w-4" aria-hidden />
+              <span>{place.label}</span>
+            </Link>
+          );
+        })}
         <a
           href={FEEDBACK_FORM_URL}
           target="_blank"
@@ -520,7 +622,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
 
 function routeTitle(pathname: string): string {
   const routes: Array<[RegExp, string]> = [
-    [/^\/$/, "Dashboard"],
+    [/^\/$/, "Reports"],
     [/^\/scans\/?$/, "Reports"],
     [/^\/scans\/new\/?$/, "New scan"],
     [/^\/scans\/protected\/new\/?$/, "New scan"],
@@ -541,12 +643,14 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
     [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
-    [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
+    [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
     // Only running and failed scans render here; a completed report
     // redirects to its issue table.
     [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Image details"],
     [/^\/tracking\/?$/, "Product roadmap"],
+    [/^\/about\/?$/, "About"],
+    [/^\/settings\/?$/, "Settings"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

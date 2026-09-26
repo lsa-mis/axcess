@@ -60,33 +60,33 @@ This audit used multiple detection methods. Each sees different things; together
 | **Bidirectional keyboard-exit probe** | ✅ found issues | WCAG 2.1.2 review leads, both directions must remain blocked. Normal wrapping, two-control cycles, modal containment, and opaque embedded contexts are not counted as traps. | Medium, repeatable browser-observed evidence with exact attempt counts. Manually check for documented or state-specific exit commands before recording a failure. |
 | **Responsive & zoom probe** | n/a | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | Medium, deterministic geometry is useful evidence, but designed truncation and state-specific clipping need an expert decision. |
 | **Live-page focus probe** | n/a | SC 2.4.11, focus hidden behind sticky headers / cookie banners / overlays. | Medium, catches elements whose centre is covered; partial-overlap and post-click overlays still need a human. |
-| **Click-through DOM states** | ✅ found issues | Barriers that a page load never shows because the content only exists after a control is operated. Links are never clicked, and controls labelled sign out, delete, remove, or unsubscribe are refused. | Same deterministic rule evidence as a load-state pass, on states a load-state pass cannot reach. Coverage is bounded per page, so absence of a finding is not evidence that a state is clean. |
+| **Click-Through** | ✅ found issues | Barriers that a page load never shows because the content only exists after a control is operated. Links are never clicked, and controls labelled sign out, delete, remove, or unsubscribe are refused. | Same deterministic rule evidence as a load-state pass, on states a load-state pass cannot reach. Coverage is bounded per page, so absence of a finding is not evidence that a state is clean. |
 | **Visual (VLM) probe** | n/a | SC 1.3.2, content visually reordered by CSS so screen readers get a different, confusing sequence. | Medium, a vision-model judgement; treat as a lead and confirm. Only runs when a local vision model is available. |
 
 _A “n/a” means this method produced no findings on this scan, it may have been disabled for the run, or it ran and found nothing. axe-core and Alfa record definitive ran-clean signals when selected._
 _Alfa completed on 2 of 5 crawled page(s); its evidence is partial for this report._
 
 
-### States behind a click
+### Click-Through: content behind a click
 
-Click-through DOM state discovery operated 12 of 16 control(s) across 2 page(s), reaching 5 additional DOM state(s) that a page load alone does not show. 2 finding(s) in this report were visible only after a control was operated.
+Click-Through operated 12 of 16 control(s) across 2 page(s), reaching 5 page states opened by clicking that a page load alone does not show. 2 finding(s) in this report were visible only after a control was operated.
 
 | Measure | Value |
 |---|---|
 | Pages probed | 2 |
 | Controls found | 16 |
 | Controls operated | 12 (75%) |
-| Additional DOM states reached | 5 |
+| Page states opened by clicking | 5 |
 | Findings visible only after a click | 2 |
 | Controls refused as destructive | 0 |
 
-- 1 page(s) hit a bound before every control was operated, so their states are partially tested. They are listed below.
-- Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what this probe can reach and still require manual testing.
-- Click-revealed findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.
+- 1 page(s) hit a bound before every control was operated, so their page states opened by clicking are partially tested. They are listed below.
+- Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what Click-Through can reach and still require manual testing.
+- Click-Through findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.
 
 **Pages where the sweep stopped early**
 
-| Page | Controls operated | States | Why it stopped |
+| Page | Controls operated | Page states opened by clicking | Why it stopped |
 |---|---|---|---|
 | https://example.org/ | 8 of 12 | 3 | reached the per-page click limit |
 

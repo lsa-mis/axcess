@@ -92,6 +92,63 @@ def test_issue_api_separates_barriers_review_leads_and_information(
     assert rows["image:logo_adequate"]["review_lane"] == "informational"
 
 
+def test_issue_api_reports_and_filters_finding_types(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Finding type is a row field, a facet count, and a filter.
+
+    The counts describe the whole report whatever the filter, like the other
+    facets; an unknown value is ignored rather than emptying the table.
+    """
+    db_path, _, scan_id = seeded_db
+    conn = connect(db_path)
+    try:
+        page_id = int(
+            conn.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()[0]
+        )
+        conn.execute(
+            "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, wcag_level, "
+            "impact, help, target_selector, html_snippet, target_hash, status, revealed_by) "
+            "VALUES (?, ?, 'button-name', '4.1.2', 'A', 'critical', 'Buttons must have "
+            "discernible text', 'nav button', '<button></button>', 'h-ct', 'new', 'Open menu')",
+            (page_id, scan_id),
+        )
+    finally:
+        conn.close()
+
+    payload = client.get(f"/api/scans/{scan_id}/issues").json()
+    assert payload["finding_type_counts"] == {"wcag": 0, "click_through": 1, "alt_text": 2}
+    rows = {row["issue_key"]: row for row in payload["rows"]}
+    assert rows["axe:button-name"]["finding_types"] == ["click_through"]
+    assert rows["axe:button-name"]["click_through_occurrence_count"] == 1
+    assert rows["image:essential_missing"]["finding_types"] == ["alt_text"]
+
+    only = client.get(f"/api/scans/{scan_id}/issues?finding_type=click_through").json()
+    assert [row["issue_key"] for row in only["rows"]] == ["axe:button-name"]
+    assert only["finding_type_counts"] == payload["finding_type_counts"]
+    assert only["total_unfiltered"] == payload["total_unfiltered"]
+
+    ignored = client.get(f"/api/scans/{scan_id}/issues?finding_type=dom_state").json()
+    assert len(ignored["rows"]) == len(payload["rows"])
+
+    # Comma-separated values widen the filter, as ?conformance= does; an
+    # unknown value among them is dropped rather than emptying the table.
+    several = client.get(
+        f"/api/scans/{scan_id}/issues?finding_type=click_through,alt_text,dom_state"
+    ).json()
+    assert {row["issue_key"] for row in several["rows"]} == {
+        key
+        for key, row in rows.items()
+        if {"click_through", "alt_text"} & set(row["finding_types"])
+    }
+    lanes = client.get(
+        f"/api/scans/{scan_id}/issues?review_lane=expert_review,informational"
+    ).json()
+    assert {row["issue_key"] for row in lanes["rows"]} == {
+        key for key, row in rows.items() if row["review_lane"] in {"expert_review", "informational"}
+    }
+
+
 def test_evaluation_and_manual_check_routes(
     client: TestClient, seeded_db: tuple[Path, Path, int]
 ) -> None:

@@ -4,11 +4,16 @@
  * The form used to explain itself in the vocabulary of its own internals:
  * "DOM states", "static only", "VLM", "rps". Each label here names what the
  * setting *does to the scan*, and each hint says what you gain or lose, so a
- * reviewer who has never met the engine can still choose. Positive labels
+ * reviewer who has never met the engine can still choose. Feature names come
+ * from `lib/labels.ts` (for example `CLICK_THROUGH`), so this page and the
+ * report call a feature the same thing. Positive labels
  * only: a switch that is on means the thing happens (SC 3.3.2, and the plain
  * reading of a toggle). The `skip_*` payload fields are inverted at the edge,
  * in `scanPolicy.ts`, never in the copy.
  */
+
+import { CLICK_THROUGH } from "../../lib/labels";
+import { CHECK_LABEL } from "../../lib/terms";
 
 export const TAB_PUBLIC = "Public website";
 export const TAB_LOGIN = "Site with a sign-in or two-step sign-in (2FA)";
@@ -28,17 +33,6 @@ export const URL_COPY = {
   },
 } as const;
 
-export const DEFAULTS_CARD = {
-  title: "Default scan settings",
-  selected: "Selected",
-  customized: "Customized",
-  leadDefault:
-    "Axcess uses these settings unless you change something under Advanced settings.",
-  leadCustom:
-    "You changed something under Advanced settings. Crossed-out lines will not run in this scan.",
-  reset: "Reset to default settings",
-} as const;
-
 export const GROUPS = {
   coverage: {
     legend: "Pages to scan",
@@ -52,6 +46,9 @@ export const GROUPS = {
     legend: "AI checks on this computer",
     description:
       "AI (artificial intelligence) runs on this computer only. Axcess uploads nothing and never downloads a model by itself.",
+  },
+  limits: {
+    legend: "Limits and rule check tool",
   },
   speed: {
     legend: "Speed and browser window",
@@ -80,7 +77,7 @@ export const SWITCHES = {
       "A site’s robots.txt file lists pages it asks scanners to skip. This setting visits those pages anyway. Use it only when you have permission to test. Axcess records this choice in the scan settings and the activity log (audit log).",
   },
   click_through: {
-    label: "Open menus, tabs, and pop-up windows (dialogs)",
+    label: `Open menus, tabs, and pop-up windows (${CLICK_THROUGH})`,
     hint:
       "Axcess opens controls on each page, then checks the content they show. This makes the scan take longer. It never submits forms, pays, or subscribes.",
   },
@@ -90,7 +87,8 @@ export const SWITCHES = {
   },
   focus: {
     label: "Check that keyboard focus is never hidden",
-    hint: "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11.",
+    hint:
+      "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
@@ -134,10 +132,15 @@ export const SWITCHES = {
 } as const;
 
 export const NUMBERS = {
-  max_pages: { label: "Maximum pages" },
+  max_pages: {
+    label: "Maximum pages",
+    hint: (max: number) =>
+      `The scan stops after this many pages, or sooner when it finds no more pages to visit. Enter a whole number from 1 to ${max.toLocaleString()}.`,
+  },
   max_depth: {
     label: "Maximum link depth",
-    hint: "How many clicks from the start page. 10 reaches almost every page on most sites.",
+    hint: (max: number) =>
+      `How many clicks from the start page the scan follows. 1 means the start page and the pages it links to. 10 reaches almost every page on most sites. Enter a whole number from 1 to ${max}.`,
   },
   rps: {
     label: "Page requests per second",
@@ -157,7 +160,13 @@ export const NUMBERS = {
 
 export const STANDARD = {
   label: "Standard to check against",
-  hint: "Web Content Accessibility Guidelines (WCAG) 2.2. Most policies require Level AA. Level AAA adds the strictest rules, such as stronger color contrast (7:1).",
+  hint: (version: string) =>
+    `Web Content Accessibility Guidelines (WCAG) ${version}. Most policies require Level AA. Level AAA adds the strictest rules, such as stronger color contrast (7:1).`,
+} as const;
+
+export const WCAG_VERSION = {
+  label: "WCAG version",
+  hint: "2.1 is the current University of Michigan (U-M) standard. 2.2 adds newer WCAG criteria, for example that keyboard focus is never hidden and that buttons and links are big enough to tap (target size).",
 } as const;
 
 export const ENGINE = {
@@ -216,6 +225,40 @@ export const ERRORS = {
   notAuthorized: "Confirm that the site owner allows this accessibility scan.",
   imageAck:
     "Before you turn on reading text inside images, confirm where Axcess saves the images and their text.",
+  limitEmpty: (label: string, min: number, max: number) =>
+    `${label} is empty. Enter a whole number from ${min} to ${max.toLocaleString()}.`,
+  limitWhole: (label: string) => `${label} must be a whole number.`,
+  limitMin: (label: string, min: number) => `${label} must be at least ${min}.`,
+  limitMax: (label: string, max: number, mode: "public" | "login") =>
+    `${label} can be at most ${max.toLocaleString()} for a ${mode === "login" ? "sign-in" : "public website"} scan.`,
+} as const;
+
+/**
+ * Starting again after a scan failed or was stopped. Settings come back;
+ * sign-in and the confirmations never do, and the notice says so.
+ */
+export const RECOVERY = {
+  loading: (id: number) => `Loading the settings from scan ${id}…`,
+  loaded: (id: number) => `Axcess copied the settings from scan ${id}. Check them, then start the scan again.`,
+  loadedLogin:
+    "Axcess never saves your sign-in. Sign in again in the browser window, and confirm again below that the site owner allows this scan.",
+  failed: (id: number) =>
+    `Axcess could not load the settings from scan ${id}. The form shows the default settings instead.`,
+} as const;
+
+/**
+ * The two ways back from a failed or stopped scan. "Scan again with faster
+ * settings" is `quickRetrySettings`: the defaults (vision model, AI review
+ * and the motion check off) with Click-Through off too.
+ */
+export const RETRY = {
+  edit: "Change settings first",
+  editHint:
+    "Opens New scan with this scan’s settings filled in. Change what went wrong, then start the scan again. Axcess never saves your sign-in.",
+  quick: "Scan again with faster settings",
+  quickPending: "Starting the scan again…",
+  quickHint:
+    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}), so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
 } as const;
 
 export const SUMMARY = {
@@ -223,10 +266,60 @@ export const SUMMARY = {
   site: "Website",
   siteEmpty: "Enter a website address to see what will be scanned.",
   coverage: "Pages to scan",
-  checks: "Checks",
-  localAi: "AI checks on this computer",
-  storage: "What is saved",
+  standard: "Standard",
+  checks: "Checks that run",
   notIncluded: "Not included",
+  nothingLeftOut: "Nothing: every option is on.",
+  /** Listed under Not included when the saved page copies are skipped. */
+  noRenderedCopies: "Saved copy of each page",
+  /**
+   * Also listed for a sign-in scan: its screenshots are cut from the same
+   * signed-in pages, so the one switch drops both (server.py, the
+   * capture_screenshots / store_rendered_html pair).
+   */
+  noScreenshots: "Screenshots of occurrences",
+  /** For a public scan: it never signs in. */
+  noSignIn: "Pages behind a sign-in",
+  /** For a sign-in scan: it never leaves the approved website. */
+  noOtherSites: "Pages on any other website",
+  /** A Pages to scan line during a Fast scan. */
+  htmlOnly: "Page code (HTML) only, no browser",
+  loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",
+  localModels:
+    "Uses only AI models already installed in Ollama on this computer. Axcess downloads nothing, and no image leaves this computer. Ollama may use several gigabytes (GB) of memory while it runs.",
+  defaultState: "Default settings",
+  customized: "Customized",
+  reset: "Reset to default settings",
   footnote:
     "Automated checks find only about a third of accessibility problems. The report shows what a person still needs to check.",
+} as const;
+
+/**
+ * Short names for the summary rail's two lists, one per switch. The rail
+ * is read at a glance, so each is a few words in plain language; the
+ * switch it stands for carries the full explanation.
+ */
+export const RAIL_LABELS = {
+  whole_host: "Whole website",
+  whole_host_login: "Whole signed-in website",
+  include_subdomain: "Subdomains",
+  click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
+  keyboard: CHECK_LABEL.keyboard,
+  focus: CHECK_LABEL.focus,
+  responsive: CHECK_LABEL.responsive,
+  ocr: CHECK_LABEL.image,
+  vision: "Vision model review",
+  semantic: CHECK_LABEL.semantic,
+  motion: CHECK_LABEL.visual,
+} as const;
+
+/**
+ * Click-Through wording outside its switch: why the switch can be
+ * unavailable.
+ */
+export const CLICK_THROUGH_COPY = {
+  /** Replaces the switch hint while the switch is disabled. */
+  unavailableStatic: "Not available with Fast scan. Opening controls needs a browser.",
+  unavailableAlfa:
+    "Choose axe or Both as the rule check tool. Axcess checks the content that opens with Rule check (axe).",
 } as const;

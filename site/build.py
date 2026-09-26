@@ -628,9 +628,9 @@ def how_it_works(summ) -> str:
     <div class="section-head">
       <span class="eyebrow">Follow-up</span>
       <h2>Rescan and compare</h2>
-      <p class="sub">Run the same scope again and open <em>Verify changes</em> to line the two reports up, issue group by issue group.</p>
+      <p class="sub">Run the same scope again and open <em>Compare reports</em> to see what is new, resolved and remaining, issue group by issue group.</p>
     </div>
-    <p>When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed". <a href="{REPO}/blob/main/docs/reading-your-report.md#verify-changes-after-a-fix">Read what each comparison result means.</a></p>
+    <p>When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed". <a href="{REPO}/blob/main/docs/reading-your-report.md#compare-reports-after-a-fix">Read what each comparison result means.</a></p>
   </div>
 </section>
 """
@@ -926,13 +926,98 @@ LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-ac
 LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html"
 
 
+# One short card per check, in the order the app's "What was checked" table
+# lists them. The app gives each check one line on what it does and one on
+# its main limit; a card may say more, and must keep every limit. Each card's
+# id is the key the app links to (MethodCoverageLedger's "More about this
+# check": coverage/#check-<key>), so a key here must match ``_methods_used``
+# in src/audit/web/server.py.
+CHECK_CARDS = (
+    (
+        "search",
+        "Site search",
+        "Runs the searches you set up and checks the result pages.",
+        "Other search words can reach other pages. You approve these searches, so they can send data to the site.",
+    ),
+    (
+        "rendered",
+        "Opened in a browser",
+        "Opens each page in a real browser, so its scripts run and the browser checks can test it.",
+        "Opening a page is not a pass.",
+    ),
+    (
+        "axe",
+        "Rule check (axe)",
+        "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose. Failures are Barriers.",
+        "A page with nothing found can still fail WCAG.",
+    ),
+    (
+        "alfa",
+        "Rule check (Alfa)",
+        "Runs Siteimprove Alfa's standard test rules (Accessibility Conformance Testing, ACT). Each rule passes, fails, or cannot tell.",
+        "A failed rule is not proof the page fails WCAG. Each \u201ccannot tell\u201d goes to Needs review.",
+    ),
+    (
+        "image",
+        "Image text check",
+        "Reads text in images (OCR) and asks a local vision model whether the alt text says the same.",
+        "A person confirms each result.",
+    ),
+    (
+        "semantic",
+        "AI review",
+        "A local AI model reads link text, headings, labels, and instructions in context.",
+        "Results go to Needs review. A person confirms each one.",
+    ),
+    (
+        "keyboard",
+        "Keyboard check",
+        "Presses Tab, Shift+Tab, and Escape to find places keyboard focus gets stuck.",
+        "It only looks for traps. Test the rest of keyboard use yourself.",
+    ),
+    (
+        "responsive",
+        "Zoom and layout check",
+        "Checks a 320-pixel-wide screen, 200% text, and wider text spacing for cut-off content.",
+        "A person confirms whether cut-off content is a barrier.",
+    ),
+    (
+        "interaction",
+        "Click-Through",
+        "Opens menus, tabs, and dialogs, then runs the rule check (axe) on each page state it reveals.",
+        "It skips payments and other risky actions and blocks sending data, so a page state can be incomplete. It may not use every control it finds, and a dialog that would not close stops that page. A person checks custom controls and anything it did not reach.",
+    ),
+)
+
+
+def check_cards() -> str:
+    """What each check does and its limit, one card each, linked from the app."""
+    cards = "".join(
+        f'<article class="card" id="check-{key}"><h3>{e(name)}</h3><p>{e(what)}</p>'
+        f'<p class="small"><strong>Limit:</strong> {e(limit)}</p></article>'
+        for key, name, what, limit in CHECK_CARDS
+    )
+    return f"""
+<section id="checks">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The checks</span>
+      <h2>What each check does, and its limit</h2>
+      <p class="sub">The same checks as the <em>What was checked</em> table in every report.</p>
+    </div>
+    <div class="grid grid-3">{cards}</div>
+  </div>
+</section>
+"""
+
+
 def checks_sections() -> str:
     """The report groups, the comparison table, and what still needs a person."""
     rows = "".join(
         f'<tr><th scope="row">{e(check)}</th><td>{e(what)}</td><td>{e(sc)}</td><td>{e(group)}</td><td>{e(si)}</td><td>{e(axe)}</td></tr>'
         for check, what, sc, group, si, axe in CHECKS
     )
-    return f"""
+    return f"""{check_cards()}
 <section class="soft" id="groups">
   <div class="wrap">
     <div class="section-head">
@@ -1535,10 +1620,10 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Every result lands in one of three groups: <strong>Barrier</strong>, <strong>Needs review</strong>, or <strong>Informational</strong>. <a href="../faq/#glossary">The glossary explains each one.</a></p>
     </div>
     <div class="grid grid-2">
-      <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open <em>About</em> on any row for a quick summary.</p></article>
+      <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open an issue's title for its pages and its guidance.</p></article>
       <article class="card">{icon("pin")}<h3>Open the evidence</h3><p>An issue's full evidence record shows the pages, the element, the code snippet, and screenshots. For problems found after a click, it names the control, for example "After clicking “Open menu”."</p></article>
-      <article class="card">{icon("eye")}<h3>Check what actually ran</h3><p>The Overview tab shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
-      <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Verify changes</em> to compare.</p></article>
+      <article class="card">{icon("eye")}<h3>Check what actually ran</h3><p><em>What this scan checked</em>, above the Issues table, shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
+      <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Compare reports</em> to see what changed.</p></article>
     </div>
     <p style="margin-top:1.25rem">The full walkthrough, including every column and export, is in <a href="{REPO}/blob/main/docs/reading-your-report.md">Reading your Axcess report</a>.</p>
   </div>

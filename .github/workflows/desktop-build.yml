@@ -20,8 +20,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    name: Choose the release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+      package_version: ${{ steps.pick.outputs.package_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # One step after the highest published two-part tag: desktop-v0.60,
+      # then 0.61 ... 0.69, 0.70. `version` is what people see; npm and
+      # Squirrel.Windows get it as semver (0.61.0) in `package_version`.
+      - id: pick
+        name: Next version after the published releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --tags --refs origin 'desktop-v*' | node desktop/scripts/next-version.cjs | tee -a "$GITHUB_OUTPUT"
+
   build-macos:
     name: Apple Silicon macOS desktop artifact
+    needs: version
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +71,7 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -85,6 +107,7 @@ jobs:
 
   build-windows:
     name: Windows x64 desktop artifact
+    needs: version
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -112,7 +135,7 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "0.1.${{ github.run_number }}" --no-git-tag-version
+          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -143,15 +166,15 @@ jobs:
 
   publish:
     name: Publish preview release
-    needs: [build-macos, build-windows]
+    needs: [version, build-macos, build-windows]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: 0.1.${{ github.run_number }}
-      TAG: desktop-v0.1.${{ github.run_number }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: desktop-v${{ needs.version.outputs.version }}
     steps:
       - uses: actions/download-artifact@v4
         with:

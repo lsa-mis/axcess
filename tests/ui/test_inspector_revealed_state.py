@@ -195,6 +195,12 @@ async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, s
         await page.locator("#inspect-panel-page").wait_for(state="attached", timeout=30000)
         # The highlight pass runs in requestIdleCallback.
         await page.wait_for_timeout(1500)
+        # The evidence list sits closed below the page; open it so its
+        # occurrences are part of the text. A view with none of the issue's
+        # occurrences has no list to open.
+        evidence = page.get_by_role("button", name="Evidence from the scan", exact=True)
+        if await evidence.count():
+            await evidence.click()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.
@@ -435,3 +441,43 @@ async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
     text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
     assert "Highlighting" not in text
     assert "in another page state" in text
+
+
+async def test_occurrences_in_other_page_states_are_counted_and_one_click_away(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The picker shows one page state; a line under it names the others.
+
+    Occurrences revealed by a click were out of sight until the reviewer
+    opened the Page state list, so nothing said the page held more. The line
+    counts them and links to each state that has some.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+            "?issue=axe:aria-required-parent&state=",
+            wait_until="domcontentloaded",
+        )
+        others = page.get_by_role("navigation", name="Other page states with occurrences")
+        await playwright_async.expect(others).to_contain_text(
+            "1 more occurrence appears only after clicking:", timeout=15000
+        )
+        link = others.get_by_role("link", name="After clicking “Filter”: 1 occurrence", exact=True)
+        await link.click()
+
+        picker = page.get_by_role("combobox", name="Page state")
+        await playwright_async.expect(picker).to_have_attribute("data-value", state_key)
+        # From the revealed state, the way back is page load.
+        await playwright_async.expect(others).to_contain_text(
+            "1 more occurrence in another page state:"
+        )
+        await playwright_async.expect(
+            others.get_by_role("link", name="At page load: 1 occurrence", exact=True)
+        ).to_be_visible()
+    finally:
+        await page.context.close()

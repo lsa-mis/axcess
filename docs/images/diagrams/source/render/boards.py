@@ -477,10 +477,11 @@ def board_release() -> str:
               + "or the workflow file. A manual run also works.")
     s2 = step("2", "wrench", "Build both apps",
               chips(["desktop-build.yml"])
-              + "macOS (Apple Silicon) and Windows (x64) build in parallel, stamped "
-              + span(mono("0.1.&lt;run number&gt;", 18), white_space="nowrap") + ".")
+              + "macOS (Apple Silicon) and Windows (x64) build in parallel, stamped with "
+              "the next version: " + span(mono("0.61", 18), white_space="nowrap")
+              + " after " + span(mono("0.60", 18), white_space="nowrap") + ".")
     s3 = step("3", "package", "Publish job",
-              "Creates GitHub release " + mono("desktop-v0.1.N", 18) + ", marked latest. "
+              "Creates GitHub release " + mono("desktop-v0.61", 18) + ", marked latest. "
               "Adds version-less download names. Keeps the 10 newest.")
     s4 = step("4", "refresh", "App checks on launch",
               "The installed app asks GitHub for the latest release and offers a newer one.")

@@ -62,6 +62,7 @@ from audit.protected.repository import (
     recover_stale_protected_run_leases,
     set_protected_scan_status,
 )
+from audit.wcag_version import DEFAULT_WCAG_VERSION
 from audit.web.protected_auth import (
     ProtectedIdentity,
     protected_identity_context_fingerprint,
@@ -1048,6 +1049,7 @@ def _protected_crawl_config(
         js_eager=True,
         axe_enabled=request.scan_engine in {"axe", "both"},
         axe_level="AA",
+        wcag_version=DEFAULT_WCAG_VERSION,
         alfa_enabled=request.scan_engine in {"alfa", "both"},
         # The protected companion currently permits optional loopback AI only
         # for bounded, in-memory image leads. Do not advertise or persist a

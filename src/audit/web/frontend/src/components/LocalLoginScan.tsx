@@ -309,12 +309,16 @@ function LocalLoginHandoff({
             Open report
           </Button>
         )}
+        {/* Back to the form with this scan's settings filled in (`from=`),
+            so a failed or stopped sign-in does not cost the reader every
+            choice they made. Sign-in and the confirmations are never
+            saved, so those are asked for again. */}
         {TERMINAL.has(state) && state !== "completed" && (
           <Button
             className="mt-5"
-            onClick={() => navigate("/scans/new?mode=login", { replace: true })}
+            onClick={() => navigate(`/scans/new?mode=login&from=${scanId}`, { replace: true })}
           >
-            Start a new sign-in scan
+            Start a new sign-in scan with these settings
           </Button>
         )}
       </Card>

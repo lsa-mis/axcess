@@ -15,6 +15,9 @@ import type { ScopePreviewState } from "./useScopePreview";
  *
  * No `required`: the browser's own bubble would fight the form's alert,
  * which is announced, focused and links back here.
+ *
+ * It is the first card of the form: label, box, then the help and the
+ * scope line under the box, where the eye lands after typing.
  */
 export default function UrlHero({
   id,
@@ -45,13 +48,10 @@ export default function UrlHero({
   const scopeId = `${id}-scope`;
   const errorId = `${id}-error`;
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-base font-semibold text-fg">
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-surface p-4 sm:p-5">
+      <label htmlFor={id} className="text-sm font-semibold text-fg">
         {label}
       </label>
-      <p id={helpId} className="text-sm text-fg-muted">
-        {help}
-      </p>
       <input
         ref={inputRef}
         id={id}
@@ -70,8 +70,11 @@ export default function UrlHero({
           error ? "border-sev-critical" : "border-border",
         )}
       />
+      <p id={helpId} className="text-xs text-fg-muted">
+        {help}
+      </p>
       {error ? (
-        <p id={errorId} className="mt-1 text-sm font-semibold text-sev-critical">
+        <p id={errorId} className="text-sm font-semibold text-sev-critical">
           {error}
         </p>
       ) : (

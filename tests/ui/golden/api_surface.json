@@ -232,9 +232,29 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/sites",
+        "methods": ["GET"],
+        "name": "api_list_sites",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/settings",
+        "methods": ["GET"],
+        "name": "api_scan_settings",
         "async": false,
         "params": {"path": ["scan_id"]},
         "request_param": null,
@@ -431,7 +451,16 @@
         "async": false,
         "params": {
           "path": ["scan_id"],
-          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+          "query": [
+            "conformance",
+            "responsibility",
+            "abilities",
+            "status",
+            "review_lane",
+            "finding_type",
+            "q",
+            "sort"
+          ]
         },
         "request_param": null,
         "background_tasks_param": null
@@ -538,6 +567,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/history",
+        "methods": ["GET"],
+        "name": "api_scan_history",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/diff",
         "methods": ["GET"],
         "name": "api_scan_diff",
@@ -604,6 +643,16 @@
         "async": false,
         "params": {"query": ["path"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/exports",
+        "methods": ["GET"],
+        "name": "export_options",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {
@@ -889,9 +938,29 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/sites",
+        "methods": ["GET"],
+        "name": "api_list_sites",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/settings",
+        "methods": ["GET"],
+        "name": "api_scan_settings",
         "async": false,
         "params": {"path": ["scan_id"]},
         "request_param": null,
@@ -1088,7 +1157,16 @@
         "async": false,
         "params": {
           "path": ["scan_id"],
-          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+          "query": [
+            "conformance",
+            "responsibility",
+            "abilities",
+            "status",
+            "review_lane",
+            "finding_type",
+            "q",
+            "sort"
+          ]
         },
         "request_param": null,
         "background_tasks_param": null
@@ -1195,6 +1273,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/history",
+        "methods": ["GET"],
+        "name": "api_scan_history",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/diff",
         "methods": ["GET"],
         "name": "api_scan_diff",
@@ -1261,6 +1349,16 @@
         "async": false,
         "params": {"query": ["path"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/exports",
+        "methods": ["GET"],
+        "name": "export_options",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {
@@ -1532,9 +1630,29 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/sites",
+        "methods": ["GET"],
+        "name": "api_list_sites",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/settings",
+        "methods": ["GET"],
+        "name": "api_scan_settings",
         "async": false,
         "params": {"path": ["scan_id"]},
         "request_param": null,
@@ -1731,7 +1849,16 @@
         "async": false,
         "params": {
           "path": ["scan_id"],
-          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+          "query": [
+            "conformance",
+            "responsibility",
+            "abilities",
+            "status",
+            "review_lane",
+            "finding_type",
+            "q",
+            "sort"
+          ]
         },
         "request_param": null,
         "background_tasks_param": null
@@ -1838,6 +1965,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/history",
+        "methods": ["GET"],
+        "name": "api_scan_history",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/diff",
         "methods": ["GET"],
         "name": "api_scan_diff",
@@ -1904,6 +2041,16 @@
         "async": false,
         "params": {"query": ["path"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/exports",
+        "methods": ["GET"],
+        "name": "export_options",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {
@@ -2188,9 +2335,29 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/sites",
+        "methods": ["GET"],
+        "name": "api_list_sites",
+        "async": false,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/settings",
+        "methods": ["GET"],
+        "name": "api_scan_settings",
         "async": false,
         "params": {"path": ["scan_id"]},
         "request_param": null,
@@ -2387,7 +2554,16 @@
         "async": false,
         "params": {
           "path": ["scan_id"],
-          "query": ["conformance", "responsibility", "abilities", "status", "review_lane", "q", "sort"]
+          "query": [
+            "conformance",
+            "responsibility",
+            "abilities",
+            "status",
+            "review_lane",
+            "finding_type",
+            "q",
+            "sort"
+          ]
         },
         "request_param": null,
         "background_tasks_param": null
@@ -2494,6 +2670,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/history",
+        "methods": ["GET"],
+        "name": "api_scan_history",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/diff",
         "methods": ["GET"],
         "name": "api_scan_diff",
@@ -2560,6 +2746,16 @@
         "async": false,
         "params": {"query": ["path"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/exports",
+        "methods": ["GET"],
+        "name": "export_options",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {

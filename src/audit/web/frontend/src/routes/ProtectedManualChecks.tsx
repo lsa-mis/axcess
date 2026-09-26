@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { serverDate } from "../lib/serverTime";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link, useParams } from "react-router";
@@ -293,6 +294,6 @@ function ProtectedManualCheckCard({
 }
 
 function displayTime(value: string): string {
-  const date = new Date(value);
+  const date = serverDate(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }

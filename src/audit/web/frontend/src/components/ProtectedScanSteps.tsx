@@ -90,7 +90,7 @@ export default function ProtectedScanSteps({
                 <span
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                     complete
-                      ? "border-umich-blue bg-umich-blue text-white"
+                      ? "border-umich-blue bg-umich-blue text-fg-inverse"
                       : active
                         ? "border-umich-blue bg-surface text-umich-blue"
                         : "border-border bg-surface text-fg-muted"

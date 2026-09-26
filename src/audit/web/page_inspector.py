@@ -49,6 +49,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from audit.crawler import url_policy
+from audit.labels import CLICK_THROUGH_STATE
 
 if TYPE_CHECKING:
     from playwright.async_api import ViewportSize
@@ -411,7 +412,7 @@ async def inspect_page(
                     "source": "state",
                     "state_key": state_key,
                     "error": (
-                        "This interaction state was not captured. Reports made "
+                        f"This {CLICK_THROUGH_STATE} was not captured. Reports made "
                         "before state capture, and scans that declined to store "
                         "rendered pages, keep no markup for it."
                     ),

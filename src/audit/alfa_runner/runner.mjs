@@ -65,6 +65,7 @@ const input = await readRunnerInput();
 verificationProgress("input received");
 const url = input.url;
 const level = input.level;
+const version = input.version;
 const userAgent = input.user_agent;
 const auth = input.storage_state ? input : null;
 
@@ -165,12 +166,15 @@ try {
     await document.dispose();
     verificationProgress("DOM captured");
 
+    // Alfa's conformance predicates default to the current Recommendation
+    // (2.2); pass the scan's chosen version so a WCAG 2.1 scan selects only
+    // the rules whose criteria 2.1 requires at this level.
     const conformance =
       level === "A"
-        ? Conformance.isA()
+        ? Conformance.isA(version)
         : level === "AAA"
-          ? Conformance.isAAA()
-          : Conformance.isAA();
+          ? Conformance.isAAA(version)
+          : Conformance.isAA(version);
     const selectedRules = rules.filter((rule) =>
       rule.hasRequirement(Refinement.and(Criterion.isCriterion, conformance)),
     );
@@ -179,7 +183,7 @@ try {
       : selectedRules;
     const outcomes = await Audit.of(alfaPage, auditRules).evaluate();
     verificationProgress("rule evaluation complete");
-    const projected = collectOutcomes(outcomes);
+    const projected = collectOutcomes(outcomes, version);
     emit({
       protocol_version: 1,
       engine: "alfa",
@@ -254,9 +258,12 @@ async function readRunnerInput() {
     fail("Runner input was incomplete.");
   }
   if (!['A', 'AA', 'AAA'].includes(parsed.level)) fail("Unsupported WCAG level.");
+  // A caller that predates the version setting ran WCAG 2.2; keep that.
+  const version = parsed.version ?? "2.2";
+  if (!["2.1", "2.2"].includes(version)) fail("Unsupported WCAG version.");
   if (typeof parsed.user_agent !== "string" || !parsed.user_agent) fail("Runner input was incomplete.");
   if (!parsed.storage_state) {
-    return { url: parsed.url, level: parsed.level, user_agent: parsed.user_agent };
+    return { url: parsed.url, level: parsed.level, version, user_agent: parsed.user_agent };
   }
   const origins = Array.isArray(parsed.allowed_origins)
     ? parsed.allowed_origins.filter((origin) => typeof origin === "string")
@@ -273,6 +280,7 @@ async function readRunnerInput() {
   return {
     url: parsed.url,
     level: parsed.level,
+    version,
     user_agent: parsed.user_agent,
     storage_state: parsed.storage_state,
     allowed_origins: origins,

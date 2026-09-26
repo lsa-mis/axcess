@@ -52,18 +52,18 @@ the toggle label on the New scan form.
 
 | Pipeline | CLI (`audit crawl`) | Web New scan form, "Public website" | Raw API (`POST /api/scans`) | Login scan (`POST /api/local-login-scans`) |
 | --- | --- | --- | --- | --- |
-| axe-core | On (`--skip-axe`, `--axe-level`) | On: Rule engine "axe-core" (the default) or "Both" | On unless `scan_engine` is `alfa` | On unless `scan_engine` is `alfa` |
-| Siteimprove Alfa | Not available | Off: choose "Siteimprove Alfa" or "Both" | Off: `scan_engine` `alfa` or `both` | Off: `scan_engine` `alfa` or `both` |
+| axe-core | On (`--skip-axe`, `--axe-level`) | On: Rule check tool "axe" (the default) or "Both" | On unless `scan_engine` is `alfa` | On unless `scan_engine` is `alfa` |
+| Siteimprove Alfa | Not available | Off: choose "Alfa" or "Both" | Off: `scan_engine` `alfa` or `both` | Off: `scan_engine` `alfa` or `both` |
 | Keyboard | On (`--skip-keyboard`) | On ("Check for keyboard traps") | On | On |
-| Focus | On (`--skip-focus`) | On ("Check that focus is never hidden") | On | Always on |
+| Focus | On (`--skip-focus`) | On ("Check that keyboard focus is never hidden") | On | Always on |
 | Responsive | On (`--skip-responsive`) | On ("Check narrow screens and zoom") | On | On |
 | Visual | On (`--skip-visual`); reading order also needs the vision model | Off ("Check motion and animation") | On | Always off |
-| Interaction | On (`--skip-interaction`) | On ("Click through menus, tabs and dialogs") | On | On |
-| Configured search journeys | Not available | Off ("Search to discover result pages") | Only with a `search` object | Only with a `search` object |
+| Interaction | On (`--skip-interaction`) | On ("Open menus, tabs, and pop-up windows (Click-Through)") | On | On |
+| Configured search journeys | Not available | Off ("Use a search box to find more pages") | Only with a `search` object | Only with a `search` object |
 | Image of text: OCR | On (`--skip-ocr`) | On ("Read text inside images (OCR)") | On | Off; turning it on needs an acknowledgement |
 | Image of text: inline SVG text | On | On | On | Only when OCR is on |
-| Image of text: vision model | On when Ollama has the model (`--skip-vlm`) | Off ("Review image text with a local vision model") | On when Ollama has the model | Off; needs OCR and an acknowledgement |
-| Semantic analyzers | On when Ollama has the model (`--skip-semantic`, `--semantic-criteria`) | Off ("Review wording with local AI") | On when Ollama has the model | Always off |
+| Image of text: vision model | On when Ollama has the model (`--skip-vlm`) | Off ("Compare image text with alt text (vision model)") | On when Ollama has the model | Off; needs OCR and an acknowledgement |
+| Semantic analyzers | On when Ollama has the model (`--skip-semantic`, `--semantic-criteria`) | Off ("AI review of wording") | On when Ollama has the model | Always off |
 | Protected image leads | Not produced | Not produced | Not produced | Not produced; protected scans only |
 
 Things that surprise people:
@@ -101,10 +101,10 @@ Every issue row gets exactly one report group, stored as `review_lane`:
 
 The group depends only on the pipeline, the rule id, the Alfa outcome, and the
 image classification and alt adequacy. A finding's
-[status](../glossary.md#status) never changes its group. The Issues table
-labels the groups Barrier, Needs review, and Informational; the issue page
-calls the middle group "Needs confirmation" and the dashboard calls it
-"Review leads".
+[status](../glossary.md#status) never changes its group. The Issues table,
+the issue page header, and the Issue guidance dialog all label the groups
+Barrier, Needs review, and Informational, the words of `REVIEW_TYPE_LABEL` in
+`src/audit/web/frontend/src/lib/terms.ts`.
 
 ### Where the code decides
 

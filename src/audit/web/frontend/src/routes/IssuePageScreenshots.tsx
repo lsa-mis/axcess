@@ -12,7 +12,7 @@ import { useScanQuery } from "../hooks/useScanQuery";
 export const ISSUE_SCREENSHOTS_VIEW = "Issue screenshots";
 
 /**
- * The captured instance screenshots of one issue on one page
+ * The screenshots of each occurrence of one issue on one page
  * (``/scans/:id/issues/:key/pages/:pageId/screenshots``).
  *
  * The pages table links here from its screenshots column. This is a page
@@ -153,12 +153,12 @@ export default function IssuePageScreenshotsRoute() {
                 <figure className="rounded-xs border border-border bg-surface p-2">
                   <img
                     src={blobUrl(hash)}
-                    alt={`Occurrence ${index + 1} on ${label}. A circle marks where Axcess found the issue.`}
+                    alt={`Occurrence ${index + 1} on ${label}. An outline marks where it was found.`}
                     className="max-h-80 w-full rounded-xs object-contain"
                     loading="lazy"
                   />
                   <figcaption className="mt-2 text-xs text-fg-muted">
-                    Occurrence {index + 1} of {found.occurrence_count}. The circle marks where Axcess found the issue.
+                    Occurrence {index + 1} of {found.occurrence_count}. The outline marks where it was found.
                   </figcaption>
                 </figure>
               </li>

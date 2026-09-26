@@ -168,13 +168,16 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
        (step 12 regenerates it).
    - Review app, under `src/audit/web/frontend/src/`: the `NewScanPayload`
      type in `api/types.ts`; `SETTING_KEYS`, `PUBLIC_DEFAULTS`,
-     `LOGIN_POLICY`, `SwitchKey`, and `SWITCH_FIELDS` in
-     `components/newScan/scanPolicy.ts`; the switch in `ChecksGroup.tsx`; the
-     label and hint in `SWITCHES` in `copy.ts`; the summaries in
-     `DefaultSettingsCard.tsx` and `ScanSummaryCard.tsx`; and the retry
-     settings in `routes/ScanDetail.tsx`. Searching the frontend for
-     `skip_focus` finds every spot except `copy.ts`, whose `SWITCHES` entry
-     is keyed `focus:`.
+     `LOGIN_POLICY`, `SwitchKey`, `SWITCH_FIELDS`, and `CHECKS` in
+     `components/newScan/scanPolicy.ts` (`CHECKS` feeds every check count
+     and the summary in `ScanSummaryCard.tsx`); the switch in
+     `ChecksGroup.tsx`; and the label and hint in `SWITCHES` in `copy.ts`.
+     Searching the frontend for `skip_focus` finds every spot except the
+     `CHECKS` and `SWITCHES` entries, which are keyed `focus`.
+   - The `skip_<x>` field of `ScanFormSettings`, and its line in
+     `snapshot_from_config`, in `src/audit/web/scan_settings.py`. The
+     snapshot is an allow-list, so a setting left out of it is not
+     prefilled when someone chooses "Change settings first".
    - Choose each entry point's default on purpose. The raw API treats a
      missing `skip_<x>` field as "on".
 6. **Report group branch** in `src/audit/web/issues.py`. Do this in the same
@@ -231,9 +234,15 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       row to `_methods_used`. It is a closed union, so add the key there
       before `METHOD_PIPELINE`, or `make typecheck` fails;
     - `METHOD_PIPELINE` in `components/MethodCoverageLedger.tsx`;
-    - `PIPELINES` in `routes/Diff.tsx`, the rescan comparison page's labels
-      and its Detection method filter. A missing entry shows the raw pipeline
-      name as the label, and the pipeline is missing from the filter.
+    - `PIPELINES` in `routes/Compare.tsx`, the method labels in the Compare reports
+      page's "What was checked in each report" notes and table. A missing entry shows
+      the raw pipeline name as the label.
+    - `CHECK_NAME` in `components/ScanProgress.tsx`, if the check runs per page,
+      so the running scan's pages-by-checks table has a column for it. Mark its
+      run with `live_progress.check("<key>")` and list the key in
+      `_tracked_checks` in `crawler/orchestrator.py`.
+    - A card in `CHECK_CARDS` in `site/build.py`, keyed as in `_methods_used`:
+      the "What was checked" table links each row to `coverage/#check-<key>`.
 11. **Exports.**
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,
       `_PIPELINE_COVERAGE`, and the hard-coded pipeline tuples in the location

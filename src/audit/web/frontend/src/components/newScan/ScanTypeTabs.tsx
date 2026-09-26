@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Globe2, LockKeyhole } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { TAB_LOGIN, TAB_PUBLIC } from "./copy";
 import type { ScanMode } from "./scanPolicy";
@@ -7,9 +6,9 @@ import type { ScanMode } from "./scanPolicy";
 export const SCAN_PANEL_ID = "scan-panel";
 export const scanTabId = (mode: ScanMode) => `scan-tab-${mode}`;
 
-const TABS: Array<{ mode: ScanMode; label: string; Icon: typeof Globe2 }> = [
-  { mode: "public", label: TAB_PUBLIC, Icon: Globe2 },
-  { mode: "login", label: TAB_LOGIN, Icon: LockKeyhole },
+const TABS: Array<{ mode: ScanMode; label: string }> = [
+  { mode: "public", label: TAB_PUBLIC },
+  { mode: "login", label: TAB_LOGIN },
 ];
 
 /**
@@ -19,7 +18,8 @@ const TABS: Array<{ mode: ScanMode; label: string; Icon: typeof Globe2 }> = [
  * automatic-activation pattern), Home/End jump, and only the selected tab
  * is in the Tab order. The panel below is keyed on the mode by the route,
  * so a change re-mounts it and it drops in; the tab strip itself never
- * animates anything but its background.
+ * animates anything but its background. It is drawn as a segmented
+ * control, the same shape as the choices inside the form.
  */
 export default function ScanTypeTabs({
   mode,
@@ -33,9 +33,9 @@ export default function ScanTypeTabs({
 }) {
   const refs = useRef<Partial<Record<ScanMode, HTMLButtonElement | null>>>({});
   const trackRef = useRef<HTMLDivElement>(null);
-  // The active tab's slot, measured, so the fill and the pointer under the
-  // rail slide to it — the same treatment as the report tabs, so the two
-  // rows read as one control across the app.
+  // The active tab's slot, measured, so the fill slides to it — the same
+  // treatment as the report tabs, so the two rows read as one control
+  // across the app.
   const [slot, setSlot] = useState<{ left: number; width: number } | null>(null);
   useLayoutEffect(() => {
     const measure = () => {
@@ -73,7 +73,7 @@ export default function ScanTypeTabs({
         ref={trackRef}
         role="tablist"
         aria-label="Scan type"
-        className="relative inline-flex flex-wrap gap-1 rounded-md border border-border bg-surface p-1"
+        className="relative inline-flex flex-wrap gap-1 rounded-md border border-border bg-surface-muted p-1"
       >
         {slot && (
           <span
@@ -82,7 +82,7 @@ export default function ScanTypeTabs({
             style={{ width: slot.width, transform: `translateX(${slot.left}px)` }}
           />
         )}
-        {TABS.map(({ mode: tabMode, label, Icon }) => {
+        {TABS.map(({ mode: tabMode, label }) => {
           const selected = tabMode === mode;
           const disabled = tabMode === "login" && Boolean(disabledReason);
           return (
@@ -102,11 +102,14 @@ export default function ScanTypeTabs({
               onKeyDown={onKeyDown}
               className={cn(
                 "relative inline-flex min-h-target items-center gap-2 rounded-xs px-4 text-sm font-semibold transition-colors duration-200 motion-reduce:transition-none",
-                selected ? "text-fg-inverse" : "text-fg hover:bg-surface-muted",
+                // The sliding fill is dropped in forced colors, so the
+                // selected tab also gets an outline there.
+                selected
+                  ? "text-fg-inverse forced-colors:outline forced-colors:outline-2 forced-colors:-outline-offset-2"
+                  : "text-fg hover:bg-surface",
                 disabled && "cursor-not-allowed opacity-60",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
               {label}
             </button>
           );
@@ -117,17 +120,6 @@ export default function ScanTypeTabs({
           {disabledReason}
         </p>
       )}
-      {/* The rail the panel hangs from, with a pointer under the chosen tab:
-          everything below — the form and the summary beside it — is that
-          tab's. */}
-      <div aria-hidden className="relative mt-3 h-px bg-border-strong">
-        {slot && (
-          <span
-            className="absolute -top-[6px] h-3 w-3 border-2 border-border-strong bg-surface transition-transform duration-300 ease-out motion-reduce:transition-none"
-            style={{ transform: `translateX(${slot.left + slot.width / 2}px) translateX(-50%) rotate(45deg)` }}
-          />
-        )}
-      </div>
     </div>
   );
 }

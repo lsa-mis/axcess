@@ -201,8 +201,9 @@ Useful `audit crawl` flags:
 | `--static-only` | Off | Fetches without a browser and renders only script-only pages and bot challenges. The browser checks skip every page it does not render. |
 | `--skip-interaction` | Off | Skips the click-through check of menus, tabs, and dialogs |
 | `--no-store-rendered` | Off | Keeps no copy of each page's rendered HTML. The page inspector then renders the live page on demand. |
-| `--skip-screenshots` | Off | Skips the circled element screenshots |
+| `--skip-screenshots` | Off | Skips the outlined element screenshots |
 | `--axe-level` | AA | Sets the axe-core level: A, AA, or AAA |
+| `--wcag-version` | 2.1 | The WCAG version the level is checked against: 2.1, the current U-M standard, or 2.2. Applies to axe-core and Alfa. |
 | `--compare-to SCAN_ID` | The last completed scan of the same site | The report to compare image findings against |
 
 Each check also has an off switch: `--skip-axe`, `--skip-keyboard`,

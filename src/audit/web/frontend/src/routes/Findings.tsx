@@ -2,16 +2,17 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowLeft, ChevronLeft, ChevronRight, Layers, Search } from "lucide-react";
+import { ArrowLeft, Layers } from "lucide-react";
 import { api, blobUrl } from "../api/client";
+import { TablePagination } from "../components/TablePagination";
+import { TableBar, TableSearch, TableStatus } from "../components/table/Table";
+import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import {
   AltTag,
-  Button,
   Card,
   EmptyState,
   LinkButton,
   PageHeader,
-  Select,
   SeverityChip,
   StatusChip,
 } from "../components/ui";
@@ -42,6 +43,7 @@ const CLASSES: Classification[] = [
 ];
 
 const PAGE_SIZE = 200;
+const FINDINGS_PAGER_ID = "pager-findings";
 
 /** A stored value as sentence-case words: "no_meaningful_text" -> "No meaningful text". */
 function sentenceCase(value: string): string {
@@ -77,6 +79,38 @@ export default function FindingsRoute() {
     next.set("page", "1");
     setParams(next);
   };
+  const option = (value: string) => ({ value, label: sentenceCase(value) });
+  const filters: FilterGroup[] = [
+    {
+      key: "severity",
+      label: "Severity",
+      value: filter.severity ?? "",
+      options: [{ value: "", label: "All" }, ...SEVERITIES.map(option)],
+    },
+    {
+      key: "status",
+      label: "Status",
+      value: filter.status ?? "",
+      options: [
+        { value: "", label: "All" },
+        ...STATUSES.map((value) => ({ value, label: STATUS_OPTION_LABEL[value] })),
+      ],
+    },
+    {
+      key: "classification",
+      label: "Image type",
+      value: filter.classification ?? "",
+      options: [{ value: "", label: "All" }, ...CLASSES.map(option)],
+    },
+  ];
+  // Every group back to "All" in one URL update; the search is its own control.
+  const resetFilters = () => {
+    const next = new URLSearchParams(params);
+    for (const group of filters) next.delete(group.key);
+    next.set("page", "1");
+    setParams(next);
+  };
+  const empty = !isLoading && rows.length === 0;
 
   return (
     <>
@@ -109,132 +143,60 @@ export default function FindingsRoute() {
         }
       />
 
-      <Card className="mb-4 p-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <FilterSelect
-            label="Severity"
-            value={filter.severity ?? ""}
-            options={SEVERITIES}
-            labelFor={sentenceCase}
-            onChange={(v) => setParam("severity", v)}
-          />
-          <FilterSelect
-            label="Status"
-            value={filter.status ?? ""}
-            options={STATUSES}
-            labelFor={(v) => STATUS_OPTION_LABEL[v as FindingStatus]}
-            onChange={(v) => setParam("status", v)}
-          />
-          <FilterSelect
-            label="Image type"
-            value={filter.classification ?? ""}
-            options={CLASSES}
-            labelFor={sentenceCase}
-            onChange={(v) => setParam("classification", v)}
-          />
-          <label className="flex flex-col text-xs font-semibold text-fg-subtle">
-            Search
-            <div className="relative mt-1">
-              <Search
-                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
-                aria-hidden
-              />
-              {/* min-h-target so the search input clears the 44×44
-                  SC 2.5.5 floor. text-base also lifts the body to 16px,
-                  which iOS won't auto-zoom on focus. */}
-              <input
-                type="search"
-                value={filter.q ?? ""}
-                onChange={(e) => setParam("q", e.target.value)}
-                placeholder="Page address, alt text, or image text"
-                className="min-h-target w-full rounded-xs border border-border bg-surface py-2 pl-8 pr-2 text-base font-normal normal-case tracking-normal text-fg placeholder:text-fg-subtle focus:border-umich-blue focus:outline-none"
-              />
-            </div>
-          </label>
-        </div>
-      </Card>
-
       {error && (
-        <Card className="border-sev-critical/30 bg-sev-critical-bg p-4 text-sm text-sev-critical">
+        <Card className="mb-4 border-sev-critical/30 bg-sev-critical-bg p-4 text-sm text-sev-critical">
           {error instanceof Error ? error.message : String(error)}
         </Card>
       )}
 
-      {!isLoading && rows.length === 0 ? (
+      {/* The search, the Filter menu and the pager in one bar over the
+          list. The card stays up when nothing matches, so the filter that
+          emptied the list is still there to undo. */}
+      <Card className={empty ? "mb-4" : undefined}>
+        <TableBar
+          pager={
+            data && (
+              <TablePagination
+                label="Images"
+                noun="images"
+                page={filter.page}
+                pages={data.total_pages}
+                total={data.total}
+                pageSize={PAGE_SIZE}
+                pagerId={FINDINGS_PAGER_ID}
+                setPage={(page) => {
+                  const next = new URLSearchParams(params);
+                  next.set("page", String(page));
+                  setParams(next);
+                }}
+              />
+            )
+          }
+          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={resetFilters} />}
+        >
+          <TableSearch
+            label="Search"
+            placeholder="Page, alt text, or image text"
+            value={filter.q ?? ""}
+            onChange={(v) => setParam("q", v)}
+          />
+          <FilterMenu groups={filters} onChange={setParam} onReset={resetFilters} />
+        </TableBar>
+        <TableStatus className={empty ? "border-b-0" : undefined}>
+          {data
+            ? `${data.total.toLocaleString()} ${data.total === 1 ? "image" : "images"}.`
+            : "Loading…"}
+        </TableStatus>
+        {!empty && <FindingsTable rows={rows} isLoading={isLoading} />}
+      </Card>
+
+      {empty && (
         <EmptyState
           title="No images match"
           message="Clear a filter or shorten your search."
         />
-      ) : (
-        <FindingsTable rows={rows} isLoading={isLoading} />
-      )}
-
-      {data && data.total_pages > 1 && (
-        <nav
-          className="mt-4 flex flex-wrap items-center gap-3 text-sm"
-          aria-label="Pagination"
-        >
-          {/* Pagination arrows are interactive, they need to clear the
-              44×44 SC 2.5.5 floor like every other control. Using the
-              shared <Button> at default `md` size pulls them up to
-              44px tall and inherits the AAA focus ring. */}
-          <Button
-            variant="secondary"
-            disabled={filter.page <= 1}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set("page", String(Math.max(1, filter.page - 1)));
-              setParams(next);
-            }}
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden />
-            Previous
-          </Button>
-          <span aria-current="page" className="font-semibold text-fg">
-            Page {filter.page} of {data.total_pages}
-          </span>
-          <Button
-            variant="secondary"
-            disabled={filter.page >= data.total_pages}
-            onClick={() => {
-              const next = new URLSearchParams(params);
-              next.set("page", String(filter.page + 1));
-              setParams(next);
-            }}
-          >
-            Next
-            <ChevronRight className="h-4 w-4" aria-hidden />
-          </Button>
-        </nav>
       )}
     </>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  labelFor = sentenceCase,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: readonly string[];
-  labelFor?: (option: string) => string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Select
-      stacked
-      label={label}
-      value={value}
-      onChange={onChange}
-      options={[
-        { value: "", label: "Any" },
-        ...options.map((option) => ({ value: option, label: labelFor(option) })),
-      ]}
-    />
   );
 }
 
@@ -265,121 +227,119 @@ function FindingsTable({
   const items = rowVirtualizer.getVirtualItems();
 
   return (
-    <Card className="overflow-hidden">
+    <div
+      role="table"
+      aria-label="Images"
+      aria-busy={isLoading}
+      className="flex flex-col"
+    >
       <div
-        role="table"
-        aria-label="Images"
-        aria-busy={isLoading}
-        className="flex flex-col"
+        role="row"
+        className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted"
       >
+        <span role="columnheader">Severity</span>
+        <span role="columnheader">Image</span>
+        <span role="columnheader">Text read from image (OCR)</span>
+        <span role="columnheader">Alt text</span>
+        <span role="columnheader">Image type</span>
+        <span role="columnheader">Page</span>
+        <span role="columnheader">Status</span>
+      </div>
+      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
         <div
-          role="row"
-          className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-subtle"
+          style={{ height: rowVirtualizer.getTotalSize() }}
+          className="relative"
         >
-          <span role="columnheader">Severity</span>
-          <span role="columnheader">Image</span>
-          <span role="columnheader">Text read from image (OCR)</span>
-          <span role="columnheader">Alt text</span>
-          <span role="columnheader">Image type</span>
-          <span role="columnheader">Page</span>
-          <span role="columnheader">Status</span>
-        </div>
-        <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
-          <div
-            style={{ height: rowVirtualizer.getTotalSize() }}
-            className="relative"
-          >
-            {items.map((v) => {
-              const f = rows[v.index];
-              return (
-                <div
-                  key={f.id}
-                  role="row"
-                  style={{
-                    transform: `translateY(${v.start}px)`,
-                    height: v.size,
-                  }}
-                  className="absolute inset-x-0 grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60"
-                >
-                  <div role="cell">
-                    <Link
-                      to={`/findings/${f.id}`}
-                      className="inline-block no-underline"
-                    >
-                      <SeverityChip value={f.severity} />
-                    </Link>
-                  </div>
-                  <div role="cell">
-                    {f.has_svg_text ? (
-                      <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border bg-umich-blue/10 font-mono text-2xs font-semibold text-umich-blue">
-                        SVG
-                      </span>
-                    ) : f.content_hash ? (
-                      <img
-                        src={blobUrl(f.content_hash)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        width={72}
-                        height={48}
-                        className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
-                      />
-                    ) : (
-                      <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
-                        No image
-                      </span>
-                    )}
-                  </div>
-                  <div role="cell" className="min-w-0">
-                    {f.ocr_text ? (
-                      <span
-                        className="block truncate font-mono text-xs text-fg"
-                        title={f.ocr_text}
-                      >
-                        {f.ocr_text}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-fg-subtle">No text found</span>
-                    )}
-                  </div>
-                  <div role="cell" className="min-w-0">
-                    <AltTag value={f.sample_alt} />
-                  </div>
-                  <div role="cell" className="text-xs text-fg-muted">
-                    {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
-                  </div>
-                  <div role="cell" className="min-w-0">
-                    {f.sample_page ? (
-                      // Page URL is now a real external link (target=_blank)
-                      // so a click here opens the actual page that has the
-                      // issue. Previously this rendered the URL as the
-                      // link text but pointed at /findings/{id}, which was
-                      // misleading. The severity chip on the same row
-                      // still links to the finding detail.
-                      <a
-                        href={f.sample_page}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block truncate text-xs text-umich-blue underline underline-offset-2"
-                        title={f.sample_page}
-                      >
-                        {f.sample_page}{" "}
-                        <span aria-hidden>↗</span>
-                        <span className="sr-only">opens in a new tab</span>
-                      </a>
-                    ) : (
-                      <span className="text-xs text-fg-subtle">Does not apply</span>
-                    )}
-                  </div>
-                  <div role="cell">
-                    <StatusChip value={f.status} />
-                  </div>
+          {items.map((v) => {
+            const f = rows[v.index];
+            return (
+              <div
+                key={f.id}
+                role="row"
+                style={{
+                  transform: `translateY(${v.start}px)`,
+                  height: v.size,
+                }}
+                className="absolute inset-x-0 grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60"
+              >
+                <div role="cell">
+                  <Link
+                    to={`/findings/${f.id}`}
+                    className="inline-block no-underline"
+                  >
+                    <SeverityChip value={f.severity} />
+                  </Link>
                 </div>
-              );
-            })}
-          </div>
+                <div role="cell">
+                  {f.has_svg_text ? (
+                    <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border bg-umich-blue/10 font-mono text-2xs font-semibold text-umich-blue">
+                      SVG
+                    </span>
+                  ) : f.content_hash ? (
+                    <img
+                      src={blobUrl(f.content_hash)}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      width={72}
+                      height={48}
+                      className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
+                    />
+                  ) : (
+                    <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
+                      No image
+                    </span>
+                  )}
+                </div>
+                <div role="cell" className="min-w-0">
+                  {f.ocr_text ? (
+                    <span
+                      className="block truncate font-mono text-xs text-fg"
+                      title={f.ocr_text}
+                    >
+                      {f.ocr_text}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-fg-subtle">No text found</span>
+                  )}
+                </div>
+                <div role="cell" className="min-w-0">
+                  <AltTag value={f.sample_alt} />
+                </div>
+                <div role="cell" className="text-xs text-fg-muted">
+                  {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
+                </div>
+                <div role="cell" className="min-w-0">
+                  {f.sample_page ? (
+                    // Page URL is now a real external link (target=_blank)
+                    // so a click here opens the actual page that has the
+                    // issue. Previously this rendered the URL as the
+                    // link text but pointed at /findings/{id}, which was
+                    // misleading. The severity chip on the same row
+                    // still links to the finding detail.
+                    <a
+                      href={f.sample_page}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-xs text-umich-blue underline underline-offset-2"
+                      title={f.sample_page}
+                    >
+                      {f.sample_page}{" "}
+                      <span aria-hidden>↗</span>
+                      <span className="sr-only">opens in a new tab</span>
+                    </a>
+                  ) : (
+                    <span className="text-xs text-fg-subtle">Does not apply</span>
+                  )}
+                </div>
+                <div role="cell">
+                  <StatusChip value={f.status} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

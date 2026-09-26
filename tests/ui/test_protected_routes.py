@@ -1254,6 +1254,15 @@ def test_protected_reports_are_hidden_from_public_legacy_routes_and_exports(
     )
     assert export.status_code == 403
 
+    # The Export panel's sizes are rendered from the same collectors, so
+    # they are refused the same way: no size, name or draft state leaks.
+    options_path = f"/api/scans/{protected_scan_id}/exports"
+    options = client.get(
+        options_path,
+        headers=_identity_headers(settings, method="GET", path=options_path),
+    )
+    assert options.status_code == 403
+
     diff_path = f"/api/scans/{protected_scan_id}/diff"
     diff = client.get(
         diff_path,

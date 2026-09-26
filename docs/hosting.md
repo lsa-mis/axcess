@@ -20,7 +20,7 @@ a few minutes of setup. This is the runbook for that ("Path A").
   Fine for a coordinating team; not multi-tenant. (Lifting this is
   "Path B": replacing the global with the per-scan job queue.)
 * **Heavy runtime.** Most checks need a real browser: axe-core and the
-  keyboard, focus, zoom, motion and click-through checks run only on pages
+  keyboard, focus, zoom, motion and Click-Through checks run only on pages
   rendered in Chromium. So the host needs Playwright and Chromium installed
   (`make setup` does this). The optional AI checks also need an
   [Ollama](https://ollama.com) service with models pulled: `make fetch-models`
@@ -183,7 +183,7 @@ U-M security team before approving a production target.
 
 You can skip the local AI service: its models are large downloads and add
 time to every page. Without it, Axcess still renders pages and runs axe-core,
-Siteimprove Alfa (if installed), the keyboard, focus, zoom, and click-through
+Siteimprove Alfa (if installed), the keyboard, focus, zoom, and Click-Through
 checks, and [OCR](./glossary.md#ocr) with Tesseract.
 
 In the New scan form, the switches that use a model are already off. You find

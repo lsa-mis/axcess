@@ -100,11 +100,12 @@ async def test_issue_table_filters_are_keyboard_operable(
         page.get_by_role("rowheader").get_by_role("link", name="Logo image, adequate alt")
     ).to_be_visible()
     await search.press("Tab")
-    # The filter's visible caption is its accessible name; it no longer
-    # carries a second, different one via aria-label.
-    await playwright_async.expect(
-        page.get_by_role("combobox", name="Level", exact=True)
-    ).to_be_focused()
+    # The next stop is the one Filter menu (Level, Type, Finding type). Its
+    # visible text is its accessible name; there is no second, different
+    # one via aria-label.
+    filters = page.get_by_role("button", name="Filter", exact=True)
+    await playwright_async.expect(filters).to_be_focused()
+    await playwright_async.expect(filters).to_have_attribute("aria-expanded", "false")
 
 
 async def test_cancelled_legacy_rationale_prompt_keeps_the_persisted_status(

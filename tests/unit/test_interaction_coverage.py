@@ -25,10 +25,42 @@ from audit.web.server import _methods_used, _scan_method_coverage
         ),
         (True, 1, 0, 0, "completed", "not_run", "Selected, but no page checks were recorded"),
         (True, 1, 0, 0, "running", "waiting", "Selected; waiting to run"),
-        (True, 1, 2, 0, "completed", "checked", "2 pages checked; 0 DOM states reached"),
-        (True, 0, 2, 5, "completed", "checked", "2 pages checked; 5 DOM states reached"),
-        (True, 1, 1, 1, "completed", "partial", "1 of 2 pages checked; 1 DOM state reached"),
-        (True, 1, 1, 3, "running", "running", "1 page checked so far; 3 DOM states reached"),
+        (
+            True,
+            1,
+            2,
+            0,
+            "completed",
+            "checked",
+            "2 pages checked; 0 page states opened by clicking",
+        ),
+        (
+            True,
+            0,
+            2,
+            5,
+            "completed",
+            "checked",
+            "2 pages checked; 5 page states opened by clicking",
+        ),
+        (
+            True,
+            1,
+            1,
+            1,
+            "completed",
+            "partial",
+            "1 of 2 pages checked; 1 page state opened by clicking",
+        ),
+        (
+            True,
+            1,
+            1,
+            3,
+            "running",
+            "running",
+            "1 page checked so far; 3 page states opened by clicking",
+        ),
     ],
 )
 def test_interaction_coverage_does_not_infer_work_from_selection(
@@ -94,10 +126,11 @@ def test_report_states_operated_controls_not_only_discovered_ones() -> None:
         }
     )
     assert method["result"] == (
-        "2 pages checked; 3 DOM states reached; 37 of 52 controls operated; "
+        "2 pages checked; 3 page states opened by clicking; 37 of 52 controls operated; "
         "6 controls skipped as unsafe; exploration limits reached on 1 page"
     )
-    assert "not necessarily operated" in method["caveat"]
+    # Controls counted as found were not all operated; the limit says so.
+    assert "may not use every control it finds" in method["caveat"]
 
 
 def test_a_stuck_dialog_is_named_in_the_report_not_folded_into_limits() -> None:
@@ -115,14 +148,17 @@ def test_a_stuck_dialog_is_named_in_the_report_not_folded_into_limits() -> None:
 
 def test_a_page_swept_to_exhaustion_claims_no_limit_and_no_refusal() -> None:
     method = methods({"interaction_controls": 4, "interaction_operated": 4})
-    assert method["result"] == "2 pages checked; 3 DOM states reached; 4 of 4 controls operated"
+    assert (
+        method["result"]
+        == "2 pages checked; 3 page states opened by clicking; 4 of 4 controls operated"
+    )
 
 
 def test_a_scan_without_a_ledger_says_less_rather_than_claiming_zero() -> None:
     """An older report has no per-page rows; that is not "0 controls found"."""
 
     method = methods({})
-    assert method["result"] == "2 pages checked; 3 DOM states reached"
+    assert method["result"] == "2 pages checked; 3 page states opened by clicking"
     assert "controls" not in method["result"]
 
 

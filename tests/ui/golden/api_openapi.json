@@ -1,6 +1,6 @@
 {
   "openapi": "3.1.0",
-  "info": {"title": "Axcess", "version": "0.1.0"},
+  "info": {"title": "Axcess", "version": "0.60"},
   "paths": {
     "/api/protected-scans": {
       "get": {
@@ -589,6 +589,16 @@
         }
       }
     },
+    "/api/sites": {
+      "get": {
+        "summary": "Api List Sites",
+        "description": "Public reports grouped by site, for the Reports list.",
+        "operationId": "api_list_sites_api_sites_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
     "/api/scans/{scan_id}": {
       "get": {
         "summary": "Api Scan Detail",
@@ -613,6 +623,28 @@
         "summary": "Api Delete Scan",
         "description": "Permanently delete a scan and everything it owns.\n\nCascades take care of the obvious children (pages, page_images,\nfindings, finding_history) via the FK declarations in\n0001_initial_schema.sql. Two things they don't cover and we have\nto handle ourselves:\n\n* ``images.first_seen_scan_id`` has no ``ON DELETE`` action, if\n  left pointing at a doomed scan, the DELETE FK-violates. We NULL\n  it instead of cascading because images are dedupe'd by\n  ``content_hash`` and may be referenced by later scans; losing\n  the image row would orphan blobs and break diff history.\n* ``jobs`` rows aren't FK-bound (``scan_id`` lives inside\n  ``payload_json``), so they need an explicit DELETE keyed on\n  ``json_extract``, same trick the cancel endpoint uses.\n\nWe refuse to delete a currently-running scan: the live asyncio\ntask would keep writing rows after the DELETE, leaving\nhalf-resurrected state. Caller must cancel first, then delete.",
         "operationId": "api_delete_scan_api_scans__scan_id__delete",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/settings": {
+      "get": {
+        "summary": "Api Scan Settings",
+        "description": "The settings a scan ran with, for New scan to start again from.\n\nBuilt from an allow-list (see ``audit.web.scan_settings``): scan\nsettings only, never sign-in state or confirmations. A report from\nthe protected workflow is refused; its settings belong to that\nworkflow's own draft, not to this form.",
+        "operationId": "api_scan_settings_api_scans__scan_id__settings_get",
         "parameters": [
           {
             "name": "scan_id",
@@ -1069,6 +1101,12 @@
             "schema": {"type": "string", "default": "", "title": "Review Lane"}
           },
           {
+            "name": "finding_type",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Finding Type"}
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -1357,7 +1395,7 @@
             "name": "page_size",
             "in": "query",
             "required": false,
-            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 50, "title": "Page Size"}
+            "schema": {"type": "integer", "maximum": 500, "minimum": 1, "default": 50, "title": "Page Size"}
           },
           {
             "name": "category",
@@ -1394,6 +1432,31 @@
           "200": {
             "description": "Successful Response",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComparisonResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/history": {
+      "get": {
+        "summary": "Api Scan History",
+        "description": "Completed reports of this report's site, for the Compare reports trend.",
+        "operationId": "api_scan_history_api_scans__scan_id__history_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SiteHistory"}}}
           },
           "422": {
             "description": "Validation Error",
@@ -1463,6 +1526,31 @@
         "operationId": "api_tracking_api_tracking_get",
         "responses": {
           "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
+    "/api/scans/{scan_id}/exports": {
+      "get": {
+        "summary": "Export Options",
+        "description": "Name, size and draft state of each file the Export panel offers.\n\nEach file is rendered exactly as the download route renders it, with\nthe draft acknowledged as the panel's links acknowledge it, and then\nmeasured. That costs a full render per format (about 1.5 s in total\nfor a 1,718-page scan), which is why the panel asks only when opened.",
+        "operationId": "export_options_api_scans__scan_id__exports_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ExportOptions"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
         }
       }
     },
@@ -1590,6 +1678,9 @@
           "current": {"$ref": "#/components/schemas/ReportIdentity"},
           "baseline": {"anyOf": [{"$ref": "#/components/schemas/ReportIdentity"}, {"type": "null"}]},
           "counts": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Counts"},
+          "changes": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Changes"},
+          "before_totals": {"anyOf": [{"$ref": "#/components/schemas/GroupTotals"}, {"type": "null"}]},
+          "after_totals": {"$ref": "#/components/schemas/GroupTotals"},
           "pipeline_counts": {
             "additionalProperties": {"type": "integer"},
             "type": "object",
@@ -1600,11 +1691,17 @@
             "type": "array",
             "title": "Coverage"
           },
+          "settings_changed": {"items": {"type": "string"}, "type": "array", "title": "Settings Changed"},
           "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"},
+          "notes": {
+            "items": {"$ref": "#/components/schemas/CoverageNote"},
+            "type": "array",
+            "title": "Notes"
+          },
           "rows": {
             "items": {"$ref": "#/components/schemas/ComparisonRow"},
             "type": "array",
-            "maxItems": 50,
+            "maxItems": 500,
             "title": "Rows"
           },
           "total": {"type": "integer", "title": "Total"},
@@ -1616,6 +1713,9 @@
           "current",
           "baseline",
           "counts",
+          "changes",
+          "before_totals",
+          "after_totals",
           "pipeline_counts",
           "limitations",
           "rows",
@@ -1639,13 +1739,40 @@
             "enum": ["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"],
             "title": "Category"
           },
+          "change": {"type": "string", "enum": ["new", "resolved", "remaining"], "title": "Change"},
+          "wcag_sc": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Wcag Sc"},
+          "wcag_name": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Wcag Name"},
+          "conformance": {"type": "string", "title": "Conformance"},
           "before": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
           "after": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
           "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"}
         },
         "type": "object",
-        "required": ["key", "pipeline", "title", "category", "before", "after", "limitations"],
+        "required": [
+          "key",
+          "pipeline",
+          "title",
+          "category",
+          "change",
+          "wcag_sc",
+          "wcag_name",
+          "conformance",
+          "before",
+          "after",
+          "limitations"
+        ],
         "title": "ComparisonRow"
+      },
+      "CoverageNote": {
+        "properties": {
+          "text": {"type": "string", "title": "Text"},
+          "scans": {"items": {"type": "integer"}, "type": "array", "title": "Scans"},
+          "differs": {"type": "boolean", "title": "Differs"}
+        },
+        "type": "object",
+        "required": ["text", "scans", "differs"],
+        "title": "CoverageNote",
+        "description": "One coverage note, said once for whichever of the two scans it is true of.\n\n``limitations`` repeats a note per report; this is the same evidence for a\nreader, without the notes the method coverage table already states."
       },
       "CoveragePair": {
         "properties": {
@@ -1715,6 +1842,43 @@
         "required": ["label", "url"],
         "title": "EvidenceLink"
       },
+      "ExportFormatOption": {
+        "properties": {
+          "format": {"type": "string", "enum": ["xlsx", "audit", "csv", "json"], "title": "Format"},
+          "filename": {"type": "string", "title": "Filename"},
+          "size_bytes": {"type": "integer", "title": "Size Bytes"}
+        },
+        "type": "object",
+        "required": ["format", "filename", "size_bytes"],
+        "title": "ExportFormatOption",
+        "description": "One file the panel offers, as the download would deliver it."
+      },
+      "ExportOptions": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "draft": {"type": "boolean", "title": "Draft"},
+          "evaluation_status": {"type": "string", "title": "Evaluation Status"},
+          "formats": {
+            "items": {"$ref": "#/components/schemas/ExportFormatOption"},
+            "type": "array",
+            "title": "Formats"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "draft", "evaluation_status", "formats"],
+        "title": "ExportOptions",
+        "description": "The Export panel's facts for one report."
+      },
+      "GroupTotals": {
+        "properties": {
+          "groups": {"type": "integer", "title": "Groups"},
+          "occurrences": {"type": "integer", "title": "Occurrences"}
+        },
+        "type": "object",
+        "required": ["groups", "occurrences"],
+        "title": "GroupTotals",
+        "description": "A report's issue groups and occurrences, counted as the Issues table does."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1725,6 +1889,18 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryPoint": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "started_at": {"type": "string", "title": "Started At"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"},
+          "groups": {"type": "integer", "title": "Groups"},
+          "occurrences": {"type": "integer", "title": "Occurrences"}
+        },
+        "type": "object",
+        "required": ["id", "started_at", "finished_at", "groups", "occurrences"],
+        "title": "HistoryPoint"
       },
       "LocalLoginScanRequest": {
         "properties": {
@@ -1756,6 +1932,7 @@
             "default": "axe"
           },
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level", "default": "AA"},
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version", "default": "2.1"},
           "skip_interaction": {"type": "boolean", "title": "Skip Interaction", "default": false},
           "skip_keyboard": {"type": "boolean", "title": "Skip Keyboard", "default": false},
           "skip_responsive": {"type": "boolean", "title": "Skip Responsive", "default": false},
@@ -2056,9 +2233,26 @@
         "required": ["target"],
         "title": "SearchTarget"
       },
+      "SiteHistory": {
+        "properties": {
+          "site_url": {"type": "string", "title": "Site Url"},
+          "total": {"type": "integer", "title": "Total"},
+          "scans": {
+            "items": {"$ref": "#/components/schemas/HistoryPoint"},
+            "type": "array",
+            "maxItems": 20,
+            "title": "Scans"
+          }
+        },
+        "type": "object",
+        "required": ["site_url", "total", "scans"],
+        "title": "SiteHistory",
+        "description": "Completed public reports of one site, oldest first, for the trend."
+      },
       "Snapshot": {
         "properties": {
           "occurrences": {"type": "integer", "title": "Occurrences"},
+          "issue_occurrences": {"type": "integer", "title": "Issue Occurrences"},
           "pages": {"type": "integer", "title": "Pages"},
           "statuses": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Statuses"},
           "outcomes": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Outcomes"},
@@ -2076,7 +2270,7 @@
           }
         },
         "type": "object",
-        "required": ["occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
+        "required": ["occurrences", "issue_occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
         "title": "Snapshot"
       },
       "ValidationError": {

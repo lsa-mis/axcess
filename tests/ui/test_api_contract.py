@@ -36,6 +36,7 @@ from fastapi.testclient import TestClient
 
 from audit import coverage_matrix, evaluation
 from audit.blob_store import BlobStore
+from audit.crawler import live_progress
 from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
@@ -54,6 +55,7 @@ _CONTRACT_GOLDEN = "api_contract.json"
 _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /health", "/health"),
     ("GET /api/scans", "/api/scans"),
+    ("GET /api/sites", "/api/sites"),
     ("GET /api/scans/{scan_id}", "/api/scans/{scan}"),
     ("GET /api/scans/{scan_id} (running)", "/api/scans/{running}"),
     ("GET /api/scans/{scan_id} (blocked)", "/api/scans/{blocked}"),
@@ -94,6 +96,7 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/scans/{scan_id}/evaluation (not saved)", "/api/scans/{baseline}/evaluation"),
     ("GET /api/scans/{scan_id}/manual-checks", "/api/scans/{scan}/manual-checks"),
     ("GET /api/scans/{scan_id}/comparison", "/api/scans/{scan}/comparison"),
+    ("GET /api/scans/{scan_id}/history", "/api/scans/{scan}/history"),
     (
         "GET /api/scans/{scan_id}/diff?compare_to={baseline_id}",
         "/api/scans/{scan}/diff?compare_to={baseline}",
@@ -329,9 +332,15 @@ def _add_report_history(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) 
     a ``before`` side. One image on each side exists only there (``new`` and
     ``resolved``), and a status changed since the baseline fills
     ``status_changed``. The baseline also fails the axe rule the report
-    fails, so that comparison row has before-side outcomes.
+    fails, so that comparison row has before-side outcomes. It ran with a
+    different page limit, so the comparison's ``settings_changed`` names one.
     """
     baseline = _seed(conn, blob_dir)
+    conn.execute(
+        "UPDATE scans SET config_json = json_set(COALESCE(config_json, '{}'), '$.max_pages', 7) "
+        "WHERE id = ?",
+        (baseline,),
+    )
     _add_label_violation(
         conn, scan_id=baseline, page_id=_page_ids(conn, baseline)[0], element_id="contract"
     )
@@ -340,6 +349,12 @@ def _add_report_history(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) 
             "UPDATE scans SET started_at = ?, finished_at = datetime(?, '+1 hour') WHERE id = ?",
             (started, started, report),
         )
+    # One of the report's pages redirected and none of the baseline's did, so
+    # the comparison's ``notes`` carries a note true of only one scan.
+    conn.execute(
+        "UPDATE pages SET final_url = url_normalized || '?moved=1' WHERE id = ?",
+        (_page_ids(conn, scan_id)[1],),
+    )
     _add_image(
         conn,
         blob_dir,
@@ -608,14 +623,26 @@ def test_read_endpoint_shapes_match_golden(
     for pipeline in ("axe", "image", "alfa"):
         ids[f"{pipeline}_issue"] = _first_issue_key(client, scan_id, pipeline)
 
+    # A scan running in this process records each page's checks in memory
+    # (audit.crawler.live_progress). Give the seeded running scan one tracked
+    # page so ``progress.page_checks[].checks`` carries a value to pin, and
+    # drop it after: the record is process-wide, and other tests reuse ids.
+    with (
+        live_progress.page(ids["running"], "http://running.example.org/0", ["axe", "keyboard"]),
+        live_progress.check("axe"),
+    ):
+        pass
     observed: dict[str, Any] = {}
-    for label, template in _ENDPOINTS:
-        response = client.get(template.format(**ids))
-        observed[label] = {
-            "status": response.status_code,
-            "content_type": response.headers.get("content-type"),
-            "body": _skeleton(response.json()),
-        }
+    try:
+        for label, template in _ENDPOINTS:
+            response = client.get(template.format(**ids))
+            observed[label] = {
+                "status": response.status_code,
+                "content_type": response.headers.get("content-type"),
+                "body": _skeleton(response.json()),
+            }
+    finally:
+        live_progress.forget(ids["running"])
     # Before the golden, so a golden cannot be regenerated from a seed that
     # has stopped exercising a field.
     _check_seed_coverage(observed)

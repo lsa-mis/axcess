@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
@@ -43,6 +44,8 @@ from typing import Any, Literal
 import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
+from audit.labels import FINDING_TYPES, FindingType
+from audit.wcag_version import WcagVersion, stored_wcag_version
 from audit.web import a11y_queries, image_findings_queries
 
 # Conformance label shown in the table's badge column.
@@ -183,7 +186,7 @@ class IssueLocation:
     # appears once a menu is opened.
     revealed_by: str | None = None
     # Blob hash of the scan-time screenshot with the detected location
-    # circled, when one was captured. Lets the Issues view expand the visual
+    # marked, when one was captured. Lets the Issues view expand the visual
     # evidence inline instead of deep-linking to the page-evidence route.
     screenshot_hash: str | None = None
     # The captured outerHTML of the flagged element, the "exact element
@@ -251,6 +254,15 @@ class IssueRow:
     # unchanged.
     repeat_finding_ids: tuple[int, ...] = ()
     repeat_page_count: int = 0
+    # Which families of checks produced this group's evidence, in the table's
+    # order (see ``audit.labels.FINDING_TYPES``). A DOM rule group can be
+    # both "wcag" and "click_through": some of its occurrences were in the
+    # page as it loaded, others appeared only after Click-Through operated a
+    # control. The group is not split, so its key, statuses, and cross-scan
+    # comparison stay what they were; ``click_through_occurrence_count`` says
+    # how many of ``occurrence_count`` are the second kind.
+    finding_types: tuple[FindingType, ...] = ("wcag",)
+    click_through_occurrence_count: int = 0
 
 
 def list_issues(
@@ -262,7 +274,8 @@ def list_issues(
     abilities: list[str] | None = None,
     status: str | None = None,
     search: str | None = None,
-    review_lane: str | None = None,
+    review_lane: str | Sequence[str] | None = None,
+    finding_type: str | Sequence[str] | None = None,
     sort: str = "priority_desc",
 ) -> list[IssueRow]:
     """Build the unified issues list with optional filters.
@@ -277,6 +290,11 @@ def list_issues(
         least one of its findings is in that status. Empty/None = all.
       * ``search``, case-insensitive substring match against title or
         WCAG SC.
+      * ``review_lane``, one lane or a list of lanes; an issue passes if
+        it is in any of them. Empty/None = all.
+      * ``finding_type``, one or a list of ``audit.labels.FINDING_TYPES``;
+        an issue passes if any of its evidence is of any of those types, so
+        a mixed WCAG and Click-Through group appears under both.
 
     Sort options:
       * ``priority_desc`` (default), barriers first, then needs-review,
@@ -292,7 +310,9 @@ def list_issues(
     rules = _load_rules()
 
     rows: list[IssueRow] = []
-    rows.extend(_axe_issue_rows(conn, scan_id, rules))
+    rows.extend(
+        _axe_issue_rows(conn, scan_id, rules, wcag_version=_scan_wcag_version(conn, scan_id))
+    )
     rows.extend(_image_issue_rows(conn, scan_id, rules))
 
     return filter_and_sort(
@@ -303,6 +323,7 @@ def list_issues(
         status=status,
         search=search,
         review_lane=review_lane,
+        finding_type=finding_type,
         sort=sort,
     )
 
@@ -315,7 +336,8 @@ def filter_and_sort(
     abilities: list[str] | None = None,
     status: str | None = None,
     search: str | None = None,
-    review_lane: str | None = None,
+    review_lane: str | Sequence[str] | None = None,
+    finding_type: str | Sequence[str] | None = None,
     sort: str = "priority_desc",
 ) -> list[IssueRow]:
     """Apply the Issues filters and sort to an already-built row list.
@@ -342,7 +364,11 @@ def filter_and_sort(
         needle = search.lower()
         rows = [r for r in rows if needle in r.title.lower() or (r.wcag_sc and needle in r.wcag_sc)]
     if review_lane:
-        rows = [r for r in rows if r.review_lane == review_lane]
+        lanes = {review_lane} if isinstance(review_lane, str) else set(review_lane)
+        rows = [r for r in rows if r.review_lane in lanes]
+    if finding_type:
+        types = {finding_type} if isinstance(finding_type, str) else set(finding_type)
+        rows = [r for r in rows if not types.isdisjoint(r.finding_types)]
 
     return _sort_rows(rows, sort)
 
@@ -433,10 +459,13 @@ def detail_for_row(
         if match:
             help_url = match.get("help_url") or None
 
+    description = meta.get("what_happening")
+    if _is_wcag21_best_practice(row):
+        description = _with_wcag21_note(description)
     return IssueDetail(
         row=row,
         pages=pages,
-        description=meta.get("what_happening"),
+        description=description,
         why_matters=meta.get("why_matters"),
         fix_steps=list(meta.get("fix_steps") or []),
         verify_manual=(
@@ -662,15 +691,74 @@ def review_lane_breakdown(rows: list[IssueRow]) -> dict[str, int]:
     return out
 
 
+def finding_type_breakdown(rows: list[IssueRow]) -> dict[str, int]:
+    """Issue groups per finding type, for the Finding type filter.
+
+    A mixed WCAG and Click-Through group counts under both, matching what
+    the filter shows, so the counts can add up to more than the row total.
+    """
+    out: dict[str, int] = dict.fromkeys(FINDING_TYPES, 0)
+    for row in rows:
+        for finding_type in row.finding_types:
+            out[finding_type] = out.get(finding_type, 0) + 1
+    return out
+
+
+def _dom_finding_types(
+    pipeline: str, occurrences: int, click_through: int
+) -> tuple[FindingType, ...]:
+    """Finding types for one DOM-engine group (see ``IssueRow.finding_types``).
+
+    A protected image-of-text lead is image evidence, like the public image
+    pipeline, even though it is stored beside the DOM findings.
+    """
+    if pipeline == "protected_image":
+        return ("alt_text",)
+    if click_through <= 0:
+        return ("wcag",)
+    if click_through >= occurrences:
+        return ("click_through",)
+    return ("wcag", "click_through")
+
+
 # --------------------------------------------------------------------------
 # Per-pipeline row builders.
 # --------------------------------------------------------------------------
+
+
+# SC 2.4.11 Focus Not Obscured (Minimum) is new in WCAG 2.2. The focus probe
+# still runs on a WCAG 2.1 scan when its switch is on, but 2.1 does not
+# require the criterion, so its findings there are best practice rather than
+# a WCAG failure. The stored findings keep their 2.2 level; this projection
+# decides the label from the scan's recorded version.
+_WCAG22_ONLY_FOCUS_SC = "2.4.11"
+_WCAG21_FOCUS_NOTE = (
+    "SC 2.4.11 Focus Not Obscured (Minimum) is a WCAG 2.2 criterion. This scan "
+    "was audited against WCAG 2.1, which does not require it, so it is reported "
+    "as best practice."
+)
+
+
+def _scan_wcag_version(conn: sqlite3.Connection, scan_id: int) -> WcagVersion:
+    row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    return stored_wcag_version(row["config_json"] if row is not None else None)
+
+
+def _is_wcag21_best_practice(row: IssueRow) -> bool:
+    """True for a 2.4.11 row that a WCAG 2.1 scan relabeled as best practice."""
+    return row.wcag_sc == _WCAG22_ONLY_FOCUS_SC and row.conformance == "BP"
+
+
+def _with_wcag21_note(text: str | None) -> str:
+    return f"{text} {_WCAG21_FOCUS_NOTE}" if text else _WCAG21_FOCUS_NOTE
 
 
 def _axe_issue_rows(
     conn: sqlite3.Connection,
     scan_id: int,
     rules: dict[str, Any],
+    *,
+    wcag_version: WcagVersion,
 ) -> list[IssueRow]:
     """One row per ``rule_id`` group from the page_a11y_findings table.
 
@@ -743,6 +831,9 @@ def _axe_issue_rows(
             wcag_level = None
             conformance = "BP"
             impact = "minor"
+        wcag21_best_practice = wcag_version == "2.1" and wcag_sc == _WCAG22_ONLY_FOCUS_SC
+        if wcag21_best_practice:
+            conformance = "BP"
         alfa_failed = sum(1 for f in reported if (f.get("engine_outcome") or "failed") == "failed")
         alfa_cant_tell = sum(1 for f in reported if f.get("engine_outcome") == "cant_tell")
         alfa_description: str | None = None
@@ -937,6 +1028,13 @@ def _axe_issue_rows(
             evidence_confidence = "high"
             high_confidence_occurrences = len(reported)
             evidence_summary = "Deterministic axe-core rule failure; verify after remediation."
+        description = meta.get("what_happening") or alfa_description
+        # ``revealed_by`` names the control Click-Through had to operate;
+        # NULL means the element was there when the page loaded.
+        click_through = sum(1 for f in reported if f.get("revealed_by"))
+        if wcag21_best_practice:
+            evidence_summary = _with_wcag21_note(evidence_summary)
+            description = _with_wcag21_note(description)
         out.append(
             IssueRow(
                 pipeline=pipeline,
@@ -984,7 +1082,7 @@ def _axe_issue_rows(
                 # what/why/how without a second API call. `help_url`
                 # falls back to the axe-supplied URL when the YAML
                 # doesn't pin one.
-                description=meta.get("what_happening") or alfa_description,
+                description=description,
                 why_matters=meta.get("why_matters") or alfa_why_matters,
                 fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
@@ -992,6 +1090,8 @@ def _axe_issue_rows(
                 locations=_a11y_location_samples(reported, scan_id=scan_id),
                 repeat_finding_ids=tuple(int(f["id"]) for f in repeats),
                 repeat_page_count=len(repeat_pages),
+                finding_types=_dom_finding_types(pipeline, len(reported), click_through),
+                click_through_occurrence_count=click_through,
             )
         )
     return out
@@ -1151,6 +1251,7 @@ def _image_issue_rows(
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url"),
                 locations=_image_location_samples(findings, scan_id=scan_id),
+                finding_types=("alt_text",),
             )
         )
     return out

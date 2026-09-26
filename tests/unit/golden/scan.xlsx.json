@@ -23,7 +23,7 @@
   "named_styles": ["Hyperlink", "Normal"],
   "properties": {"category": null, "contentStatus": null, "creator": "openpyxl", "description": null, "identifier": null, "keywords": null, "language": null, "lastPrinted": null, "revision": null, "subject": null, "title": null, "version": null},
   "protection": {"lockRevision": null, "lockStructure": null, "lockWindows": null, "revisionsAlgorithmName": null, "revisionsHashValue": null, "revisionsPassword": null, "revisionsPasswordCharacterSet": null, "revisionsSaltValue": null, "revisionsSpinCount": null, "workbookAlgorithmName": null, "workbookHashValue": null, "workbookPassword": null, "workbookPasswordCharacterSet": null, "workbookSaltValue": null, "workbookSpinCount": null},
-  "sheet_names": ["Summary", "Issues Overview", "I01 Images of text have no alt", "I02 Image (unclassified), missi", "I03 Logo image, adequate alt", "Page Hotspots", "Page References", "DOM States", "Who's Affected", "Coverage & Method", "Test Tracking", "Manual Review Evidence"],
+  "sheet_names": ["Summary", "Issues Overview", "I01 Images of text have no alt", "I02 Image (unclassified), missi", "I03 Logo image, adequate alt", "Page Hotspots", "Page References", "Click-Through", "Who's Affected", "Coverage & Method", "Test Tracking", "Manual Review Evidence"],
   "sheets": [
     {
       "title": "Summary", "active": true, "auto_filter": null, "charts": [], "comments": [], "conditional_formatting": [], "data_validations": [], "defined_names": {}, "freeze_panes": null, "images": [], "state": "visible", "tables": {},
@@ -230,7 +230,7 @@
       ]
     },
     {
-      "title": "DOM States", "active": false, "auto_filter": "A4:E5", "charts": [], "comments": [], "conditional_formatting": [], "data_validations": [], "defined_names": {}, "freeze_panes": "A5", "hyperlinks": [], "images": [], "state": "visible", "tables": {},
+      "title": "Click-Through", "active": false, "auto_filter": "A4:E5", "charts": [], "comments": [], "conditional_formatting": [], "data_validations": [], "defined_names": {}, "freeze_panes": "A5", "hyperlinks": [], "images": [], "state": "visible", "tables": {},
       "columns": {"A": [58.0, false, 0], "B": [16.0, false, 0], "C": [18.0, false, 0], "D": [12.0, false, 0], "E": [44.0, false, 0]},
       "format": {"baseColWidth": 8, "customHeight": null, "defaultColWidth": null, "defaultRowHeight": 15.0, "outlineLevelCol": null, "outlineLevelRow": null, "thickBottom": null, "thickTop": null, "zeroHeight": null},
       "merged": ["A1:E1", "A2:E2", "A5:E5"],
@@ -240,9 +240,9 @@
       "rows": {"2": [42.0, false, 0]},
       "views": [{"colorId": null, "defaultGridColor": null, "pane": {"activePane": "bottomLeft", "state": "frozen", "topLeftCell": "A5", "xSplit": null, "ySplit": 4.0}, "rightToLeft": null, "selection": [{"activeCell": "A1", "activeCellId": null, "pane": "bottomLeft", "sqref": "A1"}], "showFormulas": null, "showGridLines": null, "showOutlineSymbols": null, "showRowColHeaders": null, "showRuler": null, "showWhiteSpace": null, "showZeros": null, "tabSelected": null, "topLeftCell": null, "view": null, "windowProtection": null, "workbookViewId": 0, "zoomScale": null, "zoomScaleNormal": null, "zoomScalePageLayoutView": null, "zoomScaleSheetLayoutView": null, "zoomToFit": null}],
       "cells": [
-        ["A1", "DOM states, content behind a click", "s", "General", "9d0bc644a4f5"],
-        ["A2", "Click-through DOM state discovery reached 0 state(s) across 0 page(s). Per-page control coverage was not recorded for this scan, so the share of controls operated is unknown.  Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what this probe can reach and still require manual testing.  Click-revealed findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.", "s", "General", "f64acd9f1669"],
-        ["A4", "Page", "s", "General", "23d8d1945d10"], ["B4", "Controls found", "s", "General", "23d8d1945d10"], ["C4", "Controls operated", "s", "General", "23d8d1945d10"], ["D4", "States", "s", "General", "23d8d1945d10"], ["E4", "Why it stopped", "s", "General", "23d8d1945d10"],
+        ["A1", "Click-Through, content behind a click", "s", "General", "9d0bc644a4f5"],
+        ["A2", "Click-Through reached 0 page states opened by clicking across 0 page(s). Per-page control coverage was not recorded for this scan, so the share of controls operated is unknown.  Hover-only content, gestures, operating-system menus, closed shadow DOM, cross-origin embeds, and states with no observable DOM change are outside what Click-Through can reach and still require manual testing.  Click-Through findings are not yet compared across scans. If one is absent from a later report, confirm the fix directly, absence is not proof of repair.", "s", "General", "f64acd9f1669"],
+        ["A4", "Page", "s", "General", "23d8d1945d10"], ["B4", "Controls found", "s", "General", "23d8d1945d10"], ["C4", "Controls operated", "s", "General", "23d8d1945d10"], ["D4", "Page states opened by clicking", "s", "General", "23d8d1945d10"], ["E4", "Why it stopped", "s", "General", "23d8d1945d10"],
         ["A5", "No per-page control ledger was recorded for this scan. Treat per-page click coverage as unknown rather than zero.", "s", "General", "31b5c4357deb"]
       ]
     },

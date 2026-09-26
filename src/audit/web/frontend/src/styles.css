@@ -5,6 +5,174 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colour tokens, as space-separated RGB channels so Tailwind's `/opacity`
+   modifiers work (tailwind.config.ts maps each utility to one of these).
+
+   Light is the pinned U-M palette: every text token clears 7:1 (SC 1.4.6) on
+   every surface it lands on -- fg 17.7:1, fg-muted 10.3:1 and fg-subtle
+   7.9:1 on white; severity text 8.9-9.4:1 on its own tint. Dark keeps the
+   same ratios inverted, and More / High contrast only ever raise them.
+   Settings writes `data-theme`, `data-contrast` and `data-color-vision` on
+   <html>; nothing else should switch these. */
+:root {
+  --c-umich-blue: 0 39 76;
+  --c-umich-blue-600: 0 58 108;
+  --c-umich-blue-700: 0 30 60;
+  --c-umich-maize: 255 203 5;
+  --c-umich-maize-600: 230 183 4;
+  --c-sev-critical: 122 0 0;
+  --c-sev-critical-bg: 254 226 226;
+  --c-sev-major: 107 46 0;
+  --c-sev-major-bg: 255 235 199;
+  --c-sev-minor: 79 66 0;
+  --c-sev-minor-bg: 254 249 195;
+  --c-sev-info: 31 41 55;
+  --c-sev-info-bg: 229 231 235;
+  /* Something that ran or passed: 7.1:1 on its tint, 7.8:1 on white. The
+     label beside it always says it in words as well. */
+  --c-ok: 21 94 49;
+  --c-ok-bg: 220 252 231;
+  --c-surface: 255 255 255;
+  --c-surface-subtle: 247 249 252;
+  --c-surface-muted: 241 244 248;
+  --c-surface-raised: 255 255 255;
+  --c-surface-inverse: 0 39 76;
+  --c-surface-inverse-fg: 255 255 255;
+  --c-surface-inverse-fg-subtle: 201 212 224;
+  --c-border: 220 227 236;
+  --c-border-strong: 184 196 210;
+  --c-border-focus: 0 39 76;
+  --c-fg: 17 24 39;
+  --c-fg-muted: 55 65 81;
+  --c-fg-subtle: 71 82 99;
+  --c-fg-inverse: 255 255 255;
+  --c-fg-accent: 0 39 76;
+  /* The sidebar's top-to-bottom ramp. */
+  --c-sidebar-1: 248 250 252;
+  --c-sidebar-2: 241 244 248;
+  --c-sidebar-3: 230 235 242;
+  --font-sans: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --target: 44px;
+}
+
+:root[data-contrast="more"] {
+  --c-fg-muted: 31 41 55; /* 14.7:1 on white */
+  --c-fg-subtle: 43 53 68; /* 12.6:1 */
+  --c-border: 184 196 210;
+  --c-border-strong: 125 138 156; /* 3.5:1, SC 1.4.11 */
+}
+
+/* High: near-black on white, no tinted panels. */
+:root[data-contrast="high"] {
+  --c-fg: 0 0 0;
+  --c-fg-muted: 11 15 22;
+  --c-fg-subtle: 17 24 39;
+  --c-surface-subtle: 255 255 255;
+  --c-surface-muted: 255 255 255;
+  --c-border: 75 85 99;
+  --c-border-strong: 31 41 55;
+  --c-sidebar-1: 255 255 255;
+  --c-sidebar-2: 255 255 255;
+  --c-sidebar-3: 255 255 255;
+}
+
+/* Dark: the light palette inverted. Blue becomes the light accent, so
+   `bg-umich-blue text-fg-inverse` (the primary button) is light blue with
+   near-black text, the same 12:1+ pairing turned over. Maize stays maize. */
+:root[data-theme="dark"] {
+  --c-umich-blue: 158 197 238;
+  --c-umich-blue-600: 184 213 243;
+  --c-umich-blue-700: 134 179 230;
+  --c-sev-critical: 255 180 180;
+  --c-sev-critical-bg: 63 20 20;
+  --c-sev-major: 255 201 153;
+  --c-sev-major-bg: 58 35 12;
+  --c-sev-minor: 232 220 138;
+  --c-sev-minor-bg: 46 43 12;
+  --c-sev-info: 229 231 235;
+  --c-sev-info-bg: 42 50 61;
+  --c-ok: 134 239 172; /* 10.1:1 on its tint */
+  --c-ok-bg: 13 49 30;
+  --c-surface: 17 26 38;
+  --c-surface-subtle: 11 18 27;
+  --c-surface-muted: 26 37 51;
+  --c-surface-raised: 22 32 45;
+  --c-surface-inverse: 207 224 243;
+  --c-surface-inverse-fg: 11 18 27;
+  --c-surface-inverse-fg-subtle: 34 48 63;
+  --c-border: 44 58 77;
+  --c-border-strong: 91 110 134;
+  --c-border-focus: 158 197 238;
+  --c-fg: 237 241 246;
+  --c-fg-muted: 200 209 220;
+  --c-fg-subtle: 174 185 199;
+  --c-fg-inverse: 11 18 27;
+  --c-fg-accent: 158 197 238;
+  --c-sidebar-1: 14 22 32;
+  --c-sidebar-2: 17 26 38;
+  --c-sidebar-3: 22 32 45;
+}
+:root[data-theme="dark"][data-contrast="more"] {
+  --c-fg-muted: 221 227 234;
+  --c-fg-subtle: 203 211 221;
+  --c-border: 91 110 134;
+  --c-border-strong: 128 147 170;
+}
+:root[data-theme="dark"][data-contrast="high"] {
+  --c-umich-blue: 184 213 243;
+  --c-fg: 255 255 255;
+  --c-fg-muted: 245 247 250;
+  --c-fg-subtle: 232 236 241;
+  --c-fg-inverse: 0 0 0;
+  --c-surface: 0 0 0;
+  --c-surface-subtle: 0 0 0;
+  --c-surface-muted: 0 0 0;
+  --c-surface-raised: 0 0 0;
+  --c-border: 160 174 192;
+  --c-border-strong: 226 232 240;
+  --c-sidebar-1: 0 0 0;
+  --c-sidebar-2: 0 0 0;
+  --c-sidebar-3: 0 0 0;
+}
+
+/* Colour vision. Red, brown and olive severity all read as one muddy hue
+   to red-weak and green-weak eyes, so critical moves to blue and minor to
+   neutral grey; blue-weak eyes lose blue/green and yellow/violet, so major
+   moves to teal. Each pair still clears 7:1 on its tint and on the page. */
+:root[data-color-vision="protan"],
+:root[data-color-vision="deutan"] {
+  --c-sev-critical: 0 58 140;
+  --c-sev-critical-bg: 220 232 251;
+  --c-sev-minor: 63 63 70;
+  --c-sev-minor-bg: 237 237 240;
+}
+:root[data-color-vision="tritan"] {
+  --c-sev-major: 0 81 79;
+  --c-sev-major-bg: 211 242 240;
+  --c-sev-minor: 63 63 70;
+  --c-sev-minor-bg: 237 237 240;
+}
+:root[data-theme="dark"][data-color-vision="protan"],
+:root[data-theme="dark"][data-color-vision="deutan"] {
+  --c-sev-critical: 169 200 255;
+  --c-sev-critical-bg: 19 38 74;
+  --c-sev-minor: 212 212 216;
+  --c-sev-minor-bg: 42 42 48;
+}
+:root[data-theme="dark"][data-color-vision="tritan"] {
+  --c-sev-major: 142 224 218;
+  --c-sev-major-bg: 15 52 50;
+  --c-sev-minor: 212 212 216;
+  --c-sev-minor-bg: 42 42 48;
+}
+/* A filter on the root element does not become the containing block for
+   fixed-position children (Filter Effects §2), so dialogs and the skip link
+   still pin to the viewport. */
+:root[data-color-vision="grayscale"] {
+  filter: grayscale(1);
+}
+
 /* Base typographic + color defaults layered on top of Tailwind's reset. */
 @layer base {
   html {
@@ -15,7 +183,7 @@
     /* Wide evidence tables scroll in their named local region; they must not
        create a second, document-level horizontal scroll area at 320px. */
     overflow-x: hidden;
-    background: theme("colors.surface.subtle");
+    background: rgb(var(--c-surface-subtle));
   }
   body {
     @apply bg-surface-subtle text-fg;
@@ -24,11 +192,11 @@
     text-rendering: optimizeLegibility;
   }
   ::selection {
-    background: theme("colors.umich.maize");
-    color: theme("colors.umich.blue");
+    background: rgb(var(--c-umich-maize));
+    color: #00274c;
   }
   :focus-visible {
-    outline: 3px solid theme("colors.umich.maize");
+    outline: 3px solid rgb(var(--c-umich-maize));
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -117,6 +285,13 @@
   .tok-value {
     color: #7a0000; /* 10.4:1 */
   }
+  /* Dark theme: the same two hues lifted to clear 7:1 on dark surface-muted. */
+  :root[data-theme="dark"] .tok-attr {
+    color: #e8dc8a;
+  }
+  :root[data-theme="dark"] .tok-value {
+    color: #ffb4b4;
+  }
   .tok-text {
     @apply text-fg;
   }
@@ -173,4 +348,91 @@
   .sev-chip--info {
     @apply bg-sev-info-bg text-sev-info;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings. Each rule keys off an attribute `applyPreferences` writes  */
+/* on <html>; the default value of every setting has no rule, so the    */
+/* app renders exactly as it did before Settings existed. `!important`  */
+/* is deliberate: a reader's preference has to beat a component's own   */
+/* utility classes, the way a user stylesheet would.                    */
+/* ------------------------------------------------------------------ */
+
+:root[data-font="system"] {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-font="serif"] {
+  --font-sans: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, Cambria, "Times New Roman", serif;
+}
+
+/* Link underlines: every text link, everywhere. Links drawn as buttons
+   (`data-button`) keep their button shape instead. */
+:root[data-links="always"] a:not([data-button]) {
+  text-decoration-line: underline !important;
+  text-underline-offset: 2px;
+}
+
+/* Text spacing. "WCAG 1.4.12" is the exact SC 1.4.12 test values. */
+:root[data-text-spacing="wide"] body {
+  letter-spacing: 0.04em;
+  word-spacing: 0.08em;
+}
+:root[data-text-spacing="wide"] :is(p, li, dd, td, th, label) {
+  line-height: 1.65 !important;
+}
+:root[data-text-spacing="wcag"] body * {
+  line-height: 1.5 !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+}
+:root[data-text-spacing="wcag"] main p:not(:last-child) {
+  margin-bottom: 2em !important;
+}
+
+/* Dyslexia-friendly spacing: long text only, not controls or chips. */
+:root[data-dyslexia="on"] main :is(p, li, dd, blockquote) {
+  word-spacing: 0.22em !important;
+  letter-spacing: 0.05em !important;
+  line-height: 1.8 !important;
+}
+
+/* Focus indicator. Strong: a navy ring inside a maize halo, visible on
+   both light and dark surfaces. Always: the same ring on mouse focus too.
+   Elements focused by script (tabindex="-1", e.g. <main> after a route
+   change) are left alone, so a navigation does not ring the whole page. */
+:root[data-focus="strong"] :focus-visible,
+:root[data-focus="always"] :focus:not([tabindex="-1"]) {
+  outline: 3px solid #00274c !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 8px rgb(var(--c-umich-maize)) !important;
+}
+
+/* Table density: the vertical padding of every data cell. Default is the
+   cells' own padding (Table.tsx); Tight still leaves room between lines of
+   a wrapped cell, and Roomy adds a clear gap between rows. */
+:root[data-density="compact"] :is(td, th) {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+:root[data-density="spacious"] :is(td, th) {
+  padding-top: 1.25rem !important;
+  padding-bottom: 1.25rem !important;
+}
+
+/* Animations off: no transition or animation anywhere, whatever the OS says. */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* New scan: the summary rail beside the form is sticky, and a sticky box
+   pins to its nearest scroll container. The app shell's <main> is one
+   (`overflow-auto`) but never scrolls itself — the document does — so the
+   rail would scroll away with the page. The form has nothing wide to
+   scroll, so on this page <main> leaves the document as the container. */
+#main:has(#scan-panel) {
+  overflow: visible;
 }

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import pkg from "./package.json" with { type: "json" };
 
 // Dev server runs on 5173; proxy /api and /blobs to FastAPI on :8765 so the
 // SPA talks to the real backend without CORS. Production build is served
@@ -10,6 +11,8 @@ import react from "@vitejs/plugin-react";
 // @types/node — unnecessary for a browser-only bundle.
 export default defineConfig(({ command }) => ({
   plugins: [react()],
+  // The About page prints the version of the build it came from.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // Bundle served from /app/ in production; Vite dev server stays at /.
   base: command === "build" ? "/app/" : "/",
   server: {

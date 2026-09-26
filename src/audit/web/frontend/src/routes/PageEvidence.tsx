@@ -309,12 +309,12 @@ function FindingCard({
           <img
             className="max-h-72 rounded-xs border border-border"
             src={blobUrl(finding.screenshot_hash)}
-            alt="Screenshot of the issue. A circle marks where Axcess found it."
+            alt="Screenshot of the issue. An outline marks where it was found."
             loading="lazy"
           />
           <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-muted">
             <ScanEye className="h-3.5 w-3.5" aria-hidden />
-            Taken during the scan. The circle marks where Axcess found the issue.
+            Taken during the scan. The outline marks where it was found.
           </figcaption>
         </figure>
       ) : (
