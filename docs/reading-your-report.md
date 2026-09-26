@@ -111,12 +111,13 @@ report** menu sits at the top right. Four numbers above the table count:
 
 Below the numbers, two closed rows open more detail. **What was checked**
 shows how many checks ran, such as "7 of 9 checks ran". It opens a table with
-one row per check, such as axe-core and Click-Through, and the checks that ran
-come first. **Status** is one of Not selected, Waiting, Checking, Ran, Partly
-ran, Did not run, or Not recorded, with a check mark for Ran and Partly ran.
-**Result** says what the check ran on and what it found, and **What it can and
-cannot show** says what a clean result does and does not prove. The focus and
-visual checks have no row here. The second row, **What Barrier, Needs review
+one row per check, such as Rule check (axe) and Click-Through, and the checks
+that ran come first. **Status** is one of Not selected, Waiting, Checking, Ran,
+Partly ran, Did not run, or Not recorded, with a check mark for Ran and Partly
+ran. **Result** says what the check ran on and what it found. **About this
+check** says in one line each what the check does and its limit, and **More
+about this check** opens its card on the Axcess website. The focus and visual
+checks have no row here. The second row, **What Barrier, Needs review
 and the other labels mean**, explains the words in the **Type** and **Found
 by** columns.
 

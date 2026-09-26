@@ -926,13 +926,96 @@ LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-ac
 LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html"
 
 
+# One short card per check, in the order the app's "What was checked" table
+# lists them. Each card's id is the key the app links to
+# (MethodCoverageLedger's "More about this check": coverage/#check-<key>),
+# so a key here must match ``_methods_used`` in src/audit/web/server.py.
+CHECK_CARDS = (
+    (
+        "search",
+        "Site search",
+        "Runs the searches you set up and checks the result pages.",
+        "Other search words can reach other pages. You approve these searches, so they can send data to the site.",
+    ),
+    (
+        "rendered",
+        "Opened in a browser",
+        "Opens each page in a real browser, so its scripts run and the browser checks can test it.",
+        "Opening a page is not a pass.",
+    ),
+    (
+        "axe",
+        "Rule check (axe)",
+        "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose. Failures are Barriers.",
+        "A page with nothing found can still fail WCAG.",
+    ),
+    (
+        "alfa",
+        "Rule check (Alfa)",
+        "Runs Siteimprove Alfa's standard test rules (Accessibility Conformance Testing, ACT). Each rule passes, fails, or cannot tell.",
+        "A failed rule is not proof the page fails WCAG. Each \u201ccannot tell\u201d goes to Needs review.",
+    ),
+    (
+        "image",
+        "Image text check",
+        "Reads text in images (OCR) and asks a local vision model whether the alt text says the same.",
+        "A person confirms each result.",
+    ),
+    (
+        "semantic",
+        "AI review",
+        "A local AI model reads link text, headings, labels, and instructions in context.",
+        "Results go to Needs review. A person confirms each one.",
+    ),
+    (
+        "keyboard",
+        "Keyboard check",
+        "Presses Tab, Shift+Tab, and Escape to find places keyboard focus gets stuck.",
+        "It only looks for traps. Test the rest of keyboard use yourself.",
+    ),
+    (
+        "responsive",
+        "Zoom and layout check",
+        "Checks a 320-pixel-wide screen, 200% text, and wider text spacing for cut-off content.",
+        "A person confirms whether cut-off content is a barrier.",
+    ),
+    (
+        "interaction",
+        "Click-Through",
+        "Opens menus, tabs, and dialogs, then runs the rule check (axe) on each page state it reveals.",
+        "It skips payments and other risky actions and blocks sending data. A person checks custom controls and anything it did not reach.",
+    ),
+)
+
+
+def check_cards() -> str:
+    """What each check does and its limit, one card each, linked from the app."""
+    cards = "".join(
+        f'<article class="card" id="check-{key}"><h3>{e(name)}</h3><p>{e(what)}</p>'
+        f'<p class="small"><strong>Limit:</strong> {e(limit)}</p></article>'
+        for key, name, what, limit in CHECK_CARDS
+    )
+    return f"""
+<section id="checks">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The checks</span>
+      <h2>What each check does, and its limit</h2>
+      <p class="sub">The same checks as the <em>What was checked</em> table in every report.</p>
+    </div>
+    <div class="grid grid-3">{cards}</div>
+  </div>
+</section>
+"""
+
+
 def checks_sections() -> str:
     """The report groups, the comparison table, and what still needs a person."""
     rows = "".join(
         f'<tr><th scope="row">{e(check)}</th><td>{e(what)}</td><td>{e(sc)}</td><td>{e(group)}</td><td>{e(si)}</td><td>{e(axe)}</td></tr>'
         for check, what, sc, group, si, axe in CHECKS
     )
-    return f"""
+    return f"""{check_cards()}
 <section class="soft" id="groups">
   <div class="wrap">
     <div class="section-head">

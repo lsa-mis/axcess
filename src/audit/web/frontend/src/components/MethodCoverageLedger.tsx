@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Check, Minus } from "lucide-react";
+import { Check, ExternalLink, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Card } from "./ui";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion } from "./table/Table";
@@ -11,13 +11,15 @@ import type {
 
 /**
  * What was checked, as a table: one row per check, with what it ran on,
- * what it found, and what it can and cannot show, all in view.
+ * what it found, and one line each on what it does and its limit.
  *
  * It used to be a list of closed rows, each opened to read that check's
  * description and caveat, so reading the whole ledger took a click per
- * check. The caveats are the point of it (what a clean result does not
- * prove), so they now sit in a column of their own. Row headers and column
- * headers let a screen reader name the check and the column for every cell.
+ * check. The limit is the point of it (what a clean result does not
+ * prove), so it stays in view, but as one short line: the longer account of
+ * each check is on the Axcess website, one link per row. Row headers and
+ * column headers let a screen reader name the check and the column for
+ * every cell.
  */
 const METHOD_STATE_LABEL: Record<ScanMethodState, string> = {
   not_selected: "Not selected",
@@ -51,7 +53,10 @@ export function methodsRan(methods: ScanMethodCoverage[]): ScanMethodCoverage[] 
   return methods.filter((method) => method.state === "checked" || method.state === "partial");
 }
 
-const CAPTION = "What each check ran on, what it found, and what it can and cannot show.";
+const CAPTION = "What each check ran on, what it found, and its limits.";
+
+/** Each check's section on the Axcess website's "What Axcess checks" page. */
+const CHECK_DETAILS = "https://lsa-mis.github.io/axcess/coverage/#check-";
 
 export default function MethodCoverageLedger({
   scanId,
@@ -126,7 +131,7 @@ function LedgerTable({
             <ColumnHeader>Check</ColumnHeader>
             <ColumnHeader>Status</ColumnHeader>
             <ColumnHeader>Result</ColumnHeader>
-            <ColumnHeader>What it can and cannot show</ColumnHeader>
+            <ColumnHeader>About this check</ColumnHeader>
           </tr>
         </TableHead>
         <tbody>
@@ -192,11 +197,24 @@ function MethodRow({
         )}
       </Cell>
       <Cell className={cn(top, "min-w-[18rem]")}>
-        <p className="max-w-[70ch] text-sm leading-relaxed text-fg-muted">{method.description}</p>
-        <p className="mt-1.5 max-w-[70ch] text-xs leading-relaxed text-fg-muted">
-          <span className="font-semibold text-fg">Limits: </span>
+        <p className="max-w-[60ch] text-sm leading-relaxed text-fg">{method.description}</p>
+        <p className="mt-1 max-w-[60ch] text-sm leading-relaxed text-fg-muted">
+          <span className="font-semibold text-fg">Limit: </span>
           {method.caveat}
         </p>
+        <a
+          href={`${CHECK_DETAILS}${method.key}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-umich-blue underline underline-offset-2"
+        >
+          More about this check
+          <span className="sr-only">
+            {" "}
+            ({method.label}, on the Axcess website, opens in a new tab)
+          </span>
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </a>
       </Cell>
     </Row>
   );

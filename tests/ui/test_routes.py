@@ -158,10 +158,10 @@ def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, in
     assert body["blocked"] is None
     assert body["progress"] is None  # not running
     methods = {method["key"]: method for method in body["methods_used"]}
-    assert "Accessibility Conformance Testing" in methods["alfa"]["label"]
-    assert "specific accessibility conditions" in methods["alfa"]["description"]
+    assert methods["alfa"]["label"] == "Rule check (Alfa)"
+    assert "Accessibility Conformance Testing" in methods["alfa"]["description"]
     assert "not proof" in methods["alfa"]["caveat"]
-    assert methods["semantic"]["label"] == "Semantic review (local AI)"
+    assert methods["semantic"]["label"] == "AI review"
     assert "link purpose" in methods["semantic"]["description"]
     assert methods["semantic"]["state"] == "coverage_unknown"
     assert methods["semantic"]["result"] == "Coverage not recorded for this older scan"
@@ -2115,7 +2115,7 @@ def test_scan_detail_reports_an_old_scan_as_wcag_22(
     body = client.get(f"/api/scans/{scan_id}").json()
     assert body["wcag_version"] == "2.2"
     axe = next(method for method in body["methods_used"] if method["key"] == "axe")
-    assert axe["label"].startswith("axe-core (WCAG 2.2 ")
+    assert axe["label"].startswith("Rule check (axe), WCAG 2.2 ")
 
 
 def test_scan_detail_reports_the_chosen_wcag_version(
@@ -2130,4 +2130,4 @@ def test_scan_detail_reports_the_chosen_wcag_version(
     body = client.get(f"/api/scans/{scan_id}").json()
     assert body["wcag_version"] == "2.1"
     axe = next(method for method in body["methods_used"] if method["key"] == "axe")
-    assert axe["label"] == "axe-core (WCAG 2.1 AA)"
+    assert axe["label"] == "Rule check (axe), WCAG 2.1 Level AA"

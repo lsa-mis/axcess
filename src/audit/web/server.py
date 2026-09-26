@@ -3713,86 +3713,74 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
     method_specs = [
         {
             "key": "search",
-            "label": "Configured search",
+            "label": "Site search",
             "enabled": bool(cfg.get("search")),
             "checked_count": coverage.get("search_states", 0),
             "total_count": 0,
             "unit": "state",
             "verb": "checked",
-            "description": (
-                "Fills the configured search fields and checks result states, "
-                "then queues discovered pages within this scan's scope."
-            ),
+            "description": "Runs the searches you set up and checks the results.",
             "caveat": (
-                "Coverage depends on the supplied values and result/pagination limits. "
-                "Other searches may expose different pages. The operator authorized "
-                "these inputs and result clicks: unlike automatic clicking, a "
-                "configured search is not run behind the HTTP write guard."
+                "Other search words can reach other pages. You approved these searches, "
+                "so they can send data to the site."
             ),
         },
         {
             "key": "rendered",
-            "label": "Browser rendering",
+            "label": "Opened in a browser",
             "enabled": rendered or axe_ran_counters,
             "checked_count": coverage["rendered_pages"],
             "total_count": page_count,
             "unit": "page",
             "verb": "rendered",
-            "description": (
-                "Loads JavaScript in a real browser so dynamic content and "
-                "browser-based checks can be evaluated."
-            ),
-            "caveat": "A rendered page is not, by itself, an accessibility pass.",
+            "description": "Opens each page in a real browser, so its scripts run.",
+            "caveat": "Opening a page is not a pass.",
         },
         {
             "key": "axe",
-            "label": f"axe-core (WCAG {stored_wcag_version(cfg)} {cfg.get('axe_level', 'AA')})",
+            "label": (
+                f"Rule check (axe), WCAG {stored_wcag_version(cfg)} "
+                f"Level {cfg.get('axe_level', 'AA')}"
+            ),
             "enabled": (flag("axe_enabled") and rendered) or axe_ran_counters,
             "checked_count": int(scan.get("axe_pages_scanned") or 0),
             "total_count": coverage["rendered_pages"],
             "unit": "page",
             "verb": "checked",
-            "description": (
-                "Runs deterministic DOM rules for automatically testable WCAG "
-                "requirements at the selected level."
-            ),
-            "caveat": "No axe violation does not mean the page conforms to WCAG.",
+            "description": "Tests each page against rules a computer can check.",
+            "caveat": "A page with nothing found can still fail WCAG.",
         },
         {
             "key": "alfa",
-            "label": "Siteimprove Alfa, ACT (Accessibility Conformance Testing)",
+            "label": "Rule check (Alfa)",
             "enabled": flag("alfa_enabled", default=False) or alfa_ran_counters,
             "checked_count": int(scan.get("alfa_pages_scanned") or 0),
             "total_count": page_count,
             "unit": "page",
             "verb": "checked",
             "description": (
-                "Checks specific accessibility conditions using standardized ACT "
-                "rules. Each rule defines what is tested and can return pass, "
-                "fail, or cannot-tell."
+                "Tests specific accessibility conditions with standard rules "
+                "(Accessibility Conformance Testing, ACT)."
             ),
             "caveat": (
-                "A failed rule is evidence about that condition, not proof that the "
-                "whole page or site fails WCAG. Cannot-tell requires expert review."
+                "A failed rule is not proof the page fails WCAG. "
+                'Each "cannot tell" result goes to Needs review for a person.'
             ),
         },
         {
             "key": "image",
-            "label": "Image-of-text (OCR+VLM)",
+            "label": "Image text check",
             "enabled": flag("ocr_enabled") and flag("vlm_enabled"),
             "checked_count": coverage["analyzed_images"],
             "total_count": coverage["discovered_images"],
             "unit": "image",
             "verb": "analyzed",
-            "description": (
-                "Finds images containing visible text, uses OCR to read it, and "
-                "uses a local vision model to create expert-review leads."
-            ),
-            "caveat": "OCR and vision-model judgments require human confirmation.",
+            "description": "Reads text in images and compares it with the alt text.",
+            "caveat": "A person confirms each result.",
         },
         {
             "key": "semantic",
-            "label": "Semantic review (local AI)",
+            "label": "AI review",
             "enabled": flag("semantic_enabled"),
             "checked_count": int(scan.get("semantic_pages_analyzed") or 0),
             "total_count": page_count,
@@ -3800,15 +3788,13 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "verb": "reviewed",
             "coverage_known": coverage_version >= 1,
             "description": (
-                "Reviews page context that rule engines cannot fully judge, "
-                "including link purpose, descriptive headings and labels, form "
-                "instructions, and prerecorded-audio transcript cues."
+                "A local AI reads link purpose, headings, labels, and instructions in context."
             ),
-            "caveat": "Local-AI results are leads, never conformance verdicts.",
+            "caveat": "A person confirms each result before it counts.",
         },
         {
             "key": "keyboard",
-            "label": "Keyboard probe",
+            "label": "Keyboard check",
             # Pre-flip scans never ran it (old default False).
             "enabled": flag("keyboard_probe_enabled", default=False) and rendered,
             "checked_count": int(scan.get("keyboard_pages_probed") or 0),
@@ -3816,15 +3802,12 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "unit": "page",
             "verb": "checked",
             "coverage_known": coverage_version >= 1,
-            "description": (
-                "Walks focus with Tab and Shift+Tab and tests Escape behavior to "
-                "find repeated evidence that keyboard focus cannot leave a region."
-            ),
-            "caveat": "This conservative probe does not replace a full manual keyboard test.",
+            "description": "Presses Tab, Shift+Tab and Escape to find places focus gets stuck.",
+            "caveat": "It does not replace a full keyboard test by a person.",
         },
         {
             "key": "responsive",
-            "label": "Responsive & zoom probe",
+            "label": "Zoom and layout check",
             "enabled": flag("responsive_checks_enabled", default=False) and rendered,
             "checked_count": int(scan.get("responsive_pages_probed") or 0),
             "total_count": coverage["rendered_pages"],
@@ -3832,10 +3815,9 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "verb": "checked",
             "coverage_known": coverage_version >= 1,
             "description": (
-                "Checks 320 CSS-pixel reflow, approximately 200% text zoom, and "
-                "WCAG text-spacing overrides for clipping or lost content."
+                "Checks narrow screens, 200% text, and wider text spacing for cut-off content."
             ),
-            "caveat": "An expert must confirm whether observed clipping is a barrier.",
+            "caveat": "A person confirms whether cut-off content is a barrier.",
         },
         {
             "key": "interaction",
@@ -3850,21 +3832,17 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "coverage_known": interaction_pages > 0
             or int(cfg.get("interaction_coverage_version") or 0) >= 1,
             "description": (
-                "Opens menus, dialogs, tabs, and expandable controls in the rendered "
-                f"page, then runs axe-core on each {CLICK_THROUGH_STATE}. A "
-                "dialog is closed and verified closed before the next control is used."
+                "Opens menus, tabs and dialogs, then runs the rule check (axe) "
+                f"on each {CLICK_THROUGH_STATE}."
             ),
             "caveat": (
-                "Requires axe-core. Bounded exploration skips payment, subscription and "
-                "other blocked actions, and blocks HTTP writes during automatic clicks; "
-                f"a blocked request can leave a {CLICK_THROUGH_STATE} rendered incompletely. "
-                "Controls counted as found were not necessarily operated. A dialog "
-                "that would not close ends that page's exploration and is worth a "
-                "manual look. GET side effects, existing sockets, custom controls "
-                "and undiscovered states still need manual review."
+                "It skips payments and other risky actions, and blocks sending data, "
+                f"so a {CLICK_THROUGH_STATE} can be incomplete. Controls found were not "
+                "necessarily operated. A dialog that would not close stops that page. "
+                "A person checks custom controls and anything it did not reach."
                 if int(cfg.get("interaction_safety_version") or 0) >= 1
-                else "Requires axe-core. Exploration is bounded and skips blocked actions; "
-                "custom controls and undiscovered states still need manual review."
+                else "It skips risky actions and has limits. A person checks custom "
+                "controls and anything it did not reach."
             ),
         },
     ]
