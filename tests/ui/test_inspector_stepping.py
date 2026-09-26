@@ -117,3 +117,48 @@ async def test_previous_and_next_step_through_the_rendered_page(
         assert not violations, _render_violations(violations)
     finally:
         await page.context.close()
+
+
+async def test_the_page_code_view_sets_the_current_element_apart(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """In Page code (DOM), the element you are on reads differently from the rest.
+
+    Every flagged block used to share one maize tint, the current one told
+    apart only by the colour of a 3px edge.
+    """
+    db_path, _, _ = seeded_db
+    base, scan_id = live_server
+    page_id = _seed(db_path, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue={ISSUE_KEY}",
+            wait_until="networkidle",
+        )
+        await page.get_by_role("link", name="Page code (DOM)", exact=True).click()
+        group = page.get_by_role("group", name="Flagged elements", exact=True)
+        status = group.get_by_role("status")
+        await playwright_async.expect(status).to_have_text("Flagged element 1 of 3")
+        code = page.get_by_role("region", name="Scrollable page code (DOM)")
+        current = code.locator("[data-current]")
+        await playwright_async.expect(current.first).to_contain_text('id="field-1"')
+
+        await group.get_by_role("button", name="Next flagged element").click()
+        await playwright_async.expect(status).to_have_text("Flagged element 2 of 3")
+        await playwright_async.expect(current.first).to_contain_text('id="field-2"')
+        earlier = code.locator("div[data-index]").filter(has_text='id="field-1"')
+        await playwright_async.expect(earlier).not_to_have_attribute("data-current", "true")
+        colours = await page.evaluate(
+            """() => [...document.querySelectorAll('[data-index]')]
+                .filter(line => /field-[12]/.test(line.textContent))
+                .map(line => getComputedStyle(line).backgroundColor)"""
+        )
+        assert len(set(colours)) == 2, colours
+
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()

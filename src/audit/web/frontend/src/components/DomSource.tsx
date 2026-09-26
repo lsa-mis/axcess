@@ -271,24 +271,35 @@ export default function DomSource({
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {items.map((item) => {
             const line = lines[item.index];
+            // The flagged element Previous / Next is on: blue, like the
+            // rendered page's current element, with a thicker bar and bold
+            // line numbers, so it stands apart from the other flagged
+            // blocks by more than the colour of a thin edge.
+            const isCurrent =
+              line.marked &&
+              item.index >= (markStarts[current] ?? -1) &&
+              item.index < (markStarts[current + 1] ?? Number.POSITIVE_INFINITY);
             return (
               <div
                 key={item.key}
                 ref={virtualizer.measureElement}
                 data-index={item.index}
+                data-current={isCurrent || undefined}
                 className={cn(
                   "absolute left-0 flex w-full items-start",
-                  line.marked && "bg-umich-maize/25 shadow-[inset_3px_0_0_theme(colors.umich.maize)]",
                   line.marked &&
-                    item.index >= (markStarts[current] ?? -1) &&
-                    item.index < (markStarts[current + 1] ?? Number.POSITIVE_INFINITY) &&
-                    "shadow-[inset_3px_0_0_theme(colors.umich.blue)]",
+                    !isCurrent &&
+                    "bg-umich-maize/20 shadow-[inset_3px_0_0_theme(colors.umich.maize)]",
+                  isCurrent && "bg-umich-blue/15 shadow-[inset_6px_0_0_theme(colors.umich.blue)]",
                 )}
                 style={{ transform: `translateY(${item.start}px)` }}
               >
                 <span
                   aria-hidden
-                  className="shrink-0 select-none pr-3 text-right text-fg-subtle"
+                  className={cn(
+                    "shrink-0 select-none pr-3 text-right",
+                    isCurrent ? "font-semibold text-fg" : "text-fg-subtle",
+                  )}
                   style={{ width: `${gutter + 2}ch` }}
                 >
                   {item.index + 1}
