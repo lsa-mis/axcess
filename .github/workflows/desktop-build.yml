@@ -71,7 +71,9 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
+          # --allow-same-version: the first release, 0.60, is the version
+          # package.json already carries, and npm refuses an unchanged one.
+          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version --allow-same-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -135,7 +137,9 @@ jobs:
         shell: bash
         working-directory: desktop
         run: |
-          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
+          # --allow-same-version: the first release, 0.60, is the version
+          # package.json already carries, and npm refuses an unchanged one.
+          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version --allow-same-version
           npm pkg set "config.buildCommit=${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
