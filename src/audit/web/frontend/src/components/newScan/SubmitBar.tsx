@@ -1,10 +1,10 @@
 import { useId } from "react";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui";
-import { SUMMARY } from "./copy";
 
 /**
- * Start, Cancel and Reset, at the foot of the summary rail. Start is never
+ * Start and Cancel, at the foot of the summary rail (Reset is at its top
+ * right, in ScanSummaryCard, once a setting has changed). Start is never
  * disabled: a disabled button cannot say why, so pressing it runs
  * validation and the alert at the top of the form explains. While a request
  * is in flight it is `aria-disabled`, which keeps focus where it is and
@@ -16,7 +16,6 @@ export default function SubmitBar({
   pending,
   note,
   onCancel,
-  onReset,
   className,
 }: {
   label: string;
@@ -24,7 +23,6 @@ export default function SubmitBar({
   pending: boolean;
   note?: string;
   onCancel: () => void;
-  onReset: () => void;
   className?: string;
 }) {
   const noteId = useId();
@@ -48,19 +46,9 @@ export default function SubmitBar({
           {note}
         </p>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button type="button" onClick={onCancel} className="min-w-[7.5rem] flex-1">
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={onReset}
-          className="underline decoration-1 underline-offset-2 hover:decoration-2"
-        >
-          {SUMMARY.reset}
-        </Button>
-      </div>
+      <Button type="button" onClick={onCancel} className="w-full">
+        Cancel
+      </Button>
     </div>
   );
 }

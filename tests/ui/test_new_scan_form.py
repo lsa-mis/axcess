@@ -219,12 +219,18 @@ async def test_summary_rail_follows_the_switches_and_resets(
     assert "Keyboard check" not in await _rail_items(summary, "Checks that run")
     assert "Keyboard check" in await _rail_items(summary, "Not included")
 
-    # Start, Cancel and Reset sit under the summary, in the form.
-    reset = page.locator("form").get_by_role("button", name="Reset to default settings")
+    # Reset sits at the top right of the summary, beside "Customized", and
+    # only while something has changed. Pressed, it goes away, and focus
+    # moves to the summary's heading instead of being lost.
+    reset = summary.get_by_role("button", name="Reset to default settings")
     await reset.click()
     await playwright_async.expect(
         summary.get_by_text("Default settings", exact=True)
     ).to_be_visible()
+    await playwright_async.expect(reset).to_have_count(0)
+    await playwright_async.expect(
+        summary.get_by_role("heading", name="What this scan will do")
+    ).to_be_focused()
     await playwright_async.expect(pages).to_have_value("2500")
     await playwright_async.expect(keyboard).to_be_checked()
 

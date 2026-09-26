@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, Minus, SlidersHorizontal } from "lucide-react";
+import { Check, Minus, RotateCcw, SlidersHorizontal } from "lucide-react";
 import type { ScopePreview } from "../../api/types";
 import { cn } from "../../lib/cn";
 import { CHECK_LABEL } from "../../lib/terms";
@@ -104,6 +104,7 @@ export default function ScanSummaryCard({
   policy,
   preview,
   capabilities,
+  onReset,
   children,
   className,
 }: {
@@ -111,9 +112,12 @@ export default function ScanSummaryCard({
   policy: ScanPolicy;
   preview: { state: ScopePreviewState; data: ScopePreview | null };
   capabilities: Capabilities;
+  /** Put every setting back. Offered at the top right once something changed. */
+  onReset?: () => void;
   children?: ReactNode;
   className?: string;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const login = policy.mode === "login";
   const unchanged = isDefault(settings, policy);
   const { scope, checks } = lines(settings, policy);
@@ -167,24 +171,49 @@ export default function ScanSummaryCard({
     <div className={cn("rounded-md border border-border bg-surface shadow-card", className)}>
       <aside aria-labelledby="scan-summary-title">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-5">
-          <h2 id="scan-summary-title" className="text-base font-semibold text-fg">
+          <h2
+            id="scan-summary-title"
+            ref={titleRef}
+            tabIndex={-1}
+            className="text-base font-semibold text-fg focus:outline-none"
+          >
             {SUMMARY.title}
           </h2>
-          <span
-            className={cn(
-              "inline-flex min-h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold",
-              unchanged
-                ? "border-border bg-surface-muted text-fg-muted"
-                : "border-umich-blue/30 bg-umich-blue/[0.06] text-fg",
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span
+              className={cn(
+                "inline-flex min-h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold",
+                unchanged
+                  ? "border-border bg-surface-muted text-fg-muted"
+                  : "border-umich-blue/30 bg-umich-blue/[0.06] text-fg",
+              )}
+            >
+              {unchanged ? (
+                <Check aria-hidden className="h-3.5 w-3.5" />
+              ) : (
+                <SlidersHorizontal aria-hidden className="h-3.5 w-3.5" />
+              )}
+              {unchanged ? SUMMARY.defaultState : SUMMARY.customized}
+            </span>
+            {/* Top right, beside the word that says something changed, and
+                only then: at the foot of the rail it sat under Start and
+                Cancel, where it was the last thing found. It goes away once
+                pressed, so focus moves to the summary's heading rather than
+                being left on nothing. */}
+            {!unchanged && onReset && (
+              <button
+                type="button"
+                onClick={() => {
+                  onReset();
+                  titleRef.current?.focus();
+                }}
+                className="inline-flex min-h-target items-center gap-1 rounded-xs px-1 text-xs font-semibold text-umich-blue underline underline-offset-2 hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
+              >
+                <RotateCcw aria-hidden className="h-3.5 w-3.5" />
+                {SUMMARY.reset}
+              </button>
             )}
-          >
-            {unchanged ? (
-              <Check aria-hidden className="h-3.5 w-3.5" />
-            ) : (
-              <SlidersHorizontal aria-hidden className="h-3.5 w-3.5" />
-            )}
-            {unchanged ? SUMMARY.defaultState : SUMMARY.customized}
-          </span>
+          </div>
         </div>
 
         <dl className="mt-3 divide-y divide-border border-t border-border text-sm leading-6">

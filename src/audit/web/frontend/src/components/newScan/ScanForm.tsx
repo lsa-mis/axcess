@@ -138,6 +138,7 @@ export default function ScanForm({
           policy={policy}
           preview={preview}
           capabilities={capabilities}
+          onReset={onReset}
           className="mt-5 lg:sticky lg:top-24 lg:mt-0 lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
         >
           <SubmitBar
@@ -146,7 +147,6 @@ export default function ScanForm({
             pending={pending}
             note={policy.submitNote}
             onCancel={onCancel}
-            onReset={onReset}
           />
         </ScanSummaryCard>
       </form>
