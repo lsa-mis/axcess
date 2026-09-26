@@ -598,8 +598,21 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    await playwright_async.expect(page.get_by_text("Issue Groups", exact=True)).to_be_visible()
-    await playwright_async.expect(page.get_by_text("Pages Tested", exact=True)).to_be_visible()
+    # The summary is one line of term and value pairs.
+    terms = page.get_by_role("term")
+    await playwright_async.expect(terms.filter(has_text="Issue Groups")).to_be_visible()
+    await playwright_async.expect(terms.filter(has_text="Pages Tested")).to_be_visible()
+    # Under the title, only when the evidence was captured: no site name, no
+    # disclaimer line, and no ACT rule note among the notes.
+    await playwright_async.expect(
+        page.get_by_text(re.compile(r"^Based on the scan (completed|started) "))
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)
+    ).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_role("button", name=re.compile(r"What is an ACT rule"))
+    ).to_have_count(0)
 
     # The coverage row counts the methods the scan recorded as run, and the
     # count stays on screen while the row is closed.

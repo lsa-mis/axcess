@@ -3,9 +3,40 @@ import { Link } from "react-router";
 import { AlertOctagon } from "lucide-react";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
-import { Card, Disclosure, StatCard } from "./ui";
+import { Card, Disclosure } from "./ui";
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
+
+/**
+ * One number in the summary line: the value first, then what it counts.
+ * The label is the ``dt`` and the value the ``dd``, so a screen reader reads
+ * "Pages Tested, 8"; CSS order puts the number first on screen. ``detail``
+ * is a short aside in parentheses, and ``flag`` colors the number when it
+ * needs attention (crawl errors), which the detail text also says.
+ */
+function SummaryStat({
+  label,
+  value,
+  detail,
+  flag = false,
+}: {
+  label: string;
+  value: number;
+  detail?: string;
+  flag?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <dt className="order-2 text-fg-muted">
+        {label}
+        {detail && <span className="text-xs"> ({detail})</span>}
+      </dt>
+      <dd className={cn("order-1 text-xl font-semibold tabular-nums", flag ? "text-sev-major" : "text-umich-blue")}>
+        {value.toLocaleString()}
+      </dd>
+    </div>
+  );
+}
 
 /**
  * What the old Overview tab said about a completed report, above its table.
@@ -44,24 +75,25 @@ export function ReportSummary({
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
       {/* Read left to right as the scan itself ran: how much was tested,
           what that turned up, how those findings group, and how much of
-          the site only existed after a control was used. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+          the site only existed after a control was used. One compact line
+          rather than four cards, so the table starts higher on the screen. */}
+      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+        <SummaryStat
           label="Pages Tested"
-          value={scan.page_count.toLocaleString()}
-          hint={`${scan.error_count.toLocaleString()} crawl errors`}
-          tone={scan.error_count ? "major" : "default"}
+          value={scan.page_count}
+          detail={`${scan.error_count.toLocaleString()} crawl error${scan.error_count === 1 ? "" : "s"}`}
+          flag={scan.error_count > 0}
         />
-        <StatCard label="Issues Found" value={occurrences.toLocaleString()} />
-        <StatCard label="Issue Groups" value={issueGroups.toLocaleString()} />
+        <SummaryStat label="Issues Found" value={occurrences} />
+        <SummaryStat label="Issue Groups" value={issueGroups} />
         {/* Pages alone understate an application whose content mostly does
             not exist until a control is used. */}
-        <StatCard
+        <SummaryStat
           label={CLICK_THROUGH_STATES_LABEL}
-          value={(scan.dom_state_count ?? 0).toLocaleString()}
-          hint="Menus, tabs and dialogs the scan opened"
+          value={scan.dom_state_count ?? 0}
+          detail="menus, tabs and dialogs the scan opened"
         />
-      </div>
+      </dl>
 
       {/* Coverage leads the notes: whether the scan checked something comes
           before what its labels mean. The count stays on the closed row, so

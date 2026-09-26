@@ -698,7 +698,10 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     glossary = page.get_by_role(
         "button", name="What Barrier, Needs review and the other labels mean", exact=True
     )
-    definitions = page.get_by_role("term")
+    # The glossary's terms, not the summary line's, which are terms too.
+    definitions = page.get_by_role("term").filter(
+        has_text=re.compile(r"^(Barrier|Needs review|Informational|WCAG|Click-Through|Alt Text)$")
+    )
     await playwright_async.expect(definitions.first).to_be_hidden()
     await glossary.focus()
     await page.keyboard.press("Enter")
@@ -710,9 +713,12 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
             page.get_by_role("heading", name=heading, level=3)
         ).to_be_visible()
     meanings = page.get_by_role("definition")
-    await playwright_async.expect(meanings.first).to_contain_text("A rule failed deterministically")
-    await playwright_async.expect(meanings.nth(1)).to_contain_text("A person must confirm it")
-    await playwright_async.expect(meanings.nth(2)).to_contain_text("not a problem to fix")
+    for meaning in (
+        "A rule failed deterministically",
+        "A person must confirm it",
+        "not a problem to fix",
+    ):
+        await playwright_async.expect(meanings.filter(has_text=meaning)).to_be_visible()
 
     # Every cell of a data row is vertically centred.
     alignments = await table.evaluate(

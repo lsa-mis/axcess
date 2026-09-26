@@ -35,7 +35,7 @@ import {
   type SortDirection,
   type SortKind,
 } from "../components/table/sort";
-import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import ReportHeader from "../components/ReportHeader";
 import { ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -185,13 +185,14 @@ export default function IssuesRoute() {
   const data = issuesQuery.data;
   const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
-  const alfaCount = rows.filter((row) => row.pipeline === "alfa").length;
-  const notes = (
-    <>
-      <IssueGlossary />
-      {alfaCount > 0 && <ActRuleNote count={alfaCount} />}
-    </>
-  );
+  const notes = <IssueGlossary />;
+  const basedOn = !isComplete
+    ? null
+    : scan.finished_at
+      ? `Based on the scan completed ${formatCompleted(scan.finished_at)}`
+      : scan.started_at
+        ? `Based on the scan started ${formatCompleted(scan.started_at)}`
+        : null;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
   // The button that was pressed goes away with the column sort, so focus
   // moves to the table it just reordered rather than falling to the page.
@@ -207,21 +208,10 @@ export default function IssuesRoute() {
         scanId={scan.id}
         previousScanId={scan.previous_scan_id}
         title="Issues"
-        meta={
-          <ReportMeta
-            // No counts: the stat cards below carry them, and the same
-            // numbers twice in one screenful read as two different facts.
-            // The site leads because the topbar trail is gone the moment
-            // this becomes a screenshot or a print -- which is most of how
-            // a finding gets quoted to the team that has to fix it.
-            counts={[
-              siteLabel(scan.seed_url),
-              isComplete && scan.finished_at ? `Completed ${formatCompleted(scan.finished_at)}` : "",
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          />
-        }
+        // When the evidence was captured, and nothing else: the site is in
+        // the topbar trail, and the counts are in the summary line below.
+        // A report that never recorded its finish time says when it started.
+        meta={basedOn ? <span className="text-fg-muted">{basedOn}</span> : undefined}
         actions={
           <ExportMenu
             scanId={scan.id}
@@ -886,33 +876,6 @@ function IssueGlossary() {
           items={FINDING_TYPES.map((key) => ({ key, term: <FindingTypePill type={key} />, help: FINDING_TYPE_HELP[key] }))}
         />
       </div>
-    </ReportNote>
-  );
-}
-
-/**
- * Why some rows cite a standardized ACT rule, and what that does not prove.
- * The closed row keeps the count, so a reader sees that it applies here
- * before deciding to open it.
- */
-function ActRuleNote({ count }: { count: number }) {
-  return (
-    <ReportNote
-      id="report-act-rule"
-      title="What is an ACT rule?"
-      meta={
-        <span className="tabular-nums">
-          {count === 1 ? "Used by 1 issue group" : `Used by ${count} issue groups`}
-        </span>
-      }
-    >
-      <p className="max-w-[75ch] text-sm leading-relaxed text-fg-muted">
-        ACT means Accessibility Conformance Testing. Each standardized rule
-        checks one specific accessibility condition and returns pass, fail,
-        or cannot tell. A failed rule is evidence about that condition, not
-        proof that the whole page or site fails WCAG. “Cannot tell” needs an
-        expert decision.
-      </p>
     </ReportNote>
   );
 }
