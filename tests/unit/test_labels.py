@@ -142,8 +142,16 @@ def test_ran_status_line_counts_click_through_states() -> None:
     assert "reaching 5 page states opened by clicking" in _RAN.status_line
 
 
+# Typer forces colour when GITHUB_ACTIONS (or FORCE_COLOR / PY_COLORS) is set,
+# and colours each dash-separated piece of an option on its own, so on CI the
+# help reads "-", "-skip", "-interaction" between escape codes. Compare the
+# text without them, as test_smoke does.
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
 def test_cli_help_names_the_skip_interaction_feature() -> None:
     result = CliRunner().invoke(app, ["crawl", "--help"], env={"COLUMNS": "200"})
     assert result.exit_code == 0, result.output
-    assert "--skip-interaction" in result.output
-    assert f"Skip {labels.CLICK_THROUGH}" in result.output
+    text = _ANSI.sub("", result.output)
+    assert "--skip-interaction" in text
+    assert f"Skip {labels.CLICK_THROUGH}" in text
