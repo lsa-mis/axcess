@@ -342,6 +342,14 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
  * what the lane permits a reviewer to do with the finding, in words, so the
  * tint and icon are never the only cue.
  */
+/**
+ * A lane's name as the issue page says it ("Needs confirmation" for a lead),
+ * so the page header and the guidance dialog use one word for one thing.
+ */
+export function issuePageLaneLabel(lane: IssueRow["review_lane"]): string {
+  return (LANES[lane] ?? LANES.informational).label;
+}
+
 const LANES: Record<
   IssueRow["review_lane"],
   { label: string; meaning: string; icon: LucideIcon; className: string; iconClass: string }

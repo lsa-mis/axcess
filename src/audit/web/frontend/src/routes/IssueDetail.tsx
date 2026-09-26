@@ -4,11 +4,10 @@ import { BookOpenText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import ReportHeader from "../components/ReportHeader";
-import IssueEvidence, { IssueGuidanceDialog } from "../components/IssueEvidence";
+import IssueEvidence, { IssueGuidanceDialog, issuePageLaneLabel } from "../components/IssueEvidence";
 import { Button, Card, EmptyState, LinkButton } from "../components/ui";
 import ConformanceBadge from "../components/ConformanceBadge";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { REVIEW_LANE_LABELS } from "../lib/labels";
 
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
@@ -80,7 +79,7 @@ export default function IssueDetailRoute() {
           row
             ? [
                 row.wcag_sc ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}` : "",
-                REVIEW_LANE_LABELS[row.review_lane],
+                issuePageLaneLabel(row.review_lane),
               ]
                 .filter(Boolean)
                 .join(" · ")
