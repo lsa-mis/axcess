@@ -144,7 +144,7 @@ export function TablePagination({
   const last = Math.min(page * TABLE_PAGE_SIZE, total);
   return (
     <nav
-      aria-label={`${label} pagination`}
+      aria-label={`${label}: page controls`}
       className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"
     >
       <p role="status" aria-live="polite" aria-atomic="true" className="text-sm text-fg-muted">

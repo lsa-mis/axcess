@@ -51,7 +51,7 @@ export default function ProtectedReportGate({ children }: { children: ReactNode 
       <Card className="p-4 text-sm text-sev-critical" role="alert">
         {scan.error instanceof Error
           ? scan.error.message
-          : "This report is unavailable."}
+          : "This report could not be loaded. Go back to Reports and try again."}
       </Card>
     );
   }
@@ -61,7 +61,7 @@ export default function ProtectedReportGate({ children }: { children: ReactNode 
         <Card className="p-4 text-sm text-sev-critical" role="alert">
           {protectedIdentity.error instanceof Error
             ? protectedIdentity.error.message
-            : "Protected-report access is unavailable."}
+            : "Axcess could not confirm your access to sign-in scans. Try again, or ask your administrator."}
         </Card>
       );
     }

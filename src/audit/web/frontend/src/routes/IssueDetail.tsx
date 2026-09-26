@@ -39,21 +39,21 @@ export default function IssueDetailRoute() {
   if (detailError) {
     return (
       <EmptyState
-        title="Evidence group not found"
+        title="Issue not found"
         message={
-          "This evidence group isn't part of the current report. It may have been " +
-          "resolved or the URL may be stale. Return to the issue table."
+          "This issue is not part of this report. It may have been fixed, " +
+          "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
           <LinkButton to={`/scans/${id}/issues`} variant="primary">
-            Back to issue table
+            Back to the Issues table
           </LinkButton>
         }
       />
     );
   }
   if (!scan) {
-    return <div className="text-fg-muted">Loading…</div>;
+    return <div className="text-fg-muted">Loading issue…</div>;
   }
 
   const row = detail?.row;
@@ -71,9 +71,12 @@ export default function IssueDetailRoute() {
           </span>
         }
         meta={
-          row?.wcag_sc
-            ? `WCAG SC ${row.wcag_sc}${row.wcag_name ? `: ${row.wcag_name}` : ""}`
-            : undefined
+          row?.wcag_sc ? (
+            <>
+              <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
+              {row.wcag_name ? ` ${row.wcag_name}` : ""}
+            </>
+          ) : undefined
         }
       />
       {/* The trail names the issue, not the kind of page it is, so evidence

@@ -5,6 +5,7 @@ import { CornerDownLeft, Search } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "./ReportCrumb";
 import { cn } from "../lib/cn";
+import { CHECK_LABEL, SCAN_STATUS_LABEL } from "../lib/terms";
 
 type Item = {
   id: string;
@@ -70,7 +71,7 @@ export default function CommandPalette({
       { id: "nav-dashboard", group: "Go to", label: "Dashboard", to: "/" },
       { id: "nav-reports", group: "Go to", label: "Reports", to: "/scans" },
       { id: "nav-new", group: "Go to", label: "New scan", to: "/scans/new" },
-      { id: "nav-tracking", group: "Go to", label: "Coverage & tracking", to: "/tracking" },
+      { id: "nav-tracking", group: "Go to", label: "Product roadmap", to: "/tracking" },
     ];
     for (const a of actions) if (!q || a.label.toLowerCase().includes(q)) out.push(a);
 
@@ -81,7 +82,7 @@ export default function CommandPalette({
           id: `scan-${s.id}`,
           group: "Reports",
           label,
-          sublabel: `#${s.id} · ${s.status}`,
+          sublabel: `Report #${s.id} · ${SCAN_STATUS_LABEL[s.status] ?? s.status}`,
           to: `/scans/${s.id}`,
         });
       }
@@ -95,7 +96,7 @@ export default function CommandPalette({
             id: `issue-${scanId}-${i.issue_key}`,
             group: "Issues",
             label: i.title,
-            sublabel: `${i.issue_key} · ${i.pipeline}`,
+            sublabel: `${i.issue_key} · ${CHECK_LABEL[i.pipeline] ?? i.pipeline}`,
             to: i.detail_url,
           });
         }
@@ -163,7 +164,7 @@ export default function CommandPalette({
 
         <ul ref={listRef} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto py-1">
           {items.length === 0 ? (
-            <li className="px-4 py-8 text-center text-sm text-fg-muted">No matches for “{query}”.</li>
+            <li className="px-4 py-8 text-center text-sm text-fg-muted">Nothing matches “{query}”. Try a site name, a report number, or an issue name.</li>
           ) : (
             items.map((item, index) => {
               const showHeader = item.group !== lastGroup;
@@ -201,13 +202,13 @@ export default function CommandPalette({
 
         <div className="flex items-center gap-3 border-t border-border px-3 py-2 text-2xs text-fg-subtle">
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↑↓</kbd> navigate
+            <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↑↓</kbd> move
           </span>
           <span className="inline-flex items-center gap-1">
             <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↵</kbd> open
           </span>
           <span className="ml-auto inline-flex items-center gap-1">
-            <CornerDownLeft className="h-3 w-3" aria-hidden /> ⌘K anytime
+            <CornerDownLeft className="h-3 w-3" aria-hidden /> ⌘K or Ctrl+K opens search anytime
           </span>
         </div>
       </div>

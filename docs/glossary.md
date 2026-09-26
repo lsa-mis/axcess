@@ -24,8 +24,6 @@ page, and record your decision.
   [alt text](#alt-text) is missing or does not match, a [local AI
   model](#local-ai-model), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot
   tell" result.
-- Also called: "Needs confirmation" on the issue page and "Review leads" on the
-  dashboard.
 
 ### Informational
 
@@ -38,19 +36,20 @@ on it.
 ### Finding
 
 One result a check recorded, with its page, [element](#element), and
-[evidence](#evidence). Findings are the raw records behind the Issues table.
+[evidence](#evidence). The app calls each one an
+[occurrence](#occurrence); exports and developer tools still say finding.
 
 ### Occurrence
 
 One place a problem appears: one element on one page, or in one
-[DOM state](#dom-state). The Issues table counts these in its Occurrences
+[page state](#page-state). The Issues table counts these in its Occurrences
 column, and the Excel workbook calls them Instances.
 
-### Issue group
+### Issue
 
 One row in the Issues table: every occurrence found by the same check (for
 images, the same kind of image with the same [alt text](#alt-text) problem). The
-Issues page shows the number of issue groups and occurrences side by side.
+Issues page shows the number of issues and occurrences side by side.
 
 ### Root cause
 
@@ -77,7 +76,7 @@ field.
 How badly a problem affects people: Critical, Serious, Moderate, or Minor (for
 local AI checks, this rating shows how confident the model is). Image checks say
 major for Serious and info for Minor, and the workbook and [audit
-report](#audit-report) show Siteimprove Alfa results, which have no rating, as
+report](#written-report) show Siteimprove Alfa results, which have no rating, as
 Moderate.
 
 ### Priority
@@ -88,11 +87,11 @@ spread, a severe problem on a single page shows as Low, so check its impact too.
 
 ### Status
 
-Where a finding stands in review: new, reviewing, in progress, remediated
-(fixed), accepted risk (a known problem your team chose not to fix for now), or
-false positive. The last four need a short reason, and the Excel workbook uses
-the same words except Not Started for new, Resolved for remediated, and Not an
-Issue for false positive.
+Where an occurrence stands in review: New, Reviewing, In progress, Fixed,
+Accepted risk (a known problem your team chose not to fix for now), or Not a
+problem (a [false positive](#false-positive)). The last four need a short
+reason. The Excel workbook uses Not Started for New, Resolved for Fixed, and
+Not an Issue for Not a problem.
 
 ## WCAG terms
 
@@ -127,16 +126,16 @@ can choose A or AAA when you start a scan.
 ### Best practice
 
 A result that is good practice but not tied to a WCAG success criterion,
-labeled BP. When a rule engine finds one, Axcess lists it with
-[Barriers](#barrier), so fix WCAG Barriers first and treat BP items as
-recommended.
+labeled Best practice. When a rule engine finds one, Axcess lists it with
+[Barriers](#barrier), so fix WCAG Barriers first and treat Best practice items
+as recommended.
 
 ## Coverage
 
 ### Scan coverage
 
 What a scan actually checked: which pages it tested, which methods ran, and how
-many [DOM states](#dom-state) it reached. The report's Overview shows this under
+many [page states](#page-state) it reached. The report's Overview shows this under
 "What this scan actually checked."
 
 ### Crawl
@@ -158,12 +157,13 @@ The part of a site a scan may visit: pages under the address you start from,
 such as everything under `www.example.edu/admissions/`. A page limit and a limit
 on how many links deep the [crawl](#crawl) goes also apply.
 
-### DOM state
+### Page state
 
-What a page looks like after a control is used, for example after a menu opens
-(DOM is the browser's live copy of the page). Problems that appear only in such
-a state are labeled "After clicking" with the control's name, so you can
-reproduce them.
+How a page looks at one moment: "At page load", or after a control is used,
+for example after a menu opens. Problems that appear only after a click are
+labeled "After clicking" with the control's name, so you can reproduce them.
+Developers call this a DOM state (the DOM is the browser's live copy of the
+page).
 
 ## Accuracy
 
@@ -171,7 +171,7 @@ reproduce them.
 
 A result that turns out not to be a real problem. Mark it as a false positive
 with a short reason, and Axcess keeps that decision with the report and moves
-it out of the audit report's worklist.
+it out of the written report's worklist.
 
 ### Zero false positive goal
 
@@ -315,7 +315,7 @@ Level AAA.
 
 ## Using Axcess
 
-### Login scan
+### Sign-in scan
 
 A scan of pages behind a sign-in. Axcess opens a browser window, you sign in
 yourself (including any two-factor step), and Axcess then scans the site as
@@ -339,11 +339,12 @@ An optional scan setting, **Search to discover result pages**, that types a
 sample search you choose and tests the result pages it finds. [Single-page apps
 and search scans](spa-search-scans.md) explains how to set it up.
 
-### Audit report
+### Written report
 
-The written report you download as **Audit report** from the Export menu. It is
-a plain text file with headings (Markdown format); the Excel workbook is a
-separate export, **Remediation workbook**, with one row per issue.
+The report you download as **Written report (Markdown)** from the Export
+menu. It is a plain text file with headings (Markdown format). The Excel
+workbook is a separate export, **Issue list with fixes (Excel)**, with one row
+per issue.
 
 ### Local-first
 

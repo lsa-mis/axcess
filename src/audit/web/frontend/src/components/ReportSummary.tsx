@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
 import { Button, Card, LinkButton, StatCard } from "./ui";
+import { STATUS_LABEL } from "../lib/terms";
 
 /**
  * What the old Overview tab said about a completed report, above its table.
@@ -38,19 +39,27 @@ export function ReportSummary({
           the site only existed after a control was used. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Pages Tested"
+          label="Pages checked"
           value={scan.page_count.toLocaleString()}
-          hint={`${scan.error_count.toLocaleString()} crawl errors`}
+          hint={`${scan.error_count.toLocaleString()} error${scan.error_count === 1 ? "" : "s"} while scanning`}
           tone={scan.error_count ? "major" : "default"}
         />
-        <StatCard label="Issues Found" value={occurrences.toLocaleString()} />
-        <StatCard label="Issue Groups" value={issueGroups.toLocaleString()} />
+        <StatCard
+          label="Occurrences found"
+          value={occurrences.toLocaleString()}
+          hint="Each place an issue appears"
+        />
+        <StatCard
+          label="Issues found"
+          value={issueGroups.toLocaleString()}
+          hint="Kinds of problem, one per row below"
+        />
         {/* Pages alone understate an application whose content mostly does
             not exist until a control is used. */}
         <StatCard
-          label="DOM States Found"
+          label="Page states found"
           value={(scan.dom_state_count ?? 0).toLocaleString()}
-          hint="Reached by operating controls"
+          hint="Reached by using controls, such as menus"
         />
       </div>
 
@@ -65,7 +74,7 @@ export function ReportSummary({
           </span>
           <span aria-hidden className="text-border-strong">·</span>
           <span className="inline-flex items-center gap-0.5 font-semibold text-umich-blue">
-            <span className="underline underline-offset-2">Details</span>
+            <span className="underline underline-offset-2">See what was checked</span>
             <ChevronDown
               className="h-4 w-4 shrink-0 transition-transform duration-150 group-open:rotate-180"
               aria-hidden
@@ -124,42 +133,42 @@ export function ReportExpertTools({
   return (
     <details className="mt-5 rounded-xs border border-border bg-surface p-4 shadow-card">
       <summary className="min-h-target cursor-pointer py-2 font-semibold text-fg">
-        Expert tools and scan details
+        Expert tools and report details
       </summary>
       <div className="border-t border-border pt-4">
         <div className="flex flex-wrap gap-2">
           <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
-            <Accessibility className="h-4 w-4" aria-hidden /> DOM engines
+            <Accessibility className="h-4 w-4" aria-hidden /> Rule check issues by WCAG criterion
           </LinkButton>
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
-            Image evidence ({scan.finding_count})
+            Images ({scan.finding_count})
           </LinkButton>
         </div>
         <p className="mt-4 text-sm text-fg-muted">
-          Observed reviewer rejection rate:{" "}
+          Reviewed occurrences marked &ldquo;{STATUS_LABEL.false_positive}&rdquo;:{" "}
           <strong>
             {rows == null
               ? "loading…"
               : observedRejectionRate == null
-                ? "not measured yet"
+                ? "none reviewed yet"
                 : `${observedRejectionRate.toFixed(1)}%`}
           </strong>
           {observedRejectionRate != null &&
-            ` (${rejectedBackingFindings} of ${reviewedBackingFindings} reviewed findings marked false positive)`}
-          . This is a result from this report, not a general
-          detector-accuracy claim.
+            ` (${rejectedBackingFindings} of ${reviewedBackingFindings})`}
+          . This number is for this report only. It does not show how accurate
+          the checks are in general.
         </p>
         <details className="mt-4 border-t border-border pt-3">
           <summary className="min-h-target cursor-pointer py-2 text-sm font-semibold text-sev-critical">
-            Danger zone
+            Delete this report
           </summary>
           <p className="text-sm text-fg-muted">
-            Deleting removes this scan and its report evidence. Shared
-            image blobs may remain.
+            Deleting removes this report and everything the scan saved for it.
+            Image files that other reports also use may stay in storage.
           </p>
           {deleteScan.error && (
             <p className="mt-2 text-sm text-sev-critical" role="alert">
-              Couldn&rsquo;t delete scan:{" "}
+              The report was not deleted. Try again. Details:{" "}
               {deleteScan.error instanceof Error
                 ? deleteScan.error.message
                 : String(deleteScan.error)}
@@ -171,7 +180,7 @@ export function ReportExpertTools({
             className="mt-2 text-sev-critical hover:bg-sev-critical-bg"
             onClick={() => {
               const ok = window.confirm(
-                `Delete scan #${scan.id} (${scan.seed_url})?\n\nThis permanently removes the scan, its pages, findings, and history. This cannot be undone.`,
+                `Delete report #${scan.id} (${scan.seed_url})?\n\nThis removes the report for good, with its pages, issues, images, and history. You cannot undo this.`,
               );
               if (ok) deleteScan.mutate();
             }}
@@ -201,13 +210,12 @@ export function BlockedScanNotice({
         />
         <div className="text-sm">
           <strong className="text-sev-critical">
-            Site URL returned HTTP {blocked.status_code}
+            The website returned an error (HTTP {blocked.status_code})
           </strong>
-          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. The crawler
-          could not read past the entry page. Try a{" "}
-          <Link to="/scans/new">new scan</Link>, or use an authorized
-          sign-in scan when the site requires authentication.
-          <span className="sr-only"> Report {scanId} is incomplete.</span>
+          {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. Axcess could
+          not get past the start page, so report {scanId} is incomplete.{" "}
+          <Link to="/scans/new">Start a new scan</Link>. If the site needs you
+          to sign in, and you have permission, use a sign-in scan.
         </div>
       </div>
     </Card>

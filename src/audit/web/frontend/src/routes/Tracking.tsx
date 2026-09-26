@@ -117,8 +117,8 @@ export default function TrackingRoute() {
   return (
     <>
       <PageHeader
-        title="Product Roadmap"
-        subtitle="What the tool detects today versus what's planned. Status is reconciled against the actual code."
+        title="Product roadmap"
+        subtitle="What Axcess checks today, and what is planned. Axcess builds this page from its own code, so it matches what Axcess really does."
       />
 
       {error && (
@@ -131,13 +131,14 @@ export default function TrackingRoute() {
 
       <section aria-labelledby="roadmap-h" className="mb-8">
         <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
-          Coverage and roadmap
+          What Axcess checks, and what is planned
         </h2>
         <p className="mb-3 text-sm text-fg-muted">
-          Every WCAG 2.2 A/AA criterion, with what Axcess checks today, what
-          still needs manual testing, and the AI analyzers queued to close the
-          gap. Coverage does not mean every requirement is tested; the last
-          column is what you must still check yourself.
+          This table lists every Web Content Accessibility Guidelines (WCAG) 2.2
+          criterion at Level A and AA. For each one, it shows what Axcess checks
+          today, what you still need to test by hand, and the AI reviews planned
+          to help. A check does not test every part of a requirement. The last
+          column says what you must still check yourself.
         </p>
 
         {/* Group chips first; the second row only appears for a group that
@@ -145,7 +146,7 @@ export default function TrackingRoute() {
         since a method or status from another group would match nothing. */}
         <Tabs
           mode="filter"
-          label="Tracker sections"
+          label="Roadmap sections"
           className="mb-2"
           controls="tracker-content"
           value={view || "all"}
@@ -163,7 +164,7 @@ export default function TrackingRoute() {
         {view === "ai" && counts && (
           <Tabs
             mode="filter"
-            label="Filter AI coverage by status"
+            label="Filter AI reviews by progress"
             className="mb-2"
             controls="tracker-content"
             value={status || "all"}
@@ -180,7 +181,7 @@ export default function TrackingRoute() {
         {view === "current" && coverage && (
           <Tabs
             mode="filter"
-            label="Filter coverage by method"
+            label="Filter by kind of check"
             className="mb-2"
             controls="tracker-content"
             value={method || "all"}
@@ -199,7 +200,7 @@ export default function TrackingRoute() {
 
         <p role="status" className="mb-2 text-xs text-fg-muted">
           {isLoading
-            ? "Loading tracker…"
+            ? "Loading the roadmap…"
             : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
         </p>
 
@@ -209,15 +210,15 @@ export default function TrackingRoute() {
             <div {...criteria.hold}>
             <table className="w-full text-sm">
               <caption className="sr-only">
-                WCAG 2.2 A/AA coverage and AI roadmap
+                What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews
               </caption>
               <thead className="bg-surface-muted text-xs text-fg-muted">
                 <tr>
-                  <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="name" label="Criterion" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="level" label="Lvl" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="method" label="Coverage" sort={sort} dir={dir} onSort={onSort} />
-                  <Th>Status</Th>
+                  <SortableTh sortKey="sc" label="Number" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="name" label="WCAG criterion" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="level" label="Level" sort={sort} dir={dir} onSort={onSort} />
+                  <SortableTh sortKey="method" label="Group" sort={sort} dir={dir} onSort={onSort} />
+                  <Th>Where it stands</Th>
                   <Th>What Axcess does</Th>
                   <Th>What remains</Th>
                 </tr>
@@ -238,7 +239,7 @@ export default function TrackingRoute() {
                       <Badge tone={row.tone}>{row.badge}</Badge>
                     </td>
                     <td className="px-4 py-3 text-xs text-fg-muted">
-                      {row.detail || <span className="text-fg-subtle">n/a</span>}
+                      {row.detail || <span className="text-fg-subtle">Does not apply</span>}
                       {row.note && (
                         <span className="mt-1 block text-2xs text-fg-subtle">{row.note}</span>
                       )}
@@ -262,28 +263,29 @@ export default function TrackingRoute() {
 
       <section aria-labelledby="shipped-h" className="mb-8">
         <h2 id="shipped-h" className="mb-1 text-base font-semibold text-fg">
-          Shipped Pipelines, What Runs Today
+          Checks that run today
         </h2>
         {/* Counted from the data, not written down: the previous sentence
         said "three deterministic, two AI" and had been wrong since two
         pipelines shipped. */}
         <p className="mb-3 text-sm text-fg-muted">
-          The {deterministicCount} deterministic pipelines need only chromium
-          (no Ollama); the {aiCount} AI pipelines need a local Ollama daemon.
+          {deterministicCount} checks use fixed rules. They need only the
+          Chromium browser, not Ollama. {aiCount} checks use AI. They need
+          Ollama, an app that runs AI models on this computer.
         </p>
         <Card className="overflow-x-auto">
           {/* Holds the tallest page's height, so paging never moves the pager. */}
           <div {...pipelines.hold}>
           <table className="w-full text-sm">
             <caption className="sr-only">
-              Detection pipelines that run on a default crawl
+              Checks that run in a default scan
             </caption>
             <thead className="bg-surface-muted text-xs text-fg-muted">
               <tr>
-                <Th>Pipeline</Th>
-                <Th>Engine</Th>
-                <Th>WCAG coverage</Th>
-                <Th>AI?</Th>
+                <Th>Check</Th>
+                <Th>Tool</Th>
+                <Th>WCAG criteria checked</Th>
+                <Th>Uses AI?</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border align-top">
@@ -316,7 +318,7 @@ export default function TrackingRoute() {
                       </span>
                     ) : (
                       <span className="rounded bg-surface-muted px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-                        rule
+                        Rules
                       </span>
                     )}
                   </td>
@@ -325,13 +327,13 @@ export default function TrackingRoute() {
             </tbody>
           </table>
           </div>
-          <TablePagination label="Detection pipelines" noun="pipelines" {...pipelines} />
+          <TablePagination label="Checks" noun="checks" {...pipelines} />
         </Card>
       </section>
 
       <p className="mt-4 text-xs text-fg-subtle">
-        Long-form version with the verification map:{" "}
-        <code>docs/coverage-tracker.md</code>.
+        For more detail, including how each check is verified, see{" "}
+        <code>docs/coverage-tracker.md</code> in the Axcess source code.
       </p>
     </>
   );
@@ -343,9 +345,9 @@ const GROUPS = ["current", "future", "ai"] as const;
 type Group = (typeof GROUPS)[number];
 
 const GROUP_LABEL: Record<Group, string> = {
-  current: "Current Coverage",
-  future: "Future Coverage",
-  ai: "AI Coverage",
+  current: "Checked now",
+  future: "Not checked yet",
+  ai: "AI reviews",
 };
 
 const isGroup = (value: string): value is Group => (GROUPS as readonly string[]).includes(value);
@@ -354,7 +356,7 @@ const isStatus = (value: string): value is TrackingStatus =>
 
 /** Human labels for the roadmap status enum (never the raw key). */
 const STATUS_LABEL: Record<TrackingStatus, string> = {
-  shipped: "Shipped",
+  shipped: "Available",
   in_progress: "In progress",
   planned: "Planned",
 };
@@ -405,7 +407,7 @@ function buildRows(data: TrackingData): Row[] {
       level: c.level,
       group: future ? "future" : "current",
       method: c.method,
-      badge: future ? "Not covered yet" : data.coverage.method_labels[c.method],
+      badge: future ? "Not checked yet" : data.coverage.method_labels[c.method],
       tone: METHOD_TONE[c.method],
       detail: c.automated_check,
       remaining: c.manual_check,

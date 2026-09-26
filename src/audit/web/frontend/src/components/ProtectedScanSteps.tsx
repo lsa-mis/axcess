@@ -14,28 +14,28 @@ const STEPS: Array<{
 }> = [
   {
     key: "scope",
-    label: "Set scope",
-    detail: "Record authorization and the exact application and sign-in origins.",
+    label: "Choose what to scan",
+    detail: "Confirm you have permission, and give the exact website and sign-in addresses (origins).",
   },
   {
     key: "pair",
-    label: "Connect browser",
-    detail: "Open the protected Chromium window on your computer.",
+    label: "Open browser",
+    detail: "Axcess opens a separate, protected Chromium browser window on your computer.",
   },
   {
     key: "sign_in",
     label: "Sign in yourself",
-    detail: "Complete password, passkey, or 2FA in the visible browser window.",
+    detail: "Enter your password, passkey, or two-step sign-in (2FA) in that browser window.",
   },
   {
     key: "scan",
     label: "Scan",
-    detail: "Axcess verifies the approved page, then checks the read-only scope.",
+    detail: "Axcess confirms it reached the approved page. Then it checks the pages you chose, without changing anything (read-only).",
   },
   {
     key: "report",
     label: "Review report",
-    detail: "Open the issue table and download the available report.",
+    detail: "Open the Issues table, and download the report if you need it.",
   },
 ];
 
@@ -60,14 +60,15 @@ export default function ProtectedScanSteps({
     >
       <div className="max-w-3xl">
         <p className="text-xs font-semibold text-umich-blue">
-          Login before scanning
+          Sign in before scanning
         </p>
         <h2 id="protected-scan-steps-title" className="mt-1 text-lg font-semibold text-fg">
-          How the secure browser flow works
+          How a sign-in scan works
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
-          Your password and 2FA stay between you and the website. Checking starts
-          only after Axcess confirms an approved post-login page.
+          Only you and the website see your password and two-step sign-in (2FA).
+          Axcess starts checking only after it confirms you reached an approved
+          page after sign-in.
         </p>
       </div>
 

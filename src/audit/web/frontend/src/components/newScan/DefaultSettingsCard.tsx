@@ -1,29 +1,30 @@
 import { Check, X } from "lucide-react";
+import { CHECK_LABEL } from "../../lib/terms";
 import { Button, Card } from "../ui";
 import { DEFAULTS_CARD } from "./copy";
 import { isDefault, isFixed, switchOn, type ScanPolicy, type ScanSettings } from "./scanPolicy";
 
 export function engineName(engine: ScanSettings["scan_engine"]): string {
-  return engine === "both" ? "axe-core + Alfa" : engine === "alfa" ? "Siteimprove Alfa" : "axe-core";
+  return engine === "both" ? "Rule checks (axe and Alfa)" : engine === "alfa" ? CHECK_LABEL.alfa : CHECK_LABEL.axe;
 }
 
 /** The lines the default card shows, with whether each still applies. */
 export function includedLines(settings: ScanSettings, policy: ScanPolicy): Array<{ text: string; on: boolean }> {
   const login = policy.mode === "login";
   const lines: Array<{ text: string; on: boolean }> = [
-    { text: `Checks against WCAG 2.2 ${settings.axe_level} with ${engineName(settings.scan_engine)}`, on: true },
-    { text: "Keyboard traps", on: switchOn(settings, "keyboard") },
+    { text: `${engineName(settings.scan_engine)} against Web Content Accessibility Guidelines (WCAG) 2.2, Level ${settings.axe_level}`, on: true },
+    { text: `${CHECK_LABEL.keyboard} (keyboard traps)`, on: switchOn(settings, "keyboard") },
   ];
-  if (!isFixed(policy, "skip_focus")) lines.push({ text: "Focus visibility", on: switchOn(settings, "focus") });
+  if (!isFixed(policy, "skip_focus")) lines.push({ text: `${CHECK_LABEL.focus} (focus stays visible)`, on: switchOn(settings, "focus") });
   lines.push(
-    { text: "Responsive layout and zoom", on: switchOn(settings, "responsive") },
-    { text: "Clicks through menus and dialogs", on: switchOn(settings, "click_through") },
+    { text: `${CHECK_LABEL.responsive} (narrow screens and zoom)`, on: switchOn(settings, "responsive") },
+    { text: "Opens menus, tabs, and pop-up windows", on: switchOn(settings, "click_through") },
   );
   // A line is listed when the default profile includes it, or when it has
   // been turned on: a login scan starts without image reading, and a struck
   // line on an untouched card would claim a change nobody made.
   if (!policy.defaults.skip_ocr || switchOn(settings, "ocr")) {
-    lines.push({ text: "Reads text inside images", on: switchOn(settings, "ocr") });
+    lines.push({ text: `${CHECK_LABEL.image} (reads text inside images)`, on: switchOn(settings, "ocr") });
   }
   lines.push(
     {
@@ -31,14 +32,14 @@ export function includedLines(settings: ScanSettings, policy: ScanPolicy): Array
       on: true,
     },
     login
-      ? { text: "Stays on this website, 1 request per second", on: settings.rps <= 1 }
-      : { text: "Respects robots.txt", on: !settings.ignore_robots },
+      ? { text: "Stays on this website, 1 page request per second", on: settings.rps <= 1 }
+      : { text: "Follows the site’s robots.txt rules", on: !settings.ignore_robots },
   );
   lines.push({
-    text: "Stores rendered pages for the Page inspector",
+    text: "Keeps a saved copy of each page for the Page inspector",
     on: !settings.skip_rendered_storage && !settings.static_only,
   });
-  if (settings.static_only) lines.push({ text: "Renders every page in a real browser", on: false });
+  if (settings.static_only) lines.push({ text: "Opens every page in a real browser", on: false });
   return lines;
 }
 

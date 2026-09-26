@@ -65,7 +65,7 @@ async def test_url_hero_names_the_field_and_describes_the_scope(
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    url = page.get_by_role("textbox", name="Site URL", exact=True)
+    url = page.get_by_role("textbox", name="Website address", exact=True)
     await playwright_async.expect(url).to_be_focused()
     # The name is the label alone; help and scope are descriptions.
     described = await url.get_attribute("aria-describedby")
@@ -76,7 +76,7 @@ async def test_url_hero_names_the_field_and_describes_the_scope(
     await url.fill("https://example.com/section")
     await playwright_async.expect(scope).to_contain_text("Will scan")
     await playwright_async.expect(scope).to_contain_text("example.com/section/")
-    await playwright_async.expect(scope).to_contain_text("A trailing slash was added")
+    await playwright_async.expect(scope).to_contain_text("Axcess added a slash (/) at the end")
     assert await scope.get_attribute("role") == "status"
 
 
@@ -94,10 +94,10 @@ async def test_empty_submit_is_announced_focused_and_linked(
     alert = page.get_by_role("alert")
     await playwright_async.expect(alert).to_be_visible()
     await playwright_async.expect(alert).to_be_focused()
-    url = page.get_by_role("textbox", name="Site URL", exact=True)
+    url = page.get_by_role("textbox", name="Website address", exact=True)
     assert await url.get_attribute("aria-invalid") == "true"
     assert "scan-url-error" in (await url.get_attribute("aria-describedby") or "")
-    await alert.get_by_role("link", name="Enter the page to start from.").click()
+    await alert.get_by_role("link", name="Enter a website address to start from.").click()
     await playwright_async.expect(url).to_be_focused()
     # Typing clears that line; the alert goes with it.
     await url.fill("https://example.com/")
@@ -111,16 +111,18 @@ async def test_fast_crawl_with_axe_blocks_start_with_an_inline_alert(
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
-    await page.get_by_role("textbox", name="Site URL", exact=True).fill("https://example.com/")
-    await page.get_by_role("button", name="Speed and debugging", exact=True).click()
-    fast = page.get_by_role("switch", name=re.compile(r"^Fast crawl without a browser"))
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Speed and browser window", exact=True).click()
+    fast = page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser"))
     await fast.check()
     # Rendered-page checks switch themselves off and say why.
     keyboard = page.get_by_role("switch", name=re.compile(r"^Check for keyboard traps"))
     await playwright_async.expect(keyboard).to_be_disabled()
     await page.get_by_role("button", name="Start scan").click()
     inline = page.locator("#scan-static-only-error")
-    await playwright_async.expect(inline).to_contain_text("cannot run with axe-core")
+    await playwright_async.expect(inline).to_contain_text("cannot run Rule check (axe)")
     assert await fast.get_attribute("aria-invalid") == "true"
     await playwright_async.expect(page.get_by_role("alert").first).to_be_focused()
 
@@ -137,7 +139,7 @@ async def test_default_card_and_summary_follow_the_switches(
     await playwright_async.expect(card.get_by_text("Selected", exact=True)).to_be_visible()
     await playwright_async.expect(summary).to_contain_text("5 of 8 checks on")
 
-    pages = page.get_by_role("spinbutton", name="Max pages")
+    pages = page.get_by_role("spinbutton", name="Maximum pages")
     await pages.fill("300")
     await playwright_async.expect(summary).to_contain_text("Up to 300 pages")
     await playwright_async.expect(card).to_contain_text("Up to 300 pages")
@@ -145,14 +147,14 @@ async def test_default_card_and_summary_follow_the_switches(
 
     keyboard = page.get_by_role("switch", name=re.compile(r"^Check for keyboard traps"))
     await keyboard.uncheck()
-    await playwright_async.expect(summary).to_contain_text("Keyboard traps off")
+    await playwright_async.expect(summary).to_contain_text("Keyboard check off")
     await playwright_async.expect(summary).to_contain_text("4 of 8 checks on")
     # Struck through, and said out loud.
-    await playwright_async.expect(card.locator("li", has_text="Keyboard traps")).to_contain_text(
+    await playwright_async.expect(card.locator("li", has_text="Keyboard check")).to_contain_text(
         "turned off"
     )
 
-    await card.get_by_role("button", name="Reset to default").click()
+    await card.get_by_role("button", name="Reset to default settings").click()
     await playwright_async.expect(card.get_by_text("Selected", exact=True)).to_be_visible()
     await playwright_async.expect(pages).to_have_value("2500")
     await playwright_async.expect(keyboard).to_be_checked()
@@ -165,7 +167,7 @@ async def test_form_targets_are_44px_and_axe_aaa_clean(
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode={mode}", wait_until="networkidle")
-    for name in ("Local AI", "Speed and debugging"):
+    for name in ("AI checks on this computer", "Speed and browser window"):
         await page.get_by_role("button", name=name, exact=True).click()
     small = await page.evaluate(_SMALL_TARGETS)
     # Native checkboxes are 22px inside a 44px label row, which is the

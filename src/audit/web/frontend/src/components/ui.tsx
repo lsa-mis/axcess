@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
+import { SCAN_STATUS_LABEL, STATUS_LABEL } from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
@@ -15,7 +16,7 @@ export function SeverityChip({ value }: { value: Severity }) {
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
     <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted">
-      {value.replace(/_/g, " ")}
+      {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
     </span>
   );
 }
@@ -475,7 +476,7 @@ export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
     return (
       <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
-        missing
+        No alt text
       </span>
     );
   }
@@ -512,13 +513,13 @@ const SCAN_STATUS_CLASS: Record<ScanStatus, string> = {
 export function ScanStatusBadge({ value }: { value: ScanStatus }) {
   return (
     <span
-      aria-label={`Scan status: ${value}`}
+      aria-label={`Scan status: ${SCAN_STATUS_LABEL[value] ?? value}`}
       className={cn(
         "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold",
         SCAN_STATUS_CLASS[value],
       )}
     >
-      {value}
+      {SCAN_STATUS_LABEL[value] ?? value}
     </span>
   );
 }
@@ -1097,7 +1098,7 @@ export function PageLink({
               any title that wraps. Top-aligned it stays beside the first line. */}
           <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
-          <span className="sr-only">, opens the in-app page inspector</span>
+          <span className="sr-only">, opens in the page inspector</span>
         </Link>
       ) : (
         // Without a scan scope there is no in-app inspector to link to; keep
@@ -1127,7 +1128,7 @@ export function PageLink({
           rel="noopener noreferrer"
           className="underline underline-offset-2 hover:text-fg"
         >
-          open live page ↗
+          Open live page ↗
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
         {scanId != null && (
@@ -1139,7 +1140,7 @@ export function PageLink({
               to={pageEvidencePath({ scanId, pageId, origin, backTo })}
               className="underline underline-offset-2 hover:text-fg"
             >
-              stored evidence
+              Page details
             </Link>
           </>
         )}
@@ -1160,20 +1161,21 @@ export function PageLink({
  * the exact moment; this helper only formats, it doesn't render.
  */
 export function relativeTime(iso: string | null): string {
-  if (!iso) return "n/a";
+  if (!iso) return "Not recorded";
   const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return "n/a";
+  if (Number.isNaN(ts)) return "Not recorded";
+  const ago = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"} ago`;
   const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return ago(seconds, "second");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return ago(minutes, "minute");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return ago(hours, "hour");
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return ago(days, "day");
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
+  if (months < 12) return ago(months, "month");
   const years = Math.floor(days / 365);
-  return `${years}y ago`;
+  return ago(years, "year");
 }

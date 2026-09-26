@@ -5,6 +5,7 @@ import { cn } from "../lib/cn";
 import { TABLE_PAGE_SIZE, TablePagination, usePagedRows } from "./TablePagination";
 import { pageEvidencePath, withReturnTrail } from "./ui";
 import type { IssuePage, IssueRow } from "../api/types";
+import { STATUS_LABEL } from "../lib/terms";
 
 /** The trail label for the pages view; ReportCrumb shows the same words. */
 // "Pages" and not "Pages with this issue": the trail already names the
@@ -65,6 +66,17 @@ export const DEFAULT_PAGES_SORT: PagesSort = { column: "Occurrences", direction:
 
 type Column = "#" | SortColumn | "Open live page" | "Stored evidence";
 
+/** What each column header says. The column keys above stay as they are. */
+const COLUMN_LABEL: Record<Exclude<Column, "#">, string> = {
+  "Page title": "Page title",
+  "Page URL": "Page URL",
+  "Open live page": "Open live page",
+  "Stored evidence": "Page details",
+  Occurrences: "Occurrences",
+  "Issue screenshots": "Screenshots",
+  Status: "Status",
+};
+
 function isSortable(column: Column): column is SortColumn {
   return (SORT_COLUMNS as readonly string[]).includes(column);
 }
@@ -80,7 +92,7 @@ function describeSort(sort: PagesSort): string {
   const how = numeric
     ? sort.direction === "desc" ? "highest first" : "lowest first"
     : sort.direction === "asc" ? "A to Z" : "Z to A";
-  return `${sort.column}, ${how}`;
+  return `${COLUMN_LABEL[sort.column]}, ${how}`;
 }
 
 /** Open work first: how many of a page's occurrences are not yet closed. */
@@ -211,7 +223,7 @@ export default function IssuePagesTable({
       {visible.length === 0 ? (
         <p className="p-4 text-sm text-fg-muted">
           {pages.length === 0
-            ? "No pages are currently associated with this issue."
+            ? "No pages have this issue."
             : "No pages match that search."}
         </p>
       ) : (
@@ -243,7 +255,7 @@ export default function IssuePagesTable({
                   if (!isSortable(column)) {
                     return (
                       <th key={column} scope="col" className={cn(cell, "px-3 py-2")}>
-                        {column}
+                        {COLUMN_LABEL[column]}
                       </th>
                     );
                   }
@@ -264,7 +276,7 @@ export default function IssuePagesTable({
                           active ? "text-umich-blue" : "text-fg-subtle",
                         )}
                       >
-                        <span>{column}</span>
+                        <span>{COLUMN_LABEL[column]}</span>
                         {active ? (
                           <span
                             key={`${sort.column}-${sort.direction}`}
@@ -316,7 +328,7 @@ export default function IssuePagesTable({
                         <span>
                           {page.page_title?.trim() || <span className="font-normal">Untitled</span>}
                         </span>
-                        <span className="sr-only">, opens the in-app page inspector</span>
+                        <span className="sr-only">, opens the saved copy with this issue marked</span>
                       </Link>
                     </td>
                     <td className="min-w-[14rem] max-w-md break-all px-3 py-2.5 align-top text-xs text-fg-muted">
@@ -339,7 +351,7 @@ export default function IssuePagesTable({
                         to={pageEvidencePath({ scanId, pageId: page.page_id, origin, backTo })}
                         className="text-umich-blue underline underline-offset-2"
                       >
-                        Stored evidence
+                        Page details
                         <span className="sr-only"> for {label}</span>
                       </Link>
                     </td>
@@ -353,7 +365,7 @@ export default function IssuePagesTable({
                           <span className="sr-only"> of this issue on {label}</span>
                         </Link>
                       ) : (
-                        <span className="text-fg-muted">None captured</span>
+                        <span className="text-fg-muted">No screenshots</span>
                       )}
                     </td>
                     {!isInformational && (
@@ -372,7 +384,7 @@ export default function IssuePagesTable({
                                     : "inline-block rounded-xs bg-surface-muted px-1.5 py-0.5 text-2xs text-fg-subtle"
                                 }
                               >
-                                {n} {s.replace(/_/g, " ")}
+                                {n} {STATUS_LABEL[s]}
                               </span>
                             );
                           })}
@@ -403,7 +415,7 @@ function PageSearch({ value, onChange }: { value: string; onChange: (value: stri
       type="search"
       aria-label="Search pages"
       value={draft}
-      placeholder="Search page title or URL"
+      placeholder="Search by page title or URL"
       onChange={(event) => {
         const next = event.target.value;
         setDraft(next);

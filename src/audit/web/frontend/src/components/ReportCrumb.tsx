@@ -31,11 +31,11 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
-  [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
-  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],
-  [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
-  [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
-  [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
+  [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
+  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+  [/^\/scans\/\d+\/findings\/?$/, "Images"],
+  [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
+  [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
   [/^\/scans\/\d+\/?$/, "Report"],
 ];
 
@@ -151,7 +151,7 @@ function placeholderFor(subject: CrumbSubject): string {
     case "page":
       return subject.view === "inspect"
         ? `Page ${subject.pageId}`
-        : `Stored evidence for page ${subject.pageId}`;
+        : `Page details for page ${subject.pageId}`;
   }
 }
 
@@ -329,7 +329,7 @@ export function useReportTrail(): {
         const page = pageEvidence(subject.scanId, subject.pageId)?.page;
         const name = pageName(page?.title, page?.url_normalized);
         if (!name) return null;
-        return subject.view === "inspect" ? name : `Stored evidence for ${name}`;
+        return subject.view === "inspect" ? name : `Page details for ${name}`;
       }
     }
   };

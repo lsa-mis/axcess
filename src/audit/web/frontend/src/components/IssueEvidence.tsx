@@ -5,6 +5,7 @@ import { Card, Disclosure } from "./ui";
 import ConformanceBadge from "./ConformanceBadge";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueRow } from "../api/types";
+import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
  * The full evidence for one issue group: what it is, why it matters, the fix,
@@ -42,22 +43,19 @@ export default function IssueEvidence({
   if (error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this issue&rsquo;s evidence. The stored scan data is unchanged.
+        This issue&rsquo;s details could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
   if (!data || isLoading) {
-    return <p className="px-4 py-6 text-sm text-fg-muted" role="status">Loading issue evidence…</p>;
+    return <p className="px-4 py-6 text-sm text-fg-muted" role="status">Loading issue details…</p>;
   }
 
   const { row, pages, description, why_matters, fix_steps, verify_manual,
     verify_automated, acceptance, help_url } = data;
   const isInformational = row.review_lane === "informational";
-  const laneLabel = row.review_lane === "likely_barrier"
-    ? "Barrier"
-    : row.review_lane === "expert_review"
-      ? "Needs confirmation"
-      : "Informational evidence";
+  const laneLabel = REVIEW_TYPE_LABEL[row.review_lane];
   const laneClass = row.review_lane === "likely_barrier"
     ? "border-umich-blue/30 bg-umich-blue/5"
     : row.review_lane === "expert_review"
@@ -74,7 +72,7 @@ export default function IssueEvidence({
           </h2>
           <span className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-surface px-2 py-1 text-xs font-semibold capitalize">
-              {row.evidence_confidence} evidence confidence
+              Confidence: {row.evidence_confidence}
             </span>
             {help_url && (
               <a
@@ -83,9 +81,9 @@ export default function IssueEvidence({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-umich-blue underline underline-offset-2"
               >
-                Rule docs
+                About this rule
                 <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="sr-only">opens in a new tab</span>
+                <span className="sr-only">, opens in a new tab</span>
               </a>
             )}
           </span>
@@ -93,12 +91,13 @@ export default function IssueEvidence({
         <p className="mt-1 text-sm text-fg-muted">{row.evidence_summary}</p>
         {row.review_lane === "expert_review" && (
           <p className="mt-2 text-sm font-semibold">
-            Do not describe this as a confirmed barrier until the expert decision is documented.
+            Do not call this a confirmed barrier until an expert checks it and records the decision.
           </p>
         )}
         {isInformational && (
           <p className="mt-2 text-sm font-semibold">
-            No barrier was detected by this check. This record is read-only evidence retained for transparency.
+            This check found no barrier. Axcess keeps this record so you can see what it looked at.
+            It is for information only, and you cannot change it.
           </p>
         )}
       </Card>
@@ -122,7 +121,7 @@ export default function IssueEvidence({
                 <span
                   key={a}
                   className="inline-block rounded-full border border-border bg-surface-muted px-2 py-0.5 text-2xs font-semibold"
-                  title={`Affects users with ${a} impairments`}
+                  title={`Affects people with ${a} disabilities`}
                 >
                   {capitalize(a)}
                 </span>
@@ -153,12 +152,12 @@ export default function IssueEvidence({
 
       <Card className="mb-4 p-4">
         <h3 className="text-base font-semibold">
-          {isInformational ? "Evidence summary" : "What it is"}
+          {isInformational ? "What Axcess found" : "What it is"}
         </h3>
         <p className="mt-1 text-sm text-fg">
           {description ||
             row.evidence_summary ||
-            "This is an automated evidence record. Review the affected pages above for the captured detail."}
+            "Axcess recorded this automatically. See the pages above for the details."}
         </p>
         {!isInformational && (why_matters || fix_steps.length > 0 || verify_manual || verify_automated) && (
           <Disclosure
@@ -170,7 +169,7 @@ export default function IssueEvidence({
             {why_matters && <p className="text-sm text-fg-muted">{why_matters}</p>}
             {fix_steps.length > 0 && (
               <>
-                <h4 className="mt-3 text-2xs font-semibold text-fg-subtle">Expected behavior</h4>
+                <h4 className="mt-3 text-2xs font-semibold text-fg-subtle">How it should work</h4>
                 <ol className="mt-1 list-decimal space-y-1.5 pl-5 text-sm text-fg">
                   {fix_steps.map((step, i) => (
                     <li
@@ -191,14 +190,14 @@ export default function IssueEvidence({
             {(verify_manual || verify_automated) && (
               <>
                 <h4 className="mt-3 text-2xs font-semibold text-fg-subtle">
-                  {row.review_lane === "expert_review" ? "What to check to confirm" : "How to verify"}
+                  {row.review_lane === "expert_review" ? "How to confirm it" : "How to test the fix"}
                 </h4>
                 <ul className="mt-1 list-disc space-y-1.5 pl-5 text-sm text-fg">
                   {verify_manual && <li>{verify_manual}</li>}
                   {verify_automated && <li>{verify_automated}</li>}
                   {row.review_lane === "expert_review" && (
                     <li className="font-semibold text-umich-blue">
-                      Confirm the finding in page context before reporting it as a barrier.
+                      Look at the issue on the page itself before you report it as a barrier.
                     </li>
                   )}
                 </ul>
@@ -266,24 +265,29 @@ type IssueFact = { label: string; value: string | number; hint?: string };
  */
 function issueFacts(row: IssueRow, isInformational: boolean): IssueFact[] {
   const facts: IssueFact[] = [
-    { label: "Criterion level", value: row.wcag_sc ? row.conformance : "n/a" },
+    {
+      label: "WCAG level",
+      value: row.wcag_sc
+        ? row.conformance === "BP" ? "Best practice" : `Level ${row.conformance}`
+        : "Does not apply",
+    },
   ];
   if (!isInformational) {
     facts.push({
       label: "Priority",
       value: priorityTier(row.priority),
-      hint: "Severity × how many pages it touches. Fix sooner when both are high.",
+      hint: "Based on how serious the issue is and how many pages have it. Fix it sooner when both are high.",
     });
   }
   facts.push(
-    { label: "Pages affected", value: row.page_count },
+    { label: "Pages with the issue", value: row.page_count },
     { label: "Occurrences", value: row.occurrence_count },
   );
   if (!isInformational && row.difficulty !== "Unknown") {
     facts.push({ label: "Difficulty", value: row.difficulty });
   }
   if (!isInformational) {
-    facts.push({ label: "Responsibility", value: capitalize(row.responsibility) });
+    facts.push({ label: "Who fixes it", value: capitalize(row.responsibility) });
   }
   return facts;
 }

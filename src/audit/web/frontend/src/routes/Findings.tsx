@@ -22,6 +22,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
+import { STATUS_OPTION_LABEL } from "../lib/terms";
 
 const SEVERITIES: Severity[] = ["critical", "major", "minor", "info"];
 const STATUSES: FindingStatus[] = [
@@ -41,6 +42,12 @@ const CLASSES: Classification[] = [
 ];
 
 const PAGE_SIZE = 200;
+
+/** A stored value as sentence-case words: "no_meaningful_text" -> "No meaningful text". */
+function sentenceCase(value: string): string {
+  const words = value.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export default function FindingsRoute() {
   const { scanId } = useParams<{ scanId: string }>();
@@ -74,10 +81,10 @@ export default function FindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Findings"
+        title="Images"
         subtitle={
           data
-            ? `${data.total.toLocaleString()} total · showing ${rows.length}`
+            ? `${data.total.toLocaleString()} images · showing ${rows.length}`
             : "Loading…"
         }
         actions={
@@ -108,18 +115,21 @@ export default function FindingsRoute() {
             label="Severity"
             value={filter.severity ?? ""}
             options={SEVERITIES}
+            labelFor={sentenceCase}
             onChange={(v) => setParam("severity", v)}
           />
           <FilterSelect
             label="Status"
             value={filter.status ?? ""}
             options={STATUSES}
+            labelFor={(v) => STATUS_OPTION_LABEL[v as FindingStatus]}
             onChange={(v) => setParam("status", v)}
           />
           <FilterSelect
-            label="Classification"
+            label="Image type"
             value={filter.classification ?? ""}
             options={CLASSES}
+            labelFor={sentenceCase}
             onChange={(v) => setParam("classification", v)}
           />
           <label className="flex flex-col text-xs font-semibold text-fg-subtle">
@@ -136,7 +146,7 @@ export default function FindingsRoute() {
                 type="search"
                 value={filter.q ?? ""}
                 onChange={(e) => setParam("q", e.target.value)}
-                placeholder="URL, alt, OCR…"
+                placeholder="Page address, alt text, or image text"
                 className="min-h-target w-full rounded-xs border border-border bg-surface py-2 pl-8 pr-2 text-base font-normal normal-case tracking-normal text-fg placeholder:text-fg-subtle focus:border-umich-blue focus:outline-none"
               />
             </div>
@@ -152,8 +162,8 @@ export default function FindingsRoute() {
 
       {!isLoading && rows.length === 0 ? (
         <EmptyState
-          title="No findings match"
-          message="Try clearing a filter or widening the search."
+          title="No images match"
+          message="Clear a filter or shorten your search."
         />
       ) : (
         <FindingsTable rows={rows} isLoading={isLoading} />
@@ -178,7 +188,7 @@ export default function FindingsRoute() {
             }}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
-            Prev
+            Previous
           </Button>
           <span aria-current="page" className="font-semibold text-fg">
             Page {filter.page} of {data.total_pages}
@@ -205,11 +215,13 @@ function FilterSelect({
   label,
   value,
   options,
+  labelFor = sentenceCase,
   onChange,
 }: {
   label: string;
   value: string;
   options: readonly string[];
+  labelFor?: (option: string) => string;
   onChange: (v: string) => void;
 }) {
   return (
@@ -219,8 +231,8 @@ function FilterSelect({
       value={value}
       onChange={onChange}
       options={[
-        { value: "", label: "any" },
-        ...options.map((option) => ({ value: option, label: option.replace(/_/g, " ") })),
+        { value: "", label: "Any" },
+        ...options.map((option) => ({ value: option, label: labelFor(option) })),
       ]}
     />
   );
@@ -256,7 +268,7 @@ function FindingsTable({
     <Card className="overflow-hidden">
       <div
         role="table"
-        aria-label="Findings"
+        aria-label="Images"
         aria-busy={isLoading}
         className="flex flex-col"
       >
@@ -266,9 +278,9 @@ function FindingsTable({
         >
           <span role="columnheader">Severity</span>
           <span role="columnheader">Image</span>
-          <span role="columnheader">OCR text</span>
-          <span role="columnheader">Alt</span>
-          <span role="columnheader">Classification</span>
+          <span role="columnheader">Text read from image (OCR)</span>
+          <span role="columnheader">Alt text</span>
+          <span role="columnheader">Image type</span>
           <span role="columnheader">Page</span>
           <span role="columnheader">Status</span>
         </div>
@@ -314,7 +326,7 @@ function FindingsTable({
                       />
                     ) : (
                       <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
-                        n/a
+                        No image
                       </span>
                     )}
                   </div>
@@ -327,14 +339,14 @@ function FindingsTable({
                         {f.ocr_text}
                       </span>
                     ) : (
-                      <span className="text-xs text-fg-subtle">n/a</span>
+                      <span className="text-xs text-fg-subtle">No text found</span>
                     )}
                   </div>
                   <div role="cell" className="min-w-0">
                     <AltTag value={f.sample_alt} />
                   </div>
                   <div role="cell" className="text-xs text-fg-muted">
-                    {f.vlm_classification ?? "n/a"}
+                    {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
                   </div>
                   <div role="cell" className="min-w-0">
                     {f.sample_page ? (
@@ -356,7 +368,7 @@ function FindingsTable({
                         <span className="sr-only">opens in a new tab</span>
                       </a>
                     ) : (
-                      <span className="text-xs text-fg-subtle">n/a</span>
+                      <span className="text-xs text-fg-subtle">Does not apply</span>
                     )}
                   </div>
                   <div role="cell">

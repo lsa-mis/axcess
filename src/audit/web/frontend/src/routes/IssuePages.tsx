@@ -37,21 +37,22 @@ export default function IssuePagesRoute() {
   if (scanQuery.error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this report. The stored scan evidence is unchanged.
+        This report could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
   if (detailQuery.error) {
     return (
       <EmptyState
-        title="Evidence group not found"
+        title="Issue not found"
         message={
-          "This evidence group isn't part of the current report. It may have been " +
-          "resolved or the URL may be stale. Return to the issue table."
+          "This issue is not part of this report. It may have been fixed, " +
+          "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
           <LinkButton to={`/scans/${id}/issues`} variant="primary">
-            Back to issue table
+            Back to the Issues table
           </LinkButton>
         }
       />
@@ -84,8 +85,8 @@ export default function IssuePagesRoute() {
           <>
             {row.wcag_sc && (
               <>
-                WCAG SC {row.wcag_sc}
-                {row.wcag_name ? `: ${row.wcag_name}` : ""}
+                <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
+                {row.wcag_name ? ` ${row.wcag_name}` : ""}
                 {" · "}
               </>
             )}
@@ -94,7 +95,7 @@ export default function IssuePagesRoute() {
             {occurrences} occurrence{occurrences === 1 ? "" : "s"}
             {" · "}
             <Link to={issuePath} className="text-umich-blue underline underline-offset-2">
-              Full evidence record
+              Full issue details
             </Link>
           </>
         }
@@ -110,9 +111,9 @@ export default function IssuePagesRoute() {
           </h2>
           {row.repeat_page_count > 0 && (
             <p className="text-sm text-fg-muted">
-              The same element also appeared on {row.repeat_page_count} other page
-              {row.repeat_page_count === 1 ? "" : "s"}; it is listed once, on the first page
-              where it was found.
+              The same element is also on {row.repeat_page_count} other page
+              {row.repeat_page_count === 1 ? "" : "s"}. Axcess lists it once, on the first page
+              where it found it.
             </p>
           )}
         </div>

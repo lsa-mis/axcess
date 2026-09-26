@@ -65,7 +65,7 @@ const NAV: NavItem[] = [
   },
   {
     to: "/tracking",
-    label: "Product Roadmap",
+    label: "Product roadmap",
     icon: ListChecks,
     isActive: (p) => p === "/tracking",
   },
@@ -243,8 +243,8 @@ function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?:
       className={cn(className, onNewScanForm && "pointer-events-none opacity-50")}
       aria-disabled={onNewScanForm || undefined}
       tabIndex={onNewScanForm ? -1 : undefined}
-      aria-label="Create New Scan"
-      title="Create a new accessibility scan"
+      aria-label="Start a new scan"
+      title="Start a new accessibility scan"
     >
       <Plus className="h-5 w-5 shrink-0" aria-hidden />
       {/* "New scan" fits half the sidebar; the accessible name and tooltip
@@ -427,8 +427,8 @@ function TopBar({
           type="button"
           aria-label={
             mobileNavOpen
-              ? "Close primary navigation"
-              : "Open primary navigation"
+              ? "Close menu"
+              : "Open menu"
           }
           aria-expanded={mobileNavOpen}
           aria-controls="mobile-primary-nav"
@@ -524,29 +524,29 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/?$/, "Reports"],
     [/^\/scans\/new\/?$/, "New scan"],
     [/^\/scans\/protected\/new\/?$/, "New scan"],
-    [/^\/scans\/\d+\/protected\/manual-checks\/?$/, "Protected manual checks"],
-    [/^\/scans\/\d+\/protected\/issues\/?$/, "Protected issue index"],
-    [/^\/scans\/\d+\/protected\/?$/, "Protected companion"],
+    [/^\/scans\/\d+\/protected\/manual-checks\/?$/, "Manual checks for the sign-in scan"],
+    [/^\/scans\/\d+\/protected\/issues\/?$/, "Sign-in scan issues"],
+    [/^\/scans\/\d+\/protected\/?$/, "Sign-in scan"],
     [
       /^\/scans\/\d+\/(?:review|manual-checks|handoff)\/?$/,
       "Accessibility issues",
     ],
     [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
-    [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
+    [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/\d+\/screenshots\/?$/, "Issue screenshots"],
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
-    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],
-    [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
-    [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
-    [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
+    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+    [/^\/scans\/\d+\/findings\/?$/, "Images"],
+    [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
+    [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
     [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
     // Only running and failed scans render here; a completed report
     // redirects to its issue table.
     [/^\/scans\/\d+\/?$/, "Scan status"],
-    [/^\/findings\/\d+\/?$/, "Finding evidence"],
-    [/^\/tracking\/?$/, "Coverage tracking"],
+    [/^\/findings\/\d+\/?$/, "Image details"],
+    [/^\/tracking\/?$/, "Product roadmap"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

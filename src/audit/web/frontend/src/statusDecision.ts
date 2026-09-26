@@ -1,4 +1,5 @@
 import type { FindingStatus } from "./api/types";
+import { STATUS_LABEL } from "./lib/terms";
 
 export const RATIONALE_REQUIRED_STATUSES = new Set<FindingStatus>([
   "in_progress",
@@ -20,13 +21,13 @@ export function requestStatusRationale(
 ): string | null {
   if (!RATIONALE_REQUIRED_STATUSES.has(status)) return "";
   const response = window.prompt(
-    `Document why ${subject} should be marked ${status.replace(/_/g, " ")}. ` +
-      "Include the evidence reviewed and the basis for the decision.",
+    `Explain why ${subject} should be marked “${STATUS_LABEL[status]}”. ` +
+      "Say what evidence you looked at and why you decided this.",
   );
   if (response === null) return null;
   const rationale = response.trim();
   if (!rationale) {
-    window.alert("A decision rationale is required. No status was changed.");
+    window.alert("You need to give a reason. The status was not changed.");
     return null;
   }
   return rationale;

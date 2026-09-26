@@ -150,7 +150,7 @@ export default function NewScanRoute() {
 
   const loginDisabledReason =
     mode === "public" && !protectedCapability.isLoading && !protectedReady
-      ? (protectedCapability.data?.reason ?? "Protected sign-in scanning is unavailable on this server.")
+      ? (protectedCapability.data?.reason ?? "Sign-in scans are not available on this server.")
       : null;
   const loginModeHref = (() => {
     const params = new URLSearchParams(searchParams);
@@ -173,7 +173,7 @@ export default function NewScanRoute() {
             to={loginModeHref}
             className="report-link inline-flex min-h-target w-fit items-center font-semibold"
           >
-            View setup and workflow
+            See how to set up sign-in scans
           </Link>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ScopePreview } from "../../api/types";
 import { cn } from "../../lib/cn";
+import { CHECK_LABEL } from "../../lib/terms";
 import { SUMMARY } from "./copy";
 import { engineName } from "./DefaultSettingsCard";
 import type { Capabilities } from "./groupProps";
@@ -36,17 +37,17 @@ export default function ScanSummaryCard({
 }) {
   const login = policy.mode === "login";
   const checks: Chip[] = [
-    chip("Keyboard traps", switchOn(settings, "keyboard") && !settings.static_only),
-    ...(isFixed(policy, "skip_focus") ? [] : [chip("Focus visibility", switchOn(settings, "focus") && !settings.static_only)]),
-    chip("Responsive & zoom", switchOn(settings, "responsive") && !settings.static_only),
-    chip("Click-through", switchOn(settings, "click_through") && !settings.static_only),
-    chip("Rendered pages kept", !switchOn(settings, "skip_rendered_storage") && !settings.static_only),
+    chip(CHECK_LABEL.keyboard, switchOn(settings, "keyboard") && !settings.static_only),
+    ...(isFixed(policy, "skip_focus") ? [] : [chip(CHECK_LABEL.focus, switchOn(settings, "focus") && !settings.static_only)]),
+    chip(CHECK_LABEL.responsive, switchOn(settings, "responsive") && !settings.static_only),
+    chip("Opens menus and pop-up windows", switchOn(settings, "click_through") && !settings.static_only),
+    chip("Saved copy of each page", !switchOn(settings, "skip_rendered_storage") && !settings.static_only),
   ];
   const ai: Chip[] = [
-    chip("Image text (OCR)", switchOn(settings, "ocr")),
-    chip("Vision model", switchOn(settings, "vision")),
-    ...(isFixed(policy, "skip_semantic") ? [] : [chip("Wording review", switchOn(settings, "semantic"))]),
-    ...(isFixed(policy, "skip_visual") ? [] : [chip("Motion & animation", switchOn(settings, "motion"))]),
+    chip(CHECK_LABEL.image, switchOn(settings, "ocr")),
+    chip("Vision model review", switchOn(settings, "vision")),
+    ...(isFixed(policy, "skip_semantic") ? [] : [chip(CHECK_LABEL.semantic, switchOn(settings, "semantic"))]),
+    ...(isFixed(policy, "skip_visual") ? [] : [chip(CHECK_LABEL.visual, switchOn(settings, "motion"))]),
   ];
   const countable = [...checks.slice(0, checks.length - 1), ...ai];
   const onCount = countable.filter((item) => item.on).length;
@@ -65,17 +66,17 @@ export default function ScanSummaryCard({
 
   const coverageLine =
     `Up to ${settings.max_pages.toLocaleString()} pages, ${settings.max_depth} clicks deep. ` +
-    (login ? "Stays on this website. " : settings.ignore_robots ? "Ignores robots.txt. " : "Respects robots.txt. ") +
+    (login ? "Stays on this website. " : settings.ignore_robots ? "Ignores robots.txt. " : "Follows robots.txt. ") +
     (settings.static_only
-      ? "HTML only, no browser."
+      ? "Page code (HTML) only, no browser."
       : switchOn(settings, "click_through")
-        ? "Clicks through menus and dialogs."
-        : "Load state only.");
+        ? "Opens menus and pop-up windows."
+        : "Checks each page at page load only.");
 
   const notIncluded = login
-    ? "Pages on any other website. Nothing is uploaded; the session cookie is discarded when the scan ends."
+    ? "Pages on any other website. Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends."
     : [
-        "Pages behind a login",
+        "Pages behind a sign-in",
         settings.include_subdomain ? null : "other subdomains",
         settings.whole_host ? null : "other sections of the site",
       ]
@@ -84,7 +85,7 @@ export default function ScanSummaryCard({
 
   // The spoken digest: recomputed on every change, written 600 ms after the
   // last one, and only when it differs from what was last spoken.
-  const digest = `Up to ${settings.max_pages.toLocaleString()} pages. WCAG 2.2 ${settings.axe_level} with ${engine}. ${onCount} of ${total} checks on.`;
+  const digest = `Up to ${settings.max_pages.toLocaleString()} pages. ${engine} against WCAG 2.2 Level ${settings.axe_level}. ${onCount} of ${total} checks on.`;
   const [spoken, setSpoken] = useState(digest);
   useEffect(() => {
     if (digest === spoken) return;
@@ -137,7 +138,7 @@ export default function ScanSummaryCard({
             <>
               <dd className="mt-1 break-all font-semibold text-fg">{site.line}</dd>
               <dd className="text-fg-muted">
-                {preview.data?.whole_host ? "Whole host" : "This section only"}
+                {preview.data?.whole_host ? "Whole website" : "This section only"}
                 {login ? " · after you sign in" : " · public pages"}
               </dd>
             </>
@@ -152,7 +153,7 @@ export default function ScanSummaryCard({
         <div>
           <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.checks}</dt>
           <dd className="mt-1.5 flex flex-wrap gap-1.5">
-            <ChipView label={`WCAG 2.2 ${settings.axe_level}`} on />
+            <ChipView label={`WCAG 2.2 Level ${settings.axe_level}`} on />
             <ChipView label={engine} on />
             {checks.map((item) => (
               <ChipView key={item.label} label={item.label} on={item.on} />
@@ -160,7 +161,7 @@ export default function ScanSummaryCard({
           </dd>
           {alfaUnavailable && (
             <dd className="mt-2 text-xs text-sev-major">
-              Siteimprove Alfa is unavailable, so this scan runs with axe-core:{" "}
+              {CHECK_LABEL.alfa} is not available, so this scan uses {CHECK_LABEL.axe}. Reason:{" "}
               {capabilities.alfa?.reason ?? "not installed"}.
             </dd>
           )}
@@ -172,10 +173,10 @@ export default function ScanSummaryCard({
               <ChipView key={item.label} label={item.label} on={item.on} />
             ))}
           </dd>
-          {ai.some((item) => item.on && item.label !== "Image text (OCR)") && (
+          {ai.some((item) => item.on && item.label !== CHECK_LABEL.image) && (
             <dd className="mt-2 text-xs text-fg-muted">
-              Uses only models already installed in local Ollama; nothing is downloaded and no image leaves
-              this computer. Ollama may load several GB into memory while analysis runs.
+              Uses only AI models already installed in Ollama on this computer. Axcess downloads nothing, and
+              no image leaves this computer. Ollama may use several gigabytes (GB) of memory while it runs.
             </dd>
           )}
         </div>
@@ -183,10 +184,15 @@ export default function ScanSummaryCard({
           <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.storage}</dt>
           <dd className="mt-1 text-fg">
             {settings.static_only
-              ? "No rendered pages: this is an HTML-only crawl."
+              ? "No saved copies: a fast scan reads only the page code (HTML)."
               : settings.skip_rendered_storage
-                ? "Rendered pages are not stored; the Page inspector re-renders each page on demand. Findings and screenshots are kept as always."
-                : "Keeps a copy of each rendered page, so the Page inspector opens instantly. Findings and screenshots are kept as always."}
+                ? login
+                  ? // A sign-in scan's screenshots are cut from the same signed-in
+                    // pages, so the server keeps neither (server.py, the
+                    // capture_screenshots / store_rendered_html pair).
+                    "No saved copy of each page, and no screenshots. The Page inspector loads the live page when you open it. Occurrences are saved as usual."
+                  : "No saved copy of each page. The Page inspector loads the live page when you open it. Occurrences and screenshots are saved as usual."
+                : "Keeps a saved copy of each page, so the Page inspector opens right away. Occurrences and screenshots are saved as usual."}
           </dd>
         </div>
         <div className="border-t border-border pt-4">

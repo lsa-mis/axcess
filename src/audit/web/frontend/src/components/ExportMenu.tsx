@@ -18,10 +18,10 @@ import { Button } from "./ui";
  * take the links out of the tab order and buy nothing.
  */
 const FORMATS: { format: string; label: string; hint: string }[] = [
-  { format: "xlsx", label: "Remediation workbook", hint: "Excel · one row per issue, with fixes" },
-  { format: "audit", label: "Audit report", hint: "Markdown · narrative report" },
-  { format: "csv", label: "Issue table", hint: "CSV · one row per occurrence" },
-  { format: "json", label: "Raw findings", hint: "JSON · full evidence payload" },
+  { format: "xlsx", label: "Issue list with fixes (Excel)", hint: "One row per issue, with how to fix it" },
+  { format: "audit", label: "Written report (Markdown)", hint: "The whole report as readable text" },
+  { format: "csv", label: "Occurrence list (CSV)", hint: "One row for each place an issue appears" },
+  { format: "json", label: "All report data (JSON)", hint: "Every detail the scan saved, for developers" },
 ];
 
 export default function ExportMenu({ scanId }: { scanId: number }) {
@@ -73,7 +73,7 @@ export default function ExportMenu({ scanId }: { scanId: number }) {
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         <Download className="h-4 w-4" aria-hidden />
-        Export
+        Export report
         <ChevronDown className="h-3.5 w-3.5" aria-hidden />
       </Button>
       <div

@@ -92,10 +92,10 @@ async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
     text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
     assert REVEALING_CONTROL in text
-    assert "the page as it loaded" in text
+    assert "shows the page at page load" in text
     # Stops at "flagged": the probe records that a violation was first reported
     # after the control was operated, not that the element was absent before.
-    assert "first flagged after activating" in text
+    assert "first flagged after clicking" in text
     # The load capture is not stale, and saying so blames the site for a fact
     # about how the scan works.
     assert "changed since the scan" not in text
@@ -114,7 +114,7 @@ async def test_load_state_finding_still_reports_a_possible_change(
     # Nothing revealed this one, so it genuinely should have been in the
     # capture and drift is the honest explanation.
     assert "changed since the scan" in text
-    assert "the page as it loaded" not in text
+    assert "shows the page at page load" not in text
 
 
 async def test_a_mixed_issue_keeps_both_explanations_open(
@@ -133,11 +133,11 @@ async def test_a_mixed_issue_keeps_both_explanations_open(
 
     text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
 
-    assert "a control was operated" in text
+    assert "after a click on a control" in text
     assert "changed since the scan" in text
     # With drift still in play this is not the settled case, so it must not
     # claim a specific control accounts for the miss.
-    assert "first flagged after activating" not in text
+    assert "first flagged after clicking" not in text
 
 
 def _seed_two_state_issue(db_path: Path, scan_id: int) -> tuple[int, str]:
@@ -221,14 +221,14 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
     at_load = await _evidence_text(new_page, base, scan_id, page_id, "")
     assert "#at-load" in at_load
     assert "#after-click" not in at_load
-    assert "in another state" in at_load
+    assert "in another page state" in at_load
 
     revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
     assert "#after-click" in revealed
     # The load-state markup is usually still in the revealed document, but it
     # is one finding: listing it again here presented one element per state.
     assert "#at-load" not in revealed
-    assert "in another state" in revealed
+    assert "in another page state" in revealed
 
 
 async def test_a_load_only_issue_is_not_offered_once_per_state(
@@ -258,7 +258,7 @@ async def test_a_load_only_issue_is_not_offered_once_per_state(
 
     assert "#at-load" in text
     assert "After clicking" not in text
-    assert "in another state" not in text
+    assert "in another page state" not in text
 
 
 async def test_a_state_missing_its_element_is_labelled_at_the_picker(
@@ -434,4 +434,4 @@ async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
     page_id, _, _ = _seed_revealed_only_issue(db_path, scan_id)
     text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
     assert "Highlighting" not in text
-    assert "in another state" in text
+    assert "in another page state" in text

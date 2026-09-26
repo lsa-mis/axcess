@@ -403,12 +403,12 @@ export default function InspectorRoute() {
     if (!allTargetsRevealed) {
       return {
         whenNoneFound:
-          "Some of these were first flagged after a control was operated, so they " +
-          "may not be in this capture of the page as it loaded; the rest may have " +
-          "changed since the scan.",
+          "Some of these were first flagged after a click on a control. This copy " +
+          "shows the page at page load, so they may not be in it. The others " +
+          "may have changed since the scan.",
         whenSomeFound:
-          "the rest were either first flagged after a control was operated, or may " +
-          "have changed since the scan.",
+          "The others were first flagged after a click on a control, or the page " +
+          "may have changed since the scan.",
         certain: false,
       };
     }
@@ -421,9 +421,9 @@ export default function InspectorRoute() {
     return {
       whenNoneFound:
         `${one ? "This element was" : "These elements were"} first flagged after ` +
-        `activating ${list}. This capture is the page as it loaded, so ` +
+        `clicking ${list}. This copy shows the page at page load, so ` +
         `${one ? "it may not appear" : "they may not appear"} here.`,
-      whenSomeFound: `the rest were first flagged after activating ${list}, so they may not be in this capture.`,
+      whenSomeFound: `The others were first flagged after clicking ${list}, so they may not be in this copy.`,
       certain: true,
     };
   }, [allTargetsRevealed, revealingControls, targets.length, activeStateKey]);
@@ -532,11 +532,11 @@ export default function InspectorRoute() {
   if (error) {
     return (
       <EmptyState
-        title="Can't inspect this page"
+        title="This page cannot be shown"
         message={
           error instanceof Error
             ? error.message
-            : "This page could not be inspected. It may belong to a running or login-protected report, or be outside the scan's scope."
+            : "Axcess could not show this page. The scan may still be running, the page may be from a sign-in scan, or the page may be outside the scan's scope."
         }
         action={
           <LinkButton
@@ -548,7 +548,7 @@ export default function InspectorRoute() {
             })}
             variant="primary"
           >
-            Back to stored page evidence
+            Back to page evidence
           </LinkButton>
         }
       />
@@ -566,7 +566,7 @@ export default function InspectorRoute() {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-fg-muted" role="status">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        Rendering the page for inspection…
+        Getting the page ready…
       </div>
     );
   }
@@ -574,16 +574,20 @@ export default function InspectorRoute() {
   const { page: pageInfo, render } = data;
   const displayTitle = pageInfo.title || pageInfo.url;
   const liveUrl = pageInfo.url;
-  const status = render.status_code != null && render.status_code !== 200 ? ` (${render.status_code})` : "";
+  const status = render.status_code != null && render.status_code !== 200 ? ` (server code ${render.status_code})` : "";
   const renderNote = !render.ok
-    ? "Could not render live"
+    ? "Could not load the live page"
     : render.source === "stored"
       ? status
-        ? `Stored render${status}`
+        ? `Saved copy${status}`
         : null
       : render.source === "state"
-        ? `Captured state${status}`
-        : `Live render${status}`;
+        ? `Saved page state${status}`
+        : `Live page${status}`;
+  // What the first tab holds: a copy the scan saved, or the live page
+  // loaded just now because no copy was saved.
+  const copyName =
+    render.source === "stored" || render.source === "state" ? "Saved copy" : "Live page";
 
   return (
     <>
@@ -603,7 +607,7 @@ export default function InspectorRoute() {
               className="break-all text-fg-subtle"
               title={
                 pageInfo.captured_at
-                  ? `Captured ${new Date(pageInfo.captured_at).toLocaleString()}`
+                  ? `Saved ${new Date(pageInfo.captured_at).toLocaleString()}`
                   : undefined
               }
             >
@@ -615,7 +619,7 @@ export default function InspectorRoute() {
           <ExternalLinkButton
             href={liveUrl}
             variant="secondary"
-            aria-label={`Open ${displayTitle} in a new tab`}
+            aria-label={`Open live page: ${displayTitle} (opens in a new tab)`}
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Open live page
@@ -632,24 +636,25 @@ export default function InspectorRoute() {
                   at page load, which is the one state the reviewer has just
                   said they do not want. */}
               <p className="text-sm font-semibold text-fg">
-                This interaction state was not captured
+                The scan did not save this page state
               </p>
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
-                To reach it by hand, open the live page and follow the steps in
-                the state list above. Switch back to{" "}
-                <span className="font-semibold">At page load</span> for the
-                markup this report does hold.
+                To see it yourself, open the live page and click the controls
+                named in the Page state list above, in order. Or choose{" "}
+                <span className="font-semibold">At page load</span> to see the
+                page code this report saved.
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-semibold text-fg">This page could not be re-rendered</p>
+              <p className="text-sm font-semibold text-fg">This page could not be shown again</p>
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
-                The stored scan evidence for this page is still available, use{" "}
-                <span className="font-semibold">Open live page</span> to view it
-                yourself, or return to the stored page evidence.
+                The evidence the scan saved for this page is still available. To
+                see the page yourself, use{" "}
+                <span className="font-semibold">Open live page</span>. Or go back
+                to the page evidence.
               </p>
             </>
           )}
@@ -703,12 +708,13 @@ export default function InspectorRoute() {
           {isFetching ? (
             <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" role="status">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              Loading this state; the previous one is still shown.
+              Loading this page state. The previous one stays on screen until it
+              loads.
             </span>
           ) : (
             activeStateKey && (
               <span className="text-xs text-fg-muted">
-                Captured during the scan, after the control was operated.
+                The scan saved this page state after clicking the control.
               </span>
             )
           )}
@@ -717,27 +723,27 @@ export default function InspectorRoute() {
 
       <Tabs
         mode="nav"
-        label="How this page was rendered"
+        label="How to view this page"
         className="mb-4"
         replace
         value={tab}
         items={[
           {
             key: "page",
-            label: render.ok ? "Rendered page" : "Page",
+            label: render.ok ? copyName : "Page",
             to: viewHref("page"),
           },
           // "Loaded DOM" was accurate while the only document was the page as
           // it loaded. It can now be a state captured after a click, so the
           // name says what it shows rather than when it was taken.
-          { key: "dom", label: "DOM source", to: viewHref("dom") },
+          { key: "dom", label: "Page code (DOM)", to: viewHref("dom") },
         ]}
       />
 
       <div
         id="inspect-panel-page"
         role="region"
-        aria-label="Rendered page"
+        aria-label={render.ok ? copyName : "Page"}
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "page"}
       >
@@ -746,7 +752,7 @@ export default function InspectorRoute() {
             {scopedFindings.length > 0 && (
               <div className="border-b border-border bg-surface-muted/40 px-3 py-2">
                 <p className="text-2xs font-semibold text-fg-subtle">
-                  Stored evidence
+                  Evidence from the scan
                 </p>
                 <ul className="mt-1.5 space-y-2">
                   {scopedFindings.slice(0, 3).map((f) => (
@@ -770,7 +776,7 @@ export default function InspectorRoute() {
                 </ul>
                 {scopedFindings.length > 3 && (
                   <p className="mt-1 text-2xs text-fg-muted">
-                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this state.
+                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this page state.
                   </p>
                 )}
               </div>
@@ -780,8 +786,8 @@ export default function InspectorRoute() {
                 {highlightPending
                   ? "Highlighting…"
                   : showHighlights && highlightedCount > 0
-                    ? `${highlightedCount} location${highlightedCount === 1 ? "" : "s"} highlighted`
-                    : "Rendered page"}
+                    ? `${highlightedCount} place${highlightedCount === 1 ? "" : "s"} highlighted`
+                    : copyName}
               </span>
               {hasTarget && (
                 <button
@@ -804,7 +810,7 @@ export default function InspectorRoute() {
               ref={frameRef}
               srcDoc={srcDoc}
               onLoad={scrollToElement}
-              title={`Re-rendered ${displayTitle}`}
+              title={`${copyName}: ${displayTitle}`}
               sandbox="allow-same-origin"
               referrerPolicy="no-referrer"
               className="h-[75vh] w-full border-0 bg-white"
@@ -825,10 +831,10 @@ export default function InspectorRoute() {
                 highlightedCount > 0 &&
                 highlightedCount < highlight.total && (
                   <span className="text-sev-major">
-                    {highlightedCount} of {highlight.total} flagged elements were
-                    found,{" "}
+                    Axcess found {highlightedCount} of {highlight.total} flagged
+                    elements.{" "}
                     {missingReason?.whenSomeFound ??
-                      "the rest may have changed since the scan."}
+                      "The others may have changed since the scan."}
                   </span>
                 )}
               {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
@@ -838,7 +844,7 @@ export default function InspectorRoute() {
                 // mix, something genuinely should have been matched.
                 <span className={missingReason?.certain ? undefined : "text-sev-major"}>
                   {missingReason?.whenNoneFound ??
-                    "The flagged element was not found in this capture, it may have changed since the scan."}
+                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
                 </span>
               )}
               {offStateCount > 0 && (
@@ -846,7 +852,8 @@ export default function InspectorRoute() {
                 // is: the picker is the only way to the rest of it.
                 <span>
                   {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this issue {offStateCount === 1 ? "is" : "are"} in another state.
+                  this issue {offStateCount === 1 ? "is" : "are"} in another page
+                  state. Choose it in the Page state list.
                 </span>
               )}
               {!showHighlights && hasScopedTarget && (
@@ -855,14 +862,14 @@ export default function InspectorRoute() {
               {!hasTarget && (
                 <span>
                   {render.source === "stored"
-                    ? "Shown from the scan capture, no element to mark on this finding."
-                    : "Rendered on demand, no element to mark on this finding."}
+                    ? "This is the copy the scan saved. This issue has no element to mark."
+                    : "Axcess loaded this page just now. This issue has no element to mark."}
                 </span>
               )}
               {!data.store_rendered_html && (
                 <span>
-                  This scan was run without storing rendered pages, the page is
-                  re-rendered live on demand.
+                  This scan did not save copies of pages, so Axcess loads the
+                  live page each time you open it.
                 </span>
               )}
             </div>
@@ -870,16 +877,16 @@ export default function InspectorRoute() {
                 the capture, not a status that changes, so it should not be
                 re-announced every time the highlight count updates. */}
             <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              The markup is the stored capture; its stylesheets, fonts and
-              images load from the live site now, so styling can differ from
-              how the page looked when it was scanned. The page&rsquo;s own scripts
-              never run here, so a flagged element the site would have revealed
-              with JavaScript is forced visible to be highlighted.
+              The page code shown here is a copy. Its styles, fonts, and images
+              load from the live site now, so the page can look different from
+              how it looked during the scan. The page&rsquo;s own scripts never
+              run here. So if the site would only show a flagged element with
+              JavaScript, Axcess makes it visible to highlight it.
             </p>
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
-            {render.error || "The page could not be rendered."}
+            {render.error || "This page could not be shown."}
           </div>
         )}
       </div>
@@ -887,7 +894,7 @@ export default function InspectorRoute() {
       <div
         id="inspect-panel-dom"
         role="region"
-        aria-label="Loaded DOM"
+        aria-label="Page code (DOM)"
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "dom"}
       >
@@ -896,20 +903,20 @@ export default function InspectorRoute() {
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-2xs font-semibold text-fg-subtle">
                 <FileCode2 className="h-4 w-4" aria-hidden />
-                Loaded DOM, captured at render time
+                Page code (DOM), as the browser built it
               </p>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {hasScopedTarget && (
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
-                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the source below.`
+                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the code below.`
                       : (missingReason?.whenNoneFound ??
-                        "The flagged markup was not found in this capture.")}
+                        "Axcess could not find the flagged element in this page code.")}
                   </span>
                 )}
                 {render.dom_truncated && (
                   <span className="text-2xs text-sev-major">
-                    Truncated for length (shown at 2,000,000 characters).
+                    Cut short: only the first 2,000,000 characters are shown.
                   </span>
                 )}
               </span>
@@ -925,8 +932,8 @@ export default function InspectorRoute() {
         ) : (
           <div className="p-6 text-sm text-fg-muted">
             {render.dom_html
-              ? "No rendered HTML was captured."
-              : render.error || "The page could not be rendered."}
+              ? "No page code was saved."
+              : render.error || "This page could not be shown."}
           </div>
         )}
       </div>
