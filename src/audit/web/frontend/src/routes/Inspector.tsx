@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { ExternalLink, FileCode2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
+  Button,
   Card,
   Disclosure,
   EmptyState,
@@ -470,10 +471,15 @@ export default function InspectorRoute() {
       try {
         const doc = frameRef.current?.contentDocument;
         if (doc) {
-          let el: Element | null = null;
+          // The first outlined element in document order, so the view and
+          // "Flagged element 1 of N" agree; the targets themselves when the
+          // highlights are hidden.
+          const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
+          marks.forEach((mark, i) => markCurrent(mark, i === 0));
+          let el: Element | null = marks[0] ?? null;
           for (const t of scopedTargets) {
-            el = findTargetElement(doc, t);
             if (el) break;
+            el = findTargetElement(doc, t);
           }
           const target = el as HTMLElement | null;
           if (!target?.scrollIntoView) return;
@@ -488,6 +494,26 @@ export default function InspectorRoute() {
     };
     tryScroll();
   }, [scopedTargets]);
+
+  // Which outlined element the reader is on, for Previous / Next in the
+  // Rendered page, as the Loaded DOM tab has. Back to the first whenever the
+  // frame's document changes.
+  const [pageMark, setPageMark] = useState(0);
+  useEffect(() => setPageMark(0), [srcDoc]);
+  const goToPageMark = (index: number) => {
+    const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
+    setPageMark(bounded);
+    try {
+      const doc = frameRef.current?.contentDocument;
+      if (!doc) return;
+      const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
+      marks.forEach((mark, i) => markCurrent(mark, i === bounded));
+      const target = marks[bounded];
+      if (target) keepCentered(target);
+    } catch {
+      // Opaque document: the outlines are baked in, only the stepping is lost.
+    }
+  };
 
   // The Loaded DOM tab locates the flagged elements in its own inert parse of
   // the capture and reports how many it found; the count feeds the header line
@@ -712,6 +738,46 @@ export default function InspectorRoute() {
                     ? `${highlightedCount} location${highlightedCount === 1 ? "" : "s"} highlighted`
                     : "Rendered page"}
               </span>
+              {!highlightPending && showHighlights && highlightedCount > 0 && (
+                // Previous / Next step through the outlined elements in
+                // document order, as in the Loaded DOM tab; the count between
+                // them says where you are.
+                <span
+                  role="group"
+                  aria-label="Flagged elements on the page"
+                  className="ml-auto inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
+                >
+                  <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
+                    {highlightedCount === 1
+                      ? "1 flagged element"
+                      : `Flagged element ${pageMark + 1} of ${highlightedCount}`}
+                  </span>
+                  {highlightedCount > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="min-h-target"
+                      aria-label="Previous flagged element"
+                      disabled={pageMark === 0}
+                      onClick={() => goToPageMark(pageMark - 1)}
+                    >
+                      <ChevronUp className="h-4 w-4" aria-hidden />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-target"
+                    aria-label={highlightedCount > 1 ? "Next flagged element" : "Jump to flagged element"}
+                    disabled={highlightedCount > 1 && pageMark === highlightedCount - 1}
+                    onClick={() => goToPageMark(highlightedCount > 1 ? pageMark + 1 : 0)}
+                  >
+                    <ChevronDown className="h-4 w-4" aria-hidden />
+                  </Button>
+                </span>
+              )}
               {hasTarget && (
                 <button
                   type="button"
@@ -744,8 +810,9 @@ export default function InspectorRoute() {
               )}
               {!highlightPending && showHighlights && highlightedCount > 0 && (
                 <span>
-                  The red outline marks the flagged element
-                  {highlightedCount > 1 ? ` (${highlightedCount} on this page)` : ""}.
+                  {highlightedCount > 1
+                    ? `Red outlines mark the ${highlightedCount} flagged elements on this page; the one outlined in blue on yellow is the one you are on.`
+                    : "The red outline marks the flagged element."}
                 </span>
               )}
               {!highlightPending &&
@@ -1121,7 +1188,7 @@ function markTargets(doc: Document, targets: Target[]): number {
   locateByWalk(doc, unresolved, found);
   for (const el of found) {
     if (el instanceof HTMLElement) {
-      markElement(el, "#be001e", "rgba(190,0,30,0.12)");
+      markElement(el, FLAGGED_OUTLINE, FLAGGED_FILL);
     }
   }
   return found.size;
@@ -1257,8 +1324,33 @@ function truncatedSnippetMatches(raw: string, needle: string): boolean {
   return normalizeWhitespace(raw).startsWith(needle);
 }
 
+/** The class every outlined element carries, so the frame can be walked in order. */
+const HIGHLIGHT_CLASS = "axcess-inspect-highlight";
+
+/** Every flagged element: a red outline over a faint red tint. */
+const FLAGGED_OUTLINE = "#be001e";
+const FLAGGED_FILL = "rgba(190,0,30,0.12)";
+/**
+ * The one the reader stepped to: UMich blue on a maize halo and fill. A
+ * thicker red ring on red was too close to tell apart; blue against yellow
+ * stays distinct for red- and green-weak eyes, and the thicker outline and
+ * the halo differ in shape too, so colour is not the only cue.
+ */
+const CURRENT_OUTLINE = "#00274c";
+const CURRENT_HALO = "#ffcb05";
+const CURRENT_FILL = "rgba(255,203,5,0.3)";
+
+/** Set the element the reader is on apart from the other flagged ones, or put it back. */
+function markCurrent(el: HTMLElement, current: boolean): void {
+  el.style.setProperty("outline-color", current ? CURRENT_OUTLINE : FLAGGED_OUTLINE, "important");
+  el.style.setProperty("outline-width", current ? "4px" : "3px", "important");
+  el.style.setProperty("outline-offset", current ? "-4px" : "-3px", "important");
+  el.style.setProperty("box-shadow", current ? `0 0 0 5px ${CURRENT_HALO}` : "none", "important");
+  el.style.setProperty("background-color", current ? CURRENT_FILL : FLAGGED_FILL, "important");
+}
+
 function markElement(el: HTMLElement, outlineColor: string, bg: string): void {
-  el.classList.add("axcess-inspect-highlight");
+  el.classList.add(HIGHLIGHT_CLASS);
   el.style.setProperty("outline", `3px solid ${outlineColor}`, "important");
   // Inset, not outset. A flagged element that fills an `overflow: hidden`
   // ancestor (the ubiquitous image-tile pattern: `w-full h-full` inside a
