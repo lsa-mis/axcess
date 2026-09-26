@@ -927,9 +927,11 @@ LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html"
 
 
 # One short card per check, in the order the app's "What was checked" table
-# lists them. Each card's id is the key the app links to
-# (MethodCoverageLedger's "More about this check": coverage/#check-<key>),
-# so a key here must match ``_methods_used`` in src/audit/web/server.py.
+# lists them. The app gives each check one line on what it does and one on
+# its main limit; a card may say more, and must keep every limit. Each card's
+# id is the key the app links to (MethodCoverageLedger's "More about this
+# check": coverage/#check-<key>), so a key here must match ``_methods_used``
+# in src/audit/web/server.py.
 CHECK_CARDS = (
     (
         "search",
@@ -983,7 +985,7 @@ CHECK_CARDS = (
         "interaction",
         "Click-Through",
         "Opens menus, tabs, and dialogs, then runs the rule check (axe) on each page state it reveals.",
-        "It skips payments and other risky actions and blocks sending data. A person checks custom controls and anything it did not reach.",
+        "It skips payments and other risky actions and blocks sending data, so a page state can be incomplete. It may not use every control it finds, and a dialog that would not close stops that page. A person checks custom controls and anything it did not reach.",
     ),
 )
 

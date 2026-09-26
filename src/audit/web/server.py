@@ -3774,8 +3774,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "verb": "checked",
             "description": "Runs the searches you set up and checks the results.",
             "caveat": (
-                "Other search words can reach other pages. You approved these searches, "
-                "so they can send data to the site."
+                "Other search words can reach other pages, and these searches "
+                "can send data to the site."
             ),
         },
         {
@@ -3816,8 +3816,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "(Accessibility Conformance Testing, ACT)."
             ),
             "caveat": (
-                "A failed rule is not proof the page fails WCAG. "
-                'Each "cannot tell" result goes to Needs review for a person.'
+                "A failed rule is not proof the page fails WCAG, and a person "
+                'reviews each "cannot tell".'
             ),
         },
         {
@@ -3888,14 +3888,15 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "Opens menus, tabs and dialogs, then runs the rule check (axe) "
                 f"on each {CLICK_THROUGH_STATE}."
             ),
+            # One sentence, as every limit in the report's "What was checked"
+            # table; the website's card for this check has the rest (safety
+            # blocks, custom controls). A dialog that would not close is also
+            # named in the result when it happens.
             "caveat": (
-                "It skips payments and other risky actions, and blocks sending data, "
-                f"so a {CLICK_THROUGH_STATE} can be incomplete. Controls found were not "
-                "necessarily operated. A dialog that would not close stops that page. "
-                "A person checks custom controls and anything it did not reach."
+                "It skips risky actions such as payments, may not use every control it "
+                "finds, and stops a page when a dialog would not close."
                 if int(cfg.get("interaction_safety_version") or 0) >= 1
-                else "It skips risky actions and has limits. A person checks custom "
-                "controls and anything it did not reach."
+                else "It skips risky actions and may not reach every control."
             ),
         },
     ]

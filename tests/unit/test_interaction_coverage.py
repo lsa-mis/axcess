@@ -129,7 +129,8 @@ def test_report_states_operated_controls_not_only_discovered_ones() -> None:
         "2 pages checked; 3 page states opened by clicking; 37 of 52 controls operated; "
         "6 controls skipped as unsafe; exploration limits reached on 1 page"
     )
-    assert "not necessarily operated" in method["caveat"]
+    # Controls counted as found were not all operated; the limit says so.
+    assert "may not use every control it finds" in method["caveat"]
 
 
 def test_a_stuck_dialog_is_named_in_the_report_not_folded_into_limits() -> None:

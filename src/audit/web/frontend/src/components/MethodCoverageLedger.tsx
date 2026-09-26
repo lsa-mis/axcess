@@ -196,25 +196,28 @@ function MethodRow({
           </>
         )}
       </Cell>
+      {/* Two sentences at most, across the whole column: what the check
+          does, then its main limit, with the link to the rest of its
+          limits on the website at the end of that line. */}
       <Cell className={cn(top, "min-w-[18rem]")}>
-        <p className="max-w-[60ch] text-sm leading-relaxed text-fg">{method.description}</p>
-        <p className="mt-1 max-w-[60ch] text-sm leading-relaxed text-fg-muted">
+        <p className="text-sm leading-relaxed text-fg">{method.description}</p>
+        <p className="mt-1 text-sm leading-relaxed text-fg-muted">
           <span className="font-semibold text-fg">Limit: </span>
-          {method.caveat}
+          {method.caveat}{" "}
+          <a
+            href={`${CHECK_DETAILS}${method.key}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-umich-blue underline underline-offset-2"
+          >
+            More about this check
+            <span className="sr-only">
+              {" "}
+              ({method.label}, on the Axcess website, opens in a new tab)
+            </span>
+            <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          </a>
         </p>
-        <a
-          href={`${CHECK_DETAILS}${method.key}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-umich-blue underline underline-offset-2"
-        >
-          More about this check
-          <span className="sr-only">
-            {" "}
-            ({method.label}, on the Axcess website, opens in a new tab)
-          </span>
-          <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        </a>
       </Cell>
     </Row>
   );
