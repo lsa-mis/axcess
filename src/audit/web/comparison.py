@@ -164,8 +164,17 @@ def _protected(conn: sqlite3.Connection, scan_id: int) -> bool:
 
 
 def site_scope(seed_url: str) -> str:
-    """Normalized seed scope: the key that makes two reports the same site."""
-    return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+    """Normalized seed scope: the key that makes two reports the same site.
+
+    An older report can carry a seed too malformed for ``urlsplit`` (a stray
+    "[" in the host). Its raw address is its scope, a site of its own, so one
+    such row cannot break the Reports list or every other report's
+    previous-report lookup.
+    """
+    try:
+        return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+    except ValueError:
+        return seed_url.strip()
 
 
 def _load_scan(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

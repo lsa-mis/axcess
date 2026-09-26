@@ -14,6 +14,7 @@ projection, so they match the total the Issues page shows for that report.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from collections.abc import Iterable
 from typing import Any
 
@@ -73,11 +74,47 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
                     ScanSummaryModel(**latest_completed) if latest_completed else None
                 ),
                 most_recent_completed_issue_count=(
-                    len(issues.list_issues(conn, int(latest_completed["id"])))
-                    if latest_completed
-                    else None
+                    _issue_count(conn, int(latest_completed["id"])) if latest_completed else None
                 ),
                 scans=[ScanSummaryModel(**scan) for scan in scans],
             )
         )
     return groups
+
+
+# Issue counts of completed reports, by database file and report id, with the
+# evidence they were counted from. Reports polls every few seconds while a scan runs, and
+# building the full issue list for every site on every poll grew with the
+# number of sites times their evidence. A completed report's count changes
+# only if its evidence does (``audit synthesize`` rewrites image findings),
+# so the cheap fingerprint below decides when to count again.
+_issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], int]] = {}
+_issue_counts_lock = threading.Lock()
+
+
+def _evidence_fingerprint(conn: sqlite3.Connection, scan_id: int) -> tuple[int, ...]:
+    """How many evidence rows the report has, and its newest row ids."""
+    row = conn.execute(
+        "SELECT "
+        "(SELECT COUNT(*) FROM page_a11y_findings WHERE scan_id = ?), "
+        "(SELECT COALESCE(MAX(id), 0) FROM page_a11y_findings WHERE scan_id = ?), "
+        "(SELECT COUNT(*) FROM findings WHERE scan_id = ?), "
+        "(SELECT COALESCE(MAX(id), 0) FROM findings WHERE scan_id = ?)",
+        (scan_id, scan_id, scan_id, scan_id),
+    ).fetchone()
+    return tuple(int(value) for value in row)
+
+
+def _issue_count(conn: sqlite3.Connection, scan_id: int) -> int:
+    """Issues in a completed report, as the Issues page counts them."""
+    # The file as well as the id: report ids start at 1 in every database.
+    key = (str(conn.execute("PRAGMA database_list").fetchone()[2]), scan_id)
+    fingerprint = _evidence_fingerprint(conn, scan_id)
+    with _issue_counts_lock:
+        cached = _issue_counts.get(key)
+    if cached is not None and cached[0] == fingerprint:
+        return cached[1]
+    count = len(issues.list_issues(conn, scan_id))
+    with _issue_counts_lock:
+        _issue_counts[key] = (fingerprint, count)
+    return count
