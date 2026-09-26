@@ -401,6 +401,9 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await first.click()
     await page.wait_for_url("**/issues/**")
     await playwright_async.expect(page.get_by_role("heading", name=title, level=1)).to_be_visible()
+    # The header names the type in the issue page's own word, the one the
+    # guidance dialog uses, not the table's "Needs review".
+    await playwright_async.expect(page.locator("main h1 + p")).to_contain_text("Needs confirmation")
     # The guidance opens from the top right, every section expanded at once;
     # the lead's expert-decision caution sits under What it is.
     guidance = page.get_by_role("button", name="Issue guidance", exact=True)
