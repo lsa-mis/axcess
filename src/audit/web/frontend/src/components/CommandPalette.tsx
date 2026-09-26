@@ -1,19 +1,32 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CornerDownLeft, Search } from "lucide-react";
+import { Check, CornerDownLeft, Search } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "./ReportCrumb";
 import { cn } from "../lib/cn";
 import { CHECK_LABEL, SCAN_STATUS_LABEL } from "../lib/terms";
+import { ALL_SETTINGS } from "../lib/settingsCatalog";
+import type { Preferences } from "../lib/preferences";
+import { setPreference, usePreferences } from "../hooks/usePreferences";
 
 type Item = {
   id: string;
   group: string;
   label: string;
   sublabel?: string;
-  to: string;
-};
+} & (
+  | { to: string; setting?: undefined }
+  /** A choice for one setting: Enter applies it here, and Search stays open. */
+  | { to?: undefined; setting: { key: keyof Preferences; value: string; current: boolean; name: string; option: string } }
+);
+
+/**
+ * How many settings a query may list the choices of. A short query such as
+ * "t" matches most of them, and a list of sixty choices is not a result; the
+ * Settings page, which the same query also finds, has them all.
+ */
+const MAX_SETTINGS = 4;
 
 /**
  * Every place the sidebar links to, plus the New scan action. Keep in step
@@ -21,9 +34,9 @@ type Item = {
  * by search at all.
  *
  * ``terms`` are what a reader might type instead of the page name. For
- * Settings they are its setting labels (copied, not imported: importing
- * from routes/Settings would pull that lazy route into the entry bundle), so
- * "dark" or "font" finds the page that holds them.
+ * Settings they are its setting labels (from lib/settingsCatalog, which the
+ * lazy Settings route shares, so the entry bundle does not pull the route
+ * in), so "dark" or "font" finds the page that holds them.
  */
 const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: readonly string[] }> = [
   { id: "nav-reports", label: "Reports", to: "/scans" },
@@ -38,30 +51,7 @@ const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: rea
     id: "nav-settings",
     label: "Settings",
     to: "/settings",
-    terms: [
-      "Preferences",
-      "Theme",
-      "Dark mode",
-      "Text size",
-      "Link underlines",
-      "Contrast",
-      "Color vision",
-      "Font",
-      "Text spacing",
-      "Extra space in long text",
-      "Reading guide",
-      "Focus outline",
-      "Button size",
-      "Table spacing",
-      "Status updates",
-      "Help text",
-      "Keyboard shortcuts",
-      "Message timing",
-      "Ask before deleting",
-      "Animations",
-      "Rows per page",
-      "Sidebar",
-    ],
+    terms: ["Preferences", "Dark mode", ...ALL_SETTINGS.map((row) => row.label)],
   },
 ];
 
@@ -69,7 +59,10 @@ const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: rea
  * Cmd/Ctrl+K command palette, search everything across the app.
  *
  * Every place (Reports, New scan, About, Settings), every report (by site
- * URL), and, when you're inside a report, every issue in it. Fully keyboard
+ * URL), and, when you're inside a report, every issue in it. A query that
+ * names a setting ("dark", "text size", "motion") also lists that setting's
+ * choices, so it can be changed right here: Enter applies the choice, Search
+ * stays open, and a status message says what changed. Fully keyboard
  * driven: type to filter, ↑/↓ to move, ↵ to open, Esc to close. Screen-reader
  * friendly: a modal dialog with a labelled dialog/listbox.
  */
@@ -85,8 +78,10 @@ export default function CommandPalette({
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [message, setMessage] = useState("");
+  const prefs = usePreferences();
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const scansQuery = useQuery({
     queryKey: ["scans"],
@@ -103,12 +98,24 @@ export default function CommandPalette({
     if (!open) return;
     setQuery("");
     setActive(0);
+    setMessage("");
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
-  useEffect(() => setActive(0), [query]);
+  useEffect(() => {
+    setActive(0);
+    setMessage("");
+  }, [query]);
 
   const act = (item: Item | undefined) => {
     if (!item) return;
+    if (item.setting) {
+      // Applied at once, as on the Settings page. The list keeps its place,
+      // so the next choice is one arrow key away.
+      const { key, value, name, option } = item.setting;
+      setPreference(key, value as Preferences[typeof key]);
+      setMessage(`${name} is now ${option}.`);
+      return;
+    }
     navigate(item.to);
     onClose();
   };
@@ -142,6 +149,29 @@ export default function CommandPalette({
       }
     }
 
+    // A setting's choices, when the query names the setting, its section or
+    // one of its choices. Only for a real query: with nothing typed the list
+    // is places and reports, as before.
+    if (q) {
+      const matched = ALL_SETTINGS.filter((row) =>
+        `${row.section} ${row.label} ${row.options.map((option) => option.label).join(" ")}`
+          .toLowerCase()
+          .includes(q),
+      );
+      for (const row of matched.slice(0, MAX_SETTINGS)) {
+        for (const option of row.options) {
+          const current = prefs[row.key] === option.value;
+          out.push({
+            id: `setting-${row.key}-${option.value}`,
+            group: "Change a setting",
+            label: `${row.label}: ${option.label}`,
+            sublabel: current ? "Current setting" : row.section,
+            setting: { key: row.key, value: option.value, current, name: row.label, option: option.label },
+          });
+        }
+      }
+    }
+
     if (scanId) {
       for (const i of issuesQuery.data?.rows ?? []) {
         const hay = `${i.title} ${i.issue_key} ${i.wcag_sc ?? ""} ${i.wcag_name ?? ""}`.toLowerCase();
@@ -157,7 +187,7 @@ export default function CommandPalette({
       }
     }
     return out;
-  }, [query, scansQuery.data, issuesQuery.data, scanId]);
+  }, [query, scansQuery.data, issuesQuery.data, scanId, prefs]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
@@ -175,15 +205,22 @@ export default function CommandPalette({
   };
 
   useEffect(() => {
-    if (listRef.current) {
-      const el = listRef.current.children[active] as HTMLElement | undefined;
-      el?.scrollIntoView({ block: "nearest" });
-    }
+    // By option, not by child: the options sit inside their groups.
+    const el = listRef.current?.querySelectorAll<HTMLElement>('[role="option"]')[active];
+    el?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
   if (!open) return null;
 
-  let lastGroup = "";
+  // Consecutive results of one kind, in list order; `index` is the
+  // result's place in the whole list, which the arrow keys move through.
+  const groups: { name: string; items: { item: Item; index: number }[] }[] = [];
+  items.forEach((item, index) => {
+    const last = groups[groups.length - 1];
+    if (last && last.name === item.group) last.items.push({ item, index });
+    else groups.push({ name: item.group, items: [{ item, index }] });
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
       {/* Backdrop is a real <button> so click-to-close is keyboard- and
@@ -216,50 +253,60 @@ export default function CommandPalette({
           </kbd>
         </div>
 
-        <ul ref={listRef} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto py-1">
-          {items.length === 0 ? (
-            <li className="px-4 py-8 text-center text-sm text-fg-muted">Nothing matches “{query}”. Try a site name, a report number, or an issue name.</li>
-          ) : (
-            items.map((item, index) => {
-              const showHeader = item.group !== lastGroup;
-              lastGroup = item.group;
-              return (
-                <Fragment key={item.id}>
-                  {showHeader && (
-                    <li className="px-4 pb-1 pt-3 text-2xs font-semibold text-fg-subtle">
-                      {item.group}
-                    </li>
-                  )}
-                  <li>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={index === active}
-                      onClick={() => act(item)}
-                      onMouseEnter={() => setActive(index)}
-                      className={cn(
-                        "block w-full px-4 py-2 text-left",
-                        index === active ? "bg-umich-blue/10" : "hover:bg-surface-muted",
-                      )}
-                    >
-                      <span className="block text-sm font-medium text-fg">{item.label}</span>
-                      {item.sublabel && (
-                        <span className="block text-2xs text-fg-muted">{item.sublabel}</span>
-                      )}
-                    </button>
-                  </li>
-                </Fragment>
-              );
-            })
-          )}
-        </ul>
+        {/* Says what a setting result changed; Search stays open after it. */}
+        <p role="status" className={cn("text-sm font-semibold text-fg", message ? "border-b border-border bg-ok-bg px-4 py-2" : "sr-only")}>
+          {message}
+        </p>
+
+        {/* A listbox of groups, one per kind of result, each named by its
+            heading. The options are the group's only other children, so the
+            structure is the one a listbox allows (the headings used to sit
+            among the options as list items of their own). */}
+        {items.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-fg-muted">
+            Nothing matches “{query}”. Try a site name, a report number, an issue name, or a setting.
+          </p>
+        ) : (
+          <div ref={listRef} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto py-1">
+            {groups.map((group, groupIndex) => (
+              <div key={group.name} role="group" aria-labelledby={`palette-group-${groupIndex}`}>
+                <div id={`palette-group-${groupIndex}`} className="px-4 pb-1 pt-3 text-2xs font-semibold text-fg-subtle">
+                  {group.name}
+                </div>
+                {group.items.map(({ item, index }) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="option"
+                    aria-selected={index === active}
+                    onClick={() => act(item)}
+                    onMouseEnter={() => setActive(index)}
+                    className={cn(
+                      "block w-full px-4 py-2 text-left",
+                      index === active ? "bg-umich-blue/10" : "hover:bg-surface-muted",
+                    )}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium text-fg">
+                      {item.label}
+                      {/* The current choice: a tick and the words below, not colour alone. */}
+                      {item.setting?.current && <Check className="h-4 w-4 shrink-0 text-ok" strokeWidth={3} aria-hidden />}
+                    </span>
+                    {item.sublabel && (
+                      <span className="block text-2xs text-fg-muted">{item.sublabel}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-3 border-t border-border px-3 py-2 text-2xs text-fg-subtle">
           <span className="inline-flex items-center gap-1">
             <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↑↓</kbd> move
           </span>
           <span className="inline-flex items-center gap-1">
-            <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↵</kbd> open
+            <kbd className="rounded-2xs border border-border bg-surface-muted px-1 py-0.5">↵</kbd> open or change
           </span>
           <span className="ml-auto inline-flex items-center gap-1">
             <CornerDownLeft className="h-3 w-3" aria-hidden /> ⌘K or Ctrl+K opens search anytime

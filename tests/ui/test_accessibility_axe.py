@@ -949,6 +949,60 @@ async def test_search_finds_every_sidebar_place(
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
 
 
+async def test_search_changes_a_setting_from_its_results(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A setting's choices are results of their own, applied without leaving Search.
+
+    Searching "dark" used to lead only to the Settings page. Its Theme
+    choices now follow it in the list: Enter applies one, Search stays open
+    on the same list, and a status message says what changed.
+    """
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(f"{base}/app/scans", wait_until="networkidle")
+        await (
+            page.get_by_role("complementary", name="Primary")
+            .get_by_role("button", name="Search everything (Cmd+K)", exact=True)
+            .click()
+        )
+        dialog = page.get_by_role("dialog", name="Search everything")
+        await dialog.get_by_role("textbox", name="Search").fill("dark")
+
+        dark = dialog.get_by_role("option", name=re.compile(r"^Theme: Dark"))
+        light = dialog.get_by_role("option", name=re.compile(r"^Theme: Light"))
+        await playwright_async.expect(light).to_contain_text("Current setting")
+        await playwright_async.expect(dark).not_to_contain_text("Current setting")
+
+        # Arrow down from the first result (the Settings page) to Dark.
+        options = dialog.get_by_role("option")
+        names = await options.all_inner_texts()
+        target = next(i for i, text in enumerate(names) if text.startswith("Theme: Dark"))
+        for _ in range(target):
+            await page.keyboard.press("ArrowDown")
+        await playwright_async.expect(dark).to_have_attribute("aria-selected", "true")
+        # Groups of options, each named by its heading, in light mode as the
+        # other axe checks run.
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+        await playwright_async.expect(
+            dialog.get_by_role("group", name="Change a setting")
+        ).to_contain_text("Theme: Dark")
+        await page.keyboard.press("Enter")
+
+        await playwright_async.expect(dialog).to_be_visible()
+        await playwright_async.expect(dialog.get_by_role("status")).to_have_text(
+            "Theme is now Dark."
+        )
+        await playwright_async.expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+        await playwright_async.expect(dark).to_contain_text("Current setting")
+        await playwright_async.expect(light).not_to_contain_text("Current setting")
+    finally:
+        await page.context.close()
+
+
 async def test_scan_mode_choice_is_a_radio_group_that_keeps_other_params(
     live_server: tuple[str, int],
     new_page: Any,
