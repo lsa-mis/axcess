@@ -700,6 +700,8 @@ async def test_running_scan_shows_factual_pipeline_progress(
     payload = await response.json()
     payload.update(
         {
+            # The pages below are on this site, so the table names them by path.
+            "seed_url": "https://example.test/",
             "status": "running",
             "page_count": 7,
             "axe_pages_scanned": 6,
@@ -816,8 +818,9 @@ async def test_running_scan_shows_factual_pipeline_progress(
         await playwright_async.expect(row("/admissions/").get_by_role("cell")).to_have_text(
             ["Checked", "Done", "Done", "Not run"]
         )
+        # A waiting page has started no check.
         await playwright_async.expect(row("/admissions/visit/").get_by_role("cell")).to_have_text(
-            ["Waiting", "Every check waits for this page."]
+            ["Waiting", "Waiting", "Waiting", "Waiting"]
         )
 
         # Each check's totals are details: closed at first, then one click away.
@@ -855,6 +858,78 @@ async def test_running_scan_shows_factual_pipeline_progress(
                 exact=True,
             )
         ).to_be_visible()
+    finally:
+        await page.context.close()
+
+
+async def test_a_scan_without_per_check_records_shows_page_status_only(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """No check columns when no page has a record of its checks.
+
+    A scan run in another process, or one that was running when Axcess
+    restarted, has none; the columns then said "No record" on every row.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    payload = await (await page.request.get(f"{base}/api/scans/{scan_id}")).json()
+    payload.update(
+        {
+            "seed_url": "https://example.test/",
+            "status": "running",
+            "progress": {
+                "stage": "scanning",
+                "discovered": 3,
+                "completed": 1,
+                "pending": 1,
+                "leased": 1,
+                "failed": 0,
+                "images_seen": 0,
+                "rendered_pages": 1,
+                "static_pages": 0,
+                "eta": {
+                    "state": "estimating",
+                    "min_seconds": None,
+                    "max_seconds": None,
+                    "based_on_pages": 1,
+                },
+                "in_flight_pages": [],
+                "recent_pages": [],
+                "page_checks": [
+                    {"url": "https://example.test/#/about", "state": "checking", "checks": {}},
+                    {"url": "https://example.test/#/", "state": "checked", "checks": {}},
+                ],
+            },
+        }
+    )
+    for method in payload["methods_used"]:
+        method["enabled"] = method["key"] == "axe"
+
+    async def serve(route: Any) -> None:
+        await route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
+    await page.route(f"**/api/scans/{scan_id}", serve)
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
+        await playwright_async.expect(
+            page.get_by_role("heading", name="Pages", exact=True)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text(
+                re.compile(r"not available for this scan, so each page shows its status only")
+            )
+        ).to_be_visible()
+        table = page.get_by_role("table", name="Each page and its status")
+        await playwright_async.expect(table.get_by_role("columnheader")).to_have_text(
+            ["Page", "Status"]
+        )
+        # A single-page app's pages keep their route.
+        await playwright_async.expect(table.get_by_role("rowheader")).to_have_text(
+            ["/#/about", "/#/"]
+        )
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
     finally:
         await page.context.close()
 
