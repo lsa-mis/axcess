@@ -304,12 +304,12 @@ function FindingCard({
           <img
             className="max-h-72 rounded-xs border border-border"
             src={blobUrl(finding.screenshot_hash)}
-            alt="Circled issue evidence. The circular marker identifies the detected location."
+            alt="Issue evidence captured during the scan. An outline marks the detected location."
             loading="lazy"
           />
           <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-muted">
             <ScanEye className="h-3.5 w-3.5" aria-hidden />
-            Captured during the scan. The circle marks the detected location.
+            Captured during the scan. The outline marks the detected location.
           </figcaption>
         </figure>
       ) : (

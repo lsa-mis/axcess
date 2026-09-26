@@ -135,7 +135,7 @@ Every component has variants for each listed state. The Focus state shows the 3 
 | 20 | Issue card (below 768) | Default, Focus, Came back | The same content as label-value pairs; the title button is the card heading. |
 | 21 | Instance row | Default, Selected, Focus | #, page (link), element summary, selector (mono, wraps), evidence ("Screenshot", "HTML"), Copy selector. Selected: bar plus the evidence shown below. |
 | 22 | Code block | Selector, HTML × Default, Copied | Mono, wraps anywhere, 1 px border, a "Copy" button with a text result ("Copied"). |
-| 23 | Screenshot | Default, Focus, Expanded | Circled element; the caption says what is circled; alt text such as "Screenshot of the Walpole page. The first item image link is circled." |
+| 23 | Screenshot | Default, Focus, Expanded | Outlined element; the caption says what is outlined; alt text such as "Screenshot of the Walpole page. The first item image link is outlined." |
 | 24 | Fix option | Recommended, Other | Option label, "How", "Watch out", "Effort". Recommended adds a star icon and the word "Recommended". |
 | 25 | Health item | OK, Note, Failed | Icon (check, flag, octagon) plus words plus a detail line. |
 | 26 | Done ledger | Bars per run × Chart and Table | See §4.3 |

@@ -186,7 +186,7 @@ class IssueLocation:
     # appears once a menu is opened.
     revealed_by: str | None = None
     # Blob hash of the scan-time screenshot with the detected location
-    # circled, when one was captured. Lets the Issues view expand the visual
+    # marked, when one was captured. Lets the Issues view expand the visual
     # evidence inline instead of deep-linking to the page-evidence route.
     screenshot_hash: str | None = None
     # The captured outerHTML of the flagged element, the "exact element

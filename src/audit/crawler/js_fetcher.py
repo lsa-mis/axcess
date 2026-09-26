@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import math
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
@@ -46,7 +47,7 @@ log = get_logger(__name__)
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
-# Per-page cap on circled element screenshots. Each capture costs a
+# Per-page cap on outlined element screenshots. Each capture costs a
 # scroll + a screenshot (~50-150 ms); capping the count bounds the
 # crawl-time and storage cost on pathological findings-dense pages. One
 # hundred covers the ordinary "one image per issue instance" case while
@@ -54,46 +55,82 @@ _IDLE_TIMEOUT_MS = 10_000
 MAX_SHOTS_PER_PAGE = 100
 
 
-def _draw_issue_circle(
+# Location marker geometry, in image pixels. The outline sits _MARKER_GAP_PX
+# outside the element so it never covers the reported text or control: a
+# red stroke between two white halos, which keeps it visible on light, dark,
+# and red content alike.
+_MARKER_GAP_PX = 2
+_MARKER_HALO_PX = 2
+_MARKER_STROKE_PX = 3
+_MARKER_RED = (190, 0, 30, 255)
+_MARKER_WHITE = (255, 255, 255, 255)
+
+# Viewport box of an element's rendered content, or null to use its own box.
+# A block element spans its whole row even when its text is one short word,
+# so outlining the block would frame mostly blank space. The range around its
+# contents, clipped to the element, is what a reviewer needs to find. Controls
+# and replaced elements keep their own box: the control is what is reported.
+_CONTENT_BOX_JS = """
+(el) => {
+  const ownBox = 'img, svg, video, canvas, iframe, object, embed, '
+    + 'input, select, textarea, button, [role="button"]';
+  if (el.matches(ownBox)) return null;
+  if (!/\\S/.test(el.textContent || '')) return null;
+  const box = el.getBoundingClientRect();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const text = range.getBoundingClientRect();
+  const left = Math.max(text.left, box.left);
+  const top = Math.max(text.top, box.top);
+  const right = Math.min(text.right, box.right);
+  const bottom = Math.min(text.bottom, box.bottom);
+  if (right - left < 2 || bottom - top < 2) return null;
+  return {x: left, y: top, width: right - left, height: bottom - top};
+}
+"""
+
+
+def _draw_issue_outline(
     png: bytes,
     *,
-    center_x: float,
-    center_y: float,
-    target_width: float,
-    target_height: float,
+    left: float,
+    top: float,
+    width: float,
+    height: float,
 ) -> bytes:
-    """Draw a high-contrast circular location marker onto screenshot bytes.
+    """Outline the reported element on screenshot bytes.
 
-    The marker is applied after capture instead of mutating the audited DOM.
-    A white halo keeps the circle distinguishable on dark or red content; the
-    circular shape and the UI caption ensure the annotation does not rely on
-    color alone.
+    ``left``, ``top``, ``width`` and ``height`` locate the element in image
+    pixels. The rectangle follows the element's real extent, drawn just
+    outside it, so a reviewer sees exactly what was flagged and can still
+    read it. Edges beyond the image are clamped to it, so an element larger
+    than the capture is framed by the image border. The annotation is applied
+    after capture instead of mutating the audited DOM; the shape and the UI
+    caption keep the marker from relying on color alone.
     """
 
     with Image.open(io.BytesIO(png)) as source:
         image = source.convert("RGBA")
-    draw = ImageDraw.Draw(image)
-    available_radius = (
-        min(
-            center_x,
-            center_y,
-            image.width - center_x,
-            image.height - center_y,
-        )
-        - 4
-    )
-    if available_radius < 6:
+    if left >= image.width or top >= image.height or left + width <= 0 or top + height <= 0:
         return png
-    target_radius = max(24.0, min(48.0, max(target_width, target_height) / 2 + 10))
-    radius = int(min(target_radius, available_radius))
-    bounds = (
-        int(center_x - radius),
-        int(center_y - radius),
-        int(center_x + radius),
-        int(center_y + radius),
-    )
-    draw.ellipse(bounds, outline=(255, 255, 255, 255), width=10)
-    draw.ellipse(bounds, outline=(190, 0, 30, 255), width=5)
+    band = 2 * _MARKER_HALO_PX + _MARKER_STROKE_PX
+    reach = _MARKER_GAP_PX + band
+    x0, y0 = math.floor(left) - reach, math.floor(top) - reach
+    x1, y1 = math.ceil(left + width) + reach, math.ceil(top + height) + reach
+
+    def clamped(inset: int) -> tuple[int, int, int, int]:
+        return (
+            max(0, x0 + inset),
+            max(0, y0 + inset),
+            min(image.width - 1, x1 - inset),
+            min(image.height - 1, y1 - inset),
+        )
+
+    draw = ImageDraw.Draw(image)
+    # Pillow draws a rectangle's border inward from its bounds: the white band
+    # spans both halos, then the red stroke is painted over its middle.
+    draw.rectangle(clamped(0), outline=_MARKER_WHITE, width=band)
+    draw.rectangle(clamped(_MARKER_HALO_PX), outline=_MARKER_RED, width=_MARKER_STROKE_PX)
     output = io.BytesIO()
     image.save(output, format="PNG")
     return output.getvalue()
@@ -173,7 +210,7 @@ class JsFetcher:
         # an opened menu. Off unless explicitly attached, it is the most
         # expensive pass here (one axe run per revealed state).
         self._interaction_probe = interaction_probe
-        # When set, capture a circled screenshot of each live-page
+        # When set, capture an outlined screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
         # Protected scans own one manually-authenticated BrowserContext in the
@@ -420,7 +457,7 @@ class JsFetcher:
                             continue
                         if selector in ("", "body", "html", "(unknown)", "(none)"):
                             continue
-                        png = await self._capture_element(page, selector)
+                        png = await self._capture_element(page, selector, center=True)
                         if png:
                             screenshots[th] = png
                 except Exception as exc:
@@ -482,15 +519,23 @@ class JsFetcher:
                 with contextlib.suppress(Exception):
                     await page.close()
 
-    async def _capture_element(self, page: Page, selector: str) -> bytes | None:
-        """Screenshot the element at ``selector`` with a circular marker.
+    async def _capture_element(
+        self, page: Page, selector: str, *, center: bool = False
+    ) -> bytes | None:
+        """Screenshot the element at ``selector`` with its location outlined.
 
-        Returns contextual PNG bytes with a circle centered on the detected
-        location, or ``None`` if the element is
-        missing, off-screen, too small, or anything goes wrong. The whole
-        body is defensive, an invalid CSS selector, a detached node, or a
-        screenshot timeout returns ``None`` rather than raising, so one bad
-        finding never breaks the page's capture pass.
+        Returns contextual PNG bytes with the element's rendered content
+        outlined, or ``None`` if the element is missing, off-screen, too
+        small, or anything goes wrong. The whole body is defensive, an
+        invalid CSS selector, a detached node, or a screenshot timeout
+        returns ``None`` rather than raising, so one bad finding never breaks
+        the page's capture pass.
+
+        ``center`` scrolls the element to the middle of the viewport first,
+        so the capture has context on every side even when the element sat
+        at a viewport edge. Only the final capture pass asks for it: the
+        interaction probe photographs revealed states, and a scroll there
+        could close a menu that dismisses itself on scroll.
         """
         try:
             loc = page.locator(selector).first
@@ -499,15 +544,28 @@ class JsFetcher:
             box = await loc.bounding_box()
             if box is None or box["width"] < 2 or box["height"] < 2:
                 return None
-            with contextlib.suppress(Exception):
-                await loc.scroll_into_view_if_needed(timeout=1500)
-            box = await loc.bounding_box()
-            if box is None:
-                return None
             # Keep enough nearby page context for the marker to be useful.
             # Annotation happens on the PNG, never in the audited page DOM.
             pad = 56
             vp = page.viewport_size or {"width": 1440, "height": 900}
+            with contextlib.suppress(Exception):
+                if center and box["height"] + 2 * pad <= vp["height"]:
+                    # "instant" overrides a page's smooth-scroll CSS, which
+                    # would otherwise leave the box measured mid-animation.
+                    await loc.evaluate(
+                        "el => el.scrollIntoView("
+                        "{block: 'center', inline: 'nearest', behavior: 'instant'})"
+                    )
+                else:
+                    await loc.scroll_into_view_if_needed(timeout=1500)
+            box = await loc.bounding_box()
+            if box is None:
+                return None
+            mark: Any = None
+            with contextlib.suppress(Exception):
+                mark = await loc.evaluate(_CONTENT_BOX_JS)
+            if not mark:
+                mark = box
             x = max(0, box["x"] - pad)
             y = max(0, box["y"] - pad)
             width = min(box["width"] + 2 * pad, vp["width"] - x)
@@ -515,14 +573,12 @@ class JsFetcher:
             if width < 2 or height < 2:
                 return None
             png = await page.screenshot(clip={"x": x, "y": y, "width": width, "height": height})
-            center_x = box["x"] + box["width"] / 2 - x
-            center_y = box["y"] + box["height"] / 2 - y
-            return _draw_issue_circle(
+            return _draw_issue_outline(
                 png,
-                center_x=center_x,
-                center_y=center_y,
-                target_width=box["width"],
-                target_height=box["height"],
+                left=mark["x"] - x,
+                top=mark["y"] - y,
+                width=mark["width"],
+                height=mark["height"],
             )
         except Exception:
             return None

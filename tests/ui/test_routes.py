@@ -452,7 +452,7 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
 ) -> None:
     """Declining to store rendered pages declines their screenshots too.
 
-    A circled element screenshot is a crop of the post-sign-in page it came
+    A marked element screenshot is a crop of the post-sign-in page it came
     from. An auditor who asked Axcess not to keep those pages has asked not to
     keep the crops either, so one opt-out governs both.
     """
@@ -1261,7 +1261,7 @@ def test_blob_serves_png_bytes(client: TestClient, seeded_db: tuple[object, obje
 def test_blob_serves_a_finding_screenshot(
     client: TestClient, seeded_db: tuple[Path, Path, int]
 ) -> None:
-    """A circled finding screenshot is served even though it has no image row.
+    """A marked finding screenshot is served even though it has no image row.
 
     Finding screenshots are written straight to the content-addressed store by
     the crawler; they are evidence about an element, not image content lifted

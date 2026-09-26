@@ -152,12 +152,12 @@ export default function IssuePageScreenshotsRoute() {
                 <figure className="rounded-xs border border-border bg-surface p-2">
                   <img
                     src={blobUrl(hash)}
-                    alt={`Issue instance ${index + 1} on ${label}. A circular marker identifies the detected location.`}
+                    alt={`Issue instance ${index + 1} on ${label}. An outline marks the detected location.`}
                     className="max-h-80 w-full rounded-xs object-contain"
                     loading="lazy"
                   />
                   <figcaption className="mt-2 text-xs text-fg-muted">
-                    Instance {index + 1} of {found.occurrence_count}. The circle marks the detected location.
+                    Instance {index + 1} of {found.occurrence_count}. The outline marks the detected location.
                   </figcaption>
                 </figure>
               </li>

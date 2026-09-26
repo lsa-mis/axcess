@@ -444,7 +444,7 @@ def crawl(
         typer.Option(
             "--skip-screenshots",
             help=(
-                "Skip capturing a circled location screenshot for each "
+                "Skip capturing an outlined location screenshot for each "
                 "live-page finding. Those images are embedded in the Excel "
                 "report as visual evidence; skipping saves crawl time."
             ),

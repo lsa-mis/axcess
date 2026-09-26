@@ -778,7 +778,7 @@ export interface IssueLocation {
    *  was present at page load. Without it the URL alone does not show a
    *  defect that only appears once a menu is opened. */
   revealed_by: string | null;
-  /** Blob hash of the scan-time screenshot with the location circled, when
+  /** Blob hash of the scan-time screenshot with the location marked, when
    *  one was captured, lets the evidence expand inline in the Issues view. */
   screenshot_hash: string | null;
   /** Captured outerHTML of the flagged element, shown as escaped source in
@@ -792,7 +792,7 @@ export interface IssuePage {
   page_title: string | null;
   occurrence_count: number;
   status_summary: Record<string, number>;
-  /** Circled scan-time screenshots, one for each locatable captured instance. */
+  /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
 }
 

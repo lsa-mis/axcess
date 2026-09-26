@@ -1272,7 +1272,7 @@ def create_app(
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
             visual_checks_enabled=False,
-            # A circled element screenshot is what makes a finding reviewable
+            # A marked element screenshot is what makes a finding reviewable
             # without re-running the sign-in, so an authenticated scan needs
             # them at least as much as an anonymous one. It is also the same
             # class of evidence as the rendered page it is cropped from: both
@@ -2424,7 +2424,7 @@ def create_app(
             rendered = render_audit_report(scan, conn=conn)
         elif fmt == "xlsx":
             # Pass the blob store so the Issues Overview sheet can embed
-            # each finding's circled location screenshot as evidence.
+            # each finding's marked location screenshot as evidence.
             rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
@@ -2532,7 +2532,7 @@ def create_app(
             # Per-finding screenshots live in the same content-addressed store
             # but have no `images` row: the crawler captures them from the live
             # element, they are not image content extracted from the page. This
-            # lookup used to consider `images` only, so every circled screenshot
+            # lookup used to consider `images` only, so every marked screenshot
             # 404'd while its file sat on disk.
             with get_conn() as conn:
                 if _protected_scan_table_exists(conn):

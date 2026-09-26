@@ -292,7 +292,7 @@ class CrawlConfig:
     interaction_max_repeated: int = 20
     interaction_max_depth: int = 5
     # Per-finding element screenshots. When on (default), the JS fetcher
-    # captures a circled screenshot of each live-page finding's element
+    # captures an outlined screenshot of each live-page finding's element
     # at scan time; the orchestrator stores it in the blob store and threads
     # the hash onto the row, so the Excel report can embed the exact spot of
     # each issue. Bounded per page (see ``js_fetcher.MAX_SHOTS_PER_PAGE``);

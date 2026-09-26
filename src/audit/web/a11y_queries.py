@@ -410,7 +410,7 @@ def grouped_by_rule(
                     "engine_evidence_json": r["engine_evidence_json"],
                     "status": str(r["status"]),
                     # Blob hash of the scan-time screenshot with the detected
-                    # location circled, the inline evidence the Issues view
+                    # location marked, the inline evidence the Issues view
                     # expands, so the reviewer never has to leave the list.
                     "screenshot_hash": (
                         str(r["screenshot_hash"]) if r["screenshot_hash"] else None

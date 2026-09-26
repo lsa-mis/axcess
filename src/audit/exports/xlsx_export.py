@@ -12,7 +12,7 @@ you can sort, filter, and track in a spreadsheet:
 * **One tab per issue**, the ticket itself: a Current Behavior / Severity /
   Impact / Should be / Instances / References summary block, then one row per
   place the defect was actually seen (Where · User action · Element · What to
-  fix · How to reproduce), the acceptance criteria, and a circled location
+  fix · How to reproduce), the acceptance criteria, and a marked location
   screenshot when a ``blob_store`` is supplied. Past ``_MAX_ISSUE_SHEETS``
   issues the index still lists everything and the remaining instances pool
   into a single **More Issues** sheet.
@@ -1402,7 +1402,7 @@ def render_xlsx(
     scan's finish time formatted as a human date.
 
     ``blob_store`` is optional: when supplied and the scan has retained
-    screenshot hashes, each issue's tab embeds the first available circled
+    screenshot hashes, each issue's tab embeds the first available marked
     location screenshot beside its instance table.
     """
     date_str = audit_date or _fmt_date(scan.finished_at or scan.started_at)
