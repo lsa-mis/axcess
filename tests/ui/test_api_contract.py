@@ -348,6 +348,12 @@ def _add_report_history(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) 
             "UPDATE scans SET started_at = ?, finished_at = datetime(?, '+1 hour') WHERE id = ?",
             (started, started, report),
         )
+    # One of the report's pages redirected and none of the baseline's did, so
+    # the comparison's ``notes`` carries a note true of only one scan.
+    conn.execute(
+        "UPDATE pages SET final_url = url_normalized || '?moved=1' WHERE id = ?",
+        (_page_ids(conn, scan_id)[1],),
+    )
     _add_image(
         conn,
         blob_dir,

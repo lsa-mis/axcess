@@ -640,6 +640,28 @@
         }
       }
     },
+    "/api/scans/{scan_id}/settings": {
+      "get": {
+        "summary": "Api Scan Settings",
+        "description": "The settings a scan ran with, for New scan to start again from.\n\nBuilt from an allow-list (see ``audit.web.scan_settings``): scan\nsettings only, never sign-in state or confirmations. A report from\nthe protected workflow is refused; its settings belong to that\nworkflow's own draft, not to this form.",
+        "operationId": "api_scan_settings_api_scans__scan_id__settings_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/capabilities/alfa": {
       "get": {
         "summary": "Api Alfa Capability",
@@ -1079,6 +1101,12 @@
             "schema": {"type": "string", "default": "", "title": "Review Lane"}
           },
           {
+            "name": "finding_type",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Finding Type"}
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -1501,6 +1529,31 @@
         }
       }
     },
+    "/api/scans/{scan_id}/exports": {
+      "get": {
+        "summary": "Export Options",
+        "description": "Name, size and draft state of each file the Export panel offers.\n\nEach file is rendered exactly as the download route renders it, with\nthe draft acknowledged as the panel's links acknowledge it, and then\nmeasured. That costs a full render per format (about 1.5 s in total\nfor a 1,718-page scan), which is why the panel asks only when opened.",
+        "operationId": "export_options_api_scans__scan_id__exports_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ExportOptions"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/export/{fmt}": {
       "get": {
         "summary": "Export Scan",
@@ -1640,6 +1693,11 @@
           },
           "settings_changed": {"items": {"type": "string"}, "type": "array", "title": "Settings Changed"},
           "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"},
+          "notes": {
+            "items": {"$ref": "#/components/schemas/CoverageNote"},
+            "type": "array",
+            "title": "Notes"
+          },
           "rows": {
             "items": {"$ref": "#/components/schemas/ComparisonRow"},
             "type": "array",
@@ -1704,6 +1762,17 @@
           "limitations"
         ],
         "title": "ComparisonRow"
+      },
+      "CoverageNote": {
+        "properties": {
+          "text": {"type": "string", "title": "Text"},
+          "scans": {"items": {"type": "integer"}, "type": "array", "title": "Scans"},
+          "differs": {"type": "boolean", "title": "Differs"}
+        },
+        "type": "object",
+        "required": ["text", "scans", "differs"],
+        "title": "CoverageNote",
+        "description": "One coverage note, said once for whichever of the two scans it is true of.\n\n``limitations`` repeats a note per report; this is the same evidence for a\nreader, without the notes the method coverage table already states."
       },
       "CoveragePair": {
         "properties": {
@@ -1772,6 +1841,33 @@
         "type": "object",
         "required": ["label", "url"],
         "title": "EvidenceLink"
+      },
+      "ExportFormatOption": {
+        "properties": {
+          "format": {"type": "string", "enum": ["xlsx", "audit", "csv", "json"], "title": "Format"},
+          "filename": {"type": "string", "title": "Filename"},
+          "size_bytes": {"type": "integer", "title": "Size Bytes"}
+        },
+        "type": "object",
+        "required": ["format", "filename", "size_bytes"],
+        "title": "ExportFormatOption",
+        "description": "One file the panel offers, as the download would deliver it."
+      },
+      "ExportOptions": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "draft": {"type": "boolean", "title": "Draft"},
+          "evaluation_status": {"type": "string", "title": "Evaluation Status"},
+          "formats": {
+            "items": {"$ref": "#/components/schemas/ExportFormatOption"},
+            "type": "array",
+            "title": "Formats"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "draft", "evaluation_status", "formats"],
+        "title": "ExportOptions",
+        "description": "The Export panel's facts for one report."
       },
       "GroupTotals": {
         "properties": {
