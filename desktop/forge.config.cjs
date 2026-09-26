@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 const packageJson = require("./package.json");
+const { displayVersion } = require("./src/updates.cjs");
 
 const resources = ["backend-dist", "playwright-browsers", "ocr-runtime"]
   .map((name) => path.join(__dirname, name))
@@ -110,8 +111,9 @@ module.exports = {
       config: {
         setupIcon: path.join(__dirname, "assets", "axcess.ico"),
         // Forge's default is "Axcess-<version> Setup.exe"; GitHub rewrites the
-        // space when it becomes a release asset name.
-        setupExe: `Axcess-${packageJson.version}-Setup.exe`,
+        // space when it becomes a release asset name. The version is the one
+        // people see (0.61); the .nupkg inside keeps the packaged semver.
+        setupExe: `Axcess-${displayVersion(packageJson.version)}-Setup.exe`,
       },
     },
     {

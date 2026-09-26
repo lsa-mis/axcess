@@ -2,8 +2,9 @@
  * Pure helpers behind the launch-time update check. Nothing here touches
  * Electron so the decisions can be unit-tested with plain Node.
  *
- * Every push to `main` publishes a GitHub Release tagged `desktop-v0.60.<run>`
- * (see .github/workflows/desktop-build.yml). The packaged app asks the GitHub
+ * Every push to `main` publishes a GitHub Release tagged with the next
+ * two-part version, `desktop-v0.61` after `desktop-v0.60` (see
+ * .github/workflows/desktop-build.yml and `nextReleaseVersion`). The packaged app asks the GitHub
  * API for the latest release once per launch and compares it with its own
  * stamped version. What it can do with a newer release depends on the
  * platform: Squirrel.Windows installs in-app from the release's asset
@@ -109,13 +110,56 @@ function isNewerRelease(release, currentVersion) {
   return compareVersions(release.version, currentVersion) === 1;
 }
 
+/**
+ * How a version reads to people: two parts, "0.61", with two digits after
+ * the point, so 0.69 is followed by 0.70 and 0.99 by 1.00. npm and
+ * Squirrel.Windows need three-part semver, so the package itself carries
+ * "0.61.0" (and "1.0.0" for 1.00); this drops the ".0" again. A version
+ * from before the two-part scheme ("0.1.33") is shown as it is.
+ */
+function displayVersion(version) {
+  const parts = parseVersion(version);
+  if (!parts) return String(version);
+  if (parts.length === 3 && parts[2] !== 0) return parts.join(".");
+  return `${parts[0]}.${String(parts[1] ?? 0).padStart(2, "0")}`;
+}
+
+/** The semver a two-part version is packaged as: "0.61" -> "0.61.0", "1.00" -> "1.0.0". */
+function packageVersion(version) {
+  const parts = parseVersion(version);
+  if (!parts || parts.length !== 2) throw new Error(`Not a two-part version: ${version}`);
+  return `${parts[0]}.${parts[1]}.0`;
+}
+
+/**
+ * The version of the next release, given the release tags that exist: one
+ * step after the highest two-part tag ("desktop-v0.60" -> "0.61",
+ * "desktop-v0.99" -> "1.00"), or `first` when there is none yet. Tags of
+ * the old three-part scheme ("desktop-v0.1.33") do not count.
+ */
+function nextReleaseVersion(tags, first = "0.60") {
+  let highest = null;
+  for (const tag of tags) {
+    const match = /^desktop-v(\d+)\.(\d{2})$/.exec(String(tag).trim());
+    if (!match) continue;
+    const step = Number(match[1]) * 100 + Number(match[2]);
+    if (highest === null || step > highest) highest = step;
+  }
+  if (highest === null) return first;
+  const next = highest + 1;
+  return `${Math.floor(next / 100)}.${String(next % 100).padStart(2, "0")}`;
+}
+
 module.exports = {
   RELEASES_API_URL,
   RELEASES_PAGE_URL,
   compareVersions,
   describeRelease,
+  displayVersion,
   isNewerRelease,
   isReleaseAssetUrl,
+  nextReleaseVersion,
+  packageVersion,
   parseVersion,
   releaseVersion,
 };

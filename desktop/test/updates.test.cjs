@@ -4,8 +4,11 @@ const {
   RELEASES_API_URL,
   compareVersions,
   describeRelease,
+  displayVersion,
   isNewerRelease,
   isReleaseAssetUrl,
+  nextReleaseVersion,
+  packageVersion,
   parseVersion,
   releaseVersion,
 } = require("../src/updates.cjs");
@@ -110,4 +113,37 @@ test("an update is only offered for a strictly newer release", () => {
 
 test("the release lookup targets this repository over HTTPS", () => {
   assert.equal(RELEASES_API_URL, "https://api.github.com/repos/lsa-mis/axcess/releases/latest");
+});
+
+test("versions read as two parts, with two digits after the point", () => {
+  assert.equal(displayVersion("0.60.0"), "0.60");
+  assert.equal(displayVersion("0.61.0"), "0.61");
+  assert.equal(displayVersion("0.61"), "0.61");
+  assert.equal(displayVersion("1.0.0"), "1.00");
+  // The old per-build scheme keeps its third part.
+  assert.equal(displayVersion("0.1.33"), "0.1.33");
+});
+
+test("a two-part version is packaged as semver", () => {
+  assert.equal(packageVersion("0.61"), "0.61.0");
+  assert.equal(packageVersion("1.00"), "1.0.0");
+  assert.throws(() => packageVersion("0.61.0"));
+});
+
+test("each release is one step after the highest two-part tag", () => {
+  assert.equal(nextReleaseVersion([]), "0.60");
+  // Only the old scheme so far: the first two-part release is 0.60.
+  assert.equal(nextReleaseVersion(["desktop-v0.1.33", "desktop-v0.1.32"]), "0.60");
+  assert.equal(nextReleaseVersion(["desktop-v0.60", "desktop-v0.1.33"]), "0.61");
+  assert.equal(nextReleaseVersion(["desktop-v0.61", "desktop-v0.69", "desktop-v0.62"]), "0.70");
+  assert.equal(nextReleaseVersion(["desktop-v0.99"]), "1.00");
+  assert.equal(nextReleaseVersion(["v0.75", "desktop-v0.6", "desktop-v0.64"]), "0.65");
+});
+
+test("a two-part release is newer than the builds before it", () => {
+  assert.equal(releaseVersion("desktop-v0.61"), "0.61");
+  assert.equal(compareVersions("0.61", "0.60.0"), 1);
+  assert.equal(compareVersions("0.60", "0.1.33"), 1);
+  assert.equal(compareVersions("0.61", "0.61.0"), 0);
+  assert.equal(compareVersions("1.00", "0.99.0"), 1);
 });

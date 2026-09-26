@@ -24,6 +24,7 @@ const {
 const {
   RELEASES_API_URL,
   describeRelease,
+  displayVersion,
   isNewerRelease,
   isReleaseAssetUrl,
 } = require("./updates.cjs");
@@ -323,7 +324,8 @@ function ownerWindow() {
 
 function buildLabel() {
   const commit = packageJson.config && packageJson.config.buildCommit;
-  return commit ? `${app.getVersion()} (${String(commit).slice(0, 7)})` : app.getVersion();
+  const version = displayVersion(app.getVersion());
+  return commit ? `${version} (${String(commit).slice(0, 7)})` : version;
 }
 
 async function fetchLatestRelease() {
@@ -462,6 +464,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    // Electron's About panel would show the packaged semver (0.61.0); show
+    // the version people see everywhere else, with the build's commit.
+    app.setAboutPanelOptions({ applicationName: "Axcess", applicationVersion: buildLabel() });
     // Packaged macOS apps use the bundle's ICNS; brand the development Dock too.
     if (process.platform === "darwin" && !app.isPackaged) app.dock.setIcon(appIcon);
     return launch().catch((error) => showStartupFailure(error));

@@ -98,18 +98,27 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
 ### Version numbers and tags
 
-- Each build stamps `desktop/package.json` with version `0.60.<run number>`,
-  using the workflow's `github.run_number`. The commit SHA goes into
-  `config.buildCommit`.
-- The app shows both together, as `0.60.N (abc1234)`, in its update dialogs and
-  in the launcher log.
-- The release tag is `desktop-v0.60.N` and the release title is
-  `Axcess preview 0.60.N`.
-- In git, `desktop/package.json` stays at `0.60.0`, so every local build is
-  version `0.60.0`.
+- Versions have two parts: `0.60`, then `0.61`, and so on. After `0.69` comes
+  `0.70`, and after `0.99` comes `1.00`. Each release is one step after the
+  highest two-part release tag, so every push to `main` that publishes moves
+  the version up by one.
+- The workflow's first job, **Choose the release version**, reads the
+  `desktop-v*` tags and runs `desktop/scripts/next-version.cjs`, which
+  `nextReleaseVersion` in `desktop/src/updates.cjs` backs. Its unit tests pin
+  the steps.
+- npm and Squirrel.Windows need three-part versions, so each build stamps
+  `desktop/package.json` with the same version as semver: `0.61.0` for `0.61`,
+  `1.0.0` for `1.00`. The commit SHA goes into `config.buildCommit`.
+- Everything a person sees uses the two-part version: the release tag
+  `desktop-v0.61`, the release title `Axcess preview 0.61`, the installer
+  names, and the app's own label, `0.61 (abc1234)`, in its update dialogs and
+  the launcher log (`displayVersion`).
+- In git, `desktop/package.json` stays at `0.60.0`, so every local build shows
+  version `0.60`. `pyproject.toml` and `audit.__version__` say `0.60`.
 - Before September 2026 the scheme was `0.1.<run number>`: tags up to
-  `desktop-v0.1.33` use it. `0.60.N` sorts above every one of them, so
-  installed copies still see the next release as newer.
+  `desktop-v0.1.33` use it. They do not count toward the next version, and
+  `0.60` sorts above every one of them, so installed copies still see the
+  next release as newer.
 
 ### The publish job
 
@@ -119,7 +128,7 @@ repository secrets are involved.
 
 1. **Collect the installers.** It copies every `*.dmg`, `*.zip`,
    `*-Setup.exe`, `RELEASES`, and `*.nupkg` file from the two artifacts. It
-   stops if `Axcess-0.60.N-arm64.dmg`, `Axcess-0.60.N-Setup.exe`, or `RELEASES`
+   stops if `Axcess-0.61-arm64.dmg`, `Axcess-0.61-Setup.exe`, or `RELEASES`
    is missing.
 2. **Add version-less copies.** It adds `Axcess-macOS-AppleSilicon.dmg` and
    `Axcess-Windows-x64-Setup.exe` as copies of this build's installers. The
@@ -129,7 +138,7 @@ repository secrets are involved.
    always fetch the newest release. If you rename these files, change those
    constants and regenerate the site in the same pull request.
 3. **Create a draft, upload, then publish.** If no release exists for tag
-   `desktop-v0.60.N` yet, it creates one as a draft at the built commit. It
+   `desktop-v0.61` yet, it creates one as a draft at the built commit. It
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
@@ -246,7 +255,7 @@ release from the site.
 - Drafts and prereleases are ignored. So are tags that are not a plain dotted
   version, optionally prefixed with `desktop-v` or `v`.
 - The app offers a release only when its version is strictly newer, compared
-  as numbers (`0.60.10` is newer than `0.60.9`).
+  as numbers (`0.61` is newer than `0.60.0` and than `0.1.33`).
 
 ### What people see on Windows
 
@@ -326,18 +335,19 @@ has to make because the workflow does not.
    draft. Installed apps ignore drafts, so nobody is offered it. You can
    delete the leftover draft on the Releases page.
 5. For a failure that looks flaky, such as a packaging step or an upload,
-   try **Re-run failed jobs** on the same run first. A re-run keeps the run
-   number, so the version and tag stay `0.60.N`. The publish job creates a
+   try **Re-run failed jobs** on the same run first. A re-run keeps the
+   version job's result, so the version and tag stay the same (and a draft is
+   not a tag, so even a full re-run picks the same version). The publish job creates a
    draft only when none exists for the tag, uploads with `--clobber`, and
    then publishes, so it completes the existing draft. Start a new run only
    when the code has to change.
 
 ### Confirm the release
 
-1. On the Releases page, confirm that "Axcess preview 0.60.N" is marked
+1. On the Releases page, confirm that "Axcess preview 0.61" is marked
    Latest and has these files:
-   - `Axcess-0.60.N-arm64.dmg` and the macOS `.zip`;
-   - `Axcess-0.60.N-Setup.exe`, `RELEASES`, and the `.nupkg` package;
+   - `Axcess-0.61-arm64.dmg` and the macOS `.zip`;
+   - `Axcess-0.61-Setup.exe`, `RELEASES`, and the `.nupkg` package;
    - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
@@ -353,14 +363,15 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    opens rather than the
    ["Axcess could not start" page](../desktop-app.md#axcess-could-not-start).
 2. **Version.** Confirm the launcher log's "starting backend" line shows
-   `version 0.60.N (<short SHA>)` for the new build. The desktop app guide
+   `version 0.61 (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
    - The review app has no screen that shows the version. The update dialog
-     says "You are running 0.60.N (<short SHA>)", but only when it offers a
+     says "You are running 0.61 (<short SHA>)", but only when it offers a
      newer release, so support should ask a user for the launcher log line.
    - On macOS, also open **Axcess > About Axcess** and note whether it shows
-     0.60.N. The desktop code never replaces Electron's default menu, which
-     should include that item, but nobody has checked it on a Mac yet.
+     `0.61 (<short SHA>)`: the launcher sets the About panel's version to the
+     two-part label. The desktop code never replaces Electron's default menu,
+     which should include that item, but nobody has checked it on a Mac yet.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
 4. **Update from the previous release.** On a machine with the previous
@@ -379,7 +390,7 @@ GitHub's download count for each release file. Record the counts before the
 release is pruned, because deleting a release deletes its counts:
 
 ```bash
-gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.60.N \
+gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.61 \
   --jq '.assets[] | [.name, .download_count] | @tsv'
 ```
 
@@ -389,9 +400,9 @@ Releases page, so treat the numbers as estimates:
 | File | Who downloads it |
 | --- | --- |
 | `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
-| `Axcess-0.60.N-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-0.61-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
 | `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
-| `Axcess-0.60.N-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
+| `Axcess-0.61-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
 
 These counts miss:
 
@@ -434,7 +445,7 @@ A few things to know:
 
 - On Linux, `make desktop-package` stops at `make desktop-ocr`, because the
   OCR bundling script supports only macOS (Windows has its own script).
-- Local builds are version `0.60.0`, and local macOS builds are ad-hoc signed
+- Local builds are version `0.60`, and local macOS builds are ad-hoc signed
   unless you set the
   [signing variables](#settings-for-when-credentials-exist).
 - A packaged local build therefore offers the latest published release when
