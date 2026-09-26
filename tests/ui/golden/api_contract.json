@@ -159,6 +159,13 @@
         "images_seen": "integer",
         "in_flight_pages": [{"attempts": "integer", "depth": "integer", "lease_until": "string", "url": "string"}],
         "leased": "integer",
+        "page_checks": [
+          {
+            "checks": {"axe": "absent|string", "keyboard": "absent|string"},
+            "state": "string",
+            "url": "string"
+          }
+        ],
         "pending": "integer",
         "recent_pages": [
           {

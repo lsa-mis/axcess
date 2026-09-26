@@ -24,7 +24,7 @@ import type {
   ScanProgress,
 } from "../api/types";
 import ReportHeader from "./ReportHeader";
-import { siteLabel } from "./ReportCrumb";
+import { siteLabel, withoutUserinfo } from "./ReportCrumb";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion } from "./table/Table";
 import { Button, Card, relativeTime } from "./ui";
 import { cn } from "../lib/cn";
@@ -114,6 +114,7 @@ export default function ScanProgressView({
         rows={pageRows(progress)}
         checks={checks}
         preparing={preparing}
+        seedUrl={scan.seed_url}
       />
     </>
   );
@@ -401,11 +402,17 @@ function pageRows(progress: ScanProgress | null): ScanPageChecks[] {
   ];
 }
 
-/** The address without the site, which the header already names. */
-function pagePath(url: string): string {
+/**
+ * The address without the site, which the header already names. The part
+ * after "#" stays: a single-page app's pages differ only there
+ * ("/#/about", "/#/projects"), and without it every row read "/". A page
+ * on another host (a subdomain) keeps its host.
+ */
+function pagePath(url: string, seedUrl: string): string {
   try {
     const parsed = new URL(url);
-    return `${parsed.pathname}${parsed.search}` || "/";
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}` || "/";
+    return parsed.host === new URL(seedUrl).host ? path : `${parsed.host}${path}`;
   } catch {
     return url;
   }
@@ -413,21 +420,33 @@ function pagePath(url: string): string {
 
 function PagesTable({
   rows,
-  checks,
+  checks: chosen,
   preparing,
+  seedUrl,
 }: {
   rows: ScanPageChecks[];
   checks: ScanMethodCoverage[];
   preparing: boolean;
+  seedUrl: string;
 }) {
+  // Per-check states exist only while the scan runs in the process serving
+  // this page (see audit.crawler.live_progress). A scan run from the command
+  // line, one that was running when Axcess restarted, or a server older than
+  // this table has none; then the check columns would only repeat "no
+  // record" on every row, so the table drops them and says why once.
+  const tracked = rows.some((row) => Object.keys(row.checks).length > 0);
+  const checks = tracked ? chosen : [];
   return (
     <Card className="mt-5 overflow-hidden">
       <div className="px-5 pb-3 pt-4">
         <h2 id="progress-pages-title" className="text-base font-semibold text-fg">
-          Pages and checks
+          {tracked ? "Pages and checks" : "Pages"}
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
           The pages being checked now, the latest finished, and the next few waiting.
+          {!tracked && rows.length > 0 && (
+            <> Each check&rsquo;s progress on a page is not available for this scan, so each page shows its status only.</>
+          )}
         </p>
       </div>
       {rows.length === 0 ? (
@@ -437,8 +456,8 @@ function PagesTable({
       ) : (
         <TableRegion label="Pages and checks">
           <Table
-            caption="Each page and where each check stands on it"
-            className={cn("border-t border-border", checks.length > 3 ? "min-w-[56rem]" : "min-w-[36rem]")}
+            caption={tracked ? "Each page and where each check stands on it" : "Each page and its status"}
+            className={cn("border-t border-border", checks.length > 3 ? "min-w-[56rem]" : "min-w-[28rem]")}
           >
             <TableHead>
               <tr>
@@ -453,22 +472,16 @@ function PagesTable({
               {rows.map((row, index) => (
                 <Row key={`${row.state}-${row.url}`} index={index}>
                   <RowHeader className="max-w-[22rem] font-normal">
-                    <span className="block break-all font-mono text-xs text-fg" title={row.url}>
-                      {pagePath(row.url)}
+                    <span className="block break-all font-mono text-xs text-fg" title={withoutUserinfo(row.url)}>
+                      {pagePath(row.url, seedUrl)}
                     </span>
                   </RowHeader>
                   <Cell className="whitespace-nowrap text-center text-sm font-semibold text-fg">{PAGE_WORD[row.state]}</Cell>
-                  {Object.keys(row.checks).length === 0 ? (
-                    checks.length > 0 && (
-                      <Cell colSpan={checks.length} className="text-sm text-fg-muted">
-                        {row.state === "waiting"
-                          ? "Every check waits for this page."
-                          : "No record of each check for this page."}
-                      </Cell>
-                    )
-                  ) : (
-                    checks.map((method) => {
-                      const state = row.checks[method.key];
+                  {checks.map((method) => {
+                      // A waiting page has started no check; any other page
+                      // without a state for a check was not tracked for it
+                      // (checked before a restart, say), which says so.
+                      const state = row.checks[method.key] ?? (row.state === "waiting" ? "waiting" : undefined);
                       return (
                         <Cell key={method.key} className="text-center">
                           {state ? (
@@ -478,8 +491,7 @@ function PagesTable({
                           )}
                         </Cell>
                       );
-                    })
-                  )}
+                    })}
                 </Row>
               ))}
             </tbody>

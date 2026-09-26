@@ -36,6 +36,7 @@ from fastapi.testclient import TestClient
 
 from audit import coverage_matrix, evaluation
 from audit.blob_store import BlobStore
+from audit.crawler import live_progress
 from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
@@ -622,14 +623,26 @@ def test_read_endpoint_shapes_match_golden(
     for pipeline in ("axe", "image", "alfa"):
         ids[f"{pipeline}_issue"] = _first_issue_key(client, scan_id, pipeline)
 
+    # A scan running in this process records each page's checks in memory
+    # (audit.crawler.live_progress). Give the seeded running scan one tracked
+    # page so ``progress.page_checks[].checks`` carries a value to pin, and
+    # drop it after: the record is process-wide, and other tests reuse ids.
+    with (
+        live_progress.page(ids["running"], "http://running.example.org/0", ["axe", "keyboard"]),
+        live_progress.check("axe"),
+    ):
+        pass
     observed: dict[str, Any] = {}
-    for label, template in _ENDPOINTS:
-        response = client.get(template.format(**ids))
-        observed[label] = {
-            "status": response.status_code,
-            "content_type": response.headers.get("content-type"),
-            "body": _skeleton(response.json()),
-        }
+    try:
+        for label, template in _ENDPOINTS:
+            response = client.get(template.format(**ids))
+            observed[label] = {
+                "status": response.status_code,
+                "content_type": response.headers.get("content-type"),
+                "body": _skeleton(response.json()),
+            }
+    finally:
+        live_progress.forget(ids["running"])
     # Before the golden, so a golden cannot be regenerated from a seed that
     # has stopped exercising a field.
     _check_seed_coverage(observed)
