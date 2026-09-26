@@ -415,7 +415,7 @@ function IssueToolbar({
     <TableBar pager={pager} footer={<ActiveFilters items={active} onClear={onClearFilters} />}>
       <TableSearch
         label="Search issues"
-        placeholder="Search by issue name or WCAG number, such as 1.4.3"
+        placeholder="Issue name or WCAG number (1.4.3)"
         value={q}
         onChange={(value) => onParam("q", value)}
       />
@@ -534,7 +534,7 @@ function parseSort(raw: string | null): SortState {
 /** What the order means in words, for the status line and the caption. */
 function describeSort(sort: SortState): string {
   if (!sort) {
-    return "Recommended order: barriers first, then needs review, then informational, highest priority first in each";
+    return "Recommended order: Barriers, then Needs review, then Informational";
   }
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }

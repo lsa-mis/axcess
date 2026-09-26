@@ -244,7 +244,7 @@ export default function CommandPalette({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search reports, issues, and actions…"
+            placeholder="Search reports, issues, and settings…"
             aria-label="Search"
             className="min-w-0 flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle"
           />

@@ -176,7 +176,7 @@ export default function FindingsRoute() {
         >
           <TableSearch
             label="Search"
-            placeholder="Page address, alt text, or image text"
+            placeholder="Page, alt text, or image text"
             value={filter.q ?? ""}
             onChange={(v) => setParam("q", v)}
           />
