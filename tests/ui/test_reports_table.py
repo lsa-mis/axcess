@@ -215,7 +215,6 @@ async def test_reports_table_keyboard_and_columns(
     await page.wait_for_url(f"**/app/scans/{headline_id}/issues")
 
 
-
 async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> None:
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")

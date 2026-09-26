@@ -132,8 +132,7 @@ def test_a_stuck_dialog_is_named_in_the_report_not_folded_into_limits() -> None:
 def test_a_page_swept_to_exhaustion_claims_no_limit_and_no_refusal() -> None:
     method = methods({"interaction_controls": 4, "interaction_operated": 4})
     assert (
-        method["result"]
-        == "2 pages checked; 3 views opened by clicking; 4 of 4 controls operated"
+        method["result"] == "2 pages checked; 3 views opened by clicking; 4 of 4 controls operated"
     )
 
 

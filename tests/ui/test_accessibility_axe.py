@@ -184,9 +184,7 @@ async def test_settings_page_has_no_axe_violations(
         await page.context.close()
 
 
-async def test_settings_work_by_keyboard_alone(
-    live_server: tuple[str, int], new_page: Any
-) -> None:
+async def test_settings_work_by_keyboard_alone(live_server: tuple[str, int], new_page: Any) -> None:
     """Tab reaches a setting, arrows change it, it applies and survives a reload."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -199,7 +197,9 @@ async def test_settings_work_by_keyboard_alone(
     else:
         pytest.fail("Tab never reached the Text size setting")
     await page.keyboard.press("ArrowRight")
-    await playwright_async.expect(text_size.get_by_role("radio", name="Large", exact=True)).to_be_checked()
+    await playwright_async.expect(
+        text_size.get_by_role("radio", name="Large", exact=True)
+    ).to_be_checked()
     root_size = "document.documentElement.style.fontSize"
     assert await page.evaluate(root_size) == "112.5%"
 
@@ -208,15 +208,13 @@ async def test_settings_work_by_keyboard_alone(
 
     await page.get_by_role("button", name="Reset to defaults").focus()
     await page.keyboard.press("Enter")
-    await playwright_async.expect(page.get_by_role("status").filter(
-        has_text="Settings reset to defaults."
-    )).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_role("status").filter(has_text="Settings reset to defaults.")
+    ).to_be_visible()
     assert await page.evaluate(root_size) == ""
 
 
-async def test_quick_presets_turn_off_again(
-    live_server: tuple[str, int], new_page: Any
-) -> None:
+async def test_quick_presets_turn_off_again(live_server: tuple[str, int], new_page: Any) -> None:
     """A preset is a toggle: selecting it again undoes it, sparing another's keys."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -244,9 +242,11 @@ async def test_quick_presets_turn_off_again(
     await playwright_async.expect(motor).to_have_attribute("aria-pressed", "true")
 
     # Changing one of its settings by hand turns a preset off.
-    await page.get_by_role("radiogroup", name="Button size").get_by_role(
-        "radio", name="Default"
-    ).check()
+    await (
+        page.get_by_role("radiogroup", name="Button size")
+        .get_by_role("radio", name="Default")
+        .check()
+    )
     await playwright_async.expect(motor).to_have_attribute("aria-pressed", "false")
 
 

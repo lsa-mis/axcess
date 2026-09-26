@@ -987,9 +987,7 @@ async def test_report_crumb_returns_to_the_searched_list(
     assert parse_qs(urlparse(page.url).query)["q"] == [query]
 
 
-async def test_first_report_has_no_compare_tab(
-    live_server: tuple[str, int], new_page: Any
-) -> None:
+async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new_page: Any) -> None:
     """A site's first report has nothing to compare with, so no tab offers it.
 
     A saved link to its Compare scans page still opens, with its tabs.
