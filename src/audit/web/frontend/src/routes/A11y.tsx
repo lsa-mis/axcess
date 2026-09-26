@@ -20,6 +20,18 @@ import type {
   Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableEmpty,
+  TableHead,
+  TableRegion,
+  TableStatus,
+} from "../components/table/Table";
+import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -308,7 +320,25 @@ function DrillDownView({
   onStatusFilterChange: (value: FindingStatus | "") => void;
   statusCounts: Record<FindingStatus, number>;
 }) {
-  const paged = usePagedRows(drill, { resetKey: drill.map((f) => f.id).join(",") });
+  // A new SC or status filter starts the table over at page 1.
+  const paged = usePagedRows(drill, { resetKey: `${wcagSc}|${status}` });
+  // The option labels carry the count so the triager can see at a glance
+  // how many findings sit in each bucket before choosing.
+  const filters: FilterGroup[] = [
+    {
+      key: "status",
+      label: "Status",
+      value: status,
+      options: [
+        { value: "", label: "All" },
+        ...STATUS_OPTIONS.map((s) => ({
+          value: s,
+          label: s.replace(/_/g, " "),
+          count: statusCounts[s] ?? 0,
+        })),
+      ],
+    },
+  ];
   return (
     <>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -331,153 +361,133 @@ function DrillDownView({
         </Link>
       </div>
 
-      {/* Status filter, auto-applies on change, URL-persistent. The
-          option labels carry the count so the triager can see at a
-          glance how many findings sit in each bucket before clicking. */}
-      <Card className="mb-3 p-3">
-        <Select
-          stacked
-          label="Status filter"
-          value={status}
-          onChange={(next) => onStatusFilterChange(next as FindingStatus | "")}
-          options={[
-            { value: "", label: "all statuses" },
-            ...STATUS_OPTIONS.map((s) => ({
-              value: s,
-              label: `${s.replace(/_/g, " ")} (${statusCounts[s] ?? 0})`,
-            })),
-          ]}
-        />
-      </Card>
-
-      {loading ? (
-        <div className="text-fg-muted">Loading…</div>
-      ) : drill.length === 0 ? (
-        <Card className="p-4 text-sm text-fg-muted">
-          No drill-down rows
-          {status && (
-            <>
-              {" "}
-              matching status <strong>{status}</strong>.{" "}
-              <button
-                type="button"
-                onClick={() => onStatusFilterChange("")}
-                className="text-umich-blue underline underline-offset-2"
-              >
-                Show all statuses
-              </button>
-            </>
-          )}
-          {!status && <> for this SC.</>}
-        </Card>
-      ) : (
-        <Card className="overflow-hidden">
-          {/* Holds the tallest page's height, so paging never moves the pager. */}
-          <div {...paged.hold}>
-          <table className="w-full text-sm">
-            <caption className="sr-only">
-              DOM-engine findings for SC {wcagSc}, sorted by impact
-            </caption>
-            <thead className="bg-surface-muted text-2xs text-fg-subtle">
-              <tr>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Rule
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Source
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Impact
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Page
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Target selector
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paged.pageRows.map((f) => (
-                <tr key={f.id} className="align-top">
-                  <td className="px-3 py-2">
-                    <code className="font-mono text-xs text-fg">
-                      {f.rule_id}
-                    </code>
-                    {f.help && (
-                      <div className="mt-1 text-xs text-fg-muted">
-                        {f.help.length > 140
-                          ? `${f.help.slice(0, 140)}…`
-                          : f.help}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-fg-muted">
-                    {f.pipeline === "alfa" ? "Siteimprove Alfa" : f.pipeline === "axe" ? "axe-core" : f.pipeline}
-                    {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
-                      <span className="mt-1 block">Needs expert review</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {f.impact ? <ImpactChip value={f.impact} /> : (
-                      <span className="text-fg-subtle">n/a</span>
-                    )}
-                  </td>
-                  <td className="max-w-xs px-3 py-2">
-                    <PageLink
-                      pageId={f.page_id}
-                      scanId={scanId}
-                      pageUrl={f.page_url}
-                      pageTitle={f.page_title}
-                      selector={f.target_selector}
-                      snippet={f.html_snippet}
-                      origin="DOM-engine findings"
-                      context={f.rule_id}
-                      backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <code className="block break-all font-mono text-2xs text-fg">
-                      {(f.target_display || f.target_selector).length > 90
-                        ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
-                        : (f.target_display || f.target_selector)}
-                    </code>
-                    {f.html_snippet && (
-                      <details className="mt-1">
-                        <summary className="cursor-pointer text-2xs text-fg-subtle">
-                          show HTML
-                        </summary>
-                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
-                          {f.html_snippet}
-                        </pre>
-                      </details>
-                    )}
-                    <AlfaEvidenceNote evidence={f} />
-                    <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "DOM-engine findings", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open stored finding evidence</Link>
-                    {f.failure_summary && (
-                      <div className="mt-1 text-2xs text-fg-muted">
-                        {f.failure_summary}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StatusCell
-                      scanId={scanId}
-                      findingId={f.id}
-                      current={f.status}
-                    />
-                  </td>
+      {/* Status filter, auto-applies on change, URL-persistent. The card
+          and its bar stay up when nothing matches, so the filter that
+          emptied the table is still there to undo. */}
+      <Card>
+        <TableBar
+          pager={<TablePagination label="Findings" noun="findings" {...paged} />}
+          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
+        >
+          <FilterMenu
+            groups={filters}
+            onChange={(_key, value) => onStatusFilterChange(value as FindingStatus | "")}
+            onReset={() => onStatusFilterChange("")}
+          />
+        </TableBar>
+        <TableStatus>
+          {loading
+            ? "Loading…"
+            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "finding" : "findings"}, sorted by impact.`}
+        </TableStatus>
+        {loading ? null : drill.length === 0 ? (
+          <TableEmpty>
+            No drill-down rows
+            {status && (
+              <>
+                {" "}
+                matching status <strong>{status}</strong>.{" "}
+                <button
+                  type="button"
+                  onClick={() => onStatusFilterChange("")}
+                  className="text-umich-blue underline underline-offset-2"
+                >
+                  Show all statuses
+                </button>
+              </>
+            )}
+            {!status && <> for this SC.</>}
+          </TableEmpty>
+        ) : (
+          <TableRegion label="DOM-engine findings table" paged={paged}>
+            <Table caption={`DOM-engine findings for SC ${wcagSc}, sorted by impact`}>
+              <TableHead>
+                <tr>
+                  <ColumnHeader>Rule</ColumnHeader>
+                  <ColumnHeader>Source</ColumnHeader>
+                  <ColumnHeader>Impact</ColumnHeader>
+                  <ColumnHeader>Page</ColumnHeader>
+                  <ColumnHeader>Target selector</ColumnHeader>
+                  <ColumnHeader>Status</ColumnHeader>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-          <TablePagination label="Findings" noun="findings" {...paged} />
-        </Card>
-      )}
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((f, index) => (
+                  <Row key={f.id} index={(paged.page - 1) * paged.pageSize + index}>
+                    <Cell>
+                      <code className="font-mono text-xs text-fg">
+                        {f.rule_id}
+                      </code>
+                      {f.help && (
+                        <div className="mt-1 text-xs text-fg-muted">
+                          {f.help.length > 140
+                            ? `${f.help.slice(0, 140)}…`
+                            : f.help}
+                        </div>
+                      )}
+                    </Cell>
+                    <Cell className="text-xs text-fg-muted">
+                      {f.pipeline === "alfa" ? "Siteimprove Alfa" : f.pipeline === "axe" ? "axe-core" : f.pipeline}
+                      {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
+                        <span className="mt-1 block">Needs expert review</span>
+                      )}
+                    </Cell>
+                    <Cell>
+                      {f.impact ? <ImpactChip value={f.impact} /> : (
+                        <span className="text-fg-muted">n/a</span>
+                      )}
+                    </Cell>
+                    <Cell className="max-w-xs">
+                      <PageLink
+                        pageId={f.page_id}
+                        scanId={scanId}
+                        pageUrl={f.page_url}
+                        pageTitle={f.page_title}
+                        selector={f.target_selector}
+                        snippet={f.html_snippet}
+                        origin="DOM-engine findings"
+                        context={f.rule_id}
+                        backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
+                      />
+                    </Cell>
+                    <Cell>
+                      <code className="block break-all font-mono text-2xs text-fg">
+                        {(f.target_display || f.target_selector).length > 90
+                          ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
+                          : (f.target_display || f.target_selector)}
+                      </code>
+                      {f.html_snippet && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-2xs text-fg-muted">
+                            show HTML
+                          </summary>
+                          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
+                            {f.html_snippet}
+                          </pre>
+                        </details>
+                      )}
+                      <AlfaEvidenceNote evidence={f} />
+                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "DOM-engine findings", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open stored finding evidence</Link>
+                      {f.failure_summary && (
+                        <div className="mt-1 text-2xs text-fg-muted">
+                          {f.failure_summary}
+                        </div>
+                      )}
+                    </Cell>
+                    <Cell>
+                      <StatusCell
+                        scanId={scanId}
+                        findingId={f.id}
+                        current={f.status}
+                      />
+                    </Cell>
+                  </Row>
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
+        )}
+      </Card>
     </>
   );
 }
@@ -537,7 +547,7 @@ function StatusCell({
           Save failed
         </span>
       ) : mutation.isSuccess ? (
-        <span className="text-2xs text-fg-subtle" role="status">
+        <span className="text-2xs text-fg-muted" role="status">
           Saved
         </span>
       ) : null}

@@ -15,9 +15,59 @@ type Item = {
 };
 
 /**
+ * Every place the sidebar links to, plus the New scan action. Keep in step
+ * with NAV and FOOT_PLACES in AppShell: a page missing here cannot be found
+ * by search at all.
+ *
+ * ``terms`` are what a reader might type instead of the page name. For
+ * Settings they are its setting labels (copied, not imported: importing
+ * from routes/Settings would pull that lazy route into the entry bundle), so
+ * "dark" or "font" finds the page that holds them.
+ */
+const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: readonly string[] }> = [
+  { id: "nav-reports", label: "Reports", to: "/scans" },
+  { id: "nav-new", label: "New scan", to: "/scans/new" },
+  {
+    id: "nav-about",
+    label: "About Axcess",
+    to: "/about",
+    terms: ["Help", "Version", "Documentation", "Privacy and data", "FAQ", "Download desktop builds"],
+  },
+  {
+    id: "nav-settings",
+    label: "Settings",
+    to: "/settings",
+    terms: [
+      "Preferences",
+      "Theme",
+      "Dark mode",
+      "Text size",
+      "Link underlines",
+      "Contrast",
+      "Color vision",
+      "Font",
+      "Text spacing",
+      "Extra space in long text",
+      "Reading guide",
+      "Focus outline",
+      "Button size",
+      "Table spacing",
+      "Status updates",
+      "Help text",
+      "Keyboard shortcuts",
+      "Message timing",
+      "Ask before deleting",
+      "Animations",
+      "Rows per page",
+      "Sidebar",
+    ],
+  },
+];
+
+/**
  * Cmd/Ctrl+K command palette, search everything across the app.
  *
- * Quick actions (Dashboard, New scan, Reports, Product Roadmap), every report (by site
+ * Every place (Reports, New scan, About, Settings), every report (by site
  * URL), and, when you're inside a report, every issue in it. Fully keyboard
  * driven: type to filter, ↑/↓ to move, ↵ to open, Esc to close. Screen-reader
  * friendly: a modal dialog with a labelled dialog/listbox.
@@ -66,22 +116,26 @@ export default function CommandPalette({
     const q = query.trim().toLowerCase();
     const out: Item[] = [];
 
-    const actions: Item[] = [
-      { id: "nav-dashboard", group: "Go to", label: "Dashboard", to: "/" },
-      { id: "nav-reports", group: "Go to", label: "Reports", to: "/scans" },
-      { id: "nav-new", group: "Go to", label: "New scan", to: "/scans/new" },
-      { id: "nav-tracking", group: "Go to", label: "Coverage & tracking", to: "/tracking" },
-    ];
-    for (const a of actions) if (!q || a.label.toLowerCase().includes(q)) out.push(a);
+    for (const place of PLACES) {
+      const item = { id: place.id, group: "Go to", label: place.label, to: place.to };
+      if (!q || place.label.toLowerCase().includes(q)) {
+        out.push(item);
+        continue;
+      }
+      // Matched on a term, not the name: say which, so "dark" landing on
+      // "Settings" is not a mystery.
+      const hits = (place.terms ?? []).filter((term) => term.toLowerCase().includes(q));
+      if (hits.length) out.push({ ...item, sublabel: hits.slice(0, 3).join(", ") });
+    }
 
     for (const s of scansQuery.data ?? []) {
       const label = siteLabel(s.seed_url);
-      if (!q || label.toLowerCase().includes(q) || `#${s.id}`.includes(q) || String(s.id).includes(q)) {
+      if (!q || label.toLowerCase().includes(q) || `#${s.id}`.includes(q) || `scan ${s.id}`.includes(q) || String(s.id).includes(q)) {
         out.push({
           id: `scan-${s.id}`,
           group: "Reports",
           label,
-          sublabel: `#${s.id} · ${s.status}`,
+          sublabel: `scan ${s.id} · ${s.status}`,
           to: `/scans/${s.id}`,
         });
       }

@@ -18,6 +18,7 @@ from typing import Any
 
 from audit.analyzer.alfa_evidence import normalize_finding
 from audit.synthesizer.alt_compare import AltAdequacy, compare, worst
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion, stored_wcag_version
 
 DEFAULT_UI_BASE = "http://127.0.0.1:8765"
 
@@ -138,6 +139,9 @@ class ExportScan:
     # scan's stored config). Drives the axe rule set; "AA" for older scans
     # that predate the setting.
     axe_level: str = "AA"
+    # The WCAG version that level was read against. A scan stored before
+    # the setting existed ran 2.2 (see ``audit.wcag_version``).
+    wcag_version: WcagVersion = LEGACY_WCAG_VERSION
 
 
 def collect_scan(
@@ -167,6 +171,7 @@ def collect_scan(
             axe_level = str(cfg["axe_level"]).upper()
     except (json.JSONDecodeError, TypeError):
         pass
+    wcag_version = stored_wcag_version(scan_row["config_json"])
 
     findings = _collect_findings(conn, scan_id, ui_base_url=ui_base_url)
     by_severity: dict[str, int] = {"critical": 0, "major": 0, "minor": 0, "info": 0}
@@ -203,6 +208,7 @@ def collect_scan(
         alfa_cant_tell_total=int(scan_row["alfa_cant_tell_total"] or 0),
         by_wcag_level=by_wcag_level,
         axe_level=axe_level,
+        wcag_version=wcag_version,
     )
 
 

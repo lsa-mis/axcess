@@ -73,6 +73,7 @@ from audit.exports.audit_report import (
     load_report_rules,
 )
 from audit.exports.collector import ExportScan
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
 from audit.logging import get_logger
 from audit.web import issues
 
@@ -122,20 +123,26 @@ _OWNER_DISPLAY = {
     "content": "Content author",
 }
 
-_GUIDANCE = (
+_GUIDANCE_TEMPLATE = (
     "Prioritization Guidance, Start with rows whose Evidence decision is "
     "Likely Barrier. Rows marked Expert Review require a human decision before "
     "they are described as barriers; Informational rows are not worklist items. "
     "Within the Likely Barrier lane, fix issues in conformance-level order. "
     "Level A flags the most significant barriers that block people with "
     "disabilities outright; remediate these first. Level AA issues are "
-    "required for WCAG 2.2 AA conformance (the standard most policies and "
+    "required for WCAG {wcag_version} AA conformance (the standard most policies and "
     "laws reference) and should follow. Items marked S are best-practice "
     "recommendations that go beyond the success criteria, address them "
     "once the A and AA issues are resolved. Within a level, work top-down: "
     "the table is sorted by Axcess's priority score (occurrence count, "
     "impact, and reach)."
 )
+
+
+def _guidance(wcag_version: str) -> str:
+    """The prioritization guidance, naming the standard the scan used."""
+    return _GUIDANCE_TEMPLATE.replace("{wcag_version}", wcag_version)
+
 
 # The index: one row per issue, sortable, each linking to that issue's tab.
 _ISSUE_HEADERS = (
@@ -499,10 +506,10 @@ def _build_issue_index_sheet(
 
     meta = [
         ("Page", scan.seed_url or "n/a"),
-        ("Compliance Standard", f"WCAG 2.2 Level {scan.axe_level}"),
+        ("Compliance Standard", f"WCAG {scan.wcag_version} Level {scan.axe_level}"),
         ("Audit Date", audit_date),
         ("Auditor", auditor),
-        ("Prioritization Guidance", _GUIDANCE),
+        ("Prioritization Guidance", _guidance(scan.wcag_version)),
     ]
     for r, (label, value) in enumerate(meta, start=1):
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ncols)
@@ -937,7 +944,7 @@ def _build_summary_sheet(
     if scan.seed_url.startswith(("https://", "http://")):
         seed_url_cell.hyperlink = scan.seed_url
         seed_url_cell.style = "Hyperlink"
-    metric("Audited against", f"WCAG 2.2 Level {scan.axe_level}")
+    metric("Audited against", f"WCAG {scan.wcag_version} Level {scan.axe_level}")
     metric("Pages crawled", scan.page_count)
     metric("Audit date", audit_date)
     r += 1
@@ -1044,12 +1051,21 @@ def _build_hotspots_sheet(ws: Worksheet, cards: list[AuditCard]) -> None:
             ws.cell(row=row_number, column=1).style = "Hyperlink"
 
 
+_CLICK_THROUGH_HEADERS = (
+    "Page",
+    "Controls found",
+    "Controls operated",
+    CLICK_THROUGH_STATES_LABEL,
+    "Why it stopped",
+)
+
+
 def _build_dom_states_sheet(
     ws: Worksheet,
     conn: sqlite3.Connection,
     scan: ExportScan,
 ) -> None:
-    """Per-page ledger for the click-through probe.
+    """Per-page ledger for Click-Through (the interaction probe).
 
     The operational question this answers is not "how many states" but "where
     was the sweep incomplete, and why", so ``Controls operated`` sits next to
@@ -1061,13 +1077,13 @@ def _build_dom_states_sheet(
     if not coverage.enabled:
         _styled_table(
             ws,
-            title="DOM states, content behind a click",
+            title=f"{CLICK_THROUGH}, content behind a click",
             subtitle=(
-                "Click-through DOM state discovery was turned off for this scan. "
+                f"{CLICK_THROUGH} was turned off for this scan. "
                 "Content that appears only after operating a menu, tab, or dialog "
                 "was not tested and needs manual review."
             ),
-            headers=("Page", "Controls found", "Controls operated", "States", "Why it stopped"),
+            headers=_CLICK_THROUGH_HEADERS,
             rows=[],
             widths=(58.0, 16.0, 18.0, 12.0, 44.0),
             center_cols=(2, 3, 4),
@@ -1096,9 +1112,9 @@ def _build_dom_states_sheet(
         subtitle += "  " + "  ".join(coverage.caveats)
     _styled_table(
         ws,
-        title="DOM states, content behind a click",
+        title=f"{CLICK_THROUGH}, content behind a click",
         subtitle=subtitle,
-        headers=("Page", "Controls found", "Controls operated", "States", "Why it stopped"),
+        headers=_CLICK_THROUGH_HEADERS,
         rows=rows,
         widths=(58.0, 16.0, 18.0, 12.0, 44.0),
         center_cols=(2, 3, 4),
@@ -1440,7 +1456,7 @@ def render_xlsx(
         _build_pooled_instances_sheet(wb.create_sheet(_POOLED_SHEET), pooled)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
     _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
-    _build_dom_states_sheet(wb.create_sheet("DOM States"), conn, scan)
+    _build_dom_states_sheet(wb.create_sheet(CLICK_THROUGH), conn, scan)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
     _build_coverage_sheet(wb.create_sheet("Coverage & Method"))
     manual_checks = evaluation.list_manual_checks(conn, scan.id)

@@ -131,7 +131,7 @@ function LocalLoginHandoff({
       {showSteps && <ProtectedScanSteps current={stage} className="mb-5" />}
       <Card className="max-w-3xl p-6 [overflow-anchor:none]">
         <p className="text-xs font-semibold text-umich-blue">
-          Login scan #{scanId}
+          Login scan {scanId}
         </p>
         <h2 className="mt-1 text-xl font-semibold text-fg" aria-live="polite">
           {copy[state].title}
@@ -309,12 +309,16 @@ function LocalLoginHandoff({
             Open report
           </Button>
         )}
+        {/* Back to the form with this scan's settings filled in (`from=`),
+            so a failed or stopped sign-in does not cost the reader every
+            choice they made. Sign-in and the confirmations are never
+            saved, so those are asked for again. */}
         {TERMINAL.has(state) && state !== "completed" && (
           <Button
             className="mt-5"
-            onClick={() => navigate("/scans/new?mode=login", { replace: true })}
+            onClick={() => navigate(`/scans/new?mode=login&from=${scanId}`, { replace: true })}
           >
-            Start a new login scan
+            Start again with these settings
           </Button>
         )}
       </Card>

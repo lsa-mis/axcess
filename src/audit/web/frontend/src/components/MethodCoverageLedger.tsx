@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Check, ChevronRight, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
+import { CLICK_THROUGH_STATE, CLICK_THROUGH_STATES } from "../lib/labels";
 import { Card } from "./ui";
 import type {
   IssueRow,
@@ -54,14 +55,36 @@ export default function MethodCoverageLedger({
   scanId,
   methods,
   rows,
+  embedded = false,
   className = "",
 }: {
   scanId: number;
   methods: ScanMethodCoverage[];
   rows: IssueRow[] | undefined;
+  /**
+   * Inside a disclosure that already names the ledger and shows the count
+   * (the report's notes accordion): drop the card and its heading, which
+   * would only repeat the disclosure's own, and keep the list.
+   */
+  embedded?: boolean;
   className?: string;
 }) {
   const ran = methodsRan(methods);
+
+  if (embedded) {
+    return (
+      <div className={className}>
+        <p className="text-sm text-fg-muted">
+          Open a row for what each check does and does not prove.
+        </p>
+        <ul className="mt-3 overflow-hidden rounded-xs border border-border">
+          {methods.map((method) => (
+            <MethodRow key={method.key} scanId={scanId} method={method} rows={rows} />
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <Card className={cn("overflow-hidden", className)}>
@@ -164,7 +187,7 @@ function MethodRow({
  * "and this is what we found" for one method.
  *
  * Detector methods answer with their own issue groups. ``interaction`` is the
- * exception worth spelling out: clicking through DOM states does not detect
+ * exception worth spelling out: Click-Through does not detect
  * anything itself, it just reaches markup that would otherwise be invisible to
  * the scan, so what it "found" is the evidence that only exists after a
  * control was used. Saying "none" there is a real result, not a gap, it means
@@ -182,11 +205,11 @@ function findingsFor(
     );
     return revealed.length === 0
       ? {
-          text: "Found: no issue in this report depends on a state that only appears after a click.",
+          text: `Found: no issue in this report depends on a ${CLICK_THROUGH_STATE}.`,
           count: 0,
         }
       : {
-          text: `Found: ${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence that only appears after a control is used.`,
+          text: `Found: ${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence in ${CLICK_THROUGH_STATES}.`,
           count: revealed.length,
         };
   }

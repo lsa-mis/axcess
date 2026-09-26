@@ -93,7 +93,7 @@ requires manual reproduction.
 | Browser rendering | scan coverage counters | Executes JavaScript and exposes the live DOM for interaction checks. | A rendered page is not itself an accessibility pass. |
 | axe-core 4.10.2 | `axe` | Deterministic rendered-DOM rules at the selected WCAG level. | High-confidence rule evidence, but it covers only machine-testable conditions. |
 | Siteimprove Alfa | `alfa` | An independent ACT-rule evaluation with failed and cannot-tell outcomes. | Select axe, Alfa, or both. Alfa evidence is stored separately and does not inflate matrix counts simply because two engines overlap. |
-| Click-through [DOM states](./glossary.md#dom-state) | `axe` rows with `revealed_by`; per-page ledger in `scan_interaction_runs` | Opens menus, tabs, dialogs, and other controls on each rendered page, then re-runs axe-core on each new state a click reveals. | On by default; needs axe-core and browser rendering. Bounded per page (100 clicks, 20 per repeated control shape, depth 5, 120 seconds) and never operates controls named for destructive actions. Hover-only content, gestures, and states with no DOM change remain manual. |
+| [Click-Through](./glossary.md#click-through) | `axe` rows with `revealed_by`; per-page ledger in `scan_interaction_runs` | Opens menus, tabs, dialogs, and other controls on each rendered page, then re-runs axe-core on each new state a click reveals. | On by default; needs axe-core and browser rendering. Bounded per page (100 clicks, 20 per repeated control shape, depth 5, 120 seconds) and never operates controls named for destructive actions. Hover-only content, gestures, and states with no DOM change remain manual. |
 | Keyboard probe | `keyboard` | Tab/Shift+Tab exit evidence and Escape behavior for likely traps. | Conservative review leads; full keyboard operability is manual. |
 | Responsive and zoom probe | `responsive` | 320 CSS-pixel reflow, approximately 200% text zoom, and text-spacing overrides. | Geometry identifies likely clipping/loss; an expert determines user impact. |
 | Focus probe | `focus` | Positive `tabindex` and focus obscured by fixed/sticky overlays. | Full focus order and interaction-created overlays remain manual. |
@@ -108,7 +108,7 @@ its rule engine. Under Advanced settings you can:
   installed);
 - use **Fast crawl without a browser** with Alfa as the only engine;
 - show the scanning browser window;
-- turn the image and click-through layers on or off.
+- turn the image and Click-Through layers on or off.
 
 Every report shows the number of pages or images actually checked, not merely
 that a feature was selected.
@@ -229,7 +229,7 @@ Implementation map:
 | Semantic analyzers | `src/audit/analyzer/semantic/registry.py` and `analyzers/` |
 | axe and Alfa integration | `src/audit/analyzer/axe.py`, `src/audit/analyzer/alfa.py`, `src/audit/alfa_runner/` |
 | Browser probes | `src/audit/analyzer/keyboard/`, `responsive/`, `focus/`, and `visual/` |
-| Click-through DOM states | `src/audit/analyzer/interaction/`, migrations `0026_interaction_runs.sql` and `0028_page_dom_states.sql` |
+| Click-Through | `src/audit/analyzer/interaction/`, migrations `0026_interaction_runs.sql` and `0028_page_dom_states.sql` |
 | Durable method counters | migration `0020_method_coverage.sql` and `audit.web.server._methods_used` |
 | Desktop dependency gate | `src/audit/desktop_server.py` and `desktop/scripts/verify-packaged.cjs` |
 | False-discovery-rate corpus | `tests/quality/corpora/detection_precision_v1.json` |

@@ -51,7 +51,10 @@ export function boundedJson(value, maximum = MAX_EVIDENCE_BYTES) {
   return JSON.stringify(result);
 }
 
-export function toFinding(outcome) {
+// ``version`` is the WCAG version the scan was audited against. It decides
+// which version's level a criterion is reported at; callers that predate the
+// setting ran WCAG 2.2.
+export function toFinding(outcome, version = "2.2") {
   const rule = outcome.rule;
   const requirements = rule.toJSON().requirements || [];
   const criteria = requirements.filter((requirement) => requirement?.type === "criterion");
@@ -74,7 +77,7 @@ export function toFinding(outcome) {
     mode: outcome.mode,
     wcag_sc: primary?.chapter || null,
     wcag_scs: criteria.map((criterion) => String(criterion.chapter || "")).filter(Boolean),
-    wcag_level: ruleCriteria[0] ? criterionLevel(ruleCriteria[0]) : null,
+    wcag_level: ruleCriteria[0] ? criterionLevel(ruleCriteria[0], version) : null,
     help: primary ? `WCAG ${primary.chapter}: ${primary.title || "Alfa ACT rule"}` : "Alfa ACT rule requires expert review",
     failure_summary: truncate(summary, 2_000),
     target_hint: targetHint,
@@ -87,7 +90,7 @@ export function toFinding(outcome) {
   };
 }
 
-export function collectOutcomes(outcomes) {
+export function collectOutcomes(outcomes, version = "2.2") {
   const counts = { failed: 0, cantTell: 0, passed: 0, inapplicable: 0 };
   const failed = [], review = [];
   for (const outcome of outcomes) {
@@ -96,7 +99,7 @@ export function collectOutcomes(outcomes) {
     else if (Outcome.isPassed(outcome)) counts.passed++;
     else counts.inapplicable++;
   }
-  const findings = [...failed, ...review].slice(0, MAX_FINDINGS).map(toFinding);
+  const findings = [...failed, ...review].slice(0, MAX_FINDINGS).map((outcome) => toFinding(outcome, version));
   return { outcome_counts: counts, findings, findings_truncated: counts.failed + counts.cantTell > findings.length };
 }
 
@@ -139,9 +142,9 @@ function boundedTargetJson(target, state) {
   return JSON.stringify(target);
 }
 
-function criterionLevel(requirement) {
+function criterionLevel(requirement, version) {
   let found = null;
-  requirement.level?.some((value, versions) => { if ([...versions].includes("2.2")) found = value; });
+  requirement.level?.some((value, versions) => { if ([...versions].includes(version)) found = value; });
   return found;
 }
 function truncate(value, maximum) {

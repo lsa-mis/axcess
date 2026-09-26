@@ -28,6 +28,7 @@ from typing import Any, Literal
 
 from audit.analyzer.alfa_evidence import bounded_evidence_json, normalize_finding
 from audit.logging import get_logger
+from audit.wcag_version import LEGACY_WCAG_VERSION, is_wcag_version
 
 log = get_logger(__name__)
 
@@ -140,6 +141,7 @@ class AlfaAnalyzer:
         url: str,
         *,
         level: str,
+        version: str = LEGACY_WCAG_VERSION,
         storage_state: Mapping[str, Any] | None = None,
         allowed_origins: Sequence[str] = (),
         target_origins: Sequence[str] = (),
@@ -150,9 +152,14 @@ class AlfaAnalyzer:
         The adapter is intentionally serialized by default: Alfa's browser
         capture is a second snapshot of the page, and one local Chromium at a
         time protects laptop resources while Axcess' own crawler workers run.
+
+        ``version`` is the WCAG version ``level`` is read against ("2.1" or
+        "2.2"). Alfa selects its ACT rules by conformance under that version.
         """
         if level not in {"A", "AA", "AAA"}:
             raise AlfaError(f"Unsupported Alfa WCAG level: {level}")
+        if not is_wcag_version(version):
+            raise AlfaError(f"Unsupported Alfa WCAG version: {version}")
         state = availability()
         if not state.available:
             raise AlfaError(state.reason or "Alfa is unavailable.")
@@ -193,6 +200,7 @@ class AlfaAnalyzer:
         runner_input: dict[str, Any] = {
             "url": url,
             "level": level,
+            "version": version,
             "user_agent": self._user_agent,
         }
         if storage_state is not None:

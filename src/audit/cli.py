@@ -22,6 +22,7 @@ from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.exports.xlsx_export import render_xlsx
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATE
 from audit.protected.companion import (
     CompanionCrawlStats,
     CompanionError,
@@ -35,6 +36,7 @@ from audit.protected.vaults import (
     resolve_configured_protected_vault,
 )
 from audit.synthesizer.findings import synthesize_findings
+from audit.wcag_version import DEFAULT_WCAG_VERSION, WCAG_VERSIONS, WcagVersion, is_wcag_version
 
 app = typer.Typer(
     help=(
@@ -227,6 +229,14 @@ def protected_maintenance() -> None:
     )
 
 
+def _wcag_version_option(value: str) -> WcagVersion:
+    """Accept exactly "2.1" or "2.2" for ``--wcag-version``."""
+    value = value.strip()
+    if not is_wcag_version(value):
+        raise typer.BadParameter(f"must be one of {', '.join(WCAG_VERSIONS)}.")
+    return value
+
+
 @app.command()
 def crawl(
     url: Annotated[str, typer.Argument(help="Seed URL to crawl.")],
@@ -316,6 +326,17 @@ def crawl(
             help="WCAG level filter for axe rules: A, AA (default), or AAA.",
         ),
     ] = "AA",
+    wcag_version: Annotated[
+        str,
+        typer.Option(
+            "--wcag-version",
+            help=(
+                "WCAG version the level is checked against: 2.1 (default, the "
+                "current U-M standard) or 2.2. Applies to axe-core and Alfa."
+            ),
+            callback=_wcag_version_option,
+        ),
+    ] = DEFAULT_WCAG_VERSION,
     skip_semantic: Annotated[
         bool,
         typer.Option(
@@ -408,12 +429,13 @@ def crawl(
         typer.Option(
             "--skip-interaction",
             help=(
-                "Skip operating each page's controls (menus, tabs, "
-                "disclosure buttons). On by default: most of an application "
-                "does not exist until something is clicked, so a "
-                "load-state-only audit covers a fraction of what a user "
-                "meets. Skipping saves one axe run per revealed state at "
-                "the cost of every defect that is only reachable that way."
+                f"Skip {CLICK_THROUGH}, which operates each page's controls "
+                "(menus, tabs, dialogs, disclosure buttons) and re-checks what "
+                "they reveal. On by default: most of an application does not "
+                "exist until something is clicked, so a load-state-only audit "
+                "covers a fraction of what a user meets. Skipping saves one axe "
+                f"run per {CLICK_THROUGH_STATE} at the cost of every defect "
+                "that is only reachable that way."
             ),
         ),
     ] = False,
@@ -517,6 +539,7 @@ def crawl(
             js_eager=not static_only,
             axe_enabled=not skip_axe,
             axe_level=axe_level.upper(),
+            wcag_version=_wcag_version_option(wcag_version),
             semantic_enabled=not skip_semantic,
             keyboard_probe_enabled=not skip_keyboard,
             keyboard_probe_max_focusable=keyboard_max_focusable,

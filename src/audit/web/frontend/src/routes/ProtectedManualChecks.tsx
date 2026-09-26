@@ -114,7 +114,7 @@ export default function ProtectedManualChecksRoute() {
       <PageHeader
         crumbs={[
           { label: "Reports", to: "/scans" },
-          { label: `Protected scan #${id}`, to: `/scans/${id}/protected` },
+          { label: `Protected scan ${id}`, to: `/scans/${id}/protected` },
           { label: "Manual authentication review" },
         ]}
         title="Protected manual checks"

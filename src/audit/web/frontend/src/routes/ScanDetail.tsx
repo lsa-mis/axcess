@@ -15,7 +15,7 @@
  * records other screens are already showing.
  */
 import { Navigate, useNavigate, useParams } from "react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Clock3,
@@ -34,6 +34,8 @@ import type {
   ScanMethodState,
   ScanProgress,
 } from "../api/types";
+import { RETRY } from "../components/newScan/copy";
+import { PUBLIC_DEFAULTS, quickRetrySettings } from "../components/newScan/scanPolicy";
 import { BlockedScanNotice } from "../components/ReportSummary";
 import {
   Button,
@@ -68,41 +70,38 @@ export default function ScanDetailRoute() {
     mutationFn: () => api.cancelScan(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["scan", id] }),
   });
-  // "Retry" re-submits the same seed with a fixed balanced profile rather
-  // than the settings the original scan used: this button exists for a scan
-  // that failed, and repeating a configuration that just failed is rarely
-  // what the operator wants. The expensive optional passes (VLM, semantic,
-  // interaction, visual) are off so the retry finishes quickly enough to
-  // tell them whether the site is reachable at all.
+  // Two ways back from a scan that failed or was stopped, each saying what
+  // it does ("Retry with balanced settings" left readers asking whether
+  // their settings were kept; they were not):
   //
+  // - "Edit settings and retry" opens New scan with this scan's own
+  //   settings filled in (`from=`), the path that keeps what they chose.
+  // - "Quick retry" re-submits the same address at once with the default
+  //   profile and Click-Through off (`quickRetrySettings`), which finishes
+  //   quickly enough to show whether the site can be scanned at all. It
+  //   keeps the WCAG version the report was audited against. A login scan
+  //   has no quick retry: it cannot run without someone signing in.
+  //
+  // The settings query also says which tab the scan belongs to. A report it
+  // cannot describe (a protected report, an older row) still gets an edit
+  // link, prefilled with the address only.
+  const previousSettings = useQuery({
+    queryKey: ["scan-settings", id],
+    queryFn: () => api.getScanSettings(id),
+    enabled: Boolean(data) && data?.status !== "running" && data?.status !== "completed",
+    retry: false,
+    staleTime: Infinity,
+  });
+  const loginScan = previousSettings.data?.mode === "login";
   // A retry may produce a new scan id. When it does, navigate to it,
   // replacing history so Back does not return to a report that is now
   // superseded.
-  const retryBalanced = useMutation({
+  const quickRetry = useMutation({
     mutationFn: () =>
-      api.createScan({
-        url: data?.seed_url ?? "",
-        max_pages: 2500,
-        max_depth: 10,
-        rps: 2,
-        workers: 8,
-        include_subdomain: false,
-        whole_host: false,
-        ignore_robots: false,
-        skip_ocr: false,
-        skip_vlm: true,
-        static_only: false,
-        show_browser: false,
-        scan_engine: "axe",
-        skip_interaction: true,
-        skip_keyboard: false,
-        skip_responsive: false,
-        skip_semantic: true,
-        skip_focus: false,
-        skip_visual: true,
-        axe_level: "AA",
-        skip_rendered_storage: false,
-      }),
+      api.createScan(
+        // A report loaded without a version falls back to the new-scan default.
+        quickRetrySettings(data?.seed_url ?? "", data?.wcag_version ?? PUBLIC_DEFAULTS.wcag_version),
+      ),
     onSuccess: async ({ scan_id }) => {
       setLiveUpdates(true);
       qc.removeQueries({ queryKey: ["issues", id] });
@@ -143,7 +142,7 @@ export default function ScanDetailRoute() {
 
   return (
     <>
-      <PageHeader title={`Scan #${data.id}`} subtitle={data.seed_url} />
+      <PageHeader title={`Scan ${data.id}`} subtitle={data.seed_url} />
 
       {data.blocked && (
         <BlockedScanNotice scanId={data.id} blocked={data.blocked} />
@@ -180,37 +179,58 @@ export default function ScanDetailRoute() {
             <strong>Why it failed:</strong> {data.failure_reason}
           </p>
         )}
-        {retryBalanced.error && (
+        {quickRetry.error && (
           <p className="mt-3 text-sm text-sev-critical" role="alert">
-            Couldn&rsquo;t restart this scan: {retryBalanced.error.message}
+            Couldn&rsquo;t restart this scan: {quickRetry.error.message}
           </p>
         )}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => retryBalanced.mutate()}
-            disabled={retryBalanced.isPending}
-          >
-            {retryBalanced.isPending
-              ? "Restarting scan…"
-              : "Retry with balanced settings"}
-          </Button>
-          <LinkButton
-            to={`/scans/new?url=${encodeURIComponent(data.seed_url)}`}
-            variant="secondary"
-          >
-            Review settings first
-          </LinkButton>
+        {/* Each retry says in its own description what it keeps, so the
+            choice is made on the words and not on a guess at "balanced". */}
+        <ul className="mt-4 flex flex-col gap-4">
+          <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
+            <LinkButton
+              to={
+                previousSettings.data
+                  ? `/scans/new?${loginScan ? "mode=login&" : ""}from=${data.id}`
+                  : `/scans/new?url=${encodeURIComponent(data.seed_url)}`
+              }
+              variant="primary"
+              aria-describedby="retry-edit-hint"
+              className="shrink-0 sm:w-56"
+            >
+              {RETRY.edit}
+            </LinkButton>
+            <p id="retry-edit-hint" className="text-sm text-fg-muted sm:pt-2">
+              {RETRY.editHint}
+            </p>
+          </li>
+          {!loginScan && (
+            <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
+              <Button
+                type="button"
+                onClick={() => quickRetry.mutate()}
+                disabled={quickRetry.isPending}
+                aria-describedby="retry-quick-hint"
+                className="shrink-0 sm:w-56"
+              >
+                {quickRetry.isPending ? RETRY.quickPending : RETRY.quick}
+              </Button>
+              <p id="retry-quick-hint" className="text-sm text-fg-muted sm:pt-2">
+                {RETRY.quickHint}
+              </p>
+            </li>
+          )}
           {/* Without this the page said evidence "remains available" and
               then offered no way to reach it, so the only route onward was
               to run the scan again. */}
           {data.page_count > 0 && (
-            <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
-              Review what was collected
-            </LinkButton>
+            <li>
+              <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
+                Review what was collected
+              </LinkButton>
+            </li>
           )}
-        </div>
+        </ul>
       </Card>
     </>
   );

@@ -16,7 +16,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
 - [Recording decisions](#recording-decisions)
 - [Exports](#exports)
-- [Verify changes after a fix](#verify-changes-after-a-fix)
+- [Compare scans after a fix](#compare-scans-after-a-fix)
 - [Acting on findings](#acting-on-findings)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
 
@@ -42,26 +42,26 @@ On the **Issues** tab, select an issue's name to open its
 | You need | Where it is |
 | --- | --- |
 | The page URL | **Pages with this issue** lists each page's title and URL, with **Open live page**. |
-| The selector and code | **Flagged element** shows up to three sample locations, each with its selector and highlighted HTML. A page's **Stored evidence** lists every result on that page, with **Selector for developers**. |
-| An image with text in it | For an [image of text](glossary.md#image-of-text), **Flagged element** names the image by its position on the page, such as Image occurrence 2 (above the fold), with its alt text if it has any. It has no selector or HTML. The page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
+| The selector and code | A page's **Stored evidence** lists every result on that page, with **Selector for developers**. |
+| An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Stored evidence** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
 | A screenshot | **Issue screenshots** links to circled screenshots when the scan captured them. Siteimprove Alfa results have none, because Alfa runs in a separate browser session. |
 | The page inspector | Select a page title in **Pages with this issue**. The inspector opens the stored page (or a fresh render if none was stored) with scripts off and the flagged elements highlighted, and **DOM source** shows the markup. |
 
-Open **Why it matters, and how to fix it**, which starts collapsed. For
-Needs review it is called **Why it matters, and what to check**. Make the
-changes in **Expected behavior**, check them against **Done when**, and confirm
-them with **How to verify** (**What to check to confirm** for Needs review).
+The record's sections all start collapsed. Open **How to fix it** for the
+steps and **Done when**, then **Why it matters, and how to verify the fix** for
+**How to verify**. For Needs review, open **How to confirm it** first; the fix
+is under **Expected behavior** in **Why it matters, and how to fix it if
+confirmed**.
 
-**Rule docs** sits at the top of the record, beside the evidence confidence
-chip, and appears only when the rule has its own documentation. Start there
-when the record has no written guidance.
+**Rule docs** sits in **What it is**, beside the evidence confidence, and
+appears only when the rule has its own documentation. Start there when the
+record has no written guidance.
 
 To reproduce a problem that appears only after a click:
 
-1. Find the control's name under the page name in **Flagged element**, such
-   as After clicking “Menu”. The note names only the last control used. For a
-   page not among those samples, look in that page's **Stored evidence**,
-   which groups results under headings such as After clicking “Menu”.
+1. Open the page's **Stored evidence**, which groups results under headings
+   such as After clicking “Menu”. The heading names only the last control
+   used.
 2. Select the page title in **Pages with this issue** to open the inspector,
    then open **Page state**. The entry with a count, such as
    After clicking “Menu” → “Settings” (2), lists every control in order and
@@ -101,10 +101,10 @@ changes** tabs. Its header holds the **Export** menu and **Open Issue Groups**.
 | Pages Tested | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Its hint shows the [crawl error](glossary.md#pages-not-reached) count, and most of those pages are already in this number. |
 | Issues Found | [Occurrences](glossary.md#occurrence) in every issue group, including Needs review and Informational, so it is not a count of confirmed problems. |
 | Issue Groups | Rows in the Issues table, across all three report groups. |
-| DOM States Found | [DOM states](glossary.md#dom-state) the scan reached by operating controls. |
+| Views opened by clicking | [Views](glossary.md#click-through) the scan reached by opening menus, tabs, dialogs, and other controls. |
 
 **What this scan actually checked** lists each method, such as axe-core and
-Click Through DOM States. Each row shows a result and one of these states: Not
+Click-Through. Each row shows a result and one of these states: Not
 selected, Waiting, Checking, Ran, Partly ran, Did not run, or Not recorded.
 Open a row for what it found and what it cannot prove. The focus and visual
 checks have no row here.
@@ -126,8 +126,6 @@ review, not a conformance verdict." The columns, in order:
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "n/a" for Informational rows. |
 | Pages | How many pages have it, linked to the list of those pages. |
 | Occurrences | How many places it appears. |
-| Difficulty | Beginner, Intermediate, or Advanced when the rule has an estimate; "n/a" otherwise and for Informational rows. |
-| Responsibility | Who usually makes the fix, such as Dev, Editor, or Designer; "n/a" for Informational rows. |
 | About | A short summary, described below. |
 
 Filter with the **Search issues** box (an issue name or WCAG criterion number), **Level** (A,
@@ -144,30 +142,33 @@ until the expert decision is documented."
 
 ## The full evidence record
 
-1. **Report group card**: the group, an evidence confidence chip (high,
-   medium, or low), and **Rule docs**. A one-line evidence summary follows,
-   such as "Deterministic axe-core rule failure; verify after remediation." The
-   card calls Needs review "Needs confirmation" (the dashboard says "Review
-   leads").
-2. **Facts**: Criterion level, Priority, Pages affected, Occurrences,
-   Difficulty, Responsibility, and Abilities affected.
-3. **Pages with this issue**: page title (opens the inspector), Page URL,
+The first three sections start collapsed; select a section's name to open
+it.
+
+1. **What it is** (**Evidence summary** for Informational): the group, its
+   evidence confidence (high, medium, or low), and **Rule docs**, then a
+   one-line evidence summary, such as "Deterministic axe-core rule failure;
+   verify after remediation." It calls Needs review "Needs confirmation" (the
+   dashboard says "Review leads"). Then the facts (Criterion level, Priority,
+   Pages affected, Occurrences, and Abilities affected) and the rule's
+   description.
+2. **How to fix it**, with **Done when** (for Needs review, **How to confirm
+   it**).
+3. **Why it matters, and how to verify the fix** (for Needs review, **Why it
+   matters, and how to fix it if confirmed**).
+4. **Pages with this issue**: page title (opens the inspector), Page URL,
    Open live page, Stored evidence, Occurrences, Issue screenshots, and status.
-4. **What it is**, then **Why it matters, and how to fix it** (for Needs
-   review, **Why it matters, and what to check**).
-5. **Flagged element**: up to three sample locations, each with the page, any
-   After clicking note, the selector, highlighted HTML, and context.
 
 ## The note that shows which button revealed a problem
 
-By default, Axcess opens menus, tabs, dialogs, and other controls, then runs
-axe-core on each new [DOM state](glossary.md#dom-state). When a problem was
+By default, [Click-Through](glossary.md#click-through) opens menus, tabs,
+dialogs, and other controls, then runs axe-core on each new view opened by clicking.
+When a problem was
 first flagged after a control was used, the report names that control (here,
 "Menu"). A problem visible at page load never gets this note.
 
 | Where | What it says |
 | --- | --- |
-| Issue page, **Flagged element** | `After clicking “Menu”` under the page name |
 | A page's **Stored evidence** | Groups `At page load (N findings)`, then `After clicking “Menu” (N findings)` |
 | Page inspector, **Page state** picker | `At page load (N)` and `After clicking “Menu” → “Settings” (N)`, with the note `Captured during the scan, after the control was operated.` |
 | Workbook, **User action** column | `Open "Menu" on this page.` or `Load the page.` |
@@ -195,11 +196,10 @@ does not show again.
 
 You cannot change status in the Issues table or the evidence record. Instead:
 
-1. Open **Overview**.
-2. Expand **Expert tools and scan details**.
-3. For page results, choose **DOM engines** (use **Group by rule** to change a
-   whole rule). For image results, choose **Image evidence** (use **Group by
-   issue** for a whole group).
+1. On the report's **Issues** tab, choose a **Finding type**.
+2. For page results, select **Browse findings by WCAG criterion** (use
+   **Group by rule** to change a whole rule). For image results, select
+   **Browse every image finding** (use **Group by issue** for a whole group).
 
 Remediated, accepted risk, and false positive results move to the audit
 report's Appendix A and leave the Jira CSV; a Needs review group marked in
@@ -230,7 +230,7 @@ Remediation workbook sheets:
 - More Issues, which holds the rest when there are more than 40
 - Page Hotspots
 - Page References
-- DOM States
+- Click-Through
 - Who's Affected
 - Coverage & Method
 - Test Tracking
@@ -274,22 +274,28 @@ export state" CSV column. The app has no screen for completing the evaluation
 yet, so for now every Export menu download is a draft. The command-line
 `audit export` adds no draft label.
 
-## Verify changes after a fix
+## Compare scans after a fix
 
 After you publish fixes, scan the same site again with the same checks.
-**Verify changes** compares this report with the latest earlier completed
+**Compare scans** compares this report with the latest earlier completed
 report for the same start address, counting issue groups, not findings.
 
-| Category | What the app tells you |
+| Change | What it means |
 | --- | --- |
-| New | Found only in the later report. Check whether it is a new barrier. |
-| Still detected | The same findings were recorded in both reports. Check the issue's review status for next steps. |
-| Changed | Locations, counts, results, or review statuses differ. This does not always mean improvement. |
-| No longer detected | Not found again with comparable checks. Confirm the fix on the page before marking it remediated. |
-| Cannot compare reliably | Missing evidence or different coverage prevents a reliable conclusion. Recheck the affected pages. |
+| New | Found in this report but not in the earlier one. Check whether it is a new barrier. |
+| Resolved | Found in the earlier report but not detected again in this one. Confirm the fix on the page before marking it remediated. |
+| Remaining | Found in both reports. Its number of occurrences can still go up or down. |
 
-Read the **Comparison coverage** notes before you trust a result. See
-[rescan comparison](glossary.md#rescan-comparison).
+Each number is also a filter for the table of issue groups below it, which
+shows the occurrences before and after and the change between them. **Trend
+over time** plots every completed scan of the site. Select a point in the trend,
+or use **Show as data table**, to open that scan's issues or compare it with
+this report.
+
+When the checks, settings, or pages scanned differ between the two reports,
+the page says so above the numbers: a group can look new or resolved only
+because of what was scanned. Read the **Coverage notes** before you trust a
+result. See [rescan comparison](glossary.md#rescan-comparison).
 
 ## Acting on findings
 
@@ -302,8 +308,8 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
 2. **Then Needs review.** Test each lead and record a decision.
 3. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
-   behind an issue on many pages, and route work by Responsibility.
-4. **Rescan** and check your work in **Verify changes**.
+   behind an issue on many pages, and route the fix to whoever owns it.
+4. **Rescan** and check your work in **Compare scans**.
 
 ## What the report cannot tell you
 
@@ -317,7 +323,7 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
   [pages not reached](glossary.md#pages-not-reached)). A method marked Not
   selected did not run, with one exception: the image row reads Not selected
   whenever the vision model is off, although OCR image results can still
-  appear. The click-through cannot reach hover-only content, gestures,
+  appear. Click-Through cannot reach hover-only content, gestures,
   operating-system menus, closed shadow DOM, cross-origin embeds, or states
   with no observable DOM change.
 - **What axe-core could not decide.** Axcess keeps only axe-core's

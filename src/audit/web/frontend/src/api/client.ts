@@ -1,4 +1,5 @@
 import type {
+  ScanSettingsSnapshot,
   A11yByRuleResponse,
   A11yDrillFinding,
   A11yRollup,
@@ -7,6 +8,8 @@ import type {
   ConformanceLabel,
   ComparisonCategory,
   ComparisonReport,
+  SiteHistory,
+  FindingType,
   IssueDetail,
   EvaluationRecord,
   ManualChecksResponse,
@@ -14,6 +17,8 @@ import type {
   PageEvidence,
   PageInspection,
   DiffReport,
+  ExportFormat,
+  ExportOptions,
   FindingDetail,
   FindingsFilter,
   FindingsPage,
@@ -37,6 +42,7 @@ import type {
   ProtectedScanRecord,
   ScanDetail,
   ScanSummary,
+  SiteGroup,
   ScopePreview,
   TrackingData,
 } from "./types";
@@ -130,21 +136,70 @@ async function downloadProtectedRedactedExport(scanId: number): Promise<void> {
     const body = await res.text().catch(() => "");
     throw new ApiError(res.status, apiErrorMessage(res.status, body));
   }
-  const blob = await res.blob();
+  saveBlob(await res.blob(), `protected_scan_${scanId}_redacted.md`);
+}
+
+/** Hand a fetched file to the browser's own download handling. */
+function saveBlob(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = objectUrl;
-  link.download = `protected_scan_${scanId}_redacted.md`;
+  link.download = filename;
   link.hidden = true;
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  // Not revoked at once: Firefox can still be reading a large blob when the
+  // click returns, and revoking it then cancels the download.
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
+
+/** The ``filename="..."`` the server named a download with, if any. */
+function dispositionFilename(header: string | null): string | null {
+  return header?.match(/filename="([^"]+)"/)?.[1] ?? null;
+}
+
+/**
+ * Download one report export and say what arrived.
+ *
+ * ``fetch`` rather than following the ``<a download>`` itself, so a refusal
+ * or a server error reaches the Export panel as text. Followed directly,
+ * the browser either saved the error body as the file or failed silently,
+ * and nothing on the page said so.
+ */
+async function downloadExport(
+  scanId: number,
+  format: ExportFormat,
+): Promise<{ filename: string; sizeBytes: number; draft: boolean }> {
+  const res = await fetch(exportUrl(scanId, format, true), {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  const blob = await res.blob();
+  const filename =
+    dispositionFilename(res.headers.get("Content-Disposition")) ?? `scan_${scanId}.${format}`;
+  saveBlob(blob, filename);
+  return {
+    filename,
+    sizeBytes: blob.size,
+    draft: res.headers.get("X-Axcess-Export-State") === "draft",
+  };
+}
+
+/** The comparison API's row cap (``comparison.MAX_PAGE_SIZE``). Issue groups
+ *  are bounded by the rule catalogue, so every group of two reports fits. */
+export const COMPARISON_MAX_ROWS = 500;
 
 export const api = {
   listScans: () => request<ScanSummary[]>("/api/scans"),
+  listSites: () => request<SiteGroup[]>("/api/sites"),
   getScan: (id: number) => request<ScanDetail>(`/api/scans/${id}`),
+  /** A previous scan's settings, to start New scan again from them. */
+  getScanSettings: (id: number) => request<ScanSettingsSnapshot>(`/api/scans/${id}/settings`),
   getAlfaCapability: () => request<AlfaCapability>("/api/capabilities/alfa"),
   getLocalAnalysisCapability: () =>
     request<LocalAnalysisCapability>("/api/capabilities/local-analysis"),
@@ -289,6 +344,9 @@ export const api = {
     request<ProtectedScanRecord>(`/api/protected-scans/${scanId}/stop`, { method: "POST" }),
   /** Explicit, identity-protected download of the minimal redacted summary. */
   downloadProtectedRedactedExport,
+  /** Name, size and draft state of each file the Export panel offers. */
+  getExportOptions: (scanId: number) => request<ExportOptions>(`/api/scans/${scanId}/exports`),
+  downloadExport,
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
   /**
@@ -338,14 +396,23 @@ export const api = {
     category?: ComparisonCategory | "";
     pipeline?: string;
     page?: number;
+    page_size?: number;
   } = {}) => {
-    // Ten rows a page, like every table in the app (TABLE_PAGE_SIZE).
-    const params = new URLSearchParams({ page: String(filter.page ?? 1), page_size: "10" });
+    // Settings > Rows per page, like every table in the app (10 by default).
+    const params = new URLSearchParams({
+      page: String(filter.page ?? 1),
+      page_size: String(filter.page_size ?? 10),
+    });
     if (filter.compare_to !== undefined) params.set("compare_to", String(filter.compare_to));
     if (filter.category) params.set("category", filter.category);
     if (filter.pipeline) params.set("pipeline", filter.pipeline);
     return request<ComparisonReport>(`/api/scans/${scanId}/comparison?${params}`);
   },
+  /** Every compared issue group in one response: the page sorts and filters them. */
+  getFullComparison: (scanId: number, compareTo?: number) =>
+    api.getComparison(scanId, { compare_to: compareTo, page_size: COMPARISON_MAX_ROWS }),
+  getSiteHistory: (scanId: number) =>
+    request<SiteHistory>(`/api/scans/${scanId}/history`),
   /**
    * Per-scan WCAG DOM-engine roll-up: source-attributed coverage + counts
    * by SC, level, and impact. Empty arrays are valid when no selected engine
@@ -450,11 +517,14 @@ export const api = {
   listIssues: (
     scanId: number,
     filters: {
-      conformance?: ConformanceLabel | "";
+      // conformance, review_lane and finding_type take one value or a
+      // comma-separated list ("A,AA"); the server splits them.
+      conformance?: ConformanceLabel | "" | (string & {});
       responsibility?: string;
       abilities?: AbilityLabel | "";
       status?: FindingStatus | "";
-      review_lane?: "likely_barrier" | "expert_review" | "informational" | "";
+      review_lane?: "likely_barrier" | "expert_review" | "informational" | "" | (string & {});
+      finding_type?: FindingType | "" | (string & {});
       q?: string;
       sort?: string;
     } = {},

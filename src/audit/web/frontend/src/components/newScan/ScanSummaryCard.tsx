@@ -1,216 +1,267 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Minus, SlidersHorizontal } from "lucide-react";
 import type { ScopePreview } from "../../api/types";
 import { cn } from "../../lib/cn";
-import { SUMMARY } from "./copy";
-import { engineName } from "./DefaultSettingsCard";
+import { RAIL_LABELS, SUMMARY } from "./copy";
 import type { Capabilities } from "./groupProps";
-import { isDefault, isFixed, switchOn, type ScanPolicy, type ScanSettings } from "./scanPolicy";
+import {
+  checkInventory,
+  isDefault,
+  isFixed,
+  limitText,
+  switchOn,
+  type ScanPolicy,
+  type ScanSettings,
+} from "./scanPolicy";
 import type { ScopePreviewState } from "./useScopePreview";
 
-type Chip = { label: string; on: boolean };
+function engineName(engine: ScanSettings["scan_engine"]): string {
+  return engine === "both"
+    ? "axe-core and Siteimprove Alfa"
+    : engine === "alfa"
+      ? "Siteimprove Alfa"
+      : "axe-core";
+}
 
-function chip(label: string, on: boolean): Chip {
-  return { label: on ? label : `${label} off`, on };
+type Line = { label: string; on: boolean };
+
+/**
+ * Every switch the rail reports, by its short rail name, and whether it
+ * will happen. A check counts as on only when it will actually run
+ * (`checkInventory`), so a browser check that Fast crawl rules out lands
+ * under Not included even while its switch still looks on.
+ */
+function lines(settings: ScanSettings, policy: ScanPolicy): { scope: Line[]; checks: Line[] } {
+  const login = policy.mode === "login";
+  const scope: Line[] = [
+    {
+      label: login ? RAIL_LABELS.whole_host_login : RAIL_LABELS.whole_host,
+      on: switchOn(settings, "whole_host"),
+    },
+  ];
+  if (!isFixed(policy, "include_subdomain")) {
+    scope.push({ label: RAIL_LABELS.include_subdomain, on: switchOn(settings, "include_subdomain") });
+  }
+  const checks: Line[] = [
+    { label: RAIL_LABELS.click_through, on: switchOn(settings, "click_through") && !settings.static_only },
+    ...checkInventory(settings, policy).map((item) => ({
+      label: RAIL_LABELS[item.key as keyof typeof RAIL_LABELS],
+      on: item.on,
+    })),
+  ];
+  return { scope, checks };
+}
+
+/** One labelled part of the summary, set off from the next by a rule. */
+function Section({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <div className="px-5 py-3">
+      <dt className="text-xs font-semibold text-fg-muted">{term}</dt>
+      {children}
+    </div>
+  );
 }
 
 /**
- * The right-hand rail: what the scan will do, as it stands right now.
+ * One item per line, with an icon that repeats what the section's name
+ * already says: a tick for what runs, a dash for what does not. The icon
+ * is never the only cue, so it is hidden from a screen reader.
+ */
+function ItemList({ items, on }: { items: string[]; on: boolean }) {
+  const Icon = on ? Check : Minus;
+  return (
+    <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+      {items.map((item) => (
+        <li key={item} className={cn("flex items-start gap-2", on ? "text-fg" : "text-fg-muted")}>
+          <Icon
+            aria-hidden
+            className={cn("mt-1 h-4 w-4 shrink-0", on ? "text-umich-blue" : "text-fg-subtle")}
+          />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The right-hand rail: what the scan will do, as it stands right now, with
+ * the buttons that start it underneath.
  *
- * Everything here is derived from the settings; it holds no state of its own
- * beyond the spoken digest. The visible card is not a live region — it
- * changes on every keystroke — so a screen reader hears one short digest
- * instead, debounced so typing "2500" in Max pages is announced once.
+ * It is built to be read in one pass. Each part has a short name and its
+ * own lines, one fact per line, with a rule between parts; what runs is a
+ * ticked list and what does not is a dashed, quieter list, each item named
+ * in a few plain words. The summary is its own complementary landmark; the
+ * actions passed as `children` sit in the same card but outside it,
+ * because they belong to the form, pinned to the card's foot on a wide
+ * screen.
+ *
+ * The visible card is not a live region — it changes on every keystroke.
+ * A separate status line, outside the summary and empty until something
+ * changes, speaks a short digest 600 ms after the last change, so typing
+ * "2500" in Max pages is announced once and reading the rail never hears
+ * it twice.
  */
 export default function ScanSummaryCard({
   settings,
   policy,
   preview,
   capabilities,
+  children,
   className,
 }: {
   settings: ScanSettings;
   policy: ScanPolicy;
   preview: { state: ScopePreviewState; data: ScopePreview | null };
   capabilities: Capabilities;
+  children?: ReactNode;
   className?: string;
 }) {
   const login = policy.mode === "login";
-  const checks: Chip[] = [
-    chip("Keyboard traps", switchOn(settings, "keyboard") && !settings.static_only),
-    ...(isFixed(policy, "skip_focus") ? [] : [chip("Focus visibility", switchOn(settings, "focus") && !settings.static_only)]),
-    chip("Responsive & zoom", switchOn(settings, "responsive") && !settings.static_only),
-    chip("Click-through", switchOn(settings, "click_through") && !settings.static_only),
-    chip("Rendered pages kept", !switchOn(settings, "skip_rendered_storage") && !settings.static_only),
-  ];
-  const ai: Chip[] = [
-    chip("Image text (OCR)", switchOn(settings, "ocr")),
-    chip("Vision model", switchOn(settings, "vision")),
-    ...(isFixed(policy, "skip_semantic") ? [] : [chip("Wording review", switchOn(settings, "semantic"))]),
-    ...(isFixed(policy, "skip_visual") ? [] : [chip("Motion & animation", switchOn(settings, "motion"))]),
-  ];
-  const countable = [...checks.slice(0, checks.length - 1), ...ai];
-  const onCount = countable.filter((item) => item.on).length;
-  const total = countable.length;
-  const circumference = 138.2;
+  const unchanged = isDefault(settings, policy);
+  const { scope, checks } = lines(settings, policy);
   const engine = engineName(settings.scan_engine);
   const alfaUnavailable = capabilities.alfa?.available === false && settings.scan_engine !== "axe";
+  const usesLocalModels = checkInventory(settings, policy).some(
+    (item) => item.on && item.group === "localAi" && item.key !== "ocr",
+  );
 
-  const site = (() => {
-    if (preview.state === "idle") return null;
-    if (preview.state === "error" || !preview.data) return null;
-    return preview.data.whole_host
-      ? { line: `Every page on ${preview.data.host}`, host: preview.data.host }
-      : { line: `${preview.data.host}${preview.data.path_prefix}`, host: preview.data.host };
-  })();
+  const siteFallback =
+    preview.state === "checking"
+      ? "Checking the address…"
+      : preview.state === "error"
+        ? "Axcess could not work out what to scan from that address."
+        : SUMMARY.siteEmpty;
 
-  const coverageLine =
-    `Up to ${settings.max_pages.toLocaleString()} pages, ${settings.max_depth} clicks deep. ` +
-    (login ? "Stays on this website. " : settings.ignore_robots ? "Ignores robots.txt. " : "Respects robots.txt. ") +
-    (settings.static_only
-      ? "HTML only, no browser."
-      : switchOn(settings, "click_through")
-        ? "Clicks through menus and dialogs."
-        : "Load state only.");
+  const coverage = [
+    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`,
+    login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Respects robots.txt",
+    !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
+    settings.static_only ? SUMMARY.htmlOnly : null,
+    settings.search ? "Searches the site for result pages" : null,
+  ].filter((part): part is string => Boolean(part));
 
-  const notIncluded = login
-    ? "Pages on any other website. Nothing is uploaded; the session cookie is discarded when the scan ends."
-    : [
-        "Pages behind a login",
-        settings.include_subdomain ? null : "other subdomains",
-        settings.whole_host ? null : "other sections of the site",
-      ]
-        .filter(Boolean)
-        .join(" · ") + ".";
+  const running = checks.filter((line) => line.on).map((line) => line.label);
+  const notIncluded = [
+    ...(login ? ["Pages on any other website"] : []),
+    ...scope.filter((line) => !line.on).map((line) => line.label),
+    ...checks.filter((line) => !line.on).map((line) => line.label),
+    ...(settings.skip_rendered_storage && !settings.static_only ? [SUMMARY.noRenderedCopies] : []),
+  ];
 
-  // The spoken digest: recomputed on every change, written 600 ms after the
-  // last one, and only when it differs from what was last spoken.
-  const digest = `Up to ${settings.max_pages.toLocaleString()} pages. WCAG 2.2 ${settings.axe_level} with ${engine}. ${onCount} of ${total} checks on.`;
-  const [spoken, setSpoken] = useState(digest);
+  const digest =
+    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep. ` +
+    `WCAG ${settings.wcag_version} ${settings.axe_level} with ${engine}. ` +
+    `${running.length} ${running.length === 1 ? "check runs" : "checks run"}.`;
+  const [spoken, setSpoken] = useState("");
+  const lastDigest = useRef(digest);
   useEffect(() => {
-    if (digest === spoken) return;
-    const timer = window.setTimeout(() => setSpoken(digest), 600);
+    if (digest === lastDigest.current) return;
+    const timer = window.setTimeout(() => {
+      lastDigest.current = digest;
+      setSpoken(`Summary updated. ${digest}`);
+    }, 600);
     return () => window.clearTimeout(timer);
-  }, [digest, spoken]);
+  }, [digest]);
 
   return (
-    <aside
-      aria-labelledby="scan-summary-title"
-      className={cn("rounded-md border border-border bg-surface p-5 shadow-card", className)}
-    >
-      <div className="flex items-center gap-3.5">
-        <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden className="shrink-0">
-          <circle cx="28" cy="28" r="22" fill="none" stroke="#DCE3EC" strokeWidth="6" />
-          <circle
-            cx="28"
-            cy="28"
-            r="22"
-            fill="none"
-            stroke="#00274C"
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={(circumference * (1 - onCount / total)).toFixed(1)}
-            transform="rotate(-90 28 28)"
-            className="transition-[stroke-dashoffset] duration-300 motion-reduce:transition-none"
-          />
-          <text x="28" y="33" textAnchor="middle" fontSize="15" fontWeight="700" fill="#111827">
-            {onCount}
-          </text>
-        </svg>
-        <div className="min-w-0">
+    <div className={cn("rounded-md border border-border bg-surface shadow-card", className)}>
+      <aside aria-labelledby="scan-summary-title">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-5">
           <h2 id="scan-summary-title" className="text-base font-semibold text-fg">
             {SUMMARY.title}
           </h2>
-          <p className="text-xs text-fg-muted">
-            {onCount} of {total} checks on · {isDefault(settings, policy) ? "Default settings" : "Customized"}
-          </p>
+          <span
+            className={cn(
+              "inline-flex min-h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold",
+              unchanged
+                ? "border-border bg-surface-muted text-fg-muted"
+                : "border-umich-blue/30 bg-umich-blue/[0.06] text-fg",
+            )}
+          >
+            {unchanged ? (
+              <Check aria-hidden className="h-3.5 w-3.5" />
+            ) : (
+              <SlidersHorizontal aria-hidden className="h-3.5 w-3.5" />
+            )}
+            {unchanged ? SUMMARY.defaultState : SUMMARY.customized}
+          </span>
         </div>
-      </div>
+
+        <dl className="mt-3 divide-y divide-border border-t border-border text-sm leading-6">
+          <Section term={SUMMARY.site}>
+            {preview.state === "ok" && preview.data ? (
+              <>
+                <dd className="mt-1 break-all font-semibold text-fg">
+                  {preview.data.whole_host
+                    ? `Every page on ${preview.data.host}`
+                    : `${preview.data.host}${preview.data.path_prefix}`}
+                </dd>
+                <dd className="text-fg-muted">
+                  {preview.data.whole_host ? "Whole host" : "This section only"}
+                  {login ? ", after you sign in" : ", public pages"}
+                </dd>
+              </>
+            ) : (
+              <dd className="mt-1 text-fg-muted">{siteFallback}</dd>
+            )}
+          </Section>
+
+          <Section term={SUMMARY.coverage}>
+            {coverage.map((line) => (
+              <dd key={line} className="text-fg first-of-type:mt-1">
+                {line}
+              </dd>
+            ))}
+          </Section>
+
+          <Section term={SUMMARY.standard}>
+            <dd className="mt-1 text-fg">
+              WCAG {settings.wcag_version} {settings.axe_level}, checked with {engine}
+            </dd>
+            {alfaUnavailable && (
+              <dd className="mt-1.5 text-xs leading-5 text-sev-major">
+                Siteimprove Alfa is unavailable, so this scan runs with axe-core:{" "}
+                {capabilities.alfa?.reason ?? "not installed"}.
+              </dd>
+            )}
+          </Section>
+
+          <Section term={SUMMARY.checks}>
+            <dd className="mt-1">
+              {running.length ? <ItemList items={running} on /> : <span className="text-fg-muted">None</span>}
+            </dd>
+            {usesLocalModels && <dd className="mt-2 text-xs leading-5 text-fg-muted">{SUMMARY.localModels}</dd>}
+          </Section>
+
+          <Section term={SUMMARY.notIncluded}>
+            <dd className="mt-1">
+              {notIncluded.length ? (
+                <ItemList items={notIncluded} on={false} />
+              ) : (
+                <span className="text-fg-muted">{SUMMARY.nothingLeftOut}</span>
+              )}
+            </dd>
+            {login && <dd className="mt-2 text-xs leading-5 text-fg-muted">{SUMMARY.loginPrivacy}</dd>}
+          </Section>
+        </dl>
+      </aside>
+
+      <p className="border-t border-border px-5 py-3 text-xs leading-5 text-fg-muted">{SUMMARY.footnote}</p>
+
+      {/* When the rail is capped and scrolls, the actions stay pinned to its
+          foot and only the summary moves under them, so Start is always in
+          view beside the cards; the soft shadow above them says there is
+          more underneath. They cover nothing a keyboard can reach: the
+          summary above holds no controls. */}
+      {children && (
+        <div className="rounded-b-md border-t border-border bg-surface px-5 pb-5 pt-4 lg:sticky lg:bottom-0 lg:shadow-[0_-10px_16px_-12px_rgba(0,39,76,0.28)]">
+          {children}
+        </div>
+      )}
       <p role="status" aria-atomic="true" className="sr-only">
         {spoken}
       </p>
-
-      <dl className="mt-4 flex flex-col gap-4 text-sm">
-        <div>
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.site}</dt>
-          {site ? (
-            <>
-              <dd className="mt-1 break-all font-semibold text-fg">{site.line}</dd>
-              <dd className="text-fg-muted">
-                {preview.data?.whole_host ? "Whole host" : "This section only"}
-                {login ? " · after you sign in" : " · public pages"}
-              </dd>
-            </>
-          ) : (
-            <dd className="mt-1 text-fg-muted">{SUMMARY.siteEmpty}</dd>
-          )}
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.coverage}</dt>
-          <dd className="mt-1 text-fg">{coverageLine}</dd>
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.checks}</dt>
-          <dd className="mt-1.5 flex flex-wrap gap-1.5">
-            <ChipView label={`WCAG 2.2 ${settings.axe_level}`} on />
-            <ChipView label={engine} on />
-            {checks.map((item) => (
-              <ChipView key={item.label} label={item.label} on={item.on} />
-            ))}
-          </dd>
-          {alfaUnavailable && (
-            <dd className="mt-2 text-xs text-sev-major">
-              Siteimprove Alfa is unavailable, so this scan runs with axe-core:{" "}
-              {capabilities.alfa?.reason ?? "not installed"}.
-            </dd>
-          )}
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.localAi}</dt>
-          <dd className="mt-1.5 flex flex-wrap gap-1.5">
-            {ai.map((item) => (
-              <ChipView key={item.label} label={item.label} on={item.on} />
-            ))}
-          </dd>
-          {ai.some((item) => item.on && item.label !== "Image text (OCR)") && (
-            <dd className="mt-2 text-xs text-fg-muted">
-              Uses only models already installed in local Ollama; nothing is downloaded and no image leaves
-              this computer. Ollama may load several GB into memory while analysis runs.
-            </dd>
-          )}
-        </div>
-        <div>
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.storage}</dt>
-          <dd className="mt-1 text-fg">
-            {settings.static_only
-              ? "No rendered pages: this is an HTML-only crawl."
-              : settings.skip_rendered_storage
-                ? "Rendered pages are not stored; the Page inspector re-renders each page on demand. Findings and screenshots are kept as always."
-                : "Keeps a copy of each rendered page, so the Page inspector opens instantly. Findings and screenshots are kept as always."}
-          </dd>
-        </div>
-        <div className="border-t border-border pt-4">
-          <dt className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">{SUMMARY.notIncluded}</dt>
-          <dd className="mt-1 text-fg-muted">{notIncluded}</dd>
-        </div>
-      </dl>
-      <p className="mt-4 rounded-xs bg-surface-muted px-3 py-2.5 text-xs leading-relaxed text-fg-muted">
-        {SUMMARY.footnote}
-      </p>
-    </aside>
-  );
-}
-
-function ChipView({ label, on }: { label: string; on: boolean }) {
-  return (
-    <span
-      className={
-        on
-          ? "animate-pop-in inline-flex min-h-7 items-center rounded-full border border-border bg-surface-muted px-2.5 text-xs font-semibold text-fg"
-          : "inline-flex min-h-7 items-center rounded-full border border-dashed border-border-strong bg-surface px-2.5 text-xs font-semibold text-fg-subtle"
-      }
-    >
-      {label}
-    </span>
+    </div>
   );
 }

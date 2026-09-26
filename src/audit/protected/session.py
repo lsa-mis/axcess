@@ -48,6 +48,7 @@ from audit.protected.egress import (
     ValidatedUrl,
 )
 from audit.protected.handoff import capture_session_storage, restore_session_storage
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright, Route
@@ -719,6 +720,7 @@ class ManualAuthenticationSession:
         *,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: AxeLevel = "AA",
+        wcag_version: WcagVersion = LEGACY_WCAG_VERSION,
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
@@ -747,6 +749,7 @@ class ManualAuthenticationSession:
             user_agent=self._user_agent,
             axe_analyzer=axe_analyzer,
             axe_level=axe_level,
+            wcag_version=wcag_version,
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
@@ -785,6 +788,7 @@ class ManualAuthenticationSession:
         url: str,
         *,
         level: str = "AA",
+        version: str = LEGACY_WCAG_VERSION,
     ) -> AlfaResult:
         """Run Alfa with one in-memory, one-use copy of the browser session.
 
@@ -809,6 +813,7 @@ class ManualAuthenticationSession:
             return await analyzer.run(
                 validated.url,
                 level=level,
+                version=version,
                 storage_state=storage_state,
                 # The scan policy no longer carries an allowlist, and Alfa's
                 # runner keeps its own copy of the restrictions this module

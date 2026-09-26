@@ -1,33 +1,42 @@
-import { Link, useNavigate } from "react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Accessibility, AlertOctagon, ChevronDown, Trash2 } from "lucide-react";
-import { api } from "../api/client";
+import type { ReactNode } from "react";
+import { Link } from "react-router";
+import { AlertOctagon } from "lucide-react";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
-import { Button, Card, LinkButton, StatCard } from "./ui";
+import { Card, Disclosure, StatCard } from "./ui";
+import { cn } from "../lib/cn";
+import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 
 /**
  * What the old Overview tab said about a completed report, above its table.
  *
  * The report opens on Issues now, so the numbers and the coverage disclosure
  * that used to take a page of their own sit over the table instead: one row
- * of stat cards, then one line saying how many checks ran. The full ledger is
- * behind that line, because what a scan did and did not check is something a
+ * of stat cards, then an accordion whose first row says how many checks ran.
+ * The full ledger is behind that row, because what a scan did and did not check is something a
  * reader goes to on purpose, not something every visit should scroll past.
  *
  * ``rows`` is the unfiltered issue list (the per-method "Found" lines count
  * it); undefined while it loads, which the ledger already handles.
+ *
+ * ``notes`` are the page's other closed explanations (what the table's
+ * labels mean, what an ACT rule is), as ``ReportNote`` rows. They join the
+ * coverage row in one accordion, so the report's context reads as one short
+ * list of things to open rather than loose sentences between the numbers
+ * and the table.
  */
 export function ReportSummary({
   scan,
   issueGroups,
   occurrences,
   rows,
+  notes,
 }: {
   scan: ScanDetail;
   issueGroups: number;
   occurrences: number;
   rows: IssueRow[] | undefined;
+  notes?: ReactNode;
 }) {
   const ran = methodsRan(scan.methods_used).length;
   return (
@@ -48,140 +57,77 @@ export function ReportSummary({
         {/* Pages alone understate an application whose content mostly does
             not exist until a control is used. */}
         <StatCard
-          label="DOM States Found"
+          label={CLICK_THROUGH_STATES_LABEL}
           value={(scan.dom_state_count ?? 0).toLocaleString()}
-          hint="Reached by operating controls"
+          hint="Menus, tabs and dialogs the scan opened"
         />
       </div>
 
-      {/* Same shape as the ACT-rule disclosure below it: the summary is the
-          sentence, and the word styled as a link is where to press. The
-          chevron points down while closed and up while open, following the
-          element's own open state. */}
-      <details className="group mb-3 mt-3 text-sm">
-        <summary className="inline-flex min-h-target cursor-pointer list-none items-center gap-1.5 rounded-xs text-fg-muted">
-          <span className="tabular-nums">
-            {ran} of {scan.methods_used.length} checks ran
-          </span>
-          <span aria-hidden className="text-border-strong">·</span>
-          <span className="inline-flex items-center gap-0.5 font-semibold text-umich-blue">
-            <span className="underline underline-offset-2">Details</span>
-            <ChevronDown
-              className="h-4 w-4 shrink-0 transition-transform duration-150 group-open:rotate-180"
-              aria-hidden
-            />
-          </span>
-        </summary>
-        <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} className="mt-2" />
-      </details>
+      {/* Coverage leads the notes: whether the scan checked something comes
+          before what its labels mean. The count stays on the closed row, so
+          the fact is on screen without opening anything. */}
+      <ReportNotes className="mt-6">
+        <ReportNote
+          id="report-coverage"
+          title="What this scan checked"
+          meta={
+            <span className="tabular-nums">
+              {ran} of {scan.methods_used.length} checks ran
+            </span>
+          }
+        >
+          <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} embedded />
+        </ReportNote>
+        {notes}
+      </ReportNotes>
     </>
   );
 }
 
 /**
- * The report's expert tools and lifecycle controls, kept closed under the
- * table: the DOM-engine and image-evidence views, the observed rejection
- * rate, and deleting the report.
+ * The report's closed explanations under the header, as one accordion: a
+ * framed list of ``ReportNote`` rows, one per line, all closed on arrival.
  *
- * Delete removes the cache entry rather than invalidating it: there is no
- * record left to refetch, and an invalidation would send this screen to the
- * server for a report that is gone.
+ * These used to be link-styled ``<details>`` summaries wrapped side by side,
+ * which read as loose sentences and put the table's context in a different
+ * shape from the issue page's own disclosures. Stacked rows each say what
+ * they open, keep their one key fact visible on the right, and leave the
+ * space around the table to the table. A new explanation for a future view
+ * is one more row here, not one more line on the page.
  */
-export function ReportExpertTools({
-  scan,
-  rows,
-}: {
-  scan: ScanDetail;
-  rows: IssueRow[] | undefined;
-}) {
-  const qc = useQueryClient();
-  const navigate = useNavigate();
-  const deleteScan = useMutation({
-    mutationFn: () => api.deleteScan(scan.id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["scans"] });
-      qc.removeQueries({ queryKey: ["scan", scan.id] });
-      navigate("/scans", { replace: true });
-    },
-  });
-  const reviewed = rows?.filter((issue) => issue.review_lane !== "informational");
-  const reviewedBackingFindings =
-    reviewed?.reduce(
-      (total, issue) =>
-        total +
-        (issue.status_summary.in_progress ?? 0) +
-        (issue.status_summary.remediated ?? 0) +
-        (issue.status_summary.accepted_risk ?? 0) +
-        (issue.status_summary.false_positive ?? 0),
-      0,
-    ) ?? 0;
-  const rejectedBackingFindings =
-    reviewed?.reduce((total, issue) => total + (issue.status_summary.false_positive ?? 0), 0) ?? 0;
-  const observedRejectionRate = reviewedBackingFindings
-    ? (rejectedBackingFindings / reviewedBackingFindings) * 100
-    : null;
-
+export function ReportNotes({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <details className="mt-5 rounded-xs border border-border bg-surface p-4 shadow-card">
-      <summary className="min-h-target cursor-pointer py-2 font-semibold text-fg">
-        Expert tools and scan details
-      </summary>
-      <div className="border-t border-border pt-4">
-        <div className="flex flex-wrap gap-2">
-          <LinkButton to={`/scans/${scan.id}/a11y`} variant="secondary">
-            <Accessibility className="h-4 w-4" aria-hidden /> DOM engines
-          </LinkButton>
-          <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
-            Image evidence ({scan.finding_count})
-          </LinkButton>
-        </div>
-        <p className="mt-4 text-sm text-fg-muted">
-          Observed reviewer rejection rate:{" "}
-          <strong>
-            {rows == null
-              ? "loading…"
-              : observedRejectionRate == null
-                ? "not measured yet"
-                : `${observedRejectionRate.toFixed(1)}%`}
-          </strong>
-          {observedRejectionRate != null &&
-            ` (${rejectedBackingFindings} of ${reviewedBackingFindings} reviewed findings marked false positive)`}
-          . This is a result from this report, not a general
-          detector-accuracy claim.
-        </p>
-        <details className="mt-4 border-t border-border pt-3">
-          <summary className="min-h-target cursor-pointer py-2 text-sm font-semibold text-sev-critical">
-            Danger zone
-          </summary>
-          <p className="text-sm text-fg-muted">
-            Deleting removes this scan and its report evidence. Shared
-            image blobs may remain.
-          </p>
-          {deleteScan.error && (
-            <p className="mt-2 text-sm text-sev-critical" role="alert">
-              Couldn&rsquo;t delete scan:{" "}
-              {deleteScan.error instanceof Error
-                ? deleteScan.error.message
-                : String(deleteScan.error)}
-            </p>
-          )}
-          <Button
-            variant="ghost"
-            disabled={deleteScan.isPending}
-            className="mt-2 text-sev-critical hover:bg-sev-critical-bg"
-            onClick={() => {
-              const ok = window.confirm(
-                `Delete scan #${scan.id} (${scan.seed_url})?\n\nThis permanently removes the scan, its pages, findings, and history. This cannot be undone.`,
-              );
-              if (ok) deleteScan.mutate();
-            }}
-          >
-            <Trash2 className="h-4 w-4" aria-hidden />
-            {deleteScan.isPending ? "Deleting…" : "Delete report"}
-          </Button>
-        </details>
-      </div>
-    </details>
+    <div
+      className={cn(
+        "mb-6 divide-y divide-border rounded-xs border border-border bg-surface shadow-card",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One row of ``ReportNotes``: the issue page's ``Disclosure`` without its own
+ * frame, so the rows share the group's border and read as one list.
+ */
+export function ReportNote({
+  id,
+  title,
+  meta,
+  children,
+}: {
+  id: string;
+  title: string;
+  /** The row's one fact, shown on the right while it is closed. */
+  meta?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Disclosure id={id} title={title} meta={meta} headingLevel={2} className="rounded-none border-0">
+      {children}
+    </Disclosure>
   );
 }
 

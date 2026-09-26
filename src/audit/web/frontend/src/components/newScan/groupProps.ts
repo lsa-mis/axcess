@@ -15,5 +15,5 @@ export type GroupProps = {
   capabilities: Capabilities;
   errors: FieldError[];
   /** DOM ids for the fields the error alert can link to. */
-  fieldIds: { static_only: string };
+  fieldIds: { static_only: string; max_pages: string; max_depth: string };
 };

@@ -49,7 +49,7 @@ def test_xlsx_is_a_valid_workbook_with_all_report_sheets(tmp_db: sqlite3.Connect
         "Page References",
         # Between the page inventory and the audience roll-up: what was
         # clicked on those pages, and where the sweep stopped short.
-        "DOM States",
+        "Click-Through",
         "Who's Affected",
         "Coverage & Method",
         "Test Tracking",
@@ -387,3 +387,33 @@ def test_issues_past_the_tab_cap_are_pooled_not_dropped(
     indexed_ids = {str(index.cell(row=r, column=1).value) for r in rows[1:]}
     # Every pooled issue that has retained locations appears in the sheet.
     assert pooled_ids & indexed_ids
+
+
+def test_a_wcag_21_scan_names_21_as_its_standard(tmp_db: sqlite3.Connection) -> None:
+    """The labels follow the scan's stored version; a keyless scan stays 2.2."""
+    from audit.exports.audit_report import render_audit_report
+
+    scan_id = _scan_with_real_findings(tmp_db)
+    tmp_db.execute(
+        "UPDATE scans SET config_json = ? WHERE id = ?",
+        ('{"axe_level": "AA", "wcag_version": "2.1"}', scan_id),
+    )
+    scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
+    assert scan.wcag_version == "2.1"
+    wb = load_workbook(io.BytesIO(render_xlsx(scan, conn=tmp_db)))
+    summary = wb["Summary"]
+    cells = {
+        str(summary.cell(row=r, column=1).value or ""): summary.cell(row=r, column=2).value
+        for r in range(1, summary.max_row + 1)
+    }
+    assert cells.get("Audited against") == "WCAG 2.1 Level AA"
+    overview = wb["Issues Overview"]
+    assert overview.cell(row=2, column=1).value == "Compliance Standard: WCAG 2.1 Level AA"
+    assert "required for WCAG 2.1 AA conformance" in str(overview.cell(row=5, column=1).value)
+
+    md = render_audit_report(scan, conn=tmp_db)
+    assert "**Audited against:** WCAG 2.1 Level AA" in md
+    assert "ACT rules mapped to WCAG 2.1 at the selected level" in md
+    assert "not required under WCAG 2.1" in md
+    # The coverage matrix stays a fixed WCAG 2.2 list.
+    assert "## WCAG 2.2 A/AA coverage" in md

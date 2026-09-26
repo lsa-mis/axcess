@@ -15,8 +15,8 @@ export const SITE_URL_NOUN = "site URL";
 /**
  * Where the in-app "Send feedback" action goes.
  *
- * This is the only outbound link Axcess offers, it opens only when a person
- * clicks it, and nothing about the current scan is attached: Asana forms have
+ * Like the About page's resource links, it opens only when a person clicks
+ * it, and nothing about the current scan is attached: Asana forms have
  * no documented URL-prefill contract, so there is no supported way to carry
  * page context across, and inventing one would risk leaking a scanned URL.
  */

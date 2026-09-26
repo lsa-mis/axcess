@@ -1,6 +1,6 @@
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import { Link, useParams, useSearchParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronRight,
@@ -8,7 +8,7 @@ import {
   Info,
   Lightbulb,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import {
   Button,
@@ -29,6 +29,17 @@ import type {
   Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+  TableStatus,
+} from "../components/table/Table";
+import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -63,6 +74,9 @@ export default function A11yByRuleRoute() {
   const { data, isLoading } = useQuery({
     queryKey: ["a11y-by-rule", id, status],
     queryFn: () => api.getA11yByRule(id, status || undefined),
+    // A new status keeps this scan's groups on screen while it loads, so
+    // the Filter menu, and the focus in it, stay where they were.
+    placeholderData: (previous, query) => query?.queryKey[1] === id ? keepPreviousData(previous) : undefined,
     enabled: Number.isFinite(id),
   });
 
@@ -85,6 +99,17 @@ export default function A11yByRuleRoute() {
   }
 
   const { coverage, groups } = data;
+  const filters: FilterGroup[] = [
+    {
+      key: "status",
+      label: "Status",
+      value: status,
+      options: [
+        { value: "", label: "All" },
+        ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+      ],
+    },
+  ];
 
   return (
     <>
@@ -135,17 +160,21 @@ export default function A11yByRuleRoute() {
         />
       </div>
 
-      <Card className="mb-4 p-3">
-        <Select
-          stacked
-          label="Status filter"
-          value={status}
-          onChange={(next) => setStatusParam(next as FindingStatus | "")}
-          options={[
-            { value: "", label: "all statuses" },
-            ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
-          ]}
-        />
+      {/* One Filter menu for every rule table below: the status narrows
+          them all. */}
+      <Card className="mb-4">
+        <TableBar
+          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => setStatusParam("")} />}
+        >
+          <FilterMenu
+            groups={filters}
+            onChange={(_key, value) => setStatusParam(value as FindingStatus | "")}
+            onReset={() => setStatusParam("")}
+          />
+        </TableBar>
+        <TableStatus className="border-b-0">
+          {groups.length.toLocaleString()} rule {groups.length === 1 ? "group" : "groups"}.
+        </TableStatus>
       </Card>
 
       {groups.length === 0 ? (
@@ -190,10 +219,9 @@ function RuleGroupCard({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // One table per rule, so the page is kept per card rather than in the URL.
-  const paged = usePagedRows(group.findings, {
-    local: true,
-    resetKey: group.findings.map((f) => f.id).join(","),
-  });
+  // A new row set (a status filter, a bulk update) starts it over.
+  const resetKey = useMemo(() => group.findings.map((f) => f.id).join(","), [group.findings]);
+  const paged = usePagedRows(group.findings, { local: true, resetKey });
 
   return (
     <Card className="overflow-hidden">
@@ -286,32 +314,31 @@ function RuleGroupCard({
             ruleId={group.rule_id}
           />
 
-          <div className="overflow-x-auto">
-            {/* Holds the tallest page's height, so paging never moves the pager. */}
-            <div {...paged.hold}>
-            <table className="w-full text-sm">
-              <thead className="bg-surface-muted text-2xs text-fg-subtle">
+          {paged.pages > 1 && (
+            <TableBar pager={<TablePagination label={`${group.rule_id} findings`} noun="findings" {...paged} />} />
+          )}
+          <TableRegion label={`${group.rule_id} findings table`} paged={paged}>
+            <Table caption={`${group.rule_id} findings`}>
+              <TableHead>
                 <tr>
-                  <th scope="col" className="px-3 py-2 text-left font-semibold">
-                    Page
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-left font-semibold">
-                    Target
-                  </th>
-                  <th scope="col" className="px-3 py-2 text-left font-semibold">
-                    Status
-                  </th>
+                  <ColumnHeader>Page</ColumnHeader>
+                  <ColumnHeader>Target</ColumnHeader>
+                  <ColumnHeader>Status</ColumnHeader>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paged.pageRows.map((f) => (
-                  <FindingRow key={f.id} finding={f} scanId={scanId} ruleId={group.rule_id} />
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((f, index) => (
+                  <FindingRow
+                    key={f.id}
+                    finding={f}
+                    index={(paged.page - 1) * paged.pageSize + index}
+                    scanId={scanId}
+                    ruleId={group.rule_id}
+                  />
                 ))}
               </tbody>
-            </table>
-            </div>
-          </div>
-          <TablePagination label={`${group.rule_id} findings`} noun="findings" {...paged} />
+            </Table>
+          </TableRegion>
         </div>
       )}
     </Card>
@@ -320,16 +347,19 @@ function RuleGroupCard({
 
 function FindingRow({
   finding,
+  index,
   scanId,
   ruleId,
 }: {
   finding: A11yRuleGroupFinding;
+  /** Position across pages, for the row stripe. */
+  index: number;
   scanId: number;
   ruleId: string;
 }) {
   return (
-    <tr className="align-top">
-      <td className="max-w-xs px-3 py-2">
+    <Row index={index}>
+      <Cell className="max-w-xs">
         <PageLink
           pageId={finding.page_id}
           scanId={scanId}
@@ -341,8 +371,8 @@ function FindingRow({
           context={ruleId}
           backTo={`/scans/${scanId}/a11y/by-rule`}
         />
-      </td>
-      <td className="px-3 py-2">
+      </Cell>
+      <Cell>
         <code className="block break-all font-mono text-2xs text-fg">
           {(finding.target_display || finding.target_selector).length > 90
             ? `${(finding.target_display || finding.target_selector).slice(0, 90)}…`
@@ -350,7 +380,7 @@ function FindingRow({
         </code>
         {finding.html_snippet && (
           <details className="mt-1">
-            <summary className="cursor-pointer text-2xs text-fg-subtle">
+            <summary className="cursor-pointer text-2xs text-fg-muted">
               show HTML
             </summary>
             <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
@@ -365,9 +395,9 @@ function FindingRow({
             {finding.failure_summary}
           </div>
         )}
-      </td>
-      <td className="px-3 py-2 text-xs">{finding.status}</td>
-    </tr>
+      </Cell>
+      <Cell className="text-xs">{finding.status}</Cell>
+    </Row>
   );
 }
 

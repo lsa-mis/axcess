@@ -8,30 +8,38 @@ again. If a word is missing or unclear, please open an issue.
 
 ### Barrier
 
-A result where a [rule engine](#rule-engine) failed a fixed, machine-testable
-rule, such as an image with no [alt text](#alt-text). These are the most certain
-results, so start here: confirm the problem on the page, fix it, then
-[rescan](#rescan-comparison).
+A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
+[Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
+such as an image with no [alt text](#alt-text). These rules give the same result
+every time, so these are the most certain results. Start here: check that the
+rule applies to that part of the page, fix it, then
+[rescan](#rescan-comparison) to confirm the fix.
+
+- Good to know: some Barriers are [best practices](#best-practice), not WCAG
+  failures. These show BP in the Level column.
 
 ### Needs review
 
 A possible problem, found by a less certain check, that a person must confirm
-before it counts as a [Barrier](#barrier). Open the evidence, test it on the
-page, and record your decision.
+before it counts as a [Barrier](#barrier). Open the page and check the item
+yourself. If it is a real problem, record that in its [status](#status) and fix
+it; if not, mark it as a [false positive](#false-positive) with a short note.
 
-- Found by: a [browser check](#browser-check), the [keyboard
-  trap](#keyboard-trap) check, a [motion check](#motion-check), image text whose
-  [alt text](#alt-text) is missing or does not match, a [local AI
-  model](#local-ai-model), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot
-  tell" result.
+- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow),
+  the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check), a
+  [local AI model](#local-ai-model) (such as link text, headings, labels, or an
+  [image of text](#image-of-text) whose [alt text](#alt-text) is missing or does
+  not match), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
 - Also called: "Needs confirmation" on the issue page and "Review leads" on the
   dashboard.
 
 ### Informational
 
-A record kept for transparency, not a problem to fix, such as text in an image
-whose [alt text](#alt-text) already says the same words. You do not need to act
-on it.
+A record kept so you can see what was checked, not a problem to fix. You do not
+need to act on it, and it should not be reported as an issue.
+
+- Examples: text in an image whose [alt text](#alt-text) already says the same
+  words, and results from older checks that are no longer considered reliable.
 
 ## Issues and findings
 
@@ -43,7 +51,7 @@ One result a check recorded, with its page, [element](#element), and
 ### Occurrence
 
 One place a problem appears: one element on one page, or in one
-[DOM state](#dom-state). The Issues table counts these in its Occurrences
+[view opened by clicking](#click-through). The Issues table counts these in its Occurrences
 column, and the Excel workbook calls them Instances.
 
 ### Issue group
@@ -51,6 +59,21 @@ column, and the Excel workbook calls them Instances.
 One row in the Issues table: every occurrence found by the same check (for
 images, the same kind of image with the same [alt text](#alt-text) problem). The
 Issues page shows the number of issue groups and occurrences side by side.
+
+### Finding type
+
+Which kind of check found an issue group, shown in the Issues table's Finding
+type column and filter.
+
+- WCAG: a rule check on the page as it loaded ([axe-core](#axe-core),
+  [Siteimprove Alfa](#siteimprove-alfa), a [browser check](#browser-check), or a
+  [local AI model](#local-ai-model)).
+- [Click-Through](#click-through): found only after a control was operated.
+  Shown only when at least one of the group's errors needed the click. One
+  group can be both WCAG and Click-Through when the same problem appears at
+  page load and behind a control.
+- Alt Text: image evidence, meaning text found in an image and whether its
+  [alt text](#alt-text) says the same thing.
 
 ### Root cause
 
@@ -136,7 +159,7 @@ recommended.
 ### Scan coverage
 
 What a scan actually checked: which pages it tested, which methods ran, and how
-many [DOM states](#dom-state) it reached. The report's Overview shows this under
+many [views opened by clicking](#click-through) it reached. The report's Overview shows this under
 "What this scan actually checked."
 
 ### Crawl
@@ -158,12 +181,17 @@ The part of a site a scan may visit: pages under the address you start from,
 such as everything under `www.example.edu/admissions/`. A page limit and a limit
 on how many links deep the [crawl](#crawl) goes also apply.
 
-### DOM state
+### Click-Through
 
-What a page looks like after a control is used, for example after a menu opens
-(DOM is the browser's live copy of the page). Problems that appear only in such
-a state are labeled "After clicking" with the control's name, so you can
-reproduce them.
+The check that operates a page's controls, such as menus, tabs, dialogs, and
+disclosures, and checks again the content they reveal. What a page looks like
+after a control is used, for example after a menu opens, is a **view opened
+by clicking**. Problems that appear only in a view opened by clicking are
+labeled "After clicking" with the control's name, so you can reproduce them.
+
+- Also called: "Click-Through state" in earlier versions, and "DOM state" in
+  older reports and in Axcess's internal code (DOM is the browser's live copy
+  of the page).
 
 ## Accuracy
 
@@ -323,9 +351,11 @@ you, signed in, without ever seeing your password.
 
 ### Rescan comparison
 
-Two reports of the same [scope](#scope) lined up, with each issue marked New,
-Still detected, Changed, No longer detected, or Cannot compare reliably. "No
-longer detected" is not proof of a fix, so confirm fixes on the page.
+Two reports of the same [scope](#scope) lined up on a report's **Compare
+scans** view, with each issue group marked New, Resolved, or Remaining.
+Resolved means only that the later scan did not detect it again; it is not
+proof of a fix, so confirm fixes on the page. (The Excel workbook's
+"Resolved" is a review status, remediated, which a person sets.)
 
 ### Draft export
 

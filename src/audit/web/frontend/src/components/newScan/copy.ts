@@ -4,11 +4,15 @@
  * The form used to explain itself in the vocabulary of its own internals:
  * "DOM states", "static only", "VLM", "rps". Each label here names what the
  * setting *does to the scan*, and each hint says what you gain or lose, so a
- * reviewer who has never met the engine can still choose. Positive labels
+ * reviewer who has never met the engine can still choose. Feature names come
+ * from `lib/labels.ts` (for example `CLICK_THROUGH`), so this page and the
+ * report call a feature the same thing. Positive labels
  * only: a switch that is on means the thing happens (SC 3.3.2, and the plain
  * reading of a toggle). The `skip_*` payload fields are inverted at the edge,
  * in `scanPolicy.ts`, never in the copy.
  */
+
+import { CLICK_THROUGH } from "../../lib/labels";
 
 export const TAB_PUBLIC = "Public website";
 export const TAB_LOGIN = "Site with a login or 2FA";
@@ -28,17 +32,6 @@ export const URL_COPY = {
   },
 } as const;
 
-export const DEFAULTS_CARD = {
-  title: "Default scan settings",
-  selected: "Selected",
-  customized: "Customized",
-  leadDefault:
-    "This is what runs unless you change something under Advanced settings.",
-  leadCustom:
-    "You changed something under Advanced settings. Crossed-out lines are no longer part of this scan.",
-  reset: "Reset to default",
-} as const;
-
 export const GROUPS = {
   coverage: {
     legend: "Coverage",
@@ -52,6 +45,9 @@ export const GROUPS = {
     legend: "Local AI",
     description:
       "Runs on this computer only. Nothing is uploaded, and no model is downloaded automatically.",
+  },
+  limits: {
+    legend: "Limits and rule engine",
   },
   speed: {
     legend: "Speed and debugging",
@@ -80,7 +76,7 @@ export const SWITCHES = {
       "Visits pages the site asks crawlers to skip. Authorized testing only; the scan is flagged in its config and audit log.",
   },
   click_through: {
-    label: "Click through menus, tabs and dialogs",
+    label: `${CLICK_THROUGH}: open menus, tabs and dialogs`,
     hint:
       "Opens controls on each page and checks the content they reveal, then re-runs the checks there. Adds scan time. Never submits forms, pays, or subscribes.",
   },
@@ -90,7 +86,8 @@ export const SWITCHES = {
   },
   focus: {
     label: "Check that focus is never hidden",
-    hint: "Catches keyboard focus tucked behind sticky headers and footers (SC 2.4.11).",
+    hint:
+      "Catches keyboard focus tucked behind sticky headers and footers (SC 2.4.11). SC 2.4.11 is new in WCAG 2.2; a 2.1 scan reports it as best practice.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
@@ -134,10 +131,15 @@ export const SWITCHES = {
 } as const;
 
 export const NUMBERS = {
-  max_pages: { label: "Max pages" },
+  max_pages: {
+    label: "Max pages",
+    hint: (max: number) =>
+      `The scan stops after this many pages, or sooner when it runs out of in-scope links. A whole number from 1 to ${max.toLocaleString()}.`,
+  },
   max_depth: {
     label: "Max link depth",
-    hint: "How many clicks from the start page. 10 reaches nearly everything on most sites.",
+    hint: (max: number) =>
+      `How many clicks from the start page the scan follows. 1 is the start page and the pages it links to; 10 reaches nearly everything on most sites. A whole number from 1 to ${max}.`,
   },
   rps: {
     label: "Requests per second",
@@ -157,7 +159,13 @@ export const NUMBERS = {
 
 export const STANDARD = {
   label: "Standard to check against",
-  hint: "WCAG 2.2. AA is what most policies require; AAA adds the strictest rules, such as 7:1 contrast.",
+  hint: (version: string) =>
+    `WCAG ${version}. AA is what most policies require; AAA adds the strictest rules, such as 7:1 contrast.`,
+} as const;
+
+export const WCAG_VERSION = {
+  label: "WCAG version",
+  hint: "2.1 is the current U-M standard. 2.2 adds newer criteria, such as focus not obscured and target size.",
 } as const;
 
 export const ENGINE = {
@@ -216,6 +224,34 @@ export const ERRORS = {
   notAuthorized: "Confirm that the site owner authorized this accessibility scan.",
   imageAck:
     "Confirm how protected images and extracted text will be stored before turning on image text reading.",
+  limitEmpty: (label: string, min: number, max: number) =>
+    `Enter ${label}: a whole number from ${min} to ${max.toLocaleString()}.`,
+  limitWhole: (label: string) => `${label} must be a whole number.`,
+  limitMin: (label: string, min: number) => `${label} must be at least ${min}.`,
+  limitMax: (label: string, max: number, mode: "public" | "login") =>
+    `${label} can be at most ${max.toLocaleString()} for a ${mode === "login" ? "login" : "public website"} scan.`,
+} as const;
+
+/**
+ * Starting again after a scan failed or was stopped. Settings come back;
+ * sign-in and the confirmations never do, and the notice says so.
+ */
+export const RECOVERY = {
+  loading: (id: number) => `Loading the settings from scan ${id}…`,
+  loaded: (id: number) => `Settings copied from scan ${id}. Check them, then start the scan again.`,
+  loadedLogin:
+    "Sign-in is never saved: you sign in again in the browser window, and confirm authorization again below.",
+  failed: (id: number) => `Couldn’t load the settings from scan ${id}, so the defaults are shown.`,
+} as const;
+
+export const RETRY = {
+  edit: "Edit settings and retry",
+  editHint:
+    "Opens New scan with this scan’s settings filled in, so you can change what failed and start again. Sign-in is never saved.",
+  quick: "Quick retry",
+  quickPending: "Restarting scan…",
+  quickHint:
+    "Scans the same address again right away with the default settings, with Click-Through off, to show quickly whether the site can be scanned. It does not reuse this scan’s other settings.",
 } as const;
 
 export const SUMMARY = {
@@ -223,10 +259,49 @@ export const SUMMARY = {
   site: "Site",
   siteEmpty: "Enter a site URL to see the scope.",
   coverage: "Coverage",
-  checks: "Checks",
-  localAi: "Local AI",
-  storage: "Storage",
+  standard: "Standard",
+  checks: "Checks that run",
   notIncluded: "Not included",
+  nothingLeftOut: "Nothing: every option is on.",
+  /** Listed under Not included when the rendered-page copies are skipped. */
+  noRenderedCopies: "Stored copies of rendered pages",
+  /** A Coverage line during a Fast crawl. */
+  htmlOnly: "HTML only, no browser",
+  loginPrivacy: "Nothing is uploaded; the session cookie is discarded when the scan ends.",
+  localModels:
+    "Uses only models already installed in local Ollama; nothing is downloaded and no image leaves this computer. Ollama may load several GB into memory while analysis runs.",
+  defaultState: "Default settings",
+  customized: "Customized",
+  reset: "Reset to default",
   footnote:
     "Automated checks find roughly a third of accessibility problems. The report says what still needs a person.",
+} as const;
+
+/**
+ * Short names for the summary rail's two lists, one per switch. The rail
+ * is read at a glance, so each is a few words in plain language; the
+ * switch it stands for carries the full explanation.
+ */
+export const RAIL_LABELS = {
+  whole_host: "Entire host",
+  whole_host_login: "Entire approved host",
+  include_subdomain: "Subdomains",
+  click_through: `${CLICK_THROUGH} (menus, tabs, dialogs)`,
+  keyboard: "Keyboard traps",
+  focus: "Focus never hidden",
+  responsive: "Narrow screens and zoom",
+  ocr: "Text in images (OCR)",
+  vision: "Image text review (vision model)",
+  semantic: "Wording review (local AI)",
+  motion: "Motion and animation",
+} as const;
+
+/**
+ * Click-Through wording outside its switch: why the switch can be
+ * unavailable.
+ */
+export const CLICK_THROUGH_COPY = {
+  /** Replaces the switch hint while the switch is disabled. */
+  unavailableStatic: `${CLICK_THROUGH} is unavailable with Fast crawl: opening controls needs a rendered page.`,
+  unavailableAlfa: `Choose axe-core or Both: ${CLICK_THROUGH} re-checks revealed content with axe-core.`,
 } as const;

@@ -85,19 +85,21 @@ you install separately.
 If Ollama can't be reached when a scan starts, Axcess logs a warning and
 continues without those checks.
 
-## Verify changes has nothing to compare, or shows a surprise
+## Compare scans has nothing to compare, or shows a surprise
 
 A [rescan comparison](./glossary.md#rescan-comparison) lives on a report's
-**Verify changes** view. It compares the report with the latest earlier
+**Compare scans** view. It compares the report with the latest earlier
 completed report of the same start address.
 
 - **Nothing to compare.** The two start addresses must match. Letter case in
   the host name and a missing trailing slash don't matter, but
   `www.example.edu` and `example.edu`, or two different ports, count as
   different sites. Start the new scan from the same address as the old one.
-- **The wrong earlier report.** Add `?compare_to=<earlier report id>` to the
-  Verify changes address (`/app/scans/<new id>/diff`). Both reports must be
-  completed and share a start address.
+- **The wrong earlier report.** Select the earlier scan in **Trend over
+  time** (or in its data table) and choose **Compare with this report**, or
+  add `?compare_to=<earlier report id>` to the Compare scans address
+  (`/app/scans/<new id>/compare`). Both reports must be completed and share
+  a start address. Old `/diff` links still open the same comparison.
 - **The command-line image diff.** `audit crawl` picks the earlier scan for
   its image findings by itself, and ignores the port on `localhost` addresses.
   To choose it yourself, pass `--compare-to <id>` to `audit crawl` or

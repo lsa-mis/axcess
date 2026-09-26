@@ -20,6 +20,25 @@ export function StatusChip({ value }: { value: FindingStatus }) {
   );
 }
 
+/**
+ * A scan's number as a small tinted tag, "scan 6", in place of "#6". A
+ * screen reader reads "#6" as "number 6" or "hash 6", and the glyph never
+ * said what was numbered. The tint is translucent so the tag still shows
+ * on a hovered row or link; the transparent border draws in forced colors.
+ */
+export function ScanTag({ id, className }: { id: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded-2xs border border-transparent bg-fg/[0.08] px-1.5 font-sans text-2xs font-semibold tabular-nums",
+        className,
+      )}
+    >
+      scan {id}
+    </span>
+  );
+}
+
 /** Shared workspace surface with a quiet border and evidence-friendly depth. */
 export function Card({
   children,
@@ -278,6 +297,7 @@ export function LinkButton({
 }: LinkButtonProps) {
   return (
     <Link
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -319,6 +339,7 @@ export function DownloadLink({
 }: DownloadLinkProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -365,6 +386,7 @@ export function ExternalLinkButton({
 }: ExternalLinkButtonProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -403,6 +425,8 @@ export function Disclosure({
   title,
   headingLevel = 2,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
   icon,
   meta,
   className,
@@ -412,6 +436,13 @@ export function Disclosure({
   title: string;
   headingLevel?: 2 | 3;
   defaultOpen?: boolean;
+  /**
+   * Controlled mode, for a parent that must open the panel itself (a form
+   * whose error alert links to a field inside it). Omit both to let the
+   * disclosure keep its own state.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   icon?: ReactNode;
   /**
    * A short status shown at the right end of the header row ("3 of 4 on").
@@ -422,7 +453,13 @@ export function Disclosure({
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (update: (value: boolean) => boolean) => {
+    const next = update(open);
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const buttonId = `${id}-button`;
   const panelId = `${id}-panel`;
 

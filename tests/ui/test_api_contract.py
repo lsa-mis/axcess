@@ -54,6 +54,7 @@ _CONTRACT_GOLDEN = "api_contract.json"
 _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /health", "/health"),
     ("GET /api/scans", "/api/scans"),
+    ("GET /api/sites", "/api/sites"),
     ("GET /api/scans/{scan_id}", "/api/scans/{scan}"),
     ("GET /api/scans/{scan_id} (running)", "/api/scans/{running}"),
     ("GET /api/scans/{scan_id} (blocked)", "/api/scans/{blocked}"),
@@ -94,6 +95,7 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/scans/{scan_id}/evaluation (not saved)", "/api/scans/{baseline}/evaluation"),
     ("GET /api/scans/{scan_id}/manual-checks", "/api/scans/{scan}/manual-checks"),
     ("GET /api/scans/{scan_id}/comparison", "/api/scans/{scan}/comparison"),
+    ("GET /api/scans/{scan_id}/history", "/api/scans/{scan}/history"),
     (
         "GET /api/scans/{scan_id}/diff?compare_to={baseline_id}",
         "/api/scans/{scan}/diff?compare_to={baseline}",
@@ -329,9 +331,15 @@ def _add_report_history(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) 
     a ``before`` side. One image on each side exists only there (``new`` and
     ``resolved``), and a status changed since the baseline fills
     ``status_changed``. The baseline also fails the axe rule the report
-    fails, so that comparison row has before-side outcomes.
+    fails, so that comparison row has before-side outcomes. It ran with a
+    different page limit, so the comparison's ``settings_changed`` names one.
     """
     baseline = _seed(conn, blob_dir)
+    conn.execute(
+        "UPDATE scans SET config_json = json_set(COALESCE(config_json, '{}'), '$.max_pages', 7) "
+        "WHERE id = ?",
+        (baseline,),
+    )
     _add_label_violation(
         conn, scan_id=baseline, page_id=_page_ids(conn, baseline)[0], element_id="contract"
     )

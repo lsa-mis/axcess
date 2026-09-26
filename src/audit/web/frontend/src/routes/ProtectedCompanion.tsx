@@ -886,13 +886,13 @@ function ProtectedCompanionHeader({ scanId }: { scanId?: number }) {
     <PageHeader
       crumbs={[
         { label: "Reports", to: "/scans" },
-        ...(scanId ? [{ label: `Report #${scanId}`, to: `/scans/${scanId}` }] : []),
+        ...(scanId ? [{ label: `Scan ${scanId}`, to: `/scans/${scanId}` }] : []),
         { label: "Protected companion" },
       ]}
       title="Protected companion"
       subtitle={
         scanId
-          ? `Manual sign-in and read-only crawl handoff for scan #${scanId}.`
+          ? `Manual sign-in and read-only crawl handoff for scan ${scanId}.`
           : "Manual sign-in and read-only crawl handoff."
       }
       actions={

@@ -68,12 +68,18 @@ from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.db import repo
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
-from audit.exports.collector import collect_scan
+from audit.exports.collector import ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
 from audit.exports.xlsx_export import render_xlsx
+from audit.labels import (
+    CLICK_THROUGH,
+    CLICK_THROUGH_STATE,
+    CLICK_THROUGH_STATES,
+    click_through_states,
+)
 from audit.logging import configure_logging, get_logger
 from audit.protected.crypto import DeterministicLocalKms, ProtectedVault
 from audit.protected.models import ProtectedScanStatus, normalize_exact_https_origin
@@ -87,17 +93,29 @@ from audit.protected.repository import (
 from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
 from audit.synthesizer.diff import compute_diff
+from audit.wcag_version import (
+    DEFAULT_WCAG_VERSION,
+    WCAG_VERSIONS,
+    WcagVersion,
+    is_wcag_version,
+    stored_wcag_version,
+)
 from audit.web.comparison import (
+    MAX_PAGE_SIZE,
     Category,
     ComparisonError,
     ComparisonResponse,
     Pipeline,
+    SiteHistory,
     compare_reports,
     previous_scan_id,
+    site_history,
 )
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
+from audit.web.export_options import ExportOptions, PanelFormat, build_export_options
 from audit.web.export_readiness import (
     IncompleteEvaluationExportError,
+    PublicExportReadiness,
     assess_public_export_readiness,
     label_draft_export,
     public_export_filename,
@@ -148,6 +166,7 @@ class LocalLoginScanRequest(BaseModel):
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
+    wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
     skip_interaction: bool = False
     skip_keyboard: bool = False
     skip_responsive: bool = False
@@ -966,22 +985,19 @@ def create_app(
     @app.get("/api/scans")
     def api_list_scans() -> JSONResponse:
         with get_conn() as conn:
-            # Written out per schema rather than assembled from fragments:
-            # the column list is fixed, so a literal query keeps this
-            # obviously free of interpolation. On a database predating
-            # migration 0024 the counter is simply not selected, and
-            # _scan_row_to_summary reports 0 for the missing key, the
-            # truthful answer for a scan that ran before it existed.
-            has_states = _scans_have_interaction_columns(conn)
-            if _protected_scan_table_exists(conn):
-                rows = conn.execute(
-                    _SCANS_PUBLIC_WITH_STATES if has_states else _SCANS_PUBLIC_LEGACY
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    _SCANS_ALL_WITH_STATES if has_states else _SCANS_ALL_LEGACY
-                ).fetchall()
+            rows = _public_scan_rows(conn)
         return JSONResponse([_scan_row_to_summary(r) for r in rows])
+
+    @app.get("/api/sites")
+    def api_list_sites() -> JSONResponse:
+        """Public reports grouped by site, for the Reports list."""
+        from audit.web import sites
+
+        with get_conn() as conn:
+            groups = sites.group_scans(
+                conn, (_scan_row_to_summary(r) for r in _public_scan_rows(conn))
+            )
+        return JSONResponse([group.model_dump(mode="json") for group in groups])
 
     @app.get("/api/scans/{scan_id:int}")
     def api_scan_detail(scan_id: int) -> JSONResponse:
@@ -1015,6 +1031,9 @@ def create_app(
             # scan (derived from config_json + counters). Lets the UI
             # show when a scan was a partial / static-only run.
             "methods_used": _methods_used(scan, method_coverage),
+            # The WCAG version this scan was audited against. A scan stored
+            # before the setting existed ran 2.2 and reads as 2.2.
+            "wcag_version": stored_wcag_version(scan.get("config_json")),
         }
         if protection is not None:
             # The middleware has already required a verified proxy identity
@@ -1023,6 +1042,32 @@ def create_app(
             # enrollment data into it.
             payload["protection"] = _protected_summary(protection)
         return JSONResponse(payload)
+
+    @app.get("/api/scans/{scan_id:int}/settings")
+    def api_scan_settings(scan_id: int) -> JSONResponse:
+        """The settings a scan ran with, for New scan to start again from.
+
+        Built from an allow-list (see ``audit.web.scan_settings``): scan
+        settings only, never sign-in state or confirmations. A report from
+        the protected workflow is refused; its settings belong to that
+        workflow's own draft, not to this form.
+        """
+        from audit.web import scan_settings
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            protected = _get_protected_scan_compat(conn, scan_id=scan_id) is not None
+        if protected:
+            raise HTTPException(
+                status_code=409,
+                detail="Settings from a protected report cannot be reused in New scan.",
+            )
+        snapshot = scan_settings.snapshot_from_config(
+            scan_id=int(scan["id"]),
+            seed_url=str(scan["seed_url"]),
+            config_json=scan.get("config_json"),
+        )
+        return JSONResponse(snapshot.model_dump(mode="json"), headers={"Cache-Control": "no-store"})
 
     @app.get("/api/capabilities/alfa")
     def api_alfa_capability() -> JSONResponse:
@@ -1218,6 +1263,7 @@ def create_app(
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
+            wcag_version=body.wcag_version,
             alfa_enabled=body.scan_engine in {"alfa", "both"},
             interaction_checks_enabled=(
                 not body.skip_interaction and body.scan_engine in {"axe", "both"}
@@ -1416,6 +1462,21 @@ def create_app(
                 },
                 status_code=422,
             )
+        wcag_version = body.get("wcag_version", DEFAULT_WCAG_VERSION)
+        if not is_wcag_version(wcag_version):
+            return JSONResponse(
+                {
+                    "error": f"WCAG version must be {' or '.join(WCAG_VERSIONS)}.",
+                    "fields": ["wcag_version"],
+                },
+                status_code=422,
+            )
+        from audit.web.scan_settings import limit_refusal
+
+        limit = limit_refusal(body)
+        if limit is not None:
+            field, message = limit
+            return JSONResponse({"error": message, "fields": [field]}, status_code=422)
 
         form = {
             "url": url,
@@ -1443,6 +1504,7 @@ def create_app(
             "skip_visual": bool(body.get("skip_visual")),
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
+            "wcag_version": wcag_version,
         }
         config = _build_crawl_config(form, settings)
         scan_id = _prepare_scan_row(resolved_db, config)
@@ -1803,12 +1865,14 @@ def create_app(
         abilities: str = Query(default=""),
         status: str = Query(default=""),
         review_lane: str = Query(default=""),
+        finding_type: str = Query(default=""),
         q: str = Query(default=""),
         sort: str = Query(default="priority_desc"),
     ) -> JSONResponse:
         """JSON form of the unified Issues list, used by the SPA."""
         from dataclasses import asdict
 
+        from audit.labels import FINDING_TYPES
         from audit.web import issues as issues_mod
 
         with get_conn() as conn:
@@ -1825,11 +1889,15 @@ def create_app(
                 abilities=_split_csv(abilities),
                 status=status or None,
                 search=q or None,
-                review_lane=(
-                    review_lane
-                    if review_lane in {"likely_barrier", "expert_review", "informational"}
-                    else None
-                ),
+                # Comma-separated like ``conformance``; a single value reads
+                # as before, and an unknown one is ignored rather than
+                # emptying the table.
+                review_lane=[
+                    lane
+                    for lane in _split_csv(review_lane)
+                    if lane in {"likely_barrier", "expert_review", "informational"}
+                ],
+                finding_type=[kind for kind in _split_csv(finding_type) if kind in FINDING_TYPES],
                 sort=sort,
             )
         return JSONResponse(
@@ -1839,6 +1907,7 @@ def create_app(
                 "responsibility_counts": issues_mod.responsibility_breakdown(unfiltered),
                 "abilities_counts": issues_mod.abilities_breakdown(unfiltered),
                 "review_lane_counts": issues_mod.review_lane_breakdown(unfiltered),
+                "finding_type_counts": issues_mod.finding_type_breakdown(unfiltered),
                 "occurrence_counts": {
                     "all_evidence": sum(row.occurrence_count for row in unfiltered),
                     "high_confidence": sum(
@@ -2154,7 +2223,7 @@ def create_app(
         scan_id: int,
         compare_to: int | None = Query(default=None, ge=1),
         page: int = Query(default=1, ge=1),
-        page_size: int = Query(default=50, ge=1, le=50),
+        page_size: int = Query(default=50, ge=1, le=MAX_PAGE_SIZE),
         category: Category | None = None,
         pipeline: Pipeline | None = None,
     ) -> ComparisonResponse:
@@ -2169,6 +2238,15 @@ def create_app(
                     category=category,
                     pipeline=pipeline,
                 )
+            except ComparisonError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    @app.get("/api/scans/{scan_id:int}/history", response_model=SiteHistory)
+    def api_scan_history(scan_id: int) -> SiteHistory:
+        """Completed reports of this report's site, for the Compare scans trend."""
+        with get_conn() as conn:
+            try:
+                return site_history(conn, scan_id)
             except ComparisonError as exc:
                 raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
@@ -2313,8 +2391,70 @@ def create_app(
             )
         return FileResponse(index, media_type="text/html")
 
-    # The SPA's ``exportUrl()`` helper downloads from this ``/api/*`` route
-    # (a plain <a download>, bypassing the React-Router basename).
+    def collect_public_export_scan(
+        conn: sqlite3.Connection, scan_id: int, request: Request
+    ) -> ExportScan:
+        """Collect a scan for a public export, or refuse the way every export does."""
+        if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+            # Protected output needs an explicit owner-authorized,
+            # reviewed-redaction workflow.  The ordinary collectors can
+            # never be treated as such a handoff just because the caller
+            # has a proxy identity.
+            raise HTTPException(
+                status_code=403,
+                detail="Protected reports require an authorized redacted export workflow.",
+            )
+        try:
+            return collect_scan(conn, scan_id, ui_base_url=str(request.base_url).rstrip("/"))
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    def render_public_export(
+        conn: sqlite3.Connection,
+        scan: ExportScan,
+        fmt: str,
+        readiness: PublicExportReadiness,
+    ) -> str | bytes:
+        """Render one export format and apply its draft labeling."""
+        # The audit-report renderer needs the live connection so it
+        # can call the grouping helpers. The other renderers operate
+        # on the pre-collected `scan` only.
+        rendered: str | bytes
+        if fmt == "audit":
+            rendered = render_audit_report(scan, conn=conn)
+        elif fmt == "xlsx":
+            # Pass the blob store so the Issues Overview sheet can embed
+            # each finding's circled location screenshot as evidence.
+            rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+        else:
+            rendered = _EXPORT_RENDERERS[fmt](scan)
+        return label_draft_export(rendered, export_format=fmt, readiness=readiness)
+
+    # The Export panel asks this before offering its downloads, so each
+    # choice can say how big the file is and whether it will be a draft.
+    @app.get("/api/scans/{scan_id:int}/exports", response_model=ExportOptions)
+    def export_options(request: Request, scan_id: int) -> ExportOptions:
+        """Name, size and draft state of each file the Export panel offers.
+
+        Each file is rendered exactly as the download route renders it, with
+        the draft acknowledged as the panel's links acknowledge it, and then
+        measured. That costs a full render per format (about 1.5 s in total
+        for a 1,718-page scan), which is why the panel asks only when opened.
+        """
+        with get_conn() as conn:
+            scan = collect_public_export_scan(conn, scan_id, request)
+            readiness = assess_public_export_readiness(conn, scan_id, draft_acknowledged=True)
+
+            def render(fmt: PanelFormat) -> str | bytes:
+                return render_public_export(conn, scan, fmt, readiness)
+
+            return build_export_options(
+                scan_id, readiness, extensions=_EXPORT_EXTENSIONS, render=render
+            )
+
+    # The SPA's Export panel downloads from this ``/api/*`` route with
+    # ``fetch`` (see ``api.downloadExport``); its links keep the same URL as
+    # their href, bypassing the React-Router basename.
     @app.get("/api/scans/{scan_id:int}/export/{fmt}")
     def export_scan(
         request: Request,
@@ -2334,21 +2474,8 @@ def create_app(
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
-        ui_base = str(request.base_url).rstrip("/")
         with get_conn() as conn:
-            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
-                # Protected output needs an explicit owner-authorized,
-                # reviewed-redaction workflow.  The ordinary collectors can
-                # never be treated as such a handoff just because the caller
-                # has a proxy identity.
-                raise HTTPException(
-                    status_code=403,
-                    detail="Protected reports require an authorized redacted export workflow.",
-                )
-            try:
-                scan = collect_scan(conn, scan_id, ui_base_url=ui_base)
-            except ValueError as exc:
-                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            scan = collect_public_export_scan(conn, scan_id, request)
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -2357,23 +2484,7 @@ def create_app(
                 )
             except IncompleteEvaluationExportError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
-            # The audit-report renderer needs the live connection so it
-            # can call the grouping helpers. The other renderers operate
-            # on the pre-collected `scan` only.
-            rendered: str | bytes
-            if fmt_lower == "audit":
-                rendered = render_audit_report(scan, conn=conn)
-            elif fmt_lower == "xlsx":
-                # Pass the blob store so the Issues Overview sheet can embed
-                # each finding's circled location screenshot as evidence.
-                rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
-            else:
-                rendered = _EXPORT_RENDERERS[fmt_lower](scan)
-            rendered = label_draft_export(
-                rendered,
-                export_format=fmt_lower,
-                readiness=readiness,
-            )
+            rendered = render_public_export(conn, scan, fmt_lower, readiness)
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
         ext = _EXPORT_EXTENSIONS[fmt_lower]
         filename = public_export_filename(scan_id, ext, readiness)
@@ -2750,6 +2861,21 @@ _SCANS_ALL_LEGACY = (
 )
 
 
+def _public_scan_rows(conn: sqlite3.Connection) -> list[Any]:
+    """Every public scan row, newest first."""
+    # Written out per schema rather than assembled from fragments: the
+    # column list is fixed, so a literal query keeps this obviously free of
+    # interpolation. On a database predating migration 0024 the counter is
+    # simply not selected, and _scan_row_to_summary reports 0 for the
+    # missing key, the truthful answer for a scan that ran before it existed.
+    has_states = _scans_have_interaction_columns(conn)
+    if _protected_scan_table_exists(conn):
+        query = _SCANS_PUBLIC_WITH_STATES if has_states else _SCANS_PUBLIC_LEGACY
+    else:
+        query = _SCANS_ALL_WITH_STATES if has_states else _SCANS_ALL_LEGACY
+    return list(conn.execute(query).fetchall())
+
+
 def _scans_have_interaction_columns(conn: sqlite3.Connection) -> bool:
     """Return whether ``scans`` carries the interaction counters (0024+).
 
@@ -2907,6 +3033,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         browser_headless=not bool(form.get("show_browser")),
         axe_enabled=scan_engine in {"axe", "both"},
         axe_level=str(form.get("axe_level", "AA")).upper(),
+        wcag_version=form.get("wcag_version", DEFAULT_WCAG_VERSION),
         alfa_enabled=scan_engine in {"alfa", "both"},
         # DOM-state discovery operates controls in Axcess' browser and
         # re-runs axe-core after a control reveals new content. Keep the
@@ -2973,10 +3100,16 @@ def _prepare_scan_row(
             ).fetchone()
         if existing is not None:
             scan_id = int(existing["id"])
+            # The adopted row keeps the WCAG version it started with (an old
+            # row without one ran 2.2); the crawler reads it back from here.
+            stored = conn.execute(
+                "SELECT config_json FROM scans WHERE id = ?", (scan_id,)
+            ).fetchone()
+            adopted = replace(config, wcag_version=stored_wcag_version(stored["config_json"]))
             conn.execute(
                 "UPDATE scans SET status = 'running', finished_at = NULL, "
                 "failure_reason = NULL, config_json = ? WHERE id = ?",
-                (config_json_for_scan(config), scan_id),
+                (config_json_for_scan(adopted), scan_id),
             )
             return scan_id
         cur = conn.execute(
@@ -3079,15 +3212,16 @@ async def _run_local_login_background(
                     "interaction.unavailable",
                     reason="axe_engine_not_selected",
                     hint=(
-                        "Operating page controls re-runs axe on each revealed "
-                        "state. Choose an engine that includes axe-core to "
-                        "test states behind menus and dialogs."
+                        f"{CLICK_THROUGH} re-runs axe on each state a control "
+                        "reveals. Choose an engine that includes axe-core to "
+                        f"test {CLICK_THROUGH_STATES}."
                     ),
                 )
             else:
                 login_interaction = InteractionProbe(
                     axe=login_axe,
                     level=config.axe_level,  # type: ignore[arg-type]
+                    version=config.wcag_version,
                     max_clicks=config.interaction_max_clicks,
                     max_repeated=config.interaction_max_repeated,
                     max_depth=config.interaction_max_depth,
@@ -3103,6 +3237,7 @@ async def _run_local_login_background(
         fetcher = run.session.create_shared_js_fetcher(
             axe_analyzer=login_axe,
             axe_level=config.axe_level,  # type: ignore[arg-type]
+            wcag_version=config.wcag_version,
             keyboard_probe=(
                 KeyboardProbe(suppress_diagnostics=True) if config.keyboard_probe_enabled else None
             ),
@@ -3189,8 +3324,8 @@ class _AuthenticatedAlfaRunner:
         self._session = session
         self._analyzer = analyzer
 
-    async def run(self, url: str, *, level: str) -> AlfaResult:
-        return await self._session.run_alfa(self._analyzer, url, level=level)
+    async def run(self, url: str, *, level: str, version: str) -> AlfaResult:
+        return await self._session.run_alfa(self._analyzer, url, level=level, version=version)
 
 
 def _local_login_completion(summary: CrawlSummary) -> tuple[str, str | None]:
@@ -3611,7 +3746,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         },
         {
             "key": "axe",
-            "label": f"axe-core ({cfg.get('axe_level', 'AA')})",
+            "label": f"axe-core (WCAG {stored_wcag_version(cfg)} {cfg.get('axe_level', 'AA')})",
             "enabled": (flag("axe_enabled") and rendered) or axe_ran_counters,
             "checked_count": int(scan.get("axe_pages_scanned") or 0),
             "total_count": coverage["rendered_pages"],
@@ -3704,7 +3839,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         },
         {
             "key": "interaction",
-            "label": "Click Through DOM States",
+            "label": CLICK_THROUGH,
             "enabled": flag("interaction_checks_enabled", default=False) or interaction_pages > 0,
             "checked_count": interaction_pages,
             "total_count": coverage["rendered_pages"],
@@ -3716,13 +3851,13 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             or int(cfg.get("interaction_coverage_version") or 0) >= 1,
             "description": (
                 "Opens menus, dialogs, tabs, and expandable controls in the rendered "
-                "page, then runs axe-core on the DOM states those clicks reveal. A "
+                f"page, then runs axe-core on each {CLICK_THROUGH_STATE}. A "
                 "dialog is closed and verified closed before the next control is used."
             ),
             "caveat": (
                 "Requires axe-core. Bounded exploration skips payment, subscription and "
                 "other blocked actions, and blocks HTTP writes during automatic clicks; "
-                "a blocked request can leave a revealed state rendered incompletely. "
+                f"a blocked request can leave a {CLICK_THROUGH_STATE} rendered incompletely. "
                 "Controls counted as found were not necessarily operated. A dialog "
                 "that would not close ends that page's exploration and is worth a "
                 "manual look. GET side effects, existing sockets, custom controls "
@@ -3766,7 +3901,7 @@ def _interaction_clauses(states: int, coverage: dict[str, int]) -> list[str]:
     def plural(count: int, unit: str) -> str:
         return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
 
-    clauses = [f"{plural(states, 'DOM state')} reached"]
+    clauses = [click_through_states(states)]
     controls = coverage.get("interaction_controls", 0)
     if controls:
         operated = coverage.get("interaction_operated", 0)

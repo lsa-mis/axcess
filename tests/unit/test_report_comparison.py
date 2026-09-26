@@ -8,7 +8,14 @@ from typing import Any
 
 import pytest
 
-from audit.web.comparison import ComparisonError, compare_reports, previous_scan_id
+from audit.web import issues
+from audit.web.comparison import (
+    HISTORY_LIMIT,
+    ComparisonError,
+    compare_reports,
+    previous_scan_id,
+    site_history,
+)
 
 
 def scan(
@@ -294,8 +301,10 @@ def test_filters_pagination_and_empty_page_metadata(tmp_db: sqlite3.Connection) 
     empty = compare_reports(tmp_db, new, page=100)
     assert empty.rows == [] and empty.counts == first.counts
     assert empty.pipeline_counts == {"axe": 55, "keyboard": 1}
+    everything = compare_reports(tmp_db, new, page_size=500)
+    assert len(everything.rows) == 56
     with pytest.raises(ComparisonError):
-        compare_reports(tmp_db, new, page_size=51)
+        compare_reports(tmp_db, new, page_size=501)
 
 
 def test_image_occurrences_and_status_changes(tmp_db: sqlite3.Connection) -> None:
@@ -453,7 +462,7 @@ def test_missing_interaction_table_reports_incomplete_coverage(
     result = compare_reports(tmp_db, new)
 
     assert result.rows[0].category == "cannot_compare"
-    assert any("interaction states" in message for message in result.rows[0].limitations)
+    assert any("views opened by clicking" in message for message in result.rows[0].limitations)
     coverage = next(pair for pair in result.coverage if pair.pipeline == "axe")
     assert coverage.before.state == "incomplete"
     assert coverage.after.state == "incomplete"
@@ -475,7 +484,7 @@ def test_unoperated_control_prevents_claiming_revealed_issue_disappeared(
         )
     result = compare_reports(tmp_db, new)
     assert result.rows[0].category == "cannot_compare"
-    assert any("interaction states" in message for message in result.rows[0].limitations)
+    assert any("views opened by clicking" in message for message in result.rows[0].limitations)
     coverage = next(pair for pair in result.coverage if pair.pipeline == "axe")
     assert coverage.before.state == "complete"
     assert coverage.after.state == "incomplete"
@@ -510,3 +519,198 @@ def test_probe_attempt_counters_do_not_prove_successful_absence_checks(
     assert coverage.before.total == coverage.after.total == 1
     assert coverage.before.state == coverage.after.state == "unknown"
     assert any("per-check errors and probe limits" in item for item in result.limitations)
+
+
+@pytest.mark.parametrize(("new_version", "changed"), [("2.2", False), ("2.1", True)])
+def test_wcag_version_compares_what_each_scan_ran(
+    tmp_db: sqlite3.Connection, new_version: str, changed: bool
+) -> None:
+    """A report stored before the version setting ran WCAG 2.2.
+
+    Comparing it with a new 2.2 report is a like-for-like comparison and
+    must not claim the settings changed just because the old row lacks the
+    key. A new 2.1 report really did run a different rule set.
+    """
+    old = scan(tmp_db)
+    new = scan(
+        tmp_db,
+        date="2026-09-02 12:00:00",
+        config={"method_coverage_version": 1, "wcag_version": new_version},
+    )
+    finding(tmp_db, old, "button-name")
+    finding(tmp_db, new, "button-name")
+    limitations = " ".join(compare_reports(tmp_db, new).rows[0].limitations)
+    assert ("wcag_version" in limitations) is changed
+    if not changed:
+        assert "Scan settings changed" not in limitations
+
+
+def _second_page(conn: sqlite3.Connection, scan_id: int) -> int:
+    return int(
+        conn.execute(
+            "INSERT INTO pages(scan_id,url_normalized,status_code,render_mode) "
+            "VALUES(?,?,200,'js')",
+            (scan_id, "https://example.com/about"),
+        ).lastrowid
+        or 0
+    )
+
+
+def test_changes_are_presence_in_each_report(tmp_db: sqlite3.Connection) -> None:
+    """New, resolved and remaining say only where a group was found.
+
+    The stricter category stays on the row: a group that went away while a
+    method's coverage was unknown is "resolved" by presence and still
+    "cannot_compare" by the evidence.
+    """
+    old, new = scan(tmp_db), scan(tmp_db, date="2026-09-02 12:00:00")
+    finding(tmp_db, old, "gone")
+    finding(tmp_db, new, "arrived")
+    finding(tmp_db, old, "focus-hidden", pipeline="focus")
+    for report in (old, new):
+        finding(tmp_db, report, "kept")
+    result = compare_reports(tmp_db, new)
+    assert result.changes == {"new": 1, "resolved": 2, "remaining": 1}
+    rows = {row.key: row for row in result.rows}
+    assert rows["axe:arrived"].change == "new"
+    assert rows["axe:gone"].change == "resolved"
+    assert rows["axe:kept"].change == "remaining"
+    assert rows["focus:focus-hidden"].change == "resolved"
+    assert rows["focus:focus-hidden"].category == "cannot_compare"
+    # Filters narrow the rows, never the change counts.
+    assert compare_reports(tmp_db, new, category="new").changes == result.changes
+
+
+def test_display_counts_match_the_issues_table(tmp_db: sqlite3.Connection) -> None:
+    """An element repeated on a second page counts once, as on the Issues page.
+
+    Location matching still sees both findings (``occurrences``), so a repeat
+    that disappears is still a change.
+    """
+    old, new = scan(tmp_db), scan(tmp_db, date="2026-09-02 12:00:00")
+    finding(tmp_db, old, "button-name")
+    finding(tmp_db, new, "button-name")
+    page = _second_page(tmp_db, new)
+    tmp_db.execute(
+        "INSERT INTO page_a11y_findings(page_id,scan_id,rule_id,target_selector,target_hash,"
+        "help,impact,pipeline) SELECT ?,scan_id,rule_id,target_selector,target_hash,"
+        "help,impact,pipeline FROM page_a11y_findings WHERE scan_id=?",
+        (page, new),
+    )
+    result = compare_reports(tmp_db, new)
+    row = result.rows[0]
+    assert row.after and row.after.occurrences == 2
+    assert row.after.issue_occurrences == 1
+    assert result.after_totals.model_dump() == {"groups": 1, "occurrences": 1}
+    assert result.before_totals and result.before_totals.model_dump() == {
+        "groups": 1,
+        "occurrences": 1,
+    }
+
+
+def test_rows_carry_wcag_criterion_and_level(tmp_db: sqlite3.Connection) -> None:
+    """The criterion and level come from the Issues projection, unchanged."""
+    old, new = scan(tmp_db), scan(tmp_db, date="2026-09-02 12:00:00")
+    finding(tmp_db, old, "image-alt")
+    finding(tmp_db, new, "image-alt")
+    row = compare_reports(tmp_db, new).rows[0]
+    issue = issues.list_issues(tmp_db, new)[0]
+    assert row.wcag_sc == issue.wcag_sc == "1.1.1"
+    assert row.wcag_name == issue.wcag_name
+    assert row.conformance == issue.conformance == "A"
+
+
+def test_settings_changed_names_only_the_settings(tmp_db: sqlite3.Connection) -> None:
+    old = scan(tmp_db, config={"method_coverage_version": 1, "max_pages": 10})
+    new = scan(
+        tmp_db,
+        date="2026-09-02 12:00:00",
+        config={"method_coverage_version": 1, "max_pages": 20, "db_path": "/elsewhere"},
+    )
+    result = compare_reports(tmp_db, new, compare_to=old)
+    assert result.settings_changed == ["max_pages"]
+    assert "20" not in " ".join(result.settings_changed)
+
+
+def test_no_baseline_still_reports_this_reports_totals(tmp_db: sqlite3.Connection) -> None:
+    first = scan(tmp_db)
+    finding(tmp_db, first, "button-name")
+    result = compare_reports(tmp_db, first)
+    assert result.baseline is None and result.before_totals is None
+    assert result.after_totals.model_dump() == {"groups": 1, "occurrences": 1}
+    assert result.changes == {"new": 0, "resolved": 0, "remaining": 0}
+
+
+def test_site_history_is_one_sites_completed_public_reports(tmp_db: sqlite3.Connection) -> None:
+    """Oldest first, in the order a baseline is chosen, with comparison totals."""
+    later = scan(tmp_db, date="2026-09-03 12:00:00")
+    earlier = scan(tmp_db, seed="https://EXAMPLE.com:443", date="2026-09-01 12:00:00")
+    scan(tmp_db, seed="https://elsewhere.com/", date="2026-09-02 12:00:00")
+    scan(tmp_db, status="running", date="2026-09-02 13:00:00")
+    hidden = scan(tmp_db, date="2026-09-02 14:00:00")
+    tmp_db.execute("ALTER TABLE protected_scans RENAME TO saved_protected_scans")
+    tmp_db.execute("CREATE TABLE protected_scans(scan_id INTEGER)")
+    tmp_db.execute("INSERT INTO protected_scans VALUES(?)", (hidden,))
+    finding(tmp_db, later, "button-name")
+    finding(tmp_db, later, "image-alt", target="#logo")
+    history = site_history(tmp_db, later)
+    assert [point.id for point in history.scans] == [earlier, later]
+    assert history.total == 2
+    assert (history.scans[-1].groups, history.scans[-1].occurrences) == (2, 2)
+    assert (history.scans[0].groups, history.scans[0].occurrences) == (0, 0)
+    comparison = compare_reports(tmp_db, later)
+    assert comparison.baseline and comparison.baseline.id == earlier
+    assert comparison.after_totals.groups == history.scans[-1].groups
+    with pytest.raises(ComparisonError) as exc:
+        site_history(tmp_db, hidden)
+    assert exc.value.status_code == 403
+    with pytest.raises(ComparisonError) as exc:
+        site_history(tmp_db, 9999)
+    assert exc.value.status_code == 404
+
+
+def test_site_history_keeps_the_most_recent_reports(tmp_db: sqlite3.Connection) -> None:
+    ids = [scan(tmp_db, date=f"2026-08-{day:02d} 12:00:00") for day in range(1, 26)]
+    history = site_history(tmp_db, ids[0])
+    assert history.total == 25
+    assert [point.id for point in history.scans] == ids[-HISTORY_LIMIT:]
+
+
+def test_notes_say_each_limit_once_with_differences_first(tmp_db: sqlite3.Connection) -> None:
+    old, new = scan(tmp_db), scan(tmp_db, date="2026-09-02 12:00:00")
+    tmp_db.execute("UPDATE pages SET final_url='https://example.com/home'")
+    tmp_db.execute("UPDATE scans SET error_count=1 WHERE id=?", (new,))
+    tmp_db.execute("UPDATE scans SET axe_pages_scanned=0")
+    tmp_db.execute(
+        "UPDATE pages SET url_normalized='https://example.com/other' WHERE scan_id=?", (new,)
+    )
+    notes = compare_reports(tmp_db, new).notes
+    assert [(note.scans, note.differs) for note in notes] == [
+        ([], True),
+        ([new], True),
+        ([old, new], False),
+    ]
+    assert notes[0].text == (
+        f"The scans checked different pages: 1 page only in scan {old}, 1 page only in scan {new}."
+    )
+    assert notes[1].text.startswith("Errors were recorded")
+    assert notes[2].text.startswith("Some pages redirected")
+    # The method coverage table states these, and the scan is in ``scans``.
+    assert not any(
+        "checked 0 of" in note.text or "not recorded." in note.text or "Report #" in note.text
+        for note in notes
+    )
+
+
+def test_a_groups_evidence_limit_is_noted_for_the_scan_that_stored_it(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    old, new = scan(tmp_db), scan(tmp_db, date="2026-09-02 12:00:00")
+    broken = '{"diagnostic":{"message":"unsupported sizing"},"rest":'
+    finding(tmp_db, old, "sia-r69", pipeline="alfa", outcome="cant_tell", evidence=broken)
+    limit = "Stored Alfa evidence is incomplete or unavailable."
+    notes = compare_reports(tmp_db, new).notes
+    assert [(note.text, note.scans, note.differs) for note in notes] == [(limit, [old], True)]
+    finding(tmp_db, new, "sia-r69", pipeline="alfa", outcome="cant_tell", evidence=broken)
+    notes = compare_reports(tmp_db, new).notes
+    assert [(note.text, note.scans, note.differs) for note in notes] == [(limit, [old, new], False)]

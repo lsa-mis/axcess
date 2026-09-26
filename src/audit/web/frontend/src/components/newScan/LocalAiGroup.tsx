@@ -1,19 +1,8 @@
 import { GROUPS, SWITCHES } from "./copy";
 import type { GroupProps } from "./groupProps";
-import { isFixed, switchOn, switchPatch, type ScanSettings, type SwitchKey } from "./scanPolicy";
-import SettingsGroup from "./SettingsGroup";
+import { isFixed, switchOn, switchPatch } from "./scanPolicy";
+import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
-
-/** How many local-AI switches are on, for the disclosure header. */
-export function localAiCount(settings: ScanSettings, policy: GroupProps["policy"]) {
-  const keys: SwitchKey[] = ["ocr", "vision", "semantic", "motion"];
-  const shown = keys.filter(
-    (key) =>
-      !(key === "semantic" && isFixed(policy, "skip_semantic")) &&
-      !(key === "motion" && isFixed(policy, "skip_visual")),
-  );
-  return { on: shown.filter((key) => switchOn(settings, key)).length, total: shown.length };
-}
 
 function formatBytes(value: number | null): string {
   if (!value || value < 1) return "size unavailable";
@@ -37,7 +26,7 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
 
   return (
     <SettingsGroup id="local-ai" legend={GROUPS.localAi.legend} description={GROUPS.localAi.description}>
-      <div className="-mx-2 grid gap-x-4 sm:grid-cols-2">
+      <SwitchList>
         <SwitchRow
           checked={ocrOn}
           onChange={(on) => update(switchPatch(settings, "ocr", on))}
@@ -87,7 +76,7 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
             }
           />
         )}
-      </div>
+      </SwitchList>
     </SettingsGroup>
   );
 }

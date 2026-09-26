@@ -1,6 +1,6 @@
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { api, blobUrl } from "../api/client";
 import {
@@ -15,7 +15,18 @@ import {
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+} from "../components/table/Table";
 import { requestStatusRationale } from "../statusDecision";
+import { usePreferences } from "../hooks/usePreferences";
+import { messageDuration } from "../lib/preferences";
 
 const STATUSES: FindingStatus[] = [
   "new",
@@ -48,6 +59,16 @@ export default function FindingDetailRoute() {
   });
   const [status, setStatus] = useState<FindingStatus | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Settings > Session and message timing: 1.8s, five times that, or until
+  // the reader dismisses it.
+  const toastMs = messageDuration(usePreferences().messageTiming, 1800);
+  const showToast = useCallback(
+    (message: string) => {
+      setToast(message);
+      if (toastMs !== null) window.setTimeout(() => setToast(null), toastMs);
+    },
+    [toastMs],
+  );
 
   useEffect(() => {
     if (data) setStatus(data.status);
@@ -59,13 +80,11 @@ export default function FindingDetailRoute() {
     onSuccess: (_, { next }) => {
       qc.invalidateQueries({ queryKey: ["finding", id] });
       qc.invalidateQueries({ queryKey: ["findings"] });
-      setToast(`Status updated to ${next}`);
-      window.setTimeout(() => setToast(null), 1800);
+      showToast(`Status updated to ${next}`);
     },
     onError: () => {
       setStatus(data?.status ?? null);
-      setToast("Status not saved");
-      window.setTimeout(() => setToast(null), 1800);
+      showToast("Status not saved");
     },
   });
 
@@ -73,13 +92,12 @@ export default function FindingDetailRoute() {
     const rationale = requestStatusRationale(next, `finding #${id}`);
     if (rationale === null) {
       setStatus(data?.status ?? null);
-      setToast("Status unchanged");
-      window.setTimeout(() => setToast(null), 1800);
+      showToast("Status unchanged");
       return;
     }
     setStatus(next);
     save.mutate({ next, rationale });
-  }, [data?.status, id, save]);
+  }, [data?.status, id, save, showToast]);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -101,10 +119,12 @@ export default function FindingDetailRoute() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [attemptSave]);
-  const occurrences = data?.occurrences ?? [];
-  const paged = usePagedRows(occurrences, {
-    resetKey: occurrences.map((o) => `${o.page_id}:${o.page_url}`).join(","),
-  });
+  const occurrences = useMemo(() => data?.occurrences ?? [], [data]);
+  const resetKey = useMemo(
+    () => occurrences.map((o) => `${o.page_id}:${o.page_url}`).join(","),
+    [occurrences],
+  );
+  const paged = usePagedRows(occurrences, { resetKey });
 
   if (error) {
     return (
@@ -124,7 +144,7 @@ export default function FindingDetailRoute() {
       <PageHeader
         crumbs={[
           { label: "Reports", to: "/scans" },
-          { label: `Report #${data.scan_id}`, to: `/scans/${data.scan_id}` },
+          { label: `Scan ${data.scan_id}`, to: `/scans/${data.scan_id}` },
           { label: "Findings", to: `/scans/${data.scan_id}/findings` },
           { label: `Finding #${data.id}` },
         ]}
@@ -230,12 +250,23 @@ export default function FindingDetailRoute() {
             <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-fg-subtle">
               <span>Triage status</span>
               {toast && (
-                <span
-                  role="status"
-                  aria-live="polite"
-                  className="rounded-xs bg-umich-maize/60 px-2 py-0.5 text-2xs font-semibold text-umich-blue"
-                >
-                  {toast}
+                <span className="flex items-center gap-1">
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-xs bg-umich-maize/60 px-2 py-0.5 text-2xs font-semibold text-[#00274C] dark:bg-umich-maize"
+                  >
+                    {toast}
+                  </span>
+                  {toastMs === null && (
+                    <button
+                      type="button"
+                      onClick={() => setToast(null)}
+                      className="inline-flex min-h-target items-center rounded-xs px-2 text-2xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
+                    >
+                      Dismiss
+                    </button>
+                  )}
                 </span>
               )}
             </h2>
@@ -272,54 +303,49 @@ export default function FindingDetailRoute() {
       </div>
 
       {data.occurrences.length > 0 && (
-        <Card className="mt-6 overflow-hidden">
-          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-subtle">
+        <Card className="mt-6">
+          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted">
             Appears on {data.occurrences.length} page
             {data.occurrences.length === 1 ? "" : "s"}
           </div>
-          {/* Holds the tallest page's height, so paging never moves the pager. */}
-          <div {...paged.hold}>
-          <table className="w-full text-sm">
-            <thead className="text-2xs font-semibold text-fg-subtle">
-              <tr>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Page
-                </th>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Alt text on that page
-                </th>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Above fold
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paged.pageRows.map((o, i) => (
-                <tr key={i} className="hover:bg-surface-muted/60">
-                  <td className="px-4 py-2">
-                    <PageLink
-                      pageId={o.page_id}
-                      scanId={data.scan_id}
-                      pageUrl={o.page_url}
-                      pageTitle={null}
-                      origin={`Finding #${id}`}
-                      context={`Finding ${id}`}
-                      contextTo={`/findings/${id}`}
-                      backTo={`/findings/${id}`}
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    <AltTag value={o.alt_text} />
-                  </td>
-                  <td className="px-4 py-2 text-fg-muted">
-                    {o.above_fold ? "yes" : "no"}
-                  </td>
+          {paged.pages > 1 && (
+            <TableBar pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />} />
+          )}
+          <TableRegion label="Occurrences table" paged={paged}>
+            <Table caption={`Occurrences of finding #${data.id}`}>
+              <TableHead>
+                <tr>
+                  <ColumnHeader>Page</ColumnHeader>
+                  <ColumnHeader>Alt text on that page</ColumnHeader>
+                  <ColumnHeader>Above fold</ColumnHeader>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-          <TablePagination label="Occurrences" noun="occurrences" {...paged} />
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((o, i) => (
+                  <Row key={i} index={(paged.page - 1) * paged.pageSize + i}>
+                    <Cell>
+                      <PageLink
+                        pageId={o.page_id}
+                        scanId={data.scan_id}
+                        pageUrl={o.page_url}
+                        pageTitle={null}
+                        origin={`Finding #${id}`}
+                        context={`Finding ${id}`}
+                        contextTo={`/findings/${id}`}
+                        backTo={`/findings/${id}`}
+                      />
+                    </Cell>
+                    <Cell>
+                      <AltTag value={o.alt_text} />
+                    </Cell>
+                    <Cell className="text-fg-muted">
+                      {o.above_fold ? "yes" : "no"}
+                    </Cell>
+                  </Row>
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
         </Card>
       )}
     </>

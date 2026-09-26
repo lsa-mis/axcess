@@ -13,7 +13,7 @@
  *
  * One variable file per style covers 200-800, so every weight the UI asks for
  * is real rather than synthesised, and `swap` keeps text visible while it
- * loads. The system stack stays behind it in `tailwind.config.ts`.
+ * loads. The system stack stays behind it in `--font-sans` (styles.css).
  */
 
 @font-face {

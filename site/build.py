@@ -628,7 +628,7 @@ def how_it_works(summ) -> str:
     <div class="section-head">
       <span class="eyebrow">Follow-up</span>
       <h2>Rescan and compare</h2>
-      <p class="sub">Run the same scope again and open <em>Verify changes</em> to line the two reports up, issue group by issue group.</p>
+      <p class="sub">Run the same scope again and open <em>Compare scans</em> to see what is new, resolved and remaining, issue group by issue group.</p>
     </div>
     <p>When evidence is missing or the two scans covered different things, Axcess says it cannot compare reliably instead of guessing. "Not found this time" is not automatically "fixed". <a href="{REPO}/blob/main/docs/reading-your-report.md#verify-changes-after-a-fix">Read what each comparison result means.</a></p>
   </div>
@@ -1538,7 +1538,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open <em>About</em> on any row for a quick summary.</p></article>
       <article class="card">{icon("pin")}<h3>Open the evidence</h3><p>An issue's full evidence record shows the pages, the element, the code snippet, and screenshots. For problems found after a click, it names the control, for example "After clicking “Open menu”."</p></article>
       <article class="card">{icon("eye")}<h3>Check what actually ran</h3><p>The Overview tab shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
-      <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Verify changes</em> to compare.</p></article>
+      <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Compare scans</em> to see what changed.</p></article>
     </div>
     <p style="margin-top:1.25rem">The full walkthrough, including every column and export, is in <a href="{REPO}/blob/main/docs/reading-your-report.md">Reading your Axcess report</a>.</p>
   </div>

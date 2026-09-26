@@ -41,6 +41,13 @@ def test_comparison_api_and_chronological_predecessor(
     assert client.get(f"/api/scans/{current}").json()["previous_scan_id"] == old
     assert client.get(f"/api/scans/{old}/comparison").json()["baseline"] is None
     assert client.get(f"/api/scans/{current}/diff?compare_to={old}").status_code == 200
+    # The Compare scans page asks for every row at once.
+    full = client.get(f"/api/scans/{current}/comparison?page_size=500").json()
+    assert full["page_size"] == 500 and set(full["changes"]) == {"new", "resolved", "remaining"}
+    history = client.get(f"/api/scans/{current}/history")
+    assert history.status_code == 200
+    assert [point["id"] for point in history.json()["scans"]][-2:] == [old, current]
+    assert client.get("/api/scans/999999/history").status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -48,7 +55,7 @@ def test_comparison_api_and_chronological_predecessor(
     [
         ("compare_to=999999", 404),
         ("compare_to=0", 422),
-        ("page_size=51", 422),
+        ("page_size=501", 422),
         ("page_size=0", 422),
         ("page=0", 422),
         ("category=resolved", 422),
@@ -79,6 +86,11 @@ def test_comparison_api_does_not_read_protected_baseline(
     assert "private-reviewer" not in response.text
     # The automatic predecessor also skips protected reports.
     assert client.get(f"/api/scans/{current}/comparison").json()["baseline"] is None
+    # So does the trend. A protected report has none of its own: the
+    # protected-report gate answers before the endpoint does.
+    history = client.get(f"/api/scans/{current}/history").json()
+    assert old not in [point["id"] for point in history["scans"]]
+    assert client.get(f"/api/scans/{old}/history").status_code == 404
 
 
 def test_comparison_api_requires_configured_ingress_token(

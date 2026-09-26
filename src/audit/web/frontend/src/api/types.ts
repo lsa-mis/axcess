@@ -33,6 +33,20 @@ export interface ScanSummary {
   finished_at: string | null;
 }
 
+/** Every public report of one site (normalized seed scope), newest first.
+ *  The headline numbers come from `most_recent_completed` only: an
+ *  interrupted or failed crawl holds partial evidence. */
+export interface SiteGroup {
+  site_url: string;
+  scan_count: number;
+  completed_count: number;
+  most_recent: ScanSummary;
+  most_recent_completed: ScanSummary | null;
+  /** Unified issue groups in `most_recent_completed`; null when there is none. */
+  most_recent_completed_issue_count: number | null;
+  scans: ScanSummary[];
+}
+
 export interface ScanProgress {
   /** Durable pipeline stage derived from queue state; never an estimated percentage. */
   stage: "starting" | "scanning" | "preparing_report";
@@ -97,6 +111,9 @@ export interface ScanDetail extends ScanSummary {
    * the detail page flag partial / static-only runs at a glance.
    */
   methods_used: ScanMethodCoverage[];
+  /** The WCAG version this scan was audited against. Scans stored before the
+   *  setting existed ran, and report, WCAG 2.2. */
+  wcag_version: WcagVersion;
   /** Present only for an identity-authorized protected report. */
   protection?: {
     mode: "protected";
@@ -258,6 +275,10 @@ export interface SearchConfig {
   timeout_ms: number;
 }
 
+/** WCAG version a scan checks against. 2.1 is the default (the current U-M
+ *  standard); the server rejects anything else. */
+export type WcagVersion = "2.1" | "2.2";
+
 export interface NewScanPayload {
   search?: SearchConfig | null;
   url: string;
@@ -298,6 +319,22 @@ export interface NewScanPayload {
    */
   skip_rendered_storage: boolean;
   axe_level: "A" | "AA" | "AAA";
+  wcag_version: WcagVersion;
+}
+
+/**
+ * `GET /api/scans/{id}/settings`: the settings a finished, failed or
+ * stopped scan ran with, in the New scan form's own shape, so the form can
+ * start again from them. Built server-side from an allow-list of scan
+ * settings: it never carries a password, cookie, token, sign-in session,
+ * the post-sign-in landing URL, or the authorization and image-storage
+ * confirmations, and the address has any `user:password@` removed.
+ */
+export interface ScanSettingsSnapshot {
+  scan_id: number;
+  /** Which New scan tab the settings belong to. */
+  mode: "public" | "login";
+  settings: NewScanPayload;
 }
 
 // ---------------------------------------------------------------
@@ -350,6 +387,7 @@ export interface LocalLoginScanPayload {
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
   axe_level: "A" | "AA" | "AAA";
+  wcag_version: WcagVersion;
   /** Skip clicking controls and re-running axe in newly revealed DOM states. */
   skip_interaction: boolean;
   skip_keyboard: boolean;
@@ -681,6 +719,8 @@ export type ConformanceLabel = "A" | "AA" | "AAA" | "BP";
 export type AbilityLabel = "vision" | "cognition" | "motor" | "hearing";
 export type ReviewLane = "likely_barrier" | "expert_review" | "informational";
 export type EvidenceConfidence = "high" | "medium" | "low";
+/** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
+export type FindingType = "wcag" | "click_through" | "alt_text";
 
 export interface IssueRow {
   pipeline: DetectionPipeline;
@@ -719,6 +759,12 @@ export interface IssueRow {
   repeat_finding_ids: number[];
   /** Extra pages those repeats reached beyond the pages listed. */
   repeat_page_count: number;
+  /** In table order. A DOM rule group can be both "wcag" and
+   *  "click_through": some occurrences were there at page load, others only
+   *  after Click-Through operated a control. */
+  finding_types: FindingType[];
+  /** How many of occurrence_count only appeared after a control was used. */
+  click_through_occurrence_count: number;
 }
 
 export interface IssueLocation {
@@ -768,6 +814,8 @@ export interface IssuesResponse {
   responsibility_counts: Record<string, number>;
   abilities_counts: Record<AbilityLabel | string, number>;
   review_lane_counts: Record<ReviewLane, number>;
+  /** Issue groups per finding type; a mixed group counts under each. */
+  finding_type_counts: Record<FindingType, number>;
   occurrence_counts: {
     all_evidence: number;
     high_confidence: number;
@@ -1094,9 +1142,14 @@ export interface PageDomState {
 
 
 export type ComparisonCategory = "new" | "still_detected" | "changed" | "no_longer_detected" | "cannot_compare";
+/** Where a group was found: only in the later report, only in the earlier one, or both. */
+export type ComparisonChange = "new" | "resolved" | "remaining";
 export interface ComparisonLink { label: string; url: string }
 export interface ComparisonSnapshot {
+  /** Every stored finding, cross-page repeats included (what location matching compares). */
   occurrences: number;
+  /** The group as the Issues table counts it, each element once. */
+  issue_occurrences: number;
   pages: number;
   statuses: Record<string, number>;
   outcomes: Record<string, number>;
@@ -1108,9 +1161,20 @@ export interface ComparisonRow {
   pipeline: string;
   title: string;
   category: ComparisonCategory;
+  change: ComparisonChange;
+  wcag_sc: string | null;
+  wcag_name: string | null;
+  conformance: ConformanceLabel;
   before: ComparisonSnapshot | null;
   after: ComparisonSnapshot | null;
   limitations: string[];
+}
+export interface ComparisonNote {
+  text: string;
+  /** The scans it is true of, earlier first; empty when it is about the pair. */
+  scans: number[];
+  /** True of one scan or the pair, so it can make a group look new or resolved. */
+  differs: boolean;
 }
 export interface ComparisonCoverageState {
   state: "complete" | "incomplete" | "unknown" | "disabled";
@@ -1122,10 +1186,49 @@ export interface ComparisonReport {
   current: { id: number; seed_url: string; started_at: string };
   baseline: { id: number; seed_url: string; started_at: string } | null;
   counts: Record<ComparisonCategory, number>;
+  changes: Record<ComparisonChange, number>;
+  before_totals: ComparisonTotals | null;
+  after_totals: ComparisonTotals;
   pipeline_counts: Record<string, number>;
+  /** Names, never values, of the detection settings that differ. */
+  settings_changed: string[];
   limitations: string[];
+  /** Each coverage note once, without those the coverage table states. */
+  notes: ComparisonNote[];
   rows: ComparisonRow[];
   total: number;
   page: number;
   page_size: number;
+}
+/** Issue groups and occurrences, counted as the Issues table counts them. */
+export interface ComparisonTotals { groups: number; occurrences: number }
+export interface SiteHistoryPoint extends ComparisonTotals {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+}
+/** Completed public reports of one site, oldest first. */
+export interface SiteHistory {
+  site_url: string;
+  /** Every completed report of the site; ``scans`` keeps the most recent. */
+  total: number;
+  scans: SiteHistoryPoint[];
+}
+
+/** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
+export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+export interface ExportFormatOption {
+  format: ExportFormat;
+  /** The downloaded file's name, ``_DRAFT`` marker included. */
+  filename: string;
+  /** Bytes of the file as the download route renders it now. */
+  size_bytes: number;
+}
+/** ``GET /api/scans/{id}/exports``: what each download will deliver. */
+export interface ExportOptions {
+  scan_id: number;
+  /** Every file downloads as a labeled draft: expert review is unfinished. */
+  draft: boolean;
+  evaluation_status: string;
+  formats: ExportFormatOption[];
 }

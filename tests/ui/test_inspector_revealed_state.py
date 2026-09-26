@@ -191,6 +191,9 @@ async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, s
     try:
         await page.goto(url, wait_until="domcontentloaded")
         await page.wait_for_timeout(2500)
+        # The evidence list sits closed below the page; open it so its
+        # occurrences are part of the text.
+        await page.get_by_role("button", name="Stored evidence", exact=True).click()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.

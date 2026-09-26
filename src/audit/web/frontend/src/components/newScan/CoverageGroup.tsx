@@ -1,32 +1,17 @@
-import { GROUPS, NUMBERS, SWITCHES } from "./copy";
+import SearchSettings from "../SearchSettings";
+import { GROUPS, SWITCHES } from "./copy";
 import type { GroupProps } from "./groupProps";
-import NumberField from "./NumberField";
-import { isFixed, switchField, switchOn, switchPatch, type SwitchKey } from "./scanPolicy";
-import SettingsGroup from "./SettingsGroup";
+import { isFixed, switchOn, switchPatch } from "./scanPolicy";
+import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
 
-/** How many switches in this group are on, for the disclosure header. */
-export function coverageCount(settings: GroupProps["settings"], policy: GroupProps["policy"]) {
-  const keys: SwitchKey[] = ["whole_host", "include_subdomain", "ignore_robots", "click_through"];
-  const shown = keys.filter((key) => !isFixed(policy, switchField(key)));
-  return { on: shown.filter((key) => switchOn(settings, key)).length, total: shown.length };
-}
-
 /**
- * Where the scan goes: host, subdomains, robots, click-through, and the
- * two limits. The depth limit gets a strip of dots, one per click from the
- * start page, because "10" on its own reads as arbitrary and ten filled
- * dots reads as "most of the site".
+ * Where the scan goes: host, subdomains, robots, what it keeps of each
+ * page, and search discovery. The two limits sit with the rule engine in
+ * `LimitsGroup`, and Click-Through is a check, so it is under Checks.
  */
-export default function CoverageGroup({ settings, update, policy, capabilities }: GroupProps) {
+export default function CoverageGroup({ settings, update, policy }: GroupProps) {
   const login = policy.mode === "login";
-  const clickThroughBlocked = settings.static_only
-    ? "Unavailable with Fast crawl: opening controls needs a rendered page."
-    : settings.scan_engine === "alfa"
-      ? "Choose axe-core or Both: revealed content is re-checked with axe-core."
-      : null;
-  void capabilities;
-  const depth = Math.max(0, Math.min(10, Math.round(settings.max_depth)));
 
   return (
     <SettingsGroup
@@ -35,7 +20,7 @@ export default function CoverageGroup({ settings, update, policy, capabilities }
       description={GROUPS.coverage.description}
       note={policy.fixedNote}
     >
-      <div className="-mx-2 grid gap-x-4 sm:grid-cols-2">
+      <SwitchList>
         <SwitchRow
           checked={switchOn(settings, "whole_host")}
           onChange={(on) => update(switchPatch(settings, "whole_host", on))}
@@ -59,17 +44,9 @@ export default function CoverageGroup({ settings, update, policy, capabilities }
             hint={SWITCHES.ignore_robots.hint}
           />
         )}
-        <SwitchRow
-          checked={switchOn(settings, "click_through")}
-          onChange={(on) => update(switchPatch(settings, "click_through", on))}
-          disabled={clickThroughBlocked !== null}
-          label={SWITCHES.click_through.label}
-          hint={clickThroughBlocked ?? SWITCHES.click_through.hint}
-        />
         {/* What the scan keeps of each page it covers belongs with what it
             covers; it is not a speed setting. Off by default: on means the
-            rendered pages are not stored. Not in the header count, which
-            tallies what the scan does, not what it leaves out. */}
+            rendered pages are not stored. */}
         <SwitchRow
           checked={switchOn(settings, "skip_rendered_storage")}
           onChange={(on) => update(switchPatch(settings, "skip_rendered_storage", on))}
@@ -77,44 +54,16 @@ export default function CoverageGroup({ settings, update, policy, capabilities }
           label={SWITCHES.skip_rendered_storage.label}
           hint={settings.static_only ? "A Fast crawl has no rendered pages to store." : SWITCHES.skip_rendered_storage.hint}
         />
-      </div>
-
-      <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-t border-border pt-4">
-        <NumberField
-          label={NUMBERS.max_pages.label}
-          value={settings.max_pages}
-          min={1}
-          max={policy.caps.max_pages}
-          onChange={(value) => update({ max_pages: value })}
-          className="w-36"
-        />
-        <NumberField
-          label={NUMBERS.max_depth.label}
-          value={settings.max_depth}
-          min={1}
-          max={policy.caps.max_depth}
-          onChange={(value) => update({ max_depth: value })}
-          className="w-36"
-        />
-        <div className="flex flex-col gap-1.5 pb-2">
-          <span className="text-xs text-fg-muted">{NUMBERS.max_depth.hint}</span>
-          <div className="flex items-center gap-1.5" aria-hidden>
-            {Array.from({ length: 10 }, (_, index) => (
-              <span
-                key={index}
-                className={
-                  index < depth
-                    ? "h-3.5 w-3.5 scale-110 rounded-full bg-umich-blue transition-[background-color,transform] duration-200 motion-reduce:transition-none"
-                    : "h-3.5 w-3.5 rounded-full bg-border transition-[background-color,transform] duration-200 motion-reduce:transition-none"
-                }
-              />
-            ))}
-            {settings.max_depth > 10 && (
-              <span className="ml-1 text-xs font-semibold text-fg-muted">+{settings.max_depth - 10}</span>
-            )}
-          </div>
+        {/* Search discovery reaches pages only a search box links to, so it
+            decides how much of the site is visited. */}
+        <div className="px-2 py-2">
+          <SearchSettings
+            value={settings.search}
+            onChange={(search) => update({ search })}
+            disabled={settings.static_only || settings.scan_engine === "alfa"}
+          />
         </div>
-      </div>
+      </SwitchList>
     </SettingsGroup>
   );
 }

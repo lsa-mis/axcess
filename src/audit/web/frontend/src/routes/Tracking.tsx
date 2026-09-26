@@ -1,11 +1,29 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
-import Tabs from "../components/Tabs";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowDownUp, ArrowUp } from "lucide-react";
 import { api } from "../api/client";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import { Card, EmptyState, PageHeader } from "../components/ui";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  RowHeader,
+  SortHeader,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+  TableStatus,
+} from "../components/table/Table";
+import {
+  ActiveFilters,
+  FilterMenu,
+  activeFilterItems,
+  splitFilter,
+  type FilterGroup,
+} from "../components/table/FilterMenu";
+import { sortWords, type Sort, type SortDirection, type SortKind } from "../components/table/sort";
 import type {
   CoverageMethod,
   RoadmapItem,
@@ -22,9 +40,9 @@ import type {
  * Three lists used to sit behind three tabs — current coverage, criteria
  * not covered yet, and the AI roadmap — which meant a reader asking "where
  * does 1.4.5 stand?" had to know which tab to open. They are one table now,
- * with a group filter (Current / Future / AI) and, where a group has its
- * own vocabulary, a second row of chips: coverage method for Current, and
- * shipped / in progress / planned for AI.
+ * with a section filter (Current / Future / AI) and, where a section has
+ * its own vocabulary, a second group in the same Filter menu: coverage
+ * method for Current, and shipped / in progress / planned for AI.
  */
 export default function TrackingRoute() {
   const [params, setParams] = useSearchParams();
@@ -46,22 +64,21 @@ export default function TrackingRoute() {
 
   const rawView = params.get("view") ?? "";
   const view: Group | "" = isGroup(rawView) ? rawView : "";
-  const rawStatus = params.get("status") ?? "";
-  const status: TrackingStatus | "" =
-    view === "ai" && isStatus(rawStatus) ? rawStatus : "";
-  const rawMethod = params.get("method") ?? "";
-  const method: CoverageMethod | "" =
-    view === "current" && data?.coverage.methods.includes(rawMethod as CoverageMethod)
-      ? (rawMethod as CoverageMethod)
-      : "";
+  // Status and method are checkbox groups: each a comma-separated list of
+  // the checked values ("shipped,planned"), "" for all. The section stays a
+  // single choice, because it decides which of the two is offered.
+  const status = view === "ai" ? keepListed(params.get("status"), STATUSES) : "";
+  const method =
+    view === "current" && data ? keepListed(params.get("method"), listedMethods(data.coverage.methods)) : "";
   const rawSort = params.get("sort") ?? "";
   const sort: SortKey = SORT_KEYS.includes(rawSort as SortKey) ? (rawSort as SortKey) : "sc";
-  const dir: SortDir = params.get("dir") === "desc" ? "desc" : "asc";
+  const dir: SortDirection = params.get("dir") === "desc" ? "desc" : "asc";
 
-  const onSort = (key: SortKey) => {
-    // Re-clicking the active column reverses it; a new column starts
-    // ascending, which is what "first click" means everywhere else.
-    setParam({ sort: key, dir: key === sort && dir === "asc" ? "desc" : "asc" });
+  // Re-clicking the active column reverses it; a new column starts in its
+  // kind's first direction (./components/table/sort).
+  const sortProps = {
+    sort: { column: sort, direction: dir } satisfies Sort<SortKey>,
+    onSort: (next: Sort<SortKey>) => setParam({ sort: next.column, dir: next.direction }),
   };
 
   const allRows = useMemo(() => (data ? buildRows(data) : []), [data]);
@@ -72,11 +89,13 @@ export default function TrackingRoute() {
   }, [allRows]);
 
   const rows = useMemo(() => {
+    const statuses = new Set<string>(splitFilter(status));
+    const methods = new Set<string>(splitFilter(method));
     const filtered = allRows.filter(
       (row) =>
         (!view || row.group === view) &&
-        (!status || row.status === status) &&
-        (!method || row.method === method),
+        (!statuses.size || (row.status !== undefined && statuses.has(row.status))) &&
+        (!methods.size || (row.method !== undefined && methods.has(row.method))),
     );
     filtered.sort((a, b) => {
       const by =
@@ -102,17 +121,60 @@ export default function TrackingRoute() {
 
   const filterSummary = [
     view ? GROUP_LABEL[view] : "",
-    status ? STATUS_LABEL[status] : "",
-    method ? methodLabel(method) : "",
+    splitFilter(status)
+      .map((key) => STATUS_LABEL[key as TrackingStatus])
+      .join(", "),
+    splitFilter(method)
+      .map((key) => methodLabel(key as CoverageMethod))
+      .join(", "),
   ]
     .filter(Boolean)
     .join(" · ");
-  const criteria = usePagedRows(rows, { resetKey: rows.map((row) => row.key).join(",") });
-  const shipped = data?.shipped ?? [];
-  const pipelines = usePagedRows(shipped, {
-    param: "pipelinesPage",
-    resetKey: shipped.map((p) => p.pipeline).join(","),
-  });
+  // One Filter menu for the table. The section's own vocabulary (method
+  // for Current, status for AI) only appears inside that section.
+  const filterGroups: FilterGroup[] = [
+    {
+      key: "view",
+      label: "Section",
+      value: view,
+      options: [
+        { value: "", label: "All", count: allRows.length },
+        ...GROUPS.map((g) => ({ value: g, label: GROUP_LABEL[g], count: groupCounts[g] })),
+      ],
+    },
+  ];
+  if (view === "ai" && counts) {
+    filterGroups.push({
+      key: "status",
+      label: "Status",
+      value: status,
+      multiple: true,
+      options: STATUSES.map((key) => ({ value: key, label: STATUS_LABEL[key], count: counts[key] })),
+    });
+  }
+  if (view === "current" && coverage) {
+    filterGroups.push({
+      key: "method",
+      label: "Coverage method",
+      value: method,
+      multiple: true,
+      options: listedMethods(coverage.methods).map((m) => ({
+        value: m,
+        label: methodLabel(m),
+        count: coverage.by_method[m] ?? 0,
+      })),
+    });
+  }
+  // Switching section clears the sub-filter, since a method or status from
+  // another section would match nothing.
+  const onFilter = (key: string, value: string) =>
+    setParam(key === "view" ? { view: value, status: "", method: "" } : { [key]: value });
+  const clearFilters = () => setParam({ view: "", status: "", method: "" });
+
+  const criteria = usePagedRows(rows, { resetKey: `${view}|${status}|${method}|${sort}|${dir}` });
+  const shipped = useMemo(() => data?.shipped ?? [], [data]);
+  const shippedKey = useMemo(() => shipped.map((p) => p.pipeline).join(","), [shipped]);
+  const pipelines = usePagedRows(shipped, { param: "pipelinesPage", resetKey: shippedKey });
 
   return (
     <>
@@ -140,124 +202,72 @@ export default function TrackingRoute() {
           column is what you must still check yourself.
         </p>
 
-        {/* Group chips first; the second row only appears for a group that
-        has its own sub-vocabulary. Switching group clears the sub-filter,
-        since a method or status from another group would match nothing. */}
-        <Tabs
-          mode="filter"
-          label="Tracker sections"
-          className="mb-2"
-          controls="tracker-content"
-          value={view || "all"}
-          onChange={(key) =>
-            setParam({ view: key === "all" ? "" : key, status: "", method: "" })
-          }
-          items={[
-            { key: "all", label: `All (${allRows.length})` },
-            ...GROUPS.map((g) => ({
-              key: g,
-              label: `${GROUP_LABEL[g]} (${groupCounts[g]})`,
-            })),
-          ]}
-        />
-        {view === "ai" && counts && (
-          <Tabs
-            mode="filter"
-            label="Filter AI coverage by status"
-            className="mb-2"
-            controls="tracker-content"
-            value={status || "all"}
-            onChange={(key) => setParam({ status: key === "all" ? "" : key })}
-            items={[
-              { key: "all", label: "All" },
-              ...(["shipped", "in_progress", "planned"] as const).map((key) => ({
-                key,
-                label: `${STATUS_LABEL[key]} (${counts[key]})`,
-              })),
-            ]}
-          />
-        )}
-        {view === "current" && coverage && (
-          <Tabs
-            mode="filter"
-            label="Filter coverage by method"
-            className="mb-2"
-            controls="tracker-content"
-            value={method || "all"}
-            onChange={(key) => setParam({ method: key === "all" ? "" : key })}
-            items={[
-              { key: "all", label: "All" },
-              ...coverage.methods
-                .filter((m) => m !== "manual")
-                .map((m) => ({
-                  key: m,
-                  label: `${methodLabel(m)} (${coverage.by_method[m] ?? 0})`,
-                })),
-            ]}
-          />
-        )}
-
-        <p role="status" className="mb-2 text-xs text-fg-muted">
-          {isLoading
-            ? "Loading tracker…"
-            : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
-        </p>
-
-        <div id="tracker-content">
-          <Card className="overflow-x-auto">
-            {/* Holds the tallest page's height, so paging never moves the pager. */}
-            <div {...criteria.hold}>
-            <table className="w-full text-sm">
-              <caption className="sr-only">
-                WCAG 2.2 A/AA coverage and AI roadmap
-              </caption>
-              <thead className="bg-surface-muted text-xs text-fg-muted">
+        <Card>
+          <TableBar
+            pager={<TablePagination label="Criteria" noun="criteria" {...criteria} />}
+            footer={<ActiveFilters items={activeFilterItems(filterGroups)} onClear={clearFilters} />}
+          >
+            <FilterMenu groups={filterGroups} onChange={onFilter} onReset={clearFilters} />
+          </TableBar>
+          <TableStatus
+            actions={
+              <p role="status">
+                {isLoading
+                  ? "Loading tracker…"
+                  : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
+              </p>
+            }
+          >
+            Sorted by {SORT_LABELS[sort]}, {sortWords(SORT_KINDS[sort], dir)}.
+          </TableStatus>
+          <TableRegion label="Coverage and roadmap table" paged={criteria}>
+            <Table caption="WCAG 2.2 A/AA coverage and AI roadmap">
+              <TableHead>
                 <tr>
-                  <SortableTh sortKey="sc" label="SC" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="name" label="Criterion" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="level" label="Lvl" sort={sort} dir={dir} onSort={onSort} />
-                  <SortableTh sortKey="method" label="Coverage" sort={sort} dir={dir} onSort={onSort} />
-                  <Th>Status</Th>
-                  <Th>What Axcess does</Th>
-                  <Th>What remains</Th>
+                  <SortHeader column="sc" kind={SORT_KINDS.sc} {...sortProps}>
+                    SC
+                  </SortHeader>
+                  <SortHeader column="name" kind={SORT_KINDS.name} {...sortProps}>
+                    Criterion
+                  </SortHeader>
+                  <SortHeader column="level" kind={SORT_KINDS.level} {...sortProps}>
+                    Lvl
+                  </SortHeader>
+                  <SortHeader column="method" kind={SORT_KINDS.method} {...sortProps}>
+                    Coverage
+                  </SortHeader>
+                  <ColumnHeader>Status</ColumnHeader>
+                  <ColumnHeader>What Axcess does</ColumnHeader>
+                  <ColumnHeader>What remains</ColumnHeader>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border align-top">
-                {criteria.pageRows.map((row) => (
-                  <tr key={row.key} className="hover:bg-surface-muted/60">
-                    <th
-                      scope="row"
-                      className="whitespace-nowrap px-4 py-3 text-left font-mono text-xs text-fg"
-                    >
-                      {row.sc}
-                    </th>
-                    <td className="px-4 py-3 text-fg">{row.name}</td>
-                    <td className="px-4 py-3 text-xs text-fg-muted">{row.level}</td>
-                    <td className="px-4 py-3 text-xs text-fg-muted">{GROUP_LABEL[row.group]}</td>
-                    <td className="px-4 py-3">
+              </TableHead>
+              <tbody>
+                {criteria.pageRows.map((row, index) => (
+                  <Row key={row.key} index={(criteria.page - 1) * criteria.pageSize + index}>
+                    <RowHeader className="whitespace-nowrap font-mono text-xs text-fg">{row.sc}</RowHeader>
+                    <Cell className="text-fg">{row.name}</Cell>
+                    <Cell className="text-xs text-fg-muted">{row.level}</Cell>
+                    <Cell className="text-xs text-fg-muted">{GROUP_LABEL[row.group]}</Cell>
+                    <Cell>
                       <Badge tone={row.tone}>{row.badge}</Badge>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-fg-muted">
-                      {row.detail || <span className="text-fg-subtle">n/a</span>}
-                      {row.note && (
-                        <span className="mt-1 block text-2xs text-fg-subtle">{row.note}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-fg-muted">{row.remaining}</td>
-                  </tr>
+                    </Cell>
+                    <Cell className="text-xs text-fg-muted">
+                      {row.detail || "n/a"}
+                      {row.note && <span className="mt-1 block text-2xs">{row.note}</span>}
+                    </Cell>
+                    <Cell className="text-xs text-fg-muted">{row.remaining}</Cell>
+                  </Row>
                 ))}
               </tbody>
-            </table>
-            </div>
-            <TablePagination label="Criteria" noun="criteria" {...criteria} />
-          </Card>
-          {!isLoading && rows.length === 0 && (
-            <EmptyState
-              title="No rows match"
-              message="Choose All to see every criterion and roadmap item."
-            />
-          )}
-        </div>
+            </Table>
+          </TableRegion>
+        </Card>
+        {!isLoading && rows.length === 0 && (
+          <EmptyState
+            title="No rows match"
+            message="Choose All to see every criterion and roadmap item."
+          />
+        )}
       </section>
 
       <section aria-labelledby="shipped-h" className="mb-8">
@@ -271,61 +281,59 @@ export default function TrackingRoute() {
           The {deterministicCount} deterministic pipelines need only chromium
           (no Ollama); the {aiCount} AI pipelines need a local Ollama daemon.
         </p>
-        <Card className="overflow-x-auto">
-          {/* Holds the tallest page's height, so paging never moves the pager. */}
-          <div {...pipelines.hold}>
-          <table className="w-full text-sm">
-            <caption className="sr-only">
-              Detection pipelines that run on a default crawl
-            </caption>
-            <thead className="bg-surface-muted text-xs text-fg-muted">
-              <tr>
-                <Th>Pipeline</Th>
-                <Th>Engine</Th>
-                <Th>WCAG coverage</Th>
-                <Th>AI?</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border align-top">
-              {isLoading && (
+        <Card>
+          {pipelines.pages > 1 && (
+            <TableBar pager={<TablePagination label="Detection pipelines" noun="pipelines" {...pipelines} />} />
+          )}
+          <TableRegion label="Detection pipelines table" paged={pipelines}>
+            <Table caption="Detection pipelines that run on a default crawl">
+              <TableHead>
                 <tr>
-                  <td className="px-4 py-3 text-fg-subtle" colSpan={4}>
-                    Loading…
-                  </td>
+                  <ColumnHeader>Pipeline</ColumnHeader>
+                  <ColumnHeader>Engine</ColumnHeader>
+                  <ColumnHeader>WCAG coverage</ColumnHeader>
+                  <ColumnHeader>AI?</ColumnHeader>
                 </tr>
-              )}
-              {pipelines.pageRows.map((p) => (
-                <tr key={p.pipeline} className="hover:bg-surface-muted/60">
-                  <th scope="row" className="px-4 py-3 text-left font-medium text-fg">
-                    {p.name}{" "}
-                    <code className="rounded bg-surface-muted px-1 text-2xs text-fg-muted">
-                      {p.pipeline}
-                    </code>
-                    {p.note && (
-                      <span className="mt-1 block text-2xs font-normal text-fg-subtle">
-                        {p.note}
-                      </span>
-                    )}
-                  </th>
-                  <td className="px-4 py-3 text-fg-muted">{p.engine}</td>
-                  <td className="px-4 py-3 text-fg-muted">{p.scs}</td>
-                  <td className="px-4 py-3">
-                    {p.needs_ai ? (
-                      <span className="rounded bg-umich-blue px-2 py-0.5 text-2xs font-bold text-fg-inverse">
-                        AI
-                      </span>
-                    ) : (
-                      <span className="rounded bg-surface-muted px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-                        rule
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-          <TablePagination label="Detection pipelines" noun="pipelines" {...pipelines} />
+              </TableHead>
+              <tbody>
+                {isLoading && (
+                  <tr className="border-t border-border">
+                    <td className="px-2 py-2.5 text-fg-muted" colSpan={4}>
+                      Loading…
+                    </td>
+                  </tr>
+                )}
+                {pipelines.pageRows.map((p, index) => (
+                  <Row key={p.pipeline} index={(pipelines.page - 1) * pipelines.pageSize + index}>
+                    <RowHeader className="font-medium text-fg">
+                      {p.name}{" "}
+                      <code className="rounded bg-surface-muted px-1 text-2xs text-fg-muted">
+                        {p.pipeline}
+                      </code>
+                      {p.note && (
+                        <span className="mt-1 block text-2xs font-normal text-fg-muted">
+                          {p.note}
+                        </span>
+                      )}
+                    </RowHeader>
+                    <Cell className="text-fg-muted">{p.engine}</Cell>
+                    <Cell className="text-fg-muted">{p.scs}</Cell>
+                    <Cell>
+                      {p.needs_ai ? (
+                        <span className="rounded bg-umich-blue px-2 py-0.5 text-2xs font-bold text-fg-inverse">
+                          AI
+                        </span>
+                      ) : (
+                        <span className="rounded bg-surface-muted px-2 py-0.5 text-2xs font-semibold text-fg-muted">
+                          rule
+                        </span>
+                      )}
+                    </Cell>
+                  </Row>
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
         </Card>
       </section>
 
@@ -349,8 +357,19 @@ const GROUP_LABEL: Record<Group, string> = {
 };
 
 const isGroup = (value: string): value is Group => (GROUPS as readonly string[]).includes(value);
-const isStatus = (value: string): value is TrackingStatus =>
-  value === "shipped" || value === "in_progress" || value === "planned";
+const STATUSES = ["shipped", "in_progress", "planned"] as const satisfies readonly TrackingStatus[];
+
+/** The methods the Coverage method filter offers: "manual" rows are Future Coverage. */
+const listedMethods = (methods: readonly CoverageMethod[]) => methods.filter((m) => m !== "manual");
+
+/**
+ * A checkbox filter's parameter kept to the values it offers, in their order:
+ * "planned,shipped,nope" → "shipped,planned". "" is every row.
+ */
+function keepListed(raw: string | null, allowed: readonly string[]): string {
+  const on = new Set(splitFilter(raw ?? ""));
+  return allowed.filter((value) => on.has(value)).join(",");
+}
 
 /** Human labels for the roadmap status enum (never the raw key). */
 const STATUS_LABEL: Record<TrackingStatus, string> = {
@@ -364,7 +383,7 @@ const STATUS_LABEL: Record<TrackingStatus, string> = {
  * different fields, so each is flattened to the same shape up front and
  * the table never has to branch on where a row came from.
  */
-interface Row {
+interface TrackerRow {
   key: string;
   sc: string;
   name: string;
@@ -392,8 +411,8 @@ const STATUS_TONE: Record<TrackingStatus, string> = {
   planned: "bg-[#374151]",
 };
 
-function buildRows(data: TrackingData): Row[] {
-  const rows: Row[] = [];
+function buildRows(data: TrackingData): TrackerRow[] {
+  const rows: TrackerRow[] = [];
   const levelBySc = new Map<string, string>();
   for (const c of data.coverage.criteria) {
     levelBySc.set(c.sc, c.level);
@@ -415,7 +434,7 @@ function buildRows(data: TrackingData): Row[] {
   return rows;
 }
 
-function roadmapRow(item: RoadmapItem, level: string): Row {
+function roadmapRow(item: RoadmapItem, level: string): TrackerRow {
   return {
     key: `ai:${item.wcag}`,
     sc: item.wcag,
@@ -437,7 +456,22 @@ function roadmapRow(item: RoadmapItem, level: string): Row {
 
 const SORT_KEYS = ["sc", "name", "level", "method"] as const;
 type SortKey = (typeof SORT_KEYS)[number];
-type SortDir = "asc" | "desc";
+
+// Criterion numbers order as numbers (compareSc); the rest as text.
+const SORT_KINDS: Record<SortKey, SortKind> = {
+  sc: "number",
+  name: "text",
+  level: "text",
+  method: "text",
+};
+
+/** Column names as the status line says them. */
+const SORT_LABELS: Record<SortKey, string> = {
+  sc: "SC",
+  name: "Criterion",
+  level: "Level",
+  method: "Coverage",
+};
 
 /**
  * Compare success-criterion numbers as numbers, not strings: sorted as
@@ -453,48 +487,6 @@ function compareSc(a: string, b: string): number {
   }
   return 0;
 }
-
-/** A column header that sorts, carrying its state in `aria-sort`. */
-function SortableTh({
-  sortKey,
-  label,
-  sort,
-  dir,
-  onSort,
-}: {
-  sortKey: SortKey;
-  label: string;
-  sort: SortKey;
-  dir: SortDir;
-  onSort: (key: SortKey) => void;
-}) {
-  const active = sort === sortKey;
-  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowDownUp;
-  return (
-    <th
-      scope="col"
-      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}
-      className="px-4 py-2 text-left font-semibold"
-    >
-      {/* The label span carries the type treatment, per the house
-      rule that interactive controls reset the header's text styling. */}
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex min-h-target items-center gap-1 font-semibold normal-case tracking-normal text-fg-subtle hover:text-fg"
-      >
-        <span className="">{label}</span>
-        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      </button>
-    </th>
-  );
-}
-
-const Th = ({ children }: { children: React.ReactNode }) => (
-  <th scope="col" className="px-4 py-2 text-left font-semibold">
-    {children}
-  </th>
-);
 
 /**
  * Status pill. Colour is backed by a text label (never colour alone) so

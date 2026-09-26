@@ -225,9 +225,9 @@ def test_api_scan_detail_reports_actual_method_coverage(
     assert methods["keyboard"]["state"] == "checked"
     assert methods["responsive"]["state"] == "partial"
     assert methods["image"]["result"] == "No images found to analyze"
-    assert methods["interaction"]["label"] == "Click Through DOM States"
+    assert methods["interaction"]["label"] == "Click-Through"
     assert methods["interaction"]["state"] == "checked"
-    assert methods["interaction"]["result"] == "2 pages checked; 5 DOM states reached"
+    assert methods["interaction"]["result"] == "2 pages checked; 5 views opened by clicking"
 
 
 def test_api_scan_detail_404(client: TestClient) -> None:
@@ -408,6 +408,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
                 "whole_host": True,
                 "scan_engine": "both",
                 "axe_level": "AAA",
+                "wcag_version": "2.2",
                 "skip_interaction": True,
                 "skip_keyboard": True,
                 "skip_responsive": True,
@@ -430,6 +431,7 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.rps == 0.5
     assert config.whole_host is True
     assert config.axe_level == "AAA"
+    assert config.wcag_version == "2.2"
     assert config.axe_enabled is True
     assert config.interaction_checks_enabled is False
     assert config.keyboard_probe_enabled is False
@@ -2000,3 +2002,132 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
         )
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# WCAG version per scan: 2.1 by default, 2.2 on request, nothing else.
+# ---------------------------------------------------------------------------
+
+
+def _post_scan_capturing_config(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, **fields: object
+) -> tuple[int, dict[str, object]]:
+    from audit.web import server as _server
+
+    captured: dict[str, object] = {}
+
+    async def _capture(db_path, config):  # type: ignore[no-untyped-def]
+        captured["config"] = config
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _capture)
+    resp = client.post(
+        "/api/scans",
+        json={"url": "https://example.test/docs", "max_pages": 1, **fields},
+    )
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    return resp.status_code, captured
+
+
+@pytest.mark.parametrize(("fields", "expected"), [({}, "2.1"), ({"wcag_version": "2.2"}, "2.2")])
+def test_api_create_scan_passes_the_wcag_version(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    fields: dict[str, object],
+    expected: str,
+) -> None:
+    status, captured = _post_scan_capturing_config(client, monkeypatch, **fields)
+    assert status == 201
+    config = captured["config"]
+    assert getattr(config, "wcag_version", None) == expected
+
+
+@pytest.mark.parametrize("bad", ["3.0", "2.0", "", 2.2, None])
+def test_api_create_scan_rejects_an_unknown_wcag_version(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, bad: object
+) -> None:
+    status, captured = _post_scan_capturing_config(client, monkeypatch, wcag_version=bad)
+    assert status == 422
+    assert "config" not in captured
+
+
+def _local_login_post(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, **fields: object
+) -> tuple[int, dict[str, object]]:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "approved_auth_origins": [],
+                "authorization_acknowledged": True,
+                **fields,
+            },
+        )
+    return response.status_code, captured
+
+
+def test_local_login_scan_defaults_to_wcag_21(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    status, captured = _local_login_post(seeded_db, monkeypatch)
+    assert status == 201
+    assert getattr(captured["config"], "wcag_version", None) == "2.1"
+
+
+@pytest.mark.parametrize("bad", ["3.0", "2.0", 2.1, None])
+def test_local_login_scan_rejects_an_unknown_wcag_version(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, bad: object
+) -> None:
+    status, captured = _local_login_post(seeded_db, monkeypatch, wcag_version=bad)
+    assert status == 422
+    assert "config" not in captured
+
+
+def test_scan_detail_reports_an_old_scan_as_wcag_22(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """The seeded scan predates the setting, so it ran, and reports, 2.2."""
+    _, _, scan_id = seeded_db
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert body["wcag_version"] == "2.2"
+    axe = next(method for method in body["methods_used"] if method["key"] == "axe")
+    assert axe["label"].startswith("axe-core (WCAG 2.2 ")
+
+
+def test_scan_detail_reports_the_chosen_wcag_version(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET config_json = ? WHERE id = ?",
+            ('{"axe_level": "AA", "wcag_version": "2.1"}', scan_id),
+        )
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert body["wcag_version"] == "2.1"
+    axe = next(method for method in body["methods_used"] if method["key"] == "axe")
+    assert axe["label"] == "axe-core (WCAG 2.1 AA)"

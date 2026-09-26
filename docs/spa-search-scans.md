@@ -3,7 +3,7 @@
 A page can be a search interface with no links until a query is entered.
 Rendering its initial DOM does not enumerate its result routes.
 
-**Click through menus, tabs and dialogs** is on by default for new scans on
+**Click-Through: open menus, tabs and dialogs** is on by default for new scans on
 both the **Public website** and **Site with a login or 2FA** tabs. It explores
 controls and queues additional routes they reveal. You can turn it off under
 Advanced settings, in the **Coverage** group.
@@ -64,7 +64,7 @@ The runner checks each result-list state, captures routes from clicked
 options even when they have no `href`, and replays the search after a result
 opens.
 
-Links revealed by ordinary DOM-state clicks also enter the crawl queue.
+Links revealed by ordinary Click-Through clicks also enter the crawl queue.
 Normal scope, exclusions, depth and total-page limits still apply.
 Signed-in searches use the same browser session as the rest of that scan.
 
@@ -80,8 +80,8 @@ counts are stored in `scan_search_runs`.
 
 In the report's **What this scan actually checked** list, the
 **Configured search** row distinguishes checked states from no results,
-failed controls and limits. The **Click Through DOM States** row separately
-reports ordinary click-probe coverage. A selected method alone is not evidence
+failed controls and limits. The **Click-Through** row separately
+reports ordinary Click-Through coverage. A selected method alone is not evidence
 that it completed work.
 
 When a click opens a **modal** (`aria-modal="true"`, or a native `<dialog>`
@@ -114,11 +114,11 @@ Axcess stores per-page click coverage in `scan_interaction_runs`:
 - the controls each page exposed, including ones a click revealed;
 - how many distinct controls were operated;
 - clicks dispatched;
-- DOM states reached;
+- views opened by clicking;
 - controls refused by the blocked-label filter;
 - which bound (clicks, time, depth, or repeated shapes) ended the sweep.
 
-The report's **Click Through DOM States** row shows "N of M controls
+The report's **Click-Through** row shows "N of M controls
 operated". That way a reader can tell when most controls on a page were
 refused or capped. Discovery is not coverage: a counted control was not
 necessarily operated. Reports written before this ledger existed show the

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { api } from "../api/client";
@@ -7,6 +8,15 @@ import {
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+} from "../components/table/Table";
 import type { ProtectedIssueIndexGroup } from "../api/types";
 
 const SOURCE_LABEL: Record<ProtectedIssueIndexGroup["source_layer"], string> = {
@@ -42,10 +52,12 @@ export default function ProtectedIssueIndexRoute() {
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
   });
-  const groups = index.data?.groups ?? [];
-  const paged = usePagedRows(groups, {
-    resetKey: groups.map((group) => `${group.source_layer}:${group.rule_id}:${group.engine_outcome}`).join(","),
-  });
+  const groups = useMemo(() => index.data?.groups ?? [], [index.data]);
+  const resetKey = useMemo(
+    () => groups.map((group) => `${group.source_layer}:${group.rule_id}:${group.engine_outcome}`).join(","),
+    [groups],
+  );
+  const paged = usePagedRows(groups, { resetKey });
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return <p role="alert" className="text-sm text-sev-critical">This protected report identifier is invalid.</p>;
@@ -75,7 +87,7 @@ export default function ProtectedIssueIndexRoute() {
       <PageHeader
         crumbs={[
           { label: "Reports", to: "/scans" },
-          { label: `Protected report #${id}`, to: `/scans/${id}/protected` },
+          { label: `Protected report, scan ${id}`, to: `/scans/${id}/protected` },
           { label: "Issue index" },
         ]}
         title="Protected issue index"
@@ -109,27 +121,33 @@ export default function ProtectedIssueIndexRoute() {
               complete the manual checks and confirm coverage/limitations.
             </Card>
           ) : (
-            <Card className="overflow-x-auto">
-              {/* Holds the tallest page's height, so paging never moves the pager. */}
-              <div {...paged.hold}>
-              <table className="min-w-full text-sm">
-                <caption className="sr-only">Protected grouped automated issue leads</caption>
-                <thead className="bg-surface-muted text-2xs text-fg-subtle">
-                  <tr>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Source layer</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Rule</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">WCAG</th>
-                    <th scope="col" className="px-4 py-2 text-left font-semibold">Result</th>
-                    <th scope="col" className="px-4 py-2 text-right font-semibold">Occurrences</th>
-                    <th scope="col" className="px-4 py-2 text-right font-semibold">Indexed pages</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {paged.pageRows.map((group) => <IssueRow key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`} group={group} />)}
-                </tbody>
-              </table>
-              </div>
-              <TablePagination label="Protected issues" noun="issue groups" {...paged} />
+            <Card>
+              {paged.pages > 1 && (
+                <TableBar pager={<TablePagination label="Protected issues" noun="issue groups" {...paged} />} />
+              )}
+              <TableRegion label="Protected issues table" paged={paged}>
+                <Table caption="Protected grouped automated issue leads">
+                  <TableHead>
+                    <tr>
+                      <ColumnHeader>Source layer</ColumnHeader>
+                      <ColumnHeader>Rule</ColumnHeader>
+                      <ColumnHeader>WCAG</ColumnHeader>
+                      <ColumnHeader>Result</ColumnHeader>
+                      <ColumnHeader align="right">Occurrences</ColumnHeader>
+                      <ColumnHeader align="right">Indexed pages</ColumnHeader>
+                    </tr>
+                  </TableHead>
+                  <tbody>
+                    {paged.pageRows.map((group, position) => (
+                      <IssueRow
+                        key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`}
+                        group={group}
+                        index={(paged.page - 1) * paged.pageSize + position}
+                      />
+                    ))}
+                  </tbody>
+                </Table>
+              </TableRegion>
             </Card>
           )}
           <p className="mt-4 text-sm text-fg-muted">
@@ -141,16 +159,16 @@ export default function ProtectedIssueIndexRoute() {
   );
 }
 
-function IssueRow({ group }: { group: ProtectedIssueIndexGroup }) {
+function IssueRow({ group, index }: { group: ProtectedIssueIndexGroup; index: number }) {
   const result = group.engine_outcome ?? group.impact ?? "Review lead";
   return (
-    <tr className="transition-colors hover:bg-surface-muted/60">
-      <td className="px-4 py-3 text-fg">{SOURCE_LABEL[group.source_layer]}</td>
-      <td className="px-4 py-3 font-mono text-xs text-fg">{group.rule_id}</td>
-      <td className="px-4 py-3 text-fg">{group.wcag_sc ? `${group.wcag_sc} ${group.wcag_level ?? ""}`.trim() : "n/a"}</td>
-      <td className="px-4 py-3 text-fg">{result.replaceAll("_", " ")}</td>
-      <td className="px-4 py-3 text-right tabular-nums text-fg">{group.occurrence_count.toLocaleString()}</td>
-      <td className="px-4 py-3 text-right tabular-nums text-fg">{group.page_count.toLocaleString()}</td>
-    </tr>
+    <Row index={index}>
+      <Cell className="text-fg">{SOURCE_LABEL[group.source_layer]}</Cell>
+      <Cell className="font-mono text-xs text-fg">{group.rule_id}</Cell>
+      <Cell className="text-fg">{group.wcag_sc ? `${group.wcag_sc} ${group.wcag_level ?? ""}`.trim() : "n/a"}</Cell>
+      <Cell className="text-fg">{result.replaceAll("_", " ")}</Cell>
+      <Cell numeric className="text-fg">{group.occurrence_count.toLocaleString()}</Cell>
+      <Cell numeric className="text-fg">{group.page_count.toLocaleString()}</Cell>
+    </Row>
   );
 }

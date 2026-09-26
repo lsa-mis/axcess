@@ -17,7 +17,7 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import wraps
 from typing import Any, Concatenate, ParamSpec, Protocol, TypeVar
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -70,6 +70,13 @@ from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
+from audit.wcag_version import (
+    DEFAULT_WCAG_VERSION,
+    WCAG_VERSIONS,
+    WcagVersion,
+    is_wcag_version,
+    stored_wcag_version,
+)
 
 log = get_logger(__name__)
 
@@ -79,7 +86,7 @@ JOB_KIND = "fetch"
 class AlfaPageAnalyzer(Protocol):
     """Narrow per-page Alfa contract, including authenticated adapters."""
 
-    async def run(self, url: str, *, level: str) -> AlfaResult: ...
+    async def run(self, url: str, *, level: str, version: str) -> AlfaResult: ...
 
 
 @dataclass(frozen=True)
@@ -207,6 +214,12 @@ class CrawlConfig:
     # or "AAA" (all). Best-practice rules are always included.
     axe_enabled: bool = True
     axe_level: str = "AA"
+    # The WCAG version ``axe_level`` is read against, for axe and Alfa
+    # alike: "2.1" (default, the current U-M standard) or "2.2". Stored in
+    # ``config_json``; a stored scan without it ran 2.2 (see
+    # ``audit.wcag_version``), and a crawl that takes over an existing row
+    # keeps that row's version rather than this one.
+    wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
     # Independent Siteimprove Alfa ACT-rule engine. It is opt-in because it
     # runs a second local-browser capture per page. It can run alongside axe
     # or alone; Axcess still owns scope, page inventory, and evidence storage.
@@ -307,6 +320,13 @@ class CrawlConfig:
     resumable: bool = True
     search: SearchConfig | None = None
 
+    def __post_init__(self) -> None:
+        # Every entry point validates its own input first; this is the
+        # backstop that keeps an unknown version out of the engines and out
+        # of the stored config.
+        if not is_wcag_version(self.wcag_version):
+            raise ValueError(f"wcag_version must be one of {', '.join(WCAG_VERSIONS)}")
+
 
 @dataclass
 class CrawlSummary:
@@ -383,6 +403,10 @@ async def run_crawl(
     scope = url_policy.build_scope(normalized_seed, whole_host=config.whole_host)
 
     scan_id = _ensure_scan(conn, normalized_seed, config)
+    # A crawl that took over an existing row runs the WCAG version that row
+    # started with; ``_ensure_scan`` kept it in the stored config. Read it
+    # back so every engine below uses the version the report will claim.
+    config = replace(config, wcag_version=_stored_scan_wcag_version(conn, scan_id))
     queue.reclaim_expired(conn)
     # If we're reusing a scan whose queue was built under different scope
     # rules (e.g. path-scope was added after the scan started, or the user
@@ -464,6 +488,7 @@ async def run_crawl(
     # zero axe findings.
     axe_analyzer: AxeAnalyzer | None = None
     axe_level: AxeLevel = "AA"
+    wcag_version: WcagVersion = config.wcag_version
     if config.axe_enabled:
         try:
             axe_analyzer = AxeAnalyzer.from_bundled()
@@ -525,6 +550,7 @@ async def run_crawl(
         interaction_probe = InteractionProbe(
             axe=axe_analyzer,
             level=axe_level,
+            version=wcag_version,
             max_clicks=config.interaction_max_clicks,
             max_repeated=config.interaction_max_repeated,
             max_depth=config.interaction_max_depth,
@@ -548,6 +574,7 @@ async def run_crawl(
             injected=js_fetcher,
             axe_analyzer=axe_analyzer,
             axe_level=axe_level,
+            wcag_version=wcag_version,
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
@@ -690,7 +717,10 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         conn.execute(
             "UPDATE scans SET status = 'running', finished_at = NULL, "
             "failure_reason = NULL, config_json = ? WHERE id = ?",
-            (config_json_for_scan(config), config.scan_id),
+            (
+                config_json_for_scan(_keep_stored_wcag_version(conn, config.scan_id, config)),
+                config.scan_id,
+            ),
         )
         return config.scan_id
     # ``running`` is always adopted: it is either the row the web layer just
@@ -732,7 +762,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         conn.execute(
             "UPDATE scans SET status = 'running', finished_at = NULL, failure_reason = NULL, "
             "config_json = ? WHERE id = ?",
-            (config_json_for_scan(config), scan_id),
+            (config_json_for_scan(_keep_stored_wcag_version(conn, scan_id, config)), scan_id),
         )
         return scan_id
 
@@ -744,6 +774,24 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         (seed_url, _config_json(config)),
     )
     return int(cur.lastrowid or 0)
+
+
+def _stored_scan_wcag_version(conn: sqlite3.Connection, scan_id: int) -> WcagVersion:
+    """The WCAG version recorded on ``scans.config_json`` for ``scan_id``."""
+    row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    return stored_wcag_version(row["config_json"] if row is not None else None)
+
+
+def _keep_stored_wcag_version(
+    conn: sqlite3.Connection, scan_id: int, config: CrawlConfig
+) -> CrawlConfig:
+    """``config`` carrying the WCAG version of the row it is taking over.
+
+    A scan's version is fixed when the scan starts: its evidence so far was
+    gathered under that rule set, and a resumed crawl must not continue it
+    under another one. A row stored before the setting existed ran 2.2.
+    """
+    return replace(config, wcag_version=_stored_scan_wcag_version(conn, scan_id))
 
 
 def config_json_for_scan(config: CrawlConfig) -> str:
@@ -760,6 +808,9 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "max_pages": config.max_pages,
             "max_depth": config.max_depth,
             "allow_subdomains": config.allow_subdomains,
+            # Scope as chosen, so "Edit settings and retry" can put it back.
+            # Older rows omit it and read as False, the form's default.
+            "whole_host": config.whole_host,
             # Where the crawl began, when sign-in moved it off the seed. A
             # report that cannot say which page it started from cannot be
             # reproduced from its own record.
@@ -782,6 +833,8 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "vlm_enabled": config.vlm_enabled,
             "axe_enabled": config.axe_enabled,
             "axe_level": config.axe_level,
+            # Stored as given; readers go through ``stored_wcag_version``.
+            "wcag_version": config.wcag_version,
             "alfa_enabled": config.alfa_enabled,
             "alfa_timeout_s": config.alfa_timeout_s,
             "alfa_concurrency": config.alfa_concurrency,
@@ -889,6 +942,7 @@ class _LazyJs:
         injected: JsFetcher | None = None,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: AxeLevel = "AA",
+        wcag_version: WcagVersion = DEFAULT_WCAG_VERSION,
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
@@ -904,6 +958,7 @@ class _LazyJs:
         self._owned = injected is None
         self._axe_analyzer = axe_analyzer
         self._axe_level: AxeLevel = axe_level
+        self._wcag_version: WcagVersion = wcag_version
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
@@ -920,6 +975,7 @@ class _LazyJs:
                 user_agent=self._user_agent,
                 axe_analyzer=self._axe_analyzer,
                 axe_level=self._axe_level,
+                wcag_version=self._wcag_version,
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
@@ -969,6 +1025,7 @@ def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> Searc
         can_visit=can_visit,
         axe=axe,
         level=config.axe_level,  # type: ignore[arg-type]
+        version=config.wcag_version,
     )
 
 
@@ -1336,7 +1393,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # never suggest both engines observed one identical DOM snapshot.
         if ctx.alfa is not None:
             try:
-                alfa_result = await ctx.alfa.run(result.url, level=ctx.config.axe_level)
+                alfa_result = await ctx.alfa.run(
+                    result.url, level=ctx.config.axe_level, version=ctx.config.wcag_version
+                )
                 _persist_alfa(
                     ctx,
                     page_id=page_id,

@@ -10,8 +10,8 @@ export default function NotFoundRoute() {
         <>
           No route matches <code>{loc.pathname}</code>. Use the sidebar to
           navigate, or go back to the{" "}
-          <Link to="/" className="font-semibold text-umich-blue">
-            dashboard
+          <Link to="/scans" className="font-semibold text-umich-blue">
+            reports
           </Link>
           .
         </>

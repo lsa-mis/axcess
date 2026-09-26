@@ -9,6 +9,7 @@ import {
   LinkButton,
   PageHeader,
   ScanStatusBadge,
+  ScanTag,
   StatCard,
   relativeTime,
 } from "../components/ui";
@@ -73,7 +74,7 @@ export default function DashboardRoute() {
         <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 border-umich-blue/30 bg-umich-blue/5 p-4">
           <div className="flex items-center gap-2 text-sm">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-umich-maize" aria-hidden />
-            <strong className="text-fg">Scan #{running.id}</strong>
+            <strong className="text-fg">Scan {running.id}</strong>
             <span className="break-all text-fg-muted">
               is crawling {siteLabel(running.seed_url)}
             </span>
@@ -95,7 +96,7 @@ export default function DashboardRoute() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-2xs font-semibold text-fg-subtle">
-                Waiting on you · report #{latest.id} ·{" "}
+                Waiting on you · scan {latest.id} ·{" "}
                 <span className="break-all normal-case tracking-normal text-fg-muted">
                   {siteLabel(latest.seed_url)}
                 </span>
@@ -194,7 +195,7 @@ export default function DashboardRoute() {
                         {siteLabel(s.seed_url)}
                       </span>
                       <span className="block text-xs text-fg-subtle">
-                        #{s.id} · {s.page_count.toLocaleString()} page
+                        <ScanTag id={s.id} /> · {s.page_count.toLocaleString()} page
                         {s.page_count === 1 ? "" : "s"} · {s.finding_count.toLocaleString()}{" "}
                         finding{s.finding_count === 1 ? "" : "s"}
                       </span>

@@ -589,6 +589,16 @@
         }
       }
     },
+    "/api/sites": {
+      "get": {
+        "summary": "Api List Sites",
+        "description": "Public reports grouped by site, for the Reports list.",
+        "operationId": "api_list_sites_api_sites_get",
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+        }
+      }
+    },
     "/api/scans/{scan_id}": {
       "get": {
         "summary": "Api Scan Detail",
@@ -1357,7 +1367,7 @@
             "name": "page_size",
             "in": "query",
             "required": false,
-            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 50, "title": "Page Size"}
+            "schema": {"type": "integer", "maximum": 500, "minimum": 1, "default": 50, "title": "Page Size"}
           },
           {
             "name": "category",
@@ -1394,6 +1404,31 @@
           "200": {
             "description": "Successful Response",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ComparisonResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/history": {
+      "get": {
+        "summary": "Api Scan History",
+        "description": "Completed reports of this report's site, for the Compare scans trend.",
+        "operationId": "api_scan_history_api_scans__scan_id__history_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SiteHistory"}}}
           },
           "422": {
             "description": "Validation Error",
@@ -1590,6 +1625,9 @@
           "current": {"$ref": "#/components/schemas/ReportIdentity"},
           "baseline": {"anyOf": [{"$ref": "#/components/schemas/ReportIdentity"}, {"type": "null"}]},
           "counts": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Counts"},
+          "changes": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Changes"},
+          "before_totals": {"anyOf": [{"$ref": "#/components/schemas/GroupTotals"}, {"type": "null"}]},
+          "after_totals": {"$ref": "#/components/schemas/GroupTotals"},
           "pipeline_counts": {
             "additionalProperties": {"type": "integer"},
             "type": "object",
@@ -1600,11 +1638,12 @@
             "type": "array",
             "title": "Coverage"
           },
+          "settings_changed": {"items": {"type": "string"}, "type": "array", "title": "Settings Changed"},
           "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"},
           "rows": {
             "items": {"$ref": "#/components/schemas/ComparisonRow"},
             "type": "array",
-            "maxItems": 50,
+            "maxItems": 500,
             "title": "Rows"
           },
           "total": {"type": "integer", "title": "Total"},
@@ -1616,6 +1655,9 @@
           "current",
           "baseline",
           "counts",
+          "changes",
+          "before_totals",
+          "after_totals",
           "pipeline_counts",
           "limitations",
           "rows",
@@ -1639,12 +1681,28 @@
             "enum": ["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"],
             "title": "Category"
           },
+          "change": {"type": "string", "enum": ["new", "resolved", "remaining"], "title": "Change"},
+          "wcag_sc": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Wcag Sc"},
+          "wcag_name": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Wcag Name"},
+          "conformance": {"type": "string", "title": "Conformance"},
           "before": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
           "after": {"anyOf": [{"$ref": "#/components/schemas/Snapshot"}, {"type": "null"}]},
           "limitations": {"items": {"type": "string"}, "type": "array", "title": "Limitations"}
         },
         "type": "object",
-        "required": ["key", "pipeline", "title", "category", "before", "after", "limitations"],
+        "required": [
+          "key",
+          "pipeline",
+          "title",
+          "category",
+          "change",
+          "wcag_sc",
+          "wcag_name",
+          "conformance",
+          "before",
+          "after",
+          "limitations"
+        ],
         "title": "ComparisonRow"
       },
       "CoveragePair": {
@@ -1715,6 +1773,16 @@
         "required": ["label", "url"],
         "title": "EvidenceLink"
       },
+      "GroupTotals": {
+        "properties": {
+          "groups": {"type": "integer", "title": "Groups"},
+          "occurrences": {"type": "integer", "title": "Occurrences"}
+        },
+        "type": "object",
+        "required": ["groups", "occurrences"],
+        "title": "GroupTotals",
+        "description": "A report's issue groups and occurrences, counted as the Issues table does."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1725,6 +1793,18 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryPoint": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "started_at": {"type": "string", "title": "Started At"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"},
+          "groups": {"type": "integer", "title": "Groups"},
+          "occurrences": {"type": "integer", "title": "Occurrences"}
+        },
+        "type": "object",
+        "required": ["id", "started_at", "finished_at", "groups", "occurrences"],
+        "title": "HistoryPoint"
       },
       "LocalLoginScanRequest": {
         "properties": {
@@ -1756,6 +1836,7 @@
             "default": "axe"
           },
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level", "default": "AA"},
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version", "default": "2.1"},
           "skip_interaction": {"type": "boolean", "title": "Skip Interaction", "default": false},
           "skip_keyboard": {"type": "boolean", "title": "Skip Keyboard", "default": false},
           "skip_responsive": {"type": "boolean", "title": "Skip Responsive", "default": false},
@@ -2056,9 +2137,26 @@
         "required": ["target"],
         "title": "SearchTarget"
       },
+      "SiteHistory": {
+        "properties": {
+          "site_url": {"type": "string", "title": "Site Url"},
+          "total": {"type": "integer", "title": "Total"},
+          "scans": {
+            "items": {"$ref": "#/components/schemas/HistoryPoint"},
+            "type": "array",
+            "maxItems": 20,
+            "title": "Scans"
+          }
+        },
+        "type": "object",
+        "required": ["site_url", "total", "scans"],
+        "title": "SiteHistory",
+        "description": "Completed public reports of one site, oldest first, for the trend."
+      },
       "Snapshot": {
         "properties": {
           "occurrences": {"type": "integer", "title": "Occurrences"},
+          "issue_occurrences": {"type": "integer", "title": "Issue Occurrences"},
           "pages": {"type": "integer", "title": "Pages"},
           "statuses": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Statuses"},
           "outcomes": {"additionalProperties": {"type": "integer"}, "type": "object", "title": "Outcomes"},
@@ -2076,7 +2174,7 @@
           }
         },
         "type": "object",
-        "required": ["occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
+        "required": ["occurrences", "issue_occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
         "title": "Snapshot"
       },
       "ValidationError": {

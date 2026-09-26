@@ -6,8 +6,17 @@ import DomSource from "../components/DomSource";
 import { api } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
-import { Card, EmptyState, ExternalLinkButton, LinkButton, pageEvidencePath, Select } from "../components/ui";
+import {
+  Card,
+  Disclosure,
+  EmptyState,
+  ExternalLinkButton,
+  LinkButton,
+  pageEvidencePath,
+  Select,
+} from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { CLICK_THROUGH_STATE } from "../lib/labels";
 
 type TabId = "page" | "dom";
 
@@ -588,7 +597,7 @@ export default function InspectorRoute() {
                   at page load, which is the one state the reviewer has just
                   said they do not want. */}
               <p className="text-sm font-semibold text-fg">
-                This interaction state was not captured
+                This {CLICK_THROUGH_STATE} was not captured
               </p>
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
@@ -695,38 +704,6 @@ export default function InspectorRoute() {
       >
         {render.ok && render.dom_html ? (
           <div>
-            {scopedFindings.length > 0 && (
-              <div className="border-b border-border bg-surface-muted/40 px-3 py-2">
-                <p className="text-2xs font-semibold text-fg-subtle">
-                  Stored evidence
-                </p>
-                <ul className="mt-1.5 space-y-2">
-                  {scopedFindings.slice(0, 3).map((f) => (
-                    <li key={f.id} className="text-xs">
-                      <p className="font-semibold text-fg">
-                        {f.help}
-                        <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
-                      </p>
-                      {f.target_selector && (
-                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
-                          {f.target_selector}
-                        </code>
-                      )}
-                      {f.html_snippet && (
-                        <pre className="mt-1 max-h-24 overflow-auto rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
-                          {f.html_snippet}
-                        </pre>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {scopedFindings.length > 3 && (
-                  <p className="mt-1 text-2xs text-fg-muted">
-                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this state.
-                  </p>
-                )}
-              </div>
-            )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-muted/40 px-3 py-2">
               <span className="text-xs font-semibold text-fg-subtle">
                 {highlightPending
@@ -828,6 +805,42 @@ export default function InspectorRoute() {
               never run here, so a flagged element the site would have revealed
               with JavaScript is forced visible to be highlighted.
             </p>
+            {/* Below the page and closed: above it, the list pushed the page
+                the reviewer came to see out of view. */}
+            {scopedFindings.length > 0 && (
+              <Disclosure
+                id="inspect-evidence"
+                title="Stored evidence"
+                meta={`${scopedFindings.length} occurrence${scopedFindings.length === 1 ? "" : "s"}`}
+                className="rounded-none border-0 border-t"
+              >
+                <ul className="space-y-2">
+                  {scopedFindings.slice(0, 3).map((f) => (
+                    <li key={f.id} className="text-xs">
+                      <p className="font-semibold text-fg">
+                        {f.help}
+                        <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
+                      </p>
+                      {f.target_selector && (
+                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
+                          {f.target_selector}
+                        </code>
+                      )}
+                      {f.html_snippet && (
+                        <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
+                          {f.html_snippet}
+                        </pre>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                {scopedFindings.length > 3 && (
+                  <p className="mt-1 text-2xs text-fg-muted">
+                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this state.
+                  </p>
+                )}
+              </Disclosure>
+            )}
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">

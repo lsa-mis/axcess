@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ListChecks, PlusCircle, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight, ListChecks, PlusCircle, Trash2 } from "lucide-react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { api } from "../api/client";
 import {
   protectedQueryKey,
@@ -14,31 +14,143 @@ import {
   LinkButton,
   PageHeader,
   ScanStatusBadge,
+  ScanTag,
   relativeTime,
 } from "../components/ui";
-import type { ProtectedScanSummary, ScanSummary } from "../api/types";
+import { cn } from "../lib/cn";
+import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
+import type { ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
+import { confirmDestructive } from "../hooks/usePreferences";
+import BreakableUrl from "../components/BreakableUrl";
+import LastScannedSite from "../components/LastScannedSite";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  RowHeader,
+  SortHeader,
+  Table,
+  TableHead,
+  TableRegion,
+  TableSearch,
+  TableStatus,
+  TableBar,
+  rowBand,
+} from "../components/table/Table";
+import { sortWords, type Sort, type SortKind } from "../components/table/sort";
 
 /**
- * Scans list, the SPA's home page. Each row tells the operator three
- * things at a glance: where the crawl is pointed, what state it's in
- * (color-coded badge), and how recently it ran. Per-row actions live at
- * the right edge so the row body stays scannable.
+ * Reports list, one row per site. A site is a normalized seed scope, the
+ * same key "compare to previous report" uses, and the server does the
+ * grouping so the two can never disagree.
  *
- * Running scans get a tinted background so they're impossible to miss
- * (and a pulsing badge from ScanStatusBadge as the secondary signal).
- * The Delete affordance is disabled for running scans, the backend
- * would 409 anyway, but disabling client-side avoids the round-trip.
+ * A row shows one scan: the site's most recent *completed* run, the only
+ * one whose numbers stand for the site. Interrupted, failed and running
+ * scans never reach the row; they are listed, with every other scan, when
+ * the site is expanded. Which scan the numbers come from is carried three
+ * ways so no one depends on the shading: a spanning header over the group,
+ * `headers` on each grouped cell so a screen reader reads the group name
+ * with the value, and the help text above the table.
+ *
+ * Expanding a site lists all of its scans with the per-report actions
+ * (All issues, Delete) the flat list used to carry.
  */
-const REPORTS_PER_PAGE = 10;
+type SortKey = "site" | "scans" | "pages" | "issues" | "images" | "states" | "completed";
+
+const SORT_KINDS: Record<SortKey, SortKind> = {
+  site: "text",
+  scans: "number",
+  pages: "number",
+  issues: "number",
+  images: "number",
+  states: "number",
+  completed: "date",
+};
+
+const SORT_LABELS: Record<SortKey, string> = {
+  site: "Site",
+  scans: "Scans",
+  pages: "Pages",
+  issues: "Issues",
+  images: "Images with text",
+  states: CLICK_THROUGH_STATES_LABEL,
+  completed: "Completed",
+};
+
+// Ids for the two-level header. Grouped cells name both through `headers`.
+const GROUP_HEADER_ID = "reports-completed-group";
+const COLUMN_HEADER_IDS = {
+  pages: "reports-col-pages",
+  issues: "reports-col-issues",
+  images: "reports-col-images",
+  states: "reports-col-states",
+  completed: "reports-col-completed",
+  report: "reports-col-report",
+} as const;
+const TOTAL_COLUMNS = 8;
+
+/** `https://a.example/docs/` reads as `a.example/docs`; other schemes stay visible. */
+export function siteLabel(siteUrl: string): string {
+  return siteUrl.replace(/^https:\/\//, "").replace(/\/$/, "");
+}
+
+/** The sortable value; null sorts last in either direction. */
+function sortValue(site: SiteGroup, key: SortKey): number | string | null {
+  const completed = site.most_recent_completed;
+  switch (key) {
+    case "site":
+      return siteLabel(site.site_url).toLowerCase();
+    case "scans":
+      return site.scan_count;
+    case "pages":
+      return completed ? completed.page_count : null;
+    case "issues":
+      return site.most_recent_completed_issue_count;
+    case "images":
+      return completed ? completed.finding_count : null;
+    case "states":
+      return completed ? completed.dom_state_count ?? 0 : null;
+    case "completed":
+      // Report ids increase with creation, so they order runs without a
+      // start time too.
+      return completed ? completed.id : null;
+  }
+}
+
+/** A site matches when its address, or any of its scans' start address,
+ *  contains the query. Case-insensitive; `query` is already lower case. */
+function matchesSearch(site: SiteGroup, query: string): boolean {
+  if (site.site_url.toLowerCase().includes(query)) return true;
+  return site.scans.some((scan) => scan.seed_url.toLowerCase().includes(query));
+}
+
+function sortSites(sites: SiteGroup[], { column, direction }: Sort<SortKey>): SiteGroup[] {
+  return [...sites].sort((a, b) => {
+    const left = sortValue(a, column);
+    const right = sortValue(b, column);
+    if (left === null || right === null) {
+      if (left === right) return b.most_recent.id - a.most_recent.id;
+      return left === null ? 1 : -1;
+    }
+    const diff = left < right ? -1 : left > right ? 1 : 0;
+    if (diff !== 0) return direction === "asc" ? diff : -diff;
+    return b.most_recent.id - a.most_recent.id;
+  });
+}
+
+// One empty list, so the memoized views below do not recompute while loading.
+const NO_SITES: SiteGroup[] = [];
 
 export default function ScansRoute() {
-  const [searchInput, setSearchInput] = useState("");
+  const [sort, setSort] = useState<Sort<SortKey>>({ column: "completed", direction: "desc" });
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [requestedPage, setPage] = useState(1);
-  const [requestedProtectedPage, setProtectedPage] = useState(1);
-  const { data: scans = [], isLoading, isError } = useQuery({
-    queryKey: ["scans"],
-    queryFn: api.listScans,
+  // Under the "scans" prefix so every existing invalidation of the scan
+  // list (create, cancel, delete) refreshes the grouped view as well.
+  const { data: sites = NO_SITES, isLoading, isError } = useQuery({
+    queryKey: ["scans", "sites"],
+    queryFn: api.listSites,
   });
   const protectedIdentity = useProtectedIdentityContext();
   const protectedReports = useQuery({
@@ -54,19 +166,39 @@ export default function ScansRoute() {
     // misleading error card.
     retry: false,
   });
-  const protectedScans =
-    protectedIdentity.isReady && !protectedReports.isFetching
-      ? protectedReports.data?.reports ?? []
-      : [];
+  const protectedList = protectedReports.data?.reports;
+  const protectedShown = protectedIdentity.isReady && !protectedReports.isFetching;
+  // The same array until the data changes, so the pager does not re-measure
+  // its table on every render.
+  const protectedScans = useMemo(
+    () => (protectedShown ? protectedList ?? [] : []),
+    [protectedShown, protectedList],
+  );
 
   const query = search.trim().toLowerCase();
-  const filteredScans = scans.filter((scan) => !query || scan.seed_url.toLowerCase().includes(query) || `#${scan.id}`.includes(query));
-  const filteredProtectedScans = protectedScans.filter((report) => !query || `#${report.scan_id}`.includes(query));
+  // Filtered and sorted only when the sites, the search or the sort change,
+  // not on every render (expanding a site, a refetch that changed nothing).
+  const matchingSites = useMemo(
+    () => (query ? sites.filter((site) => matchesSearch(site, query)) : sites),
+    [sites, query],
+  );
+  const sortedSites = useMemo(() => sortSites(matchingSites, sort), [matchingSites, sort]);
+  const scanTotal = sites.reduce((total, site) => total + site.scan_count, 0);
 
-  const page = Math.min(requestedPage, Math.max(1, Math.ceil(filteredScans.length / REPORTS_PER_PAGE)));
-  const protectedPage = Math.min(requestedProtectedPage, Math.max(1, Math.ceil(filteredProtectedScans.length / REPORTS_PER_PAGE)));
-  const visibleScans = filteredScans.slice((page - 1) * REPORTS_PER_PAGE, page * REPORTS_PER_PAGE);
-  const visibleProtectedScans = filteredProtectedScans.slice((protectedPage - 1) * REPORTS_PER_PAGE, protectedPage * REPORTS_PER_PAGE);
+  // A new search or sort starts the table over at page 1.
+  const sitePages = usePagedRows(sortedSites, { resetKey: `${query}|${sort.column}|${sort.direction}` });
+  const protectedPages = usePagedRows(protectedScans, { param: "protectedPage" });
+
+  // Stable, so a site row that did not change skips re-rendering.
+  const toggleSite = useCallback((siteUrl: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(siteUrl)) next.delete(siteUrl);
+      else next.add(siteUrl);
+      return next;
+    });
+  }, []);
+  const sortProps = { sort, onSort: setSort };
 
   return (
     <>
@@ -74,40 +206,21 @@ export default function ScansRoute() {
           global CTA. The empty state below keeps its contextual one. */}
       <PageHeader
         title="Reports"
-        subtitle={isLoading ? "Loading…" : isError ? "Reports unavailable" : `${scans.length} public reports`}
+        subtitle={
+          isLoading
+            ? "Loading…"
+            : isError
+              ? "Reports unavailable"
+              : `${sites.length} ${sites.length === 1 ? "site" : "sites"} · ${scanTotal} ${scanTotal === 1 ? "scan" : "scans"}`
+        }
       />
 
-      <form role="search" aria-label="Search reports" className="mb-4 flex flex-wrap items-end gap-2" onSubmit={(event) => {
-        event.preventDefault();
-        setSearch(searchInput);
-        setPage(1);
-        setProtectedPage(1);
-      }}>
-        <div className="w-full sm:max-w-sm">
-          <label htmlFor="report-search" className="mb-1 block text-sm font-medium text-fg">Search reports</label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-            <input id="report-search" type="search" className="field rounded-lg pl-9" placeholder="Site URL or report #" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
-          </div>
-        </div>
-        <Button type="submit" variant="primary" className="rounded-lg">
-          <Search className="h-4 w-4" aria-hidden /> Search
-        </Button>
-        {search && <Button type="button" variant="ghost" onClick={() => {
-          setSearchInput(""); setSearch(""); setPage(1); setProtectedPage(1);
-        }}>Clear search</Button>}
-      </form>
-      {query && <p role="status" className="mb-4 text-sm text-fg-muted">
-        {filteredScans.length} public reports{protectedIdentity.isReady ? ` and ${filteredProtectedScans.length} protected reports` : ""} match “{search.trim()}”. Protected reports are searched by report number only.
-      </p>}
-
-      <p id="reports-help" className="mb-4 text-sm text-fg-muted">
-        Findings are observations recorded during a scan. Related findings are grouped
-        into issues. Open All issues to review every detection method, affected pages,
-        and suggested fixes. The Image findings column counts only image-of-text evidence; zero
-        does not mean there are no other issues. DOM states are page states reached
-        by operating controls. Some findings need manual confirmation.
-      </p>
+      {/* No help paragraph above the table. It restated the "Most recent
+          completed scan" band and glossed each column, and as the table's
+          description a screen reader read all of it on every entry. The band,
+          the caption and each cell's `headers` say which scan the numbers
+          come from. */}
+      {!isLoading && !isError && <LastScannedSite sites={sites} />}
 
       {isError ? (
         <p role="alert" className="mb-4 text-sm text-sev-critical">
@@ -115,7 +228,7 @@ export default function ScansRoute() {
         </p>
       ) : isLoading ? (
         <p role="status">Loading reports…</p>
-      ) : scans.length === 0 && protectedScans.length === 0 ? (
+      ) : sites.length === 0 && protectedScans.length === 0 ? (
         <EmptyState
           title="No scans yet"
           message="Point the crawler at a URL to start auditing."
@@ -127,48 +240,96 @@ export default function ScansRoute() {
         />
       ) : (
         <Card>
-          {/* Keyboard users need focus on the overflow region to scroll the table. */}
-          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-          <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Public reports table" aria-describedby="reports-help" tabIndex={0}>
-            <table className="min-w-[58rem] w-full text-sm">
-              <caption className="sr-only">Public reports, newest first</caption>
-              <thead className="bg-surface-muted text-xs text-fg-muted">
+          {/* One small search, in the table's own bar: it filters the rows
+              below by site address. The ⌘K palette still finds anything
+              anywhere; this is for narrowing a long list in place. */}
+          <TableBar pager={<TablePagination label="Public reports" noun="sites" {...sitePages} />}>
+            <TableSearch label="Search sites" id="site-search" value={search} onChange={setSearch} />
+          </TableBar>
+          <TableStatus
+            actions={
+              // Always mounted, so the count is announced when it changes.
+              <p role="status">
+                {query &&
+                  `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
+              </p>
+            }
+          >
+            Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
+          </TableStatus>
+          <TableRegion label="Public reports table" paged={sitePages}>
+            <Table
+              className="min-w-[56rem]"
+              caption="Public reports by site. Grouped columns come from each site’s most recent completed scan."
+            >
+              <TableHead>
                 <tr>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Report
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Site URL
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Pages
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    DOM states
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Image findings
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Started
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Actions
-                  </th>
+                  <SortHeader
+                    column="site"
+                    kind="text"
+                    rowSpan={2}
+                    wrap="words"
+                    className="sticky left-0 z-[2] bg-surface-muted align-bottom"
+                    {...sortProps}
+                  >
+                    {SORT_LABELS.site}
+                  </SortHeader>
+                  <SortHeader column="scans" kind="number" rowSpan={2} align="right" wrap="words" className="align-bottom" {...sortProps}>
+                    {SORT_LABELS.scans}
+                  </SortHeader>
+                  <ColumnHeader
+                    id={GROUP_HEADER_ID}
+                    scope="colgroup"
+                    colSpan={6}
+                    className="border-l-2 border-umich-blue bg-umich-blue/10 pb-1 pt-2 text-xs text-fg-accent"
+                  >
+                    Most recent completed scan
+                  </ColumnHeader>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredScans.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-fg-muted">No public reports match your search.</td></tr>}
-                {visibleScans.map((s) => (
-                  <ScanRow key={s.id} scan={s} />
-                ))}
+                <tr>
+                  {(["pages", "issues", "images", "states", "completed"] as const).map((column) => (
+                    <SortHeader
+                      key={column}
+                      column={column}
+                      kind={SORT_KINDS[column]}
+                      id={COLUMN_HEADER_IDS[column]}
+                      align={column === "completed" ? "left" : "right"}
+                      wrap="words"
+                      className={cn("bg-umich-blue/10", column === "pages" && "border-l-2 border-umich-blue")}
+                      {...sortProps}
+                    >
+                      {SORT_LABELS[column]}
+                    </SortHeader>
+                  ))}
+                  <ColumnHeader id={COLUMN_HEADER_IDS.report} align="right" className="whitespace-nowrap bg-umich-blue/10">
+                    Report
+                  </ColumnHeader>
+                </tr>
+              </TableHead>
+              <tbody>
+                {sortedSites.length === 0 && (
+                  <tr className="border-t border-border">
+                    <td colSpan={TOTAL_COLUMNS} className="p-6 text-center text-fg-muted">
+                      {query ? `No sites match “${search.trim()}”.` : "No public reports yet."}
+                    </td>
+                  </tr>
+                )}
+                {sitePages.pageRows.map((site, index) => {
+                  const position = (sitePages.page - 1) * sitePages.pageSize + index;
+                  return (
+                    <SiteRows
+                      key={site.site_url}
+                      site={site}
+                      index={position}
+                      rowId={`site-row-${position}`}
+                      expanded={expanded.has(site.site_url)}
+                      onToggle={toggleSite}
+                    />
+                  );
+                })}
               </tbody>
-            </table>
-          </div>
-          <ReportPagination label="Public reports" page={page} total={filteredScans.length} onPageChange={setPage} />
+            </Table>
+          </TableRegion>
         </Card>
       )}
 
@@ -204,29 +365,33 @@ export default function ScansRoute() {
             </Card>
           ) : (
             <Card>
-              {/* Keyboard users need focus on the overflow region to scroll the table. */}
-              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-              <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Protected reports table" tabIndex={0}>
-                <table className="min-w-[58rem] w-full text-sm">
-                  <caption className="sr-only">Your protected reports, newest activity first</caption>
-                  <thead className="bg-surface-muted text-xs text-fg-muted">
+              {protectedPages.pages > 1 && (
+                <TableBar pager={<TablePagination label="Protected reports" noun="reports" {...protectedPages} />} />
+              )}
+              <TableRegion label="Protected reports table" paged={protectedPages}>
+                <Table className="min-w-[58rem]" caption="Your protected reports, newest activity first">
+                  <TableHead>
                     <tr>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Report</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Status</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Handling</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Pages</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Issue leads</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Updated</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Open</th>
+                      <ColumnHeader>Report</ColumnHeader>
+                      <ColumnHeader>Status</ColumnHeader>
+                      <ColumnHeader>Handling</ColumnHeader>
+                      <ColumnHeader align="right">Pages</ColumnHeader>
+                      <ColumnHeader align="right">Issue leads</ColumnHeader>
+                      <ColumnHeader>Updated</ColumnHeader>
+                      <ColumnHeader align="right">Open</ColumnHeader>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredProtectedScans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-fg-muted">No protected reports match your search.</td></tr>}
-                    {visibleProtectedScans.map((report) => <ProtectedReportRow key={report.scan_id} report={report} />)}
+                  </TableHead>
+                  <tbody>
+                    {protectedPages.pageRows.map((report, index) => (
+                      <ProtectedReportRow
+                        key={report.scan_id}
+                        report={report}
+                        index={(protectedPages.page - 1) * protectedPages.pageSize + index}
+                      />
+                    ))}
                   </tbody>
-                </table>
-              </div>
-              <ReportPagination label="Protected reports" page={protectedPage} total={filteredProtectedScans.length} onPageChange={setProtectedPage} />
+                </Table>
+              </TableRegion>
             </Card>
           )}
         </section>
@@ -235,109 +400,183 @@ export default function ScansRoute() {
   );
 }
 
-function ReportPagination({ label, page, total, onPageChange }: {
-  label: string;
-  page: number;
-  total: number;
-  onPageChange: (page: number) => void;
+/**
+ * One site's summary row, plus its scan list when expanded. The expanded
+ * list is its own captioned table: a nested table keeps each scan's
+ * columns labelled, where extra rows in the outer table would sit under
+ * headers that describe a different scan. Memoized: expanding one site
+ * re-renders that site's rows, not every row on the page.
+ */
+const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle }: {
+  site: SiteGroup;
+  /** Position across pages, for the row stripe. */
+  index: number;
+  rowId: string;
+  expanded: boolean;
+  onToggle: (siteUrl: string) => void;
 }) {
-  const pages = Math.max(1, Math.ceil(total / REPORTS_PER_PAGE));
+  const label = siteLabel(site.site_url);
+  const completed = site.most_recent_completed;
+  const detailId = `${rowId}-scans`;
+  const grouped = (column: keyof typeof COLUMN_HEADER_IDS) =>
+    `${rowId} ${GROUP_HEADER_ID} ${COLUMN_HEADER_IDS[column]}`;
+  const groupCell = "bg-umich-blue/[0.04]";
   return (
-    <nav aria-label={`${label} pagination`} className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
-      <p role="status" aria-atomic="true" className="text-sm text-fg-muted">
-        Showing {total === 0 ? 0 : (page - 1) * REPORTS_PER_PAGE + 1}–{Math.min(page * REPORTS_PER_PAGE, total)} of {total} reports · Page {page} of {pages}
-      </p>
-      <div className="flex gap-2">
-        <Button variant="secondary" aria-label={`Previous page of ${label.toLowerCase()}`} aria-disabled={page === 1} onClick={() => { if (page > 1) onPageChange(page - 1); }}>
-          Previous
-        </Button>
-        <Button variant="secondary" aria-label={`Next page of ${label.toLowerCase()}`} aria-disabled={page === pages} onClick={() => { if (page < pages) onPageChange(page + 1); }}>
-          Next
-        </Button>
-      </div>
-    </nav>
+    <>
+      <Row index={index}>
+        <RowHeader id={rowId} sticky className="min-w-52 max-w-xs py-1 font-normal">
+          <div className="flex items-start gap-1">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={expanded ? detailId : undefined}
+              aria-label={`${expanded ? "Hide" : "Show"} all ${site.scan_count} ${site.scan_count === 1 ? "scan" : "scans"} for ${label}`}
+              onClick={() => onToggle(site.site_url)}
+              className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg"
+            >
+              <ChevronRight
+                className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", expanded && "rotate-90")}
+                aria-hidden
+              />
+            </button>
+            <div className="min-w-0 py-2">
+              <span className="block break-words font-semibold text-fg" title={site.site_url}>
+                <BreakableUrl text={label} />
+              </span>
+              <span className="block text-xs text-fg-muted">
+                {site.completed_count} completed
+              </span>
+            </div>
+          </div>
+        </RowHeader>
+        <Cell numeric className="text-fg">
+          {site.scan_count.toLocaleString()}
+        </Cell>
+        {completed ? (
+          <>
+            <Cell numeric headers={grouped("pages")} className={cn(groupCell, "border-l-2 border-umich-blue text-fg")}>
+              {completed.page_count.toLocaleString()}
+            </Cell>
+            <Cell numeric headers={grouped("issues")} className={groupCell}>
+              <Link
+                to={`/scans/${completed.id}/issues`}
+                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                aria-label={`${(site.most_recent_completed_issue_count ?? 0).toLocaleString()} issues in report ${completed.id}`}
+              >
+                {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+              </Link>
+            </Cell>
+            <Cell numeric headers={grouped("images")} className={cn(groupCell, "text-fg")}>
+              {completed.finding_count.toLocaleString()}
+            </Cell>
+            <Cell numeric headers={grouped("states")} className={cn(groupCell, "text-fg")}>
+              {(completed.dom_state_count ?? 0).toLocaleString()}
+            </Cell>
+            <Cell
+              headers={grouped("completed")}
+              className={cn(groupCell, "whitespace-nowrap text-xs text-fg-muted")}
+              title={completed.finished_at ?? completed.started_at ?? undefined}
+            >
+              {relativeTime(completed.finished_at ?? completed.started_at)}
+            </Cell>
+            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap text-right")}>
+              <LinkButton
+                to={`/scans/${completed.id}`}
+                variant="secondary"
+                aria-label={`Open latest scan of ${label}, the most recent completed scan`}
+              >
+                Open latest scan
+              </LinkButton>
+            </Cell>
+          </>
+        ) : (
+          <Cell
+            colSpan={6}
+            headers={`${rowId} ${GROUP_HEADER_ID}`}
+            className={cn(groupCell, "border-l-2 border-umich-blue text-fg-muted")}
+          >
+            No completed scan yet. Expand the site to open its other scans.
+          </Cell>
+        )}
+      </Row>
+      {expanded && (
+        // The site's stripe, and no rule above: it reads as part of the site row.
+        <tr id={detailId} className={rowBand(index)}>
+          <td colSpan={TOTAL_COLUMNS} className="px-4 pb-4 pt-2">
+            <SiteScansTable site={site} label={label} />
+          </td>
+        </tr>
+      )}
+    </>
   );
-}
+});
 
-function ProtectedReportRow({ report }: { report: ProtectedScanSummary }) {
+function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
   return (
-    <tr className="transition-colors hover:bg-surface-muted/60">
-      <th scope="row" className="whitespace-nowrap px-4 py-2 text-left font-mono text-xs text-fg-muted">#{report.scan_id}</th>
-      <td className="px-4 py-2"><span className="font-medium text-fg">{report.protection_status.replaceAll("_", " ")}</span></td>
-      <td className="px-4 py-2 text-fg-muted">{report.environment} · {report.data_classification}</td>
-      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.page_count.toLocaleString()}</td>
-      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.issue_occurrences.toLocaleString()}</td>
-      <td className="px-4 py-2 text-xs text-fg-subtle" title={report.updated_at}>{relativeTime(report.updated_at)}</td>
-      <td className="px-4 py-2 text-right">
-        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
-          Open protected report
-        </LinkButton>
-      </td>
-    </tr>
+    <Table
+      className="rounded-xs border border-border bg-surface"
+      captionClassName="px-2 py-2 text-left text-sm font-semibold text-fg"
+      caption={`All scans for ${label}, most recent first`}
+    >
+      <TableHead>
+        <tr>
+          <ColumnHeader>Report</ColumnHeader>
+          <ColumnHeader>Status</ColumnHeader>
+          <ColumnHeader>Started</ColumnHeader>
+          <ColumnHeader align="right">Pages</ColumnHeader>
+          <ColumnHeader align="right">Images with text</ColumnHeader>
+          <ColumnHeader align="right">{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
+          <ColumnHeader align="right">Actions</ColumnHeader>
+        </tr>
+      </TableHead>
+      <tbody>
+        {site.scans.map((scan, index) => (
+          <ScanRow key={scan.id} scan={scan} index={index} isHeadline={scan.id === site.most_recent_completed?.id} />
+        ))}
+      </tbody>
+    </Table>
   );
 }
 
 /**
- * One scans-table row. Pulled out so the delete mutation's loading state
- * is local to the row that owns it, clicking delete on row 7 doesn't
- * grey out the buttons in row 8.
+ * One scan in a site's expanded list. Pulled out so the delete mutation's
+ * loading state is local to the row that owns it.
  */
-function ScanRow({ scan }: { scan: ScanSummary }) {
-  const isRunning = scan.status === "running";
+function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number; isHeadline: boolean }) {
   return (
-    <tr
-      className={
-        isRunning
-          ? "bg-umich-blue/5 transition-colors hover:bg-umich-blue/10"
-          : "transition-colors hover:bg-surface-muted/60"
-      }
-    >
-      <th scope="row" className="whitespace-nowrap px-4 py-2 text-left font-mono text-xs text-fg-muted">
-        <Link
-          to={`/scans/${scan.id}`}
-          className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-        >
-          <span className="sr-only">Open report </span>#{scan.id}
-        </Link>
-      </th>
-      <td className="min-w-48 max-w-md break-all px-4 py-2 text-fg">
+    <Row index={index}>
+      <RowHeader className="whitespace-nowrap py-1 text-xs font-normal tabular-nums text-fg-muted">
         <Link
           to={`/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
           title={scan.seed_url}
         >
-          {scan.seed_url}
+          <span className="sr-only">Open </span>scan {scan.id}
         </Link>
-      </td>
-      <td className="px-4 py-2">
+        {isHeadline && (
+          <span className="ml-2 font-sans text-xs font-normal text-fg-muted">
+            (shown in the site row)
+          </span>
+        )}
+      </RowHeader>
+      <Cell>
         <ScanStatusBadge value={scan.status} />
-      </td>
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
-        {scan.page_count.toLocaleString()}
-      </td>
-      {/* States reached by operating controls, alongside pages: a scan of an
-          application is not described by its URL count alone. */}
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
-        {(scan.dom_state_count ?? 0).toLocaleString()}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
-        <span className="text-fg">{scan.finding_count.toLocaleString()}</span>
-      </td>
-      <td
-        className="whitespace-nowrap px-4 py-2 text-xs text-fg-subtle"
-        // Full ISO on hover gives precision when "2h ago" isn't enough,
-        // e.g. comparing two scans that both say "yesterday".
-        title={scan.started_at ?? undefined}
-      >
+      </Cell>
+      <Cell className="whitespace-nowrap text-xs text-fg-muted" title={scan.started_at ?? undefined}>
         {relativeTime(scan.started_at)}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2">
-        {/* Per-row actions kept at default `md` size (44px tall). The
-            earlier compressed `px-2 py-1 text-xs` style was the exact
-            SC 2.5.5 fail flagged by the discovery audit, destructive
-            controls in particular must be a real target. The action
-            cluster gets `gap-2` so the two controls don't visually
-            merge into one wide button. */}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {scan.page_count.toLocaleString()}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {scan.finding_count.toLocaleString()}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {(scan.dom_state_count ?? 0).toLocaleString()}
+      </Cell>
+      <Cell className="whitespace-nowrap py-1">
+        {/* Default `md` size (44px tall): destructive controls in
+            particular must be a real target (SC 2.5.5). */}
         <div className="flex items-center justify-end gap-2">
           <LinkButton
             to={`/scans/${scan.id}/issues`}
@@ -350,8 +589,26 @@ function ScanRow({ scan }: { scan: ScanSummary }) {
           </LinkButton>
           <DeleteScanButton scan={scan} />
         </div>
-      </td>
-    </tr>
+      </Cell>
+    </Row>
+  );
+}
+
+function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; index: number }) {
+  return (
+    <Row index={index}>
+      <RowHeader className="whitespace-nowrap text-xs font-normal text-fg-muted"><ScanTag id={report.scan_id} /></RowHeader>
+      <Cell><span className="font-medium text-fg">{report.protection_status.replaceAll("_", " ")}</span></Cell>
+      <Cell className="text-fg-muted">{report.environment} · {report.data_classification}</Cell>
+      <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
+      <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
+      <Cell className="text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
+      <Cell className="py-1 text-right">
+        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
+          Open protected report
+        </LinkButton>
+      </Cell>
+    </Row>
   );
 }
 
@@ -407,8 +664,8 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
           // confirm() blocks; it's the right primitive for "are you sure".
           // Message includes the scan ID and seed URL so the user knows
           // exactly which scan they're about to remove.
-          const ok = window.confirm(
-            `Delete scan #${scan.id} (${scan.seed_url})?\n\n` +
+          const ok = confirmDestructive(
+            `Delete scan ${scan.id} (${scan.seed_url})?\n\n` +
               "This permanently removes the scan, its pages, findings, and " +
               "history. Image blobs are kept (they may be referenced by " +
               "other scans). This cannot be undone.",

@@ -39,6 +39,7 @@ from audit.analyzer.interaction.base import (
 )
 from audit.analyzer.interaction.safety import exploration_guard, safe_url
 from audit.logging import get_logger
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -429,6 +430,8 @@ class InteractionProbe:
 
     axe: AxeAnalyzer
     level: Level = "AA"
+    # The WCAG version ``level`` is read against; the scan's own choice.
+    version: WcagVersion = LEGACY_WCAG_VERSION
     # Total clicks per page load, across the whole recursion. The dominant
     # cost is one axe pass per state that actually changed, so this is
     # effectively a per-page time budget.
@@ -984,7 +987,7 @@ class InteractionProbe:
     ) -> None:
         """Run axe on the current state and keep only unseen violations."""
         try:
-            violations = await self.axe.run(page, self.level)
+            violations = await self.axe.run(page, self.level, self.version)
         except Exception as exc:
             log.debug("interaction.axe_failed", error_type=type(exc).__name__)
             return

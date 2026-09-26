@@ -33,7 +33,7 @@ async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues_url = page.url
     table = page.get_by_role("table", name="Accessibility issue groups")
-    await table.get_by_role("rowheader").first.get_by_role("link").click()
+    await table.get_by_role("rowheader").get_by_role("link").first.click()
     await page.wait_for_url("**/issues/**")
     await page.get_by_role("heading", level=1).wait_for()
     # Over the page title: nothing there scrolls sideways.

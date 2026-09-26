@@ -36,6 +36,7 @@ from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.search import SearchExplorer
 from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright, ViewportSize
@@ -126,6 +127,7 @@ class JsFetcher:
         idle_timeout_ms: int | None = None,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: Level = "AA",
+        wcag_version: WcagVersion = LEGACY_WCAG_VERSION,
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
@@ -147,6 +149,7 @@ class JsFetcher:
         self._idle_timeout_ms = _IDLE_TIMEOUT_MS if idle_timeout_ms is None else idle_timeout_ms
         self._axe_analyzer = axe_analyzer
         self._axe_level: Level = axe_level
+        self._wcag_version: WcagVersion = wcag_version
         # SC 2.1.2 keyboard probe. When set, runs *after* the axe scan
         # (which is read-only) but before the page closes. Order
         # matters: the probe presses Tab/Esc and alters focus state,
@@ -308,7 +311,9 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                axe_violations = await self._axe_analyzer.run(page, level=self._axe_level)
+                axe_violations = await self._axe_analyzer.run(
+                    page, level=self._axe_level, version=self._wcag_version
+                )
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe

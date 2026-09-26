@@ -20,6 +20,55 @@
       }
     ]
   },
+  "GET /api/sites": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": [
+      {
+        "completed_count": "integer",
+        "most_recent": {
+          "dom_state_count": "integer",
+          "finding_count": "integer",
+          "finished_at": "null|string",
+          "id": "integer",
+          "page_count": "integer",
+          "seed_url": "string",
+          "started_at": "string",
+          "status": "string"
+        },
+        "most_recent_completed": {
+          "anyOf": [
+            "null",
+            {
+              "dom_state_count": "integer",
+              "finding_count": "integer",
+              "finished_at": "string",
+              "id": "integer",
+              "page_count": "integer",
+              "seed_url": "string",
+              "started_at": "string",
+              "status": "string"
+            }
+          ]
+        },
+        "most_recent_completed_issue_count": "integer|null",
+        "scan_count": "integer",
+        "scans": [
+          {
+            "dom_state_count": "integer",
+            "finding_count": "integer",
+            "finished_at": "null|string",
+            "id": "integer",
+            "page_count": "integer",
+            "seed_url": "string",
+            "started_at": "string",
+            "status": "string"
+          }
+        ],
+        "site_url": "string"
+      }
+    ]
+  },
   "GET /api/scans/{scan_id}": {
     "status": 200,
     "content_type": "application/json",
@@ -58,7 +107,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (running)": {
@@ -124,7 +174,8 @@
       },
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (blocked)": {
@@ -165,7 +216,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (failed)": {
@@ -206,7 +258,8 @@
       "progress": "null",
       "seed_url": "string",
       "started_at": "string",
-      "status": "string"
+      "status": "string",
+      "wcag_version": "string"
     }
   },
   "GET /api/scans/{scan_id} (unknown scan)": {"status": 404, "content_type": "application/json", "body": {"detail": "string"}},
@@ -913,7 +966,10 @@
     "status": 200,
     "content_type": "application/json",
     "body": {
+      "after_totals": {"groups": "integer", "occurrences": "integer"},
       "baseline": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "before_totals": {"groups": "integer", "occurrences": "integer"},
+      "changes": {"new": "integer", "remaining": "integer", "resolved": "integer"},
       "counts": {
         "cannot_compare": "integer",
         "changed": "integer",
@@ -937,6 +993,7 @@
         {
           "after": {
             "evidence": [{"label": "string", "url": "string"}],
+            "issue_occurrences": "integer",
             "issues": [{"label": "string", "url": "string"}],
             "occurrences": "integer",
             "outcomes": {"cant_tell": "absent|integer", "failed": "absent|integer"},
@@ -948,6 +1005,7 @@
               "null",
               {
                 "evidence": [{"label": "string", "url": "string"}],
+                "issue_occurrences": "integer",
                 "issues": [{"label": "string", "url": "string"}],
                 "occurrences": "integer",
                 "outcomes": {"failed": "absent|integer"},
@@ -957,12 +1015,34 @@
             ]
           },
           "category": "string",
+          "change": "string",
+          "conformance": "string",
           "key": "string",
           "limitations": ["string"],
           "pipeline": "string",
-          "title": "string"
+          "title": "string",
+          "wcag_name": "string",
+          "wcag_sc": "null|string"
         }
       ],
+      "settings_changed": ["string"],
+      "total": "integer"
+    }
+  },
+  "GET /api/scans/{scan_id}/history": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "scans": [
+        {
+          "finished_at": "string",
+          "groups": "integer",
+          "id": "integer",
+          "occurrences": "integer",
+          "started_at": "string"
+        }
+      ],
+      "site_url": "string",
       "total": "integer"
     }
   },

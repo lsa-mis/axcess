@@ -3,7 +3,13 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
+import { getPreferences } from "./hooks/usePreferences";
+import { applyPreferences } from "./lib/preferences";
 import "./styles.css";
+
+// Settings (theme, text size, contrast...) go onto <html> before the first
+// render, so a dark-theme reader never sees a flash of the light one.
+applyPreferences(getPreferences());
 
 // Defaults for every query in the app. These are the app's main data-fetching
 // knobs, so they are worth stating rather than leaving to be inferred:

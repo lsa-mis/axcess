@@ -50,6 +50,7 @@ from audit.analyzer.alfa_evidence import (
 from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
 from audit.web import issues as issues_mod
 
 # The framework caps the executive summary at 8 sentences. The renderer
@@ -142,7 +143,8 @@ _PIPELINE_COVERAGE = [
         "key": "alfa",
         "name": "Siteimprove Alfa",
         "method": "Independent ACT-rule evaluation on a separate local-browser capture.",
-        "checks": "ACT rules mapped to WCAG 2.2 at the selected level; unresolved "
+        # ``{wcag_version}`` is filled from the scan when the table renders.
+        "checks": "ACT rules mapped to WCAG {wcag_version} at the selected level; unresolved "
         "`cantTell` outcomes are review leads.",
         "confidence": "High for failed outcomes; `cantTell` is explicitly not a "
         "conformance failure.",
@@ -200,7 +202,7 @@ _PIPELINE_COVERAGE = [
     },
     {
         "key": "interaction",
-        "name": "Click-through DOM states",
+        "name": CLICK_THROUGH,
         "method": "Operates the page's own menus, tabs, dialogs, and disclosure "
         "controls, then re-runs the rule engine on each state a click reveals.",
         "checks": "Barriers that a page load never shows because the content only "
@@ -511,7 +513,7 @@ def render_audit_report(
     lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
-    lines.append(f"**Audited against:** WCAG 2.2 Level {scan.axe_level}")
+    lines.append(f"**Audited against:** WCAG {scan.wcag_version} Level {scan.axe_level}")
     lines.append(f"**Pages crawled:** {scan.page_count}")
     lines.append(f"**Detection methods used:** {_methods_line(rows)}")
     lines.append("")
@@ -904,7 +906,13 @@ def _coverage_and_method(
                 ran = "n/a"
         else:
             ran = "✅ found issues" if p["key"] in pipelines_present else "n/a"
-        lines.append(f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |")
+        checks = p["checks"].replace("{wcag_version}", scan.wcag_version)
+        if p["key"] == "focus" and scan.wcag_version == "2.1":
+            checks += (
+                " SC 2.4.11 is a WCAG 2.2 criterion, not required under WCAG 2.1; "
+                "its findings are reported as best practice."
+            )
+        lines.append(f"| **{p['name']}** | {ran} | {checks} | {p['confidence']} |")
     lines.append("")
     lines.append(
         "_A “n/a” means this method produced no findings on this scan, it may "
@@ -938,7 +946,7 @@ def _coverage_and_method(
 
 
 def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
-    """What the click-through probe reached, and what it could not.
+    """What Click-Through reached, and what it could not.
 
     A page count alone understates an application whose content appears after
     a click, so states are reported beside pages rather than folded into them.
@@ -946,7 +954,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
     tested less here" is the half of a coverage claim a reader cannot infer
     from a total, and it is the half that decides where manual testing goes.
     """
-    lines = ["### States behind a click", ""]
+    lines = [f"### {CLICK_THROUGH}: content behind a click", ""]
     lines.append(interaction.status_line)
     lines.append("")
     if not interaction.enabled:
@@ -960,7 +968,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
         lines.append(f"| Pages probed | {interaction.pages_probed} |")
         lines.append(f"| Controls found | {interaction.controls_found} |")
         lines.append(f"| Controls operated | {interaction.controls_operated} ({pct}) |")
-        lines.append(f"| Additional DOM states reached | {interaction.states_total} |")
+        lines.append(f"| {CLICK_THROUGH_STATES_LABEL} | {interaction.states_total} |")
         lines.append(f"| Findings visible only after a click | {interaction.findings_revealed} |")
         lines.append(f"| Controls refused as destructive | {interaction.blocked_controls} |")
         lines.append("")
@@ -973,7 +981,9 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
     if limited:
         lines.append("**Pages where the sweep stopped early**")
         lines.append("")
-        lines.append("| Page | Controls operated | States | Why it stopped |")
+        lines.append(
+            f"| Page | Controls operated | {CLICK_THROUGH_STATES_LABEL} | Why it stopped |"
+        )
         lines.append("|---|---|---|---|")
         for page in limited[:_MAX_LIMITED_PAGES]:
             lines.append(
@@ -983,7 +993,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
         if len(limited) > _MAX_LIMITED_PAGES:
             lines.append(
                 f"| _…and {len(limited) - _MAX_LIMITED_PAGES} more page(s)_ | | | "
-                "_see the workbook's DOM States sheet_ |"
+                f"_see the workbook's {CLICK_THROUGH} sheet_ |"
             )
         lines.append("")
         lines.append(

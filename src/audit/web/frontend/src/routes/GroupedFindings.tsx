@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Info, Lightbulb } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, blobUrl } from "../api/client";
 import {
   Button,
@@ -20,6 +20,17 @@ import type {
   GroupedFinding,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+  TableStatus,
+} from "../components/table/Table";
+import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -58,6 +69,9 @@ export default function GroupedFindingsRoute() {
   const { data, isLoading } = useQuery({
     queryKey: ["grouped-findings", id, status],
     queryFn: () => api.getGroupedFindings(id, status || undefined),
+    // A new status keeps this scan's groups on screen while it loads, so
+    // the Filter menu, and the focus in it, stay where they were.
+    placeholderData: (previous, query) => query?.queryKey[1] === id ? keepPreviousData(previous) : undefined,
     enabled: Number.isFinite(id),
   });
 
@@ -80,6 +94,17 @@ export default function GroupedFindingsRoute() {
   }
 
   const { coverage, groups } = data;
+  const filters: FilterGroup[] = [
+    {
+      key: "status",
+      label: "Status",
+      value: status,
+      options: [
+        { value: "", label: "All" },
+        ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+      ],
+    },
+  ];
 
   return (
     <>
@@ -122,18 +147,21 @@ export default function GroupedFindingsRoute() {
       </div>
 
       {/* Status filter, URL-persistent, auto-applies on change. Same
-          UX shape as the WCAG drill-down filter. */}
-      <Card className="mb-4 p-3">
-        <Select
-          stacked
-          label="Status filter"
-          value={status}
-          onChange={(next) => setStatusParam(next as FindingStatus | "")}
-          options={[
-            { value: "", label: "all statuses" },
-            ...STATUS_OPTIONS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
-          ]}
-        />
+          UX shape as the WCAG drill-down filter. One Filter menu for
+          every group's table below: the status narrows them all. */}
+      <Card className="mb-4">
+        <TableBar
+          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => setStatusParam("")} />}
+        >
+          <FilterMenu
+            groups={filters}
+            onChange={(_key, value) => setStatusParam(value as FindingStatus | "")}
+            onReset={() => setStatusParam("")}
+          />
+        </TableBar>
+        <TableStatus className="border-b-0">
+          {groups.length.toLocaleString()} issue {groups.length === 1 ? "group" : "groups"}.
+        </TableStatus>
       </Card>
 
       {groups.length === 0 ? (
@@ -254,7 +282,7 @@ function GroupCard({
             kind="image"
           />
 
-          <FindingsInGroup findings={group.findings} />
+          <FindingsInGroup findings={group.findings} label={group.label} />
         </div>
       )}
     </Card>
@@ -346,52 +374,43 @@ function BulkStatusBar({
   );
 }
 
-function FindingsInGroup({ findings }: { findings: GroupedFinding[] }) {
+function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; label: string }) {
   // One table per group, so the page is kept per group rather than in the URL.
-  const paged = usePagedRows(findings, { local: true, resetKey: findings.map((f) => f.id).join(",") });
+  // A new row set (a status filter, a bulk update) starts it over.
+  const resetKey = useMemo(() => findings.map((f) => f.id).join(","), [findings]);
+  const paged = usePagedRows(findings, { local: true, resetKey });
   return (
     <>
-    <div className="overflow-x-auto">
-      {/* Holds the tallest page's height, so paging never moves the pager. */}
-      <div {...paged.hold}>
-      <table className="w-full text-sm">
-        <thead className="bg-surface-muted text-2xs text-fg-subtle">
-          <tr>
-            <th scope="col" className="px-3 py-2 text-left font-semibold">
-              Image
-            </th>
-            <th scope="col" className="px-3 py-2 text-left font-semibold">
-              OCR text
-            </th>
-            <th scope="col" className="px-3 py-2 text-left font-semibold">
-              Severity
-            </th>
-            <th scope="col" className="px-3 py-2 text-left font-semibold">
-              Status
-            </th>
-            <th scope="col" className="px-3 py-2 text-left font-semibold">
-              Pages
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {paged.pageRows.map((f) => (
-            <FindingRow key={f.id} finding={f} />
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </div>
-    <TablePagination label="Images in this group" noun="images" {...paged} />
+      {paged.pages > 1 && (
+        <TableBar pager={<TablePagination label="Images in this group" noun="images" {...paged} />} />
+      )}
+      <TableRegion label={`${label} images table`} paged={paged}>
+        <Table caption={`Images in ${label}`}>
+          <TableHead>
+            <tr>
+              <ColumnHeader>Image</ColumnHeader>
+              <ColumnHeader>OCR text</ColumnHeader>
+              <ColumnHeader>Severity</ColumnHeader>
+              <ColumnHeader>Status</ColumnHeader>
+              <ColumnHeader>Pages</ColumnHeader>
+            </tr>
+          </TableHead>
+          <tbody>
+            {paged.pageRows.map((f, index) => (
+              <FindingRow key={f.id} finding={f} index={(paged.page - 1) * paged.pageSize + index} />
+            ))}
+          </tbody>
+        </Table>
+      </TableRegion>
     </>
   );
 }
 
-function FindingRow({ finding }: { finding: GroupedFinding }) {
+function FindingRow({ finding, index }: { finding: GroupedFinding; index: number }) {
   const [showPages, setShowPages] = useState(false);
   return (
-    <tr className="align-top">
-      <td className="px-3 py-2">
+    <Row index={index}>
+      <Cell>
         {finding.has_svg_text ? (
           <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-dashed border-umich-blue/40 bg-umich-blue/5 font-mono text-2xs font-semibold text-umich-blue">
             SVG text
@@ -407,10 +426,10 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
             />
           </Link>
         ) : (
-          <span className="text-fg-subtle">n/a</span>
+          <span className="text-fg-muted">n/a</span>
         )}
-      </td>
-      <td className="px-3 py-2">
+      </Cell>
+      <Cell>
         {finding.ocr_text ? (
           <>
             <code className="block max-w-md break-words font-mono text-xs text-fg">
@@ -419,22 +438,22 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
                 : finding.ocr_text}
             </code>
             {finding.ocr_confidence !== null && (
-              <div className="mt-1 text-2xs text-fg-subtle">
+              <div className="mt-1 text-2xs text-fg-muted">
                 confidence {Math.round(finding.ocr_confidence)}%
               </div>
             )}
           </>
         ) : (
-          <span className="text-fg-subtle">n/a</span>
+          <span className="text-fg-muted">n/a</span>
         )}
-      </td>
-      <td className="px-3 py-2">
+      </Cell>
+      <Cell>
         <SeverityChip value={finding.severity} />
-      </td>
-      <td className="px-3 py-2">
+      </Cell>
+      <Cell>
         <StatusChip value={finding.status} />
-      </td>
-      <td className="px-3 py-2">
+      </Cell>
+      <Cell>
         {/* Per-finding occurrence drawer, keyed off a local toggle so
             opening row 3 doesn't change row 4. Collapsed by default
             because most findings appear on 1-3 pages and the row stays
@@ -473,11 +492,11 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
                 </a>
                 <Link
                   to={`/pages/${occ.page_id}`}
-                  className="ml-2 text-2xs text-fg-subtle underline underline-offset-2"
+                  className="ml-2 text-2xs text-fg-muted underline underline-offset-2"
                 >
                   view in audit
                 </Link>
-                <span className="ml-2 text-fg-subtle">
+                <span className="ml-2 text-fg-muted">
                   alt=
                   {occ.alt_text === null ? (
                     <em className="text-sev-critical">missing</em>
@@ -488,7 +507,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
                   )}
                 </span>
                 {occ.above_fold && (
-                  <span className="ml-1 text-fg-subtle">(above fold)</span>
+                  <span className="ml-1 text-fg-muted">(above fold)</span>
                 )}
               </li>
             ))}
@@ -500,7 +519,7 @@ function FindingRow({ finding }: { finding: GroupedFinding }) {
         >
           triage finding →
         </Link>
-      </td>
-    </tr>
+      </Cell>
+    </Row>
   );
 }
