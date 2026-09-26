@@ -6,7 +6,7 @@ const path = require("node:path");
 if (process.platform !== "darwin") process.exit(0);
 
 const packageJson = require("../package.json");
-const { displayVersion } = require("../src/updates.cjs");
+const { dmgName } = require("./release-names.cjs");
 const application = path.join(
   __dirname,
   "..",
@@ -20,7 +20,7 @@ const output = path.join(
   "out",
   "make",
   // Named with the version people see (0.61), not the packaged semver.
-  `Axcess-${displayVersion(packageJson.version)}-${process.arch}.dmg`,
+  dmgName(packageJson.version, process.arch),
 );
 
 if (!fs.existsSync(application)) {

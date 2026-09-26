@@ -70,6 +70,7 @@ schedule, and manual dispatch.
 | `python-tests` | `pytest tests/unit tests/quality tests/ui -m "not browser"` |
 | `frontend` | `npm run lint` and `npm run build` (the build is also the TypeScript check) |
 | `desktop-node` | `npm test` in `desktop/` |
+| `desktop-release-dry-run` | The release's version pick, `package.json` stamp, and installer-name check, with the scripts `desktop-build.yml` uses |
 | `browser-suites` | `pytest tests/integration` and `pytest tests/ui -m browser` |
 
 The `browser-suites` job runs only on the daily schedule, on manual dispatch,
@@ -90,6 +91,9 @@ Other workflows:
 - CI runs Python 3.13, and ruff and mypy target 3.11 (the minimum version).
 - `pages.yml` publishes the public site, and [Releases](docs/internal/releases.md)
   covers the desktop build.
+- `desktop-build.yml` also builds both installers, without publishing, on
+  pull requests that change `desktop/**`, the workflow itself,
+  `pyproject.toml`, or `uv.lock`.
 
 ## Rules from AGENTS.md that apply to everyone
 

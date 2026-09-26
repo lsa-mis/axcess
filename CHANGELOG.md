@@ -38,6 +38,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   issue, how many, and links to each state.
 - The website's "What Axcess checks" page has a short card for each check,
   and each row of a report's "What was checked" table links to its card.
+- CI runs the desktop release's version pick, stamp and installer-name check
+  on every pull request, and builds both installers on pull requests that
+  change the desktop app or its release workflow.
 - This changelog.
 
 ### Changed
@@ -89,6 +92,8 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   URL too malformed for `urlsplit` to parse.
 - One older report with a start address too malformed to parse no longer
   breaks Reports or every report's link to its previous report.
+- The desktop build no longer stops at its version stamp when the version is
+  the one package.json already has, as on the first 0.60 build.
 
 ### Performance
 
