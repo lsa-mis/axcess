@@ -446,7 +446,10 @@ function TopBar({
           Axcess
         </span>
       </div>
-      <div className="hidden min-w-0 md:block">
+      {/* flex-1: the trail's room is the bar's, not its own content's. The
+          crumbs are cut to fit this width, so a width that followed them
+          would shrink with every cut. */}
+      <div className="hidden min-w-0 flex-1 md:block">
         <ReportCrumb />
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">

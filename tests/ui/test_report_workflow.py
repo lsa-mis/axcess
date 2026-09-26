@@ -491,6 +491,10 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     under the tabs carried the rest. The topbar now shows the whole path, and
     the report tabs are gone from a page that is inside the report rather
     than one of its views.
+
+    Each crumb names the specific thing, not the kind of view: the page list
+    by its size and the inspector by the page's own title. "Pages" and "Page
+    inspector" read the same for every issue and every page.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -506,16 +510,22 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     inspector = page.get_by_role("link", name="opens the in-app page inspector", exact=False)
     await inspector.first.click()
     await page.wait_for_url("**/inspect?**")
+    page_id = int(re.search(r"/pages/(\d+)/inspect", page.url)[1])
+    inspected = (
+        await (await page.request.get(f"{base}/api/scans/{scan_id}/pages/{page_id}")).json()
+    )["page"]
+    page_name = inspected["title"] or inspected["url_normalized"].removeprefix("http://")
+    affected = f"{row['page_count']} affected page{'' if row['page_count'] == 1 else 's'}"
     await playwright_async.expect(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    ).to_contain_text("Page inspector")
+    ).to_contain_text(page_name)
     items = await _breadcrumb(page)
     assert [item["text"] for item in items] == [
         "Reports",
         f"example.com #{scan_id}",
         row["title"],
-        "Pages",
-        "Page inspector",
+        affected,
+        page_name,
     ], items
     _assert_current_is_plain_text(items)
     # The report crumb goes back to the table the reader left, filter kept.
@@ -726,11 +736,102 @@ async def test_actual_comparison_links_reach_stored_finding(
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report workspace")
     ).to_have_count(0)
+    evidence_page = int(re.search(r"/pages/(\d+)", path)[1])
+    stored = (
+        await (await page.request.get(f"{base}/api/scans/{new}/pages/{evidence_page}")).json()
+    )["page"]
+    stored_name = stored["title"] or stored["url_normalized"].removeprefix("http://")
+    await playwright_async.expect(
+        page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+    ).to_contain_text(stored_name)
     items = await _breadcrumb(page)
     assert [item["text"] for item in items] == [
         "Reports",
         f"example.com #{new}",
         "Verify changes",
-        "Page evidence",
+        f"Stored evidence for {stored_name}",
     ], items
     _assert_current_is_plain_text(items)
+
+
+async def test_crumbs_stay_on_one_line_and_cut_the_longest_first(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Each page view names its page, on one line, whole whenever it fits.
+
+    The trail never wraps or scrolls. With room to spare nothing is cut. When
+    the line is full, only the longest crumbs are cut, all to the same width,
+    and every shorter crumb (the report name, "Reports") keeps every
+    character: cutting a short crumb removes most of what it says. A cut
+    crumb keeps its whole name in the DOM for a screen reader and in
+    ``title`` for a hover.
+    """
+    db_path, _, _ = seeded_db
+    base, scan_id = live_server
+    long_title = "Editing submission by … for LSA CodeGrade Test in LSA LTI Test Course - CodeGrade"
+    conn = sqlite3.connect(db_path)
+    try:
+        page_id = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()[0]
+        conn.execute("UPDATE pages SET title = ? WHERE id = ?", (long_title, page_id))
+        conn.commit()
+    finally:
+        conn.close()
+    response = await (await new_page()).request.get(f"{base}/api/scans/{scan_id}/issues")
+    row = (await response.json())["rows"][0]
+    issue_path = f"/scans/{scan_id}/issues/{quote(row['issue_key'], safe='')}"
+    measure = """nav => {
+        const list = nav.firstElementChild;
+        const crumbs = [...list.children].map(li => li.querySelector("a, [aria-current]"));
+        return {
+            overflows: list.scrollWidth > list.clientWidth + 1,
+            rows: new Set(
+                [...list.children].map(li => Math.round(li.getBoundingClientRect().top))
+            ).size,
+            texts: crumbs.map(el => {
+                const text = el.querySelector("[data-crumb-text]");
+                return text
+                    ? {
+                          natural: text.scrollWidth,
+                          shown: text.getBoundingClientRect().width,
+                          cut: text.scrollWidth > text.clientWidth + 1,
+                      }
+                    : { natural: el.scrollWidth, shown: el.clientWidth, cut: false };
+            }),
+            titles: crumbs.map(el => el.getAttribute("title")),
+            text: crumbs.map(el => el.textContent),
+        };
+    }"""
+    for path, expected in (
+        (f"/scans/{scan_id}/pages/{page_id}/inspect", long_title),
+        (f"/scans/{scan_id}/pages/{page_id}", f"Stored evidence for {long_title}"),
+    ):
+        # The issue as context puts a second long crumb in the trail.
+        url = f"{base}/app{path}?context=Issue&contextTo={quote(issue_path, safe='')}"
+        for width, fits in ((1920, True), (1024, False)):
+            page = await new_page(viewport={"width": width, "height": 900})
+            try:
+                await page.goto(url, wait_until="networkidle")
+                crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
+                await playwright_async.expect(crumb).to_contain_text(expected)
+                await playwright_async.expect(crumb).to_contain_text(row["title"][:10])
+                state = await crumb.evaluate(measure)
+                assert state["rows"] == 1, (width, state)
+                assert not state["overflows"], (width, state)
+                assert state["text"][-1] == expected, state
+                assert state["titles"][-1] == expected, state
+                texts = state["texts"]
+                cut = [t for t in texts if t["cut"]]
+                if fits:
+                    assert not cut, state
+                    continue
+                assert texts[-1]["cut"], state
+                assert not texts[0]["cut"] and not texts[1]["cut"], state  # Reports, report
+                widths = [t["shown"] for t in cut]
+                assert max(widths) - min(widths) <= 2, state  # cut to one shared width
+                assert all(t["natural"] <= min(widths) + 2 for t in texts if not t["cut"]), state
+            finally:
+                await page.context.close()
