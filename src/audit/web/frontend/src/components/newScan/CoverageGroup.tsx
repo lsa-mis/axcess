@@ -21,9 +21,9 @@ export function coverageCount(settings: GroupProps["settings"], policy: GroupPro
 export default function CoverageGroup({ settings, update, policy, capabilities }: GroupProps) {
   const login = policy.mode === "login";
   const clickThroughBlocked = settings.static_only
-    ? "Unavailable with Fast crawl: opening controls needs a rendered page."
+    ? "Not available with Fast scan. Opening controls needs a browser."
     : settings.scan_engine === "alfa"
-      ? "Choose axe-core or Both: revealed content is re-checked with axe-core."
+      ? "Choose axe or Both as the rule check tool. Axcess checks the content that opens with Rule check (axe)."
       : null;
   void capabilities;
   const depth = Math.max(0, Math.min(10, Math.round(settings.max_depth)));
@@ -75,7 +75,7 @@ export default function CoverageGroup({ settings, update, policy, capabilities }
           onChange={(on) => update(switchPatch(settings, "skip_rendered_storage", on))}
           disabled={settings.static_only}
           label={SWITCHES.skip_rendered_storage.label}
-          hint={settings.static_only ? "A Fast crawl has no rendered pages to store." : SWITCHES.skip_rendered_storage.hint}
+          hint={settings.static_only ? "A fast scan has no saved copies to keep." : SWITCHES.skip_rendered_storage.hint}
         />
       </div>
 

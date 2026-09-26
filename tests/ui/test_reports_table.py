@@ -57,8 +57,8 @@ async def test_reports_table_keyboard_and_columns(
             "Site URL",
             "Status",
             "Pages",
-            "DOM states",
-            "Image findings",
+            "Page states",
+            "Images with text",
             "Started",
             "Actions",
         ]
@@ -75,7 +75,7 @@ async def test_reports_table_keyboard_and_columns(
     await region.focus()
     await page.keyboard.press("ArrowRight")
     await playwright_async.expect(region).to_be_focused()
-    pagination = page.get_by_role("navigation", name="Public reports pagination")
+    pagination = page.get_by_role("navigation", name="Public reports: page controls")
     previous = pagination.get_by_role("button", name="Previous page of public reports")
     next_page = pagination.get_by_role("button", name="Next page of public reports")
     await playwright_async.expect(previous).to_have_attribute("aria-disabled", "true")

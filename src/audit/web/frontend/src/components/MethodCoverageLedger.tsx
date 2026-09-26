@@ -67,11 +67,11 @@ export default function MethodCoverageLedger({
     <Card className={cn("overflow-hidden", className)}>
       <div className="px-4 pb-3 pt-4">
         <h2 className="text-base font-semibold tracking-[-0.015em] text-fg">
-          What this scan actually checked
+          What was checked
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
-          {ran.length} of {methods.length} methods ran. Open a row for what it
-          does and does not prove.
+          {ran.length} of {methods.length} checks ran. Open a row to see what
+          each check can and cannot show.
         </p>
       </div>
       <ul className="border-t border-border">
@@ -118,7 +118,7 @@ function MethodRow({
           {method.label}
         </span>
         <span className="hidden shrink-0 text-sm tabular-nums text-fg-muted sm:block">
-          {ran ? method.result : "n/a"}
+          {ran ? method.result : "No result"}
         </span>
         <StateChip state={method.state} />
         <ChevronRight
@@ -131,7 +131,7 @@ function MethodRow({
       </button>
       <div hidden={!open} className="bg-surface-subtle px-4 pb-4 pl-[46px] pt-0">
         <p className="max-w-[78ch] text-sm leading-relaxed text-fg-muted sm:hidden">
-          {ran ? method.result : "This method was not part of this scan."}
+          {ran ? method.result : "This check did not run in this scan."}
         </p>
         <p className="mt-1 max-w-[78ch] text-sm leading-relaxed text-fg-muted">
           {method.description}
@@ -146,7 +146,7 @@ function MethodRow({
                   to={`/scans/${scanId}/issues`}
                   className="font-semibold text-umich-blue underline underline-offset-2"
                 >
-                  See them in Issues
+                  See them in the Issues table
                 </Link>
               </>
             )}
@@ -182,11 +182,11 @@ function findingsFor(
     );
     return revealed.length === 0
       ? {
-          text: "Found: no issue in this report depends on a state that only appears after a click.",
+          text: "Found: no occurrence in this report appears only after a click.",
           count: 0,
         }
       : {
-          text: `Found: ${revealed.length} issue group${revealed.length === 1 ? "" : "s"} with evidence that only appears after a control is used.`,
+          text: `Found: ${revealed.length} issue${revealed.length === 1 ? "" : "s"} with at least one occurrence that appears only after you use a control, such as a menu.`,
           count: revealed.length,
         };
   }
@@ -195,9 +195,9 @@ function findingsFor(
   if (!pipelines) return null;
   const count = rows.filter((row) => pipelines.includes(row.pipeline)).length;
   return count === 0
-    ? { text: "Found: no issue groups.", count: 0 }
+    ? { text: "Found: no issues.", count: 0 }
     : {
-        text: `Found: ${count} issue group${count === 1 ? "" : "s"}.`,
+        text: `Found: ${count} issue${count === 1 ? "" : "s"}.`,
         count,
       };
 }

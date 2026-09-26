@@ -64,7 +64,7 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
               label={SWITCHES.show_browser.label}
               hint={
                 settings.static_only
-                  ? "There is no browser to show during a Fast crawl."
+                  ? "A fast scan does not use a browser, so there is nothing to show."
                   : SWITCHES.show_browser.hint
               }
             />

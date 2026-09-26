@@ -12,6 +12,7 @@ import { TABLE_PAGE_SIZE, TablePagination, usePagedRows } from "../components/Ta
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { ReportExpertTools, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
+import { REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 import type {
   ConformanceLabel,
@@ -93,12 +94,13 @@ export default function IssuesRoute() {
   if (error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this issue table. The stored scan evidence is unchanged.
+        The Issues table could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
   if (!scanQuery.data || !issuesQuery.data) {
-    return <p className="text-sm text-fg-muted" role="status">Loading issue table…</p>;
+    return <p className="text-sm text-fg-muted" role="status">Loading issues…</p>;
   }
 
   const scan = scanQuery.data;
@@ -147,19 +149,21 @@ export default function IssuesRoute() {
             <Info className="h-4 w-4 shrink-0" aria-hidden />
             <span>
               {alfaCount === 1
-                ? "One of these comes from a standardized ACT rule."
-                : `${alfaCount} of these come from standardized ACT rules.`}{" "}
+                ? "1 of these issues comes from a standard test rule (ACT rule)."
+                : `${alfaCount} of these issues come from standard test rules (ACT rules).`}{" "}
               <span className="font-semibold text-umich-blue underline underline-offset-2">
                 What is an ACT rule?
               </span>
             </span>
           </summary>
           <p className="mt-2 max-w-3xl pl-6 leading-relaxed">
-            ACT means Accessibility Conformance Testing. Each standardized rule
-            checks one specific accessibility condition and returns pass, fail,
-            or cannot tell. A failed rule is evidence about that condition, not
-            proof that the whole page or site fails WCAG. “Cannot tell” needs an
-            expert decision.
+            ACT stands for Accessibility Conformance Testing. An ACT rule is a
+            shared, public test for one accessibility requirement. Each rule
+            gives one of three answers: pass, fail, or cannot tell. A fail shows
+            a problem with that one requirement. It does not prove that the whole
+            page or site fails the Web Content Accessibility Guidelines (WCAG).
+            “Cannot tell” means an expert must decide, so Axcess lists it as
+            “{REVIEW_TYPE_LABEL.expert_review}”.
           </p>
         </details>
       )}
@@ -173,7 +177,7 @@ export default function IssuesRoute() {
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
-          : `${rows.length} of ${data.total_unfiltered} issue groups shown` +
+          : `${rows.length} of ${data.total_unfiltered} issues shown` +
             (hasFilter ? ", filtered" : "")}
       </p>
 
@@ -194,7 +198,7 @@ export default function IssuesRoute() {
           <p className="px-4 py-8 text-center text-sm text-fg-muted">
             {hasFilter
               ? "No issues match these filters. Clear a filter to see more results."
-              : "No issue groups were detected. Check scan coverage before drawing a conformance conclusion."}
+              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See what was checked, above this table."}
           </p>
         ) : (
           <IssueTable
@@ -305,6 +309,17 @@ const COLUMNS = [
   "Responsibility",
 ] as const;
 type SortColumn = (typeof COLUMNS)[number];
+/** What each column header says. The column keys above stay as they are. */
+const COLUMN_LABEL: Record<SortColumn, string> = {
+  Issue: "Issue",
+  Type: "Type",
+  WCAG: "WCAG",
+  Priority: "Priority",
+  Pages: "Pages",
+  Occurrences: "Occurrences",
+  Difficulty: "Difficulty",
+  Responsibility: "Who fixes it",
+};
 type Direction = "asc" | "desc";
 type SortState = { column: SortColumn; direction: Direction };
 
@@ -368,7 +383,7 @@ function describeSort(sort: SortState): string {
   // reader who sees a low score above a higher one should not think the
   // sort is broken.
   if (sort.column === "Priority") return `Priority, barriers first, then ${how}`;
-  return `${sort.column}, ${how}`;
+  return `${COLUMN_LABEL[sort.column]}, ${how}`;
 }
 
 const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, expert_review: 1, informational: 2 };
@@ -493,7 +508,7 @@ function IssueTable({
       {/* Keyboard users need focus on the overflow region to scroll the table. */}
       <div
         role="region"
-        aria-label="Issue table"
+        aria-label="Issues table"
         aria-busy={busy}
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
@@ -502,7 +517,7 @@ function IssueTable({
       {/* Holds the tallest page's height, so paging never moves the pager. */}
       <div {...paged.hold}>
       <table className="w-full text-sm">
-        <caption className="sr-only">Accessibility issue groups</caption>
+        <caption className="sr-only">Accessibility issues</caption>
         <thead className="bg-surface-muted text-2xs text-fg-subtle">
           <tr>
             {COLUMNS.map((column) => {
@@ -538,7 +553,15 @@ function IssueTable({
                       active ? "text-umich-blue" : "text-fg-subtle",
                     )}
                   >
-                    <span>{column}</span>
+                    <span>
+                      {column === "WCAG" ? (
+                        <abbr title="Web Content Accessibility Guidelines">
+                          WCAG
+                        </abbr>
+                      ) : (
+                        COLUMN_LABEL[column]
+                      )}
+                    </span>
                     {active ? (
                       <span
                         key={`${sort.column}-${sort.direction}`}
@@ -567,7 +590,7 @@ function IssueTable({
       </table>
       </div>
       </div>
-      <TablePagination label="Issues" noun="issue groups" {...paged} />
+      <TablePagination label="Issues" noun="issues" {...paged} />
     </>
   );
 }
@@ -612,7 +635,7 @@ function IssueTableRow({ scanId, row, index }: { scanId: number; row: IssueRow; 
           className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
         >
           {row.title}
-          <span className="sr-only">, full evidence</span>
+          <span className="sr-only">, full details</span>
         </Link>
       </th>
       <td className="whitespace-nowrap px-2 py-2.5 align-top">
@@ -631,7 +654,7 @@ function IssueTableRow({ scanId, row, index }: { scanId: number; row: IssueRow; 
       </td>
       <td className="whitespace-nowrap px-2 py-2.5 align-top">
         {isInformational ? (
-          <span className="text-fg-muted">n/a</span>
+          <span className="whitespace-normal text-fg-muted">Does not apply</span>
         ) : (
           // The band, not the score: "11.28" means nothing to a reader,
           // and two decimals invited comparing issues by hundredths. The
@@ -657,14 +680,14 @@ function IssueTableRow({ scanId, row, index }: { scanId: number; row: IssueRow; 
       </td>
       <td className="whitespace-nowrap px-2 py-2.5 align-top">
         {isInformational || row.difficulty === "Unknown" ? (
-          <span className="text-fg-muted">n/a</span>
+          <span className="whitespace-normal text-fg-muted">Does not apply</span>
         ) : (
           row.difficulty
         )}
       </td>
       <td className="whitespace-nowrap px-2 py-2.5 align-top">
         {isInformational ? (
-          <span className="text-fg-muted">n/a</span>
+          <span className="whitespace-normal text-fg-muted">Does not apply</span>
         ) : (
           capitalize(row.responsibility)
         )}
@@ -693,11 +716,7 @@ const isReviewLane = (value: string): value is ReviewLane =>
   (REVIEW_LANES as readonly string[]).includes(value);
 
 function laneLabel(lane: IssueRow["review_lane"]): string {
-  return lane === "likely_barrier"
-    ? "Barrier"
-    : lane === "expert_review"
-      ? "Needs review"
-      : "Informational";
+  return REVIEW_TYPE_LABEL[lane];
 }
 
 function capitalize(value: string): string {
@@ -761,7 +780,7 @@ function IssueSearch({ value, onChange }: { value: string; onChange: (value: str
     type="search"
     aria-label="Search issues"
     value={draft}
-    placeholder="Search issue name or WCAG criterion"
+    placeholder="Search by issue name or WCAG number, such as 1.4.3"
     onChange={(event) => {
       const next = event.target.value;
       setDraft(next);

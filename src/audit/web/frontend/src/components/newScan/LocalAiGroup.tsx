@@ -16,7 +16,7 @@ export function localAiCount(settings: ScanSettings, policy: GroupProps["policy"
 }
 
 function formatBytes(value: number | null): string {
-  if (!value || value < 1) return "size unavailable";
+  if (!value || value < 1) return "size unknown";
   if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
   return `${Math.round(value / 1024 ** 2)} MB`;
 }
@@ -45,8 +45,8 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
           label={SWITCHES.ocr.label}
           hint={
             ocrOff
-              ? "Tesseract OCR is not available in this installation."
-              : `${SWITCHES.ocr.hint} Up to ${local?.ocr.max_workers ?? 2} workers.`
+              ? "Reading text inside images (Tesseract OCR) is not available on this computer."
+              : `${SWITCHES.ocr.hint} Reads up to ${local?.ocr.max_workers ?? 2} images at a time.`
           }
         />
         <SwitchRow
@@ -56,10 +56,10 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
           label={SWITCHES.vision.label}
           hint={
             !ocrOn
-              ? "Turn on image text reading first; the vision model only reviews images where OCR found text."
+              ? "Turn on “Read text inside images” first. The vision model only looks at images where text was found."
               : local?.vision.available
                 ? `${SWITCHES.vision.hint} ${local.vision.model} is installed (${formatBytes(local.vision.installed_size_bytes)}).`
-                : (local?.vision.reason ?? "Checking whether the local vision model is ready…")
+                : (local?.vision.reason ?? "Checking whether the vision model is ready on this computer…")
           }
         />
         {!isFixed(policy, "skip_semantic") && (
@@ -70,8 +70,8 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
             label={SWITCHES.semantic.label}
             hint={
               local?.semantic.available
-                ? `${SWITCHES.semantic.hint} Up to ${local.semantic.checks_per_page} checks per page.`
-                : (local?.semantic.reason ?? "Checking whether the local text models are ready…")
+                ? `${SWITCHES.semantic.hint} It makes up to ${local.semantic.checks_per_page} checks per page.`
+                : (local?.semantic.reason ?? "Checking whether the AI language models are ready on this computer…")
             }
           />
         )}
@@ -82,8 +82,8 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
             label={SWITCHES.motion.label}
             hint={
               local?.vision.available
-                ? `${SWITCHES.motion.hint} Adds one vision-model review per page.`
-                : `${SWITCHES.motion.hint} The vision review joins once the local model is installed.`
+                ? `${SWITCHES.motion.hint} Adds one vision model review per page.`
+                : `${SWITCHES.motion.hint} The vision model review starts once the model is installed on this computer.`
             }
           />
         )}

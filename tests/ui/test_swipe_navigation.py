@@ -32,7 +32,7 @@ async def _swipe(page: Any, dx: float, steps: int = 4) -> None:
 async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str, str]:
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues_url = page.url
-    table = page.get_by_role("table", name="Accessibility issue groups")
+    table = page.get_by_role("table", name="Accessibility issues")
     await table.get_by_role("rowheader").first.get_by_role("link").click()
     await page.wait_for_url("**/issues/**")
     await page.get_by_role("heading", level=1).wait_for()
@@ -86,14 +86,14 @@ async def test_swipe_over_a_wide_table_scrolls_it_instead(
     page = await new_page(viewport={"width": 320, "height": 800}, user_agent=DESKTOP_UA)
     await page.goto(f"{base}/app/scans/{scan_id}/diff", wait_until="networkidle")
     await (
-        page.get_by_role("navigation", name="Report workspace")
+        page.get_by_role("navigation", name="Report views")
         .get_by_role("link", name="Issues", exact=True)
         .click()
     )
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
     issues_url = page.url
 
-    region = page.get_by_role("region", name="Issue table")
+    region = page.get_by_role("region", name="Issues table")
     await region.scroll_into_view_if_needed()
     box = await region.bounding_box()
     assert box is not None

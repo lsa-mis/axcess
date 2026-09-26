@@ -20,9 +20,9 @@ export default function ConformanceBadge({ level }: { level: ConformanceLabel })
   return (
     <span
       className={`${bg} inline-block rounded-xs px-2 py-0.5 text-xs font-bold text-white`}
-      title="WCAG conformance level"
+      title={level === "BP" ? "Best practice: not a WCAG requirement" : "WCAG level: how strict the requirement is"}
     >
-      {level}
+      {level === "BP" ? "Best practice" : <><span className="sr-only">Level </span>{level}</>}
     </span>
   );
 }

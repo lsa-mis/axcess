@@ -32,7 +32,7 @@ export default function ReportWorkspaceNav({
     <Tabs
       mode="nav"
       attached
-      label="Report workspace"
+      label="Report views"
       className="mt-0"
       value={active}
       items={[

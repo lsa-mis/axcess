@@ -7,10 +7,10 @@
  *, e.g. to "Root URL", is a one-line change that can't leave a hint behind
  * saying something different from the label above it.
  */
-export const SITE_URL_LABEL = "Site URL";
+export const SITE_URL_LABEL = "Website address";
 
 /** The same thing in running prose, for hints and helper text. */
-export const SITE_URL_NOUN = "site URL";
+export const SITE_URL_NOUN = "website address";
 
 /**
  * Where the in-app "Send feedback" action goes.

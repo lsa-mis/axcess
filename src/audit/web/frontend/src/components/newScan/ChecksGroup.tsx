@@ -1,3 +1,4 @@
+import { CHECK_LABEL } from "../../lib/terms";
 import SearchSettings from "../SearchSettings";
 import { ENGINE, GROUPS, STANDARD, SWITCHES } from "./copy";
 import type { GroupProps } from "./groupProps";
@@ -22,7 +23,7 @@ export function checksCount(settings: ScanSettings, policy: GroupProps["policy"]
 export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
   const alfaOff = capabilities.alfa?.available === false;
   const alfaReason = alfaOff
-    ? `Siteimprove Alfa is unavailable: ${capabilities.alfa?.reason ?? "not installed"}.`
+    ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
     : undefined;
   const rendered = !settings.static_only;
 
@@ -36,9 +37,9 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           value={settings.axe_level}
           onChange={(axe_level) => update({ axe_level })}
           options={[
-            { value: "A", label: "A" },
-            { value: "AA", label: "AA" },
-            { value: "AAA", label: "AAA" },
+            { value: "A", label: "Level A" },
+            { value: "AA", label: "Level AA" },
+            { value: "AAA", label: "Level AAA" },
           ]}
         />
         <PillGroup
@@ -68,7 +69,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           onChange={(on) => update(switchPatch(settings, "keyboard", on))}
           disabled={!rendered}
           label={SWITCHES.keyboard.label}
-          hint={rendered ? SWITCHES.keyboard.hint : "Needs a rendered page; turn off Fast crawl."}
+          hint={rendered ? SWITCHES.keyboard.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
         {!isFixed(policy, "skip_focus") && (
           <SwitchRow
@@ -76,7 +77,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             onChange={(on) => update(switchPatch(settings, "focus", on))}
             disabled={!rendered}
             label={SWITCHES.focus.label}
-            hint={rendered ? SWITCHES.focus.hint : "Needs a rendered page; turn off Fast crawl."}
+            hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
           />
         )}
         <SwitchRow
@@ -84,7 +85,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           onChange={(on) => update(switchPatch(settings, "responsive", on))}
           disabled={!rendered}
           label={SWITCHES.responsive.label}
-          hint={rendered ? SWITCHES.responsive.hint : "Needs a rendered page; turn off Fast crawl."}
+          hint={rendered ? SWITCHES.responsive.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
       </div>
 

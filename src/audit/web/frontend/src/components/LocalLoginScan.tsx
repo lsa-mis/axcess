@@ -89,22 +89,22 @@ function LocalLoginHandoff({
     {
       opening_browser: {
         title: "Opening the sign-in browser",
-        detail: "A visible Chromium window should appear on this computer.",
+        detail: "A Chromium browser window should open on this computer.",
       },
       awaiting_authentication: {
-        title: "Sign in in the Chromium window",
-        detail: "Complete the full login and 2FA flow, then return here.",
+        title: "Sign in using the Chromium window",
+        detail: "Finish every sign-in step, including two-step sign-in (2FA). Then come back here.",
       },
       verifying_authentication: {
         title: "Preparing the signed-in session",
         detail:
-          "Axcess is preparing your signed-in session using your browser visibility setting.",
+          "Axcess is setting up your signed-in session. It uses your choice to show or hide the browser.",
       },
       scanning: browserHidden
         ? {
             title: "Scanning in the background",
             detail:
-              "The sign-in window has closed. Axcess is scanning in a background browser with your transferred login session. Keep Axcess running until the scan finishes.",
+              "The sign-in window has closed. Axcess moved your sign-in to a hidden browser and is scanning there. Keep Axcess running until the scan finishes.",
           }
         : {
             title: "Scanning with the browser visible",
@@ -113,16 +113,16 @@ function LocalLoginHandoff({
           },
       completed: {
         title: "Report ready",
-        detail: "Opening the normal Axcess report now.",
+        detail: "Open the report to see what the scan found.",
       },
       failed: {
-        title: "Login scan stopped",
+        title: "Sign-in scan stopped",
         detail:
-          status.data?.error ?? "The local browser scan could not continue.",
+          status.data?.error ?? "The browser on this computer could not continue the scan. Start a new sign-in scan to try again.",
       },
       interrupted: {
-        title: "Login scan interrupted",
-        detail: status.data?.error ?? "The in-memory browser session ended.",
+        title: "Sign-in scan interrupted",
+        detail: status.data?.error ?? "The sign-in session ended. Axcess keeps it only in memory, so this scan cannot continue.",
       },
     };
 
@@ -131,7 +131,7 @@ function LocalLoginHandoff({
       {showSteps && <ProtectedScanSteps current={stage} className="mb-5" />}
       <Card className="max-w-3xl p-6 [overflow-anchor:none]">
         <p className="text-xs font-semibold text-umich-blue">
-          Login scan #{scanId}
+          Sign-in scan #{scanId}
         </p>
         <h2 className="mt-1 text-xl font-semibold text-fg" aria-live="polite">
           {copy[state].title}
@@ -163,8 +163,8 @@ function LocalLoginHandoff({
           <div className="mt-6 rounded-md border-2 border-umich-blue bg-umich-blue/5 p-5">
             <h3 className="font-semibold text-fg">Finished signing in?</h3>
             <p className="mt-1 text-sm text-fg-muted">
-              Make sure the visible browser shows the protected application, not
-              the U-M or Duo login screen.
+              Check that the browser window shows the site you signed in to, not
+              the U-M or Duo sign-in screen.
             </p>
             <div className="mt-4 rounded-xs border border-border bg-surface p-3">
               <h4 className="text-sm font-semibold text-fg">
@@ -172,13 +172,13 @@ function LocalLoginHandoff({
               </h4>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-muted">
                 <li>
-                  Unless you chose to show the scanning browser, Axcess
-                  transfers your login session to a background browser and
-                  closes the sign-in window.
+                  If &ldquo;Show the scanning browser window&rdquo; is off,
+                  Axcess moves your sign-in to a hidden browser and closes the
+                  sign-in window.
                 </li>
                 <li>
-                  If you chose to show it, the scan runs in this signed-in
-                  window. Leave it open: closing it ends the scan.
+                  If it is on, the scan runs in this signed-in window. Leave it
+                  open. Closing it ends the scan.
                 </li>
                 <li>Keep Axcess running. Progress appears on this page.</li>
               </ul>
@@ -241,7 +241,7 @@ function LocalLoginHandoff({
                 </p>
                 <p className="mt-2 text-sm font-semibold text-fg">
                   {scanActivity.data?.progress
-                    ? `${scanActivity.data.progress.completed} completed · ${scanActivity.data.progress.pending} queued`
+                    ? `${scanActivity.data.progress.completed} pages checked · ${scanActivity.data.progress.pending} waiting`
                     : "Loading scan activity…"}
                 </p>
               </div>
@@ -280,7 +280,7 @@ function LocalLoginHandoff({
             {!!scanActivity.data?.progress?.recent_pages.length && (
               <div className="mt-3">
                 <h4 className="text-sm font-semibold text-fg">
-                  Recently completed
+                  Recently checked pages
                 </h4>
                 <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto overscroll-contain">
                   {scanActivity.data.progress.recent_pages.map((page) => (
@@ -314,7 +314,7 @@ function LocalLoginHandoff({
             className="mt-5"
             onClick={() => navigate("/scans/new?mode=login", { replace: true })}
           >
-            Start a new login scan
+            Start a new sign-in scan
           </Button>
         )}
       </Card>

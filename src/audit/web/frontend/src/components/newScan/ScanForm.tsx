@@ -3,6 +3,7 @@ import { Disclosure } from "../ui";
 import ChecksGroup, { checksCount } from "./ChecksGroup";
 import CoverageGroup, { coverageCount } from "./CoverageGroup";
 import DefaultSettingsCard from "./DefaultSettingsCard";
+import { GROUPS } from "./copy";
 import FormErrorAlert from "./FormErrorAlert";
 import type { Capabilities } from "./groupProps";
 import LocalAiGroup, { localAiCount } from "./LocalAiGroup";
@@ -115,12 +116,12 @@ export default function ScanForm({
           <h2 id="advanced-settings-title" className="text-base font-semibold text-fg">
             Advanced settings
             <span className="ml-2 text-sm font-normal text-fg-muted">
-              — change anything here and the card above shows what moved
+              — the card above shows what you change
             </span>
           </h2>
           <Disclosure
             id="coverage-group"
-            title="Coverage"
+            title={GROUPS.coverage.legend}
             defaultOpen
             meta={countMeta(coverageCount(settings, policy))}
           >
@@ -128,16 +129,16 @@ export default function ScanForm({
           </Disclosure>
           <Disclosure
             id="checks-group"
-            title="Checks"
+            title={GROUPS.checks.legend}
             defaultOpen
             meta={countMeta(checksCount(settings, policy))}
           >
             <ChecksGroup {...groupProps} />
           </Disclosure>
-          <Disclosure id="local-ai-group" title="Local AI" meta={countMeta(localAiCount(settings, policy))}>
+          <Disclosure id="local-ai-group" title={GROUPS.localAi.legend} meta={countMeta(localAiCount(settings, policy))}>
             <LocalAiGroup {...groupProps} />
           </Disclosure>
-          <Disclosure id="speed-group" title="Speed and debugging">
+          <Disclosure id="speed-group" title={GROUPS.speed.legend}>
             <SpeedGroup {...groupProps} />
           </Disclosure>
         </section>

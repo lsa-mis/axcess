@@ -24,7 +24,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
-Each [issue group](glossary.md#issue-group) lands in one report group, based
+Each [issue group](glossary.md#issue) lands in one report group, based
 on the check that found it and its result. Only rule-engine failures become
 Barriers; anything a person has to judge waits in Needs review.
 
@@ -101,7 +101,7 @@ changes** tabs. Its header holds the **Export** menu and **Open Issue Groups**.
 | Pages Tested | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Its hint shows the [crawl error](glossary.md#pages-not-reached) count, and most of those pages are already in this number. |
 | Issues Found | [Occurrences](glossary.md#occurrence) in every issue group, including Needs review and Informational, so it is not a count of confirmed problems. |
 | Issue Groups | Rows in the Issues table, across all three report groups. |
-| DOM States Found | [DOM states](glossary.md#dom-state) the scan reached by operating controls. |
+| DOM States Found | [DOM states](glossary.md#page-state) the scan reached by operating controls. |
 
 **What this scan actually checked** lists each method, such as axe-core and
 Click Through DOM States. Each row shows a result and one of these states: Not
@@ -161,7 +161,7 @@ until the expert decision is documented."
 ## The note that shows which button revealed a problem
 
 By default, Axcess opens menus, tabs, dialogs, and other controls, then runs
-axe-core on each new [DOM state](glossary.md#dom-state). When a problem was
+axe-core on each new [DOM state](glossary.md#page-state). When a problem was
 first flagged after a control was used, the report names that control (here,
 "Menu"). A problem visible at page load never gets this note.
 

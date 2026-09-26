@@ -42,7 +42,8 @@ export default function IssuePageScreenshotsRoute() {
   if (scanQuery.error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        Couldn&rsquo;t load this report. The stored scan evidence is unchanged.
+        This report could not load. Nothing in the saved report has changed.
+        Reload the page to try again.
       </Card>
     );
   }
@@ -53,8 +54,8 @@ export default function IssuePageScreenshotsRoute() {
       <EmptyState
         title="Screenshots not found"
         message={
-          "This page is not part of the evidence group in the current report. It may have been " +
-          "resolved or the URL may be stale."
+          "This page does not have this issue in this report. The issue may have been fixed, " +
+          "or the link may be out of date."
         }
         action={
           <LinkButton to={pagesPath} variant="primary">
@@ -120,7 +121,7 @@ export default function IssuePageScreenshotsRoute() {
               })}
               className="text-umich-blue underline underline-offset-2"
             >
-              Stored evidence
+              Page details
             </Link>
             {" · "}
             <Link
@@ -140,10 +141,10 @@ export default function IssuePageScreenshotsRoute() {
       />
 
       <Card className="p-4">
-        <h2 className="text-base font-semibold">Instance screenshots</h2>
+        <h2 className="text-base font-semibold">Screenshots of each occurrence</h2>
         {found.screenshot_hashes.length === 0 ? (
           <p className="mt-2 text-sm text-fg-muted">
-            No instance on this page had a locatable screenshot.
+            Axcess could not find any of these occurrences on screen, so there are no screenshots.
           </p>
         ) : (
           <ul className="mt-3 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">
@@ -152,12 +153,12 @@ export default function IssuePageScreenshotsRoute() {
                 <figure className="rounded-xs border border-border bg-surface p-2">
                   <img
                     src={blobUrl(hash)}
-                    alt={`Issue instance ${index + 1} on ${label}. A circular marker identifies the detected location.`}
+                    alt={`Occurrence ${index + 1} on ${label}. A circle marks where Axcess found the issue.`}
                     className="max-h-80 w-full rounded-xs object-contain"
                     loading="lazy"
                   />
                   <figcaption className="mt-2 text-xs text-fg-muted">
-                    Instance {index + 1} of {found.occurrence_count}. The circle marks the detected location.
+                    Occurrence {index + 1} of {found.occurrence_count}. The circle marks where Axcess found the issue.
                   </figcaption>
                 </figure>
               </li>
@@ -166,7 +167,8 @@ export default function IssuePageScreenshotsRoute() {
         )}
         {missing > 0 && (
           <p className="mt-3 text-xs text-fg-muted">
-            {missing} additional instance{missing === 1 ? "" : "s"} had no locatable screenshot or exceeded the per-page safety limit.
+            {missing} more occurrence{missing === 1 ? " has" : "s have"} no screenshot. Axcess could not find{" "}
+            {missing === 1 ? "it" : "them"} on screen, or the page reached its safety limit for screenshots.
           </p>
         )}
       </Card>

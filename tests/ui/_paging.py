@@ -15,7 +15,7 @@ async def all_pages_text(page: Any, cells: Any, label: str) -> list[str]:
     """
     previous = page.get_by_role("button", name=f"Previous page of {label.lower()}")
     next_button = page.get_by_role("button", name=f"Next page of {label.lower()}")
-    status = page.get_by_role("navigation", name=f"{label} pagination").get_by_role("status")
+    status = page.get_by_role("navigation", name=f"{label}: page controls").get_by_role("status")
 
     async def enabled(button: Any) -> bool:
         return bool(await button.count()) and await button.get_attribute("aria-disabled") != "true"

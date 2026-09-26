@@ -93,7 +93,7 @@ requires manual reproduction.
 | Browser rendering | scan coverage counters | Executes JavaScript and exposes the live DOM for interaction checks. | A rendered page is not itself an accessibility pass. |
 | axe-core 4.10.2 | `axe` | Deterministic rendered-DOM rules at the selected WCAG level. | High-confidence rule evidence, but it covers only machine-testable conditions. |
 | Siteimprove Alfa | `alfa` | An independent ACT-rule evaluation with failed and cannot-tell outcomes. | Select axe, Alfa, or both. Alfa evidence is stored separately and does not inflate matrix counts simply because two engines overlap. |
-| Click-through [DOM states](./glossary.md#dom-state) | `axe` rows with `revealed_by`; per-page ledger in `scan_interaction_runs` | Opens menus, tabs, dialogs, and other controls on each rendered page, then re-runs axe-core on each new state a click reveals. | On by default; needs axe-core and browser rendering. Bounded per page (100 clicks, 20 per repeated control shape, depth 5, 120 seconds) and never operates controls named for destructive actions. Hover-only content, gestures, and states with no DOM change remain manual. |
+| Click-through [DOM states](./glossary.md#page-state) | `axe` rows with `revealed_by`; per-page ledger in `scan_interaction_runs` | Opens menus, tabs, dialogs, and other controls on each rendered page, then re-runs axe-core on each new state a click reveals. | On by default; needs axe-core and browser rendering. Bounded per page (100 clicks, 20 per repeated control shape, depth 5, 120 seconds) and never operates controls named for destructive actions. Hover-only content, gestures, and states with no DOM change remain manual. |
 | Keyboard probe | `keyboard` | Tab/Shift+Tab exit evidence and Escape behavior for likely traps. | Conservative review leads; full keyboard operability is manual. |
 | Responsive and zoom probe | `responsive` | 320 CSS-pixel reflow, approximately 200% text zoom, and text-spacing overrides. | Geometry identifies likely clipping/loss; an expert determines user impact. |
 | Focus probe | `focus` | Positive `tabindex` and focus obscured by fixed/sticky overlays. | Full focus order and interaction-created overlays remain manual. |
@@ -117,7 +117,7 @@ that a feature was selected.
 
 Axcess supports two manual sign-in models without collecting credentials:
 
-- **[Login scan](./glossary.md#login-scan)** (the **Site with a login or 2FA**
+- **[Login scan](./glossary.md#sign-in-scan)** (the **Site with a login or 2FA**
   tab). The browser window opens on the Axcess computer, and the signed-in
   session is held only in memory.
 - **Managed protected scan:** an identity-gated, scan-bound companion model
