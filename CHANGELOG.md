@@ -1,10 +1,11 @@
 # Changelog
 
-Notable changes to Axcess, newest first. Versions use three parts
-(`0.60.0`). Desktop previews are published from CI as `0.60.<run number>`;
-before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
+Notable changes to Axcess, newest first. Versions have two parts: `0.60`,
+then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
+`main` is one step after the last. Before 0.60 desktop previews were
+`0.1.<run number>`, up to `desktop-v0.1.33`.
 
-## 0.60.0 - 2026-09-26
+## 0.60 - 2026-09-26
 
 ### Added
 
@@ -33,6 +34,8 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
 - **Pages and checks** on a running scan: a row per page and a column per
   check, each cell Done, Checking, Waiting or Not run.
 - Reports shows a running scan's progress, with a link to it.
+- The inspector says when other page states hold more occurrences of the
+  issue, how many, and links to each state.
 - The website's "What Axcess checks" page has a short card for each check,
   and each row of a report's "What was checked" table links to its card.
 - This changelog.
@@ -58,6 +61,16 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
 - Table cells have more room: wider padding and taller rows. The Table
   spacing setting's Tight and Roomy each step up to match.
 - Settings' quick presets sit on one row under their explanation.
+- New scan: Reset to default settings moves to the top right of the summary,
+  beside "Customized", and shows only once a setting has changed.
+- Each check in "What was checked" says what it does and its main limit in
+  one sentence each, across the whole column; its card on the website keeps
+  the rest.
+- The running scan's table drops its check columns when the scan's checks
+  are not recorded page by page, and shows a single-page app's pages by
+  their route ("/#/about") instead of "/" for every row.
+- Long control names in the inspector's Page state list are cut short, and
+  the Issues search box's hint fits it ("Issue name or WCAG number (1.4.3)").
 - Compare reports reads trend first, then the change cards and table, with the
   coverage notes last.
 - The issue pages table drops its Open live page and Stored evidence
@@ -65,8 +78,10 @@ before 0.60 they were `0.1.<run number>`, up to `desktop-v0.1.33`.
 - The inspector's "Page state" picker says what its counts count ("At page
   load: 19 occurrences").
 - Clicking a site's name on Reports expands its scans.
-- The project version moves from 0.1.x to 0.60, and CI stamps desktop builds
-  `0.60.<run number>`.
+- The project version moves from 0.1.x to two-part versions: this is 0.60,
+  and each desktop release from `main` is the next (0.61, 0.62, ... 0.70).
+  npm and the Windows installer still get a three-part package version
+  (0.61.0); every name and label people see says 0.61.
 
 ### Fixed
 
