@@ -146,7 +146,7 @@ to `priority_asc`, so priority only orders rows within a group. The
 > soon as a migration allows a new `pipeline` value, its rows appear as
 > Barriers unless `_axe_issue_rows` has an explicit branch for it. Also add
 > the new value to the pipeline tuples
-> in `_rule_meta_for` (line 469) and `_pages_for_issue` (lines 511-520), or
+> in `rule_meta_for` and `_pages_for_issue`, or
 > the issue page looks for its card and its pages in the image tables.
 
 ### Downstream consumers

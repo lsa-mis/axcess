@@ -16,6 +16,21 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   check saw it: 320 pixels wide for reflow, 640 by 450 for text at 200% zoom,
   or with WCAG's text spacing, with the element highlighted. "Show at full
   width" compares.
+- **Issue guidance for every issue.** Every rule a scan can run now has a
+  guidance card: all 93 axe rules (81 had none), all 58 Alfa rules a scan can
+  select (none had one), the three AI review criteria that had none, and
+  every image group (17 had none). The 29 existing cards were improved too.
+  Each card says what the rule checks, why it matters and to whom, how to fix
+  it (with code where it helps), how to test the fix, and when it is done.
+  Each was written from the rule's own documentation (Deque University,
+  Siteimprove Alfa, W3C ACT rules and Understanding WCAG) and from Axcess's
+  code, then checked again against those sources: the second check changed
+  wrong causes, a fix that would not pass its rule, and advice that could
+  hide a meaningful image from screen readers. Rescan advice names the
+  setting the check needs (Alfa or Both, Level AAA, WCAG version 2.2, the AI
+  review, the motion check, the vision model), because a default scan skips
+  those and the issue would look fixed. `tests/unit/test_guidance_cards.py`
+  fails when a rule has no card, or a card breaks the plain-language rules.
 - **Hover hints** on words that need explaining: the Issues table's Type and
   Found by tags (in the glossary's own words), its column headers, the
   priority bands, the level badges, Compare's New, No longer found and Still
@@ -57,6 +72,14 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 - Two elements with identical markup but different locators were treated as
   one occurrence, so the second was never outlined; and an occurrence in a
   clicked state was dropped when the same markup was flagged at page load.
+- Issue guidance showed the "Why it was flagged" line twice when an issue
+  had no card, and that line read "Deterministic axe-core rule failure;
+  verify after remediation." The evidence lines are plain now, an Alfa
+  issue's title says "a person must decide" rather than "expert decision
+  needed", and an Alfa issue keeps its outcome note (a "can't tell" is not a
+  failure) after its card's words. The exports print the cards' code as code
+  (Markdown) or plain text (Excel) instead of raw tags, and find the same
+  card as the issue page, so Alfa and browser-check issues get theirs.
 - The Barrier meaning said a new scan "confirms the fix". It now says to
   test the fix, then scan again to see if it is still found: a later scan not
   finding an issue does not prove it was fixed.

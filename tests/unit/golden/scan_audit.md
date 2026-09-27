@@ -12,9 +12,9 @@ After self-critique, **3 open issue type(s)** need work (1 already-triaged item(
 
 Of those, **1 map to WCAG Level A** and **1 map to Level AA**. These are likely barriers, not a standalone conformance determination; Level A items should be triaged first.
 
-The biggest themes by reach are: *Images don't announce text to screen readers* (on 1 page); *Text doesn't meet the 4.5:1 contrast ratio* (on 1 page); *Elements must meet enhanced color contrast* (on 1 page).
+The biggest themes by reach are: *Images have no alt text for screen readers* (on 1 page); *Text does not stand out enough from its background* (on 1 page); *Elements must meet enhanced color contrast* (on 1 page).
 
-**Highest-impact fix this team could ship this week:** *Images don't announce text to screen readers*, Critical, Under 15 minutes, 1 page(s).
+**Highest-impact fix this team could ship this week:** *Images have no alt text for screen readers*, Critical, Under 15 minutes, 1 page(s).
 
 Rough effort to clear what this tool can see: **1 quick win(s) (< 15 min each) · 1 medium item(s) (< 2 hr each)**.
 
@@ -169,16 +169,16 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 
 ### Content editors (1 item(s))
 
-- [ ] **Images don't announce text to screen readers**, Critical, Under 15 minutes, 1 page.
+- [ ] **Images have no alt text for screen readers**, Critical, Under 15 minutes, 1 page.
 
 ### Designers (1 item(s))
 
-- [ ] **Text doesn't meet the 4.5:1 contrast ratio**, Serious, Under 2 hours, 1 page.
+- [ ] **Text does not stand out enough from its background**, Serious, Under 2 hours, 1 page.
 
 
 ## Issue cards
 
-### 1. Images don't announce text to screen readers
+### 1. Images have no alt text for screen readers
 
 **WCAG:** SC 1.1.1 Non-text Content, Level A
 
@@ -191,11 +191,11 @@ Specific locations:
 
 **What is happening:**
 
-One or more <img> elements have no alt attribute (or have alt="" when the image is informative). Screen readers announce "image" with no context, so the information the image conveys is unreachable.
+An image (`<img>`) has no alt text (the text a screen reader reads for an image). The rule check (axe) found no `alt` attribute, `aria-label`, `aria-labelledby` or `title`, and no role that marks it as decoration (`role="none"` or `role="presentation"`). An `alt` that holds only a space, such as `alt=" "`, also fails. The check only sees whether alt text exists, not whether it is good.
 
 **Why it matters:**
 
-Blind, low-vision, and screen-reader users get a broken version of the page, the image's content is silently dropped.
+Blind and deafblind people who use a screen reader or a braille display get nothing from the image. Without an alt attribute, screen readers often read the file name instead, such as "image.jpg".
 
 **Affects:** Vision.
 
@@ -207,21 +207,22 @@ Blind, low-vision, and screen-reader users get a broken version of the page, the
 
 **Fix (do this):**
 
-1. For each affected image, decide what the image conveys. If it conveys information, write alt text that describes the *meaning*, not the appearance ("Acme logo", not "blue square with letters").
-2. If the image is purely decorative (a divider, a stock photo with no semantic role), set `alt=""` explicitly so screen readers skip it cleanly.
-3. Update the CMS field or the template so the alt attribute is always present, even when empty.
+1. Decide what the image does on this page. If it gives information, write alt text that says what it means, not how it looks. For example, write "Acme logo", not "blue square with letters": `<img src="logo.png" alt="Acme logo">`. Do not use the file name or the word "image".
+2. If the image is only decoration, add an empty alt: `alt=""`, with nothing between the quotes. Screen readers then skip it.
+3. An image that is the only content of a link or a button needs alt text that says what it does. For a link, say where it goes: `<a href="/search"><img src="search.svg" alt="Search"></a>`.
+4. Change the content management system (CMS) field or the page template so every image always gets an `alt` attribute, even an empty one.
 
 **Verify it is fixed:**
 
-- **Manual:** With a screen reader running (VoiceOver: Cmd+F5 on macOS; NVDA: Ctrl+Alt+N on Windows), tab to each affected image. It should announce meaningful text or be skipped entirely if marked decorative.
-- **Automated:** axe-core image-alt rule passes after the fix.
-- **Acceptance:** Every <img> on the affected pages has either a non-empty alt attribute that describes its purpose, or alt="" explicitly when decorative.
+- **Manual:** Turn on a screen reader (VoiceOver: Cmd+F5 on macOS; NVDA: Ctrl+Alt+N on Windows). Tab does not stop on images, so read line by line (VoiceOver: Control+Option+Right Arrow; NVDA: Down Arrow). You should hear alt text that makes sense for each image that gives information, and nothing for decorative images.
+- **Automated:** Scan again and see if this image is still found.
+- **Acceptance:** Every image on the affected pages has alt text that says what it means, or alt="" when it is only decoration.
 
 **My confidence:** High.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/image-alt_
 
-### 2. Text doesn't meet the 4.5:1 contrast ratio
+### 2. Text does not stand out enough from its background
 
 **WCAG:** SC 1.4.3 Contrast (Minimum), Level AA
 
@@ -234,11 +235,11 @@ Specific locations:
 
 **What is happening:**
 
-Text falls below the WCAG 1.4.3 minimum contrast against its background (4.5:1 for body text; 3:1 for 18pt+ or 14pt-bold).
+The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. The rule check does not report text it cannot measure, such as text over an image or a gradient.
 
 **Why it matters:**
 
-Users with low vision, color blindness, or who view the site in bright sunlight can't read the text. This is one of the most commonly-reported barriers in user testing.
+People with low vision or color blindness may not be able to read text that is too close in color to its background. Glare from bright sunlight makes such text hard for everyone to read.
 
 **Affects:** Vision.
 
@@ -250,15 +251,16 @@ Users with low vision, color blindness, or who view the site in bright sunlight 
 
 **Fix (do this):**
 
-1. Open the affected page in DevTools, inspect the failing element, and read its foreground and background colors.
-2. Run the pair through WebAIM's Contrast Checker. Find a darker foreground (or lighter background) that clears 4.5:1.
-3. Update the CSS custom property or design-system token, most contrast failures cascade from one token, so one change often fixes many findings at once.
+1. Open the occurrence and read the measured ratio, the two colors, the font size and the font weight. For example: "color contrast of 4.16 (foreground color: #3170fb, background color: #fafafc, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1". The foreground color is the text color.
+2. Put the two colors into a contrast checker, such as the WebAIM Contrast Checker. Find a darker text color or a lighter background that reaches 4.5:1, or 3:1 for large text. Do not round up: 4.499:1 does not pass.
+3. Change the color where the whole site sets it, such as a shared color setting (design token) or a CSS custom property like `--link-color`. One setting often colors many elements, so one change can fix many occurrences.
+4. Check the same text in every state people can see, such as hover, focus and visited.
 
 **Verify it is fixed:**
 
-- **Manual:** Open DevTools → Accessibility tab → Contrast ratio reading. Confirm ≥ 4.5:1 for body text, ≥ 3:1 for large text.
-- **Automated:** axe-core color-contrast rule passes after the fix.
-- **Acceptance:** All text on the affected pages clears 4.5:1 (body) or 3:1 (large) against its background, verified in DevTools or WebAIM.
+- **Manual:** In Chrome's developer tools, use the Inspect tool and point at the text: the pop-up shows the contrast ratio. Check text over images or gradients by eye, because the rule check does not report it. Text in a logo, or on a control that is turned off (disabled), has no contrast requirement.
+- **Automated:** Scan again and see if this text is still found.
+- **Acceptance:** Every piece of text on the affected pages reaches 4.5:1 against its background, or 3:1 when it is large text.
 
 **My confidence:** High.
 
@@ -293,11 +295,11 @@ Users relying on assistive technology hit a barrier here.
 
 **Fix (do this):**
 
-1. Human review needed, no templated fix for `axe:color-contrast-enhanced` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced
+1. Human review needed, no templated fix for `axe:rule-without-a-card` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/rule-without-a-card
 
 **My confidence:** Medium.
 
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced_
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/rule-without-a-card_
 
 ## Appendix A, Findings dropped during self-critique
 
@@ -305,16 +307,16 @@ These issue types *were* detected but every finding in them has already been tri
 
 | Method | Issue | WCAG | Reason set aside |
 |---|---|---|---|
-| axe | Form controls have no programmatic label | 4.1.2 | Already triaged: accepted_risk (1) |
+| axe | Form fields have no name for screen readers | 4.1.2 | Already triaged: accepted_risk (1) |
 
 ## Appendix B, Review leads and informational evidence
 
 These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
-- **The page has no top-level heading** (`page-has-heading-one`), 1 finding(s) on 1 page; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
-- **Keyboard users can't escape this element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Measured Tab and Shift+Tab exit attempts both remained on the same observable element; manually check for another documented exit command.
-- **Images of text have no alt and can't be read** (`essential_missing`), 1 finding(s) on 1 page; **expert review / medium confidence**. OCR/VLM-assisted image lead; confirm purpose and alternative in context.
-- **Links don't describe their purpose (LLM-detected)** (`2.4.4`), 1 finding(s) on 1 page; **expert review / medium confidence**. AI-assisted semantic lead; confirm in page context.
+- **The page has no main heading (h1)** (`page-has-heading-one`), 1 finding(s) on 1 page; **likely barrier / high confidence**. The rule check (axe) found the page code breaks this rule.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
+- **Images with important text have no alt text** (`essential_missing`), 1 finding(s) on 1 page; **expert review / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
+- **Link text may not say where the link goes** (`2.4.4`), 1 finding(s) on 1 page; **expert review / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
 
 ---
 

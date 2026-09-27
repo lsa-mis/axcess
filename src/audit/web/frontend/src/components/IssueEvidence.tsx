@@ -272,14 +272,18 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             </p>
           )}
 
-          <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
-            {description ? (
-              <RuleText text={description} />
-            ) : (
-              row.evidence_summary ||
-              "Axcess recorded this automatically. See the pages with this issue for the details."
-            )}
-          </p>
+          {/* What the rule looks for. Without a card, nothing: the evidence
+              line above already says why it was flagged, and repeating it
+              here read as two findings. */}
+          {(description || !row.evidence_summary) && (
+            <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
+              {description ? (
+                <RuleText text={description} />
+              ) : (
+                "Axcess recorded this automatically. See the pages with this issue for the details."
+              )}
+            </p>
+          )}
         </GuidanceSection>
 
         {nextSteps.length > 0 && (

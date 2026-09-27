@@ -445,7 +445,7 @@ def detail_for_row(
     pages = _sort_pages(pages, sort)
 
     rules = _load_rules()
-    meta = _rule_meta_for(row, rules)
+    meta = rule_meta_for(row, rules)
 
     # Help URL preference: YAML card → the row itself (the list builder
     # already resolved the per-finding URL, dequeuniversity for axe,
@@ -459,15 +459,23 @@ def detail_for_row(
         if match:
             help_url = match.get("help_url") or None
 
+    # The card first; else what the row itself carries (an Alfa rule or an
+    # older observation with no card has its own description and steps).
     description = meta.get("what_happening")
-    if _is_wcag21_best_practice(row):
+    if description and _is_wcag21_best_practice(row):
         description = _with_wcag21_note(description)
     return IssueDetail(
         row=row,
         pages=pages,
-        description=description,
-        why_matters=meta.get("why_matters"),
-        fix_steps=list(meta.get("fix_steps") or []),
+        # The row's own description already carries the WCAG 2.1 note.
+        description=description or row.description,
+        # An Alfa row's own text already joins its card with its outcome note.
+        why_matters=(
+            row.why_matters
+            if row.pipeline == "alfa"
+            else meta.get("why_matters") or row.why_matters
+        ),
+        fix_steps=list(meta.get("fix_steps") or row.fix_steps or []),
         verify_manual=(
             meta.get("verify_manual")
             or (
@@ -485,13 +493,17 @@ def detail_for_row(
                 else None
             )
         ),
-        acceptance=meta.get("acceptance"),
+        acceptance=meta.get("acceptance") or row.acceptance,
         help_url=help_url,
     )
 
 
-def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
-    """Pick the right YAML block for this issue's pipeline + key."""
+def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
+    """Pick the right YAML block for this issue's pipeline + key.
+
+    The one lookup every surface uses, the issue page and the exports, so an
+    issue always resolves to the same card.
+    """
     # The yaml-loaded dicts are typed as `Any` at this depth, coerce
     # via `dict(...)` so mypy sees a concrete dict[str, Any] return.
     if row.pipeline == "axe":
@@ -515,12 +527,25 @@ def _rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         )
         return dict(meta) if isinstance(meta, dict) else {}
     if row.pipeline == "alfa":
-        # Alfa rule documentation and ACT diagnostics are the authoritative
-        # remediation lead; no axe-specific YAML card should be borrowed.
-        return {}
+        # Alfa's own card, never an axe card with a colliding id.
+        rule_id, _outcome = _alfa_rule_and_outcome(row.issue_key)
+        return _alfa_guidance(rules, rule_id)
     image_key = row.issue_key.removeprefix("image:")
     meta = rules.get("image_findings", {}).get(image_key, {})
     return dict(meta) if isinstance(meta, dict) else {}
+
+
+# Card fields an Alfa issue does not take: it keeps its own title and the
+# criterion Alfa reported, so a card can only add guidance, never re-file it.
+_ALFA_OWN_FIELDS = frozenset({"title", "wcag_sc", "wcag_name", "wcag_level", "help_url"})
+
+
+def _alfa_guidance(rules: dict[str, Any], rule_id: str) -> dict[str, Any]:
+    """An Alfa rule's card from ``alfa_rules``, less the fields Alfa itself sets."""
+    card = rules.get("alfa_rules", {}).get(rule_id, {})
+    if not isinstance(card, dict):
+        return {}
+    return {key: value for key, value in card.items() if key not in _ALFA_OWN_FIELDS}
 
 
 def _alfa_rule_and_outcome(issue_key: str) -> tuple[str, str | None]:
@@ -804,11 +829,16 @@ def _axe_issue_rows(
             meta = semantic_meta.get(sc, {})
         elif pipeline == "alfa":
             # Alfa/ACT metadata is source-specific. Never borrow an axe card
-            # merely because a third-party rule id happens to collide.
-            meta = {}
+            # merely because a third-party rule id happens to collide; an
+            # Alfa rule has its own card, for guidance only.
+            meta = _alfa_guidance(rules, raw_rule_id)
         else:
             meta = axe_rules_meta.get(raw_rule_id, {})
-            if not meta:
+            # A browser check's card is keyed by its criterion. An axe rule
+            # with no card of its own borrows nothing: another criterion's
+            # card is about a different check (the AI review's 3.3.2 card,
+            # say) and would misdescribe the rule check (axe).
+            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual"):
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
                     meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
@@ -841,37 +871,40 @@ def _axe_issue_rows(
         alfa_fix_steps: tuple[str, ...] = ()
         review_lane: ReviewLane = "expert_review"
         evidence_confidence: EvidenceConfidence = "medium"
-        evidence_summary = "Observed evidence requires expert confirmation."
+        evidence_summary = "A check found this, but a person must confirm it on the page."
         high_confidence_occurrences = 0
         if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
             issue_key = f"semantic:{sc}"
             default_title = f"WCAG SC {sc} (LLM-detected)"
-            evidence_summary = "AI-assisted semantic lead; confirm in page context."
+            evidence_summary = (
+                "The AI review (a language model on this computer) judged this. "
+                "Check it on the page before you report it."
+            )
         elif pipeline == "protected_image":
             issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = "Protected image-of-text review lead"
             alfa_description = (
-                "The local companion detected embedded text while handling a protected "
-                "image in memory. The image bytes and OCR text were not retained; "
-                "review the page manually to determine whether the text is essential."
+                "The helper app found text in an image on a signed-in page. It read the "
+                "image in memory and kept neither the image nor its text, so check the "
+                "page yourself to decide whether the words in the image matter."
             )
             alfa_why_matters = (
-                "This is an image-analysis lead, not a conformance verdict. Confirm "
-                "the applicable text alternative and WCAG criterion manually."
+                "This is a lead from the image text check, not a WCAG decision. Find the "
+                "image's text alternative and the WCAG criterion that applies by hand."
             )
             alfa_fix_steps = (
-                "Re-open the affected protected page in the companion browser.",
+                "Open the signed-in page again in the helper app.",
+                "Decide whether the words in the image matter, and what text could say the same.",
                 (
-                    "Determine whether the image text is essential and identify an "
-                    "equivalent text alternative."
-                ),
-                (
-                    "If confirmed, treat it as a remediation item; otherwise keep it "
-                    "labeled as unconfirmed evidence."
+                    "If they matter, fix it like any other issue; if not, record that it "
+                    "is not a problem."
                 ),
             )
-            evidence_summary = "Local image-analysis lead; no conformance decision was automated."
+            evidence_summary = (
+                "The image text check, run on this computer, found text in an image. "
+                "Axcess made no WCAG decision about it."
+            )
         elif pipeline == "keyboard":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_keyboard_observation:
@@ -879,40 +912,46 @@ def _axe_issue_rows(
                 review_lane = "informational"
                 evidence_confidence = "low"
                 evidence_summary = (
-                    "An older Axcess probe used a one-direction, Escape, or iframe "
-                    "heuristic that does not establish WCAG 2.1.2. Retained for audit "
-                    "history; do not report it as a barrier without manual evidence."
+                    "An older keyboard check used a test that cannot show a keyboard trap "
+                    "(WCAG 2.1.2). It is kept as a record. Do not report it as a barrier "
+                    "unless you find the trap by hand."
                 )
                 alfa_description = (
-                    "This result predates the bidirectional accuracy gate. The recorded "
-                    "observation may reflect ordinary focus movement, dialog behavior, "
-                    "or focus moving inside an opaque embedded document."
+                    "An older keyboard check recorded this before it learned to press "
+                    "both Tab and Shift+Tab. What it saw may be focus moving as usual, a "
+                    "dialog, or focus moving inside a frame it could not look into."
                 )
                 alfa_why_matters = (
-                    "Axcess preserves original scan evidence, but unsupported historical "
-                    "heuristics must not inflate the remediation worklist or a WCAG report."
+                    "Axcess keeps the scan's record as it was, but an older test that could "
+                    "not show a trap must not add to the list of things to fix or to a WCAG report."
                 )
                 alfa_fix_steps = (
-                    "Do not remediate from this observation alone.",
-                    "Test the component manually with Tab, Shift+Tab, and any "
-                    "documented exit command.",
-                    "Run a new scan to collect bidirectional keyboard-exit measurements.",
+                    "Do not fix anything based on this record alone.",
+                    (
+                        "Test the component by hand with Tab, Shift+Tab, and any exit key "
+                        "the page names."
+                    ),
+                    "Scan again to measure leaving the component in both directions.",
                 )
             else:
                 default_title = "Keyboard exit blocked in both directions"
                 evidence_summary = (
-                    "Measured Tab and Shift+Tab exit attempts both remained on the same "
-                    "observable element; manually check for another documented exit command."
+                    "Pressing Tab and pressing Shift+Tab both left focus on the same element. "
+                    "Check by hand whether another key, such as Escape, moves focus out."
                 )
         elif pipeline == "responsive":
             issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = f"Responsive failure: {raw_rule_id}"
-            evidence_summary = "Browser geometry signal; confirm at 320 CSS px and 200% zoom."
+            evidence_summary = (
+                "Found by measuring the page's layout in a browser. Check it by hand at "
+                "320 pixels wide, at 200% zoom, and with wider text spacing."
+            )
         elif pipeline == "focus":
             issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = f"Focus not visible: {raw_rule_id}"
             evidence_summary = (
-                "Browser focus probe lead; confirm across the full interaction state."
+                "Found by moving keyboard focus through the page in a browser. Check it "
+                "by hand, including after you open menus and dialogs."
             )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
@@ -921,40 +960,41 @@ def _axe_issue_rows(
                 review_lane = "informational"
                 evidence_confidence = "low"
                 evidence_summary = (
-                    "An older detector saw autoplay markup but did not establish that media "
-                    "loaded, played, or met the WCAG duration threshold. Retained for audit "
-                    "history; do not report it as a barrier without manual evidence."
+                    "An older motion check saw code that starts media on its own, but did not "
+                    "measure whether it played, or for how long WCAG allows. It is kept as a "
+                    "record. Do not report it as a barrier unless you see it play by hand."
                 )
                 alfa_description = (
-                    "This result predates runtime playback measurement. A missing or blocked "
-                    "media resource can carry an autoplay attribute while never producing "
-                    "audio or motion."
+                    "An older motion check recorded this before it measured playback. A "
+                    "video or sound file that is missing or blocked can carry the autoplay "
+                    "setting and never play or move."
                 )
                 alfa_why_matters = (
-                    "Markup is not enough to establish SC 1.4.2 or SC 2.2.2. Unsupported "
-                    "historical observations must not inflate a remediation report."
+                    "The page code alone cannot show a WCAG 1.4.2 or 2.2.2 failure. An older "
+                    "record like this must not add to the list of things to fix."
                 )
                 alfa_fix_steps = (
-                    "Do not remediate from this observation alone.",
-                    "Verify that the media actually starts and continues playing.",
-                    "Run a new scan to collect a runtime playback measurement.",
+                    "Do not fix anything based on this record alone.",
+                    "Check by hand that the media starts on its own and keeps playing.",
+                    "Scan again with Check motion and animation turned on to measure playback.",
                 )
             elif raw_rule_id == "visual-autoplay-audio-no-control":
                 default_title = "Automatically playing audio may lack a usable control"
                 evidence_summary = (
-                    "Runtime playback advanced while audible audio had no detected native or "
-                    "explicitly associated custom control; confirm the interaction manually."
+                    "Sound played on its own, and Axcess found no control to pause or stop it. "
+                    "Check by hand for a control Axcess could not see."
                 )
             elif raw_rule_id == "visual-motion-no-pause":
                 default_title = "Moving content may lack pause, stop, or hide controls"
                 evidence_summary = (
-                    "Runtime motion or marquee evidence requires expert confirmation of duration, "
-                    "page context, and any custom controls."
+                    "Content was measured moving on its own. A person must check how long it "
+                    "moves, what it is for, and whether there is a way to pause it."
                 )
             else:
                 default_title = f"Visual order: {raw_rule_id}"
                 evidence_summary = (
-                    "Visual-model lead; compare DOM and visual reading order manually."
+                    "A vision model compared the order on screen with the order in the page "
+                    "code (DOM). Check the reading order by hand."
                 )
         elif pipeline == "alfa":
             outcome_group = str(g.get("outcome_group") or "failed")
@@ -964,24 +1004,27 @@ def _axe_issue_rows(
             diagnostic_text = "; ".join(diagnostics)
             if outcome_group == "cant_tell":
                 default_title = (
-                    f"{criterion_name or 'Alfa ACT result'}, expert decision needed "
+                    f"{criterion_name or 'Rule check (Alfa)'}, a person must decide "
                     f"(Alfa {raw_rule_id})"
                 )
                 evidence_summary = (
-                    f"Alfa returned {alfa_cant_tell} cantTell occurrence(s); this is not a "
-                    f"failure. {diagnostic_text or 'Review the stored target in page context.'}"
+                    f"The rule check (Alfa) could not decide on {alfa_cant_tell} "
+                    f"occurrence{'' if alfa_cant_tell == 1 else 's'}. That is not a failure. "
+                    f"{diagnostic_text or 'Check the element on the page.'}"
                 )
             else:
-                diagnostic_title = diagnostics[0] if diagnostics else "rule requirements failed"
+                diagnostic_title = diagnostics[0] if diagnostics else "the rule was not met"
                 default_title = (
-                    f"{criterion_name or 'Alfa ACT rule'}, {diagnostic_title} (Alfa {raw_rule_id})"
+                    f"{criterion_name or 'Rule check (Alfa)'}, {diagnostic_title} "
+                    f"(Alfa {raw_rule_id})"
                 )
                 review_lane = "likely_barrier"
                 evidence_confidence = "high"
                 high_confidence_occurrences = alfa_failed
                 evidence_summary = (
-                    f"Alfa produced {alfa_failed} failed ACT occurrence(s). Observed: "
-                    f"{diagnostic_text or 'the stored rule requirements failed.'}"
+                    f"The rule check (Alfa) failed {alfa_failed} "
+                    f"occurrence{'' if alfa_failed == 1 else 's'}. What it saw: "
+                    f"{diagnostic_text or 'the rule was not met.'}"
                 )
             outcome_parts: list[str] = []
             if alfa_failed:
@@ -996,14 +1039,13 @@ def _axe_issue_rows(
             )
             if outcome_group == "cant_tell":
                 alfa_why_matters = (
-                    "A cantTell outcome is not a failure. Review the target in context and "
-                    "record a human decision before describing it as a barrier."
+                    "The rule check (Alfa) could not decide, so this is not a failure. Check "
+                    "it on the page and record your decision before you call it a barrier."
                 )
             else:
                 alfa_why_matters = (
-                    "A failed ACT outcome is strong automated evidence, not a conformance "
-                    "verdict. Confirm that the rule applies and reproduce the barrier before "
-                    "presenting the row as a confirmed accessibility issue."
+                    "A failed rule is strong evidence, but it does not prove the page fails "
+                    "WCAG. Check that the rule applies here before you report it."
                 )
             review_hint = next(
                 (f.get("manual_review_hint") for f in finding_rows if f.get("manual_review_hint")),
@@ -1027,7 +1069,7 @@ def _axe_issue_rows(
             review_lane = "likely_barrier"
             evidence_confidence = "high"
             high_confidence_occurrences = len(reported)
-            evidence_summary = "Deterministic axe-core rule failure; verify after remediation."
+            evidence_summary = "The rule check (axe) found the page code breaks this rule."
         description = meta.get("what_happening") or alfa_description
         # ``revealed_by`` names the control Click-Through had to operate;
         # NULL means the element was there when the page loaded.
@@ -1083,7 +1125,13 @@ def _axe_issue_rows(
                 # falls back to the axe-supplied URL when the YAML
                 # doesn't pin one.
                 description=description,
-                why_matters=meta.get("why_matters") or alfa_why_matters,
+                # An Alfa card says who is affected; the outcome note after it
+                # says how far the evidence goes, which the card cannot know.
+                why_matters=(
+                    f"{meta['why_matters']} {alfa_why_matters}"
+                    if pipeline == "alfa" and meta.get("why_matters") and alfa_why_matters
+                    else meta.get("why_matters") or alfa_why_matters
+                ),
                 fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url") or g.get("help_url") or None,
@@ -1211,15 +1259,18 @@ def _image_issue_rows(
         evidence_confidence: EvidenceConfidence = "low" if is_unclassified else "medium"
         if is_informational:
             evidence_summary = (
-                "Alt comparison appears adequate; retained as non-actionable evidence."
+                "The alt text says the same as the text in the image. "
+                "It is kept as a record, not a problem to fix."
             )
         elif is_unclassified:
             evidence_summary = (
-                "Image analysis was inconclusive; classify manually before reporting a barrier."
+                "Axcess could not tell what this image is for: the vision model did not "
+                "sort it. Decide that by hand before you report a barrier."
             )
         else:
             evidence_summary = (
-                "OCR/VLM-assisted image lead; confirm purpose and alternative in context."
+                "Text recognition (OCR) and a vision model found text in this image. Check "
+                "what the image is for and whether its alt text says the same."
             )
         out.append(
             IssueRow(
@@ -1418,7 +1469,7 @@ def _load_rules() -> dict[str, Any]:
     of YAML that took ~17 ms to parse, and an export that renders 200
     issues used to re-read it once per issue. Every caller therefore
     shares one dict and must treat it as read-only; the per-row lookups
-    in :func:`_rule_meta_for` already copy the block they return.
+    in :func:`rule_meta_for` already copy the block they return.
     """
     try:
         text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")

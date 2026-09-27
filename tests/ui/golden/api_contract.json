@@ -278,15 +278,15 @@
       "conformance_counts": {"A": "integer", "AA": "integer", "AAA": "integer", "BP": "integer"},
       "finding_type_counts": {"alt_text": "integer", "click_through": "integer", "wcag": "integer"},
       "occurrence_counts": {"all_evidence": "integer", "high_confidence": "integer"},
-      "responsibility_counts": {"dev": "integer", "editor": "integer"},
+      "responsibility_counts": {"designer": "integer", "dev": "integer", "editor": "integer"},
       "review_lane_counts": {"expert_review": "integer", "informational": "integer", "likely_barrier": "integer"},
       "rows": [
         {
           "abilities_affected": ["string"],
-          "acceptance": "null|string",
+          "acceptance": "string",
           "click_through_occurrence_count": "integer",
           "conformance": "string",
-          "description": "null|string",
+          "description": "string",
           "detail_url": "string",
           "difficulty": "string",
           "evidence_confidence": "string",
@@ -330,7 +330,7 @@
           "title": "string",
           "wcag_name": "string",
           "wcag_sc": "null|string",
-          "why_matters": "null|string"
+          "why_matters": "string"
         }
       ],
       "total_unfiltered": "integer"
@@ -481,9 +481,9 @@
     "status": 200,
     "content_type": "application/json",
     "body": {
-      "acceptance": "null",
-      "description": "null",
-      "fix_steps": [],
+      "acceptance": "string",
+      "description": "string",
+      "fix_steps": ["string"],
       "help_url": "string",
       "pages": [
         {
@@ -496,8 +496,8 @@
         }
       ],
       "row": {
-        "abilities_affected": [],
-        "acceptance": "null",
+        "abilities_affected": ["string"],
+        "acceptance": "string",
         "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
@@ -548,7 +548,7 @@
       },
       "verify_automated": "string",
       "verify_manual": "string",
-      "why_matters": "null"
+      "why_matters": "string"
     }
   },
   "GET /api/scans/{scan_id}/findings": {

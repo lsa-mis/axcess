@@ -22,6 +22,8 @@ from typing import Any
 
 import pytest
 
+from audit.exports.audit_report import load_report_rules
+
 from ._paging import all_pages_text
 from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
 
@@ -556,9 +558,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issues")
-    row_link = issues.get_by_role("rowheader").get_by_role(
-        "link", name="Logo image, adequate alt", exact=False
-    )
+    logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
+    row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
     await playwright_async.expect(
         informational_row.get_by_text("Informational", exact=True)

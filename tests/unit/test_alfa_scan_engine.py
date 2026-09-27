@@ -315,11 +315,19 @@ def test_alfa_findings_are_source_separated_and_keep_outcome(tmp_db: sqlite3.Con
         ("axe", "axe:sia-r2"),
     }
     alfa_row = next(row for row in rows if row.pipeline == "alfa")
-    assert alfa_row.title == "Non-text Content, expert decision needed (Alfa sia-r2)"
-    assert alfa_row.description is not None and "cantTell" in alfa_row.description
+    assert alfa_row.title == "Non-text Content, a person must decide (Alfa sia-r2)"
+    # The rule's card says what it checks; the outcome note after the card's
+    # own words says how far the evidence goes: can't tell is not a failure.
+    card = issues._load_rules()["alfa_rules"]["sia-r2"]
+    assert alfa_row.description == card["what_happening"]
+    assert "could not decide" in alfa_row.evidence_summary
+    assert "not a failure" in alfa_row.evidence_summary
     assert alfa_row.why_matters is not None
+    assert alfa_row.why_matters.startswith(card["why_matters"])
     assert "not a failure" in alfa_row.why_matters
-    assert "human decision" in alfa_row.why_matters
+    assert "record your decision" in alfa_row.why_matters
+    shown = f"{alfa_row.description} {alfa_row.why_matters} {alfa_row.evidence_summary}"
+    assert "cantTell" not in shown
     # Pre-subgroup links remain valid when one Alfa outcome is unambiguous.
     alfa_detail = issues.get_issue_detail(tmp_db, scan_id, "alfa:sia-r2")
     assert alfa_detail is not None

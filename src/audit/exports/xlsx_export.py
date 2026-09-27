@@ -71,6 +71,7 @@ from audit.exports.audit_report import (
     fix_options_for,
     issue_locations,
     load_report_rules,
+    plain_text,
 )
 from audit.exports.collector import ExportScan
 from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
@@ -341,27 +342,30 @@ class _Ticket:
     @property
     def current_behavior(self) -> str:
         detail = (self.detail.description if self.detail else None) or self.row.description
-        return detail or self.row.title
+        return plain_text(detail) if detail else self.row.title
 
     @property
     def impact(self) -> str:
         why = (self.detail.why_matters if self.detail else None) or self.row.why_matters
-        return why or "Users relying on assistive technology hit a barrier here."
+        return (
+            plain_text(why) if why else "Users relying on assistive technology hit a barrier here."
+        )
 
     @property
     def should_be(self) -> str | None:
-        return (self.detail.acceptance if self.detail else None) or self.row.acceptance
+        acceptance = (self.detail.acceptance if self.detail else None) or self.row.acceptance
+        return plain_text(acceptance) if acceptance else None
 
     @property
     def fix_steps(self) -> list[str]:
         steps = (self.detail.fix_steps if self.detail else None) or list(self.row.fix_steps)
-        return list(steps)
+        return [plain_text(step) for step in steps]
 
     @property
     def reproduce(self) -> str:
         if self.detail is None:
             return ""
-        return self.detail.verify_manual or self.detail.verify_automated or ""
+        return plain_text(self.detail.verify_manual or self.detail.verify_automated or "")
 
     @property
     def help_url(self) -> str:
@@ -615,8 +619,8 @@ def _write_fix_options(ws: Worksheet, ticket: _Ticket, *, row: int, ncols: int) 
         values = (
             f"{chr(ord('A') + idx)}. {option.label}",
             applies,
-            option.approach,
-            option.watch_out or "n/a",
+            plain_text(option.approach),
+            plain_text(option.watch_out) if option.watch_out else "n/a",
         )
         for c, value in enumerate(values, start=1):
             cell = ws.cell(row=row, column=c, value=value)
