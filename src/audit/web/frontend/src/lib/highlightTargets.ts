@@ -390,14 +390,7 @@ export function describeElement(el: Element): ElementDescription {
                       : tag === "iframe"
                         ? "Frame"
                         : `<${tag}> element`;
-  const name =
-    el.getAttribute("aria-label") ||
-    el.getAttribute("alt") ||
-    el.getAttribute("title") ||
-    (el as HTMLElement).innerText ||
-    el.textContent ||
-    "";
-  const text = normalizeWhitespace(name);
+  const text = normalizeWhitespace(nameOrText(el));
   const rect = el.getBoundingClientRect();
   return {
     kind,
@@ -405,6 +398,48 @@ export function describeElement(el: Element): ElementDescription {
     width: Math.round(rect.width),
     height: Math.round(rect.height),
   };
+}
+
+/**
+ * The words that name an element, in roughly the order a browser picks its
+ * accessible name: the elements ``aria-labelledby`` points to, ``aria-label``,
+ * a ``<label>``, alt text, a button input's value, its own text, the alt text
+ * or SVG title of an image inside it (an image link), then ``title`` and
+ * ``placeholder``. Not the full algorithm, but it no longer calls a labelled
+ * field or an image link nameless. Duck-typed, because the element can
+ * belong to the saved copy's frame, whose constructors are not this page's.
+ */
+function nameOrText(el: Element): string {
+  const doc = el.ownerDocument;
+  const pick = (value: string | null | undefined) => (value && value.trim() ? value : "");
+  const labelledBy = el.getAttribute("aria-labelledby");
+  const fromIds = labelledBy
+    ? labelledBy
+        .split(/\s+/)
+        .map((id) => (id ? (doc.getElementById(id)?.textContent ?? "") : ""))
+        .join(" ")
+    : "";
+  const labels = "labels" in el ? (el as HTMLInputElement).labels : null;
+  const fromLabels = labels ? Array.from(labels, (label) => label.textContent ?? "").join(" ") : "";
+  const tag = el.tagName.toLowerCase();
+  const inputType = (el.getAttribute("type") ?? "").toLowerCase();
+  const buttonValue =
+    tag === "input" && ["button", "submit", "reset"].includes(inputType) ? el.getAttribute("value") : null;
+  const innerImage = el.querySelector("img[alt]");
+  const innerSvgTitle = el.querySelector("svg title");
+  return (
+    pick(fromIds) ||
+    pick(el.getAttribute("aria-label")) ||
+    pick(fromLabels) ||
+    pick(el.getAttribute("alt")) ||
+    pick(buttonValue) ||
+    pick((el as HTMLElement).innerText) ||
+    pick(el.textContent) ||
+    pick(innerImage?.getAttribute("alt")) ||
+    pick(innerSvgTitle?.textContent) ||
+    pick(el.getAttribute("title")) ||
+    pick(el.getAttribute("placeholder"))
+  );
 }
 
 /** A locator as a reader can use it: the CSS selector, or an Alfa record's XPath. */

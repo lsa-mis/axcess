@@ -68,6 +68,7 @@ Use the word in the first column, and never the words in the last.
 | Product roadmap | The page listing planned checks. | coverage tracking, coverage and tracking |
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
+| element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
 | Does not apply | A table cell with no value for this row. | n/a |
 
 ### Check names

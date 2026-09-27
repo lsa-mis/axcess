@@ -24,6 +24,7 @@ from audit.db.schema import connect
 from audit.extractor.html_images import extract_image_refs
 
 from .test_accessibility_axe import _render_violations, _run_axe
+from .test_inspector_highlight_strict import _fact
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -170,12 +171,12 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
             "/sale.png",
             "/sale.png",
         ]
-        where = page.locator("p", has_text="Where it is in the page code:")
-        await playwright_async.expect(where).to_contain_text("number 1 of the 3 img elements")
-        await playwright_async.expect(where).to_contain_text("Image address: /sale.png")
+        where = _fact(page, "Where it is in the page code")
+        await playwright_async.expect(where).to_have_text("Number 1 of the 3 img elements")
+        await playwright_async.expect(_fact(page, "Image address")).to_have_text("/sale.png")
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         await group.get_by_role("button", name="Next flagged element").click()
-        await playwright_async.expect(where).to_contain_text("number 3 of the 3 img elements")
+        await playwright_async.expect(where).to_have_text("Number 3 of the 3 img elements")
         await playwright_async.expect(
             page.get_by_text(
                 "1 more occurrence is in page code that browsers do not show when scripts run",
@@ -206,9 +207,9 @@ async def test_an_ai_review_issue_outlines_the_exact_link(
         # Both links' kept code is the same; the second is the one reviewed.
         href = await marked.get_attribute("href")
         assert href is not None and href.startswith("/two?")
-        await playwright_async.expect(
-            page.locator("p", has_text="Where it is in the page code:")
-        ).to_contain_text("number 2 of the 2 a elements")
+        await playwright_async.expect(_fact(page, "Where it is in the page code")).to_have_text(
+            "Number 2 of the 2 a elements"
+        )
     finally:
         await page.context.close()
 
