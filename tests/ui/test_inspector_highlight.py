@@ -90,7 +90,7 @@ async def test_a_start_tag_snippet_finds_its_container(
 
     text = await _status(new_page, live_server[0], scan_id, page_id, "#portal-1")
 
-    assert "The red outline marks the flagged element" in text
+    assert "A blue box with a yellow ring marks the flagged element" in text
     assert "could not find the flagged element in this" not in text
 
 
@@ -113,7 +113,7 @@ async def test_a_start_tag_for_a_different_element_is_refused(
     text = await _status(new_page, live_server[0], scan_id, page_id, "div")
 
     assert "could not find the flagged element in this" in text
-    assert "The red outline marks the flagged element" not in text
+    assert "A blue box with a yellow ring marks the flagged element" not in text
 
 
 async def test_a_snippet_with_a_subtree_still_needs_to_match_it(

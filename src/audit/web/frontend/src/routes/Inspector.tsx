@@ -19,26 +19,22 @@ import {
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import {
+  buildHighlightedHtml,
+  countFound,
+  describeElement,
+  findTargetElement,
+  HIGHLIGHT_CLASS,
+  markCurrent,
+  normalizeWhitespace,
+  readableLocator,
+  spotlight,
+  type ElementDescription,
+  type HighlightResult,
+  type Target,
+} from "../lib/highlightTargets";
 
 type TabId = "page" | "dom";
-
-/**
- * What the inspector points at: a CSS selector and/or the exact element markup.
- *
- * `revealedBy` is the accessible name of the control that had to be operated
- * before this element existed, and null for elements present at page load. The
- * capture this view searches is the page *as it loaded*, so a revealed element
- * is legitimately absent from it — without this field the inspector cannot tell
- * "we could not find it" from "it was never there", and reports the first for
- * both.
- */
-type Target = {
-  selector: string | null;
-  snippet: string | null;
-  revealedBy: string | null;
-  /** The captured state this finding is visible in, when one was stored. */
-  stateKey: string | null;
-};
 
 /**
  * Page/DOM inspector for one recorded page.
@@ -122,7 +118,16 @@ export default function InspectorRoute() {
       const selector = f.target_selector || null;
       const snippet = f.html_snippet || null;
       if (!selector && !snippet) continue;
-      const key = snippet ? normalizeWhitespace(snippet) : (selector ?? "");
+      // A duplicate only when the state, the locator and the markup all
+      // agree. Keyed on the markup alone, two elements with identical markup
+      // (a repeated link, each with its own selector) collapsed into one, so
+      // the second was never outlined; and an occurrence in a clicked state
+      // was dropped when the same markup was also flagged at page load.
+      const key = [
+        f.revealed_state_key ?? "",
+        selector ?? "",
+        snippet ? normalizeWhitespace(snippet) : "",
+      ].join("\u0000");
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
@@ -150,7 +155,6 @@ export default function InspectorRoute() {
   }, [targets]);
   const allTargetsRevealed =
     hasTarget && targets.every((target) => target.revealedBy !== null);
-
 
   // Toggle to show/hide the highlight, persisted so a reload keeps the view.
   const [showHighlights, setShowHighlights] = useState(() => readShowHighlights());
@@ -518,7 +522,7 @@ export default function InspectorRoute() {
   const missingFor = (key: string): MissingCount | undefined => {
     if (key === (activeStateKey ?? "")) {
       return highlight && !isFetching
-        ? { missing: highlight.total - highlight.found, total: highlight.total }
+        ? { missing: highlight.total - highlight.located, total: highlight.total }
         : undefined;
     }
     return missingByState.get(key);
@@ -536,9 +540,8 @@ export default function InspectorRoute() {
           // The first outlined element in document order, so the view and
           // "Flagged element 1 of N" agree; the targets themselves when the
           // highlights are hidden.
-          const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
-          marks.forEach((mark, i) => markCurrent(mark, i === 0));
-          let el: Element | null = marks[0] ?? null;
+          if (showMark(doc, 0)) return;
+          let el: Element | null = null;
           for (const t of scopedTargets) {
             if (el) break;
             el = findTargetElement(doc, t);
@@ -557,21 +560,46 @@ export default function InspectorRoute() {
     tryScroll();
   }, [scopedTargets]);
 
+  // What the element the reader is on is, for the line under the toolbar,
+  // and the locator the occurrence was recorded with.
+  const [currentElement, setCurrentElement] = useState<ElementDescription | null>(null);
+  useEffect(() => setCurrentElement(null), [srcDoc]);
+
+  /**
+   * Make outlined element ``index`` the current one: solid outline, the
+   * numbered box over it, scrolled to the centre, and described. False when
+   * the document has no outlined elements (highlights off, or none found).
+   */
+  function showMark(doc: Document, index: number): boolean {
+    const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
+    if (marks.length === 0) {
+      spotlight(null, "", doc);
+      return false;
+    }
+    marks.forEach((mark, i) => markCurrent(mark, i === index));
+    const target = marks[index] ?? null;
+    spotlight(target, marks.length > 1 ? `${index + 1} of ${marks.length}` : "Flagged element", doc, (el) =>
+      setCurrentElement(describeElement(el)),
+    );
+    if (target) keepCentered(target);
+    return true;
+  }
+
   // Which outlined element the reader is on, for Previous / Next in the
   // saved copy, as the Page code (DOM) tab has. Back to the first whenever the
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
+  const currentLocator = readableLocator(
+    scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1]?.selector ?? null,
+  );
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
     try {
       const doc = frameRef.current?.contentDocument;
       if (!doc) return;
-      const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
-      marks.forEach((mark, i) => markCurrent(mark, i === bounded));
-      const target = marks[bounded];
-      if (target) keepCentered(target);
+      showMark(doc, bounded);
     } catch {
       // Opaque document: the outlines are baked in, only the stepping is lost.
     }
@@ -907,6 +935,39 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
+            {/* What the numbered box is on, in words: tiny, empty or
+                off-screen elements are easy to lose on the page itself. */}
+            {showHighlights && highlightedCount > 0 && currentElement && (
+              <div className="border-b border-border bg-surface px-3 py-2 text-sm text-fg">
+                <p>
+                  <span className="font-semibold">
+                    {highlightedCount > 1 ? `Flagged element ${pageMark + 1}: ` : "Flagged element: "}
+                  </span>
+                  {currentElement.kind}
+                  {currentElement.text ? <> “{currentElement.text}”</> : <span className="text-fg-muted"> with no text</span>}
+                  <span className="text-fg-muted">
+                    {" · "}
+                    {currentElement.width} × {currentElement.height} pixels
+                  </span>
+                  {(currentElement.width === 0 || currentElement.height === 0) && (
+                    <span className="text-fg-muted">
+                      {" "}· It has no visible size in this saved copy, so the box marks where it sits.
+                    </span>
+                  )}
+                  {(highlight?.steps[pageMark]?.targets.length ?? 0) > 1 && (
+                    <span className="text-fg-muted">
+                      {" "}· {highlight?.steps[pageMark]?.targets.length} occurrences on this element
+                    </span>
+                  )}
+                </p>
+                {currentLocator && (
+                  <p className="mt-0.5 text-xs text-fg-muted">
+                    Element locator (CSS selector):{" "}
+                    <code className="break-all font-mono text-fg">{currentLocator}</code>
+                  </p>
+                )}
+              </div>
+            )}
             {layout && (
               <p className="border-b border-border bg-umich-blue/5 px-3 py-2 text-xs text-fg">
                 <span className="font-semibold">As the zoom and layout check saw it: </span>
@@ -938,22 +999,31 @@ export default function InspectorRoute() {
               {!highlightPending && showHighlights && highlightedCount > 0 && (
                 <span>
                   {highlightedCount > 1
-                    ? `Red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a thicker blue outline on yellow.`
-                    : "The red outline marks the flagged element."}
+                    ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
+                    : "A blue box with a yellow ring marks the flagged element."}
                 </span>
               )}
               {!highlightPending &&
                 showHighlights &&
                 highlight !== null &&
                 highlightedCount > 0 &&
-                highlightedCount < highlight.total && (
+                highlight.located + highlight.ambiguous < highlight.total && (
                   <span className="text-sev-major">
-                    Axcess found {highlightedCount} of {highlight.total} flagged
-                    elements.{" "}
+                    Axcess found {highlight.located} of {highlight.total} flagged
+                    occurrences.{" "}
                     {missingReason?.whenSomeFound ??
                       "The others may have changed since the scan."}
                   </span>
                 )}
+              {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
+                // Never a guess: the same markup in several places, with no
+                // locator to tell them apart, is said, not outlined.
+                <span className="text-sev-major">
+                  {highlight.ambiguous === 1
+                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
+                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
+                </span>
+              )}
               {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
                 // Only drops the error styling when interaction accounts for
                 // every miss. Then "not found" is the expected result and
@@ -1213,9 +1283,6 @@ function keepCentered(target: HTMLElement): void {
   step();
 }
 
-/** Result of baking the highlight into the srcdoc. */
-type HighlightResult = { srcDoc: string; found: number; total: number };
-
 /** A state's flagged elements that its capture does not hold, of how many. */
 type MissingCount = { missing: number; total: number };
 
@@ -1262,214 +1329,6 @@ function IssueNotHereChip() {
       <span className="sr-only">Issue not here, </span>
     </span>
   );
-}
-
-/** How many of ``targets`` the matcher locates in ``html``, without re-serializing. */
-function countFound(html: string | null, targets: Target[]): number {
-  if (!html || targets.length === 0) return 0;
-  try {
-    return markTargets(new DOMParser().parseFromString(html, "text/html"), targets);
-  } catch {
-    return 0;
-  }
-}
-
-/** Ceiling on elements examined by one snippet-match walk, bounds the worst
- *  case on pathological pages while remaining far above any real page's size. */
-const WALK_CAP = 20_000;
-/** Cheap exact-prefix check applied before any full/whitespace-normalized
- *  markup comparison, prunes almost every candidate element. */
-const SNIPPET_HEAD = 64;
-/** Snippets at/near the storage cap were truncated mid-markup and can never
- *  equal the element's full serialization; match them by normalized prefix. */
-const TRUNCATED_SNIPPET_LENGTH = 3900;
-
-/** A run of the captured source, either plain or inside a highlight mark. */
-
-
-/**
- * Build the ``srcDoc`` for the Rendered-page tab with the current issue's
- * finding(s) highlighted. Parses the captured HTML once, resolves every
- * target (see ``markTargets``), and re-serializes only when at least one
- * element was found. Because the outline is part of the markup, it renders
- * even when the sandbox makes the frame's ``contentDocument`` opaque (the
- * reason the earlier contentDocument-based outline never showed). Only the
- * given findings are marked, not every other issue on the page.
- */
-function buildHighlightedHtml(html: string | null, targets: Target[]): HighlightResult {
-  if (!html) return { srcDoc: "", found: 0, total: 0 };
-  if (targets.length === 0) return { srcDoc: html, found: 0, total: 0 };
-  try {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const found = markTargets(doc, targets);
-    if (found === 0) return { srcDoc: html, found: 0, total: targets.length };
-    return {
-      srcDoc: "<!doctype html>" + doc.documentElement.outerHTML,
-      found,
-      total: targets.length,
-    };
-  } catch {
-    return { srcDoc: html, found: 0, total: targets.length };
-  }
-}
-
-/**
- * Resolve every target in ``doc`` and mark each located element. Two passes:
- *
- * 1. Precise, cheap locators, an Alfa JSON XPath, or a plain CSS selector
- *    whose match is *verified* against the finding's snippet so a generic
- *    selector (``h3``) that happens to hit a different element falls back to
- *    the markup walk instead of pointing at the wrong node.
- * 2. One bounded document-order walk shared by every target the precise pass
- *    missed, previously each finding walked the whole tree on its own.
- *
- * Returns the number of distinct elements located.
- */
-function markTargets(doc: Document, targets: Target[]): number {
-  const found = new Set<Element>();
-  const unresolved: Target[] = [];
-  for (const target of targets) {
-    const el = findPrecise(doc, target);
-    if (el) found.add(el);
-    else unresolved.push(target);
-  }
-  locateByWalk(doc, unresolved, found);
-  for (const el of found) {
-    if (el instanceof HTMLElement) {
-      markElement(el, FLAGGED_OUTLINE, FLAGGED_FILL);
-    }
-  }
-  return found.size;
-}
-
-function findPrecise(doc: Document, target: Target): Element | null {
-  if (target.selector && isAlfaJsonSelector(target.selector)) {
-    const el = findByXPath(doc, target.selector);
-    if (el) return el;
-    return null; // the walk below re-tries via the snippet if one exists
-  }
-  if (target.selector) {
-    try {
-      const el = doc.querySelector(target.selector);
-      if (el && (!target.snippet || snippetMatches(el, target.snippet))) {
-        return el;
-      }
-      // Generic selector hit the wrong element, the walk will match the
-      // exact markup instead.
-    } catch {
-      // Invalid CSS selector, the walk is the fallback.
-    }
-  }
-  return null;
-}
-
-/**
- * Walk ``doc`` once in document order, matching the remaining targets'
- * snippets. Each element is checked against only the snippets whose tag
- * matches its own, with a 64-char exact-prefix gate before any full
- * serialization comparison, and exact string equality before any
- * whitespace-normalized comparison (same-capture markup compares exactly).
- * Iterations are capped so an adversarial document cannot pin the tab.
- */
-function locateByWalk(doc: Document, targets: Target[], found: Set<Element>): void {
-  const buckets = new Map<
-    string,
-    { raw: string; needle: string; head: string; startTag: boolean }[]
-  >();
-  for (const t of targets) {
-    if (!t.snippet) continue;
-    const needle = normalizeWhitespace(t.snippet);
-    if (!needle) continue;
-    const tag = firstTagName(t.snippet) ?? "";
-    const entry = {
-      raw: t.snippet,
-      needle,
-      head: t.snippet.slice(0, SNIPPET_HEAD),
-      startTag: isStartTagOnly(t.snippet),
-    };
-    const bucket = buckets.get(tag);
-    if (bucket) bucket.push(entry);
-    else buckets.set(tag, [entry]);
-  }
-  if (buckets.size === 0) return;
-  const walker = doc.createTreeWalker(doc.documentElement, NodeFilter.SHOW_ELEMENT);
-  let node = walker.nextNode();
-  let visited = 0;
-  while (node && buckets.size > 0) {
-    visited += 1;
-    if (visited > WALK_CAP) break;
-    const el = node as Element;
-    const bucket = buckets.get(el.tagName.toLowerCase());
-    if (bucket && bucket.length > 0) {
-      const raw = el.outerHTML;
-      const remaining: typeof bucket = [];
-      for (const entry of bucket) {
-        if (
-          raw === entry.raw ||
-          (raw.startsWith(entry.head) &&
-            (normalizeWhitespace(raw) === entry.needle ||
-              (entry.startTag &&
-                normalizeWhitespace(raw).startsWith(entry.needle)) ||
-              truncatedSnippetMatches(raw, entry.needle)))
-        ) {
-          found.add(el);
-        } else {
-          remaining.push(entry);
-        }
-      }
-      if (remaining.length === 0) buckets.delete(el.tagName.toLowerCase());
-      else buckets.set(el.tagName.toLowerCase(), remaining);
-    }
-    node = walker.nextNode();
-  }
-}
-
-/** True when ``el``'s serialization is the snippet's element (any whitespace). */
-function snippetMatches(el: Element, snippet: string): boolean {
-  const needle = normalizeWhitespace(snippet);
-  if (!needle) return false;
-  const raw = el.outerHTML;
-  return (
-    raw === snippet ||
-    normalizeWhitespace(raw) === needle ||
-    startTagMatches(raw, needle, snippet) ||
-    truncatedSnippetMatches(raw, needle)
-  );
-}
-
-/**
- * True when `snippet` is a bare start tag: one tag, nothing inside it, no
- * closing tag.
- *
- * axe reports a container element as its start tag alone — `<div id="portal-1"
- * class="category-menu" role="listbox">` — rather than the element with its
- * subtree. No non-empty element's `outerHTML` can equal that, so equality is
- * simply the wrong test, and every container finding failed to highlight:
- * the page said the element "was not found in this capture" while the element
- * sat in the document being searched.
- *
- * Matching one is therefore a prefix test. A complete start tag carries the
- * element's whole attribute list, which is specific enough to identify it; two
- * elements that agree on every attribute are the identical siblings this
- * inspector already treats as one location.
- */
-function isStartTagOnly(snippet: string): boolean {
-  const trimmed = snippet.trim();
-  return (
-    trimmed.length > 2 &&
-    trimmed.startsWith("<") &&
-    trimmed.endsWith(">") &&
-    trimmed.indexOf("<", 1) === -1
-  );
-}
-
-function startTagMatches(raw: string, needle: string, snippet: string): boolean {
-  return isStartTagOnly(snippet) && normalizeWhitespace(raw).startsWith(needle);
-}
-
-function truncatedSnippetMatches(raw: string, needle: string): boolean {
-  if (needle.length < TRUNCATED_SNIPPET_LENGTH) return false;
-  return normalizeWhitespace(raw).startsWith(needle);
 }
 
 /**
@@ -1559,72 +1418,6 @@ function withStyle(html: string, css: string): string {
   return head === -1 ? style + html : html.slice(0, head) + style + html.slice(head);
 }
 
-/** The class every outlined element carries, so the frame can be walked in order. */
-const HIGHLIGHT_CLASS = "axcess-inspect-highlight";
-
-/** Every flagged element: a red outline over a faint red tint. */
-const FLAGGED_OUTLINE = "#be001e";
-const FLAGGED_FILL = "rgba(190,0,30,0.12)";
-/**
- * The one the reader stepped to: UMich blue on a maize halo and fill. A
- * thicker red ring on red was too close to tell apart; blue against yellow
- * stays distinct for red- and green-weak eyes, and the thicker outline and
- * the halo differ in shape too, so colour is not the only cue.
- */
-const CURRENT_OUTLINE = "#00274c";
-const CURRENT_HALO = "#ffcb05";
-const CURRENT_FILL = "rgba(255,203,5,0.3)";
-
-/** Set the element the reader is on apart from the other flagged ones, or put it back. */
-function markCurrent(el: HTMLElement, current: boolean): void {
-  el.style.setProperty("outline-color", current ? CURRENT_OUTLINE : FLAGGED_OUTLINE, "important");
-  el.style.setProperty("outline-width", current ? "4px" : "3px", "important");
-  el.style.setProperty("outline-offset", current ? "-4px" : "-3px", "important");
-  el.style.setProperty("box-shadow", current ? `0 0 0 5px ${CURRENT_HALO}` : "none", "important");
-  el.style.setProperty("background-color", current ? CURRENT_FILL : FLAGGED_FILL, "important");
-}
-
-function markElement(el: HTMLElement, outlineColor: string, bg: string): void {
-  el.classList.add(HIGHLIGHT_CLASS);
-  el.style.setProperty("outline", `3px solid ${outlineColor}`, "important");
-  // Inset, not outset. A flagged element that fills an `overflow: hidden`
-  // ancestor (the ubiquitous image-tile pattern: `w-full h-full` inside a
-  // clipped tile) has an outset ring drawn entirely outside the clip box, so
-  // it is never painted. Drawing just inside the border box is always visible.
-  el.style.setProperty("outline-offset", "-3px", "important");
-  el.style.setProperty("background-color", bg, "important");
-  el.style.setProperty("scroll-margin-top", "96px", "important");
-  forceVisible(el);
-  // An ancestor can hide the element no matter what we set on the element
-  // itself (opacity is inherited-by-compositing, not by cascade), so the whole
-  // chain has to be cleared too.
-  let parent = el.parentElement;
-  while (parent && parent !== el.ownerDocument.documentElement) {
-    forceVisible(parent);
-    parent = parent.parentElement;
-  }
-}
-
-/**
- * Undo the ways a *frozen* page hides an element we need to point at.
- *
- * The frame runs the capture with scripts disabled, so any state the site's
- * own JS would have transitioned out of stays exactly as it was at scan time.
- * The common case is a lazy-loaded image still carrying `opacity-0` because
- * the load handler that swaps in `opacity-100` never runs; scroll-reveal
- * wrappers behave the same way. Those elements are genuinely invisible, and so
- * is any highlight on them.
- *
- * Transitions and animations are cleared as well so nothing re-hides what we
- * just revealed. This only ever touches the flagged element and its ancestors.
- */
-function forceVisible(el: HTMLElement): void {
-  el.style.setProperty("opacity", "1", "important");
-  el.style.setProperty("visibility", "visible", "important");
-  el.style.setProperty("animation", "none", "important");
-  el.style.setProperty("transition", "none", "important");
-}
-
 function readShowHighlights(): boolean {
   try {
     return localStorage.getItem("axcess.inspect.showHighlights") !== "0";
@@ -1648,52 +1441,3 @@ function scheduleIdle(task: () => void): void {
   }
 }
 
-/**
- * Locate the flagged element in ``doc``: a verified CSS selector or Alfa JSON
- * XPath when possible, else a bounded exact-markup walk (handles generic
- * selectors like ``h3`` that would otherwise hit the wrong element).
- */
-function findTargetElement(doc: Document, target: Target): Element | null {
-  const precise = findPrecise(doc, target);
-  if (precise) return precise;
-  if (!target.snippet) return null;
-  const found = new Set<Element>();
-  locateByWalk(doc, [target], found);
-  return found.size > 0 ? [...found][0] : null;
-}
-
-function isAlfaJsonSelector(selector: string): boolean {
-  const s = selector.trim();
-  return s.startsWith("{") && s.includes('"path"');
-}
-
-function findByXPath(doc: Document, jsonSelector: string): Element | null {
-  try {
-    const parsed = JSON.parse(jsonSelector) as { path?: unknown };
-    if (typeof parsed.path !== "string" || !parsed.path) return null;
-    const node = doc.evaluate(
-      parsed.path,
-      doc,
-      null,
-      XPathResult.FIRST_ORDERED_NODE_TYPE,
-      null,
-    ).singleNodeValue;
-    if (!node) return null;
-    // Alfa paths often end in `/text()[1]`, a text node, not an element.
-    if (node.nodeType === Node.TEXT_NODE) {
-      return (node as Text).parentElement;
-    }
-    return node as Element;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeWhitespace(s: string): string {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function firstTagName(markup: string): string | null {
-  const m = /^\s*<([a-zA-Z][a-zA-Z0-9-]*)/.exec(markup);
-  return m ? m[1].toLowerCase() : null;
-}

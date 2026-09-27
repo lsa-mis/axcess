@@ -26,6 +26,22 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- **Saved-copy highlights are exact.** An occurrence is outlined only when
+  its locator, checked against its recorded markup, or the markup alone
+  names one element. Checked against every occurrence in the local reports
+  (23,750): the old matcher guessed among identical-looking elements 45
+  times and outlined a different element than the only real match 4 times;
+  both are gone, and an occurrence that cannot be pinned is said, not
+  outlined. Alfa's records are now checked by tag, attributes and text
+  (3,653 located, where they were accepted unchecked).
+- The current flagged element gets a numbered box with a yellow ring and the
+  rest of the page dimmed, at least 18 pixels even for a tiny or empty
+  element, and a line under the toolbar says what it is (kind, text, size)
+  and its locator. Other flagged elements have a thin dashed outline and no
+  tint, so nested ones stay readable.
+- Two elements with identical markup but different locators were treated as
+  one occurrence, so the second was never outlined; and an occurrence in a
+  clicked state was dropped when the same markup was flagged at page load.
 - **Pages at once (workers)** now also sets how many pages are fetched from
   the site at once. It stayed at 2, so every worker past two waited: on a
   test site 32 workers took 12.3 s against 14.5 s for 8, and now take 5.5 s.
