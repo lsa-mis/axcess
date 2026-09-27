@@ -20,11 +20,16 @@ uploads an installer by hand.
 
 ### What starts a build
 
-The workflow runs in two cases:
+The workflow runs in three cases:
 
 - a push to `main` that changes at least one of
   `.github/workflows/desktop-build.yml`, `desktop/**`, `src/**`,
   `pyproject.toml`, or `uv.lock`;
+- a pull request that changes `.github/workflows/desktop-build.yml`,
+  `desktop/**`, `pyproject.toml`, or `uv.lock`. It builds both installers as
+  workflow artifacts and never publishes, so a packaging break shows before
+  the merge. Changes under `src/` alone do not trigger it, since each run
+  costs macOS and Windows minutes;
 - a manual run (`workflow_dispatch`) from the Actions tab.
 
 There is no tag trigger. A merge that only changes docs, the site, or tests
@@ -109,6 +114,8 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 - npm and Squirrel.Windows need three-part versions, so each build stamps
   `desktop/package.json` with the same version as semver: `0.61.0` for `0.61`,
   `1.0.0` for `1.00`. The commit SHA goes into `config.buildCommit`.
+  `desktop/scripts/stamp-version.cjs` does the stamp rather than `npm version`,
+  which refuses to set the version a package already has (`0.60.0`).
 - Everything a person sees uses the two-part version: the release tag
   `desktop-v0.61`, the release title `Axcess preview 0.61`, the installer
   names, and the app's own label, `0.61 (abc1234)`, in its update dialogs and
@@ -310,15 +317,23 @@ has to make because the workflow does not.
 
 ### Before you merge
 
-1. Confirm CI is green on the pull request. Four jobs run on every pull
+1. Confirm CI is green on the pull request. Five jobs run on every pull
    request: "Ruff and mypy", "Unit, quality and route tests", "Frontend lint
-   and build", and "Desktop launcher tests".
-2. If the change touches the crawler, a
+   and build", "Desktop launcher tests", and "Desktop release dry run". The
+   dry run picks the next version from the published tags, stamps it into
+   `desktop/package.json`, and checks the installer names against the ones
+   the publish job requires, with the same scripts a release uses
+   (`next-version.cjs`, `stamp-version.cjs`, `release-names.cjs` in
+   `desktop/scripts/`). The first 0.60 build failed at the stamp step, which
+   no pull request job ran before.
+2. If the pull request changes the desktop app or its build, confirm the
+   "Desktop application build" run on it built both installers.
+3. If the change touches the crawler, a
    [browser check](../glossary.md#browser-check), or the review app, add the
    `run-browser-tests` label. That runs the "Browser and integration suites"
    job on the pull request.
-3. If "Detection evaluations" ran on the pull request, confirm it passed.
-4. Write the merge commit message as release notes. Its body becomes the
+4. If "Detection evaluations" ran on the pull request, confirm it passed.
+5. Write the merge commit message as release notes. Its body becomes the
    "What changed" section.
 
 ### Merge and watch

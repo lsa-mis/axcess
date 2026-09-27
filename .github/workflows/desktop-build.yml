@@ -10,6 +10,17 @@ on:
       - src/**
       - pyproject.toml
       - uv.lock
+  # A pull request that changes the desktop app or how it is built and
+  # released builds both installers too, so a packaging break shows before
+  # the merge rather than in the release after it. It never publishes: the
+  # publish job runs only on main. Changes under src/ alone do not trigger
+  # it (most pull requests), since each run costs macOS and Windows minutes.
+  pull_request:
+    paths:
+      - .github/workflows/desktop-build.yml
+      - desktop/**
+      - pyproject.toml
+      - uv.lock
   workflow_dispatch:
 
 permissions:
@@ -70,9 +81,9 @@ jobs:
       - name: Stamp build version
         shell: bash
         working-directory: desktop
-        run: |
-          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
-          npm pkg set "config.buildCommit=${{ github.sha }}"
+        # The same script CI's release dry run calls on every pull request.
+        # (npm version refused 0.60, the version package.json already has.)
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: bash
@@ -134,9 +145,9 @@ jobs:
       - name: Stamp build version
         shell: bash
         working-directory: desktop
-        run: |
-          npm version "${{ needs.version.outputs.package_version }}" --no-git-tag-version
-          npm pkg set "config.buildCommit=${{ github.sha }}"
+        # The same script CI's release dry run calls on every pull request.
+        # (npm version refused 0.60, the version package.json already has.)
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: pwsh

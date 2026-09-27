@@ -106,6 +106,31 @@ jobs:
         run: npm ci
       - run: npm test
 
+  desktop-release-dry-run:
+    name: Desktop release dry run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The release steps desktop-build.yml runs only after a merge, run here
+      # first with the same scripts: pick the version from the published
+      # tags, stamp it into desktop/package.json, and check the installer
+      # names against the ones the publish job requires. The first 0.60
+      # build failed at the stamp, which no pull request job had ever run.
+      - name: Choose the version a release would take
+        id: pick
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --tags --refs origin 'desktop-v*' | node desktop/scripts/next-version.cjs | tee -a "$GITHUB_OUTPUT"
+      - name: Stamp it as a release build does
+        run: node desktop/scripts/stamp-version.cjs "${{ steps.pick.outputs.package_version }}" "${{ github.sha }}"
+      - name: Check the installer names the publish job requires
+        run: node desktop/scripts/release-names.cjs --expect "${{ steps.pick.outputs.version }}"
+
   browser-suites:
     name: Browser and integration suites
     if: >-
