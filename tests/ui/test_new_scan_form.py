@@ -451,6 +451,55 @@ async def test_limits_are_validated_by_name_with_their_range(
     await playwright_async.expect(alert.get_by_role("link", name=message)).to_have_count(0)
 
 
+async def test_scan_every_page_it_finds(live_server: tuple[str, int], new_page: Any) -> None:
+    """No page limit: Maximum pages goes off, the rail says so, and it is what posts.
+
+    A sign-in scan keeps its cap, so its form does not offer the switch.
+    """
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    every = page.get_by_role("switch", name=re.compile(r"^Scan every page it finds"))
+    pages = page.get_by_role("spinbutton", name="Maximum pages")
+    await playwright_async.expect(every).not_to_be_checked()
+    await playwright_async.expect(pages).to_be_enabled()
+
+    await every.check()
+    await playwright_async.expect(pages).to_be_disabled()
+    hint_id = (await pages.get_attribute("aria-describedby") or "").split()[0]
+    await playwright_async.expect(page.locator(f"#{hint_id}")).to_have_text(
+        "Off while the scan visits every page it finds."
+    )
+    await playwright_async.expect(summary).to_contain_text("Every page it finds, 10 clicks deep")
+    await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
+
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Start scan").click()
+    # The refused request shows its alert once it has been sent.
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted and posted[-1]["all_pages"] is True
+
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    await playwright_async.expect(
+        page.get_by_role("spinbutton", name="Maximum pages")
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_role("switch", name=re.compile(r"^Scan every page it finds"))
+    ).to_have_count(0)
+
+
 async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) -> None:
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})

@@ -47,6 +47,7 @@ export type ScanPolicy = {
 /** Every setting the default card and `isDefault` compare; never the URL. */
 const SETTING_KEYS = [
   "max_pages",
+  "all_pages",
   "max_depth",
   "rps",
   "workers",
@@ -72,6 +73,7 @@ const SETTING_KEYS = [
 export const PUBLIC_DEFAULTS: ScanSettings = {
   url: "",
   max_pages: 2500,
+  all_pages: false,
   max_depth: 10,
   rps: 2.0,
   workers: 8,
@@ -148,6 +150,9 @@ export const LOGIN_POLICY: ScanPolicy = {
   caps: { max_pages: 2500, max_depth: 20, rps: 5, workers: 4 },
   defaults: LOGIN_DEFAULTS,
   fixed: {
+    // A signed-in session keeps its page cap: an unbounded crawl behind a
+    // sign-in is a load the session and the site owner did not agree to.
+    all_pages: false,
     include_subdomain: false,
     static_only: false,
     ignore_robots: true,
@@ -233,6 +238,8 @@ export function validateScan(
   const urlMessage = policy.validateUrl(settings.url);
   if (urlMessage) errors.push({ field: "url", message: urlMessage });
   for (const key of ["max_pages", "max_depth"] as const) {
+    // With no page limit the Maximum pages box is off, so its value is not checked.
+    if (key === "max_pages" && settings.all_pages && !isFixed(policy, "all_pages")) continue;
     const message = limitError(key, settings[key], policy);
     if (message) errors.push({ field: key, message });
   }

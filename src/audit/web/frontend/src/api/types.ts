@@ -303,6 +303,11 @@ export interface NewScanPayload {
   search?: SearchConfig | null;
   url: string;
   max_pages: number;
+  /**
+   * No page limit: the scan ends when it runs out of pages in scope within
+   * the link depth. `max_pages` then only keeps the form's value.
+   */
+  all_pages: boolean;
   max_depth: number;
   rps: number;
   workers: number;

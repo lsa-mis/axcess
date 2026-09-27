@@ -1,10 +1,11 @@
-import { ENGINE, GROUPS, NUMBERS } from "./copy";
+import { ALL_PAGES, ENGINE, GROUPS, NUMBERS } from "./copy";
 import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import NumberField from "./NumberField";
 import PillGroup from "./PillGroup";
-import { LIMIT_MIN, type ScanSettings } from "./scanPolicy";
-import SettingsGroup from "./SettingsGroup";
+import { isFixed, LIMIT_MIN, type ScanSettings } from "./scanPolicy";
+import SettingsGroup, { SwitchList } from "./SettingsGroup";
+import SwitchRow from "./SwitchRow";
 
 /**
  * When the scan stops and which engine checks each page. Each limit states
@@ -20,14 +21,29 @@ export default function LimitsGroup({ settings, update, policy, capabilities, er
     ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
     : undefined;
 
+  const offersAllPages = !isFixed(policy, "all_pages");
+  const allPages = offersAllPages && settings.all_pages;
+
   return (
     <SettingsGroup variant="plain" id="limits" legend={GROUPS.limits.legend}>
+      {offersAllPages && (
+        <SwitchList>
+          <SwitchRow
+            tone="warning"
+            checked={allPages}
+            onChange={(on) => update({ all_pages: on })}
+            label={ALL_PAGES.label}
+            hint={ALL_PAGES.hint}
+          />
+        </SwitchList>
+      )}
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
         <NumberField
           id={fieldIds.max_pages}
           label={NUMBERS.max_pages.label}
-          hint={NUMBERS.max_pages.hint(policy.caps.max_pages)}
-          error={errorFor("max_pages")}
+          hint={allPages ? ALL_PAGES.maxPagesOff : NUMBERS.max_pages.hint(policy.caps.max_pages)}
+          error={allPages ? undefined : errorFor("max_pages")}
+          disabled={allPages}
           value={settings.max_pages}
           min={LIMIT_MIN}
           max={policy.caps.max_pages}

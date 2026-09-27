@@ -49,6 +49,8 @@ class ScanFormSettings(BaseModel):
     url: str
     search: SearchConfig | None = None
     max_pages: int
+    # No page limit; ``max_pages`` then only keeps the form's value.
+    all_pages: bool = False
     max_depth: int
     rps: float
     workers: int
@@ -158,6 +160,9 @@ def snapshot_from_config(
         url=strip_userinfo(seed_url),
         search=_search(config),
         max_pages=int(_number(config, "max_pages", 2500)),
+        # Stored as null by a scan with no page limit; a missing key is an
+        # older scan, which always had one.
+        all_pages="max_pages" in config and config["max_pages"] is None,
         max_depth=int(_number(config, "max_depth", 10)),
         rps=_number(config, "rps", 2.0),
         workers=int(_number(config, "workers", 8)),

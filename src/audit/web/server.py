@@ -1473,7 +1473,10 @@ def create_app(
             )
         from audit.web.scan_settings import limit_refusal
 
-        limit = limit_refusal(body)
+        # "Scan every page it finds": no page limit, so any max_pages sent
+        # alongside is the form's hidden value, not a limit to check.
+        all_pages = body.get("all_pages") is True
+        limit = limit_refusal({**body, "max_pages": None} if all_pages else body)
         if limit is not None:
             field, message = limit
             return JSONResponse({"error": message, "fields": [field]}, status_code=422)
@@ -1481,7 +1484,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": int(body.get("max_pages") or 2500),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 2500),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),
@@ -3007,9 +3010,15 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     return CrawlConfig(
         seed_url=str(form["url"]).strip(),
         search=form.get("search"),
-        max_pages=int(form["max_pages"]),
+        max_pages=None if form.get("max_pages") is None else int(form["max_pages"]),
         max_depth=int(form["max_depth"]),
         rps=float(form["rps"]),
+        # "Pages at once" means pages fetched at once too. Left at its
+        # default of 2, the per-host limit let every worker past 2 wait for
+        # the plain HTML fetch that comes before each render: 32 workers
+        # scanned a delayed fixture site in 12.3 s against 14.5 s for 8.
+        # `rps` still paces the requests themselves.
+        concurrency_per_host=int(form["workers"]),
         workers=int(form["workers"]),
         allow_subdomains=bool(form["include_subdomain"]),
         whole_host=bool(form.get("whole_host")),

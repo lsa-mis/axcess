@@ -191,6 +191,45 @@ def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     assert summary.pages_fetched >= config.max_pages
 
 
+def test_crawl_with_no_page_limit_visits_every_page_in_scope(tmp_db: sqlite3.Connection) -> None:
+    """``max_pages=None`` ends the crawl only when the frontier runs dry."""
+    with _serve() as base:
+        limited = asyncio.run(
+            run_crawl(
+                tmp_db,
+                CrawlConfig(
+                    js_eager=False,
+                    seed_url=base,
+                    max_pages=50,
+                    rps=100.0,
+                    workers=2,
+                    vlm_enabled=False,
+                    semantic_enabled=False,
+                ),
+            )
+        )
+        unlimited = asyncio.run(
+            run_crawl(
+                tmp_db,
+                CrawlConfig(
+                    js_eager=False,
+                    seed_url=base,
+                    max_pages=None,
+                    rps=100.0,
+                    workers=2,
+                    vlm_enabled=False,
+                    semantic_enabled=False,
+                ),
+            )
+        )
+
+    assert unlimited.status == "completed"
+    # The fixture site has fewer than 50 pages, so a limit of 50 was never
+    # reached either: both crawls saw the whole site.
+    assert _page_urls(tmp_db, unlimited.scan_id) == _page_urls(tmp_db, limited.scan_id)
+    assert unlimited.pages_fetched == limited.pages_fetched
+
+
 def test_crawl_skips_out_of_scope_and_non_http(tmp_db: sqlite3.Connection) -> None:
     with _serve() as base:
         config = CrawlConfig(

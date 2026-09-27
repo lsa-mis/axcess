@@ -140,6 +140,21 @@ def test_protected_report_settings_are_refused(
     assert "private-reviewer" not in response.text
 
 
+def test_create_scans_every_page_when_asked(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    """With all_pages the crawl has no page limit, and the box's value is not checked."""
+    import json
+
+    scan_id = _create(client, all_pages=True, max_pages=0)
+    with connect(seeded_db[0]) as conn:
+        row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    assert json.loads(row[0])["max_pages"] is None
+    _stop(seeded_db[0], scan_id, "failed")
+    settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
+    assert settings["all_pages"] is True
+
+
 @pytest.mark.parametrize(
     ("overrides", "field"),
     [

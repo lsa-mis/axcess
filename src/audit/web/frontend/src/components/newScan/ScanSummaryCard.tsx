@@ -149,8 +149,13 @@ export default function ScanSummaryCard({
         ? "Axcess could not work out what to scan from that address."
         : SUMMARY.siteEmpty;
 
+  // No page limit reads as what the scan will do, not as a number.
+  const pagesLine =
+    settings.all_pages && !isFixed(policy, "all_pages")
+      ? `Every page it finds, ${limitText(settings.max_depth)} clicks deep`
+      : `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`;
   const coverage = [
-    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`,
+    pagesLine,
     login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Follows robots.txt",
     !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
     settings.static_only ? SUMMARY.htmlOnly : null,
@@ -168,7 +173,7 @@ export default function ScanSummaryCard({
   ];
 
   const digest =
-    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep. ` +
+    `${pagesLine}. ` +
     `${engine} against WCAG ${settings.wcag_version} Level ${settings.axe_level}. ` +
     `${running.length} ${running.length === 1 ? "check runs" : "checks run"}.`;
   const [spoken, setSpoken] = useState("");

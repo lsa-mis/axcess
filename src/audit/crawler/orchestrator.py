@@ -107,7 +107,9 @@ class CrawlConfig:
     # So scope always comes from ``seed_url``; only the entry point moves.
     # ``None`` means "start at the seed", which is every unauthenticated crawl.
     start_url: str | None = None
-    max_pages: int = 500
+    # ``None`` is no page limit: the crawl ends when it runs out of in-scope
+    # pages within ``max_depth`` (New scan's "Scan every page it finds").
+    max_pages: int | None = 500
     max_depth: int = 10
     allow_subdomains: bool = False
     rps: float = 2.0
@@ -1226,7 +1228,8 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
 
 
 def _page_limit_reached(ctx: _WorkerContext) -> bool:
-    return ctx.summary.pages_fetched >= ctx.config.max_pages
+    limit = ctx.config.max_pages
+    return limit is not None and ctx.summary.pages_fetched >= limit
 
 
 async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
