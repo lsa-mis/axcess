@@ -19,6 +19,19 @@ export const STATUS_LABEL: Record<FindingStatus, string> = {
   false_positive: "Not a problem",
 };
 
+/**
+ * What each status means, for the hover hint on its chip. A status is a
+ * person's decision; Axcess checks none of them, so "Fixed" says so.
+ */
+export const STATUS_HELP: Record<FindingStatus, string> = {
+  new: "No one has set a status for it in this report yet.",
+  reviewing: "Someone is checking whether it is a real problem.",
+  in_progress: "Someone confirmed it is a real problem, and a fix is planned or under way.",
+  remediated: "Someone marked it as fixed. Axcess does not check this: scan again to see if it is still found.",
+  accepted_risk: "A known problem that your team chose not to fix for now.",
+  false_positive: "Someone checked it and found it is not a real problem (a false positive).",
+};
+
 /** The same statuses as choices, where the longer form helps the decision. */
 export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
   ...STATUS_LABEL,

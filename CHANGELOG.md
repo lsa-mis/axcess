@@ -16,8 +16,23 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   check saw it: 320 pixels wide for reflow, 640 by 450 for text at 200% zoom,
   or with WCAG's text spacing, with the element highlighted. "Show at full
   width" compares.
+- **Hover hints** on words that need explaining: the Issues table's Type and
+  Found by tags (in the glossary's own words), its column headers, the
+  priority bands, the level badges, Compare's New, No longer found and Still
+  found, and status chips. They follow the Hints setting; a column header's
+  hint also shows on keyboard focus and is read as its description. The
+  Issues glossary now explains the priority bands too, and an occurrence's
+  page says what the chosen status means ("Fixed" is a person's decision;
+  Axcess does not check it).
 
 ### Changed
+
+- Inspector: what the numbered box is on is a short table, with the same
+  labels in the same places as you step: what it is, its text or label, its
+  size, and its element locator. A long locator shows its end, the element
+  itself, on one line; Show all lists one step per line, and Copy element
+  locator copies it whole (or, where the browser blocks copying, selects it).
+  A Rule check (Alfa) locator is named an XPath, not a CSS selector.
 
 - New scan: every settings group is an accordion row, closed on arrival. A
   failed submit opens the group that holds the field it names.
@@ -42,6 +57,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 - Two elements with identical markup but different locators were treated as
   one occurrence, so the second was never outlined; and an occurrence in a
   clicked state was dropped when the same markup was flagged at page load.
+- The Barrier meaning said a new scan "confirms the fix". It now says to
+  test the fix, then scan again to see if it is still found: a later scan not
+  finding an issue does not prove it was fixed.
+- With hints set to Always, focusing a control took its hint away while the
+  hint showed, so a screen reader lost the control's description.
 - **Needs review issues are highlighted exactly, as Barriers are.** AI review
   issues outlined nothing: the inspector compared their stored rule
   (`semantic:2.4.4`) with `2.4.4`. Each is now outlined by the element the AI

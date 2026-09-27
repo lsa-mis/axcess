@@ -82,8 +82,8 @@ REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
 
 REVIEW_LANE_HELP: dict[ReviewLane, str] = {
     "likely_barrier": (
-        "A check failed a fixed rule, so this is likely to block someone. "
-        "Fix it, then scan again to confirm the fix."
+        "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. "
+        "Fix it, test the fix, then scan again to see if it is still found."
     ),
     "expert_review": (
         "A possible problem from a less certain check, such as the AI review or a "

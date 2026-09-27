@@ -256,6 +256,7 @@ export function SortHeader<K extends string>({
   kind = "text",
   chip,
   wrap = "chip",
+  hint,
   className,
   children,
   ...th
@@ -267,6 +268,12 @@ export function SortHeader<K extends string>({
   /** Words for the chip when the column's order is not plain text, number or date. */
   chip?: (sort: Sort<K>) => string;
   wrap?: "chip" | "words";
+  /**
+   * What the column holds, as a hover hint on the sort button: the element
+   * that takes focus, so it is also the button's description for a screen
+   * reader and shows on focus in the "Always" hints setting.
+   */
+  hint?: string;
   className?: string;
   /** The header's label. Defaults to the column key. */
   children?: ReactNode;
@@ -309,6 +316,7 @@ export function SortHeader<K extends string>({
     >
       <button
         type="button"
+        title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
           "group inline-flex min-h-target items-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",

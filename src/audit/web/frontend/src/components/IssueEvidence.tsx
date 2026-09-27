@@ -7,6 +7,7 @@ import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
+import { REVIEW_LANE_HELP } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
@@ -359,7 +360,7 @@ const LANES: Record<
 > = {
   likely_barrier: {
     label: REVIEW_TYPE_LABEL.likely_barrier,
-    meaning: "A check failed a fixed rule, so this is likely to block someone. Fix it, then test the fix.",
+    meaning: REVIEW_LANE_HELP.likely_barrier,
     icon: AlertOctagon,
     className: "border-umich-blue/30 border-l-umich-blue bg-umich-blue/5",
     iconClass: "text-umich-blue",

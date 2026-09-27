@@ -1,6 +1,19 @@
 import type { ConformanceLabel } from "../api/types";
 
 /**
+ * What each level means, for the hover hint. A badge marks one criterion's
+ * level, so a level is described on its own, not as a conformance target.
+ * Best practice is a criterion this scan's WCAG version does not require (a
+ * WCAG 2.2 criterion on a 2.1 scan) or a rule no criterion requires.
+ */
+const LEVEL_HELP: Record<ConformanceLabel, string> = {
+  A: "Level A: the most basic requirements in the Web Content Accessibility Guidelines (WCAG).",
+  AA: "Level AA: the level of the Web Content Accessibility Guidelines (WCAG) that most accessibility policies require.",
+  AAA: "Level AAA: the strictest requirements in the Web Content Accessibility Guidelines (WCAG).",
+  BP: "Best practice: recommended, but not required by the Web Content Accessibility Guidelines (WCAG) version this scan checked.",
+};
+
+/**
  * WCAG conformance badge (A/AA/AAA/BP), shared by the list, detail, and evidence.
  *
  * Every background here carries white bold 13px text, which is not "large
@@ -20,7 +33,7 @@ export default function ConformanceBadge({ level }: { level: ConformanceLabel })
   return (
     <span
       className={`${bg} inline-block rounded-xs px-2 py-0.5 text-xs font-bold text-white`}
-      title={level === "BP" ? "Best practice: not a WCAG requirement" : "WCAG level: how strict the requirement is"}
+      title={LEVEL_HELP[level]}
     >
       {level === "BP" ? "Best practice" : <><span className="sr-only">Level </span>{level}</>}
     </span>

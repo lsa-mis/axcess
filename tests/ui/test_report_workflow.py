@@ -729,7 +729,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         ).to_be_visible()
     meanings = page.get_by_role("definition")
     for meaning in (
-        "A check failed a fixed rule",
+        "A rule check (axe or Alfa) failed a fixed rule",
         "A person must confirm it",
         "not a problem to fix",
     ):

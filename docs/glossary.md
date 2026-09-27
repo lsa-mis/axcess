@@ -12,8 +12,8 @@ A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
 [Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
 such as an image with no [alt text](#alt-text). These rules give the same result
 every time, so these are the most certain results. Start here: check that the
-rule applies to that part of the page, fix it, then
-[rescan](#rescan-comparison) to confirm the fix.
+rule applies to that part of the page, fix it, test the fix, then
+[rescan](#rescan-comparison) to see if it is still found.
 
 - Good to know: some Barriers are [best practices](#best-practice), not WCAG
   failures. The Issues table's WCAG column shows Best practice for these.
@@ -92,6 +92,14 @@ check a result later.
 
 One piece of a web page, such as a heading, image, link, button, or form
 field.
+
+### Element locator
+
+The text that finds one [element](#element) in the page code. The rule check
+(axe) and the browser checks record it as a CSS selector, such as
+`main > h2`. The rule check (Alfa) records it as an XPath, a path from the top
+of the page, such as `/html[1]/body[1]/main[1]/h2[1]`. The page inspector names
+which one it shows and can copy it.
 
 ## Severity and priority
 

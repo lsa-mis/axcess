@@ -134,21 +134,26 @@ function FocusHint() {
   useEffect(() => {
     let active: Element | null = null;
     let parked = "";
-    const show = (el: Element | null) => {
+    const show = (el: Element | null, pointer = false) => {
       if (active && parked) active.setAttribute("title", parked);
       active = null;
       parked = "";
       const target = el?.closest("[title]");
       const text = target?.getAttribute("title")?.trim();
       if (!target || !text) return setHint(null);
-      // Park the title while ours shows, so the native one does not stack on it.
-      active = target;
-      parked = text;
-      target.removeAttribute("title");
+      // Under a pointer, park the title while ours shows, so the native
+      // tooltip does not stack on it. On keyboard focus a browser shows no
+      // tooltip, and the title must stay: it is the control's description
+      // for a screen reader.
+      if (pointer) {
+        active = target;
+        parked = text;
+        target.removeAttribute("title");
+      }
       const box = target.getBoundingClientRect();
       setHint({ text, top: box.bottom + 6, left: Math.max(8, Math.min(box.left, window.innerWidth - 328)) });
     };
-    const onOver = (event: Event) => show(event.target as Element);
+    const onOver = (event: Event) => show(event.target as Element, true);
     const onFocus = (event: Event) => show(event.target as Element);
     const onLeave = () => show(null);
     const onKey = (event: KeyboardEvent) => {

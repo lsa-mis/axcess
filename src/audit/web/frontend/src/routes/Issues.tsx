@@ -45,6 +45,8 @@ import {
   FINDING_TYPES,
   FINDING_TYPE_HELP,
   FINDING_TYPE_LABELS,
+  ISSUE_COLUMN_HELP,
+  PRIORITY_HELP,
   REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
@@ -698,6 +700,7 @@ function IssueTable({
                 sort={sort}
                 onSort={onSort}
                 className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
+                hint={columnHint(column)}
               >
                 {column === "WCAG" ? (
                   <abbr title="Web Content Accessibility Guidelines">WCAG</abbr>
@@ -797,7 +800,7 @@ const IssueTableRow = memo(function IssueTableRow({
           // The band, not the score: "11.28" means nothing to a reader,
           // and two decimals invited comparing issues by hundredths. The
           // score still orders the column; the word is what shows.
-          priorityTier(row.priority)
+          <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
         )}
       </Cell>
       <Cell numeric className={cell}>
@@ -838,10 +841,15 @@ const IssueTableRow = memo(function IssueTableRow({
   );
 });
 
-/** A row's type as the table shows it; the glossary reuses it so the two match. */
-function LaneTag({ lane }: { lane: ReviewLane }) {
+/**
+ * A row's type as the table shows it; the glossary reuses it so the two match.
+ * On hover it says what the type means (the glossary's words), except in the
+ * glossary, where the meaning is printed beside it.
+ */
+function LaneTag({ lane, hint = true }: { lane: ReviewLane; hint?: boolean }) {
   return (
     <span
+      title={hint ? REVIEW_LANE_HELP[lane] : undefined}
       className={cn(
         "inline-flex items-center rounded-2xs px-2 py-0.5 text-2xs font-semibold",
         lane === "informational"
@@ -872,10 +880,13 @@ function FindingTypeCell({ row }: { row: IssueRow }) {
   );
 }
 
-/** One finding type as the table shows it; the glossary reuses it so the two match. */
-function FindingTypePill({ type }: { type: FindingType }) {
+/** One finding type as the table shows it; the glossary reuses it, without the hover hint. */
+function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: boolean }) {
   return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg">
+    <span
+      title={hint ? FINDING_TYPE_HELP[type] : undefined}
+      className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
+    >
       {FINDING_TYPE_LABELS[type]}
     </span>
   );
@@ -884,9 +895,9 @@ function FindingTypePill({ type }: { type: FindingType }) {
 /**
  * What the Type and Finding type words mean, closed until asked for.
  *
- * A definition list rather than tooltips: the words are read on purpose,
- * the text has to reach keyboard and touch users, and a tooltip on a tag in
- * every row would be the same sentence many times over.
+ * The tags in the table carry the same sentences as hover hints, but a hint
+ * on a tag reaches only a mouse: this list is how keyboard and touch users,
+ * and anyone who turned hints off, read them.
  */
 function IssueGlossary() {
   return (
@@ -894,14 +905,28 @@ function IssueGlossary() {
       id="report-labels"
       title={`What ${REVIEW_TYPE_LABEL.likely_barrier}, ${REVIEW_TYPE_LABEL.expert_review} and the other labels mean`}
     >
-      <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2">
+      <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
         <GlossaryList
           heading="Type: how sure the evidence is"
-          items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} />, help: REVIEW_LANE_HELP[key] }))}
+          items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
           heading={`${COLUMN_LABEL["Finding type"]}: which group of checks found it`}
-          items={FINDING_TYPES.map((key) => ({ key, term: <FindingTypePill type={key} />, help: FINDING_TYPE_HELP[key] }))}
+          items={FINDING_TYPES.map((key) => ({
+            key,
+            term: <FindingTypePill type={key} hint={false} />,
+            help: FINDING_TYPE_HELP[key],
+          }))}
+        />
+        {/* The bands' limits, such as a critical problem on one page showing
+            as Low, in words everyone can reach, not only in a hover hint. */}
+        <GlossaryList
+          heading={`${COLUMN_LABEL.Priority}: which issues to look at first`}
+          items={(["High", "Medium", "Low"] as const).map((key) => ({
+            key,
+            term: <span className="font-semibold text-fg">{key}</span>,
+            help: PRIORITY_HELP[key],
+          }))}
         />
       </div>
     </ReportNote>
@@ -978,6 +1003,12 @@ function FindingTypeViewLink({
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** The hover hint on a column's header, where one helps. */
+function columnHint(column: SortColumn): string | undefined {
+  const label = COLUMN_LABEL[column];
+  return label in ISSUE_COLUMN_HELP ? ISSUE_COLUMN_HELP[label as keyof typeof ISSUE_COLUMN_HELP] : undefined;
 }
 
 /** A plain-English band for the priority score (severity × log1p(pages)). */
