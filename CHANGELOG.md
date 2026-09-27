@@ -5,6 +5,20 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 `main` is one step after the last. Before 0.60 desktop previews were
 `0.1.<run number>`, up to `desktop-v0.1.33`.
 
+## Unreleased
+
+### Changed
+
+- New scan: every settings group is an accordion row, closed on arrival. A
+  failed submit opens the group that holds the field it names.
+- New scan: Start scan and Cancel sit at the top right of the page, beside
+  its title. Enter in the address field still starts the scan.
+
+### Fixed
+
+- New scan: on a narrow screen, the Scan type tabs' highlight covered half of
+  the second tab's name. It now fits the selected tab.
+
 ## 0.60 - 2026-09-26
 
 ### Added

@@ -118,6 +118,21 @@ export default function ScanSummaryCard({
   className?: string;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
+  // Scrolls when it is taller than its cap (a wide screen, a long summary).
+  // A scrolling region with nothing focusable in it cannot be scrolled from
+  // the keyboard, so then, and only then, the summary itself takes focus.
+  const scrollRef = useRef<HTMLElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const measure = () => setScrolls(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    for (const child of Array.from(element.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, []);
   const login = policy.mode === "login";
   const unchanged = isDefault(settings, policy);
   const { scope, checks } = lines(settings, policy);
@@ -169,7 +184,14 @@ export default function ScanSummaryCard({
 
   return (
     <div className={cn("rounded-md border border-border bg-surface shadow-card", className)}>
-      <aside aria-labelledby="scan-summary-title">
+      <aside
+        ref={scrollRef}
+        aria-labelledby="scan-summary-title"
+        // A scrolling region must be reachable by keyboard (as TableRegion).
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={scrolls ? 0 : undefined}
+        className="rounded-md focus:outline-none focus-visible:shadow-focus lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
+      >
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-5">
           <h2
             id="scan-summary-title"

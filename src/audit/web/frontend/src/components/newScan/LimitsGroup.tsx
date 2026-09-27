@@ -21,7 +21,7 @@ export default function LimitsGroup({ settings, update, policy, capabilities, er
     : undefined;
 
   return (
-    <SettingsGroup id="limits" legend={GROUPS.limits.legend}>
+    <SettingsGroup variant="plain" id="limits" legend={GROUPS.limits.legend}>
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
         <NumberField
           id={fieldIds.max_pages}

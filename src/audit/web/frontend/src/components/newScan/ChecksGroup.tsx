@@ -19,7 +19,7 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
       : null;
 
   return (
-    <SettingsGroup id="checks" legend={GROUPS.checks.legend} description={GROUPS.checks.description}>
+    <SettingsGroup variant="plain" id="checks" legend={GROUPS.checks.legend} description={GROUPS.checks.description}>
       <div className="grid gap-5 sm:grid-cols-2">
         <PillGroup
           name="axe-level"

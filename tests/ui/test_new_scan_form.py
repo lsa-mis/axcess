@@ -13,21 +13,13 @@ from typing import Any
 import pytest
 
 from .test_accessibility_axe import _AXE_TEXT, _render_violations
+from .test_accessibility_axe import _SCAN_GROUPS as _GROUPS
+from .test_accessibility_axe import _open_scan_groups as _open_groups
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
-
-# Every setting group is an open card; only Speed and browser window folds away.
-_CARDS = ("Pages to scan", "Checks", "AI checks on this computer", "Limits and rule check tool")
-
-
-async def _open_speed(page: Any) -> None:
-    """Expand Speed and browser window, the one group that starts collapsed."""
-    button = page.get_by_role("button", name="Speed and browser window", exact=True)
-    if await button.get_attribute("aria-expanded") != "true":
-        await button.click()
 
 
 async def _rail_items(summary: Any, term: str) -> list[str]:
@@ -152,6 +144,26 @@ async def test_empty_submit_is_announced_focused_and_linked(
     await playwright_async.expect(alert).to_have_count(0)
 
 
+async def test_enter_in_the_address_field_starts_the_scan(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Start is in the page header, outside the form, and still its default button.
+
+    It names the form it submits, so Enter in a field submits as before: an
+    empty address shows the alert rather than doing nothing.
+    """
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    url = page.get_by_role("textbox", name="Website address", exact=True)
+    await url.focus()
+    await page.keyboard.press("Enter")
+    alert = page.get_by_role("alert")
+    await playwright_async.expect(alert).to_be_focused()
+    await playwright_async.expect(alert).to_contain_text("Enter a website address to start from.")
+
+
 async def test_fast_crawl_with_axe_blocks_start_with_an_inline_alert(
     live_server: tuple[str, int],
     new_page: Any,
@@ -162,7 +174,7 @@ async def test_fast_crawl_with_axe_blocks_start_with_an_inline_alert(
     await page.get_by_role("textbox", name="Website address", exact=True).fill(
         "https://example.com/"
     )
-    await _open_speed(page)
+    await _open_groups(page)
     fast = page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser"))
     await fast.check()
     # Rendered-page checks switch themselves off and say why.
@@ -206,6 +218,7 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await playwright_async.expect(digest).to_have_count(0)
     assert await summary.get_by_role("status").count() == 0
 
+    await _open_groups(page)
     pages = page.get_by_role("spinbutton", name="Maximum pages")
     await pages.fill("300")
     await playwright_async.expect(summary).to_contain_text("Up to 300 pages")
@@ -243,8 +256,8 @@ async def test_form_targets_are_44px_and_axe_aaa_clean(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode={mode}", wait_until="networkidle")
     # A collapsed panel is hidden, so axe and the target check would skip
-    # every control in it: open Speed and browser window first.
-    await _open_speed(page)
+    # every control in it: open every group first.
+    await _open_groups(page)
     small = await page.evaluate(_SMALL_TARGETS)
     # Native checkboxes are 22px inside a 44px label row, which is the
     # target; everything else must stand on its own.
@@ -277,6 +290,7 @@ async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
     await page.route("**/api/scans", capture)
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
     summary = page.get_by_role("complementary", name="What this scan will do")
+    await _open_groups(page)
     versions = page.get_by_role("group", name="WCAG version")
     v21 = versions.get_by_role("radio", name="2.1", exact=True)
     v22 = versions.get_by_role("radio", name="2.2", exact=True)
@@ -313,49 +327,55 @@ async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
 
 
 @pytest.mark.parametrize("mode", ["public", "login"])
-async def test_settings_are_open_cards_and_only_speed_folds_away(
+async def test_settings_are_closed_accordions_and_start_is_top_right(
     live_server: tuple[str, int], new_page: Any, mode: str
 ) -> None:
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode={mode}", wait_until="networkidle")
-    # Each group is a named fieldset, open from the start: no click stands
-    # between the reader and what will run.
-    for name in _CARDS:
-        await playwright_async.expect(
-            page.get_by_role("group", name=name, exact=True)
-        ).to_be_visible()
+    # Every group is an accordion row, closed on arrival: the first screen
+    # is the address, the group names and the rail saying what will run.
+    for name in _GROUPS:
+        button = page.get_by_role("button", name=name, exact=True)
+        await playwright_async.expect(button).to_have_attribute("aria-expanded", "false")
+        panel = page.locator(f"#{await button.get_attribute('aria-controls')}")
+        await playwright_async.expect(panel).to_be_hidden()
     await playwright_async.expect(
         page.get_by_role("spinbutton", name="Maximum pages")
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("group", name="Rule check tool", exact=True)
-    ).to_be_visible()
+    ).to_be_hidden()
     # No second summary to keep in step with the rail.
     await playwright_async.expect(
         page.get_by_role("heading", name="Advanced settings", exact=True)
     ).to_have_count(0)
-    await playwright_async.expect(
-        page.get_by_role("region", name=re.compile(r"^Scan settings"))
-    ).to_have_count(0)
 
-    speed = page.get_by_role("button", name="Speed and browser window", exact=True)
-    await playwright_async.expect(speed).to_have_attribute("aria-expanded", "false")
-    panel = page.locator(f"#{await speed.get_attribute('aria-controls')}")
-    await playwright_async.expect(panel).to_be_hidden()
-    await speed.click()
-    await playwright_async.expect(speed).to_have_attribute("aria-expanded", "true")
+    # One click opens a group; its fieldset keeps the group's name.
+    limits = page.get_by_role("button", name="Limits and rule check tool", exact=True)
+    await limits.click()
+    await playwright_async.expect(limits).to_have_attribute("aria-expanded", "true")
     await playwright_async.expect(
-        page.get_by_role("spinbutton", name="Page requests per second")
+        page.get_by_role("group", name="Limits and rule check tool", exact=True)
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_role("group", name="Rule check tool", exact=True)
+    ).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_role("spinbutton", name="Maximum pages")
     ).to_be_visible()
 
-    # The actions sit in the rail at a wide width: Start is beside the
-    # cards, not below them.
-    start = await page.get_by_role(
-        "button", name=re.compile(r"^(Start scan|Open browser)")
-    ).bounding_box()
+    # Start and Cancel are at the top right, beside the page title, and
+    # Start still submits the form it sits outside of.
+    heading = await page.get_by_role("heading", name="New scan", level=1).bounding_box()
+    start_button = page.get_by_role("button", name=re.compile(r"^(Start scan|Open browser)"))
+    start = await start_button.bounding_box()
     url = await page.locator("#scan-url").bounding_box()
-    assert start and url and start["x"] > url["x"] + url["width"]
+    assert heading and start and url
+    assert start["y"] < url["y"], "Start sits above the form"
+    assert start["x"] > url["x"] + url["width"] / 2, "Start sits on the right"
+    assert abs(start["y"] - heading["y"]) < 40, "Start is on the title's row"
+    await playwright_async.expect(start_button).to_have_attribute("form", "scan-form")
+    await playwright_async.expect(
+        page.get_by_role("button", name="Cancel", exact=True)
+    ).to_be_visible()
 
 
 @pytest.mark.parametrize(
@@ -401,6 +421,7 @@ async def test_limits_are_validated_by_name_with_their_range(
     await page.get_by_role("textbox", name="Website address", exact=True).fill(
         "https://example.com/"
     )
+    await _open_groups(page)
     box = page.get_by_role("spinbutton", name=field, exact=True)
     # The range is in the field's description before anything goes wrong.
     hint_id = (await box.get_attribute("aria-describedby") or "").split()[0]
@@ -410,8 +431,14 @@ async def test_limits_are_validated_by_name_with_their_range(
     await box.fill(value)
     # An emptied box stays empty; it does not snap back to 0.
     await playwright_async.expect(box).to_have_value(value)
+    # Folded before Start: the failed submit opens the group again, so the
+    # alert's link lands on a visible field.
+    limits = page.get_by_role("button", name="Limits and rule check tool", exact=True)
+    await limits.click()
+    await playwright_async.expect(box).to_be_hidden()
 
     await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(limits).to_have_attribute("aria-expanded", "true")
     alert = page.get_by_role("alert").first
     await playwright_async.expect(alert).to_be_focused()
     assert await box.get_attribute("aria-invalid") == "true"
@@ -428,6 +455,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
     limits = page.get_by_role("group", name="Limits and rule check tool", exact=True)
     await playwright_async.expect(
         limits.get_by_role("spinbutton", name="Maximum link depth")
@@ -494,6 +522,7 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
     )
     assert await _rail_items(summary, "Checks that run") == included
     assert await _rail_items(summary, "Not included") == left_out
+    await _open_groups(page)
 
     async def agrees() -> None:
         """Every check switch sits on the rail's side its state says."""
@@ -511,7 +540,7 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
     if mode == "public":
         # Fast scan makes the browser checks impossible: they move to Not
         # included even though their switches still read on.
-        await _open_speed(page)
+        await _open_groups(page)
         await page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser")).check()
         await playwright_async.expect(summary).to_contain_text("Page code (HTML) only, no browser")
         assert "Keyboard check" in await _rail_items(summary, "Not included")
@@ -569,6 +598,7 @@ async def test_a_stopped_scan_is_restarted_with_its_settings_and_no_credentials(
     await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
     await playwright_async.expect(summary).to_contain_text("Up to 321 pages, 4 clicks deep")
     assert "Keyboard check" in await _rail_items(summary, "Not included")
+    await _open_groups(page)
     await playwright_async.expect(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_have_value("321")
@@ -631,7 +661,7 @@ async def test_a_login_scan_restarts_on_its_tab_with_confirmations_unticked(
     await playwright_async.expect(
         page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan"))
     ).not_to_be_checked()
-    await _open_speed(page)
+    await _open_groups(page)
     await playwright_async.expect(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_have_value("40")
