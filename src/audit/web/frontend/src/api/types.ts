@@ -1086,6 +1086,9 @@ export interface PageEvidence {
      *  made before state capture. The label above cannot stand in for it:
      *  several controls on a page can share an accessible name. */
     revealed_state_key: string | null;
+    /** For an AI review finding, the element it is about, named the way a
+     *  browser can count it (the 3rd of 12 `a`). Null when not worked out. */
+    element_place: ElementPlace | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1099,7 +1102,36 @@ export interface PageEvidence {
     ocr_text: string | null;
     vlm_classification: Classification | null;
     vlm_rationale: string | null;
+    /** The Images with text issue this image is in; null when the scan made
+     *  no finding for it. */
+    issue_key: string | null;
+    /** Which element of the saved copy the image came from; null when the
+     *  page kept no copy or the copy disagrees with the stored occurrence. */
+    locator: ImageLocator | null;
+    /** In a <noscript> or <template> element, which the saved copy on
+     *  screen does not show (usually a lazy-loaded image's backup copy). */
+    hidden_in_copy: boolean;
   }>;
+}
+
+/** The `index`th of the `total` elements `selector` matches in the saved copy. */
+export interface ElementPlace {
+  selector: string;
+  index: number;
+  total: number;
+}
+
+/**
+ * The `index`th of the `total` elements of `kind` in the saved copy's body.
+ * `candidate` is the image address as its attribute wrote it; `text` is an
+ * inline SVG's drawn text. Both are checked before it is outlined.
+ */
+export interface ImageLocator {
+  kind: "img" | "source" | "svg";
+  index: number;
+  total: number;
+  candidate: string | null;
+  text: string | null;
 }
 
 // ---------------------------------------------------------------

@@ -5,6 +5,7 @@ import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import { api } from "../api/client";
+import type { PageEvidence } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -28,6 +29,7 @@ import {
   markCurrent,
   normalizeWhitespace,
   readableLocator,
+  snippetCutFor,
   spotlight,
   type ElementDescription,
   type HighlightResult,
@@ -84,21 +86,14 @@ export default function InspectorRoute() {
   });
 
   // The findings that belong to the issue being reviewed on this page. For the
-  // ?issue= path this is every finding of the same rule/pipeline (an issue can
-  // have several occurrences on one page); for a direct selector/snippet it is
-  // that one finding. Only these are highlighted, not other issues on the page.
+  // ?issue= path this is every finding of the issue (an issue can have several
+  // occurrences on one page); for a direct selector/snippet it is that one
+  // finding. Only these are highlighted, not other issues on the page.
   const currentFindings = useMemo(() => {
     if (!pageEvidence) return [];
     if (issueKey) {
-      const segments = issueKey.split(":");
-      if (segments.length < 2) return [];
-      const pipeline = segments[0];
-      const rule = segments[1];
       return pageEvidence.a11y_findings.filter(
-        (f) =>
-          f.pipeline === pipeline &&
-          f.rule_id === rule &&
-          (f.target_selector || f.html_snippet),
+        (f) => findingInIssue(f, issueKey) && (f.target_selector || f.html_snippet),
       );
     }
     return pageEvidence.a11y_findings.filter(
@@ -107,6 +102,24 @@ export default function InspectorRoute() {
         (directSnippet && f.html_snippet === directSnippet),
     );
   }, [pageEvidence, issueKey, directSelector, directSnippet]);
+
+  // An Images with text issue's occurrences on this page: images, which carry
+  // no selector. One row per occurrence (the evidence lists an image once per
+  // analysis of it).
+  const currentImages = useMemo(() => {
+    if (!pageEvidence || !issueKey?.startsWith("image:")) return [];
+    const seen = new Set<number>();
+    return pageEvidence.image_occurrences.filter((image) => {
+      if (image.issue_key !== issueKey || seen.has(image.occurrence_id)) return false;
+      seen.add(image.occurrence_id);
+      return true;
+    });
+  }, [pageEvidence, issueKey]);
+  // Copies inside <noscript> or <template> (in practice the no-script fallback
+  // of a lazy-loaded image, whose shown twin is outlined): not in the saved
+  // copy on screen, so they are said, not counted as missing.
+  const shownImages = useMemo(() => currentImages.filter((image) => !image.hidden_in_copy), [currentImages]);
+  const hiddenImageCount = currentImages.length - shownImages.length;
 
   // The findings' locators, deduped (two rules can share one element, and
   // identical siblings are intentionally one location). This list drives both
@@ -135,10 +148,22 @@ export default function InspectorRoute() {
         snippet,
         revealedBy: f.revealed_by || null,
         stateKey: f.revealed_state_key || null,
+        place: f.element_place,
+        cutAt: snippetCutFor(f.pipeline),
+      });
+    }
+    // Images were read at page load. Each occurrence is its own element.
+    for (const image of shownImages) {
+      out.push({
+        selector: null,
+        snippet: null,
+        revealedBy: null,
+        stateKey: null,
+        image: { locator: image.locator, alt: image.alt_text },
       });
     }
     return out;
-  }, [currentFindings]);
+  }, [currentFindings, shownImages]);
   const hasTarget = targets.length > 0;
 
   // The controls that were operated before these findings were first flagged,
@@ -350,6 +375,9 @@ export default function InspectorRoute() {
     () => currentFindings.filter((f) => (f.revealed_state_key || null) === activeStateKey),
     [currentFindings, activeStateKey],
   );
+  // Images were read at page load, so they belong to that state alone.
+  const scopedImages = activeStateKey === null ? currentImages : [];
+  const evidenceCount = scopedFindings.length + scopedImages.length;
 
   /**
    * The states worth offering for the issue being reviewed.
@@ -375,8 +403,8 @@ export default function InspectorRoute() {
 
   /** Occurrences of this issue that were already present at page load. */
   const loadStateCount = useMemo(
-    () => currentFindings.filter((f) => !f.revealed_state_key).length,
-    [currentFindings],
+    () => currentFindings.filter((f) => !f.revealed_state_key).length + shownImages.length,
+    [currentFindings, shownImages],
   );
 
   const occurrencesByState = useMemo(() => {
@@ -590,9 +618,18 @@ export default function InspectorRoute() {
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
-  const currentLocator = readableLocator(
-    scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1]?.selector ?? null,
-  );
+  const currentTarget = scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1];
+  const currentLocator = readableLocator(currentTarget?.selector ?? null);
+  // An image or an AI review finding is found by its place among elements of
+  // its kind; its selector (``a[ord=6]``) is not one a browser can use.
+  const currentPlace = currentTarget?.image?.locator
+    ? {
+        selector: currentTarget.image.locator.kind === "source" ? "picture > source" : currentTarget.image.locator.kind,
+        index: currentTarget.image.locator.index,
+        total: currentTarget.image.locator.total,
+      }
+    : (currentTarget?.place ?? null);
+  const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -960,11 +997,25 @@ export default function InspectorRoute() {
                     </span>
                   )}
                 </p>
-                {currentLocator && (
+                {currentPlace ? (
                   <p className="mt-0.5 text-xs text-fg-muted">
-                    Element locator (CSS selector):{" "}
-                    <code className="break-all font-mono text-fg">{currentLocator}</code>
+                    Where it is in the page code: number {currentPlace.index + 1} of the{" "}
+                    {currentPlace.total} <code className="font-mono text-fg">{currentPlace.selector}</code>{" "}
+                    {currentPlace.total === 1 ? "element" : "elements"}
+                    {currentAddress && (
+                      <>
+                        {" · "}Image address:{" "}
+                        <code className="break-all font-mono text-fg">{currentAddress}</code>
+                      </>
+                    )}
                   </p>
+                ) : (
+                  currentLocator && (
+                    <p className="mt-0.5 text-xs text-fg-muted">
+                      Element locator (CSS selector):{" "}
+                      <code className="break-all font-mono text-fg">{currentLocator}</code>
+                    </p>
+                  )
                 )}
               </div>
             )}
@@ -1034,6 +1085,13 @@ export default function InspectorRoute() {
                     "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
                 </span>
               )}
+              {activeStateKey === null && hiddenImageCount > 0 && (
+                <span>
+                  {hiddenImageCount === 1
+                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
+                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
+                </span>
+              )}
               {offStateCount > 0 && (
                 // Without this the issue looks smaller in a state view than it
                 // is: the picker is the only way to the rest of it.
@@ -1072,11 +1130,11 @@ export default function InspectorRoute() {
             </p>
             {/* Below the page and closed: above it, the list pushed the page
                 the reviewer came to see out of view. */}
-            {scopedFindings.length > 0 && (
+            {evidenceCount > 0 && (
               <Disclosure
                 id="inspect-evidence"
                 title="Evidence from the scan"
-                meta={`${scopedFindings.length} occurrence${scopedFindings.length === 1 ? "" : "s"}`}
+                meta={`${evidenceCount} occurrence${evidenceCount === 1 ? "" : "s"}`}
                 className="rounded-none border-0 border-t"
               >
                 <ul className="space-y-2">
@@ -1098,10 +1156,31 @@ export default function InspectorRoute() {
                       )}
                     </li>
                   ))}
+                  {scopedImages.slice(0, Math.max(0, 3 - scopedFindings.length)).map((image) => (
+                    <li key={`image-${image.occurrence_id}`} className="text-xs">
+                      <p className="font-semibold text-fg">
+                        Image with text
+                        {image.hidden_in_copy && (
+                          <span className="ml-1 font-normal text-fg-muted">(a backup copy not shown here)</span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-fg-muted">{altTextLine(image.alt_text)}</p>
+                      {image.ocr_text && (
+                        <p className="mt-0.5 text-fg-muted">
+                          Text in the image: “{shorten(normalizeWhitespace(image.ocr_text), 160)}”
+                        </p>
+                      )}
+                      {image.locator?.kind !== "svg" && !image.src_url_canonical.startsWith("inline-svg:") && (
+                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
+                          {image.locator?.candidate ?? image.src_url_canonical}
+                        </code>
+                      )}
+                    </li>
+                  ))}
                 </ul>
-                {scopedFindings.length > 3 && (
+                {evidenceCount > 3 && (
                   <p className="mt-1 text-2xs text-fg-muted">
-                    + {scopedFindings.length - 3} more occurrence{scopedFindings.length - 3 === 1 ? "" : "s"} in this page state.
+                    + {evidenceCount - 3} more occurrence{evidenceCount - 3 === 1 ? "" : "s"} in this page state.
                   </p>
                 )}
               </Disclosure>
@@ -1379,6 +1458,33 @@ p {
   margin-bottom: 2em !important;
 }
 `;
+
+/** What an image's alt text is, in words: whether it is missing, empty, or says something. */
+function altTextLine(alt: string | null): string {
+  if (alt === null) return "No alt text (the text a screen reader reads for an image): the image has no alt attribute.";
+  if (!alt.trim()) return "Empty alt text: the image is marked as decorative, so screen readers skip it.";
+  return `Alt text (what a screen reader reads): “${shorten(normalizeWhitespace(alt), 160)}”`;
+}
+
+function shorten(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+/**
+ * Whether a finding is an occurrence of the issue ``key`` names, reading the
+ * keys the Issues page builds: ``axe:rule`` and ``keyboard:rule`` (and the
+ * other browser checks), ``semantic:2.4.6`` for AI review (whose findings
+ * keep the whole key as their rule), and ``alfa:rule:failed`` or
+ * ``alfa:rule:cant_tell``, one issue for each Alfa outcome.
+ */
+function findingInIssue(finding: PageEvidence["a11y_findings"][number], key: string): boolean {
+  const [pipeline, rule, outcome] = key.split(":");
+  if (!pipeline || !rule || finding.pipeline !== pipeline) return false;
+  if (pipeline === "semantic") return finding.rule_id === key || finding.rule_id === rule;
+  if (finding.rule_id !== rule) return false;
+  if (pipeline === "alfa") return (finding.engine_outcome || "failed") === (outcome || "failed");
+  return true;
+}
 
 function layoutForIssue(issueKey: string | null): CheckLayout | null {
   const [pipeline, rule] = (issueKey ?? "").split(":");

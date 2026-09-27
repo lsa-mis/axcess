@@ -18,6 +18,13 @@
  *    tell them apart, is "ambiguous", and a locator and markup that match
  *    nothing are "missing". Both are counted and said, never guessed.
  *
+ * An image from the Images with text check carries no selector, and an AI
+ * review finding carries one only its analyzer can read (`a[ord=6]`). The
+ * saved copy is the document both read, so the server names the element by
+ * its place among elements of its kind (the 3rd of 12 `img`), and it is
+ * outlined only when this document has those 12 and the 3rd one is the
+ * recorded element: the same address and alt text, or the same markup.
+ *
  * The inspector used to take the first element whose markup looked the same
  * whenever the locator did not verify, so identical-looking elements (a row
  * of cards, a repeated link) could be outlined for an occurrence that was
@@ -27,17 +34,53 @@
  * inspector run the same code.
  */
 
+import type { ElementPlace, ImageLocator } from "../api/types";
+
 export type Target = {
   selector: string | null;
   snippet: string | null;
   revealedBy: string | null;
   /** The captured state this finding is visible in, when one was stored. */
   stateKey: string | null;
+  /** Set for an image from the Images with text check, which has no selector. */
+  image?: ImageTarget;
+  /** For an AI review finding, the element the server worked out it is about. */
+  place?: ElementPlace | null;
+  /**
+   * The length the check cut its element code (the snippet) to, without
+   * marking the cut: a snippet exactly this long is the start of a longer
+   * element's code, and matches as a prefix. See ``snippetCutFor``.
+   */
+  cutAt?: number | null;
+};
+
+/**
+ * How many characters of an element's code each browser check keeps
+ * (``outerHTML.slice(0, n)`` in ``src/audit/analyzer/<check>/probe.py``).
+ * The checks do not mark the cut, so without this a longer element's
+ * snippet matched nothing, even where its selector named one element.
+ */
+const SNIPPET_CUTS: Record<string, number> = {
+  focus: 300,
+  keyboard: 240,
+  responsive: 240,
+  visual: 240,
+};
+
+/** The snippet length a pipeline cuts to, or null when it keeps the whole element. */
+export function snippetCutFor(pipeline: string): number | null {
+  return SNIPPET_CUTS[pipeline] ?? null;
+}
+
+export type ImageTarget = {
+  locator: ImageLocator | null;
+  /** The alt text the scan recorded: null when the attribute was missing. */
+  alt: string | null;
 };
 
 export type Located =
   /** One element, or several for an Alfa record that names several. */
-  | { status: "found"; elements: Element[]; how: "selector" | "xpath" | "markup" }
+  | { status: "found"; elements: Element[]; how: "selector" | "xpath" | "markup" | "place" }
   | { status: "ambiguous"; candidates: number }
   | { status: "missing" };
 
@@ -64,6 +107,13 @@ const WALK_CAP = 20_000;
 const SNIPPET_HEAD = 64;
 /** Snippets at the storage cap were cut mid-markup; they match by normalized prefix. */
 const TRUNCATED_SNIPPET_LENGTH = 3900;
+/**
+ * The AI review keeps 300 characters of markup and ends a longer element's
+ * with "…". No whole element's markup ends that way (it ends with a tag), so
+ * such a snippet matches by prefix; a prefix this long names one element or,
+ * repeated, several, which the steps above then count as ambiguous.
+ */
+const CUT_SNIPPET_MIN = 200;
 
 /** The class every outlined element carries, so the frame can be walked in order. */
 export const HIGHLIGHT_CLASS = "axcess-inspect-highlight";
@@ -91,7 +141,13 @@ const SPOTLIGHT_ID = "axcess-spotlight";
 
 /** Locate each target in ``doc`` by the rules above; one result per target, in order. */
 export function locateTargets(doc: Document, targets: Target[]): Located[] {
-  const results: (Located | null)[] = targets.map((target) => locateByLocator(doc, target));
+  const results: (Located | null)[] = targets.map((target) =>
+    target.image
+      ? locateImage(doc, target.image)
+      : target.place
+        ? (locateByPlace(doc, target.place, target.snippet, target.cutAt) ?? locateByLocator(doc, target))
+        : locateByLocator(doc, target),
+  );
   // One walk serves every target the locator could not settle.
   const pending = targets
     .map((target, index) => ({ target, index }))
@@ -99,7 +155,7 @@ export function locateTargets(doc: Document, targets: Target[]): Located[] {
   if (pending.length) {
     const matches = markupMatches(
       doc,
-      pending.map(({ target }) => target.snippet),
+      pending.map(({ target }) => target),
     );
     pending.forEach(({ index }, i) => {
       const candidates = matches[i];
@@ -158,7 +214,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
     if (byElement.size === 0) return { srcDoc: html, ...none, ambiguous };
     const ordered = [...byElement.keys()].sort(documentOrder);
     for (const element of ordered) {
-      if (element instanceof HTMLElement) markElement(element);
+      if (element instanceof HTMLElement || element instanceof SVGElement) markElement(element);
     }
     return {
       srcDoc: "<!doctype html>" + doc.documentElement.outerHTML,
@@ -174,7 +230,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
 }
 
 /** Outline a flagged element and keep it visible whatever the page's own styles say. */
-export function markElement(el: HTMLElement): void {
+export function markElement(el: HTMLElement | SVGElement): void {
   el.classList.add(HIGHLIGHT_CLASS);
   // Inset, not outset: a flagged element filling an `overflow: hidden`
   // ancestor (the image-tile pattern) has an outset ring drawn entirely
@@ -193,7 +249,7 @@ export function markElement(el: HTMLElement): void {
 }
 
 /** Set the element the reader is on apart from the other flagged ones, or put it back. */
-export function markCurrent(el: HTMLElement, current: boolean): void {
+export function markCurrent(el: HTMLElement | SVGElement, current: boolean): void {
   el.style.setProperty(
     "outline",
     current ? `3px solid ${CURRENT_OUTLINE}` : `2px dashed ${FLAGGED_OUTLINE}`,
@@ -364,7 +420,7 @@ export function readableLocator(selector: string | null): string | null {
   }
 }
 
-function forceVisible(el: HTMLElement): void {
+function forceVisible(el: HTMLElement | SVGElement): void {
   el.style.setProperty("opacity", "1", "important");
   el.style.setProperty("visibility", "visible", "important");
   el.style.setProperty("animation", "none", "important");
@@ -397,7 +453,7 @@ function locateByLocator(doc: Document, target: Target): Located | null {
       ? { status: "found", elements: [matches[0]], how: "selector" }
       : { status: "ambiguous", candidates: matches.length };
   }
-  const agreeing = matches.filter((el) => snippetMatches(el, snippet));
+  const agreeing = matches.filter((el) => snippetMatches(el, snippet, target.cutAt));
   if (agreeing.length === 1) return { status: "found", elements: [agreeing[0]], how: "selector" };
   // None agree (the page changed there, or a generic selector hit the wrong
   // element), or several do (identical elements the selector cannot tell
@@ -405,15 +461,101 @@ function locateByLocator(doc: Document, target: Target): Located | null {
   return null;
 }
 
+/** The elements an image locator counts, by kind. */
+const IMAGE_KINDS: Record<ImageLocator["kind"], string> = {
+  img: "img",
+  source: "picture > source",
+  svg: "svg",
+};
+
+/**
+ * An image named by its place among elements of its kind. Found only when the
+ * document has exactly as many of them as the scan's copy did and the one in
+ * that place has the recorded address and alt text (or, for an inline SVG,
+ * the recorded text). Anything else is missing: a count that differs means
+ * this is not the document the check read, and no neighbour is taken instead.
+ */
+function locateImage(doc: Document, { locator, alt }: ImageTarget): Located {
+  if (!locator || !doc.body) return { status: "missing" };
+  const elements = countedMatches(doc.body, IMAGE_KINDS[locator.kind]);
+  const el = elements?.length === locator.total ? elements[locator.index] : undefined;
+  if (!el) return { status: "missing" };
+  if (locator.kind === "svg") {
+    return svgText(el) === locator.text ? { status: "found", elements: [el], how: "place" } : { status: "missing" };
+  }
+  if (locator.candidate === null || !imageAddresses(el).includes(locator.candidate)) return { status: "missing" };
+  if (locator.kind === "img") {
+    if ((el.hasAttribute("alt") ? el.getAttribute("alt") : null) !== alt) return { status: "missing" };
+    return { status: "found", elements: [el], how: "place" };
+  }
+  // A <source> is never drawn itself: its picture's image is what shows.
+  const picture = el.parentElement;
+  const shown = picture?.querySelector(":scope > img") ?? picture;
+  return shown ? { status: "found", elements: [shown], how: "place" } : { status: "missing" };
+}
+
+/**
+ * An element named by its place among its tag's elements, found only when
+ * the document has as many of them as the scan's copy did and the one there
+ * has the recorded markup. Else it falls through to the selector and markup
+ * steps, which say "missing" or "ambiguous" rather than take a neighbour.
+ */
+function locateByPlace(
+  doc: Document,
+  place: ElementPlace,
+  snippet: string | null,
+  cutAt: number | null | undefined,
+): Located | null {
+  const elements = countedMatches(doc, place.selector);
+  const el = elements?.length === place.total ? elements[place.index] : undefined;
+  if (!el || (snippet !== null && !snippetMatches(el, snippet, cutAt))) return null;
+  return { status: "found", elements: [el], how: "place" };
+}
+
+/**
+ * ``selector``'s matches as the server counts them: in document order, less
+ * any inside a ``<noscript>``. The page view removes those blocks before it
+ * parses; the Page code (DOM) tab parses them as elements. (A browser never
+ * lists ``<template>`` content, which the server leaves out too.) Null for a
+ * selector this document cannot read.
+ */
+function countedMatches(root: ParentNode, selector: string): Element[] | null {
+  try {
+    return Array.from(root.querySelectorAll(selector)).filter((el) => !el.closest("noscript"));
+  } catch {
+    return null;
+  }
+}
+
+/** An image element's addresses as written: its src, then each srcset candidate. */
+function imageAddresses(el: Element): string[] {
+  const out: string[] = [];
+  const src = el.getAttribute("src")?.trim();
+  if (src) out.push(src);
+  for (const part of (el.getAttribute("srcset") ?? "").trim().split(/,\s*/)) {
+    const url = part.trim().split(/\s+/)[0];
+    if (url) out.push(url);
+  }
+  return out;
+}
+
+/** An inline SVG's drawn text, as the scan collected it. */
+function svgText(el: Element): string {
+  return Array.from(el.querySelectorAll("text"))
+    .map((node) => normalizeWhitespace(node.textContent ?? ""))
+    .filter(Boolean)
+    .join(" ");
+}
+
 /**
  * Step 2: every element whose markup is each snippet, in one document-order
  * walk. Elements are compared only against snippets of their own tag, with an
  * exact-prefix gate before any full comparison. A null snippet matches nothing.
  */
-function markupMatches(doc: Document, snippets: (string | null)[]): Element[][] {
-  const results: Element[][] = snippets.map(() => []);
-  const buckets = new Map<string, { index: number; raw: string; needle: string; head: string; startTag: boolean }[]>();
-  snippets.forEach((snippet, index) => {
+function markupMatches(doc: Document, targets: Pick<Target, "snippet" | "cutAt">[]): Element[][] {
+  const results: Element[][] = targets.map(() => []);
+  const buckets = new Map<string, { index: number; raw: string; needle: string; head: string; prefix: boolean }[]>();
+  targets.forEach(({ snippet, cutAt }, index) => {
     if (!snippet) return;
     const needle = normalizeWhitespace(snippet);
     if (!needle) return;
@@ -423,7 +565,7 @@ function markupMatches(doc: Document, snippets: (string | null)[]): Element[][] 
       raw: snippet,
       needle,
       head: snippet.slice(0, SNIPPET_HEAD),
-      startTag: isStartTagOnly(snippet),
+      prefix: matchesAsPrefix(snippet, cutAt),
     };
     const bucket = buckets.get(tag);
     if (bucket) bucket.push(entry);
@@ -445,7 +587,7 @@ function markupMatches(doc: Document, snippets: (string | null)[]): Element[][] 
           raw === entry.raw ||
           (raw.startsWith(entry.head) &&
             (normalizeWhitespace(raw) === entry.needle ||
-              (entry.startTag && normalizeWhitespace(raw).startsWith(entry.needle)) ||
+              (entry.prefix && normalizeWhitespace(raw).startsWith(entry.needle)) ||
               truncatedSnippetMatches(raw, entry.needle)))
         ) {
           results[entry.index].push(el);
@@ -458,16 +600,24 @@ function markupMatches(doc: Document, snippets: (string | null)[]): Element[][] 
 }
 
 /** True when ``el``'s serialization is the snippet's element (any whitespace). */
-function snippetMatches(el: Element, snippet: string): boolean {
+function snippetMatches(el: Element, snippet: string, cutAt?: number | null): boolean {
   const needle = normalizeWhitespace(snippet);
   if (!needle) return false;
   const raw = el.outerHTML;
   return (
     raw === snippet ||
     normalizeWhitespace(raw) === needle ||
-    (isStartTagOnly(snippet) && normalizeWhitespace(raw).startsWith(needle)) ||
+    (matchesAsPrefix(snippet, cutAt) && normalizeWhitespace(raw).startsWith(needle)) ||
     truncatedSnippetMatches(raw, needle)
   );
+}
+
+/**
+ * True when a snippet is only the start of its element's code: a bare start
+ * tag (below), or code a check cut at its length (``SNIPPET_CUTS``).
+ */
+function matchesAsPrefix(snippet: string, cutAt: number | null | undefined): boolean {
+  return isStartTagOnly(snippet) || (cutAt != null && snippet.length === cutAt);
 }
 
 /**
@@ -482,6 +632,10 @@ function isStartTagOnly(snippet: string): boolean {
 }
 
 function truncatedSnippetMatches(raw: string, needle: string): boolean {
+  if (needle.endsWith("…")) {
+    const head = needle.slice(0, -1).trimEnd();
+    return head.length >= CUT_SNIPPET_MIN && normalizeWhitespace(raw).startsWith(head);
+  }
   if (needle.length < TRUNCATED_SNIPPET_LENGTH) return false;
   return normalizeWhitespace(raw).startsWith(needle);
 }

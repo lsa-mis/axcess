@@ -10,9 +10,12 @@ SVG accessible-name algorithm, not visible text, so we ignore them.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from selectolax.parser import HTMLParser, Node
+
+from audit.extractor.places import Place, Places
 
 
 @dataclass(frozen=True)
@@ -31,12 +34,49 @@ def find_inline_svg_text(body: bytes) -> list[InlineSvgTextHit]:
     Nested ``<svg>`` elements are ignored, we only report the outermost one
     so a single composition doesn't generate multiple findings.
     """
+    return [
+        InlineSvgTextHit(
+            position=position,
+            visible_text=visible,
+            alt_context=_accessible_name(node),
+        )
+        for position, node, visible in _walk_hits(HTMLParser(body))
+    ]
+
+
+@dataclass(frozen=True)
+class SvgElement:
+    """Where one inline SVG hit sits, in terms a browser can find again.
+
+    ``place`` counts every ``<svg>`` in the body, nested ones included, as
+    :mod:`places` explains; None for an SVG no browser count includes.
+    """
+
+    place: Place | None
+    visible_text: str
+
+
+def locate_inline_svg_text(body: bytes) -> dict[int, SvgElement]:
+    """Where each hit :func:`find_inline_svg_text` returns sits, by position."""
     tree = HTMLParser(body)
+    if tree.body is None:
+        return {}
+    places = Places(tree, root=tree.body)
+    return {
+        position: SvgElement(place=places.of(node, "svg"), visible_text=visible)
+        for position, node, visible in _walk_hits(tree)
+    }
+
+
+def _walk_hits(tree: HTMLParser) -> Iterator[tuple[int, Node, str]]:
+    """Yield ``(position, svg node, visible text)`` for each hit.
+
+    The one walk both :func:`find_inline_svg_text` and
+    :func:`locate_inline_svg_text` use, so their positions cannot disagree.
+    """
     body_node = tree.body
     if body_node is None:
-        return []
-
-    out: list[InlineSvgTextHit] = []
+        return
     position = 0
     for node in body_node.css("svg"):
         if _has_svg_ancestor(node):
@@ -44,15 +84,8 @@ def find_inline_svg_text(body: bytes) -> list[InlineSvgTextHit]:
         visible = _collect_text(node)
         if not visible:
             continue
-        out.append(
-            InlineSvgTextHit(
-                position=position,
-                visible_text=visible,
-                alt_context=_accessible_name(node),
-            )
-        )
+        yield position, node, visible
         position += 1
-    return out
 
 
 def _has_svg_ancestor(node: Node) -> bool:

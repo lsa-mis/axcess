@@ -22,6 +22,7 @@ is a reviewed change to this file and to ``golden/api_contract.json``.
 from __future__ import annotations
 
 import functools
+import gzip
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -143,6 +144,11 @@ _UNPINNED_PATHS: dict[tuple[str, str], str] = {
     ("GET /api/scans/{scan_id}/diff", "body.resolved[].severity"): _RESOLVED_PAIR,
     ("GET /api/scans/{scan_id}/findings", "body.findings[].alt_adequacy"): (
         "_query_findings always sets it to None; the grouped endpoint carries adequacy."
+    ),
+    ("GET /api/scans/{scan_id}/pages/{page_id}", "body.a11y_findings[].element_place"): (
+        "Only an AI review finding with an [ord=N] selector carries it. One in the seed "
+        "reorders the issue lists' first page and hides their null fields; "
+        "tests/unit/test_saved_copy_places.py pins its value."
     ),
 }
 
@@ -430,6 +436,51 @@ def _add_a11y_evidence(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) -
     )
 
 
+# The home page as the scan read it: its images at the positions the shared
+# seed stores (the banner, with no alt, at 0; the logo at 2) and an inline SVG
+# with drawn text, which the image check stores after the images (at 3).
+_HOME_COPY = (
+    b"<!doctype html><html><head><title>Home</title></head><body>"
+    b'<img src="/banner.png"><img src="/spacer.png" alt=""><img src="/logo.png" alt="Acme Corp">'
+    b'<svg aria-label="Sale"><text>Sale today</text></svg>'
+    b"</body></html>"
+)
+
+
+def _add_saved_copy(conn: sqlite3.Connection, scan_id: int) -> None:
+    """A saved copy of the home page, holding its images and an inline SVG.
+
+    The page endpoint names the element of the copy each image came from
+    (``locator``), which it can only do for a page with a copy.
+    """
+    home = _page_ids(conn, scan_id)[0]
+    conn.execute(
+        "UPDATE pages SET rendered_html = ? WHERE id = ?", (gzip.compress(_HOME_COPY), home)
+    )
+    svg = repo.upsert_image(
+        conn,
+        content_hash="5" * 64,
+        src_url="inline-svg://http://example.com/#0",
+        mime="image/svg+xml",
+        bytes_len=None,
+        width=None,
+        height=None,
+        blob_path=None,
+        has_svg_text=True,
+        scan_id=scan_id,
+    )
+    repo.upsert_page_image(
+        conn,
+        page_id=home,
+        image_id=svg,
+        alt_text="Sale",
+        role=None,
+        context_snippet="Sale today",
+        position=3,
+    )
+    conn.commit()
+
+
 def _add_expert_review(conn: sqlite3.Connection, scan_id: int) -> None:
     """A saved evaluation with one decided criterion and two evidence notes.
 
@@ -534,6 +585,7 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
     try:
         baseline = _add_report_history(conn, blob_dir, scan_id)
         _add_a11y_evidence(conn, blob_dir, scan_id)
+        _add_saved_copy(conn, scan_id)
         _add_expert_review(conn, scan_id)
         states = _add_scan_states(conn)
         missing = conn.execute("SELECT MAX(id) + 1 AS id FROM scans").fetchone()

@@ -1224,7 +1224,7 @@ def _image_issue_rows(
         out.append(
             IssueRow(
                 pipeline="image",
-                issue_key=f"image:{key}",
+                issue_key=image_findings_queries.image_issue_key(cls, adequacy),
                 title=meta.get("title") or _humanize_image_title(cls, adequacy),
                 conformance=conformance,
                 wcag_sc=wcag_sc,

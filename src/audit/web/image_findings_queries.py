@@ -185,13 +185,46 @@ def coverage(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     }
 
 
+def image_issue_key(classification: str | None, alt_adequacy: str | None) -> str:
+    """The Issues key for one image's ``(classification, alt_adequacy)`` group."""
+    return f"image:{classification or 'unclassified'}_{alt_adequacy or 'unknown'}"
+
+
+def issue_keys_for_images(
+    conn: sqlite3.Connection, scan_id: int, image_ids: list[int]
+) -> dict[int, str]:
+    """The Issues key of each of these images in this scan, keyed by image id.
+
+    An image with no finding in this scan is absent. Adequacy is worked out
+    exactly as the Issues page works it out, across every occurrence of the
+    image in the scan, so the key always names the group the image is in.
+    """
+    if not image_ids:
+        return {}
+    return {
+        image_id: image_issue_key(f["classification"], f["alt_adequacy"])
+        for image_id, f in _load_findings_by_image(conn, scan_id, status=None, image_ids=image_ids)
+    }
+
+
 def _load_findings(
     conn: sqlite3.Connection,
     scan_id: int,
     *,
     status: str | None,
 ) -> list[dict[str, Any]]:
-    """Flat list of image findings with per-row classification and adequacy.
+    """Flat list of image findings with per-row classification and adequacy."""
+    return [f for _, f in _load_findings_by_image(conn, scan_id, status=status)]
+
+
+def _load_findings_by_image(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    *,
+    status: str | None,
+    image_ids: list[int] | None = None,
+) -> list[tuple[int, dict[str, Any]]]:
+    """Image findings with per-row classification and adequacy, with image ids.
 
     Joins to ``analyses`` (best-rank per image, same trick as the
     exports collector) for OCR / VLM context, then recomputes
@@ -207,6 +240,11 @@ def _load_findings(
     if status:
         extra_clause = " AND f.status = ?"
         params.append(status)
+    if image_ids is not None:
+        # Bound one by one; a page holds far fewer images than SQLite's
+        # parameter cap.
+        extra_clause += f" AND f.image_id IN ({','.join('?' * len(image_ids))})"
+        params.extend(image_ids)
 
     rows = conn.execute(
         f"""
@@ -240,7 +278,7 @@ def _load_findings(
           LEFT JOIN best b ON b.image_id = i.id AND b.rank = 1
          WHERE f.scan_id = ?{extra_clause}
          ORDER BY f.priority_score DESC, f.id ASC
-        """,  # noqa: S608, `extra_clause` is one of two fixed strings
+        """,  # noqa: S608, `extra_clause` holds fixed strings and placeholders
         tuple(params),
     ).fetchall()
 
@@ -251,7 +289,7 @@ def _load_findings(
         conn, scan_id=scan_id, image_ids=[int(r["image_id"]) for r in rows]
     )
 
-    findings: list[dict[str, Any]] = []
+    findings: list[tuple[int, dict[str, Any]]] = []
     for r in rows:
         occurrences = occurrences_by_image.get(int(r["image_id"]), [])
         ocr_text = r["ocr_text"] or ""
@@ -266,25 +304,28 @@ def _load_findings(
             else AltAdequacy.MISSING
         )
         findings.append(
-            {
-                "id": int(r["id"]),
-                "severity": str(r["severity"]),
-                "status": str(r["status"]),
-                "priority_score": float(r["priority_score"] or 0),
-                "classification": r["vlm_classification"],
-                "alt_adequacy": adequacy.value,
-                "remediation_hint": r["remediation_hint"],
-                "ocr_text": r["ocr_text"],
-                "ocr_confidence": (
-                    float(r["ocr_confidence"]) if r["ocr_confidence"] is not None else None
-                ),
-                "vlm_rationale": r["vlm_rationale"],
-                "image_url": str(r["src_url_canonical"]),
-                "content_hash": str(r["content_hash"]),
-                "mime": r["mime"],
-                "has_svg_text": bool(r["has_svg_text"]),
-                "occurrences": occurrences,
-            }
+            (
+                int(r["image_id"]),
+                {
+                    "id": int(r["id"]),
+                    "severity": str(r["severity"]),
+                    "status": str(r["status"]),
+                    "priority_score": float(r["priority_score"] or 0),
+                    "classification": r["vlm_classification"],
+                    "alt_adequacy": adequacy.value,
+                    "remediation_hint": r["remediation_hint"],
+                    "ocr_text": r["ocr_text"],
+                    "ocr_confidence": (
+                        float(r["ocr_confidence"]) if r["ocr_confidence"] is not None else None
+                    ),
+                    "vlm_rationale": r["vlm_rationale"],
+                    "image_url": str(r["src_url_canonical"]),
+                    "content_hash": str(r["content_hash"]),
+                    "mime": r["mime"],
+                    "has_svg_text": bool(r["has_svg_text"]),
+                    "occurrences": occurrences,
+                },
+            )
         )
     return findings
 

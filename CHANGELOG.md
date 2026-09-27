@@ -42,6 +42,25 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 - Two elements with identical markup but different locators were treated as
   one occurrence, so the second was never outlined; and an occurrence in a
   clicked state was dropped when the same markup was flagged at page load.
+- **Needs review issues are highlighted exactly, as Barriers are.** AI review
+  issues outlined nothing: the inspector compared their stored rule
+  (`semantic:2.4.4`) with `2.4.4`. Each is now outlined by the element the AI
+  review read, found by its place in the saved copy, because its `a[ord=6]`
+  is not a selector a browser can use: all 1,032 local occurrences, where
+  their code alone would have missed 64 (cut at 300 characters) and left 29
+  ambiguous. An Alfa "can't tell" issue outlined the same rule's failed
+  occurrences too, and the reverse; each outlines only its own now.
+- Images with text issues outline their images: each by its place among
+  the saved copy's images, checked against its address and alt text (1,867
+  of 2,105 local occurrences). The other 237 are backup copies inside
+  `<noscript>`, each with an outlined twin; the inspector says it does not
+  show them. The evidence list shows each image's alt text and text.
+- The focus, keyboard, motion and reading-order, and zoom and layout checks
+  keep only the first 240 or 300 characters of an element's code, without
+  marking the cut, so a longer element matched nothing even where its
+  selector named it. That code now matches as the start of the element's:
+  zoom and layout occurrences not found fell from 156 to 20 (those 20 are
+  no longer in the saved copy), and every focus occurrence is found.
 - **Pages at once (workers)** now also sets how many pages are fetched from
   the site at once. It stayed at 2, so every worker past two waited: on a
   test site 32 workers took 12.3 s against 14.5 s for 8, and now take 5.5 s.

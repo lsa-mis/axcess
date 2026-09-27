@@ -837,6 +837,7 @@
       "a11y_findings": [
         {
           "criterion_sc": "null|string",
+          "element_place": "null",
           "engine_evidence_json": "null|string",
           "engine_evidence_status": "absent|string",
           "engine_outcome": "string",
@@ -864,13 +865,22 @@
           "alt_text": "null|string",
           "content_hash": "string",
           "context_snippet": "null|string",
+          "hidden_in_copy": "boolean",
+          "issue_key": "null|string",
+          "locator": {
+            "candidate": "null|string",
+            "index": "integer",
+            "kind": "string",
+            "text": "null|string",
+            "total": "integer"
+          },
           "mime": "string",
           "occurrence_id": "integer",
-          "ocr_text": "string",
+          "ocr_text": "null|string",
           "position": "integer",
           "src_url_canonical": "string",
-          "vlm_classification": "string",
-          "vlm_rationale": "string"
+          "vlm_classification": "null|string",
+          "vlm_rationale": "null|string"
         }
       ],
       "page": {
