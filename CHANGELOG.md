@@ -7,6 +7,16 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ## Unreleased
 
+### Added
+
+- New scan: **Scan every page it finds**, for public scans. There is no page
+  limit; the scan ends when it runs out of pages in scope within the link
+  depth. Sign-in scans keep their cap.
+- Inspector: a Zoom and layout check issue opens the saved copy the way the
+  check saw it: 320 pixels wide for reflow, 640 by 450 for text at 200% zoom,
+  or with WCAG's text spacing, with the element highlighted. "Show at full
+  width" compares.
+
 ### Changed
 
 - New scan: every settings group is an accordion row, closed on arrival. A
@@ -16,6 +26,10 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- **Pages at once (workers)** now also sets how many pages are fetched from
+  the site at once. It stayed at 2, so every worker past two waited: on a
+  test site 32 workers took 12.3 s against 14.5 s for 8, and now take 5.5 s.
+  Page requests per second still paces the site.
 - New scan: on a narrow screen, the Scan type tabs' highlight covered half of
   the second tab's name. It now fits the selected tab.
 

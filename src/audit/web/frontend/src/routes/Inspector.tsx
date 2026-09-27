@@ -18,6 +18,7 @@ import {
   Select,
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { cn } from "../lib/cn";
 
 type TabId = "page" | "dom";
 
@@ -67,6 +68,11 @@ export default function InspectorRoute() {
   const scan = Number(scanId);
   const page = Number(pageId);
   const issueKey = params.get("issue");
+  // A zoom and layout issue opens the saved page the way the check saw it:
+  // its window size, or its text spacing. "Show at full width" compares.
+  const checkLayout = useMemo(() => layoutForIssue(issueKey), [issueKey]);
+  const [asChecked, setAsChecked] = useState(true);
+  const layout = checkLayout && asChecked ? checkLayout : null;
   const directSelector = params.get("selector");
   const directSnippet = params.get("snippet");
 
@@ -501,7 +507,8 @@ export default function InspectorRoute() {
     });
   }, [documentHtml, scopedTargets]);
 
-  const srcDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
+  const pageDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
+  const srcDoc = layout?.css ? withStyle(pageDoc, layout.css) : pageDoc;
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
   // Only what this view can hold: a view whose targets are all in other
   // states has nothing to highlight, and must not wait for it forever.
@@ -874,6 +881,16 @@ export default function InspectorRoute() {
                   </Button>
                 </span>
               )}
+              {checkLayout && (
+                <button
+                  type="button"
+                  aria-pressed={!asChecked}
+                  onClick={() => setAsChecked((value) => !value)}
+                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                >
+                  Show at full width
+                </button>
+              )}
               {hasTarget && (
                 <button
                   type="button"
@@ -890,16 +907,30 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
-            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-            <iframe
-              ref={frameRef}
-              srcDoc={srcDoc}
-              onLoad={scrollToElement}
-              title={`${copyName}: ${displayTitle}`}
-              sandbox="allow-same-origin"
-              referrerPolicy="no-referrer"
-              className="h-[75vh] w-full border-0 bg-white"
-            />
+            {layout && (
+              <p className="border-b border-border bg-umich-blue/5 px-3 py-2 text-xs text-fg">
+                <span className="font-semibold">As the zoom and layout check saw it: </span>
+                {layout.label}
+              </p>
+            )}
+            {/* The check's window, centred on a grey stage, so its width is
+                the page's width, as it was when the issue was found. */}
+            <div className={cn(layout?.width && "flex justify-center overflow-auto bg-surface-muted p-4")}>
+              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+              <iframe
+                ref={frameRef}
+                srcDoc={srcDoc}
+                onLoad={scrollToElement}
+                title={`${copyName}: ${displayTitle}`}
+                sandbox="allow-same-origin"
+                referrerPolicy="no-referrer"
+                className={cn(
+                  "border-0 bg-white",
+                  layout?.width ? "shrink-0 shadow-card ring-1 ring-border" : "h-[75vh] w-full",
+                )}
+                style={layout?.width ? { width: layout.width, height: layout.height ?? undefined } : undefined}
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3 py-2 text-xs text-fg-muted" aria-live="polite">
               {highlightPending && (
                 <span>Highlighting the flagged element…</span>
@@ -1469,6 +1500,63 @@ function shortName(name: string, max = 40): string {
 function occurrencesHere(count: number): string {
   if (count === 0) return "";
   return `: ${count.toLocaleString()} occurrence${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * How the zoom and layout check saw the page when it found an issue, from
+ * the issue's rule, so the inspector can show it the same way. The window
+ * sizes and the spacing stylesheet mirror audit/analyzer/responsive/probe.py
+ * (``_REFLOW_VIEWPORT``, ``_ZOOM_VIEWPORT``, ``_TEXT_SPACING_CSS``).
+ */
+type CheckLayout = { width: number | null; height: number | null; css: string | null; label: string };
+
+const TEXT_SPACING_CSS = `
+* {
+  line-height: 1.5 !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+}
+p {
+  margin-bottom: 2em !important;
+}
+`;
+
+function layoutForIssue(issueKey: string | null): CheckLayout | null {
+  const [pipeline, rule] = (issueKey ?? "").split(":");
+  if (pipeline !== "responsive") return null;
+  switch (rule) {
+    case "responsive-reflow-overflow":
+      return {
+        width: 320,
+        height: 900,
+        css: null,
+        label: "320 pixels wide, where content must fit without scrolling sideways (WCAG 1.4.10).",
+      };
+    case "responsive-text-clipped":
+      return {
+        width: 640,
+        height: 450,
+        css: null,
+        label: "640 by 450 pixels, which is how the page lays out at 200% zoom on a 1280-pixel screen (WCAG 1.4.4).",
+      };
+    case "responsive-text-spacing-clipped":
+      return {
+        width: null,
+        height: null,
+        css: TEXT_SPACING_CSS,
+        label:
+          "with WCAG's text spacing: line height 1.5, letter spacing 0.12 em, word spacing 0.16 em, and 2 em after each paragraph (WCAG 1.4.12).",
+      };
+    default:
+      return null;
+  }
+}
+
+/** ``html`` with a stylesheet added at the end of its head, so it wins the cascade. */
+function withStyle(html: string, css: string): string {
+  const style = `<style data-axcess-check-layout>${css}</style>`;
+  const head = html.search(/<\/head>/i);
+  return head === -1 ? style + html : html.slice(0, head) + style + html.slice(head);
 }
 
 /** The class every outlined element carries, so the frame can be walked in order. */
