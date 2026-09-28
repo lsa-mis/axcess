@@ -303,6 +303,14 @@ function isWholePage(el: Element): boolean {
  * as it looks focused (``showAsFocused``). One that stays off the screen gets
  * no box: a box off the screen shows the reader nothing.
  *
+ * A part of the page that cuts off what does not fit without scrolling (a
+ * carousel's window, a menu bar: ``overflow: hidden``) cuts the box too, so
+ * it covers only the part that shows, and there is none when nothing shows.
+ * The whole box was drawn over the slide or menu items beside it, marking
+ * what the reader saw instead of the flagged element. Rejected: scrolling
+ * such a part to the element, which would show the page as no visitor sees
+ * it (see ``scrollPanels``), and drawing the box anyway, as before.
+ *
  * The whole page (``<html>``, ``<body>``) gets no box. A box around the whole
  * document dimmed nothing, since nothing is outside it, and put its label off
  * the top of the view, so it looked like a stray frame. Rejected: a box
@@ -518,12 +526,23 @@ export function scrollPanels(el: Element): HTMLElement[] {
  * - ``focus-only``: off the screen until it has focus, as a skip link is.
  *   Shown, and boxed, as it looks focused (``showAsFocused``).
  * - ``off-screen``: off the screen, and focus does not bring it back. No box.
+ * - ``part-clipped``: a part of the page around it that does not scroll (a
+ *   carousel, a menu bar) cuts part of it off. The box covers what shows.
+ * - ``clipped``: such a part cuts all of it off. No box.
  */
-export type BoxNote = "contents" | "list-box" | "image-map" | "whole-page" | "focus-only" | "off-screen";
+export type BoxNote =
+  | "contents"
+  | "list-box"
+  | "image-map"
+  | "whole-page"
+  | "focus-only"
+  | "off-screen"
+  | "part-clipped"
+  | "clipped";
 
 /** The notes for which no box is drawn at all. */
 export function drawsNoBox(note: BoxNote | null): boolean {
-  return note === "whole-page" || note === "off-screen";
+  return note === "whole-page" || note === "off-screen" || note === "clipped";
 }
 
 /** A rectangle in the frame's view. */
@@ -545,7 +564,90 @@ export type BoxRect = { left: number; top: number; right: number; bottom: number
  */
 export function boxPlace(el: Element): BoxPlace {
   const placed = boxPlaceOf(el);
-  return { ...placed, lines: placed.lines ?? [placed.rect] };
+  const lines = placed.lines ?? [placed.rect];
+  if (drawsNoBox(placed.note)) return { ...placed, lines };
+  // Cut to what the parts of the page around it show (see ``clippingParts``).
+  const parts = clippingParts(placed.on);
+  if (parts.length === 0) return { ...placed, lines };
+  const shown = lines.map((line) => clipTo(line, parts)).filter((line): line is BoxRect => line !== null);
+  if (shown.length === 0) return { ...placed, lines: [], note: "clipped" };
+  const rect = clipTo(placed.rect, parts) ?? shown[0];
+  const cut = rect.width < placed.rect.width - 0.5 || rect.height < placed.rect.height - 0.5;
+  return { ...placed, rect, lines: shown, note: placed.note ?? (cut ? "part-clipped" : null) };
+}
+
+/**
+ * The parts of the page around ``el`` that cut it off without scrolling
+ * (``overflow: hidden`` or ``clip``), and on which axes. Only those that
+ * cut it off in the browser: an element placed by ``position: absolute`` is
+ * cut off only by its positioned ancestor (its containing block) and those
+ * above it, and one placed by ``position: fixed`` by none. The body's
+ * overflow belongs to the window unless the root sets its own.
+ *
+ * Only those inside the nearest panel that scrolls (see ``scrollPanels``):
+ * what a part outside it cuts off (an app's page, fixed to the window's
+ * height, around its scrolling sidebar) comes into view as the panel
+ * scrolls, as it would in the window.
+ */
+function clippingParts(el: Element): { node: Element; x: boolean; y: boolean }[] {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view) return [];
+  const parts: { node: Element; x: boolean; y: boolean }[] = [];
+  const bodyIsWindow = view.getComputedStyle(doc.documentElement).overflow === "visible";
+  let position = view.getComputedStyle(el).position;
+  if (position === "fixed") return parts;
+  let placedAbove = position === "absolute";
+  for (let node = el.parentElement; node && node !== doc.documentElement; node = node.parentElement) {
+    const style = view.getComputedStyle(node);
+    if (placedAbove) {
+      if (!holdsPlacedElements(style)) continue;
+      placedAbove = false;
+    }
+    if (node === doc.body && bodyIsWindow) break;
+    const x = /hidden|clip/.test(style.overflowX);
+    const y = /hidden|clip/.test(style.overflowY);
+    if (x || y) parts.push({ node, x, y });
+    // A panel that scrolls on one axis can still cut off on the other.
+    if (/(auto|scroll|overlay)/.test(`${style.overflowX} ${style.overflowY}`)) break;
+    position = style.position;
+    if (position === "fixed") break;
+    if (position === "absolute") placedAbove = true;
+  }
+  return parts;
+}
+
+/** True when an element is the containing block of absolutely placed elements inside it. */
+function holdsPlacedElements(style: CSSStyleDeclaration): boolean {
+  return (
+    style.position !== "static" ||
+    style.transform !== "none" ||
+    style.perspective !== "none" ||
+    style.filter !== "none" ||
+    /paint|layout|strict|content/.test(style.contain) ||
+    /transform|perspective|filter/.test(style.willChange)
+  );
+}
+
+/** ``rect`` cut to each part's inside (its padding box), or null when nothing is left. */
+function clipTo(rect: BoxRect, parts: { node: Element; x: boolean; y: boolean }[]): BoxRect | null {
+  let { left, top, right, bottom } = rect;
+  for (const { node, x, y } of parts) {
+    const outer = node.getBoundingClientRect();
+    const insideLeft = outer.left + node.clientLeft;
+    const insideTop = outer.top + node.clientTop;
+    if (x) {
+      left = Math.max(left, insideLeft);
+      right = Math.min(right, insideLeft + node.clientWidth);
+    }
+    if (y) {
+      top = Math.max(top, insideTop);
+      bottom = Math.min(bottom, insideTop + node.clientHeight);
+    }
+  }
+  // Equal edges still count: an empty element is shown where it sits.
+  if (right < left || bottom < top) return null;
+  return plainRect({ left, top, right, bottom });
 }
 
 /**

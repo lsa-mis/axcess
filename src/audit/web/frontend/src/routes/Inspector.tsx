@@ -1523,6 +1523,8 @@ const BOX_NOTES: Record<BoxNote, string> = {
   "whole-page": "No box, because it is the whole page. Nothing is dimmed.",
   "focus-only": "It shows only when it has keyboard focus. The box is where it shows then.",
   "off-screen": "No box. It is off the screen in this saved copy.",
+  "part-clipped": "Around the part that shows. The part of the page around it hides the rest (overflow: hidden).",
+  clipped: "No box. The part of the page around it hides it (overflow: hidden).",
 };
 
 /** "1 pixel", "924 pixels". */

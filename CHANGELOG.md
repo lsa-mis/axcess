@@ -127,6 +127,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 - Inspector: a flagged link that wraps onto two lines gets a ring on each
   line, with the number on the first. One box used to cover both lines and
   the words beside them.
+- Inspector: a flagged element that a part of the page cuts off (a
+  carousel slide out of view, a menu item that does not fit) is boxed only
+  where it shows, and gets no box when none of it shows. The table under
+  the toolbar says the part of the page around it hides it. The box used to
+  be drawn over the slide or items beside it.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.
