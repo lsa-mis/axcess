@@ -233,17 +233,24 @@ def _load_findings_by_image(
     string comparison heuristic in :mod:`alt_compare` can evolve
     without a migration.
     """
-    # Two scan_id bindings: the first scopes the `best` CTE, the second the
-    # findings themselves. Keep them in this order, the CTE is bound first.
+    # The `best` CTE's bindings come first, then the findings' own: keep the
+    # two lists in that order, as the SQL reads.
+    cte_clause = ""
+    cte_params: list[Any] = [scan_id]
     extra_clause = ""
-    params: list[Any] = [scan_id, scan_id]
+    params: list[Any] = [scan_id]
     if status:
         extra_clause = " AND f.status = ?"
         params.append(status)
     if image_ids is not None:
-        # Bound one by one; a page holds far fewer images than SQLite's
-        # parameter cap.
-        extra_clause += f" AND f.image_id IN ({','.join('?' * len(image_ids))})"
+        # One page's images: rank only their analyses too, not every image
+        # the scan analyzed, since the page evidence asks once per page.
+        # Bound one by one (twice); a page holds far fewer images than
+        # SQLite's parameter cap.
+        marks = ",".join("?" * len(image_ids))
+        cte_clause = f" AND a.image_id IN ({marks})"
+        cte_params.extend(image_ids)
+        extra_clause += f" AND f.image_id IN ({marks})"
         params.extend(image_ids)
 
     rows = conn.execute(
@@ -266,7 +273,7 @@ def _load_findings_by_image(
              -- materialized the ranking over every analysis row in the
              -- database before the outer WHERE could narrow it, so the
              -- cost of reading one scan grew with the history beside it.
-             WHERE a.image_id IN (SELECT image_id FROM findings WHERE scan_id = ?)
+             WHERE a.image_id IN (SELECT image_id FROM findings WHERE scan_id = ?){cte_clause}
         )
         SELECT f.id, f.severity, f.status, f.priority_score,
                f.remediation_hint,
@@ -278,8 +285,8 @@ def _load_findings_by_image(
           LEFT JOIN best b ON b.image_id = i.id AND b.rank = 1
          WHERE f.scan_id = ?{extra_clause}
          ORDER BY f.priority_score DESC, f.id ASC
-        """,  # noqa: S608, `extra_clause` holds fixed strings and placeholders
-        tuple(params),
+        """,  # noqa: S608, the clauses hold fixed strings and placeholders
+        (*cte_params, *params),
     ).fetchall()
 
     # Every finding's occurrences in one query rather than one query per

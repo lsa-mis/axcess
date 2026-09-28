@@ -164,3 +164,33 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
         await playwright_async.expect(button).to_have_accessible_description(hint)
     finally:
         await page.context.close()
+
+
+async def test_hovering_keeps_the_hint_as_the_description(
+    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Under a pointer the title is parked (no double tooltip), but not the description.
+
+    A screen reader user may also use a pointer: while the visible hint shows,
+    the words stay the control's description, and the title comes back after.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.add_init_script(
+        "localStorage.setItem('axcess.preferences', JSON.stringify({hints: 'always'}))"
+    )
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        table = page.get_by_role("table", name="Accessibility issues")
+        button = table.get_by_role("columnheader", name="Type", exact=False).get_by_role("button")
+        hint = "How sure the evidence is: Barrier, Needs review, or Informational."
+        await button.hover()
+        await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
+        await playwright_async.expect(button).not_to_have_attribute("title", hint)
+        await playwright_async.expect(button).to_have_accessible_description(hint)
+        # Moving away puts the title back and removes the description it added.
+        await page.mouse.move(5, 5)
+        await playwright_async.expect(button).to_have_attribute("title", hint)
+        assert await button.get_attribute("aria-description") is None
+    finally:
+        await page.context.close()
