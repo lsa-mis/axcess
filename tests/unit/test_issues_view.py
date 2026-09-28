@@ -508,8 +508,8 @@ def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
     assert row.evidence_confidence == "medium"
     assert row.wcag_sc == "2.1.2"
     assert row.conformance == "A"
-    assert row.title == "Keyboard users can't escape this element"
-    assert "both remained" in row.evidence_summary
+    assert row.title == issues_mod._load_rules()["semantic_criteria"]["2.1.2"]["title"]
+    assert "both left focus on the same element" in row.evidence_summary
 
 
 def _seed_visual_motion_finding(
@@ -623,7 +623,7 @@ def test_alfa_rows_expose_rule_name_diagnostic_and_outcome_boundary(
     assert failed.wcag_name == "Link Purpose (In Context)"
     assert "link does not have an accessible name" in failed.title.lower()
     assert review.review_lane == "expert_review"
-    assert "this is not a failure" in review.evidence_summary.lower()
+    assert "that is not a failure" in review.evidence_summary.lower()
 
 
 def test_responsive_rows_get_their_own_pipeline_label(
@@ -651,7 +651,8 @@ def test_responsive_rows_get_their_own_pipeline_label(
     assert row.conformance == "AA"
     # The YAML card (semantic_criteria["1.4.10"]) supplies the curated
     # title + longform what/why/fix via the SC fallback.
-    assert "reflow" in row.title.lower() or "320" in row.title
+    assert row.title == issues_mod._load_rules()["semantic_criteria"]["1.4.10"]["title"]
+    assert not row.title.startswith("Responsive failure")
     assert row.description, "what_happening should come from the YAML card"
     assert row.fix_steps, "fix steps should come from the YAML card"
     assert row.responsibility == "dev"

@@ -19,9 +19,15 @@ from audit.db import repo
 from audit.exports.audit_report import build_audit_cards, render_audit_report
 from audit.exports.collector import collect_scan
 from audit.synthesizer.findings import synthesize_findings
+from audit.web import issues as issues_mod
 
 UPDATE_GOLDEN = os.environ.get("AUDIT_UPDATE_GOLDEN") == "1"
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
+
+
+def _rules() -> dict:
+    """The authored cards, so a title check follows the card, not a copy of it."""
+    return issues_mod._load_rules()
 
 
 def _scan_with_real_findings(conn: sqlite3.Connection) -> int:
@@ -32,8 +38,10 @@ def _scan_with_real_findings(conn: sqlite3.Connection) -> int:
       a fully-templated card.
     * Two axe findings (`color-contrast`, `image-alt`) — both have YAML
       entries, so they render as full cards too.
-    * One axe finding for an unknown rule (`color-contrast-enhanced`)
-      — falls through to "human review needed".
+    * One axe finding for a rule no card covers (`rule-without-a-card`,
+      as a rule new in an axe upgrade would be) — falls through to "human
+      review needed". Every rule a scan runs today has a card
+      (tests/unit/test_guidance_cards.py), so the id is made up.
     * One already-triaged finding (`status='accepted_risk'`) — should
       land in Appendix A, not the main report.
     """
@@ -130,10 +138,10 @@ def _scan_with_real_findings(conn: sqlite3.Connection) -> int:
             (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
              impact, help, help_url, target_selector, failure_summary,
              html_snippet, target_hash, status)
-        VALUES (?, ?, 'color-contrast-enhanced', '1.4.6', '1.4.6', 'AAA',
+        VALUES (?, ?, 'rule-without-a-card', '1.4.6', '1.4.6', 'AAA',
             'serious',
             'Elements must meet enhanced color contrast',
-            'https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced',
+            'https://dequeuniversity.com/rules/axe/4.10/rule-without-a-card',
             'p.subtle',
             'Contrast 6.1 — fails AAA threshold of 7.',
             '<p class="subtle">subtle text</p>',
@@ -276,9 +284,9 @@ def test_audit_report_unifies_all_four_pipelines(
     # never promoted into the stakeholder failure scorecard.
     issue_cards = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
     appendix_b = md.split("## Appendix B", 1)[1]
-    assert "AI-assisted semantic lead" not in issue_cards
+    assert "The AI review (a language model on this computer)" not in issue_cards
     assert "keyboard-trap" not in issue_cards
-    assert "AI-assisted semantic lead" in appendix_b
+    assert "The AI review (a language model on this computer)" in appendix_b
     assert "keyboard-trap" in appendix_b
     assert "expert review / medium confidence" in appendix_b
 
@@ -318,7 +326,7 @@ def test_audit_report_templated_cards_have_full_shape(
 
     # color-contrast is templated in the YAML; its card should carry
     # WCAG, severity reason, owner, effort, fix steps, verify, acceptance.
-    assert "Text doesn't meet the 4.5:1 contrast ratio" in md
+    assert _rules()["axe_rules"]["color-contrast"]["title"] in md
     assert "**WCAG:** SC 1.4.3" in md
     assert "**Severity:** Serious" in md
     assert "**Effort:** Under 2 hours" in md
@@ -337,8 +345,8 @@ def test_audit_report_unknown_rule_flagged_for_human_review(
     scan = collect_scan(tmp_db, scan_id, ui_base_url="http://127.0.0.1:8765")
     md = render_audit_report(scan, conn=tmp_db)
 
-    # color-contrast-enhanced isn't in the YAML.
-    assert "color-contrast-enhanced" in md
+    # No card covers this rule.
+    assert "rule-without-a-card" in md
     # The renderer should have added the "human review needed" callout
     # for at least one card.
     assert "Human review needed" in md
@@ -353,13 +361,14 @@ def test_audit_report_already_triaged_lands_in_appendix_a(
     md = render_audit_report(scan, conn=tmp_db)
 
     # The accepted_risk finding (rule_id=label) should NOT appear in the
-    # main "Form controls have no programmatic label" card — it should
-    # only show up in Appendix A as a dropped row.
+    # main issue cards under the label card's title — it should only show
+    # up in Appendix A as a dropped row.
+    label_title = _rules()["axe_rules"]["label"]["title"]
     issue_cards_section = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
-    assert "Form controls have no programmatic label" not in issue_cards_section
+    assert label_title not in issue_cards_section
 
     appendix_a = md.split("## Appendix A", 1)[1].split("## Appendix B", 1)[0]
-    assert "label" in appendix_a
+    assert label_title in appendix_a
     assert "accepted_risk" in appendix_a
 
 
@@ -400,11 +409,12 @@ def test_audit_report_image_lead_uses_yaml_title_without_claiming_failure(
     md = render_audit_report(scan, conn=tmp_db)
 
     # Title from the YAML.
-    assert "Images of text have no alt and can't be read" in md
+    title = _rules()["image_findings"]["essential_missing"]["title"]
+    assert title in md
     issue_cards = md.split("## Issue cards", 1)[1].split("## Appendix A", 1)[0]
     appendix_b = md.split("## Appendix B", 1)[1]
-    assert "Images of text have no alt and can't be read" not in issue_cards
-    assert "Images of text have no alt and can't be read" in appendix_b
+    assert title not in issue_cards
+    assert title in appendix_b
     assert "expert review / medium confidence" in appendix_b
 
 

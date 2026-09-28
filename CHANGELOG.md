@@ -5,6 +5,112 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 `main` is one step after the last. Before 0.60 desktop previews were
 `0.1.<run number>`, up to `desktop-v0.1.33`.
 
+## Unreleased
+
+### Added
+
+- New scan: **Scan every page it finds**, for public scans. There is no page
+  limit; the scan ends when it runs out of pages in scope within the link
+  depth. Sign-in scans keep their cap.
+- Inspector: a Zoom and layout check issue opens the saved copy the way the
+  check saw it: 320 pixels wide for reflow, 640 by 450 for text at 200% zoom,
+  or with WCAG's text spacing, with the element highlighted. "Show at full
+  width" compares.
+- **Issue guidance for every issue.** Every rule a scan can run now has a
+  guidance card: all 93 axe rules (81 had none), all 58 Alfa rules a scan can
+  select (none had one), the three AI review criteria that had none, and
+  every image group (17 had none). The 29 existing cards were improved too.
+  Each card says what the rule checks, why it matters and to whom, how to fix
+  it (with code where it helps), how to test the fix, and when it is done.
+  Each was written from the rule's own documentation (Deque University,
+  Siteimprove Alfa, W3C ACT rules and Understanding WCAG) and from Axcess's
+  code, then checked again against those sources: the second check changed
+  wrong causes, a fix that would not pass its rule, and advice that could
+  hide a meaningful image from screen readers. Rescan advice names the
+  setting the check needs (Alfa or Both, Level AAA, WCAG version 2.2, the AI
+  review, the motion check, the vision model), because a default scan skips
+  those and the issue would look fixed. `tests/unit/test_guidance_cards.py`
+  fails when a rule has no card, or a card breaks the plain-language rules.
+- **Hover hints** on words that need explaining: the Issues table's Type and
+  Found by tags (in the glossary's own words), its column headers, the
+  priority bands, the level badges, Compare's New, No longer found and Still
+  found, and status chips. They follow the Hints setting; a column header's
+  hint also shows on keyboard focus and is read as its description. The
+  Issues glossary now explains the priority bands too, and an occurrence's
+  page says what the chosen status means ("Fixed" is a person's decision;
+  Axcess does not check it).
+
+### Changed
+
+- Inspector: what the numbered box is on is a short table, with the same
+  labels in the same places as you step: what it is, its text or label, its
+  size, and its element locator. A long locator shows its end, the element
+  itself, on one line; Show all lists one step per line, and Copy element
+  locator copies it whole (or, where the browser blocks copying, selects it).
+  A Rule check (Alfa) locator is named an XPath, not a CSS selector.
+
+- New scan: every settings group is an accordion row, closed on arrival. A
+  failed submit opens the group that holds the field it names.
+- New scan: Start scan and Cancel sit at the top right of the page, beside
+  its title. Enter in the address field still starts the scan.
+
+### Fixed
+
+- **Saved-copy highlights are exact.** An occurrence is outlined only when
+  its locator, checked against its recorded markup, or the markup alone
+  names one element. Checked against every occurrence in the local reports
+  (23,750): the old matcher guessed among identical-looking elements 45
+  times and outlined a different element than the only real match 4 times;
+  both are gone, and an occurrence that cannot be pinned is said, not
+  outlined. Alfa's records are now checked by tag, attributes and text
+  (3,653 located, where they were accepted unchecked).
+- The current flagged element gets a numbered box with a yellow ring and the
+  rest of the page dimmed, at least 18 pixels even for a tiny or empty
+  element, and a line under the toolbar says what it is (kind, text, size)
+  and its locator. Other flagged elements have a thin dashed outline and no
+  tint, so nested ones stay readable.
+- Two elements with identical markup but different locators were treated as
+  one occurrence, so the second was never outlined; and an occurrence in a
+  clicked state was dropped when the same markup was flagged at page load.
+- Issue guidance showed the "Why it was flagged" line twice when an issue
+  had no card, and that line read "Deterministic axe-core rule failure;
+  verify after remediation." The evidence lines are plain now, an Alfa
+  issue's title says "a person must decide" rather than "expert decision
+  needed", and an Alfa issue keeps its outcome note (a "can't tell" is not a
+  failure) after its card's words. The exports print the cards' code as code
+  (Markdown) or plain text (Excel) instead of raw tags, and find the same
+  card as the issue page, so Alfa and browser-check issues get theirs.
+- The Barrier meaning said a new scan "confirms the fix". It now says to
+  test the fix, then scan again to see if it is still found: a later scan not
+  finding an issue does not prove it was fixed.
+- With hints set to Always, focusing a control took its hint away while the
+  hint showed, so a screen reader lost the control's description.
+- **Needs review issues are highlighted exactly, as Barriers are.** AI review
+  issues outlined nothing: the inspector compared their stored rule
+  (`semantic:2.4.4`) with `2.4.4`. Each is now outlined by the element the AI
+  review read, found by its place in the saved copy, because its `a[ord=6]`
+  is not a selector a browser can use: all 1,032 local occurrences, where
+  their code alone would have missed 64 (cut at 300 characters) and left 29
+  ambiguous. An Alfa "can't tell" issue outlined the same rule's failed
+  occurrences too, and the reverse; each outlines only its own now.
+- Images with text issues outline their images: each by its place among
+  the saved copy's images, checked against its address and alt text (1,867
+  of 2,105 local occurrences). The other 237 are backup copies inside
+  `<noscript>`, each with an outlined twin; the inspector says it does not
+  show them. The evidence list shows each image's alt text and text.
+- The focus, keyboard, motion and reading-order, and zoom and layout checks
+  keep only the first 240 or 300 characters of an element's code, without
+  marking the cut, so a longer element matched nothing even where its
+  selector named it. That code now matches as the start of the element's:
+  zoom and layout occurrences not found fell from 156 to 20 (those 20 are
+  no longer in the saved copy), and every focus occurrence is found.
+- **Pages at once (workers)** now also sets how many pages are fetched from
+  the site at once. It stayed at 2, so every worker past two waited: on a
+  test site 32 workers took 12.3 s against 14.5 s for 8, and now take 5.5 s.
+  Page requests per second still paces the site.
+- New scan: on a narrow screen, the Scan type tabs' highlight covered half of
+  the second tab's name. It now fits the selected tab.
+
 ## 0.60 - 2026-09-26
 
 ### Added

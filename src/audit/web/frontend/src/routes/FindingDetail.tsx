@@ -27,7 +27,7 @@ import {
 import { requestStatusRationale } from "../statusDecision";
 import { usePreferences } from "../hooks/usePreferences";
 import { messageDuration } from "../lib/preferences";
-import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { STATUS_HELP, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUSES: FindingStatus[] = [
   "new",
@@ -297,6 +297,12 @@ export default function FindingDetailRoute() {
                 Save status
               </Button>
             </div>
+            {/* What the chosen status means, in words: a status is a person's
+                decision, and "Fixed" is not something Axcess checks. */}
+            <p className="mt-2 text-sm text-fg-muted">
+              <span className="font-semibold text-fg">{STATUS_OPTION_LABEL[status ?? data.status]}:</span>{" "}
+              {STATUS_HELP[status ?? data.status]}
+            </p>
             <p className="mt-2 text-2xs text-fg-muted">
               Or press a number key:{" "}
               {Object.entries(STATUS_KEY_MAP).map(([key, value], index) => (

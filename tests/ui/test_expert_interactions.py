@@ -7,6 +7,8 @@ from typing import Any
 
 import pytest
 
+from audit.exports.audit_report import load_report_rules
+
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
@@ -97,7 +99,9 @@ async def test_issue_table_filters_are_keyboard_operable(
     # The row header holds the issue's own link; the count link beside
     # it names the issue too, so its purpose stands alone (SC 2.4.9).
     await playwright_async.expect(
-        page.get_by_role("rowheader").get_by_role("link", name="Logo image, adequate alt")
+        page.get_by_role("rowheader").get_by_role(
+            "link", name=load_report_rules()["image_findings"]["logo_adequate"]["title"]
+        )
     ).to_be_visible()
     await search.press("Tab")
     # The next stop is the one Filter menu (Level, Type, Finding type). Its

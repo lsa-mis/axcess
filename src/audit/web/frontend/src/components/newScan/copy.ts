@@ -131,6 +131,13 @@ export const SWITCHES = {
   },
 } as const;
 
+/** New scan's no-limit switch, beside Maximum pages (public scans only). */
+export const ALL_PAGES = {
+  label: "Scan every page it finds",
+  hint: "No page limit. The scan ends when it has visited every page it can reach within the link depth. A large site can take many hours and use gigabytes of disk space.",
+  maxPagesOff: "Off while the scan visits every page it finds.",
+} as const;
+
 export const NUMBERS = {
   max_pages: {
     label: "Maximum pages",

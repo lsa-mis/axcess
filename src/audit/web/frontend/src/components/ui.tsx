@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
-import { SCAN_STATUS_LABEL, STATUS_LABEL } from "../lib/terms";
+import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
@@ -16,7 +16,10 @@ export function SeverityChip({ value }: { value: Severity }) {
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted">
+    <span
+      title={STATUS_HELP[value]}
+      className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted"
+    >
       {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
     </span>
   );

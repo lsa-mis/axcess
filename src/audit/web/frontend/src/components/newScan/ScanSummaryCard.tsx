@@ -118,6 +118,21 @@ export default function ScanSummaryCard({
   className?: string;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
+  // Scrolls when it is taller than its cap (a wide screen, a long summary).
+  // A scrolling region with nothing focusable in it cannot be scrolled from
+  // the keyboard, so then, and only then, the summary itself takes focus.
+  const scrollRef = useRef<HTMLElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const measure = () => setScrolls(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    for (const child of Array.from(element.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, []);
   const login = policy.mode === "login";
   const unchanged = isDefault(settings, policy);
   const { scope, checks } = lines(settings, policy);
@@ -134,8 +149,13 @@ export default function ScanSummaryCard({
         ? "Axcess could not work out what to scan from that address."
         : SUMMARY.siteEmpty;
 
+  // No page limit reads as what the scan will do, not as a number.
+  const pagesLine =
+    settings.all_pages && !isFixed(policy, "all_pages")
+      ? `Every page it finds, ${limitText(settings.max_depth)} clicks deep`
+      : `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`;
   const coverage = [
-    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`,
+    pagesLine,
     login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Follows robots.txt",
     !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
     settings.static_only ? SUMMARY.htmlOnly : null,
@@ -153,7 +173,7 @@ export default function ScanSummaryCard({
   ];
 
   const digest =
-    `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep. ` +
+    `${pagesLine}. ` +
     `${engine} against WCAG ${settings.wcag_version} Level ${settings.axe_level}. ` +
     `${running.length} ${running.length === 1 ? "check runs" : "checks run"}.`;
   const [spoken, setSpoken] = useState("");
@@ -169,7 +189,14 @@ export default function ScanSummaryCard({
 
   return (
     <div className={cn("rounded-md border border-border bg-surface shadow-card", className)}>
-      <aside aria-labelledby="scan-summary-title">
+      <aside
+        ref={scrollRef}
+        aria-labelledby="scan-summary-title"
+        // A scrolling region must be reachable by keyboard (as TableRegion).
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+        tabIndex={scrolls ? 0 : undefined}
+        className="rounded-md focus:outline-none focus-visible:shadow-focus lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
+      >
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-5">
           <h2
             id="scan-summary-title"

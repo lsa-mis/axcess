@@ -25,7 +25,7 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
   const ocrOn = switchOn(settings, "ocr");
 
   return (
-    <SettingsGroup id="local-ai" legend={GROUPS.localAi.legend} description={GROUPS.localAi.description}>
+    <SettingsGroup variant="plain" id="local-ai" legend={GROUPS.localAi.legend} description={GROUPS.localAi.description}>
       <SwitchList>
         <SwitchRow
           checked={ocrOn}

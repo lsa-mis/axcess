@@ -22,6 +22,8 @@ from typing import Any
 
 import pytest
 
+from audit.exports.audit_report import load_report_rules
+
 from ._paging import all_pages_text
 from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
 
@@ -79,6 +81,24 @@ async def _run_axe(page: Any) -> list[dict[str, Any]]:
         _AXE_TAGS,
     )
     return list(result)
+
+
+# The New scan form's settings groups: accordion rows, closed on arrival.
+_SCAN_GROUPS = (
+    "Pages to scan",
+    "Checks",
+    "AI checks on this computer",
+    "Limits and rule check tool",
+    "Speed and browser window",
+)
+
+
+async def _open_scan_groups(page: Any) -> None:
+    """Expand every New scan settings group, so the controls in them can be used."""
+    for name in _SCAN_GROUPS:
+        button = page.get_by_role("button", name=name, exact=True)
+        if await button.get_attribute("aria-expanded") != "true":
+            await button.click()
 
 
 def _render_violations(violations: list[dict[str, Any]]) -> str:
@@ -287,24 +307,21 @@ async def test_simple_scan_path_shows_settings_and_folds_only_speed(
     await playwright_async.expect(
         page.get_by_role("textbox", name="Website address", exact=True)
     ).to_be_visible()
-    # Every setting group is an open card and the summary rail says what
-    # will run; only Speed and browser window is folded away.
+    # The summary rail says what will run, and every settings group is a
+    # closed accordion row that one click opens, controls intact.
     await playwright_async.expect(
         page.get_by_role("complementary", name="What this scan will do")
     ).to_be_visible()
     await playwright_async.expect(page.get_by_role("button", name="Start scan")).to_be_visible()
-    for name in (
-        "Pages to scan",
-        "Checks",
-        "AI checks on this computer",
-        "Limits and rule check tool",
-    ):
+    for name in _SCAN_GROUPS:
+        await playwright_async.expect(
+            page.get_by_role("button", name=name, exact=True)
+        ).to_have_attribute("aria-expanded", "false")
+    await _open_scan_groups(page)
+    for name in _SCAN_GROUPS:
         await playwright_async.expect(
             page.get_by_role("group", name=name, exact=True)
         ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("button", name="Speed and browser window", exact=True)
-    ).to_have_attribute("aria-expanded", "false")
     await playwright_async.expect(page.get_by_label("Maximum pages")).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("group", name="Rule check tool", exact=True)
@@ -541,9 +558,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issues")
-    row_link = issues.get_by_role("rowheader").get_by_role(
-        "link", name="Logo image, adequate alt", exact=False
-    )
+    logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
+    row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
     await playwright_async.expect(
         informational_row.get_by_text("Informational", exact=True)
@@ -1300,6 +1316,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     ).to_be_visible()
     # No disabled-for-parity controls: what a login scan pins is said
     # once, in the Pages to scan group, and the switches are simply absent.
+    await _open_scan_groups(page)
     await playwright_async.expect(
         page.get_by_role("note").filter(has_text="Sign-in scans always work this way")
     ).to_be_visible()
@@ -1319,7 +1336,6 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     dom_discovery = page.get_by_role("switch", name=re.compile(r"^Open menus, tabs"))
     await playwright_async.expect(dom_discovery).to_be_checked()
 
-    await page.get_by_role("button", name="Speed and browser window", exact=True).click()
     workers = page.get_by_role("spinbutton", name="Signed-in tabs")
     await playwright_async.expect(workers).to_be_enabled()
     await playwright_async.expect(workers).to_have_value("2")
@@ -1395,7 +1411,8 @@ async def test_search_settings_keyboard_and_axe(
         # for the new mode; wait for that render, or the controls below can
         # be filled in the public form just before it is replaced.
         await playwright_async.expect(login_tab).to_have_attribute("aria-selected", "true")
-    # Search discovery lives in the Pages to scan group, which is always open.
+    # Search discovery lives in the Pages to scan group.
+    await page.get_by_role("button", name="Pages to scan", exact=True).click()
     toggle = page.get_by_role("checkbox", name=re.compile("^Use a search box to find more pages"))
     await toggle.focus()
     await playwright_async.expect(toggle).to_be_focused()

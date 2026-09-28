@@ -16,6 +16,7 @@ export default function CoverageGroup({ settings, update, policy }: GroupProps) 
   return (
     <SettingsGroup
       id="coverage"
+      variant="plain"
       legend={GROUPS.coverage.legend}
       description={GROUPS.coverage.description}
       note={policy.fixedNote}

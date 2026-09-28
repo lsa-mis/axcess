@@ -79,8 +79,8 @@ def test_mixed_alfa_outcomes_have_distinct_api_groups_and_details(
         "high",
     )
     assert failed["finding_ids"] == [finding_ids["failed"]]
-    assert "strong automated evidence" in failed["why_matters"]
-    assert "not a conformance verdict" in failed["why_matters"]
+    assert "strong evidence" in failed["why_matters"]
+    assert "does not prove the page fails WCAG" in failed["why_matters"]
     assert (review["review_lane"], review["evidence_confidence"]) == (
         "expert_review",
         "medium",

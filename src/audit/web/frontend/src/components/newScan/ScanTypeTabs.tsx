@@ -35,8 +35,10 @@ export default function ScanTypeTabs({
   const trackRef = useRef<HTMLDivElement>(null);
   // The active tab's slot, measured, so the fill slides to it — the same
   // treatment as the report tabs, so the two rows read as one control
-  // across the app.
-  const [slot, setSlot] = useState<{ left: number; width: number } | null>(null);
+  // across the app. Its top and height too: on a narrow screen the tabs
+  // wrap onto two lines, and a fill the height of the whole row covered the
+  // second tab's words.
+  const [slot, setSlot] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   useLayoutEffect(() => {
     const measure = () => {
       const track = trackRef.current;
@@ -44,7 +46,7 @@ export default function ScanTypeTabs({
       if (!track || !chip) return setSlot(null);
       const t = track.getBoundingClientRect();
       const c = chip.getBoundingClientRect();
-      setSlot({ left: c.left - t.left, width: c.width });
+      setSlot({ left: c.left - t.left, top: c.top - t.top, width: c.width, height: c.height });
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -78,8 +80,8 @@ export default function ScanTypeTabs({
         {slot && (
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-1 left-0 top-1 rounded-xs bg-umich-blue transition-[transform,width] duration-300 ease-out motion-reduce:transition-none"
-            style={{ width: slot.width, transform: `translateX(${slot.left}px)` }}
+            className="pointer-events-none absolute left-0 top-0 rounded-xs bg-umich-blue transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none"
+            style={{ width: slot.width, height: slot.height, transform: `translate(${slot.left}px, ${slot.top}px)` }}
           />
         )}
         {TABS.map(({ mode: tabMode, label }) => {

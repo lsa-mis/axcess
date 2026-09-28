@@ -7,6 +7,7 @@ import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
+import { REVIEW_LANE_HELP } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
@@ -271,14 +272,18 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             </p>
           )}
 
-          <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
-            {description ? (
-              <RuleText text={description} />
-            ) : (
-              row.evidence_summary ||
-              "Axcess recorded this automatically. See the pages with this issue for the details."
-            )}
-          </p>
+          {/* What the rule looks for. Without a card, nothing: the evidence
+              line above already says why it was flagged, and repeating it
+              here read as two findings. */}
+          {(description || !row.evidence_summary) && (
+            <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
+              {description ? (
+                <RuleText text={description} />
+              ) : (
+                "Axcess recorded this automatically. See the pages with this issue for the details."
+              )}
+            </p>
+          )}
         </GuidanceSection>
 
         {nextSteps.length > 0 && (
@@ -359,7 +364,7 @@ const LANES: Record<
 > = {
   likely_barrier: {
     label: REVIEW_TYPE_LABEL.likely_barrier,
-    meaning: "A check failed a fixed rule, so this is likely to block someone. Fix it, then test the fix.",
+    meaning: REVIEW_LANE_HELP.likely_barrier,
     icon: AlertOctagon,
     className: "border-umich-blue/30 border-l-umich-blue bg-umich-blue/5",
     iconClass: "text-umich-blue",

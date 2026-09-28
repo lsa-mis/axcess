@@ -47,7 +47,7 @@ So the moment your migration allows a new `pipeline` value, every row it
 writes shows up as a Barrier. It counts toward the dashboard's Barriers tile,
 sorts to the top of the Issues table, and can become an issue card in the audit
 report and the workbook. Meanwhile the issue page looks for its card and its
-pages in the image tables, because `_rule_meta_for` and `_pages_for_issue`
+pages in the image tables, because `rule_meta_for` and `_pages_for_issue`
 do not know the new value either.
 
 Nothing fails loudly when this happens, because no test covers an unknown
@@ -187,7 +187,7 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      `evidence_summary` that tells a reviewer what to confirm. Leave
      `review_lane` at its `expert_review` default unless you decided otherwise
      above.
-   - Add `"<x>"` to the pipeline tuples in `_rule_meta_for` and
+   - Add `"<x>"` to the pipeline tuples in `rule_meta_for` and
      `_pages_for_issue`.
 7. **Report card.**
    - Add an entry under `semantic_criteria:` in
@@ -247,25 +247,13 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
     - In `src/audit/exports/audit_report.py`: `_PIPELINE_LABEL`,
       `_PIPELINE_COVERAGE`, and the hard-coded pipeline tuples in the location
       query and in `_methods_line`.
-    - Also in `audit_report.py`, add an `<x>:` branch to `_meta_for_row` that
-      looks the card up by `row.wcag_sc` in `semantic_criteria`, like the
-      `keyboard:` branch. `_meta_for_row` handles only `axe:`, `semantic:`,
-      and `keyboard:` keys and sends every other key to the image cards,
-      where it finds nothing.
-    - That is a known bug today for responsive, focus, and visual rows. Their
-      audit report cards lack the Manual and Automated verify lines and always
-      show Medium confidence, even where the card says high (1.4.10, 1.4.12,
-      and 2.4.3). The issue page and the workbook's other ticket fields are
-      not affected, because they use `_rule_meta_for` in `issues.py`, which
-      handles these pipelines; the workbook's fix options are the exception
-      (see below). Until the bug is fixed, read verification steps
-      for those issues on the issue page or in the workbook.
-    - Alfa rows have no card on purpose: `_rule_meta_for` returns nothing for
-      them either, and Alfa's own rule documentation is the remediation lead.
-    - The workbook's fix options come from `fix_options_for`, which uses the
-      same `_meta_for_row` lookup. No `semantic_criteria` card has
-      `fix_options` today, so if you want workbook fix options for your check,
-      add them to its card as well as adding the `_meta_for_row` branch.
+    - The exports find a row's card with `rule_meta_for` in `issues.py`, the
+      same lookup the issue page uses (`_meta_for_row` in `audit_report.py`
+      calls it), so a card added for step 7 reaches the audit report and the
+      workbook's fix options with no export change. Adding your pipeline to
+      `rule_meta_for` is the only step.
+    - Alfa rows use the `alfa_rules:` cards, for guidance only: an Alfa issue
+      keeps the title and criterion Alfa reported (`_ALFA_OWN_FIELDS`).
     - `_SOURCE_LABELS` in `jira_export.py` and in `markdown_report.py`.
     - The workbook reuses `_PIPELINE_LABEL`, so it needs no change of its own.
 12. **Goldens.** `tests/ui/golden/api_openapi.json` pins the pipeline
@@ -372,10 +360,13 @@ apply, so experimental and deprecated rules never run.
   `corpus_version`, as [DETECTION_EFFICACY.md](../../DETECTION_EFFICACY.md)
   asks.
 - **Cards.** Every axe rule already lands in Barrier; a card makes it
-  readable. Add one under `axe_rules:` in `audit_report.yaml`, keyed by rule
-  id. Without a card, the row's title falls back to axe's own help text with
-  no what, why, or fix, and the audit report marks the card "Human review
-  needed".
+  readable. Every rule a scan can run has one under `axe_rules:` in
+  `audit_report.yaml`, keyed by rule id, and so does every Alfa rule the
+  runner selects, under `alfa_rules:`. After an axe or Alfa upgrade,
+  `tests/unit/test_guidance_cards.py` names any new rule with no card; write
+  it from the rule's own documentation. Without a card, the row's title falls
+  back to axe's own help text with no what, why, or fix, and the audit report
+  marks the card "Human review needed".
 - **Card values win.** A card's `wcag_sc` and `wcag_level` override what axe
   stored. The `tabindex` card, for example, shows axe's best-practice rule as
   2.4.3, Level A.
@@ -430,9 +421,9 @@ also corrects the places where they have drifted.
    `extract_media`. Cap the elements sent per call, as the existing analyzers
    do (40 to 60). Anything past the cap is dropped with only a log line.
 5. **Report card.** Add an entry under `semantic_criteria:` in
-   `audit_report.yaml`, keyed by criterion. 1.2.1, 2.4.6, and 3.3.2 have none
-   today, so their rows are titled "WCAG SC <sc> (LLM-detected)" with no what,
-   why, or fix.
+   `audit_report.yaml`, keyed by criterion. Without one, the rows are titled
+   "WCAG SC <sc> (LLM-detected)" with no what, why, or fix;
+   `tests/unit/test_guidance_cards.py` fails for an analyzer with no card.
 6. **Model pick (optional).** Add a `criteria:` entry in
    `src/audit/rules/analyzer_models.yaml`; otherwise the analyzer uses the
    `text` default. See [Model settings](#model-settings).

@@ -1230,12 +1230,12 @@ def _render_card(idx: int, card: AuditCard) -> list[str]:
 
     lines.append("**What is happening:**")
     lines.append("")
-    lines.append(card.what_happening.strip())
+    lines.append(_strip_html(card.what_happening).strip())
     lines.append("")
 
     lines.append("**Why it matters:**")
     lines.append("")
-    lines.append(card.why_matters.strip())
+    lines.append(_strip_html(card.why_matters).strip())
     lines.append("")
 
     if card.abilities:
@@ -1813,38 +1813,52 @@ def _fix_options(meta: dict[str, Any]) -> tuple[FixOption, ...]:
 
 
 def _meta_for_row(row: Any, rules: dict[str, Any]) -> dict[str, Any]:
-    """Re-resolve the YAML card for a row (for verify/confidence fields).
+    """Re-resolve the YAML card for a row (for verify/confidence/fix options).
 
     ``list_issues`` already pulled description/why/fix/acceptance onto the
-    row, but not the verify_* / confidence_default fields, look them up
-    here by the same key scheme ``issues._rule_meta_for`` uses.
+    row, but not the verify_* / confidence_default / fix_options fields. The
+    issue page's own lookup finds them, so an Alfa rule or a browser check
+    resolves to the same card in an export as on screen.
     """
-    key = row.issue_key
-    if key.startswith("axe:"):
-        meta = rules.get("axe_rules", {}).get(key.removeprefix("axe:"), {})
-    elif key.startswith("semantic:"):
-        meta = rules.get("semantic_criteria", {}).get(key.removeprefix("semantic:"), {})
-    elif key.startswith("keyboard:"):
-        # Keyboard cards are keyed by SC in the YAML (semantic_criteria
-        # block today). Fall back to the row's SC.
-        meta = rules.get("semantic_criteria", {}).get(row.wcag_sc or "", {}) or rules.get(
-            "axe_rules", {}
-        ).get(row.wcag_sc or "", {})
-    else:  # image:
-        meta = rules.get("image_findings", {}).get(key.removeprefix("image:"), {})
-    return dict(meta) if isinstance(meta, dict) else {}
+    return issues_mod.rule_meta_for(row, rules)
 
 
 def _strip_html(text: str) -> str:
-    """Drop the inline <code>/<strong> tags the YAML uses for HTML rendering.
+    """Card prose as Markdown.
 
-    The audit report is Markdown/plain-text; the YAML's HTML markup would
-    render literally. Backtick the <code> spans, drop the rest.
+    The cards are written for the issue page, which renders ``<code>`` and
+    shows everything else as text: element names such as ``<li>`` stay as
+    written, and code carries ``&lt;``-style entities. A Markdown viewer would
+    read a bare ``<li>`` as HTML and show entities inside backticks as typed.
+    So ``<code>`` spans become code spans with their entities decoded, bare
+    element names become code spans, and emphasis tags are dropped.
     """
+    import html
     import re
 
-    text = re.sub(r"</?code>", "`", text)
-    return re.sub(r"</?(strong|em|b|i)>", "", text)
+    text = re.sub(r"</?(strong|em|b|i)>", "", text)
+    parts = re.split(r"<code>([\s\S]*?)</code>", text)
+    out: list[str] = []
+    for index, part in enumerate(parts):
+        if index % 2:
+            out.append(f"`{html.unescape(part)}`")
+        else:
+            part = html.unescape(part)
+            out.append(re.sub(r"<(/?[a-zA-Z][\w:-]*(?:\s[^<>]*)?)>", r"`<\1>`", part))
+    return "".join(out)
+
+
+def plain_text(text: str) -> str:
+    """Card prose as plain text, for a spreadsheet cell.
+
+    ``<code>`` and emphasis tags are dropped and entities decoded, so a cell
+    reads ``<img alt="">`` rather than ``<code>&lt;img alt=""&gt;</code>``.
+    Element names written as ``<li>`` stay: they read as meant in plain text.
+    """
+    import html
+    import re
+
+    return html.unescape(re.sub(r"</?(code|strong|em|b|i)>", "", text))
 
 
 def _md_escape(text: str) -> str:
@@ -1894,6 +1908,7 @@ __all__ = [
     "IssueLocation",
     "fix_options_for",
     "load_report_rules",
+    "plain_text",
     "render_audit_report",
 ]
 

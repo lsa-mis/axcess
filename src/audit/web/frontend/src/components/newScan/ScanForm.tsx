@@ -11,10 +11,24 @@ import type { FieldError, FieldKey, ScanPolicy, ScanSettings } from "./scanPolic
 import ScanSummaryCard from "./ScanSummaryCard";
 import { SCAN_PANEL_ID, scanTabId } from "./ScanTypeTabs";
 import SpeedGroup from "./SpeedGroup";
-import SubmitBar from "./SubmitBar";
+import { SUBMIT_NOTE_ID } from "./SubmitBar";
 import UrlHero from "./UrlHero";
 import type { ScopePreviewState } from "./useScopePreview";
 import type { ScopePreview } from "../../api/types";
+
+/** The form's id, so Start in the page header (outside it) submits it. */
+export const SCAN_FORM_ID = "scan-form";
+
+type GroupKey = keyof typeof GROUPS;
+const GROUP_KEYS: GroupKey[] = ["coverage", "checks", "localAi", "limits", "speed"];
+/** The fields a failed submit can name, by the group that holds them. */
+const GROUP_FIELDS: Record<GroupKey, readonly FieldKey[]> = {
+  coverage: [],
+  checks: [],
+  localAi: [],
+  limits: ["max_pages", "max_depth"],
+  speed: ["static_only"],
+};
 
 /**
  * The whole scan form, for either mode.
@@ -26,11 +40,13 @@ import type { ScopePreview } from "../../api/types";
  * the login form drops its authorization checkbox and its image-storage
  * acknowledgement.
  *
- * Every group is an open card, so the first screen already shows what will
- * run and the rail beside it says it in words. Only "Speed and browser window"
- * is folded away; a failed submit that names Fast crawl opens it, so the
- * alert's link lands on a visible switch. Start, Cancel and Reset sit in
- * the rail, under the summary they act on.
+ * Every settings group is an accordion row, closed on arrival: the first
+ * screen is the address, the group names, and the rail beside them saying
+ * in words what will run, so nothing has to be scrolled past to start. A
+ * failed submit opens the group that holds a named field (the limits, or
+ * Fast scan under Speed), so the alert's link lands on a visible control.
+ * Start and Cancel are at the top right of the page (`SubmitBar`, in the
+ * route's header), and Reset at the top right of the rail.
  *
  * It is the tab panel, and it is keyed on the mode by the route, so a tab
  * change re-mounts it and it drops in (`animate-drop-in`, 300 ms, off under
@@ -46,8 +62,6 @@ export default function ScanForm({
   errors,
   fieldIds,
   onSubmit,
-  pending,
-  onCancel,
   urlInputRef,
   beforeGroups,
   afterGroups,
@@ -66,8 +80,6 @@ export default function ScanForm({
     max_depth: string;
   };
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  pending: boolean;
-  onCancel: () => void;
   urlInputRef?: Ref<HTMLInputElement>;
   beforeGroups?: ReactNode;
   afterGroups?: ReactNode;
@@ -75,13 +87,32 @@ export default function ScanForm({
   const urlError = errors.find((error) => error.field === "url")?.message;
   const groupProps = { settings, update, policy, capabilities, errors, fieldIds };
 
-  // Keyed on the errors array itself, not on whether it names Fast crawl:
-  // a second failed submit after the reader folded the group must open it
-  // again.
-  const [speedOpen, setSpeedOpen] = useState(false);
+  // Which accordion rows are open; none on arrival. Keyed on the errors
+  // array itself, not on which fields it names: a second failed submit after
+  // the reader folded a group must open it again.
+  const [open, setOpen] = useState<ReadonlySet<GroupKey>>(new Set());
+  const setGroupOpen = (key: GroupKey) => (next: boolean) =>
+    setOpen((current) => {
+      const updated = new Set(current);
+      if (next) updated.add(key);
+      else updated.delete(key);
+      return updated;
+    });
   useEffect(() => {
-    if (errors.some((error) => error.field === "static_only")) setSpeedOpen(true);
+    const named = GROUP_KEYS.filter((key) => errors.some((error) => GROUP_FIELDS[key].includes(error.field)));
+    if (named.length) setOpen((current) => new Set([...current, ...named]));
   }, [errors]);
+  const accordion = (key: GroupKey, children: ReactNode) => (
+    <Disclosure
+      id={`${key}-group`}
+      title={GROUPS[key].legend}
+      open={open.has(key)}
+      onOpenChange={setGroupOpen(key)}
+      className="rounded-md"
+    >
+      {children}
+    </Disclosure>
+  );
 
   return (
     // The tab panel is a div around the form: `tabpanel` is not a role a
@@ -89,6 +120,7 @@ export default function ScanForm({
     // landmark semantics for a screen reader's form-mode.
     <div id={SCAN_PANEL_ID} role="tabpanel" aria-labelledby={scanTabId(policy.mode)} className="animate-drop-in">
       <form
+        id={SCAN_FORM_ID}
         onSubmit={onSubmit}
         noValidate
         aria-labelledby={scanTabId(policy.mode)}
@@ -113,41 +145,32 @@ export default function ScanForm({
 
           {beforeGroups}
 
-          <CoverageGroup {...groupProps} />
-          <ChecksGroup {...groupProps} />
-          <LocalAiGroup {...groupProps} />
-          <LimitsGroup {...groupProps} />
-          <Disclosure
-            id="speed-group"
-            title={GROUPS.speed.legend}
-            open={speedOpen}
-            onOpenChange={setSpeedOpen}
-            className="rounded-md"
-          >
-            <SpeedGroup {...groupProps} />
-          </Disclosure>
+          {accordion("coverage", <CoverageGroup {...groupProps} />)}
+          {accordion("checks", <ChecksGroup {...groupProps} />)}
+          {accordion("localAi", <LocalAiGroup {...groupProps} />)}
+          {accordion("limits", <LimitsGroup {...groupProps} />)}
+          {accordion("speed", <SpeedGroup {...groupProps} />)}
 
           {afterGroups}
         </div>
 
-        {/* Sticky beside the cards on a wide screen. The cap leaves room
-            for the page header above the rail's first position, so its
-            pinned actions are in view on arrival, not only after a scroll. */}
+        {/* Sticky beside the groups on a wide screen, capped so the whole
+            summary stays in view while a group is open. */}
         <ScanSummaryCard
           settings={settings}
           policy={policy}
           preview={preview}
           capabilities={capabilities}
           onReset={onReset}
-          className="mt-5 lg:sticky lg:top-24 lg:mt-0 lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
+          className="mt-5 lg:sticky lg:top-24 lg:mt-0"
         >
-          <SubmitBar
-            label={policy.submitLabel}
-            pendingLabel={policy.submitPendingLabel}
-            pending={pending}
-            note={policy.submitNote}
-            onCancel={onCancel}
-          />
+          {/* What happens after Start, which sits at the top right of the
+              page; this note is that button's description. */}
+          {policy.submitNote && (
+            <p id={SUBMIT_NOTE_ID} className="text-xs text-fg-muted">
+              {policy.submitNote}
+            </p>
+          )}
         </ScanSummaryCard>
       </form>
     </div>

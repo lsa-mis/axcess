@@ -5,7 +5,8 @@ import { api } from "../api/client";
 import { Checkbox, PageHeader } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
 import { AUTHORIZATION, IMAGE_ACK, RECOVERY } from "../components/newScan/copy";
-import ScanForm from "../components/newScan/ScanForm";
+import ScanForm, { SCAN_FORM_ID } from "../components/newScan/ScanForm";
+import SubmitBar from "../components/newScan/SubmitBar";
 import ScanTypeTabs from "../components/newScan/ScanTypeTabs";
 import {
   applyPolicy,
@@ -215,7 +216,23 @@ export default function NewScanRoute() {
       {/* No `crumbs` here: the trail lives in the topbar, same as every report
           view. Passing it again would print the breadcrumb twice on this one
           route and in a different place from the rest of the app. */}
-      <PageHeader title="New scan" />
+      {/* Start at the top right, where every page keeps its action. It
+          submits the form below by id; a sign-in handoff has no form. */}
+      <PageHeader
+        title="New scan"
+        actions={
+          inHandoff ? undefined : (
+            <SubmitBar
+              form={SCAN_FORM_ID}
+              label={policy.submitLabel}
+              pendingLabel={policy.submitPendingLabel}
+              pending={pending}
+              hasNote={Boolean(policy.submitNote)}
+              onCancel={() => navigate("/scans")}
+            />
+          )
+        }
+      />
 
       <div className="mb-5 flex flex-col gap-2">
         <ScanTypeTabs mode={mode} onChange={selectMode} disabledReason={loginDisabledReason} />
@@ -262,8 +279,6 @@ export default function NewScanRoute() {
           errors={errors}
           fieldIds={FIELD_IDS}
           onSubmit={onSubmit}
-          pending={pending}
-          onCancel={() => navigate("/scans")}
           urlInputRef={urlInputRef}
           beforeGroups={
             mode === "login" ? (

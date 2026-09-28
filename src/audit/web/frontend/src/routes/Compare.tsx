@@ -7,7 +7,7 @@ import { api } from "../api/client";
 import type { ComparisonChange, ComparisonCoverageState, ComparisonReport, DetectionPipeline } from "../api/types";
 import { Button, Card } from "../components/ui";
 import ReportHeader from "../components/ReportHeader";
-import ChangeTag, { CHANGES } from "../components/compare/ChangeTag";
+import ChangeTag, { CHANGE_HELP, CHANGES } from "../components/compare/ChangeTag";
 import ComparedIssuesTable, {
   parseChanges,
   parseSort,
@@ -293,17 +293,20 @@ function Comparison({
         {CHANGES.map((key) => {
           const active = change === key;
           return (
+            // The hint on the button, not the tag inside it: a hint shows
+            // for the element that has focus, and only the button takes it.
             <button
               key={key}
               type="button"
               aria-pressed={active}
+              title={CHANGE_HELP[key]}
               onClick={() => onChange(active ? "" : key)}
               className={cn(
                 "rounded-xs border bg-surface p-4 text-left shadow-card transition-colors hover:border-umich-blue focus-visible:outline-none focus-visible:shadow-focus",
                 active ? "border-umich-blue ring-2 ring-inset ring-umich-blue" : "border-border",
               )}
             >
-              <ChangeTag change={key} />
+              <ChangeTag change={key} hint={false} />
               <span className="mt-2 block text-3xl font-semibold leading-none tabular-nums text-fg">
                 {data.changes[key].toLocaleString()}
               </span>
@@ -618,7 +621,7 @@ function TermsDialog({
       <dl className="divide-y divide-border px-5 py-2 text-sm">
         {terms.map(([key, term, meaning]) => (
           <div key={key} className="py-3">
-            <dt>{isChange(key) ? <ChangeTag change={key} /> : <span className="font-semibold">{term}</span>}</dt>
+            <dt>{isChange(key) ? <ChangeTag change={key} hint={false} /> : <span className="font-semibold">{term}</span>}</dt>
             <dd className="mt-1 leading-relaxed text-fg-muted">{meaning}</dd>
           </div>
         ))}

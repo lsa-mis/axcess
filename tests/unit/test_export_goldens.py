@@ -74,6 +74,7 @@ from test_exports_csv_json import scan_fixture  # noqa: F401  # fixture behind s
 
 from audit.blob_store import BlobStore
 from audit.exports import xlsx_export
+from audit.exports.audit_report import load_report_rules
 from audit.web import issues
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
@@ -325,10 +326,11 @@ def test_rich_scan_reaches_the_paths_its_goldens_pin(
             if sheet["cells"] and str(sheet["cells"][0][1]).endswith(f" · {title}")
         )
 
+    cards = load_report_rules()
     embedded = set()
     for title, (width, height) in {
-        "Text doesn't meet the 4.5:1 contrast ratio": (240, 60),
-        "The page has no top-level heading": (160, 90),
+        cards["axe_rules"]["color-contrast"]["title"]: (240, 60),
+        cards["axe_rules"]["page-has-heading-one"]["title"]: (160, 90),
     }.items():
         sheet = issue_sheet(title)
         [image] = sheet["images"]
@@ -336,9 +338,9 @@ def test_rich_scan_reaches_the_paths_its_goldens_pin(
         assert sheet["rows"][image["anchor"][1:]][0] == height * 0.75
         embedded.add(image["sha256"])
     assert len(embedded) == 2
-    assert issue_sheet("Links have no accessible name")["images"] == []
+    assert issue_sheet(cards["axe_rules"]["link-name"]["title"])["images"] == []
     pooled = next(sheet for sheet in workbook["sheets"] if sheet["title"] == "More Issues")
-    assert "Keyboard users can't escape this element" in {cell[1] for cell in pooled["cells"]}
+    assert cards["semantic_criteria"]["2.1.2"]["title"] in {cell[1] for cell in pooled["cells"]}
     assert sum(len(sheet["images"]) for sheet in workbook["sheets"]) == 2
 
     # A best-practice group, which never becomes a card, on several pages.

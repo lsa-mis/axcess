@@ -16,9 +16,12 @@ SC 1.4.3 will need it in a later phase) will use Playwright
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from selectolax.parser import HTMLParser, Node
+
+from audit.extractor.places import Place, Places
 
 # How deep up the ancestor chain we capture context for an element.
 # GenA11y's paper uses 5; the value is in one place so a future tuning
@@ -33,6 +36,15 @@ ANCESTOR_DEPTH = 5
 # it points at, not the link's text). We skip them at extraction time
 # to keep prompt size + false-positive rate down.
 _SKIP_SCHEMES = ("javascript:", "mailto:", "tel:", "sms:")
+
+# What each extractor walks. The ``[ord=N]`` in a selector it builds is the
+# element's index in this walk, so :func:`locate_ordinals` walks the same.
+_LINK_SELECTOR = "a"
+_FIELD_SELECTOR = "input, select, textarea"
+_MEDIA_SELECTOR = "audio, video"
+
+# Characters of an element's markup kept as its snippet.
+_SNIPPET_LIMIT = 300
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +93,7 @@ def extract_links(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> list[
         return []
 
     out: list[LinkRecord] = []
-    for idx, anchor in enumerate(tree.css("a")):
+    for idx, anchor in enumerate(tree.css(_LINK_SELECTOR)):
         href_raw = anchor.attributes.get("href")
         if href_raw is None:
             # `<a name="...">` placeholder anchors aren't navigation
@@ -105,7 +117,7 @@ def extract_links(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> list[
                 aria_label=anchor.attributes.get("aria-label"),
                 title=anchor.attributes.get("title"),
                 ancestors=_ancestor_texts(anchor, depth=ancestor_depth),
-                snippet=_truncated_html(anchor, limit=300),
+                snippet=_truncated_html(anchor, limit=_SNIPPET_LIMIT),
             )
         )
     return out
@@ -294,7 +306,7 @@ def extract_headings(body: bytes, *, ancestor_depth: int = ANCESTOR_DEPTH) -> li
                 text=text,
                 following_text=_following_section_text(node),
                 ancestors=_ancestor_texts(node, depth=ancestor_depth),
-                snippet=_truncated_html(node, limit=300),
+                snippet=_truncated_html(node, limit=_SNIPPET_LIMIT),
             )
         )
     return out
@@ -390,7 +402,7 @@ def extract_form_fields(body: bytes) -> list[FormFieldRecord]:
         return []
 
     out: list[FormFieldRecord] = []
-    for idx, node in enumerate(tree.css("input, select, textarea")):
+    for idx, node in enumerate(tree.css(_FIELD_SELECTOR)):
         tag = (node.tag or "").lower()
         if tag == "input":
             input_type = (node.attributes.get("type") or "text").strip().lower()
@@ -411,7 +423,7 @@ def extract_form_fields(body: bytes) -> list[FormFieldRecord]:
                 described_by=_described_by_text(node),
                 required=node.attributes.get("required") is not None
                 or (node.attributes.get("aria-required") or "").lower() == "true",
-                snippet=_truncated_html(node, limit=300),
+                snippet=_truncated_html(node, limit=_SNIPPET_LIMIT),
             )
         )
     return out
@@ -519,7 +531,7 @@ def extract_media(body: bytes) -> list[MediaRecord]:
         return []
 
     out: list[MediaRecord] = []
-    for idx, node in enumerate(tree.css("audio, video")):
+    for idx, node in enumerate(tree.css(_MEDIA_SELECTOR)):
         kind = (node.tag or "").lower()
         src = node.attributes.get("src") or ""
         if not src:
@@ -545,9 +557,60 @@ def extract_media(body: bytes) -> list[MediaRecord]:
                 track_kinds=track_kinds,
                 nearby_links=nearby_links,
                 nearby_text=nearby_text,
-                snippet=_truncated_html(node, limit=300),
+                snippet=_truncated_html(node, limit=_SNIPPET_LIMIT),
             )
         )
+    return out
+
+
+# --------------------------------------------------------------------
+# Finding an element again from its ``[ord=N]`` selector.
+# --------------------------------------------------------------------
+
+_ORDINAL = re.compile(r"^([a-z][a-z0-9-]*)(?:\.[^\s\[\]]+)?\[ord=(\d+)\]$")
+
+
+def locate_ordinals(body: bytes, findings: list[tuple[str, str, str]]) -> list[Place | None]:
+    """Where each ``(criterion, selector, snippet)`` finding's element sits.
+
+    ``[ord=N]`` counts the extractor's own walk, which a browser cannot
+    repeat (selectolax lists ``h1, h2, ...`` heading by heading level, not in
+    document order). Run over the bytes the analyzer read, the same walk
+    gives back the element, which is then named as :mod:`places` explains.
+    None when the selector has no ordinal, the criterion has no walk here, or
+    the element there is not the recorded one (its tag or its snippet
+    differs), so a changed document is never read as the analyzed one.
+    """
+    walks = {
+        "2.4.4": _LINK_SELECTOR,
+        "2.4.6": _HEADING_SELECTOR,
+        "3.3.2": _FIELD_SELECTOR,
+        "1.2.1": _MEDIA_SELECTOR,
+    }
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        return [None] * len(findings)
+    places = Places(tree)
+    walked: dict[str, list[Node]] = {}
+    out: list[Place | None] = []
+    for criterion, selector, snippet in findings:
+        match = _ORDINAL.match(selector)
+        walk = walks.get(criterion)
+        if match is None or walk is None:
+            out.append(None)
+            continue
+        nodes = walked.setdefault(walk, list(tree.css(walk)))
+        ordinal = int(match.group(2))
+        node = nodes[ordinal] if ordinal < len(nodes) else None
+        if (
+            node is None
+            or (node.tag or "").lower() != match.group(1)
+            or _truncated_html(node, limit=_SNIPPET_LIMIT) != snippet
+        ):
+            out.append(None)
+            continue
+        out.append(places.of(node, match.group(1)))
     return out
 
 
@@ -561,4 +624,5 @@ __all__ = [
     "extract_headings",
     "extract_links",
     "extract_media",
+    "locate_ordinals",
 ]

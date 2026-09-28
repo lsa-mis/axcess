@@ -8,6 +8,7 @@ import IssueEvidence, { IssueGuidanceDialog, issuePageLaneLabel } from "../compo
 import { Button, Card, EmptyState, LinkButton } from "../components/ui";
 import ConformanceBadge from "../components/ConformanceBadge";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { REVIEW_LANE_HELP } from "../lib/labels";
 
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
@@ -86,7 +87,7 @@ export default function IssueDetailRoute() {
                   {" · "}
                 </>
               )}
-              {issuePageLaneLabel(row.review_lane)}
+              <span title={REVIEW_LANE_HELP[row.review_lane]}>{issuePageLaneLabel(row.review_lane)}</span>
             </>
           ) : undefined
         }

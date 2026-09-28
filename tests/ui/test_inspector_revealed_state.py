@@ -314,7 +314,7 @@ async def test_a_state_holding_its_element_has_no_label(
         new_page, live_server[0], scan_id, page_id, quote(state_key, safe="")
     )
 
-    assert "The red outline marks the flagged element" in text
+    assert "A blue box with a yellow ring marks the flagged element" in text
     assert "no longer here" not in text.lower()
 
 
@@ -420,7 +420,7 @@ async def test_an_issue_found_only_after_clicks_opens_where_it_can_be_seen(
         picker = page.get_by_role("combobox", name="Page state")
         await playwright_async.expect(picker).to_have_attribute("data-value", kept, timeout=10000)
         await playwright_async.expect(
-            page.get_by_text("The red outline marks the flagged element")
+            page.get_by_text("A blue box with a yellow ring marks the flagged element")
         ).to_be_visible()
         await picker.click()
         load = page.locator('[role="option"][data-value=""]')

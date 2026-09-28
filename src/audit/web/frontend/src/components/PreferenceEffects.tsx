@@ -134,21 +134,37 @@ function FocusHint() {
   useEffect(() => {
     let active: Element | null = null;
     let parked = "";
-    const show = (el: Element | null) => {
-      if (active && parked) active.setAttribute("title", parked);
+    // Whether an aria-description was added while a title was parked, so
+    // only that one is taken away again.
+    let addedDescription = false;
+    const show = (el: Element | null, pointer = false) => {
+      if (active && parked) {
+        active.setAttribute("title", parked);
+        if (addedDescription) active.removeAttribute("aria-description");
+      }
       active = null;
       parked = "";
+      addedDescription = false;
       const target = el?.closest("[title]");
       const text = target?.getAttribute("title")?.trim();
       if (!target || !text) return setHint(null);
-      // Park the title while ours shows, so the native one does not stack on it.
-      active = target;
-      parked = text;
-      target.removeAttribute("title");
+      // Under a pointer, park the title while ours shows, so the native
+      // tooltip does not stack on it, and keep its words as the control's
+      // description meanwhile: a screen reader user may also use a pointer.
+      // On keyboard focus a browser shows no tooltip, and the title stays.
+      if (pointer) {
+        active = target;
+        parked = text;
+        target.removeAttribute("title");
+        if (!target.hasAttribute("aria-description")) {
+          target.setAttribute("aria-description", text);
+          addedDescription = true;
+        }
+      }
       const box = target.getBoundingClientRect();
       setHint({ text, top: box.bottom + 6, left: Math.max(8, Math.min(box.left, window.innerWidth - 328)) });
     };
-    const onOver = (event: Event) => show(event.target as Element);
+    const onOver = (event: Event) => show(event.target as Element, true);
     const onFocus = (event: Event) => show(event.target as Element);
     const onLeave = () => show(null);
     const onKey = (event: KeyboardEvent) => {

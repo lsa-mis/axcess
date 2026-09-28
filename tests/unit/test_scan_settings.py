@@ -33,6 +33,7 @@ _CUSTOM_FORM: dict[str, Any] = {
     "url": "https://example.test/section/",
     "search": None,
     "max_pages": 300,
+    "all_pages": False,
     "max_depth": 3,
     "rps": 1.5,
     "workers": 4,
@@ -96,6 +97,33 @@ def test_the_form_defaults_round_trip() -> None:
         "wcag_version": "2.1",
     }
     assert _round_trip(defaults) == defaults
+
+
+def test_no_page_limit_round_trips_and_keeps_the_form_value() -> None:
+    """ "Scan every page it finds" is stored as a null limit.
+
+    The server builds the form with no max_pages; the snapshot turns it back
+    into the switch, with the form's default in the box it leaves off.
+    """
+    config = server._build_crawl_config({**_CUSTOM_FORM, "max_pages": None}, Settings())
+    assert config.max_pages is None
+    assert json.loads(config_json_for_scan(config))["max_pages"] is None
+    settings = _round_trip({**_CUSTOM_FORM, "max_pages": None})
+    assert settings == {**_CUSTOM_FORM, "all_pages": True, "max_pages": 2500}
+
+
+def test_pages_at_once_is_also_the_per_site_fetch_limit() -> None:
+    """32 workers fetch 32 pages at once; the host limit used to stay at 2."""
+    config = server._build_crawl_config({**_CUSTOM_FORM, "workers": 32}, Settings())
+    assert (config.workers, config.concurrency_per_host) == (32, 32)
+
+
+def test_an_older_scan_without_a_limit_key_had_a_limit() -> None:
+    snapshot = snapshot_from_config(
+        scan_id=3, seed_url="https://old.example.test/", config_json="{}"
+    )
+    assert snapshot.settings.all_pages is False
+    assert snapshot.settings.max_pages == 2500
 
 
 def test_fast_crawl_with_alfa_round_trips() -> None:

@@ -15,9 +15,9 @@ Of those, **23 map to WCAG Level A** and **19 map to Level AA**. These are likel
 
 The biggest themes by reach are: *Fixture rule 12 synthetic check* (on 2 pages); *Fixture rule 24 synthetic check* (on 2 pages); *Fixture rule 36 synthetic check* (on 2 pages).
 
-**Highest-impact fix this team could ship this week:** *Images don't announce text to screen readers*, Critical, Under 15 minutes, 1 page(s).
+**Highest-impact fix this team could ship this week:** *Images have no alt text for screen readers*, Critical, Under 15 minutes, 1 page(s).
 
-Rough effort to clear what this tool can see: **3 quick win(s) (< 15 min each) · 1 medium item(s) (< 2 hr each)**.
+Rough effort to clear what this tool can see: **4 quick win(s) (< 15 min each) · 2 medium item(s) (< 2 hr each)**.
 
 
 ## Open barrier summary
@@ -44,7 +44,8 @@ Each issue is tagged with the user groups it blocks. One issue can affect severa
 
 | User group | Issue types affecting them | Across (page-instances) |
 |---|---:|---:|
-| Vision (blind / low-vision / color-blind) | 4 | 5 |
+| Vision (blind / low-vision / color-blind) | 6 | 7 |
+| Motor (keyboard-only / switch / tremor) | 2 | 2 |
 | Cognition (memory / attention / language) | 2 | 2 |
 
 ## Coverage and method
@@ -231,7 +232,7 @@ _Weighted load = sum of severity weights (Critical 4 · Serious 3 · Moderate 2 
 
 The same findings, re-sliced by who fixes them. Hand each team their pack.
 
-### Developers (39 item(s))
+### Developers (38 item(s))
 
 - [ ] **Fixture rule 12 synthetic check**, Critical, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 24 synthetic check**, Critical, Effort: see fix steps, 2 pages.
@@ -245,13 +246,13 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 - [ ] **Fixture rule 09 synthetic check**, Serious, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 21 synthetic check**, Serious, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 33 synthetic check**, Serious, Effort: see fix steps, 2 pages.
-- [ ] **Elements must meet enhanced color contrast**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture: buttons [primary/secondary] need names?**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 05 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 13 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 17 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 25 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 29 synthetic check**, Serious, Effort: see fix steps, 1 page.
+- [ ] **Links have no name for screen readers**, Serious, Under 15 minutes, 1 page.
 - [ ] **Fixture rule without a documentation link**, Moderate, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 06 synthetic check**, Moderate, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 18 synthetic check**, Moderate, Effort: see fix steps, 2 pages.
@@ -262,7 +263,6 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 - [ ] **Fixture rule 22 synthetic check**, Moderate, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 26 synthetic check**, Moderate, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 34 synthetic check**, Moderate, Effort: see fix steps, 1 page.
-- [ ] **Alfa ACT rule, The image has no accessible name. [Stored evidence is unavailable.] (Alfa sia-r2)**, Moderate, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 03 synthetic check**, Minor, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 15 synthetic check**, Minor, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 27 synthetic check**, Minor, Effort: see fix steps, 2 pages.
@@ -275,13 +275,14 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 
 ### Content editors (3 item(s))
 
-- [ ] **Images don't announce text to screen readers**, Critical, Under 15 minutes, 1 page.
-- [ ] **Links have no accessible name**, Serious, Under 15 minutes, 1 page.
-- [ ] **Links don't describe their purpose (LLM-detected)**, Moderate, Under 15 minutes, 1 page.
+- [ ] **Images have no alt text for screen readers**, Critical, Under 15 minutes, 1 page.
+- [ ] **Rule check (Alfa), The image has no accessible name. [Stored evidence is unavailable.] (Alfa sia-r2)**, Moderate, Under 15 minutes, 1 page.
+- [ ] **Link text may not say where the link goes**, Moderate, Under 15 minutes, 1 page.
 
-### Designers (1 item(s))
+### Designers (2 item(s))
 
-- [ ] **Text doesn't meet the 4.5:1 contrast ratio**, Serious, Under 2 hours, 2 pages.
+- [ ] **Text does not stand out enough from its background**, Serious, Under 2 hours, 2 pages.
+- [ ] **Text misses the stricter Level AAA contrast ratio**, Serious, Under 2 hours, 1 page.
 
 
 ## Issue cards
@@ -604,7 +605,7 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-32_
 
-### 10. Images don't announce text to screen readers
+### 10. Images have no alt text for screen readers
 
 **WCAG:** SC 1.1.1 Non-text Content, Level A
 
@@ -617,11 +618,11 @@ Specific locations:
 
 **What is happening:**
 
-One or more <img> elements have no alt attribute (or have alt="" when the image is informative). Screen readers announce "image" with no context, so the information the image conveys is unreachable.
+An image (`<img>`) has no alt text (the text a screen reader reads for an image). The rule check (axe) found no `alt` attribute, `aria-label`, `aria-labelledby` or `title`, and no role that marks it as decoration (`role="none"` or `role="presentation"`). An `alt` that holds only a space, such as `alt=" "`, also fails. The check only sees whether alt text exists, not whether it is good.
 
 **Why it matters:**
 
-Blind, low-vision, and screen-reader users get a broken version of the page, the image's content is silently dropped.
+Blind and deafblind people who use a screen reader or a braille display get nothing from the image. Without an alt attribute, screen readers often read the file name instead, such as "image.jpg".
 
 **Affects:** Vision.
 
@@ -633,21 +634,22 @@ Blind, low-vision, and screen-reader users get a broken version of the page, the
 
 **Fix (do this):**
 
-1. For each affected image, decide what the image conveys. If it conveys information, write alt text that describes the *meaning*, not the appearance ("Acme logo", not "blue square with letters").
-2. If the image is purely decorative (a divider, a stock photo with no semantic role), set `alt=""` explicitly so screen readers skip it cleanly.
-3. Update the CMS field or the template so the alt attribute is always present, even when empty.
+1. Decide what the image does on this page. If it gives information, write alt text that says what it means, not how it looks. For example, write "Acme logo", not "blue square with letters": `<img src="logo.png" alt="Acme logo">`. Do not use the file name or the word "image".
+2. If the image is only decoration, add an empty alt: `alt=""`, with nothing between the quotes. Screen readers then skip it.
+3. An image that is the only content of a link or a button needs alt text that says what it does. For a link, say where it goes: `<a href="/search"><img src="search.svg" alt="Search"></a>`.
+4. Change the content management system (CMS) field or the page template so every image always gets an `alt` attribute, even an empty one.
 
 **Verify it is fixed:**
 
-- **Manual:** With a screen reader running (VoiceOver: Cmd+F5 on macOS; NVDA: Ctrl+Alt+N on Windows), tab to each affected image. It should announce meaningful text or be skipped entirely if marked decorative.
-- **Automated:** axe-core image-alt rule passes after the fix.
-- **Acceptance:** Every <img> on the affected pages has either a non-empty alt attribute that describes its purpose, or alt="" explicitly when decorative.
+- **Manual:** Turn on a screen reader (VoiceOver: Cmd+F5 on macOS; NVDA: Ctrl+Alt+N on Windows). Tab does not stop on images, so read line by line (VoiceOver: Control+Option+Right Arrow; NVDA: Down Arrow). You should hear alt text that makes sense for each image that gives information, and nothing for decorative images.
+- **Automated:** Scan again and see if this image is still found.
+- **Acceptance:** Every image on the affected pages has alt text that says what it means, or alt="" when it is only decoration.
 
 **My confidence:** High.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/image-alt_
 
-### 11. Text doesn't meet the 4.5:1 contrast ratio
+### 11. Text does not stand out enough from its background
 
 **WCAG:** SC 1.4.3 Contrast (Minimum), Level AA
 
@@ -662,11 +664,11 @@ Specific locations:
 
 **What is happening:**
 
-Text falls below the WCAG 1.4.3 minimum contrast against its background (4.5:1 for body text; 3:1 for 18pt+ or 14pt-bold).
+The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. The rule check does not report text it cannot measure, such as text over an image or a gradient.
 
 **Why it matters:**
 
-Users with low vision, color blindness, or who view the site in bright sunlight can't read the text. This is one of the most commonly-reported barriers in user testing.
+People with low vision or color blindness may not be able to read text that is too close in color to its background. Glare from bright sunlight makes such text hard for everyone to read.
 
 **Affects:** Vision.
 
@@ -678,15 +680,16 @@ Users with low vision, color blindness, or who view the site in bright sunlight 
 
 **Fix (do this):**
 
-1. Open the affected page in DevTools, inspect the failing element, and read its foreground and background colors.
-2. Run the pair through WebAIM's Contrast Checker. Find a darker foreground (or lighter background) that clears 4.5:1.
-3. Update the CSS custom property or design-system token, most contrast failures cascade from one token, so one change often fixes many findings at once.
+1. Open the occurrence and read the measured ratio, the two colors, the font size and the font weight. For example: "color contrast of 4.16 (foreground color: #3170fb, background color: #fafafc, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1". The foreground color is the text color.
+2. Put the two colors into a contrast checker, such as the WebAIM Contrast Checker. Find a darker text color or a lighter background that reaches 4.5:1, or 3:1 for large text. Do not round up: 4.499:1 does not pass.
+3. Change the color where the whole site sets it, such as a shared color setting (design token) or a CSS custom property like `--link-color`. One setting often colors many elements, so one change can fix many occurrences.
+4. Check the same text in every state people can see, such as hover, focus and visited.
 
 **Verify it is fixed:**
 
-- **Manual:** Open DevTools → Accessibility tab → Contrast ratio reading. Confirm ≥ 4.5:1 for body text, ≥ 3:1 for large text.
-- **Automated:** axe-core color-contrast rule passes after the fix.
-- **Acceptance:** All text on the affected pages clears 4.5:1 (body) or 3:1 (large) against its background, verified in DevTools or WebAIM.
+- **Manual:** In Chrome's developer tools, use the Inspect tool and point at the text: the pop-up shows the contrast ratio. Check text over images or gradients by eye, because the rule check does not report it. Text in a logo, or on a control that is turned off (disabled), has no contrast requirement.
+- **Automated:** Scan again and see if this text is still found.
+- **Acceptance:** Every piece of text on the affected pages reaches 4.5:1 against its background, or 3:1 when it is large text.
 
 **My confidence:** High.
 
@@ -800,11 +803,9 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-33_
 
-### 15. Elements must meet enhanced color contrast
+### 15. Text misses the stricter Level AAA contrast ratio
 
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 1.4.6, Level AAA
+**WCAG:** SC 1.4.6 Contrast (Enhanced), Level AAA
 
 **Detected by:** axe-core (deterministic DOM rules).
 
@@ -815,23 +816,34 @@ Specific locations:
 
 **What is happening:**
 
-1 finding(s) for Elements must meet enhanced color contrast across 1 page(s).
+The rule check (axe) found text that meets the Level AA contrast minimum but not the stricter Level AAA level. The contrast ratio measures how much lighter one color is than the other, from 1:1 (same color) to 21:1 (black on white). This text is at least 4.5:1 but under 7:1, or, for large text, at least 3:1 but under 4.5:1. Text below the AA minimum shows up in the `color-contrast` issue instead.
 
 **Why it matters:**
 
-Users relying on assistive technology hit a barrier here.
+Text that blends into its background is hard to read for people with low vision, and color blindness can lower the contrast even more. The 7:1 level makes up for the contrast loss of about 20/80 vision (seeing at 20 feet what most people see at 80 feet).
+
+**Affects:** Vision.
 
 **Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
 
-**Effort:** Effort: see fix steps
+**Effort:** Under 2 hours
 
-**Owner:** Dev
+**Owner:** Designer
 
 **Fix (do this):**
 
-1. Human review needed, no templated fix for `axe:color-contrast-enhanced` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced
+1. Check whether your policy asks for Level AAA. If it asks only for Level AA, you do not have to fix this, but a fix still helps people with low vision. The World Wide Web Consortium (W3C), which writes WCAG, does not advise requiring Level AAA for a whole site. Some content cannot meet every Level AAA criterion.
+2. Open each occurrence and read the check's message. It gives the contrast ratio, the text color (foreground color), the background color, the font size and the font weight. For example: "contrast of 6.54 ... Expected contrast ratio of 7:1".
+3. Pick a darker text color, or a lighter background, that reaches 7:1 for normal text, or 4.5:1 for large text. Large text is 24px (18pt) or bigger, or 14pt (about 18.7px) or bigger in bold. Do not round up: 6.99:1 does not meet 7:1. For example, on white, `#767676` gives 4.54:1 and `#595959` just reaches 7:1.
+4. Change the color in the shared style (the design token or CSS custom property, such as `--text-muted: #595959;`), not on each element. One shared color often causes many occurrences, so one change can fix them all.
 
-**My confidence:** Medium.
+**Verify it is fixed:**
+
+- **Manual:** Inspect the text in your browser's developer tools; in Chrome, the color picker shows the contrast ratio with AA and AAA lines. Check hover and focus states too. Use a contrast checker for text on images or gradients, text under other elements, and images of text, because the rule check (axe) skips them.
+- **Automated:** Scan again at Level AAA and see if this text is still found, because a Level AA scan does not run this rule.
+- **Acceptance:** Every text element on the affected pages reaches 7:1 contrast with its background, or 4.5:1 if large, except logos and disabled controls.
+
+**My confidence:** High.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced_
 
@@ -1045,7 +1057,7 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29_
 
-### 22. Links have no accessible name
+### 22. Links have no name for screen readers
 
 **WCAG:** SC 2.4.4 Link Purpose (In Context), Level A
 
@@ -1068,31 +1080,32 @@ Specific locations:
 
 **What is happening:**
 
-One or more <a> elements have no visible text, no aria-label, and no aria-labelledby. Screen readers either skip them or announce "link" with no destination context.
+A link (`<a href>`) has no name that a screen reader can read (accessible name). The rule check (axe) found no text inside the link that a screen reader can read, and no `aria-label`, `aria-labelledby` or `title`. Common causes are an empty link, a link with only an icon, and a link around an image with no alt text. The check only sees whether a name exists, not whether it is clear.
 
 **Why it matters:**
 
-Screen reader users navigate by pulling up a list of links; an unnamed link is invisible in that list. Keyboard users also can't tell where the link goes from the focus indicator alone.
+Screen reader users do not know where the link goes, on the page or in their list of links. The screen reader may say only "link", or read out an image's file name. People who use voice control cannot say the link's name to click it.
 
-**Affects:** Vision, Cognition.
+**Affects:** Vision, Motor, Cognition.
 
 **Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
 
 **Effort:** Under 15 minutes
 
-**Owner:** Editor
+**Owner:** Dev
 
 **Fix (do this):**
 
-1. If the link contains only an icon (e.g. a magnifier for search), add aria-label with a short description ("Search").
-2. If the link wraps an <img>, ensure the image has a non-empty alt attribute that describes the link's destination.
-3. Avoid "click here" and "read more", write text that describes the destination so users scanning a link list can decide.
+1. If the link holds only an image, give the image alt text that says where the link goes: `<a href="/search"><img src="search.svg" alt="Search"></a>`.
+2. If the link holds only an icon, add `aria-label="Search"` to the link, or visually hidden text inside it.
+3. If the link has text, make sure `display: none` or `aria-hidden="true"` does not hide it from screen readers. If an empty link sits next to a link to the same page, remove the empty one.
+4. Make each name say where the link goes. A list of links that all say "read more" or "click here" does not tell people which link is which.
 
 **Verify it is fixed:**
 
-- **Manual:** Tab through the affected page; the focus ring should land on each link with a descriptive announcement. Use a screen reader's link list (VoiceOver: VO+U then arrow to Links) to confirm every link has meaningful text.
-- **Automated:** axe-core link-name rule passes after the fix.
-- **Acceptance:** Every <a> on the affected pages has either visible text or an aria-label / aria-labelledby that describes the destination.
+- **Manual:** Turn on a screen reader and open its list of links (VoiceOver: Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+- **Automated:** Scan again and see if this link is still found.
+- **Acceptance:** Every link on the affected pages has a name a screen reader can read, and the name says where the link goes.
 
 **My confidence:** High.
 
@@ -1450,7 +1463,7 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-34_
 
-### 33. Alfa ACT rule, The image has no accessible name. [Stored evidence is unavailable.] (Alfa sia-r2)
+### 33. Rule check (Alfa), The image has no accessible name. [Stored evidence is unavailable.] (Alfa sia-r2)
 
 > ⚠ **Human review needed**, Alfa ACT evidence is a review lead, not a conformance verdict. Confirm any `cantTell` outcome manually before reporting it as a barrier.
 
@@ -1465,29 +1478,38 @@ Specific locations:
 
 **What is happening:**
 
-Siteimprove Alfa returned 1 failed ACT outcome(s) for this rule. WCAG 1.1.1; Alfa rule sia-r2. Observed diagnostic: The image has no accessible name. [Stored evidence is unavailable.]
+This rule check (Alfa) looks at every element that screen readers treat as an image. That means an `<img>`, or any HTML element with `role="img"`, that is not hidden from screen readers. It fails when the image has no name for a screen reader to read (accessible name), or the name is only spaces. A common cause is an `<img>` with no `alt` attribute and no other name.
 
 **Why it matters:**
 
-A failed ACT outcome is strong automated evidence, not a conformance verdict. Confirm that the rule applies and reproduce the barrier before presenting the row as a confirmed accessibility issue.
+Blind and low-vision people who use a screen reader get no words that say what the image shows. People who read the page on a braille display lose the same information. A failed rule is strong evidence, but it does not prove the page fails WCAG. Check that the rule applies here before you report it.
+
+**Affects:** Vision.
 
 **Severity:** Moderate, 1 finding(s) on 1 page(s).
 
-**Effort:** Effort: see fix steps
+**Effort:** Under 15 minutes
 
-**Owner:** Dev
+**Owner:** Editor
 
 **Fix (do this):**
 
-1. Open the linked page evidence and review the Alfa target and diagnostic.
-2. Manually test the applicable WCAG success criterion with the relevant assistive technology.
-3. Apply the correction, then rescan the same scope to verify the ACT outcome is resolved.
+1. Decide what each flagged image is for. If it gives information, add alt text (the text a screen reader reads for an image) that says the same thing in a few words. Example: `<img src="chart.png" alt="Sales rose 20% in 2025">`
+2. If the image is only decoration, give it an empty alt: `<img src="swirl.png" alt="">`. Do not also give it `tabindex`, `aria-label`, `aria-labelledby` or `aria-describedby`. Any of these makes screen readers treat it as an image again.
+3. For an element that is not an `<img>`, such as `<div role="img">`, add a name with `aria-label` or `aria-labelledby`. Example: `<div role="img" aria-label="Five stars out of five">`
+4. Fix the template or the image field in your content system. Editors should either write alt text or choose to mark the image as decoration. Do not add `alt=""` to every image by default, because that hides images that give information.
 
-**My confidence:** Medium.
+**Verify it is fixed:**
+
+- **Manual:** Turn on a screen reader (VoiceOver: Cmd+F5 on macOS; NVDA on Windows) and move through each flagged image. An image that gives information should read out a useful name. A decorative image should be skipped.
+- **Automated:** Scan again with Alfa or Both as the rule check tool, and see if these images are still found.
+- **Acceptance:** Every image that screen readers can reach has a name that is not empty, and every decorative image is hidden from screen readers.
+
+**My confidence:** High.
 
 _Rule docs: https://alfa.siteimprove.com/rules/sia-r2_
 
-### 34. Links don't describe their purpose (LLM-detected)
+### 34. Link text may not say where the link goes
 
 **WCAG:** SC 2.4.4 Link Purpose (In Context), Level A
 
@@ -1500,13 +1522,13 @@ Specific locations:
 
 **What is happening:**
 
-Our per-criterion language model reviewed every link on the page, together with up to five levels of ancestor context, and flagged cases where the link text, alone OR with its surrounding paragraph / heading / list-item, doesn't tell a user where the link goes. Common offenders: "click here", "read more", "details", raw URLs, and icon-only links with no aria-label.
+The AI review (a language model on this computer) reads the first 50 links on each page. It skips links to a spot on the same page, and email, phone, text-message and script (`javascript:`) links. For each link, it sees the link address and the name a screen reader reads (accessible name). It also sees the text of up to 5 elements that contain the link, such as its paragraph or list item. It reports a link only when it judges that you cannot tell where the link goes, even with that text. Examples are "click here", "read more", a bare web address, or an icon link with no name. The model can be wrong, for example about long brand names or abbreviations, so a person must confirm each occurrence.
 
 **Why it matters:**
 
-Screen-reader users pull up a list of every link on the page and jump between them. A link whose text is "click here" has no meaning out of context, so users either pick wrong or read the surrounding paragraph (an extra read step that ought not be necessary). This is one of the most-reported barriers in real accessibility audits.
+Screen reader users often jump from link to link, or open a list of all links. Then they hear only the link text, so "read more" tells them nothing unless they stop to read the text around it. Clear links also help people with physical disabilities skip links they do not want, and help people with cognitive disabilities avoid getting lost.
 
-**Affects:** Vision, Cognition.
+**Affects:** Vision, Cognition, Motor.
 
 **Severity:** Moderate, 1 finding(s) on 1 page(s).
 
@@ -1516,15 +1538,16 @@ Screen-reader users pull up a list of every link on the page and jump between th
 
 **Fix (do this):**
 
-1. Rewrite link text so it names the destination. "Click here to download" becomes "Download the 2025 annual report (PDF)".
-2. For icon-only links, add an `aria-label` that names the action, e.g. `aria-label="Search the catalog"`.
-3. When the link wraps an image, give the image meaningful alt text describing the destination, not the picture.
+1. Read the model's reason and suggested fix in the occurrence. Then find the link on the live page and read it together with its sentence, paragraph, list item, table cell, or the heading before it.
+2. If the purpose is clear from that nearby text, set the status to Not a problem (false positive).
+3. If it is not clear, rewrite the link text so it names the destination. For example, change "Click here" to "Download the 2025 annual report (PDF)".
+4. For a link that is only an image or icon, give it a name. Give the image alt text (the text a screen reader reads for an image) that names the destination. Or add an `aria-label` to the link, for example `<a href="/search" aria-label="Search the catalog">`.
 
 **Verify it is fixed:**
 
-- **Manual:** Run a screen reader's links-list view (VoiceOver: VO+U then Links; NVDA: K key). Every link should announce its destination clearly without needing the surrounding paragraph for context.
-- **Automated:** Re-run a scan with semantic analyzers enabled, the same model shouldn't flag fixed links on the next pass. Watch for false positives that the model can't reliably distinguish (very long brand names, abbreviations).
-- **Acceptance:** Every link on the affected pages tells a screen-reader user where it goes from its text alone, or from text + immediate heading / paragraph context.
+- **Manual:** Open the list of links in a screen reader (VoiceOver: VO+U, then Links; NVDA: Insert+F7). For a link that is unclear on its own, read its sentence, paragraph, list item or table cell, and the heading before it. Each link should make clear where it goes, from its text or from that context.
+- **Automated:** Scan again with AI review of wording turned on, and see if the link is still found.
+- **Acceptance:** Every link on the affected pages tells people where it goes, from its own text or from the text and heading around it.
 
 **My confidence:** Medium.
 
@@ -1854,8 +1877,8 @@ These detected findings or finding subsets were set aside after triage (remediat
 
 | Method | Issue | WCAG | Reason set aside |
 |---|---|---|---|
-| axe | Text doesn't meet the 4.5:1 contrast ratio | 1.4.3 | Triaged subset: false_positive (1) |
-| axe | Form controls have no programmatic label | 4.1.2 | Already triaged: accepted_risk (1) |
+| axe | Text does not stand out enough from its background | 1.4.3 | Triaged subset: false_positive (1) |
+| axe | Form fields have no name for screen readers | 4.1.2 | Already triaged: accepted_risk (1) |
 
 ## Appendix B, Review leads and informational evidence
 
@@ -1863,15 +1886,15 @@ These results are preserved for transparency but are not included in the remedia
 
 **Alfa note:** Alfa ACT evidence is a review lead when the engine returns `cantTell`; it is not a conformance failure until an expert reviews the stored evidence.
 
-- **The page has no top-level heading** (`page-has-heading-one`), 3 finding(s) on 3 pages; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
-- **Top-level content isn't inside a landmark** (`region`), 2 finding(s) on 2 pages; **likely barrier / high confidence**. Deterministic axe-core rule failure; verify after remediation.
-- **Images of text have no alt and can't be read** (`essential_missing`), 2 finding(s) on 2 pages; **expert review / medium confidence**. OCR/VLM-assisted image lead; confirm purpose and alternative in context.
-- **Keyboard users can't escape this element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Measured Tab and Shift+Tab exit attempts both remained on the same observable element; manually check for another documented exit command.
-- **Links don't describe their purpose (LLM-detected)** (`2.4.4`), 2 finding(s) on 2 pages; **expert review / medium confidence**. AI-assisted semantic lead; confirm in page context.
-- **Image (unclassified), inadequate alt** (`unclassified_inadequate`), 2 finding(s) on 2 pages; **expert review / low confidence**. Image analysis was inconclusive; classify manually before reporting a barrier.
-- **Alfa ACT result, expert decision needed (Alfa sia-r111)** (`sia-r111:cant_tell`), 1 finding(s) on 1 page; **expert review / medium confidence**. Alfa returned 1 cantTell occurrence(s); this is not a failure. Alfa could not decide whether the target spacing is sufficient. [Stored evidence is unavailable.]
-- **Image (unclassified), missing alt** (`unclassified_missing`), 1 finding(s) on 1 page; **expert review / low confidence**. Image analysis was inconclusive; classify manually before reporting a barrier.
-- **Logo image, adequate alt** (`logo_adequate`), 1 finding(s) on 1 page; **informational / medium confidence**. Alt comparison appears adequate; retained as non-actionable evidence.
+- **The page has no main heading (h1)** (`page-has-heading-one`), 3 finding(s) on 3 pages; **likely barrier / high confidence**. The rule check (axe) found the page code breaks this rule.
+- **Some content sits outside any page region** (`region`), 2 finding(s) on 2 pages; **likely barrier / high confidence**. The rule check (axe) found the page code breaks this rule.
+- **Images with important text have no alt text** (`essential_missing`), 2 finding(s) on 2 pages; **expert review / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
+- **Link text may not say where the link goes** (`2.4.4`), 2 finding(s) on 2 pages; **expert review / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
+- **Image with words has empty or different alt text** (`unclassified_inadequate`), 2 finding(s) on 2 pages; **expert review / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
+- **Rule check (Alfa), a person must decide (Alfa sia-r111)** (`sia-r111:cant_tell`), 1 finding(s) on 1 page; **expert review / medium confidence**. The rule check (Alfa) could not decide on 1 occurrence. That is not a failure. Alfa could not decide whether the target spacing is sufficient. [Stored evidence is unavailable.]
+- **Image with words has no alt text** (`unclassified_missing`), 1 finding(s) on 1 page; **expert review / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
+- **Logo alt text uses words from the logo** (`logo_adequate`), 1 finding(s) on 1 page; **informational / medium confidence**. The alt text says the same as the text in the image. It is kept as a record, not a problem to fix.
 
 ---
 
