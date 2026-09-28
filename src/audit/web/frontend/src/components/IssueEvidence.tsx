@@ -406,7 +406,7 @@ function RuleText({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         i % 2 === 1 ? (
-          <code key={i} className="rounded-2xs bg-surface-muted px-1 py-px text-[0.9em]">
+          <code key={i} className="rounded-2xs bg-surface-muted px-1 py-px">
             {decodeEntities(part)}
           </code>
         ) : (

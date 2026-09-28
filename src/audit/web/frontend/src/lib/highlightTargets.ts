@@ -359,7 +359,7 @@ export function spotlight(
       top: above ? "-29px" : "0",
       background: CURRENT_OUTLINE,
       color: "#ffffff",
-      font: "600 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
+      font: "600 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
       "letter-spacing": "normal",
       "text-transform": "none",
       padding: "2px 8px",

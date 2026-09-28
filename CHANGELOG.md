@@ -42,6 +42,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- No text in the app is smaller than 14 pixels. Hints, chips, captions and
+  table notes were 12 or 13 pixels. Secondary text now stands apart by its
+  colour and weight rather than by being smaller. Checked at 320, 390 and
+  1280 pixels wide on every main page: nothing is cut off and no page
+  scrolls sideways.
 - Inspector: the box of page-state links under the Page state picker is now
   one sentence: "3 more occurrences are in 2 other page states. Choose one
   in the Page state list." The links repeated the picker, which already
