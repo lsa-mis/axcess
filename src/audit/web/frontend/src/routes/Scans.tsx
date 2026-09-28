@@ -19,6 +19,7 @@ import {
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
+import { liveSearchParams } from "../lib/liveSearchParams";
 import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
@@ -226,12 +227,13 @@ export default function ScansRoute() {
   const openKey = params.getAll("open").join("\n");
   const expanded = useMemo<ReadonlySet<string>>(() => new Set(openKey ? openKey.split("\n") : []), [openKey]);
   // Against the live query string, as on Issues: the search publishes on a
-  // debounce, so a snapshot taken at render could drop a pending keystroke.
+  // debounce, so a snapshot taken at render could drop a pending keystroke
+  // or a site just opened (liveSearchParams says why `previous` cannot).
   const updateParams = useCallback(
     (change: (next: URLSearchParams) => void) =>
       setParams(
-        (previous) => {
-          const next = new URLSearchParams(previous);
+        () => {
+          const next = liveSearchParams();
           change(next);
           return next;
         },

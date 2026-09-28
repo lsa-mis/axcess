@@ -106,6 +106,8 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Issues and Reports: a filter chosen while the search box was still
+  catching up with your typing could be lost. Both are kept now.
 - Tabbing to a long table scrolled the page to the table's middle, away from
   its header row. Now its top comes into view, just under the top bar. A
   table that fits the screen is no longer a tab stop of its own, so Tab goes
