@@ -1521,6 +1521,8 @@ const BOX_NOTES: Record<BoxNote, string> = {
   "list-box": "On its list box. An option has no box of its own.",
   "image-map": "On the part of its image it covers. An area of an image map (<area>) has no box of its own.",
   "whole-page": "No box, because it is the whole page. Nothing is dimmed.",
+  "focus-only": "It shows only when it has keyboard focus. The box is where it shows then.",
+  "off-screen": "No box. It is off the screen in this saved copy.",
 };
 
 /** "1 pixel", "924 pixels". */

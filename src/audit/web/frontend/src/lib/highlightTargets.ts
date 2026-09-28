@@ -291,6 +291,10 @@ function isWholePage(el: Element): boolean {
  * An element with no box of its own is marked where ``boxPlace`` says, on
  * what stands for it.
  *
+ * An element placed off the screen until it has focus (a skip link) is shown
+ * as it looks focused (``showAsFocused``). One that stays off the screen gets
+ * no box: a box off the screen shows the reader nothing.
+ *
  * The whole page (``<html>``, ``<body>``) gets no box. A box around the whole
  * document dimmed nothing, since nothing is outside it, and put its label off
  * the top of the view, so it looked like a stray frame. Rejected: a box
@@ -323,7 +327,14 @@ export function spotlight(
 
   let lastSize: string | null = null;
   let lastPlace: string | null = null;
+  let triedFocus = false;
   const place = () => {
+    // Once per box, and again only when asked for (Previous, Next, Jump):
+    // when a stylesheet arriving late moves it off the screen, too.
+    if (!triedFocus && hidesUntilFocused(el)) {
+      triedFocus = true;
+      showAsFocused(el);
+    }
     const own = el.getBoundingClientRect();
     const { on, rect, note } = boxPlace(el);
     const size = `${own.width},${own.height},${note}`;
@@ -404,7 +415,10 @@ export function spotlight(
     frame = requestAnimationFrame(follow);
   };
   follow();
-  stopFollowing.set(owner, () => cancelAnimationFrame(frame));
+  stopFollowing.set(owner, () => {
+    cancelAnimationFrame(frame);
+    undoFocusStyle(el);
+  });
 }
 
 const stopFollowing = new WeakMap<Document, () => void>();
@@ -448,12 +462,15 @@ export function scrollPanels(el: Element): HTMLElement[] {
  *   its image the area covers.
  * - ``whole-page``: ``<html>`` or ``<body>``, as for a rule about the page
  *   itself (axe's html-has-lang). No box and no dimming (see ``spotlight``).
+ * - ``focus-only``: off the screen until it has focus, as a skip link is.
+ *   Shown, and boxed, as it looks focused (``showAsFocused``).
+ * - ``off-screen``: off the screen, and focus does not bring it back. No box.
  */
-export type BoxNote = "contents" | "list-box" | "image-map" | "whole-page";
+export type BoxNote = "contents" | "list-box" | "image-map" | "whole-page" | "focus-only" | "off-screen";
 
 /** The notes for which no box is drawn at all. */
 export function drawsNoBox(note: BoxNote | null): boolean {
-  return note === "whole-page";
+  return note === "whole-page" || note === "off-screen";
 }
 
 /** A rectangle in the frame's view. */
@@ -498,7 +515,146 @@ export function boxPlace(el: Element): { on: Element; rect: BoxRect; note: BoxNo
       }
     }
   }
+  if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
+  if (isOffScreen(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "off-screen" };
   return { on: el, rect: plainRect(el.getBoundingClientRect()), note: null };
+}
+
+/**
+ * True when ``el`` lies wholly above or left of the page, where no scrolling
+ * reaches (``left: -9999px``, the usual way to hide a skip link).
+ */
+function isOffScreen(el: Element): boolean {
+  const view = el.ownerDocument.defaultView;
+  if (!view) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.right + view.scrollX <= 0 || rect.bottom + view.scrollY <= 0;
+}
+
+/**
+ * True when ``el`` may be one of the elements a page hides until it has
+ * focus: off the screen, or cut to nothing by its own ``clip`` or
+ * ``clip-path`` (the "visually hidden until focused" pattern).
+ */
+function hidesUntilFocused(el: Element): boolean {
+  if (el.hasAttribute(FOCUS_STYLED) || isWholePage(el)) return false;
+  const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+  if (!style) return false;
+  return isOffScreen(el) || (style.clip !== "auto" && style.clip !== "") || style.clipPath !== "none";
+}
+
+/** Set on an element while it is shown with its focus styles. */
+const FOCUS_STYLED = "data-axcess-focus-style";
+/** Each such element's own inline styles before, to put back. */
+const focusStyleUndo = new WeakMap<Element, { name: string; value: string; priority: string }[]>();
+
+/**
+ * Show ``el`` as it looks when it has focus, so the box can go where a
+ * keyboard user sees it. True when that brings it on screen.
+ *
+ * A skip link is placed off the screen until it has keyboard focus, and the
+ * box followed it there, so the reader saw nothing. The saved copy runs no
+ * scripts, but the inspector can still call ``focus()`` on its elements.
+ * Focus alone was rejected: it stays only while the saved copy has the
+ * reader's focus, so it would have to take their focus from the inspector
+ * and keep it, and a keyboard or screen reader user would find themselves
+ * inside the saved copy without having moved there. No WCAG criterion is
+ * about a tool moving focus by itself; it would break the order the reader
+ * moves through the inspector in (SC 2.4.3 Focus Order, Level A,
+ * paraphrased). Instead, in one step with no drawing
+ * in between: note where the reader's focus is, focus the element, read
+ * which of its styles focus changes, and put the reader's focus straight
+ * back. The changed styles are then set on the element itself, so it stays
+ * as it looks focused while the box is on it, and is put back when the box
+ * moves on. Only the element's own styles are copied, not those focus
+ * changes on its parents (``:focus-within``). The table under the toolbar
+ * says it shows only with keyboard focus.
+ *
+ * Focus still moves for that instant, so the inspector's focused control
+ * gets blur and focus events; nothing is done while the reader types in a
+ * field or has a list open, which a blur would close.
+ *
+ * Rejected, too: saying it is off the screen and drawing no box. That tells
+ * the reader nothing about where a keyboard user meets it, and it is used
+ * only when focus does not bring the element on screen.
+ */
+function showAsFocused(el: Element): boolean {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view || !("focus" in el)) return false;
+  const focusable = el as HTMLElement;
+  const host = view.frameElement?.ownerDocument ?? null;
+  const hostFocus = host?.activeElement ?? null;
+  // Not while the reader is typing or has a list open: taking focus, even for
+  // an instant, would close the list. The next Previous, Next or Jump tries
+  // again.
+  if (hostFocus && (hostFocus.getAttribute("aria-expanded") === "true" || isEditable(hostFocus))) return false;
+  const frameFocus = doc.activeElement;
+  const before = styleSnapshot(view.getComputedStyle(el));
+  let after: Map<string, string> | null = null;
+  try {
+    // focusVisible asks for the page's :focus-visible styles too, where the
+    // browser supports it.
+    focusable.focus({ preventScroll: true, focusVisible: true } as FocusOptions);
+    if (doc.activeElement === el) after = styleSnapshot(view.getComputedStyle(el));
+  } finally {
+    focusable.blur();
+    if (frameFocus instanceof view.HTMLElement && frameFocus !== doc.body && frameFocus !== el) {
+      frameFocus.focus({ preventScroll: true });
+    }
+    if (host) {
+      if (hostFocus && hostFocus !== host.body && "focus" in hostFocus) {
+        (hostFocus as HTMLElement).focus({ preventScroll: true });
+      } else if (host.activeElement && host.activeElement !== host.body && "blur" in host.activeElement) {
+        (host.activeElement as HTMLElement).blur();
+      }
+    }
+  }
+  if (!after) return false;
+  const style = (el as HTMLElement | SVGElement).style;
+  const undo: { name: string; value: string; priority: string }[] = [];
+  for (const [name, value] of after) {
+    // The outline is the inspector's own mark; a transition would only
+    // replay the change.
+    if (before.get(name) === value || name.startsWith("outline") || name.startsWith("transition")) continue;
+    undo.push({ name, value: style.getPropertyValue(name), priority: style.getPropertyPriority(name) });
+    style.setProperty(name, value, "important");
+  }
+  if (undo.length === 0) return false;
+  focusStyleUndo.set(el, undo);
+  el.setAttribute(FOCUS_STYLED, "");
+  if (isOffScreen(el)) {
+    undoFocusStyle(el);
+    return false;
+  }
+  return true;
+}
+
+function isEditable(el: Element): boolean {
+  const tag = el.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || (el as HTMLElement).isContentEditable === true;
+}
+
+/** Put back the element's own styles after ``showAsFocused``. */
+function undoFocusStyle(el: Element): void {
+  const undo = focusStyleUndo.get(el);
+  if (!undo) return;
+  const style = (el as HTMLElement | SVGElement).style;
+  for (const { name, value, priority } of undo) {
+    if (value) style.setProperty(name, value, priority);
+    else style.removeProperty(name);
+  }
+  focusStyleUndo.delete(el);
+  el.removeAttribute(FOCUS_STYLED);
+}
+
+function styleSnapshot(style: CSSStyleDeclaration): Map<string, string> {
+  const out = new Map<string, string>();
+  for (let i = 0; i < style.length; i += 1) {
+    const name = style[i];
+    out.set(name, style.getPropertyValue(name));
+  }
+  return out;
 }
 
 function plainRect(rect: DOMRect | Omit<BoxRect, "width" | "height">): BoxRect {
