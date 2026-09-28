@@ -106,6 +106,10 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Tabbing to a long table scrolled the page to the table's middle, away from
+  its header row. Now its top comes into view, just under the top bar. A
+  table that fits the screen is no longer a tab stop of its own, so Tab goes
+  straight to its links.
 - Inspector: an element with no box of its own is marked where the reader
   can see it. The numbered box used to jump to the top left of the saved
   copy. Now an element styled `display: contents` is marked around what it

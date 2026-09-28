@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -201,19 +202,70 @@ export function TableRegion({
   className?: string;
   children: ReactNode;
 }) {
+  // Whether the table is wider than the region, so the region scrolls
+  // sideways. Measured whenever either changes size.
+  const [scrolls, setScrolls] = useState(false);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const setRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      setNode(element);
+      if (typeof regionRef === "function") regionRef(element);
+      else if (regionRef) (regionRef as { current: HTMLDivElement | null }).current = element;
+    },
+    [regionRef],
+  );
+  useEffect(() => {
+    if (!node) return;
+    const measure = () => setScrolls(node.scrollWidth > node.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    for (const child of Array.from(node.children)) observer.observe(child);
+    // Keyboard focus only: bring the table's top back into view when the
+    // browser's centring left it above the top bar (see the comment below).
+    const onFocus = (event: FocusEvent) => {
+      if (event.target !== node || !node.matches(":focus-visible")) return;
+      if (node.getBoundingClientRect().top < 88) node.scrollIntoView({ block: "start", behavior: "instant" });
+    };
+    node.addEventListener("focus", onFocus);
+    return () => {
+      observer.disconnect();
+      node.removeEventListener("focus", onFocus);
+    };
+  }, [node]);
   return (
     <div
-      ref={regionRef}
+      ref={setRef}
       role="region"
       aria-label={label}
       aria-busy={busy || undefined}
+      // In the tab order only while it scrolls sideways. A keyboard user needs
+      // focus on a region to scroll it (axe scrollable-region-focusable; WCAG
+      // 2.2 SC 2.1.1 Keyboard), but a table that fits had a tab stop that did
+      // nothing, one more for every table on the way to its links. It stays
+      // focusable from code (-1): a table takes focus when the control that
+      // reordered it goes away ("Back to recommended order"), so focus is
+      // not lost to the page.
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-      tabIndex={0}
+      tabIndex={scrolls ? 0 : -1}
+      // A browser brings a focused element into view by centring it when it
+      // is off the screen, so tabbing to a table taller than the window
+      // dropped the reader in its middle, away from the header row that
+      // names the columns: a jump the reader did not ask for (SC 3.2.1 On
+      // Focus, Level A, is about that kind of surprise, paraphrased). On
+      // keyboard focus, when the table's top has gone above the top bar,
+      // its top is brought back into view, just under the bar (the 72px
+      // topbar and 16px of room: scroll-mt-[88px]); see the effect above.
+      // A mouse click inside it moves nothing.
       // `relative`: screen-reader-only text in a cell is positioned
       // absolutely (`sr-only`). Without a positioned region it was placed
       // against the page, outside this clip, and on a phone widened the whole
       // page (615px at 320), so it scrolled sideways (SC 1.4.10 Reflow).
-      className={cn("relative overflow-x-auto focus:outline-none focus-visible:shadow-focus", CARD_EDGE, className)}
+      className={cn(
+        "relative scroll-mt-[88px] overflow-x-auto focus:outline-none focus-visible:shadow-focus",
+        CARD_EDGE,
+        className,
+      )}
     >
       {paged ? <div {...paged.hold}>{children}</div> : children}
     </div>

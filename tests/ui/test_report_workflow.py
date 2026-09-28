@@ -1104,10 +1104,12 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["name"] == "Search issues"),
         # One Filter menu holds Level, Type and Found by.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter"),
-        first(lambda s: s["group"] == "table-region"),
         first(lambda s: s["group"] == "table"),
     ]
     assert order == sorted(order), names
+    # The table fits at this width, so its scroll region is no tab stop of
+    # its own: Tab goes from the Filter menu straight into the table.
+    assert not any(stop["group"] == "table-region" for stop in stops), names
     # The current crumb is text, so it is not a tab stop.
     assert f"example.com Report #{scan_id}" not in names, names
     missing = [stop for stop in stops if not stop["visible"]]
