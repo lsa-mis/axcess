@@ -268,9 +268,17 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
  * two-pixel link, a zero-width icon) and was clipped by `overflow: hidden`
  * ancestors, so the reader stepped to "Flagged element 5 of 7" and saw
  * nothing. The box is drawn on the page's root, over everything, at least
- * ``SPOTLIGHT_MIN`` pixels on each side and centred on the element, and it
- * follows the element when the frame is resized, calling ``onPlace`` each
- * time so a description of the element can follow too. Null removes it.
+ * ``SPOTLIGHT_MIN`` pixels on each side and centred on the element. It is
+ * checked against the element every frame, so it follows the element through
+ * a resize, a late stylesheet or a scroll, and ``onPlace`` is called whenever
+ * the element's size changes so a description of it can follow too. Null
+ * removes it.
+ *
+ * An app-style page scrolls a panel of its own (a sidebar, a dialog), not the
+ * window. The box once followed only a resize, so a flagged element in such a
+ * panel scrolled away and left the box behind, stuck at the top or bottom of
+ * the panel over something else. Now the box covers only the part of the
+ * element its panels show, and is hidden while none of it is shown.
  */
 export function spotlight(
   el: HTMLElement | null,
@@ -282,9 +290,8 @@ export function spotlight(
   if (!owner) return;
   const view = owner.defaultView;
   owner.getElementById(SPOTLIGHT_ID)?.remove();
-  const listeners = resizeListeners.get(owner);
-  if (listeners && view) view.removeEventListener("resize", listeners);
-  resizeListeners.delete(owner);
+  stopFollowing.get(owner)?.();
+  stopFollowing.delete(owner);
   if (!el || !view) return;
 
   const box = owner.createElement("div");
@@ -294,12 +301,30 @@ export function spotlight(
   tag.textContent = label;
   box.appendChild(tag);
   owner.documentElement.appendChild(box);
+  const panels = scrollPanels(el);
 
+  let lastSize: string | null = null;
+  let lastPlace: string | null = null;
   const place = () => {
     const rect = el.getBoundingClientRect();
-    let { width, height } = rect;
-    let left = rect.left + view.scrollX;
-    let top = rect.top + view.scrollY;
+    const size = `${rect.width},${rect.height}`;
+    if (size !== lastSize) {
+      lastSize = size;
+      onPlace?.(el);
+    }
+    const shown = shownPart(rect, panels);
+    const where = shown
+      ? [shown.left, shown.top, shown.width, shown.height, view.scrollX, view.scrollY].join()
+      : "hidden";
+    if (where === lastPlace) return;
+    lastPlace = where;
+    if (!shown) {
+      box.style.setProperty("display", "none", "important");
+      return;
+    }
+    let { width, height } = shown;
+    let left = shown.left + view.scrollX;
+    let top = shown.top + view.scrollY;
     if (width < SPOTLIGHT_MIN) {
       left -= (SPOTLIGHT_MIN - width) / 2;
       width = SPOTLIGHT_MIN;
@@ -310,6 +335,7 @@ export function spotlight(
     }
     const pad = 4;
     setStyles(box, {
+      display: "block",
       position: "absolute",
       left: `${left - pad}px`,
       top: `${top - pad}px`,
@@ -325,8 +351,8 @@ export function spotlight(
       padding: "0",
     });
     // The label sits above the box, or inside its top when the element is
-    // at the very top of the page.
-    const above = top - pad > 30;
+    // at the top of the frame's view.
+    const above = top - view.scrollY - pad > 30;
     setStyles(tag, {
       position: "absolute",
       left: "-3px",
@@ -341,14 +367,72 @@ export function spotlight(
       "white-space": "nowrap",
       "box-shadow": `0 0 0 2px ${CURRENT_RING}`,
     });
-    onPlace?.(el);
   };
-  place();
-  view.addEventListener("resize", place);
-  resizeListeners.set(owner, place);
+  // Every frame, not on events: a panel's scroll, a reflow when the live
+  // site's stylesheets and fonts arrive, and an animation all move the
+  // element, and no single event reports them all. Nothing is written unless
+  // the element moved. The frames are the inspector's own: the saved copy is
+  // sandboxed without scripts, so nothing scheduled on its window ever runs.
+  // It stops once the saved copy is replaced or closed (it has no window).
+  let frame = 0;
+  const follow = () => {
+    if (!owner.defaultView || !el.isConnected || !box.isConnected) return;
+    place();
+    frame = requestAnimationFrame(follow);
+  };
+  follow();
+  stopFollowing.set(owner, () => cancelAnimationFrame(frame));
 }
 
-const resizeListeners = new WeakMap<Document, () => void>();
+const stopFollowing = new WeakMap<Document, () => void>();
+
+/**
+ * The elements between ``el`` and the page that scroll on their own (a
+ * sidebar, a dialog, a table), innermost first. The window is not one: the
+ * frame scrolls that itself. Only ``auto`` and ``scroll`` count, the panels a
+ * reader can scroll; a ``hidden`` one is often a closed menu or a slider,
+ * and scrolling it would show the page as no visitor sees it.
+ */
+export function scrollPanels(el: Element): HTMLElement[] {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view) return [];
+  const panels: HTMLElement[] = [];
+  const scrolls = (style: CSSStyleDeclaration) =>
+    /(auto|scroll|overlay)/.test(`${style.overflowX} ${style.overflowY}`);
+  // The body's overflow scrolls the window unless the root sets its own.
+  const bodyScrolls = view.getComputedStyle(doc.documentElement).overflow !== "visible";
+  if (view.getComputedStyle(el).position === "fixed") return panels;
+  for (let node = el.parentElement; node && node !== doc.documentElement; node = node.parentElement) {
+    if (node === doc.body && !bodyScrolls) break;
+    const style = view.getComputedStyle(node);
+    if (scrolls(style)) panels.push(node);
+    // A fixed element is out of every panel above it.
+    if (style.position === "fixed") break;
+  }
+  return panels;
+}
+
+/** The part of ``rect`` that its scrolling ``panels`` show, or null when none of it is shown. */
+function shownPart(
+  rect: DOMRect,
+  panels: HTMLElement[],
+): { left: number; top: number; width: number; height: number } | null {
+  let { left, top, right, bottom } = rect;
+  for (const panel of panels) {
+    if (!panel.isConnected) continue;
+    const outer = panel.getBoundingClientRect();
+    const panelLeft = outer.left + panel.clientLeft;
+    const panelTop = outer.top + panel.clientTop;
+    left = Math.max(left, panelLeft);
+    top = Math.max(top, panelTop);
+    right = Math.min(right, panelLeft + panel.clientWidth);
+    bottom = Math.min(bottom, panelTop + panel.clientHeight);
+  }
+  // Equal edges still count: an empty element is shown where it sits.
+  if (right < left || bottom < top) return null;
+  return { left, top, width: right - left, height: bottom - top };
+}
 
 function setStyles(el: HTMLElement, styles: Record<string, string>): void {
   for (const [name, value] of Object.entries(styles)) el.style.setProperty(name, value, "important");
