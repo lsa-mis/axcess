@@ -1429,7 +1429,13 @@ function keepCentered(target: HTMLElement): void {
       // The whole page is everywhere, and an element that is not displayed or
       // is off the screen is nowhere to scroll to: moving the view would only
       // lose the reader's place, so it stays where it is.
-      if (placed.note === "whole-page" || placed.note === "hidden" || placed.note === "off-screen") return;
+      if (
+        placed.note === "whole-page" ||
+        placed.note === "hidden" ||
+        placed.note === "off-screen" ||
+        placed.note === "focus-unread"
+      )
+        return;
       const top = placed.rect.top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
@@ -1569,6 +1575,8 @@ const BOX_NOTES: Record<BoxNote, string> = {
   "whole-page": "No box, because it is the whole page. Nothing is dimmed.",
   "focus-only": "It shows only when it has keyboard focus. The box is where it shows then.",
   "off-screen": "No box. It is off the screen in this saved copy.",
+  "focus-unread":
+    "No box. It is off the screen in this saved copy. Pages often place a link there and show it only when it has keyboard focus.",
   "part-clipped": "Around the part that shows. The part of the page around it hides the rest (overflow: hidden).",
   clipped: "No box. The part of the page around it hides it (overflow: hidden).",
   opened: "Around it. Axcess opened the closed section it is in (<details>) in this saved copy.",

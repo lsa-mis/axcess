@@ -4,10 +4,14 @@ A skip link is often placed off the screen (``left: -9999px``) until it has
 keyboard focus. The numbered box followed it off the screen, so the reader
 saw no box at all. The inspector now shows the link where it appears when
 focused, draws the box there, and says it shows only with keyboard focus.
-It must not take the reader's own keyboard focus to do it: focus stays where
-it was, on page load and after the reader asks for the element. An element
-that focus does not bring back on screen gets no box, and the table says it
-is off the screen.
+Its focused look is read from the saved copy's own `:focus` rules; nothing
+is focused. (A first version focused the link for an instant and put focus
+back, which still fired blur and focus events on the reader's control and
+could make a screen reader announce the link.) Focus stays where it was, on
+page load and after the reader asks for the element, and no focus event
+fires. A link whose focused look cannot be read gets no box, and the table
+says it is off the screen and why that is common; any other off-screen
+element is just said to be off the screen.
 """
 
 from __future__ import annotations
@@ -77,11 +81,22 @@ async def test_a_skip_link_is_shown_where_it_appears_with_focus(
         # reader's focus stays on the button they used.
         jump = page.get_by_role("button", name="Jump to flagged element")
         await jump.focus()
+        # From here on, nothing may move focus: count every focus change.
+        await page.evaluate(
+            """() => {
+              window.__focusMoves = 0;
+              const count = () => { window.__focusMoves += 1; };
+              document.addEventListener('focusout', count, true);
+              document.addEventListener('focusin', count, true);
+              window.addEventListener('blur', count);
+            }"""
+        )
         await page.keyboard.press("Enter")
         await settled(page)
         assert await page.evaluate(_BOX_ON_LINK)
         assert await page.evaluate(_FOCUS) == [False, False]
         await playwright_async.expect(jump).to_be_focused()
+        assert await page.evaluate("window.__focusMoves") == 0
     finally:
         await page.context.close()
 
@@ -116,6 +131,47 @@ async def test_an_element_focus_does_not_bring_on_screen_gets_no_box(
     try:
         await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
             "No box. It is off the screen in this saved copy."
+        )
+        await settled(page)
+        assert await page.evaluate(f"({BOX_RECT})()") is None
+        assert await page.evaluate(_FOCUS) == [False, False]
+    finally:
+        await page.context.close()
+
+
+UNREAD = (
+    "<!doctype html><html><head><title>Unread skip link fixture</title></head>"
+    "<body style='margin:0'>"
+    "<a id='skip' href='#main' style='position:absolute;left:-9999px'>Skip to content</a>"
+    "<header style='height:120px'>Site name</header>"
+    "<main id='main' style='height:1600px'>Main content</main></body></html>"
+)
+
+
+async def test_a_link_whose_focused_look_cannot_be_read_is_said_to_be_off_screen(
+    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
+) -> None:
+    """No readable :focus rule (as when it lives in another site's stylesheet)."""
+    db_path, _, _ = seeded_db
+    base, scan_id = live_server
+    page_id = seed(
+        db_path,
+        scan_id,
+        UNREAD,
+        "skip-link",
+        [
+            (
+                "#skip",
+                '<a id="skip" href="#main" style="position:absolute;left:-9999px">'
+                "Skip to content</a>",
+            )
+        ],
+    )
+    page = await open_inspector(new_page, base, scan_id, page_id, "skip-link")
+    try:
+        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+            "No box. It is off the screen in this saved copy. Pages often place a link "
+            "there and show it only when it has keyboard focus."
         )
         await settled(page)
         assert await page.evaluate(f"({BOX_RECT})()") is None

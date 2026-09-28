@@ -121,9 +121,12 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   the box's number above it. Centring it used to hide both.
 - Inspector: a skip link placed off the screen until it has keyboard focus
   is shown where it appears with focus, and the box is drawn there. The box
-  used to be off the screen with it. Your own keyboard focus stays where it
-  was. Something else off the screen gets no box, and the table under the
-  toolbar says why.
+  used to be off the screen with it. Axcess reads how the link looks with
+  focus from the page's own styles, and never moves your keyboard focus to
+  find out. When it cannot read those styles (they come from another
+  site), there is no box, and the table under the toolbar says the link is
+  off the screen and that pages often show such a link only with keyboard
+  focus. Something else off the screen gets no box, and the table says so.
 - Inspector: a flagged link that wraps onto two lines gets a ring on each
   line, with the number on the first. One box used to cover both lines and
   the words beside them.

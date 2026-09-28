@@ -595,6 +595,7 @@ export type BoxNote =
   | "image-map"
   | "whole-page"
   | "focus-only"
+  | "focus-unread"
   | "off-screen"
   | "part-clipped"
   | "clipped"
@@ -604,7 +605,13 @@ export type BoxNote =
 
 /** The notes for which no box is drawn at all. */
 export function drawsNoBox(note: BoxNote | null): boolean {
-  return note === "whole-page" || note === "off-screen" || note === "clipped" || note === "hidden";
+  return (
+    note === "whole-page" ||
+    note === "off-screen" ||
+    note === "focus-unread" ||
+    note === "clipped" ||
+    note === "hidden"
+  );
 }
 
 /** A rectangle in the frame's view. */
@@ -749,7 +756,12 @@ function boxPlaceOf(el: Element): Omit<BoxPlace, "lines"> & { lines?: BoxRect[] 
     if (notDisplayed(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "hidden" };
   }
   if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
-  if (isOffScreen(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "off-screen" };
+  if (isOffScreen(el)) {
+    // A focusable element off the screen is most often a skip link whose
+    // focused look Axcess could not read (see showAsFocused).
+    const note = el.matches(FOCUSABLE) ? "focus-unread" : "off-screen";
+    return { on: el, rect: plainRect(el.getBoundingClientRect()), note };
+  }
   const note = tag === "canvas" ? "canvas" : el.parentElement?.closest(`details[${OPENED}]`) ? "opened" : null;
   return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note };
 }
@@ -821,6 +833,9 @@ function hidesUntilFocused(el: Element): boolean {
   return isOffScreen(el) || (style.clip !== "auto" && style.clip !== "") || style.clipPath !== "none";
 }
 
+/** Elements a keyboard can reach, for "focus-unread". */
+const FOCUSABLE = "a[href], button, input, select, textarea, summary, [tabindex]";
+
 /** Set on an element while it is shown with its focus styles. */
 const FOCUS_STYLED = "data-axcess-focus-style";
 /** Each such element's own inline styles before, to put back. */
@@ -831,70 +846,36 @@ const focusStyleUndo = new WeakMap<Element, { name: string; value: string; prior
  * keyboard user sees it. True when that brings it on screen.
  *
  * A skip link is placed off the screen until it has keyboard focus, and the
- * box followed it there, so the reader saw nothing. The saved copy runs no
- * scripts, but the inspector can still call ``focus()`` on its elements.
- * Focus alone was rejected: it stays only while the saved copy has the
- * reader's focus, so it would have to take their focus from the inspector
- * and keep it, and a keyboard or screen reader user would find themselves
- * inside the saved copy without having moved there. No WCAG criterion is
- * about a tool moving focus by itself; it would break the order the reader
- * moves through the inspector in (SC 2.4.3 Focus Order, Level A,
- * paraphrased). Instead, in one step with no drawing
- * in between: note where the reader's focus is, focus the element, read
- * which of its styles focus changes, and put the reader's focus straight
- * back. The changed styles are then set on the element itself, so it stays
- * as it looks focused while the box is on it, and is put back when the box
- * moves on. Only the element's own styles are copied, not those focus
- * changes on its parents (``:focus-within``). The table under the toolbar
- * says it shows only with keyboard focus.
+ * box followed it there, so the reader saw nothing. Its look with focus is
+ * read from the saved copy's own style rules (`:focus`, `:focus-visible`)
+ * and set on the element while the box is on it; nothing is focused.
  *
- * Focus still moves for that instant, so the inspector's focused control
- * gets blur and focus events; nothing is done while the reader types in a
- * field or has a list open, which a blur would close.
+ * Rejected: focusing the element. Focus alone stays only while the saved
+ * copy has the reader's focus, so it would have to take their focus from the
+ * inspector. And focusing it for an instant, reading its styles and putting
+ * focus straight back (the first version of this) still reports two focus
+ * changes to assistive technology, so a screen reader could announce "Skip
+ * to main content, link" and then the reader's own control again, for
+ * nothing they did. Moving focus by itself is what a reader must be able to
+ * count on a page not doing: WCAG 2.2 SC 3.2.1 On Focus and SC 2.4.3 Focus
+ * Order (both Level A) are about exactly that kind of surprise (paraphrased).
  *
- * Rejected, too: saying it is off the screen and drawing no box. That tells
- * the reader nothing about where a keyboard user meets it, and it is used
- * only when focus does not bring the element on screen.
+ * The cost: a stylesheet loaded from another site cannot be read (the
+ * browser forbids it), so a skip link styled only there gets no box, and the
+ * table says it is off the screen and that a page often shows such a link
+ * only with keyboard focus ("focus-unread"). Only rules whose `:focus` is on
+ * the element itself count, not on a parent (`.menu:focus a`), and
+ * `:focus-within` is left alone.
  */
 function showAsFocused(el: Element): boolean {
-  const doc = el.ownerDocument;
-  const view = doc.defaultView;
-  if (!view || !("focus" in el)) return false;
-  const focusable = el as HTMLElement;
-  const host = view.frameElement?.ownerDocument ?? null;
-  const hostFocus = host?.activeElement ?? null;
-  // Not while the reader is typing or has a list open: taking focus, even for
-  // an instant, would close the list. The next Previous, Next or Jump tries
-  // again.
-  if (hostFocus && (hostFocus.getAttribute("aria-expanded") === "true" || isEditable(hostFocus))) return false;
-  const frameFocus = doc.activeElement;
-  const before = styleSnapshot(view.getComputedStyle(el));
-  let after: Map<string, string> | null = null;
-  try {
-    // focusVisible asks for the page's :focus-visible styles too, where the
-    // browser supports it.
-    focusable.focus({ preventScroll: true, focusVisible: true } as FocusOptions);
-    if (doc.activeElement === el) after = styleSnapshot(view.getComputedStyle(el));
-  } finally {
-    focusable.blur();
-    if (frameFocus instanceof view.HTMLElement && frameFocus !== doc.body && frameFocus !== el) {
-      frameFocus.focus({ preventScroll: true });
-    }
-    if (host) {
-      if (hostFocus && hostFocus !== host.body && "focus" in hostFocus) {
-        (hostFocus as HTMLElement).focus({ preventScroll: true });
-      } else if (host.activeElement && host.activeElement !== host.body && "blur" in host.activeElement) {
-        (host.activeElement as HTMLElement).blur();
-      }
-    }
-  }
-  if (!after) return false;
+  const declared = focusRuleStyles(el);
+  if (!declared || declared.size === 0) return false;
   const style = (el as HTMLElement | SVGElement).style;
   const undo: { name: string; value: string; priority: string }[] = [];
-  for (const [name, value] of after) {
+  for (const [name, value] of declared) {
     // The outline is the inspector's own mark; a transition would only
     // replay the change.
-    if (before.get(name) === value || name.startsWith("outline") || name.startsWith("transition")) continue;
+    if (name.startsWith("outline") || name.startsWith("transition")) continue;
     undo.push({ name, value: style.getPropertyValue(name), priority: style.getPropertyPriority(name) });
     style.setProperty(name, value, "important");
   }
@@ -908,9 +889,110 @@ function showAsFocused(el: Element): boolean {
   return true;
 }
 
-function isEditable(el: Element): boolean {
-  const tag = el.tagName.toLowerCase();
-  return tag === "input" || tag === "textarea" || (el as HTMLElement).isContentEditable === true;
+/**
+ * The declarations of every readable style rule that styles ``el`` when it
+ * has focus, in the order the page gives them (a later one wins), or null
+ * when there are none. Media and supports blocks count only when they apply.
+ */
+function focusRuleStyles(el: Element): Map<string, string> | null {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view) return null;
+  const out = new Map<string, string>();
+  const visit = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      if ("selectorText" in rule && "style" in rule) {
+        const styleRule = rule as CSSStyleRule;
+        if (styleRule.selectorText.includes(":focus") && focusedSubjectMatches(el, styleRule.selectorText)) {
+          for (let i = 0; i < styleRule.style.length; i += 1) {
+            const name = styleRule.style[i];
+            out.set(name, styleRule.style.getPropertyValue(name));
+          }
+        }
+        continue;
+      }
+      if ("media" in rule && "cssRules" in rule) {
+        const media = (rule as CSSMediaRule).media.mediaText;
+        if (!media || view.matchMedia(media).matches) visit((rule as CSSMediaRule).cssRules);
+        continue;
+      }
+      if ("conditionText" in rule && "cssRules" in rule) {
+        let applies = false;
+        try {
+          applies = view.CSS.supports((rule as CSSSupportsRule).conditionText);
+        } catch {
+          applies = false;
+        }
+        if (applies) visit((rule as CSSSupportsRule).cssRules);
+        continue;
+      }
+      // Cascade layers (@layer { }) hold rules too.
+      if ("cssRules" in rule && "name" in rule) visit((rule as unknown as CSSGroupingRule).cssRules);
+    }
+  };
+  for (const sheet of Array.from(doc.styleSheets)) {
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // loaded from another site: the browser will not let it be read
+    }
+    if (sheet.media.mediaText && !view.matchMedia(sheet.media.mediaText).matches) continue;
+    visit(rules);
+  }
+  return out.size > 0 ? out : null;
+}
+
+/**
+ * True when one selector in ``selectorText`` puts `:focus` or
+ * `:focus-visible` on its last part (the element it styles) and, with those
+ * taken away, matches ``el``: `.skip:focus`, `a.skip-link:focus-visible`,
+ * not `.menu:focus a`.
+ */
+function focusedSubjectMatches(el: Element, selectorText: string): boolean {
+  const focus = /:focus(?:-visible)?(?![-\w])/g;
+  for (const selector of splitTopLevel(selectorText, ",")) {
+    const parts = splitCompounds(selector.trim());
+    const subject = parts[parts.length - 1] ?? "";
+    if (!focus.test(subject)) continue;
+    focus.lastIndex = 0;
+    const stripped = selector.replace(focus, "").trim();
+    focus.lastIndex = 0;
+    try {
+      if (el.matches(stripped || "*")) return true;
+    } catch {
+      // Not a selector this browser reads; skip it.
+    }
+  }
+  return false;
+}
+
+/** ``text`` split on ``separator`` outside brackets and quotes. */
+function splitTopLevel(text: string, separator: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote && text[i - 1] !== "\\") quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "(" || c === "[") depth += 1;
+    else if (c === ")" || c === "]") depth -= 1;
+    else if (c === separator && depth === 0) {
+      out.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(text.slice(start));
+  return out;
+}
+
+/** A selector's compound parts, split at its combinators (space, >, +, ~). */
+function splitCompounds(selector: string): string[] {
+  const spaced = selector.replace(/\s*([>+~])\s*/g, " ");
+  return splitTopLevel(spaced, " ").filter(Boolean);
 }
 
 /** Put back the element's own styles after ``showAsFocused``. */
@@ -924,15 +1006,6 @@ function undoFocusStyle(el: Element): void {
   }
   focusStyleUndo.delete(el);
   el.removeAttribute(FOCUS_STYLED);
-}
-
-function styleSnapshot(style: CSSStyleDeclaration): Map<string, string> {
-  const out = new Map<string, string>();
-  for (let i = 0; i < style.length; i += 1) {
-    const name = style[i];
-    out.set(name, style.getPropertyValue(name));
-  }
-  return out;
 }
 
 function plainRect(rect: DOMRect | Omit<BoxRect, "width" | "height">): BoxRect {
