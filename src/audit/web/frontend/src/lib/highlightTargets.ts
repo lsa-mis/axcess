@@ -232,6 +232,9 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
 /** Outline a flagged element and keep it visible whatever the page's own styles say. */
 export function markElement(el: HTMLElement | SVGElement): void {
   el.classList.add(HIGHLIGHT_CLASS);
+  // The whole page is not outlined: a ring round the edge of the saved copy
+  // marks nothing in it (see ``spotlight``).
+  if (isWholePage(el)) return;
   // Inset, not outset: a flagged element filling an `overflow: hidden`
   // ancestor (the image-tile pattern) has an outset ring drawn entirely
   // outside the clip box, so it is never painted.
@@ -250,14 +253,19 @@ export function markElement(el: HTMLElement | SVGElement): void {
 
 /** Set the element the reader is on apart from the other flagged ones, or put it back. */
 export function markCurrent(el: HTMLElement | SVGElement, current: boolean): void {
+  if (current) el.setAttribute("data-axcess-current", "");
+  else el.removeAttribute("data-axcess-current");
+  if (isWholePage(el)) return;
   el.style.setProperty(
     "outline",
     current ? `3px solid ${CURRENT_OUTLINE}` : `2px dashed ${FLAGGED_OUTLINE}`,
     "important",
   );
   el.style.setProperty("outline-offset", current ? "-3px" : "-2px", "important");
-  if (current) el.setAttribute("data-axcess-current", "");
-  else el.removeAttribute("data-axcess-current");
+}
+
+function isWholePage(el: Element): boolean {
+  return el === el.ownerDocument.documentElement || el === el.ownerDocument.body;
 }
 
 /**
@@ -282,6 +290,12 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
  *
  * An element with no box of its own is marked where ``boxPlace`` says, on
  * what stands for it.
+ *
+ * The whole page (``<html>``, ``<body>``) gets no box. A box around the whole
+ * document dimmed nothing, since nothing is outside it, and put its label off
+ * the top of the view, so it looked like a stray frame. Rejected: a box
+ * around the frame's view, which would say the element is what happens to be
+ * on screen. The table under the toolbar says it is the whole page instead.
  */
 export function spotlight(
   el: HTMLElement | null,
@@ -321,7 +335,7 @@ export function spotlight(
       panelsOf = on;
       panels = scrollPanels(on);
     }
-    const shown = shownPart(rect, panels);
+    const shown = drawsNoBox(note) ? null : shownPart(rect, panels);
     const where = shown
       ? [shown.left, shown.top, shown.width, shown.height, view.scrollX, view.scrollY].join()
       : "hidden";
@@ -432,8 +446,15 @@ export function scrollPanels(el: Element): HTMLElement[] {
  *   goes on the list box.
  * - ``image-map``: an ``<area>`` of an image map. The box goes on the part of
  *   its image the area covers.
+ * - ``whole-page``: ``<html>`` or ``<body>``, as for a rule about the page
+ *   itself (axe's html-has-lang). No box and no dimming (see ``spotlight``).
  */
-export type BoxNote = "contents" | "list-box" | "image-map";
+export type BoxNote = "contents" | "list-box" | "image-map" | "whole-page";
+
+/** The notes for which no box is drawn at all. */
+export function drawsNoBox(note: BoxNote | null): boolean {
+  return note === "whole-page";
+}
 
 /** A rectangle in the frame's view. */
 export type BoxRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
@@ -455,6 +476,9 @@ export type BoxRect = { left: number; top: number; right: number; bottom: number
 export function boxPlace(el: Element): { on: Element; rect: BoxRect; note: BoxNote | null } {
   const doc = el.ownerDocument;
   const tag = el.tagName.toLowerCase();
+  if (isWholePage(el)) {
+    return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "whole-page" };
+  }
   if (tag === "area") {
     const image = mapImage(el);
     if (image) return { on: image, rect: areaRect(el, image), note: "image-map" };
@@ -597,7 +621,7 @@ export function describeElement(el: Element): ElementDescription {
   const text = normalizeWhitespace(nameOrText(el));
   const rect = el.getBoundingClientRect();
   return {
-    kind,
+    kind: isWholePage(el) ? `The whole page (<${tag}> element)` : kind,
     text: text.length > 80 ? `${text.slice(0, 79).trimEnd()}…` : text,
     width: Math.round(rect.width),
     height: Math.round(rect.height),

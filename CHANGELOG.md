@@ -111,6 +111,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   copy. Now an element styled `display: contents` is marked around what it
   holds, an option on its list box, and an image map area on the part of its
   image it covers. The table under the toolbar says where the box is.
+- Inspector: an occurrence on the whole page (`<html>` or `<body>`, as for
+  a missing page language) no longer draws a box around the whole saved
+  copy, with its label off the top and the view scrolled to the middle.
+  There is no box and no dimming, the view stays put, and the table under
+  the toolbar says it is the whole page.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.

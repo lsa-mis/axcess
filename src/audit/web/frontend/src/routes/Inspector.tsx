@@ -26,6 +26,7 @@ import {
   buildHighlightedHtml,
   countFound,
   describeElement,
+  drawsNoBox,
   findTargetElement,
   HIGHLIGHT_CLASS,
   markCurrent,
@@ -1083,7 +1084,10 @@ export default function InspectorRoute() {
                 <span>
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
-                    : "A blue box with a yellow ring marks the flagged element."}
+                    : // Never describe a box that is not drawn (see ``drawsNoBox``).
+                      drawsNoBox(currentElement?.where ?? null)
+                      ? "No box marks the flagged element. The table above the saved copy says why."
+                      : "A blue box with a yellow ring marks the flagged element."}
                 </span>
               )}
               {!highlightPending &&
@@ -1375,6 +1379,9 @@ function keepCentered(target: HTMLElement): void {
       // Where the box goes: an element with no box of its own (an option,
       // an image map area) is centred by what stands for it.
       const placed = boxPlace(target);
+      // The whole page is everywhere: moving the view would only lose the
+      // reader's place, so it stays where it is.
+      if (placed.note === "whole-page") return;
       const top = placed.rect.top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
@@ -1489,6 +1496,7 @@ const BOX_NOTES: Record<BoxNote, string> = {
   contents: "Around what it holds. It has no box of its own (display: contents).",
   "list-box": "On its list box. An option has no box of its own.",
   "image-map": "On the part of its image it covers. An area of an image map (<area>) has no box of its own.",
+  "whole-page": "No box, because it is the whole page. Nothing is dimmed.",
 };
 
 /** "1 pixel", "924 pixels". */
