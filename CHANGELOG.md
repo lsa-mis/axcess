@@ -42,6 +42,10 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- A stopped scan's page: with a partial report, "Review what the scan
+  found" is now the main button and comes first, with a sentence saying what
+  it opens, like the other actions. Every action's button is the same
+  width. With no report, "Change settings first" still leads.
 - No text in the app is smaller than 14 pixels. Hints, chips, captions and
   table notes were 12 or 13 pixels. Secondary text now stands apart by its
   colour and weight rather than by being smaller. Checked at 320, 390 and
