@@ -106,6 +106,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Inspector: an element with no box of its own is marked where the reader
+  can see it. The numbered box used to jump to the top left of the saved
+  copy. Now an element styled `display: contents` is marked around what it
+  holds, an option on its list box, and an image map area on the part of its
+  image it covers. The table under the toolbar says where the box is.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.

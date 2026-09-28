@@ -21,6 +21,8 @@ import {
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
 import {
+  boxPlace,
+  type BoxNote,
   buildHighlightedHtml,
   countFound,
   describeElement,
@@ -1004,12 +1006,17 @@ export default function InspectorRoute() {
                     <span className="tabular-nums">
                       {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
                     </span>
-                    {(currentElement.width === 0 || currentElement.height === 0) && (
+                    {/* The row below says where the box is when it is not on the element. */}
+                    {currentElement.where === null &&
+                      (currentElement.width === 0 || currentElement.height === 0) && (
                       <span className="block text-xs text-fg-muted">
                         It has no visible size in this saved copy, so the box marks where it sits.
                       </span>
                     )}
                   </ElementFact>
+                  {currentElement.where && (
+                    <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
+                  )}
                   {sharedCount > 1 && <ElementFact term="Occurrences">{sharedCount} on this element</ElementFact>}
                   {currentPlace ? (
                     <>
@@ -1365,7 +1372,10 @@ function keepCentered(target: HTMLElement): void {
       // Position in the *document*, not the viewport: the viewport-relative
       // top barely moves once we have centered it, so it cannot tell us
       // whether the page beneath is still reflowing.
-      const top = target.getBoundingClientRect().top + win.scrollY;
+      // Where the box goes: an element with no box of its own (an option,
+      // an image map area) is centred by what stands for it.
+      const placed = boxPlace(target);
+      const top = placed.rect.top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
       // Scroll the *frame* only. `scrollIntoView` also scrolls every ancestor
@@ -1375,16 +1385,16 @@ function keepCentered(target: HTMLElement): void {
       // An app-style page scrolls a panel of its own (a sidebar) rather than
       // the window, so each panel around the element, innermost first, is
       // centred on it before the frame is.
-      for (const panel of scrollPanels(target)) {
+      for (const panel of scrollPanels(placed.on)) {
         const outer = panel.getBoundingClientRect();
-        const inner = target.getBoundingClientRect();
+        const inner = boxPlace(target).rect;
         panel.scrollTo({
           top: panel.scrollTop + inner.top - outer.top - panel.clientTop - (panel.clientHeight - inner.height) / 2,
           left: panel.scrollLeft + inner.left - outer.left - panel.clientLeft - (panel.clientWidth - inner.width) / 2,
           behavior: "instant",
         });
       }
-      const rect = target.getBoundingClientRect();
+      const rect = boxPlace(target).rect;
       win.scrollTo({
         top: win.scrollY + rect.top - (win.innerHeight - rect.height) / 2,
         left: win.scrollX + rect.left - (win.innerWidth - rect.width) / 2,
@@ -1465,6 +1475,21 @@ function IssueNotHereChip() {
     </span>
   );
 }
+
+/**
+ * Where the numbered box is, in words, when it is not simply around the
+ * flagged element (see ``boxPlace``). A row of its own in the table, after
+ * Size, and only when it applies, so every other element's table keeps the
+ * same labels in the same places. Said in words because the box's position
+ * alone cannot tell the reader that an option was marked on its list box:
+ * WCAG 2.2 SC 1.3.3 Sensory Characteristics (Level A). The technical name is
+ * in parentheses for developers (docs/plain-language.md, rule 6).
+ */
+const BOX_NOTES: Record<BoxNote, string> = {
+  contents: "Around what it holds. It has no box of its own (display: contents).",
+  "list-box": "On its list box. An option has no box of its own.",
+  "image-map": "On the part of its image it covers. An area of an image map (<area>) has no box of its own.",
+};
 
 /** "1 pixel", "924 pixels". */
 function pixels(n: number): string {

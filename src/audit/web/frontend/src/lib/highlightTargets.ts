@@ -279,6 +279,9 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
  * panel scrolled away and left the box behind, stuck at the top or bottom of
  * the panel over something else. Now the box covers only the part of the
  * element its panels show, and is hidden while none of it is shown.
+ *
+ * An element with no box of its own is marked where ``boxPlace`` says, on
+ * what stands for it.
  */
 export function spotlight(
   el: HTMLElement | null,
@@ -301,16 +304,22 @@ export function spotlight(
   tag.textContent = label;
   box.appendChild(tag);
   owner.documentElement.appendChild(box);
-  const panels = scrollPanels(el);
+  let panelsOf: Element | null = null;
+  let panels: HTMLElement[] = [];
 
   let lastSize: string | null = null;
   let lastPlace: string | null = null;
   const place = () => {
-    const rect = el.getBoundingClientRect();
-    const size = `${rect.width},${rect.height}`;
+    const own = el.getBoundingClientRect();
+    const { on, rect, note } = boxPlace(el);
+    const size = `${own.width},${own.height},${note}`;
     if (size !== lastSize) {
       lastSize = size;
       onPlace?.(el);
+    }
+    if (on !== panelsOf) {
+      panelsOf = on;
+      panels = scrollPanels(on);
     }
     const shown = shownPart(rect, panels);
     const where = shown
@@ -413,9 +422,118 @@ export function scrollPanels(el: Element): HTMLElement[] {
   return panels;
 }
 
+/**
+ * Why the box is not simply around the flagged element itself, for the table
+ * under the toolbar. Null when it is.
+ *
+ * - ``contents``: styled ``display: contents``, so only what it holds is
+ *   drawn. The box goes around that.
+ * - ``list-box``: an ``<option>`` of a closed list box (``<select>``). The box
+ *   goes on the list box.
+ * - ``image-map``: an ``<area>`` of an image map. The box goes on the part of
+ *   its image the area covers.
+ */
+export type BoxNote = "contents" | "list-box" | "image-map";
+
+/** A rectangle in the frame's view. */
+export type BoxRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
+
+/**
+ * Where the numbered box goes for ``el``: the element it is drawn over (the
+ * flagged one, or what shows for it), the rectangle, and why when it is not
+ * the element's own.
+ *
+ * An element without a box of its own reports an empty rectangle at the top
+ * left of the frame, and the box used to jump there, over whatever the page
+ * had in that corner. Rejected: drawing no box for these. The reader can see
+ * what stands for each one (the buttons a ``display: contents`` wrapper holds,
+ * the list box an option is in, the hotspot of an image map), so the box goes
+ * there and the table says so in words. Not colour or position alone: WCAG
+ * 2.2 SC 1.3.3 Sensory Characteristics (Level A), paraphrased, says
+ * instructions do not rely on shape or location alone.
+ */
+export function boxPlace(el: Element): { on: Element; rect: BoxRect; note: BoxNote | null } {
+  const doc = el.ownerDocument;
+  const tag = el.tagName.toLowerCase();
+  if (tag === "area") {
+    const image = mapImage(el);
+    if (image) return { on: image, rect: areaRect(el, image), note: "image-map" };
+  }
+  if (el.getClientRects().length === 0) {
+    if (doc.defaultView?.getComputedStyle(el).display === "contents") {
+      // A range over its children is the box every one of them draws.
+      const range = doc.createRange();
+      range.selectNodeContents(el);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) return { on: el, rect: plainRect(rect), note: "contents" };
+    }
+    if (tag === "option" || tag === "optgroup") {
+      const select = el.closest("select");
+      if (select && select.getClientRects().length > 0) {
+        return { on: select, rect: plainRect(select.getBoundingClientRect()), note: "list-box" };
+      }
+    }
+  }
+  return { on: el, rect: plainRect(el.getBoundingClientRect()), note: null };
+}
+
+function plainRect(rect: DOMRect | Omit<BoxRect, "width" | "height">): BoxRect {
+  const { left, top, right, bottom } = rect;
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+/** The image an ``<area>``'s map belongs to (``<img usemap="#name">``), or null. */
+function mapImage(area: Element): Element | null {
+  const map = area.closest("map");
+  const name = map?.getAttribute("name") || map?.id;
+  if (!map || !name) return null;
+  const images = Array.from(map.ownerDocument.querySelectorAll("img[usemap], object[usemap]"));
+  // HTML compares the name after the "#" without regard to ASCII case.
+  const wanted = `#${name.toLowerCase()}`;
+  return images.find((image) => image.getAttribute("usemap")?.trim().toLowerCase() === wanted) ?? null;
+}
+
+/**
+ * The part of ``image`` an ``<area>`` covers: the bounding box of its shape,
+ * in the image's own pixels from its top left, kept inside the image. The
+ * whole image for ``default``, and for coordinates it cannot read.
+ */
+function areaRect(area: Element, image: Element): BoxRect {
+  const outer = image.getBoundingClientRect();
+  const style = image.ownerDocument.defaultView?.getComputedStyle(image);
+  const left = outer.left + image.clientLeft + parseFloat(style?.paddingLeft ?? "0");
+  const top = outer.top + image.clientTop + parseFloat(style?.paddingTop ?? "0");
+  const whole = plainRect(outer);
+  const shape = (area.getAttribute("shape") ?? "rect").trim().toLowerCase();
+  const coords = (area.getAttribute("coords") ?? "")
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
+  if (coords.some((n) => !Number.isFinite(n))) return whole;
+  let box: [number, number, number, number] | null = null;
+  if ((shape === "rect" || shape === "rectangle") && coords.length >= 4) {
+    const [x1, y1, x2, y2] = coords;
+    box = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
+  } else if ((shape === "circle" || shape === "circ") && coords.length >= 3) {
+    box = [coords[0] - coords[2], coords[1] - coords[2], coords[0] + coords[2], coords[1] + coords[2]];
+  } else if ((shape === "poly" || shape === "polygon") && coords.length >= 6) {
+    const xs = coords.filter((_, i) => i % 2 === 0);
+    const ys = coords.filter((_, i) => i % 2 === 1);
+    box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  }
+  if (!box) return whole;
+  const clamp = (n: number, low: number, high: number) => Math.min(Math.max(n, low), high);
+  return plainRect({
+    left: clamp(left + box[0], whole.left, whole.right),
+    top: clamp(top + box[1], whole.top, whole.bottom),
+    right: clamp(left + box[2], whole.left, whole.right),
+    bottom: clamp(top + box[3], whole.top, whole.bottom),
+  });
+}
+
 /** The part of ``rect`` that its scrolling ``panels`` show, or null when none of it is shown. */
 function shownPart(
-  rect: DOMRect,
+  rect: BoxRect,
   panels: HTMLElement[],
 ): { left: number; top: number; width: number; height: number } | null {
   let { left, top, right, bottom } = rect;
@@ -446,6 +564,8 @@ export type ElementDescription = {
   text: string;
   width: number;
   height: number;
+  /** Why the box is somewhere other than around it, or null. */
+  where: BoxNote | null;
 };
 
 export function describeElement(el: Element): ElementDescription {
@@ -481,6 +601,7 @@ export function describeElement(el: Element): ElementDescription {
     text: text.length > 80 ? `${text.slice(0, 79).trimEnd()}…` : text,
     width: Math.round(rect.width),
     height: Math.round(rect.height),
+    where: boxPlace(el).note,
   };
 }
 
