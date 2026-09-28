@@ -20,6 +20,21 @@ export const FIRST_DIRECTION: Record<SortKind, SortDirection> = {
   date: "desc",
 };
 
+/**
+ * A sort as it is kept in the URL (`?sort=completed_desc`), the form the
+ * Issues table uses too, so Back and a shared link bring the order back.
+ */
+export function sortParam<K extends string>(sort: Sort<K>): string {
+  return `${sort.column}_${sort.direction}`;
+}
+
+/** ``sortParam`` read back; null for a missing value or a column the table does not have. */
+export function parseSortParam<K extends string>(raw: string | null, columns: readonly K[]): Sort<K> | null {
+  const match = raw?.match(/^(.+)_(asc|desc)$/);
+  if (!match || !(columns as readonly string[]).includes(match[1])) return null;
+  return { column: match[1] as K, direction: match[2] as SortDirection };
+}
+
 /** Pressing the sorted column flips it; any other column starts at its first direction. */
 export function nextSort<K extends string>(current: Sort<K> | null, column: K, kind: SortKind): Sort<K> {
   if (current?.column === column) {

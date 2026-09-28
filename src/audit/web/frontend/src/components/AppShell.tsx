@@ -19,6 +19,7 @@ import { Button, LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import { useScrollRestoration } from "../hooks/useScrollRestoration";
 import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
 import PreferenceEffects from "./PreferenceEffects";
@@ -172,15 +173,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, routeLabel]);
 
-  useEffect(() => {
-    // Every route starts at the top. React Router keeps the previous page's
-    // offset by default, so opening a short page from a long one landed the
-    // reader partway down it. Deliberately not inside the focus effect above:
-    // that one runs in a requestAnimationFrame, which never fires while the
-    // tab is in the background, and where the page starts should not depend
-    // on whether anyone was watching it load.
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [pathname]);
+  // A new page starts at the top; Back and Forward return to where the
+  // reader was (see the hook). Deliberately not inside the focus effect
+  // above: that one runs in a requestAnimationFrame, which never fires while
+  // the tab is in the background, and where the page starts should not
+  // depend on whether anyone was watching it load.
+  useScrollRestoration();
 
   return (
     <div className="min-h-screen bg-surface-subtle">

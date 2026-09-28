@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, ListChecks, PlusCircle, Trash2 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -38,7 +38,7 @@ import {
   TableBar,
   rowBand,
 } from "../components/table/Table";
-import { sortWords, type Sort, type SortKind } from "../components/table/sort";
+import { parseSortParam, sortParam, sortWords, type Sort, type SortKind } from "../components/table/sort";
 
 /** A sign-in scan's progress, in the same words as the public scan badges. */
 const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
@@ -127,6 +127,9 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
 
+const SORT_COLUMNS = ["site", "completed", "pages", "issues", "images", "states"] as const satisfies readonly SortKey[];
+const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
+
 const SORT_KINDS: Record<SortKey, SortKind> = {
   site: "text",
   pages: "number",
@@ -204,9 +207,48 @@ const NO_SITES: SiteGroup[] = [];
 const RUNNING_REFRESH_MS = 5_000;
 
 export default function ScansRoute() {
-  const [sort, setSort] = useState<Sort<SortKey>>({ column: "completed", direction: "desc" });
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [search, setSearch] = useState("");
+  // The view lives in the URL, not in component state: the order
+  // (`?sort=`), the search (`?q=`), the sites opened (`?open=`, one per
+  // site) and the page (`?page=`, usePagedRows). Going to a report and
+  // pressing Back used to bring the table back sorted by date, unsearched
+  // and with every site closed, so the reader had to find their place
+  // again: a cost that falls hardest on keyboard and screen reader users,
+  // who find it by moving through the rows (W3C COGA, "Making Content
+  // Usable", https://www.w3.org/TR/coga-usable/: do not make people redo
+  // steps). Every change replaces the history entry rather than adding
+  // one, so Back leaves the page instead of undoing a sort or a click; and
+  // a copied link opens the same view. The Issues table keeps its view the
+  // same way.
+  const [params, setParams] = useSearchParams();
+  const rawSort = params.get("sort");
+  const sort = useMemo(() => parseSortParam(rawSort, SORT_COLUMNS) ?? DEFAULT_SORT, [rawSort]);
+  const search = params.get("q") ?? "";
+  const openKey = params.getAll("open").join("\n");
+  const expanded = useMemo<ReadonlySet<string>>(() => new Set(openKey ? openKey.split("\n") : []), [openKey]);
+  // Against the live query string, as on Issues: the search publishes on a
+  // debounce, so a snapshot taken at render could drop a pending keystroke.
+  const updateParams = useCallback(
+    (change: (next: URLSearchParams) => void) =>
+      setParams(
+        (previous) => {
+          const next = new URLSearchParams(previous);
+          change(next);
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const setSort = (next: Sort<SortKey>) =>
+    updateParams((p) => {
+      if (next.column === DEFAULT_SORT.column && next.direction === DEFAULT_SORT.direction) p.delete("sort");
+      else p.set("sort", sortParam(next));
+    });
+  const setSearch = (next: string) =>
+    updateParams((p) => {
+      if (next) p.set("q", next);
+      else p.delete("q");
+    });
   // Under the "scans" prefix so every existing invalidation of the scan
   // list (create, cancel, delete) refreshes the grouped view as well.
   const { data: sites = NO_SITES, isLoading, isError } = useQuery({
@@ -258,14 +300,16 @@ export default function ScansRoute() {
   const protectedPages = usePagedRows(protectedScans, { param: "protectedPage" });
 
   // Stable, so a site row that did not change skips re-rendering.
-  const toggleSite = useCallback((siteUrl: string) => {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(siteUrl)) next.delete(siteUrl);
-      else next.add(siteUrl);
-      return next;
-    });
-  }, []);
+  const toggleSite = useCallback(
+    (siteUrl: string) =>
+      updateParams((p) => {
+        const open = p.getAll("open");
+        p.delete("open");
+        const next = open.includes(siteUrl) ? open.filter((url) => url !== siteUrl) : [...open, siteUrl];
+        for (const url of next) p.append("open", url);
+      }),
+    [updateParams],
+  );
   const sortProps = { sort, onSort: setSort };
 
   return (

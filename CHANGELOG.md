@@ -42,6 +42,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Back returns you to where you were. Open a report from Reports and press
+  Back: the table keeps its order, search, page and opened sites, and the
+  page is scrolled where you left it. The Reports view is kept in the page
+  address, so a copied link opens the same view too. A new page still
+  starts at the top.
 - A stopped scan's page: with a partial report, "Review what the scan
   found" is now the main button and comes first, with a sentence saying what
   it opens, like the other actions. Every action's button is the same

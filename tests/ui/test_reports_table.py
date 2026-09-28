@@ -301,3 +301,55 @@ async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> N
     ).to_have_attribute("href", "/app/scans/20")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
+
+
+async def test_back_brings_the_table_back_as_it_was(new_page: Any) -> None:
+    """Sort, search, open sites and scroll survive going to a report and back.
+
+    Back used to bring the table back sorted by date, with every site
+    closed, so the reader had to find their place again.
+    """
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    sites = [_site(index, 1) for index in reversed(range(8))]
+    page = await new_page(viewport={"width": 1280, "height": 600})
+
+    async def respond(route: Any) -> None:
+        path = route.request.url.split("reports.test", 1)[-1].split("?", 1)[0]
+        if path == "/api/sites":
+            await route.fulfill(json=sites)
+        elif path.startswith("/api/"):
+            await route.fulfill(status=404, json={"detail": "Unavailable"})
+        elif path.startswith("/app/assets/"):
+            await route.fulfill(path=str(DIST / path.removeprefix("/app/")))
+        else:
+            await route.fulfill(path=str(DIST / "index.html"))
+
+    await page.route("**/*", respond)
+    await page.goto("http://reports.test/app/scans", wait_until="networkidle")
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    await table.locator("thead").get_by_role("button", name=re.compile(r"^Site\b")).click()
+    toggle = table.get_by_role("button", name="Show all 2 scans for site3.example")
+    await toggle.click()
+    await playwright_async.expect(
+        table.get_by_role("button", name="Hide all 2 scans for site3.example")
+    ).to_have_attribute("aria-expanded", "true")
+    # The view is in the URL, and changing it added no history entries.
+    await playwright_async.expect(page).to_have_url(re.compile(r"sort=site_asc"))
+    await playwright_async.expect(page).to_have_url(re.compile(r"open=https%3A%2F%2Fsite3"))
+    assert await page.evaluate("history.length") == 2
+    await page.evaluate("window.scrollTo(0, 400)")
+    scrolled = await page.evaluate("window.scrollY")
+
+    await table.get_by_role("link", name=re.compile(r"^Open latest scan of site5\.example")).click()
+    await page.wait_for_url(re.compile(r"/app/scans/\d+$"))
+    await page.go_back()
+
+    await playwright_async.expect(
+        table.get_by_role("button", name="Hide all 2 scans for site3.example")
+    ).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(table.locator("thead th").first).to_have_attribute(
+        "aria-sort", "ascending"
+    )
+    await page.wait_for_function(f"Math.abs(window.scrollY - {scrolled}) < 40")
+    await page.context.close()
