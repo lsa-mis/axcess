@@ -29,6 +29,7 @@ import {
   markCurrent,
   normalizeWhitespace,
   readableLocator,
+  scrollPanels,
   snippetCutFor,
   spotlight,
   type ElementDescription,
@@ -1376,6 +1377,18 @@ function keepCentered(target: HTMLElement): void {
       // scroll container, including the page that holds the iframe, so each
       // re-centre yanked the reader down the inspector page; where the page
       // itself starts is the app shell's decision (the top), not the frame's.
+      // An app-style page scrolls a panel of its own (a sidebar) rather than
+      // the window, so each panel around the element, innermost first, is
+      // centred on it before the frame is.
+      for (const panel of scrollPanels(target)) {
+        const outer = panel.getBoundingClientRect();
+        const inner = target.getBoundingClientRect();
+        panel.scrollTo({
+          top: panel.scrollTop + inner.top - outer.top - panel.clientTop - (panel.clientHeight - inner.height) / 2,
+          left: panel.scrollLeft + inner.left - outer.left - panel.clientLeft - (panel.clientWidth - inner.width) / 2,
+          behavior: "instant",
+        });
+      }
       const rect = target.getBoundingClientRect();
       win.scrollTo({
         top: win.scrollY + rect.top - (win.innerHeight - rect.height) / 2,

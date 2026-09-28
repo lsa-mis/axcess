@@ -56,6 +56,12 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Inspector: on an app-style page that scrolls a panel of its own (a
+  sidebar, a dialog) rather than the whole page, the flagged element is
+  scrolled into view in that panel, and the numbered box stays on it as the
+  panel scrolls. The box used to be left behind at the top or bottom of the
+  panel, over some other control. It is hidden while the element is
+  scrolled out of its panel.
 - **Saved-copy highlights are exact.** An occurrence is outlined only when
   its locator, checked against its recorded markup, or the markup alone
   names one element. Checked against every occurrence in the local reports
