@@ -122,7 +122,19 @@ export function ReportSummary({
 
       {/* What was checked leads the notes: whether the scan checked
           something comes before what its labels mean. The count stays on
-          the closed row, so the fact is on screen without opening anything. */}
+          the closed row, so the fact is on screen without opening anything.
+
+          The notes come after the numbers, not before them. Putting them
+          first was considered and rejected: the numbers are what the report
+          found, and leading with the main point is the first rule of the
+          U.S. Federal Plain Language Guidelines; two closed rows above them
+          would start every visit with things to open. Each note sits by
+          what it explains instead: "What was checked" (how many checks ran)
+          qualifies the numbers just above it, and what the labels mean
+          explains the table just below it. The count of checks that ran
+          stays visible on the closed row, so nobody reads the numbers
+          without the limitation beside them. Reading order for a screen
+          reader is the same: heading, numbers, notes, table. */}
       <ReportNotes className="mt-8">
         <ReportNote
           id="report-coverage"
