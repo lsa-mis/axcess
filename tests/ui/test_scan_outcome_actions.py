@@ -45,8 +45,10 @@ def _stopped_scan(db_path: Path, from_scan: int, *, with_pages: bool) -> int:
                 if row["name"] not in ("id", "scan_id")
             ]
             names = ", ".join(columns)
+            # Column names come from the table's own schema (PRAGMA
+            # table_info), not from input; the values are bound parameters.
             conn.execute(
-                f"INSERT INTO pages (scan_id, {names}) "
+                f"INSERT INTO pages (scan_id, {names}) "  # noqa: S608
                 f"SELECT ?, {names} FROM pages WHERE scan_id = ?",
                 (scan_id, from_scan),
             )
