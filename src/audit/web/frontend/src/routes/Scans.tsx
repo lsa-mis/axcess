@@ -109,6 +109,15 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   under a screen reader, and `treegrid` needs grid keyboard handling
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ * - Column order: the site that names the row, when its latest completed
+ *   scan finished, that scan's numbers, then the link to open it. The link
+ *   stays last, the usual place for a row's action: the row is read (by eye
+ *   or, cell by cell, by a screen reader) as "this site, as of then, with
+ *   these results", and only then offers to open it. It was considered as
+ *   the second column; that split the site from its date and numbers, and
+ *   the Issues count is already a link into the same report earlier in the
+ *   row. The Site column is sticky, so the row keeps its name when a narrow
+ *   screen scrolls the table sideways to reach the link.
  * - "Open latest scan" is a link, styled as one, because it goes to a
  *   page; a button acts on this one. One quiet link per row rather than an
  *   outlined button in every row, which outweighed the numbers. Its
