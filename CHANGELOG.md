@@ -124,6 +124,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   used to be off the screen with it. Your own keyboard focus stays where it
   was. Something else off the screen gets no box, and the table under the
   toolbar says why.
+- Inspector: a flagged link that wraps onto two lines gets a ring on each
+  line, with the number on the first. One box used to cover both lines and
+  the words beside them.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.

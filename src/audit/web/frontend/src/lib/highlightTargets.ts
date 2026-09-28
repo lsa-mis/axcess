@@ -291,6 +291,14 @@ function isWholePage(el: Element): boolean {
  * An element with no box of its own is marked where ``boxPlace`` says, on
  * what stands for it.
  *
+ * A link that wraps onto a second line gets a ring on each line, with the
+ * label on the first. One rectangle around it covered both lines and the
+ * words beside them, so the reader could not see which words are the link.
+ * The dimming is drawn once, around all the lines: a dimmed ring per line
+ * would dim the other lines, and stack. Rejected: an outline that follows
+ * the text's shape exactly, which needs a drawn path per line and says no
+ * more than the rings do.
+ *
  * An element placed off the screen until it has focus (a skip link) is shown
  * as it looks focused (``showAsFocused``). One that stays off the screen gets
  * no box: a box off the screen shows the reader nothing.
@@ -336,7 +344,7 @@ export function spotlight(
       showAsFocused(el);
     }
     const own = el.getBoundingClientRect();
-    const { on, rect, note } = boxPlace(el);
+    const { on, lines, note } = boxPlace(el);
     const size = `${own.width},${own.height},${note}`;
     if (size !== lastSize) {
       lastSize = size;
@@ -346,28 +354,46 @@ export function spotlight(
       panelsOf = on;
       panels = scrollPanels(on);
     }
-    const shown = drawsNoBox(note) ? null : shownPart(rect, panels);
-    const where = shown
-      ? [shown.left, shown.top, shown.width, shown.height, view.scrollX, view.scrollY].join()
+    const parts = drawsNoBox(note)
+      ? []
+      : lines.map((line) => shownPart(line, panels)).filter((part): part is ShownPart => part !== null);
+    const where = parts.length
+      ? [...parts.flatMap((part) => [part.left, part.top, part.width, part.height]), view.scrollX, view.scrollY].join()
       : "hidden";
     if (where === lastPlace) return;
     lastPlace = where;
-    if (!shown) {
+    if (parts.length === 0) {
       box.style.setProperty("display", "none", "important");
       return;
     }
-    let { width, height } = shown;
-    let left = shown.left + view.scrollX;
-    let top = shown.top + view.scrollY;
-    if (width < SPOTLIGHT_MIN) {
-      left -= (SPOTLIGHT_MIN - width) / 2;
-      width = SPOTLIGHT_MIN;
-    }
-    if (height < SPOTLIGHT_MIN) {
-      top -= (SPOTLIGHT_MIN - height) / 2;
-      height = SPOTLIGHT_MIN;
-    }
+    // Page coordinates, each at least SPOTLIGHT_MIN on each side.
+    const pieces = parts.map((part) => {
+      let { width, height } = part;
+      let left = part.left + view.scrollX;
+      let top = part.top + view.scrollY;
+      if (width < SPOTLIGHT_MIN) {
+        left -= (SPOTLIGHT_MIN - width) / 2;
+        width = SPOTLIGHT_MIN;
+      }
+      if (height < SPOTLIGHT_MIN) {
+        top -= (SPOTLIGHT_MIN - height) / 2;
+        height = SPOTLIGHT_MIN;
+      }
+      return { left, top, width, height };
+    });
+    const left = Math.min(...pieces.map((piece) => piece.left));
+    const top = Math.min(...pieces.map((piece) => piece.top));
+    const width = Math.max(...pieces.map((piece) => piece.left + piece.width)) - left;
+    const height = Math.max(...pieces.map((piece) => piece.top + piece.height)) - top;
     const pad = 4;
+    const ring = {
+      "box-sizing": "border-box",
+      border: `3px solid ${CURRENT_OUTLINE}`,
+      "border-radius": "4px",
+    };
+    const single = pieces.length === 1;
+    // One piece: the box is the ring. Several (a wrapped link): the box only
+    // dims around them all, and each line gets a ring of its own.
     setStyles(box, {
       display: "block",
       position: "absolute",
@@ -375,22 +401,49 @@ export function spotlight(
       top: `${top - pad}px`,
       width: `${width + pad * 2}px`,
       height: `${height + pad * 2}px`,
-      "box-sizing": "border-box",
-      border: `3px solid ${CURRENT_OUTLINE}`,
-      "border-radius": "4px",
-      "box-shadow": `0 0 0 3px ${CURRENT_RING}, 0 0 0 100vmax ${CURRENT_DIM}`,
+      ...(single ? ring : { "box-sizing": "border-box", border: "0", "border-radius": "4px" }),
+      "box-shadow": single
+        ? `0 0 0 3px ${CURRENT_RING}, 0 0 0 100vmax ${CURRENT_DIM}`
+        : `0 0 0 100vmax ${CURRENT_DIM}`,
       "pointer-events": "none",
       "z-index": "2147483647",
       margin: "0",
       padding: "0",
     });
-    // The label sits above the box, or inside its top when the element is
-    // at the top of the frame's view.
-    const above = top - view.scrollY - pad > 30;
+    for (const old of Array.from(box.querySelectorAll("[data-axcess-line]"))) old.remove();
+    if (!single) {
+      // As far out as the one-piece ring, so no ring covers the text.
+      const linePad = pad;
+      // Inside the box, which has no border: offsets from its padding edge.
+      for (const piece of pieces) {
+        const line = owner.createElement("div");
+        line.setAttribute("data-axcess-line", "");
+        setStyles(line, {
+          position: "absolute",
+          left: `${piece.left - linePad - (left - pad)}px`,
+          top: `${piece.top - linePad - (top - pad)}px`,
+          width: `${piece.width + linePad * 2}px`,
+          height: `${piece.height + linePad * 2}px`,
+          ...ring,
+          "box-shadow": `0 0 0 3px ${CURRENT_RING}`,
+          margin: "0",
+          padding: "0",
+        });
+        box.appendChild(line);
+      }
+    }
+    // The label sits above the first line's box, or inside its top when that
+    // is at the top of the frame's view. After the lines, so it is drawn
+    // over their rings.
+    const first = pieces[0];
+    const above = first.top - view.scrollY - pad > 30;
+    const labelLeft = single ? -3 : first.left - pad - (left - pad);
+    const labelTop = single ? 0 : first.top - pad - (top - pad);
     setStyles(tag, {
       position: "absolute",
-      left: "-3px",
-      top: above ? "-29px" : "0",
+      left: `${labelLeft}px`,
+      top: `${above ? labelTop - 29 : labelTop}px`,
+      "z-index": "1",
       background: CURRENT_OUTLINE,
       color: "#ffffff",
       font: "600 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -490,7 +543,19 @@ export type BoxRect = { left: number; top: number; right: number; bottom: number
  * 2.2 SC 1.3.3 Sensory Characteristics (Level A), paraphrased, says
  * instructions do not rely on shape or location alone.
  */
-export function boxPlace(el: Element): { on: Element; rect: BoxRect; note: BoxNote | null } {
+export function boxPlace(el: Element): BoxPlace {
+  const placed = boxPlaceOf(el);
+  return { ...placed, lines: placed.lines ?? [placed.rect] };
+}
+
+/**
+ * Where the box goes: the element it is drawn over, the whole rectangle, one
+ * rectangle per line for an inline element that wraps (see ``spotlight``),
+ * and why when it is not simply the element's own box.
+ */
+export type BoxPlace = { on: Element; rect: BoxRect; lines: BoxRect[]; note: BoxNote | null };
+
+function boxPlaceOf(el: Element): Omit<BoxPlace, "lines"> & { lines?: BoxRect[] } {
   const doc = el.ownerDocument;
   const tag = el.tagName.toLowerCase();
   if (isWholePage(el)) {
@@ -517,7 +582,18 @@ export function boxPlace(el: Element): { on: Element; rect: BoxRect; note: BoxNo
   }
   if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
   if (isOffScreen(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "off-screen" };
-  return { on: el, rect: plainRect(el.getBoundingClientRect()), note: null };
+  return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note: null };
+}
+
+/**
+ * The lines an inline element (a link in a sentence) is drawn on, when it
+ * wraps onto more than one; else undefined. Empty fragments at a line's end
+ * are left out.
+ */
+function lineRects(el: Element): BoxRect[] | undefined {
+  if (el.ownerDocument.defaultView?.getComputedStyle(el).display !== "inline") return undefined;
+  const lines = Array.from(el.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+  return lines.length > 1 ? lines.map(plainRect) : undefined;
 }
 
 /**
@@ -711,11 +787,10 @@ function areaRect(area: Element, image: Element): BoxRect {
   });
 }
 
+type ShownPart = { left: number; top: number; width: number; height: number };
+
 /** The part of ``rect`` that its scrolling ``panels`` show, or null when none of it is shown. */
-function shownPart(
-  rect: BoxRect,
-  panels: HTMLElement[],
-): { left: number; top: number; width: number; height: number } | null {
+function shownPart(rect: BoxRect, panels: HTMLElement[]): ShownPart | null {
   let { left, top, right, bottom } = rect;
   for (const panel of panels) {
     if (!panel.isConnected) continue;
