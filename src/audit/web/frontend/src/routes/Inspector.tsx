@@ -839,19 +839,16 @@ export default function InspectorRoute() {
           />
           {/* The previous document stays on screen while the next one loads,
               so say which is which rather than letting the reviewer read the
-              old state under the new label. */}
-          {isFetching ? (
+              old state under the new label. Once loaded, nothing is said:
+              "The scan saved this page state after clicking the control."
+              only repeated the chosen option, which already reads "After
+              clicking …". */}
+          {isFetching && (
             <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" role="status">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               Loading this page state. The previous one stays on screen until it
               loads.
             </span>
-          ) : (
-            activeStateKey && (
-              <span className="text-xs text-fg-muted">
-                The scan saved this page state after clicking the control.
-              </span>
-            )
           )}
         </div>
       )}
