@@ -91,6 +91,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- An issue's page: the Pages with this issue table was inset from the page
+  edges. It now spans the same width as the Issues table, lined up with
+  the title.
 - Inspector: on an app-style page that scrolls a panel of its own (a
   sidebar, a dialog) rather than the whole page, the flagged element is
   scrolled into view in that panel, and the numbered box stays on it as the

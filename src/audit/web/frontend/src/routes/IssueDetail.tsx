@@ -13,10 +13,8 @@ import { REVIEW_LANE_HELP } from "../lib/labels";
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
  *
- * This is now a thin shell: the full evidence content lives in
- * ``<IssueEvidence>``, which is also expanded inline on the Issues list, so
- * the detail route and the inline expansion can never drift apart. The route
- * exists for deep links, bookmarks, and the breadcrumb trail.
+ * This is a thin shell: the evidence content lives in ``<IssueEvidence>``.
+ * The route exists for deep links, bookmarks, and the breadcrumb trail.
  */
 export default function IssueDetailRoute() {
   const { scanId, issueKey } = useParams<{ scanId: string; issueKey: string }>();

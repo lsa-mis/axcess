@@ -56,9 +56,15 @@ export default function IssueEvidence({
   const { row, pages } = data;
 
   return (
-    <div className="space-y-4 p-4">
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border bg-surface-muted px-4 py-3">
+    // No padding of its own: the card spans the page's content width, as the
+    // Issues list's table does, so the two pages line up. (The padding was
+    // for when this was also expanded inside an Issues row.) The card does
+    // not clip (no overflow-hidden), which would cut off the table region's
+    // focus ring at its edge (SC 2.4.7); its bar rounds its own top corners
+    // and the table region its bottom ones (CARD_EDGE, table/Table.tsx).
+    <div className="space-y-4">
+      <Card>
+        <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
           <h2 className="text-base font-semibold">
             Pages with this issue
             <span className="ml-2 text-sm font-normal text-fg-muted">
