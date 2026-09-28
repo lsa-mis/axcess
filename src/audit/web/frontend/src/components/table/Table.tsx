@@ -209,7 +209,11 @@ export function TableRegion({
       aria-busy={busy || undefined}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
-      className={cn("overflow-x-auto focus:outline-none focus-visible:shadow-focus", CARD_EDGE, className)}
+      // `relative`: screen-reader-only text in a cell is positioned
+      // absolutely (`sr-only`). Without a positioned region it was placed
+      // against the page, outside this clip, and on a phone widened the whole
+      // page (615px at 320), so it scrolled sideways (SC 1.4.10 Reflow).
+      className={cn("relative overflow-x-auto focus:outline-none focus-visible:shadow-focus", CARD_EDGE, className)}
     >
       {paged ? <div {...paged.hold}>{children}</div> : children}
     </div>

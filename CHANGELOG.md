@@ -97,6 +97,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
+  words kept for screen readers in the table were placed against the page,
+  outside the table's scrolling box. They now stay inside it.
 - The breadcrumb's focus ring showed only its sides: the trail clips so a
   shortened name cannot spill, and it cut the ring off at the top and
   bottom. The whole ring now shows around the focused link.
