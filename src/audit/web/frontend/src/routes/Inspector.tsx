@@ -1364,6 +1364,8 @@ function escapeAttribute(value: string): string {
  * drifts far off-screen a moment later. This re-centers until the element's
  * position in the document stops moving (two consecutive quiet checks), with a
  * hard ceiling so a page that never stops animating cannot spin forever.
+ * An element taller or wider than the view is scrolled to its start instead
+ * (see ``toCentre``).
  */
 function keepCentered(target: HTMLElement): void {
   let previous: number | null = null;
@@ -1395,16 +1397,18 @@ function keepCentered(target: HTMLElement): void {
       for (const panel of scrollPanels(placed.on)) {
         const outer = panel.getBoundingClientRect();
         const inner = boxPlace(target).rect;
+        const fromTop = inner.top - outer.top - panel.clientTop;
+        const fromLeft = inner.left - outer.left - panel.clientLeft;
         panel.scrollTo({
-          top: panel.scrollTop + inner.top - outer.top - panel.clientTop - (panel.clientHeight - inner.height) / 2,
-          left: panel.scrollLeft + inner.left - outer.left - panel.clientLeft - (panel.clientWidth - inner.width) / 2,
+          top: panel.scrollTop + toCentre(fromTop, inner.height, panel.clientHeight, "top"),
+          left: panel.scrollLeft + toCentre(fromLeft, inner.width, panel.clientWidth, "left"),
           behavior: "instant",
         });
       }
       const rect = boxPlace(target).rect;
       win.scrollTo({
-        top: win.scrollY + rect.top - (win.innerHeight - rect.height) / 2,
-        left: win.scrollX + rect.left - (win.innerWidth - rect.width) / 2,
+        top: win.scrollY + toCentre(rect.top, rect.height, win.innerHeight, "top"),
+        left: win.scrollX + toCentre(rect.left, rect.width, win.innerWidth, "left"),
         behavior: "instant",
       });
       ticks += 1;
@@ -1414,6 +1418,26 @@ function keepCentered(target: HTMLElement): void {
     }
   };
   step();
+}
+
+/**
+ * How far to scroll a view so an element starting ``start`` pixels into it,
+ * ``size`` pixels long, is centred; or, when it is longer than the view,
+ * so it starts a little way in.
+ *
+ * Centring a flagged ``<main>`` or long form that is taller than the view put
+ * its middle on screen and scrolled away its top, where it starts, and the
+ * box's numbered label above it: the reader saw an unmarked stretch of page.
+ * Rejected: centring on the element's top, which would waste half the view
+ * above it. The margin leaves room for the label above the box (the label is
+ * about 30 pixels tall, see ``spotlight``); sideways, only for the box's
+ * ring. No WCAG criterion covers where a tool scrolls; the nearest is SC
+ * 2.4.11 Focus Not Obscured (Minimum), Level AA, which asks (paraphrased)
+ * that the item a reader is on is not hidden from them.
+ */
+function toCentre(start: number, size: number, view: number, axis: "top" | "left"): number {
+  const margin = axis === "top" ? 48 : 16;
+  return size > view ? start - margin : start - (view - size) / 2;
 }
 
 /** A state's flagged elements that its capture does not hold, of how many. */

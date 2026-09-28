@@ -116,6 +116,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   copy, with its label off the top and the view scrolled to the middle.
   There is no box and no dimming, the view stays put, and the table under
   the toolbar says it is the whole page.
+- Inspector: a flagged element taller than the view (a whole `<main>`, a
+  long form) is scrolled so its top shows, a little below the edge, with
+  the box's number above it. Centring it used to hide both.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.
