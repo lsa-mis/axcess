@@ -82,7 +82,16 @@ export type Located =
   /** One element, or several for an Alfa record that names several. */
   | { status: "found"; elements: Element[]; how: "selector" | "xpath" | "markup" | "place" }
   | { status: "ambiguous"; candidates: number }
-  | { status: "missing" };
+  | { status: "missing" }
+  /** Where no saved copy holds it (see ``unreachableLocator``): said, never guessed. */
+  | { status: "unreachable"; where: Unreachable };
+
+/**
+ * Where a flagged element is that no saved copy holds: inside a component's
+ * own page code (``shadow``, shadow DOM), or inside another page shown within
+ * this one (``frame``, an iframe).
+ */
+export type Unreachable = "shadow" | "frame";
 
 /** One highlighted element, in document order, and the occurrences it stands for. */
 export type HighlightStep = { targets: number[] };
@@ -97,6 +106,8 @@ export type HighlightResult = {
   total: number;
   /** Occurrences whose markup appears in several places and could not be pinned. */
   ambiguous: number;
+  /** Occurrences where no saved copy holds them, by where they are. */
+  unreachable: Record<Unreachable, number>;
   /** One entry per highlighted element, in document order: what Previous / Next step through. */
   steps: HighlightStep[];
 };
@@ -176,12 +187,18 @@ export function findTargetElement(doc: Document, target: Target): Element | null
   return located.status === "found" ? located.elements[0] : null;
 }
 
-/** How many of ``targets`` are located in ``html``, without re-serializing. */
+/**
+ * How many of ``targets`` are located in ``html``, without re-serializing.
+ * One that no saved copy can hold counts too: it is not missing from this
+ * one, so the state picker does not call it "No longer here".
+ */
 export function countFound(html: string | null, targets: Target[]): number {
   if (!html || targets.length === 0) return 0;
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
-    return locateTargets(doc, targets).filter((located) => located.status === "found").length;
+    return locateTargets(doc, targets).filter(
+      (located) => located.status === "found" || located.status === "unreachable",
+    ).length;
   } catch {
     return 0;
   }
@@ -195,12 +212,21 @@ export function countFound(html: string | null, targets: Target[]): number {
  * one the reader is on.
  */
 export function buildHighlightedHtml(html: string | null, targets: Target[]): HighlightResult {
-  const none = { found: 0, located: 0, total: targets.length, ambiguous: 0, steps: [] };
+  const none = {
+    found: 0,
+    located: 0,
+    total: targets.length,
+    ambiguous: 0,
+    unreachable: { shadow: 0, frame: 0 },
+    steps: [],
+  };
   if (!html) return { srcDoc: "", ...none };
   if (targets.length === 0) return { srcDoc: html, ...none };
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const located = locateTargets(doc, targets);
+    const unreachable = { shadow: 0, frame: 0 };
+    for (const result of located) if (result.status === "unreachable") unreachable[result.where] += 1;
     const byElement = new Map<Element, number[]>();
     located.forEach((result, index) => {
       if (result.status !== "found") return;
@@ -211,7 +237,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
       }
     });
     const ambiguous = located.filter((result) => result.status === "ambiguous").length;
-    if (byElement.size === 0) return { srcDoc: html, ...none, ambiguous };
+    if (byElement.size === 0) return { srcDoc: html, ...none, ambiguous, unreachable };
     const ordered = [...byElement.keys()].sort(documentOrder);
     for (const element of ordered) {
       if (element instanceof HTMLElement || element instanceof SVGElement) markElement(element);
@@ -222,6 +248,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
       located: located.filter((result) => result.status === "found").length,
       total: targets.length,
       ambiguous,
+      unreachable,
       steps: ordered.map((element) => ({ targets: byElement.get(element) ?? [] })),
     };
   } catch {
@@ -558,6 +585,9 @@ export function scrollPanels(el: Element): HTMLElement[] {
  * - ``hidden``: not displayed in the saved copy (``display: none``), as in a
  *   tab that was not open. No box: it has no place on the page to mark, and
  *   showing it would change the page around it. Its page states may show it.
+ * - ``canvas``: a drawing area (``<canvas>``). The saved copy runs no
+ *   scripts, so a browser shows the area's backup (fallback) content in its
+ *   place, not the drawing (see ``drawnOnCanvas``). The box is round that.
  */
 export type BoxNote =
   | "contents"
@@ -569,7 +599,8 @@ export type BoxNote =
   | "part-clipped"
   | "clipped"
   | "opened"
-  | "hidden";
+  | "hidden"
+  | "canvas";
 
 /** The notes for which no box is drawn at all. */
 export function drawsNoBox(note: BoxNote | null): boolean {
@@ -636,8 +667,11 @@ function clippingParts(el: Element): { node: Element; x: boolean; y: boolean }[]
       placedAbove = false;
     }
     if (node === doc.body && bodyIsWindow) break;
-    const x = /hidden|clip/.test(style.overflowX);
-    const y = /hidden|clip/.test(style.overflowY);
+    // Overflow does not apply to an inline element (a browser's own styles
+    // give a <canvas> showing its backup content ``overflow: clip``).
+    const applies = style.display !== "inline" && style.display !== "contents";
+    const x = applies && /hidden|clip/.test(style.overflowX);
+    const y = applies && /hidden|clip/.test(style.overflowY);
     if (x || y) parts.push({ node, x, y });
     // A panel that scrolls on one axis can still cut off on the other.
     if (/(auto|scroll|overlay)/.test(`${style.overflowX} ${style.overflowY}`)) break;
@@ -716,8 +750,30 @@ function boxPlaceOf(el: Element): Omit<BoxPlace, "lines"> & { lines?: BoxRect[] 
   }
   if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
   if (isOffScreen(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "off-screen" };
-  const note = el.parentElement?.closest(`details[${OPENED}]`) ? "opened" : null;
+  const note = tag === "canvas" ? "canvas" : el.parentElement?.closest(`details[${OPENED}]`) ? "opened" : null;
   return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note };
+}
+
+/**
+ * True when the page in ``doc`` draws on a drawing area (``<canvas>``) of
+ * some size: at least 100 by 100 pixels by its own width and height (a
+ * browser's default is 300 by 150), so a 1-pixel canvas a script uses behind
+ * the scenes does not count.
+ *
+ * A page draws on a canvas with scripts, and the saved copy runs none, so
+ * a browser shows the canvas's backup (fallback) content in its place, or
+ * nothing, and nothing the page drew (a game's buttons, a chart's labels)
+ * can be outlined. Measured by its attributes, because without scripts the
+ * canvas takes the size of its backup content, not its own.
+ */
+export function drawnOnCanvas(doc: Document): boolean {
+  return Array.from(doc.getElementsByTagName("canvas")).some((canvas) => {
+    const size = (name: string, fallback: number) => {
+      const value = Number.parseInt(canvas.getAttribute(name) ?? "", 10);
+      return Number.isFinite(value) && value >= 0 ? value : fallback;
+    };
+    return size("width", 300) >= 100 && size("height", 150) >= 100;
+  });
 }
 
 /** True when ``el`` or an element around it is ``display: none``. */
@@ -1081,6 +1137,8 @@ function locateByLocator(doc: Document, target: Target): Located | null {
   const { selector, snippet } = target;
   if (!selector) return null;
   if (isAlfaJsonSelector(selector)) return locateAlfa(doc, selector);
+  const where = unreachableLocator(doc, selector);
+  if (where) return { status: "unreachable", where };
   let matches: Element[];
   try {
     matches = Array.from(doc.querySelectorAll(selector));
@@ -1100,6 +1158,42 @@ function locateByLocator(doc: Document, target: Target): Located | null {
   // element), or several do (identical elements the selector cannot tell
   // apart): the markup walk decides, and says "ambiguous" when it cannot.
   return null;
+}
+
+/**
+ * Whether ``selector`` names an element no saved copy holds, and where.
+ *
+ * axe names an element with one locator per frame it is in, and one inside a
+ * component's shadow DOM with a list of locators, one per component
+ * (``[["#host", "button"]]``). The scan joins the frames with " > " and
+ * stores such a list as Python writes it: ``['#host', 'button']``. The saved
+ * copy is the page's own code: it keeps neither the shadow DOM nor the pages
+ * inside frames. Such a locator found nothing, and the markup step then
+ * outlined any element elsewhere that looked the same, a guess.
+ *
+ * - ``shadow``: a part starts with ``['`` or ``["``, which no CSS selector
+ *   can (an attribute selector's name is never quoted).
+ * - ``frame``: the whole selector matches nothing, and the part before a
+ *   " > " matches only frames (``iframe``, ``frame``). No real selector
+ *   reaches inside one: a frame has no child elements in the page's code.
+ */
+function unreachableLocator(doc: Document, selector: string): Unreachable | null {
+  if (/(^|\s>\s)\[\s*['"]/.test(selector.trim())) return "shadow";
+  const parts = selector.split(" > ");
+  if (parts.length < 2 || safeQuery(doc, selector).length > 0) return null;
+  for (let i = 1; i < parts.length; i += 1) {
+    const before = safeQuery(doc, parts.slice(0, i).join(" > "));
+    if (before.length > 0 && before.every((el) => /^i?frame$/i.test(el.tagName))) return "frame";
+  }
+  return null;
+}
+
+function safeQuery(doc: Document, selector: string): Element[] {
+  try {
+    return Array.from(doc.querySelectorAll(selector));
+  } catch {
+    return [];
+  }
 }
 
 /** The elements an image locator counts, by kind. */

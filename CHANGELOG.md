@@ -138,6 +138,13 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   was not open, gets no box, the view stays where it was, and the table
   says it was hidden. The box used to land at the top left, or somewhere
   near the section.
+- Inspector: an occurrence inside a component's own page code (shadow DOM)
+  or inside another page shown within this one (an iframe) is no longer
+  pinned on a different element that looks the same. The saved copy keeps
+  neither, so the inspector counts these and says why they are not
+  outlined. A page that draws on a drawing area (canvas) is said to show no
+  drawing in the saved copy, which runs no scripts, and a flagged canvas
+  says the same.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.

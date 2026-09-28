@@ -26,6 +26,7 @@ import {
   buildHighlightedHtml,
   countFound,
   describeElement,
+  drawnOnCanvas,
   drawsNoBox,
   findTargetElement,
   HIGHLIGHT_CLASS,
@@ -38,6 +39,7 @@ import {
   type ElementDescription,
   type HighlightResult,
   type Target,
+  type Unreachable,
 } from "../lib/highlightTargets";
 
 type TabId = "page" | "dom";
@@ -546,6 +548,7 @@ export default function InspectorRoute() {
   const pageDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const srcDoc = layout?.css ? withStyle(pageDoc, layout.css) : pageDoc;
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
+  const unreachableCount = highlight ? highlight.unreachable.shadow + highlight.unreachable.frame : 0;
   // Only what this view can hold: a view whose targets are all in other
   // states has nothing to highlight, and must not wait for it forever.
   const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
@@ -554,7 +557,11 @@ export default function InspectorRoute() {
   const missingFor = (key: string): MissingCount | undefined => {
     if (key === (activeStateKey ?? "")) {
       return highlight && !isFetching
-        ? { missing: highlight.total - highlight.located, total: highlight.total }
+        ? {
+            // One no saved copy can hold is not missing from this one.
+            missing: highlight.total - highlight.located - unreachableCount,
+            total: highlight.total,
+          }
         : undefined;
     }
     return missingByState.get(key);
@@ -591,6 +598,24 @@ export default function InspectorRoute() {
     };
     tryScroll();
   }, [scopedTargets]);
+
+  // Whether the saved copy is a page drawn on a drawing area (canvas), which
+  // it cannot keep: said under the frame, highlights or not, since no
+  // outline can point at anything the page drew. Checked when it loads, and
+  // kept with the document it was checked in: a srcDoc frame can load before
+  // an effect keyed on it would run.
+  const [canvasCheck, setCanvasCheck] = useState<{ doc: string; drawn: boolean } | null>(null);
+  const canvasPage = canvasCheck?.doc === srcDoc && canvasCheck.drawn;
+  const onFrameLoad = useCallback(() => {
+    scrollToElement();
+    try {
+      const frame = frameRef.current;
+      const doc = frame?.contentDocument;
+      if (frame && doc) setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
+    } catch {
+      // Opaque document: nothing to measure.
+    }
+  }, [scrollToElement]);
 
   // What the element the reader is on is, for the line under the toolbar,
   // and the locator the occurrence was recorded with.
@@ -1065,7 +1090,7 @@ export default function InspectorRoute() {
               <iframe
                 ref={frameRef}
                 srcDoc={srcDoc}
-                onLoad={scrollToElement}
+                onLoad={onFrameLoad}
                 title={`${copyName}: ${displayTitle}`}
                 sandbox="allow-same-origin"
                 referrerPolicy="no-referrer"
@@ -1094,7 +1119,7 @@ export default function InspectorRoute() {
                 showHighlights &&
                 highlight !== null &&
                 highlightedCount > 0 &&
-                highlight.located + highlight.ambiguous < highlight.total && (
+                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
                   <span className="text-sev-major">
                     Axcess found {highlight.located} of {highlight.total} flagged
                     occurrences.{" "}
@@ -1111,7 +1136,21 @@ export default function InspectorRoute() {
                     : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
                 </span>
               )}
-              {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
+              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
+                // Never a guess: an element inside shadow DOM or a frame is
+                // in no saved copy, and one that looks the same elsewhere is
+                // not it (see ``unreachableLocator``). Said, with the reason.
+                <span className="text-sev-major">
+                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
+                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
+                  {unreachableSentence(highlight.unreachable.frame, "frame")}
+                </span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                hasScopedTarget &&
+                highlightedCount === 0 &&
+                unreachableCount < (highlight?.total ?? 0) && (
                 // Only drops the error styling when interaction accounts for
                 // every miss. Then "not found" is the expected result and
                 // flagging it warns about a fact of how the scan works; with a
@@ -1119,6 +1158,12 @@ export default function InspectorRoute() {
                 <span className={missingReason?.certain ? undefined : "text-sev-major"}>
                   {missingReason?.whenNoneFound ??
                     "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
+                </span>
+              )}
+              {canvasPage && (
+                <span>
+                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
+                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
                 </span>
               )}
               {activeStateKey === null && hiddenImageCount > 0 && (
@@ -1528,7 +1573,22 @@ const BOX_NOTES: Record<BoxNote, string> = {
   clipped: "No box. The part of the page around it hides it (overflow: hidden).",
   opened: "Around it. Axcess opened the closed section it is in (<details>) in this saved copy.",
   hidden: "No box. It was hidden in this saved copy (display: none).",
+  canvas:
+    "Around a drawing area (canvas). The saved copy runs no scripts, so it shows the area's backup content, not the drawing.",
 };
+
+/**
+ * Why some occurrences are not outlined: where they are, and that the saved
+ * copy does not keep that part. Empty for none.
+ */
+function unreachableSentence(count: number, where: Unreachable): string {
+  if (count === 0) return "";
+  const lead =
+    count === 1 ? "1 occurrence is not outlined: it is" : `${count} occurrences are not outlined: they are`;
+  return where === "shadow"
+    ? `${lead} inside a part of the page that keeps its own page code (shadow DOM). The saved copy does not keep that code.`
+    : `${lead} inside another page shown within this one (an iframe). The saved copy does not keep that page.`;
+}
 
 /** "1 pixel", "924 pixels". */
 function pixels(n: number): string {
