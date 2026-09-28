@@ -339,9 +339,14 @@ async def test_back_brings_the_table_back_as_it_was(new_page: Any) -> None:
     await playwright_async.expect(page).to_have_url(re.compile(r"open=https%3A%2F%2Fsite3"))
     assert await page.evaluate("history.length") == 2
     await page.evaluate("window.scrollTo(0, 400)")
+    link = table.get_by_role("link", name=re.compile(r"^Open latest scan of site5\.example"))
+    # Clicking scrolls the link into view first; the place to come back to
+    # is where the page is when the reader leaves it.
+    await link.scroll_into_view_if_needed()
     scrolled = await page.evaluate("window.scrollY")
+    assert scrolled > 0, scrolled
 
-    await table.get_by_role("link", name=re.compile(r"^Open latest scan of site5\.example")).click()
+    await link.click()
     await page.wait_for_url(re.compile(r"/app/scans/\d+$"))
     await page.go_back()
 
