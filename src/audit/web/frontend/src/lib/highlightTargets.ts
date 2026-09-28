@@ -247,8 +247,32 @@ export function markElement(el: HTMLElement | SVGElement): void {
   let parent = el.parentElement;
   while (parent && parent !== el.ownerDocument.documentElement) {
     forceVisible(parent);
+    openSection(parent, el);
     parent = parent.parentElement;
   }
+}
+
+/** Set on a ``<details>`` section the inspector opened (see ``openSection``). */
+const OPENED = "data-axcess-opened";
+
+/**
+ * Open ``section`` when it is a closed ``<details>`` that hides ``el``.
+ *
+ * A closed section shows only its summary, so a flagged element inside it
+ * has no box of its own, and the numbered box landed somewhere else. This
+ * is a saved copy, not the site: opening it changes nothing a visitor sees,
+ * and it is what a reader would do on the live page to reach the element.
+ * The table under the toolbar says the section was opened, so the reader
+ * knows the page does not start that way. Rejected: leaving it closed and
+ * saying so, which shows the reader nothing. An element in the section's own
+ * summary shows while it is closed, so that section stays as it is.
+ */
+function openSection(section: Element, el: Element): void {
+  if (section.tagName.toLowerCase() !== "details" || section.hasAttribute("open")) return;
+  const summary = Array.from(section.children).find((child) => child.tagName.toLowerCase() === "summary");
+  if (summary?.contains(el)) return;
+  section.setAttribute("open", "");
+  section.setAttribute(OPENED, "");
 }
 
 /** Set the element the reader is on apart from the other flagged ones, or put it back. */
@@ -529,6 +553,11 @@ export function scrollPanels(el: Element): HTMLElement[] {
  * - ``part-clipped``: a part of the page around it that does not scroll (a
  *   carousel, a menu bar) cuts part of it off. The box covers what shows.
  * - ``clipped``: such a part cuts all of it off. No box.
+ * - ``opened``: it is inside a closed ``<details>`` section, which the
+ *   inspector opened in the saved copy (see ``openSection``).
+ * - ``hidden``: not displayed in the saved copy (``display: none``), as in a
+ *   tab that was not open. No box: it has no place on the page to mark, and
+ *   showing it would change the page around it. Its page states may show it.
  */
 export type BoxNote =
   | "contents"
@@ -538,11 +567,13 @@ export type BoxNote =
   | "focus-only"
   | "off-screen"
   | "part-clipped"
-  | "clipped";
+  | "clipped"
+  | "opened"
+  | "hidden";
 
 /** The notes for which no box is drawn at all. */
 export function drawsNoBox(note: BoxNote | null): boolean {
-  return note === "whole-page" || note === "off-screen" || note === "clipped";
+  return note === "whole-page" || note === "off-screen" || note === "clipped" || note === "hidden";
 }
 
 /** A rectangle in the frame's view. */
@@ -681,10 +712,22 @@ function boxPlaceOf(el: Element): Omit<BoxPlace, "lines"> & { lines?: BoxRect[] 
         return { on: select, rect: plainRect(select.getBoundingClientRect()), note: "list-box" };
       }
     }
+    if (notDisplayed(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "hidden" };
   }
   if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
   if (isOffScreen(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "off-screen" };
-  return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note: null };
+  const note = el.parentElement?.closest(`details[${OPENED}]`) ? "opened" : null;
+  return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note };
+}
+
+/** True when ``el`` or an element around it is ``display: none``. */
+function notDisplayed(el: Element): boolean {
+  const view = el.ownerDocument.defaultView;
+  if (!view) return false;
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    if (view.getComputedStyle(node).display === "none") return true;
+  }
+  return false;
 }
 
 /**
@@ -706,7 +749,8 @@ function isOffScreen(el: Element): boolean {
   const view = el.ownerDocument.defaultView;
   if (!view) return false;
   const rect = el.getBoundingClientRect();
-  return rect.right + view.scrollX <= 0 || rect.bottom + view.scrollY <= 0;
+  // An empty element at the page's top left is where it sits, not off it.
+  return (rect.left < 0 && rect.right + view.scrollX <= 0) || (rect.top < 0 && rect.bottom + view.scrollY <= 0);
 }
 
 /**

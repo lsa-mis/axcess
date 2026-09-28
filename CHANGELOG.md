@@ -132,6 +132,12 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   where it shows, and gets no box when none of it shows. The table under
   the toolbar says the part of the page around it hides it. The box used to
   be drawn over the slide or items beside it.
+- Inspector: a flagged element inside a closed section (`<details>`) is
+  shown: the inspector opens the section in the saved copy and says so. One
+  that was not displayed in the saved copy, such as a button in a tab that
+  was not open, gets no box, the view stays where it was, and the table
+  says it was hidden. The box used to land at the top left, or somewhere
+  near the section.
 - On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
   words kept for screen readers in the table were placed against the page,
   outside the table's scrolling box. They now stay inside it.

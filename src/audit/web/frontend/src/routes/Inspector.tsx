@@ -1381,9 +1381,10 @@ function keepCentered(target: HTMLElement): void {
       // Where the box goes: an element with no box of its own (an option,
       // an image map area) is centred by what stands for it.
       const placed = boxPlace(target);
-      // The whole page is everywhere: moving the view would only lose the
-      // reader's place, so it stays where it is.
-      if (placed.note === "whole-page") return;
+      // The whole page is everywhere, and an element that is not displayed or
+      // is off the screen is nowhere to scroll to: moving the view would only
+      // lose the reader's place, so it stays where it is.
+      if (placed.note === "whole-page" || placed.note === "hidden" || placed.note === "off-screen") return;
       const top = placed.rect.top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
@@ -1525,6 +1526,8 @@ const BOX_NOTES: Record<BoxNote, string> = {
   "off-screen": "No box. It is off the screen in this saved copy.",
   "part-clipped": "Around the part that shows. The part of the page around it hides the rest (overflow: hidden).",
   clipped: "No box. The part of the page around it hides it (overflow: hidden).",
+  opened: "Around it. Axcess opened the closed section it is in (<details>) in this saved copy.",
+  hidden: "No box. It was hidden in this saved copy (display: none).",
 };
 
 /** "1 pixel", "924 pixels". */
