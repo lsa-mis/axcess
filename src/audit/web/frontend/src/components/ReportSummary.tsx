@@ -27,7 +27,7 @@ function SummaryStat({
   flag?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1 bg-surface px-5 py-4">
+    <div className="flex flex-col gap-1">
       <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
       <dd
         className={cn(
@@ -81,10 +81,20 @@ export function ReportSummary({
           what that turned up, how those occurrences group, and how much of
           the site only existed after a control was used. Four even cells,
           each a number, its name and one sentence, rather than one run-on
-          line of text. The 1px gaps over the border colour draw the dividers
-          in any layout: four across on a wide screen, two by two on a narrow
-          one. */}
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xs border border-border bg-border lg:grid-cols-4">
+          line of text: four across on a wide screen, two by two on a narrow
+          one.
+
+          No panel, border or dividers, the same rule as StatCard (ui.tsx):
+          a frame around a number competes with the number. The cells were
+          a white panel cut by 1px dividers, which made a second card above
+          the issues table and left the app with two looks for the same kind
+          of readout. The space between the cells does the grouping instead
+          (W3C COGA, "Making Content Usable": group related content, and keep
+          the page free of what does not help). Every colour here is at least
+          7:1 on the page background, in light and dark and every
+          colour-vision setting (WCAG 2.2 SC 1.4.6 Contrast (Enhanced), Level
+          AAA), so taking the white away costs no contrast. */}
+      <dl className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
         <SummaryStat
           label="Pages checked"
           value={scan.page_count}

@@ -42,6 +42,12 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Issues: the four numbers over the table (Pages checked, Occurrences
+  found, Issues found, Page states opened by clicking) sit on the page
+  itself, spaced apart, instead of in a white panel cut by lines. The
+  table is the one card under the title, and the numbers look like the
+  other number readouts in the app. Every colour still has at least 7:1
+  contrast.
 - Every card and panel has the same rounded corners, 8 pixels, like the
   Last scanned card. Several used to look square-cornered because what was
   inside painted square corners over the card's rounded ones: a table's bar
