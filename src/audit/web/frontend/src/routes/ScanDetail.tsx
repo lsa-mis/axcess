@@ -147,8 +147,8 @@ export default function ScanDetailRoute() {
               <strong>{SCAN_STATUS_LABEL[data.status]}</strong> after{" "}
               {data.page_count.toLocaleString()} page
               {data.page_count === 1 ? "" : "s"}. Axcess saved everything it
-              reached, and you can review it. The scan did not visit the rest
-              of the site, so this report does not cover the whole site.
+              reached. The scan did not visit the rest of the site, so this
+              report does not cover the whole site.
             </>
           ) : (
             <>
@@ -168,9 +168,37 @@ export default function ScanDetailRoute() {
             Axcess could not start this scan again: {quickRetry.error.message}
           </p>
         )}
-        {/* Each retry says in its own description what it keeps, so the
-            choice is made on the words and not on a guess at "balanced". */}
+        {/* Each action is one row of the same shape: a button of one width
+            and, beside it, what it does, so the choice is made on the words
+            and not on a guess at "balanced". "Review what the scan found"
+            used to be added as a bare button of its own width with no words,
+            so the card mixed two patterns (W3C COGA, "Making Content
+            Usable": the same kind of thing looks and works the same way).
+
+            One primary button per card, the likeliest next step. With a
+            partial report that is reviewing what was saved, so it leads;
+            with no report there is nothing to review, and changing the
+            settings leads. The retries follow as secondary buttons. */}
         <ul className="mt-4 flex flex-col gap-4">
+          {data.page_count > 0 && (
+            <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
+              <LinkButton
+                to={`/scans/${data.id}/issues`}
+                variant="primary"
+                aria-describedby="review-partial-hint"
+                className="shrink-0 sm:w-56"
+              >
+                Review what the scan found
+              </LinkButton>
+              {/* Without this the page said evidence "remains available" and
+                  then offered no way to reach it, so the only route onward
+                  was to run the scan again. */}
+              <p id="review-partial-hint" className="text-sm text-fg-muted sm:pt-2">
+                Opens the issues found on the {data.page_count.toLocaleString()} page
+                {data.page_count === 1 ? "" : "s"} this scan reached.
+              </p>
+            </li>
+          )}
           <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
             <LinkButton
               to={
@@ -178,7 +206,7 @@ export default function ScanDetailRoute() {
                   ? `/scans/new?${loginScan ? "mode=login&" : ""}from=${data.id}`
                   : `/scans/new?url=${encodeURIComponent(data.seed_url)}`
               }
-              variant="primary"
+              variant={data.page_count > 0 ? "secondary" : "primary"}
               aria-describedby="retry-edit-hint"
               className="shrink-0 sm:w-56"
             >
@@ -202,16 +230,6 @@ export default function ScanDetailRoute() {
               <p id="retry-quick-hint" className="text-sm text-fg-muted sm:pt-2">
                 {RETRY.quickHint}
               </p>
-            </li>
-          )}
-          {/* Without this the page said evidence "remains available" and
-              then offered no way to reach it, so the only route onward was
-              to run the scan again. */}
-          {data.page_count > 0 && (
-            <li>
-              <LinkButton to={`/scans/${data.id}/issues`} variant="secondary">
-                Review what the scan found
-              </LinkButton>
             </li>
           )}
         </ul>

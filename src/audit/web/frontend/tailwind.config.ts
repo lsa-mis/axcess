@@ -140,16 +140,21 @@ const config: Config = {
         "2xs": "5px",
         xs: "8px",
       },
-      // Smallest-step floor. WCAG sets no minimum size (1.4.4 asks only that
-      // text survive 200% zoom), but low-vision guidance converges on ~16px
-      // body and treats anything under 12px as unreadable for sustained use.
-      // `2xs` was 11px and appears ~80 times, `xs` 12px and appears ~200, so
-      // most of the interface's secondary text sat at or below that floor.
-      // Lifting the tokens raises every one of those at once and keeps the
-      // steps in proportion, rather than editing hundreds of call sites.
+      // A 14px floor: no text in the app is smaller than `sm`. WCAG sets no
+      // minimum size (SC 1.4.4 asks only that text survive 200% zoom), but
+      // low-vision guidance converges on ~16px body text, and an
+      // accessibility tool's readers are the people small text fails first.
+      // `2xs` (was 11px, then 12px) and `xs` (was 12px, then 13px) held
+      // about 240 uses of secondary text: hints, chips, captions, table
+      // notes. Lifting the tokens raises every one at once rather than
+      // editing each call site. The cost is that `2xs`, `xs` and `sm` are
+      // now one size, so secondary text stands apart by colour and weight
+      // (`text-fg-muted`, `font-semibold`), not by being smaller. Do not add
+      // a smaller size back, and do not use an arbitrary one (text-[12px])
+      // to get round the floor.
       fontSize: {
-        "2xs": ["0.75rem", { lineHeight: "1.05rem" }], // 12px, was 11px
-        xs: ["0.8125rem", { lineHeight: "1.15rem" }], // 13px, was 12px
+        "2xs": ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 12px
+        xs: ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 13px
       },
     },
   },

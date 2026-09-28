@@ -19,6 +19,7 @@ import { Button, LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import { useScrollRestoration } from "../hooks/useScrollRestoration";
 import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
 import PreferenceEffects from "./PreferenceEffects";
@@ -172,15 +173,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, routeLabel]);
 
-  useEffect(() => {
-    // Every route starts at the top. React Router keeps the previous page's
-    // offset by default, so opening a short page from a long one landed the
-    // reader partway down it. Deliberately not inside the focus effect above:
-    // that one runs in a requestAnimationFrame, which never fires while the
-    // tab is in the background, and where the page starts should not depend
-    // on whether anyone was watching it load.
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [pathname]);
+  // A new page starts at the top; Back and Forward return to where the
+  // reader was (see the hook). Deliberately not inside the focus effect
+  // above: that one runs in a requestAnimationFrame, which never fires while
+  // the tab is in the background, and where the page starts should not
+  // depend on whether anyone was watching it load.
+  useScrollRestoration();
 
   return (
     <div className="min-h-screen bg-surface-subtle">
@@ -337,6 +335,13 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
  * About and Settings are places, but reference ones: they sit at the foot of
  * the sidebar with feedback rather than among the working sections, so the
  * nav above stays the places the work happens.
+ *
+ * Settings was considered right under Reports, where it would be found at
+ * a glance. It stays here: moving it would mix the app's own utilities into
+ * the places a reader works, and the foot group does not scroll away, so it
+ * is always in view anyway. What WCAG asks is that the order never changes
+ * from page to page (SC 3.2.3 Consistent Navigation, Level AA), which one
+ * fixed foot group gives.
  */
 const FOOT_PLACES = [
   { to: "/about", label: "About", name: "About Axcess", icon: Info },
@@ -413,6 +418,7 @@ function Sidebar({
             </span>
           </>
         )}
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
         <button
           type="button"
           aria-label={
@@ -510,6 +516,7 @@ function TopBar({
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
           type="button"
           aria-label={
@@ -581,6 +588,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
         </ul>
       </nav>
       <div className="mt-1 grid grid-cols-2 gap-1 border-t border-white/20 pt-1">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
         <button
           type="button"
           onClick={onSearch}

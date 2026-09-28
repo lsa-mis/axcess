@@ -42,7 +42,7 @@ export default function SettingsGroup({
       aria-describedby={description ? descriptionId : undefined}
       className={cn(
         "m-0 min-w-0",
-        card ? "rounded-md border border-border bg-surface px-4 pb-4 pt-1 sm:px-5" : "border-0 p-0",
+        card ? "rounded-xs border border-border bg-surface px-4 pb-4 pt-1 sm:px-5" : "border-0 p-0",
         className,
       )}
     >

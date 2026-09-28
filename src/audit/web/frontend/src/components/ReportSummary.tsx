@@ -27,11 +27,11 @@ function SummaryStat({
   flag?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1 bg-surface px-5 py-4">
+    <div className="flex flex-col gap-1">
       <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
       <dd
         className={cn(
-          "order-1 text-3xl font-semibold leading-none tabular-nums",
+          "order-1 mb-1 text-3xl font-semibold leading-none tabular-nums",
           flag ? "text-sev-major" : "text-umich-blue",
         )}
       >
@@ -81,10 +81,28 @@ export function ReportSummary({
           what that turned up, how those occurrences group, and how much of
           the site only existed after a control was used. Four even cells,
           each a number, its name and one sentence, rather than one run-on
-          line of text. The 1px gaps over the border colour draw the dividers
-          in any layout: four across on a wide screen, two by two on a narrow
-          one. */}
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xs border border-border bg-border lg:grid-cols-4">
+          line of text: four across on a wide screen, two by two on a narrow
+          one.
+
+          No panel, border or dividers, the same rule as StatCard (ui.tsx):
+          a frame around a number competes with the number. The cells were
+          a white panel cut by 1px dividers, which made a second card above
+          the issues table and left the app with two looks for the same kind
+          of readout. The space between the cells does the grouping instead
+          (W3C COGA, "Making Content Usable": group related content, and keep
+          the page free of what does not help). Every colour here is at least
+          7:1 on the page background, in light and dark and every
+          colour-vision setting (WCAG 2.2 SC 1.4.6 Contrast (Enhanced), Level
+          AAA), so taking the white away costs no contrast.
+
+          Without a panel, space alone has to say what belongs together
+          (proximity), so the space outside the group is clearly larger than
+          the space inside it: 32px above (with the header's margin) and
+          below it, 48px between columns on a wide screen (32px on a narrow
+          one, where width is short) and 32px between rows, against 8px from
+          a number to its name and 4px from the name to its sentence, which
+          read as one unit. */}
+      <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 lg:grid-cols-4 lg:gap-x-12">
         <SummaryStat
           label="Pages checked"
           value={scan.page_count}
@@ -104,8 +122,20 @@ export function ReportSummary({
 
       {/* What was checked leads the notes: whether the scan checked
           something comes before what its labels mean. The count stays on
-          the closed row, so the fact is on screen without opening anything. */}
-      <ReportNotes className="mt-6">
+          the closed row, so the fact is on screen without opening anything.
+
+          The notes come after the numbers, not before them. Putting them
+          first was considered and rejected: the numbers are what the report
+          found, and leading with the main point is the first rule of the
+          U.S. Federal Plain Language Guidelines; two closed rows above them
+          would start every visit with things to open. Each note sits by
+          what it explains instead: "What was checked" (how many checks ran)
+          qualifies the numbers just above it, and what the labels mean
+          explains the table just below it. The count of checks that ran
+          stays visible on the closed row, so nobody reads the numbers
+          without the limitation beside them. Reading order for a screen
+          reader is the same: heading, numbers, notes, table. */}
+      <ReportNotes className="mt-8">
         <ReportNote
           id="report-coverage"
           title="What was checked"
@@ -135,16 +165,7 @@ export function ReportSummary({
  * is one more row here, not one more line on the page.
  */
 export function ReportNotes({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "mb-6 divide-y divide-border rounded-xs border border-border bg-surface shadow-card",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <Card className={cn("mb-6 divide-y divide-border", className)}>{children}</Card>;
 }
 
 /**
@@ -164,7 +185,16 @@ export function ReportNote({
   children: ReactNode;
 }) {
   return (
-    <Disclosure id={id} title={title} meta={meta} headingLevel={2} className="rounded-none border-0">
+    // Square between rows; the first and last round their outer corners to
+    // the card's (8px less its 1px border), so their fill does not paint
+    // square corners over it.
+    <Disclosure
+      id={id}
+      title={title}
+      meta={meta}
+      headingLevel={2}
+      className="rounded-none border-0 first:rounded-t-[7px] last:rounded-b-[7px]"
+    >
       {children}
     </Disclosure>
   );

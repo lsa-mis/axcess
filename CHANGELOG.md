@@ -42,6 +42,57 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Inspector and page code view: stepping through flagged elements uses two
+  labelled buttons, Previous and Next (Jump when there is only one), each
+  with its own border, beside the count "Flagged element 1 of 3". They were
+  two arrows in one box with the count.
+- Back returns you to where you were. Open a report from Reports and press
+  Back: the table keeps its order, search, page and opened sites, and the
+  page is scrolled where you left it. The Reports view is kept in the page
+  address, so a copied link opens the same view too. A new page still
+  starts at the top.
+- A stopped scan's page: with a partial report, "Review what the scan
+  found" is now the main button and comes first, with a sentence saying what
+  it opens, like the other actions. Every action's button is the same
+  width. With no report, "Change settings first" still leads.
+- No text in the app is smaller than 14 pixels. Hints, chips, captions and
+  table notes were 12 or 13 pixels. Secondary text now stands apart by its
+  colour and weight rather than by being smaller. Checked at 320, 390 and
+  1280 pixels wide on every main page: nothing is cut off and no page
+  scrolls sideways.
+- Inspector: the box of page-state links under the Page state picker is now
+  one sentence: "3 more occurrences are in 2 other page states. Choose one
+  in the Page state list." The links repeated the picker, which already
+  lists those page states with their counts. Screen readers hear the
+  sentence as the picker's description.
+- Issues: the four numbers over the table (Pages checked, Occurrences
+  found, Issues found, Page states opened by clicking) sit on the page
+  itself, spaced apart, instead of in a white panel cut by lines. The
+  table is the one card under the title, and the numbers look like the
+  other number readouts in the app. Every colour still has at least 7:1
+  contrast. More space above and below the four, and between them, than
+  inside each one, so they read as one group without a box.
+- Every card and panel has the same rounded corners, 8 pixels, like the
+  Last scanned card. Several used to look square-cornered because what was
+  inside painted square corners over the card's rounded ones: a table's bar
+  and last row, the first and last rows of the report's "What was checked"
+  box, and the saved copy's bar in the Inspector. The small tables inside
+  a section or an expanded site (the checks list, a site's scans) were
+  square too: a table's own corners cannot be rounded, so the frame is now
+  on the box around it. A site's list of scans now scrolls sideways in its
+  own box when it is wide, instead of widening the whole Reports table. The
+  New scan settings, sign-in scan panels and summary used 6 pixels, and an
+  open section's header had rounded corners where it meets its content.
+- Reports: a simpler table, with one header row. The number of scans sits
+  under each site's name ("7 scans, 4 completed"), so every column is about
+  the latest completed scan, and one sentence over the table says so. That
+  replaces the "Most recent completed scan" header over six columns, its
+  blue shading, and the Scans column; the table no longer sorts by number
+  of scans. Completed comes right after Site. "Open latest scan" is a link
+  rather than a button in every row. The order is no longer a line of its
+  own, because the sorted column's chip shows it; screen readers still hear
+  it when it changes. The search count sits beside the search box. A sort
+  arrow stays beside its label's last word instead of on a line of its own.
 - Inspector: what the numbered box is on is a short table, with the same
   labels in the same places as you step: what it is, its text or label, its
   size, and its element locator. A long locator shows its end, the element
@@ -51,11 +102,71 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 - New scan: every settings group is an accordion row, closed on arrival. A
   failed submit opens the group that holds the field it names.
-- New scan: Start scan and Cancel sit at the top right of the page, beside
-  its title. Enter in the address field still starts the scan.
+- New scan: Start scan and Cancel sit at the foot of the summary beside the
+  form, where they stay in view while you scroll the settings, and after
+  the form on a narrow screen. They were at the top of the page, which
+  scrolled away and came before every field in keyboard order. Enter in
+  the address field still starts the scan.
 
 ### Fixed
 
+- Issues and Reports: a filter chosen while the search box was still
+  catching up with your typing could be lost. Both are kept now.
+- Tabbing to a long table scrolled the page to the table's middle, away from
+  its header row. Now its top comes into view, just under the top bar. A
+  table that fits the screen is no longer a tab stop of its own, so Tab goes
+  straight to its links.
+- Inspector: an element with no box of its own is marked where the reader
+  can see it. The numbered box used to jump to the top left of the saved
+  copy. Now an element styled `display: contents` is marked around what it
+  holds, an option on its list box, and an image map area on the part of its
+  image it covers. The table under the toolbar says where the box is.
+- Inspector: an occurrence on the whole page (`<html>` or `<body>`, as for
+  a missing page language) no longer draws a box around the whole saved
+  copy, with its label off the top and the view scrolled to the middle.
+  There is no box and no dimming, the view stays put, and the table under
+  the toolbar says it is the whole page.
+- Inspector: a flagged element taller than the view (a whole `<main>`, a
+  long form) is scrolled so its top shows, a little below the edge, with
+  the box's number above it. Centring it used to hide both.
+- Inspector: a skip link placed off the screen until it has keyboard focus
+  is shown where it appears with focus, and the box is drawn there. The box
+  used to be off the screen with it. Axcess reads how the link looks with
+  focus from the page's own styles, and never moves your keyboard focus to
+  find out. When it cannot read those styles (they come from another
+  site), there is no box, and the table under the toolbar says the link is
+  off the screen and that pages often show such a link only with keyboard
+  focus. Something else off the screen gets no box, and the table says so.
+- Inspector: a flagged link that wraps onto two lines gets a ring on each
+  line, with the number on the first. One box used to cover both lines and
+  the words beside them.
+- Inspector: a flagged element that a part of the page cuts off (a
+  carousel slide out of view, a menu item that does not fit) is boxed only
+  where it shows, and gets no box when none of it shows. The table under
+  the toolbar says the part of the page around it hides it. The box used to
+  be drawn over the slide or items beside it.
+- Inspector: a flagged element inside a closed section (`<details>`) is
+  shown: the inspector opens the section in the saved copy and says so. One
+  that was not displayed in the saved copy, such as a button in a tab that
+  was not open, gets no box, the view stays where it was, and the table
+  says it was hidden. The box used to land at the top left, or somewhere
+  near the section.
+- Inspector: an occurrence inside a component's own page code (shadow DOM)
+  or inside another page shown within this one (an iframe) is no longer
+  pinned on a different element that looks the same. The saved copy keeps
+  neither, so the inspector counts these and says why they are not
+  outlined. A page that draws on a drawing area (canvas) is said to show no
+  drawing in the saved copy, which runs no scripts, and a flagged canvas
+  says the same.
+- On a phone, the Issues page scrolled sideways (to 615 pixels at 320):
+  words kept for screen readers in the table were placed against the page,
+  outside the table's scrolling box. They now stay inside it.
+- The breadcrumb's focus ring showed only its sides: the trail clips so a
+  shortened name cannot spill, and it cut the ring off at the top and
+  bottom. The whole ring now shows around the focused link.
+- An issue's page: the Pages with this issue table was inset from the page
+  edges. It now spans the same width as the Issues table, lined up with
+  the title.
 - Inspector: on an app-style page that scrolls a panel of its own (a
   sidebar, a dialog) rather than the whole page, the flagged element is
   scrolled into view in that panel, and the numbered box stays on it as the

@@ -81,7 +81,30 @@ export default tseslint.config(
       "jsx-a11y/no-noninteractive-element-interactions": "error",
       "jsx-a11y/label-has-associated-control": "error",
       "jsx-a11y/no-static-element-interactions": "error",
+
+      // Reuse the shared components (AGENTS.md, "Reuse before you build").
+      // A raw element here is a copy of a design that then drifts: its
+      // target size, focus ring, contrast and wording stop following the
+      // shared one. Where a raw element is really needed (a widget's own
+      // part: a tab, a listbox option), disable this rule on that line and
+      // say why after "--", starting "Keep:"; one that should be converted
+      // starts "Convert:" and names what to use.
+      "react/forbid-elements": [
+        "error",
+        {
+          forbid: [
+            { element: "button", message: "use Button or LinkButton from components/ui.tsx (or the shared widget that owns it)" },
+            { element: "table", message: "use Table, TableHead, Row and Cell from components/table/Table.tsx" },
+            { element: "select", message: "use Select from components/ui.tsx" },
+          ],
+        },
+      ],
     },
+  },
+  // The shared components are where the raw elements live.
+  {
+    files: ["src/components/ui.tsx", "src/components/table/**"],
+    rules: { "react/forbid-elements": "off" },
   },
   // Test files have looser rules — they often need raw DOM access patterns
   // that look like a11y violations (e.g. clicking on non-interactive

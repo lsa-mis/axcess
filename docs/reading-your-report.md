@@ -190,7 +190,7 @@ problem visible at page load never gets this note.
 | Where | What it says |
 | --- | --- |
 | A page's **Page details** | Groups `At page load (N occurrences)`, then `After clicking “Menu” (N occurrences)` |
-| Page inspector, **Page state** list | `At page load: N occurrences` and `After clicking “Menu” → “Settings”: N occurrences`, with the note `The scan saved this page state after clicking the control.` When every occurrence came after a click, At page load shows `Issue not here`. |
+| Page inspector, **Page state** list | `At page load: N occurrences` and `After clicking “Menu” → “Settings”: N occurrences`. When every occurrence came after a click, At page load shows `Issue not here`. |
 | Workbook, **User action** column | `Open "Menu" on this page.` or `Load the page.` |
 | Written report | `Seen after: activating "Menu" on this page.` |
 | Jira CSV | `To reproduce: Load the page, then activate "Menu".` or `Load the page.` |

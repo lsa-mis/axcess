@@ -88,6 +88,10 @@ async def test_previous_and_next_step_through_the_rendered_page(
         following = group.get_by_role("button", name="Next flagged element")
         await playwright_async.expect(status).to_have_text("Flagged element 1 of 3")
         await playwright_async.expect(previous).to_be_disabled()
+        # The buttons say what they do, and each name starts with the word a
+        # voice control user sees and says (SC 2.5.3).
+        await playwright_async.expect(previous).to_have_text("Previous")
+        await playwright_async.expect(following).to_have_text("Next")
 
         frame = page.frame_locator("iframe[title^='Saved copy']")
 
@@ -160,5 +164,34 @@ async def test_the_page_code_view_sets_the_current_element_apart(
 
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_the_stepper_fits_a_phone(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """With words on the buttons, the group wraps rather than running off a 320px screen."""
+    db_path, _, _ = seeded_db
+    base, scan_id = live_server
+    page_id = _seed(db_path, scan_id)
+    page = await new_page(viewport={"width": 320, "height": 800})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue={ISSUE_KEY}",
+            wait_until="networkidle",
+        )
+        group = page.get_by_role("group", name="Flagged elements", exact=True)
+        await playwright_async.expect(group.get_by_role("status")).to_have_text(
+            "Flagged element 1 of 3"
+        )
+        box = await group.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box
+        for name in ("Previous flagged element", "Next flagged element"):
+            button = await group.get_by_role("button", name=name).bounding_box()
+            assert button and button["x"] + button["width"] <= 320, (name, button)
+            assert button["height"] >= 44, (name, button)
     finally:
         await page.context.close()

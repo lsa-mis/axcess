@@ -140,7 +140,7 @@ function LocalLoginHandoff({
 
         {status.error && (
           <p
-            className="mt-4 rounded-md border border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
+            className="mt-4 rounded-xs border border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
             role="alert"
           >
             {status.error instanceof Error
@@ -150,7 +150,7 @@ function LocalLoginHandoff({
         )}
         {confirm.error && (
           <p
-            className="mt-4 rounded-md border border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
+            className="mt-4 rounded-xs border border-sev-critical/40 bg-sev-critical-bg p-3 text-sm text-sev-critical"
             role="alert"
           >
             {confirm.error instanceof Error
@@ -160,7 +160,7 @@ function LocalLoginHandoff({
         )}
 
         {state === "awaiting_authentication" && (
-          <div className="mt-6 rounded-md border-2 border-umich-blue bg-umich-blue/5 p-5">
+          <div className="mt-6 rounded-xs border-2 border-umich-blue bg-umich-blue/5 p-5">
             <h3 className="font-semibold text-fg">Finished signing in?</h3>
             <p className="mt-1 text-sm text-fg-muted">
               Check that the browser window shows the site you signed in to, not

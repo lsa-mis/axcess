@@ -1,9 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
+import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
 import type { PageEvidence } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -21,9 +22,13 @@ import {
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
 import {
+  boxPlace,
+  type BoxNote,
   buildHighlightedHtml,
   countFound,
   describeElement,
+  drawnOnCanvas,
+  drawsNoBox,
   findTargetElement,
   HIGHLIGHT_CLASS,
   markCurrent,
@@ -35,6 +40,7 @@ import {
   type ElementDescription,
   type HighlightResult,
   type Target,
+  type Unreachable,
 } from "../lib/highlightTargets";
 
 type TabId = "page" | "dom";
@@ -543,6 +549,7 @@ export default function InspectorRoute() {
   const pageDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
   const srcDoc = layout?.css ? withStyle(pageDoc, layout.css) : pageDoc;
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
+  const unreachableCount = highlight ? highlight.unreachable.shadow + highlight.unreachable.frame : 0;
   // Only what this view can hold: a view whose targets are all in other
   // states has nothing to highlight, and must not wait for it forever.
   const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
@@ -551,7 +558,11 @@ export default function InspectorRoute() {
   const missingFor = (key: string): MissingCount | undefined => {
     if (key === (activeStateKey ?? "")) {
       return highlight && !isFetching
-        ? { missing: highlight.total - highlight.located, total: highlight.total }
+        ? {
+            // One no saved copy can hold is not missing from this one.
+            missing: highlight.total - highlight.located - unreachableCount,
+            total: highlight.total,
+          }
         : undefined;
     }
     return missingByState.get(key);
@@ -588,6 +599,24 @@ export default function InspectorRoute() {
     };
     tryScroll();
   }, [scopedTargets]);
+
+  // Whether the saved copy is a page drawn on a drawing area (canvas), which
+  // it cannot keep: said under the frame, highlights or not, since no
+  // outline can point at anything the page drew. Checked when it loads, and
+  // kept with the document it was checked in: a srcDoc frame can load before
+  // an effect keyed on it would run.
+  const [canvasCheck, setCanvasCheck] = useState<{ doc: string; drawn: boolean } | null>(null);
+  const canvasPage = canvasCheck?.doc === srcDoc && canvasCheck.drawn;
+  const onFrameLoad = useCallback(() => {
+    scrollToElement();
+    try {
+      const frame = frameRef.current;
+      const doc = frame?.contentDocument;
+      if (frame && doc) setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
+    } catch {
+      // Opaque document: nothing to measure.
+    }
+  }, [scrollToElement]);
 
   // What the element the reader is on is, for the line under the toolbar,
   // and the locator the occurrence was recorded with.
@@ -810,6 +839,7 @@ export default function InspectorRoute() {
           <Select
             id="inspect-state"
             label="Page state"
+            aria-describedby={elsewhere.length > 0 ? ELSEWHERE_ID : undefined}
             value={stateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
             options={[
@@ -838,50 +868,42 @@ export default function InspectorRoute() {
           />
           {/* The previous document stays on screen while the next one loads,
               so say which is which rather than letting the reviewer read the
-              old state under the new label. */}
-          {isFetching ? (
+              old state under the new label. Once loaded, nothing is said:
+              "The scan saved this page state after clicking the control."
+              only repeated the chosen option, which already reads "After
+              clicking …". */}
+          {isFetching && (
             <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" role="status">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               Loading this page state. The previous one stays on screen until it
               loads.
             </span>
-          ) : (
-            activeStateKey && (
-              <span className="text-xs text-fg-muted">
-                The scan saved this page state after clicking the control.
-              </span>
-            )
           )}
         </div>
       )}
 
-      {/* The picker shows one page state at a time, so occurrences in the
-          others were out of sight: nothing said a click had revealed more.
-          This line counts them and links to each state that holds some. */}
+      {/* Where else this issue is, in one sentence, not a second control.
+
+          The picker shows one page state at a time, so occurrences in the
+          others were out of sight: nothing said a click had revealed more
+          (eb39b33). That was first fixed with a box of pill links, one per
+          page state holding occurrences. But while reviewing an issue the
+          picker lists exactly those page states, with the same counts, so
+          the pills were a second control for the same choice. Two ways to
+          do one thing make a reader work out whether they differ (W3C COGA,
+          "Making Content Usable", https://www.w3.org/TR/coga-usable/:
+          keep the interface simple and consistent), and a pill per click
+          path wraps into a large block on a busy page, where the select
+          scales to dozens of states. So the select is the one control, and
+          this sentence says what it holds. It is the select's description
+          (aria-describedby), so a screen reader hears it on the control
+          too. The term stays "page state": docs/plain-language.md lists
+          "interaction state" as a word not to use. */}
       {elsewhere.length > 0 && (
-        <nav
-          aria-label="Other page states with occurrences"
-          className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xs border border-umich-blue/30 bg-umich-blue/5 px-3 py-2 text-sm"
-        >
-          <Layers className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
-          <span className="font-semibold text-fg">
-            {elsewhereCount.toLocaleString()} more occurrence{elsewhereCount === 1 ? "" : "s"}{" "}
-            {activeStateKey
-              ? `in ${elsewhere.length === 1 ? "another page state" : "other page states"}:`
-              : `${elsewhereCount === 1 ? "appears" : "appear"} only after clicking:`}
-          </span>
-          {elsewhere.map((state) => (
-            <Link
-              key={state.key || "load"}
-              to={stateHref(state.key || null)}
-              replace
-              className="inline-flex min-h-target items-center rounded-full border border-umich-blue/40 bg-surface px-3 text-xs font-semibold text-umich-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              {state.label}
-              {occurrencesHere(state.count)}
-            </Link>
-          ))}
-        </nav>
+        <p id={ELSEWHERE_ID} className="-mt-1 mb-3 flex items-start gap-2 text-sm text-fg">
+          <Layers className="mt-0.5 h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+          <span>{elsewhereSentence(elsewhereCount, elsewhere.length, Boolean(activeStateKey))}</span>
+        </p>
       )}
 
       <Tabs
@@ -912,7 +934,9 @@ export default function InspectorRoute() {
       >
         {render.ok && render.dom_html ? (
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-muted/40 px-3 py-2">
+            {/* Top corners as the panel's inner ones (8px less its 1px border),
+                so the bar's fill does not paint square corners over them. */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
               <span className="text-xs font-semibold text-fg-subtle">
                 {highlightPending
                   ? "Highlighting…"
@@ -921,46 +945,17 @@ export default function InspectorRoute() {
                     : copyName}
               </span>
               {!highlightPending && showHighlights && highlightedCount > 0 && (
-                // Previous / Next step through the outlined elements in
-                // document order, as in the Page code (DOM) tab; the count between
-                // them says where you are.
-                <span
-                  role="group"
-                  aria-label="Flagged elements"
-                  className="ml-auto inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
-                >
-                  <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
-                    {highlightedCount === 1
-                      ? "1 flagged element"
-                      : `Flagged element ${pageMark + 1} of ${highlightedCount}`}
-                  </span>
-                  {highlightedCount > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="min-h-target"
-                      aria-label="Previous flagged element"
-                      disabled={pageMark === 0}
-                      onClick={() => goToPageMark(pageMark - 1)}
-                    >
-                      <ChevronUp className="h-4 w-4" aria-hidden />
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="min-h-target"
-                    aria-label={highlightedCount > 1 ? "Next flagged element" : "Jump to flagged element"}
-                    disabled={highlightedCount > 1 && pageMark === highlightedCount - 1}
-                    onClick={() => goToPageMark(highlightedCount > 1 ? pageMark + 1 : 0)}
-                  >
-                    <ChevronDown className="h-4 w-4" aria-hidden />
-                  </Button>
-                </span>
+                // Previous / Next through the outlined elements, the same
+                // control as the Page code (DOM) tab's (FlaggedStepper).
+                <FlaggedStepper
+                  count={highlightedCount}
+                  index={pageMark}
+                  onGo={goToPageMark}
+                  className="ml-auto"
+                />
               )}
               {checkLayout && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
                 <button
                   type="button"
                   aria-pressed={!asChecked}
@@ -971,6 +966,7 @@ export default function InspectorRoute() {
                 </button>
               )}
               {hasTarget && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
                 <button
                   type="button"
                   onClick={toggleHighlights}
@@ -1009,12 +1005,17 @@ export default function InspectorRoute() {
                     <span className="tabular-nums">
                       {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
                     </span>
-                    {(currentElement.width === 0 || currentElement.height === 0) && (
+                    {/* The row below says where the box is when it is not on the element. */}
+                    {currentElement.where === null &&
+                      (currentElement.width === 0 || currentElement.height === 0) && (
                       <span className="block text-xs text-fg-muted">
                         It has no visible size in this saved copy, so the box marks where it sits.
                       </span>
                     )}
                   </ElementFact>
+                  {currentElement.where && (
+                    <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
+                  )}
                   {sharedCount > 1 && <ElementFact term="Occurrences">{sharedCount} on this element</ElementFact>}
                   {currentPlace ? (
                     <>
@@ -1062,7 +1063,7 @@ export default function InspectorRoute() {
               <iframe
                 ref={frameRef}
                 srcDoc={srcDoc}
-                onLoad={scrollToElement}
+                onLoad={onFrameLoad}
                 title={`${copyName}: ${displayTitle}`}
                 sandbox="allow-same-origin"
                 referrerPolicy="no-referrer"
@@ -1081,14 +1082,17 @@ export default function InspectorRoute() {
                 <span>
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
-                    : "A blue box with a yellow ring marks the flagged element."}
+                    : // Never describe a box that is not drawn (see ``drawsNoBox``).
+                      drawsNoBox(currentElement?.where ?? null)
+                      ? "No box marks the flagged element. The table above the saved copy says why."
+                      : "A blue box with a yellow ring marks the flagged element."}
                 </span>
               )}
               {!highlightPending &&
                 showHighlights &&
                 highlight !== null &&
                 highlightedCount > 0 &&
-                highlight.located + highlight.ambiguous < highlight.total && (
+                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
                   <span className="text-sev-major">
                     Axcess found {highlight.located} of {highlight.total} flagged
                     occurrences.{" "}
@@ -1105,7 +1109,21 @@ export default function InspectorRoute() {
                     : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
                 </span>
               )}
-              {!highlightPending && showHighlights && hasScopedTarget && highlightedCount === 0 && (
+              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
+                // Never a guess: an element inside shadow DOM or a frame is
+                // in no saved copy, and one that looks the same elsewhere is
+                // not it (see ``unreachableLocator``). Said, with the reason.
+                <span className="text-sev-major">
+                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
+                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
+                  {unreachableSentence(highlight.unreachable.frame, "frame")}
+                </span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                hasScopedTarget &&
+                highlightedCount === 0 &&
+                unreachableCount < (highlight?.total ?? 0) && (
                 // Only drops the error styling when interaction accounts for
                 // every miss. Then "not found" is the expected result and
                 // flagging it warns about a fact of how the scan works; with a
@@ -1113,6 +1131,12 @@ export default function InspectorRoute() {
                 <span className={missingReason?.certain ? undefined : "text-sev-major"}>
                   {missingReason?.whenNoneFound ??
                     "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
+                </span>
+              )}
+              {canvasPage && (
+                <span>
+                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
+                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
                 </span>
               )}
               {activeStateKey === null && hiddenImageCount > 0 && (
@@ -1358,6 +1382,8 @@ function escapeAttribute(value: string): string {
  * drifts far off-screen a moment later. This re-centers until the element's
  * position in the document stops moving (two consecutive quiet checks), with a
  * hard ceiling so a page that never stops animating cannot spin forever.
+ * An element taller or wider than the view is scrolled to its start instead
+ * (see ``toCentre``).
  */
 function keepCentered(target: HTMLElement): void {
   let previous: number | null = null;
@@ -1370,7 +1396,20 @@ function keepCentered(target: HTMLElement): void {
       // Position in the *document*, not the viewport: the viewport-relative
       // top barely moves once we have centered it, so it cannot tell us
       // whether the page beneath is still reflowing.
-      const top = target.getBoundingClientRect().top + win.scrollY;
+      // Where the box goes: an element with no box of its own (an option,
+      // an image map area) is centred by what stands for it.
+      const placed = boxPlace(target);
+      // The whole page is everywhere, and an element that is not displayed or
+      // is off the screen is nowhere to scroll to: moving the view would only
+      // lose the reader's place, so it stays where it is.
+      if (
+        placed.note === "whole-page" ||
+        placed.note === "hidden" ||
+        placed.note === "off-screen" ||
+        placed.note === "focus-unread"
+      )
+        return;
+      const top = placed.rect.top + win.scrollY;
       quiet = previous !== null && Math.abs(top - previous) < 2 ? quiet + 1 : 0;
       previous = top;
       // Scroll the *frame* only. `scrollIntoView` also scrolls every ancestor
@@ -1380,19 +1419,21 @@ function keepCentered(target: HTMLElement): void {
       // An app-style page scrolls a panel of its own (a sidebar) rather than
       // the window, so each panel around the element, innermost first, is
       // centred on it before the frame is.
-      for (const panel of scrollPanels(target)) {
+      for (const panel of scrollPanels(placed.on)) {
         const outer = panel.getBoundingClientRect();
-        const inner = target.getBoundingClientRect();
+        const inner = boxPlace(target).rect;
+        const fromTop = inner.top - outer.top - panel.clientTop;
+        const fromLeft = inner.left - outer.left - panel.clientLeft;
         panel.scrollTo({
-          top: panel.scrollTop + inner.top - outer.top - panel.clientTop - (panel.clientHeight - inner.height) / 2,
-          left: panel.scrollLeft + inner.left - outer.left - panel.clientLeft - (panel.clientWidth - inner.width) / 2,
+          top: panel.scrollTop + toCentre(fromTop, inner.height, panel.clientHeight, "top"),
+          left: panel.scrollLeft + toCentre(fromLeft, inner.width, panel.clientWidth, "left"),
           behavior: "instant",
         });
       }
-      const rect = target.getBoundingClientRect();
+      const rect = boxPlace(target).rect;
       win.scrollTo({
-        top: win.scrollY + rect.top - (win.innerHeight - rect.height) / 2,
-        left: win.scrollX + rect.left - (win.innerWidth - rect.width) / 2,
+        top: win.scrollY + toCentre(rect.top, rect.height, win.innerHeight, "top"),
+        left: win.scrollX + toCentre(rect.left, rect.width, win.innerWidth, "left"),
         behavior: "instant",
       });
       ticks += 1;
@@ -1402,6 +1443,26 @@ function keepCentered(target: HTMLElement): void {
     }
   };
   step();
+}
+
+/**
+ * How far to scroll a view so an element starting ``start`` pixels into it,
+ * ``size`` pixels long, is centred; or, when it is longer than the view,
+ * so it starts a little way in.
+ *
+ * Centring a flagged ``<main>`` or long form that is taller than the view put
+ * its middle on screen and scrolled away its top, where it starts, and the
+ * box's numbered label above it: the reader saw an unmarked stretch of page.
+ * Rejected: centring on the element's top, which would waste half the view
+ * above it. The margin leaves room for the label above the box (the label is
+ * about 30 pixels tall, see ``spotlight``); sideways, only for the box's
+ * ring. No WCAG criterion covers where a tool scrolls; the nearest is SC
+ * 2.4.11 Focus Not Obscured (Minimum), Level AA, which asks (paraphrased)
+ * that the item a reader is on is not hidden from them.
+ */
+function toCentre(start: number, size: number, view: number, axis: "top" | "left"): number {
+  const margin = axis === "top" ? 48 : 16;
+  return size > view ? start - margin : start - (view - size) / 2;
 }
 
 /** A state's flagged elements that its capture does not hold, of how many. */
@@ -1443,6 +1504,25 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
  * wrong with this capture. Screen readers get sentence case, as with
  * ``MissingChip``.
  */
+/** The sentence under the Page state picker, and the picker's description. */
+const ELSEWHERE_ID = "inspect-state-elsewhere";
+
+/**
+ * "3 more occurrences are in 2 other page states. Choose one in the Page
+ * state list." From page load, the others all come after a click, so it
+ * says so. Counts and states are both given: a state can hold several.
+ */
+function elsewhereSentence(occurrences: number, states: number, inClickedState: boolean): string {
+  const many = occurrences === 1 ? "1 more occurrence" : `${occurrences.toLocaleString()} more occurrences`;
+  const where = states === 1 ? "1 page state" : `${states} page states`;
+  const choose = states === 1 ? "Choose it in the Page state list." : "Choose one in the Page state list.";
+  if (inClickedState) {
+    const others = states === 1 ? "another page state" : `${states} other page states`;
+    return `${many} ${occurrences === 1 ? "is" : "are"} in ${others}. ${choose}`;
+  }
+  return `${many} ${occurrences === 1 ? "appears" : "appear"} only after clicking a control, in ${where}. ${choose}`;
+}
+
 function IssueNotHereChip() {
   return (
     <span className="sev-chip shrink-0 bg-surface-muted text-fg-muted">
@@ -1450,6 +1530,45 @@ function IssueNotHereChip() {
       <span className="sr-only">Issue not here, </span>
     </span>
   );
+}
+
+/**
+ * Where the numbered box is, in words, when it is not simply around the
+ * flagged element (see ``boxPlace``). A row of its own in the table, after
+ * Size, and only when it applies, so every other element's table keeps the
+ * same labels in the same places. Said in words because the box's position
+ * alone cannot tell the reader that an option was marked on its list box:
+ * WCAG 2.2 SC 1.3.3 Sensory Characteristics (Level A). The technical name is
+ * in parentheses for developers (docs/plain-language.md, rule 6).
+ */
+const BOX_NOTES: Record<BoxNote, string> = {
+  contents: "Around what it holds. It has no box of its own (display: contents).",
+  "list-box": "On its list box. An option has no box of its own.",
+  "image-map": "On the part of its image it covers. An area of an image map (<area>) has no box of its own.",
+  "whole-page": "No box, because it is the whole page. Nothing is dimmed.",
+  "focus-only": "It shows only when it has keyboard focus. The box is where it shows then.",
+  "off-screen": "No box. It is off the screen in this saved copy.",
+  "focus-unread":
+    "No box. It is off the screen in this saved copy. Pages often place a link there and show it only when it has keyboard focus.",
+  "part-clipped": "Around the part that shows. The part of the page around it hides the rest (overflow: hidden).",
+  clipped: "No box. The part of the page around it hides it (overflow: hidden).",
+  opened: "Around it. Axcess opened the closed section it is in (<details>) in this saved copy.",
+  hidden: "No box. It was hidden in this saved copy (display: none).",
+  canvas:
+    "Around a drawing area (canvas). The saved copy runs no scripts, so it shows the area's backup content, not the drawing.",
+};
+
+/**
+ * Why some occurrences are not outlined: where they are, and that the saved
+ * copy does not keep that part. Empty for none.
+ */
+function unreachableSentence(count: number, where: Unreachable): string {
+  if (count === 0) return "";
+  const lead =
+    count === 1 ? "1 occurrence is not outlined: it is" : `${count} occurrences are not outlined: they are`;
+  return where === "shadow"
+    ? `${lead} inside a part of the page that keeps its own page code (shadow DOM). The saved copy does not keep that code.`
+    : `${lead} inside another page shown within this one (an iframe). The saved copy does not keep that page.`;
 }
 
 /** "1 pixel", "924 pixels". */

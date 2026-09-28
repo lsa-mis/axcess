@@ -263,6 +263,7 @@ export default function FindingDetailRoute() {
                     {toast}
                   </span>
                   {toastMs === null && (
+                    // eslint-disable-next-line react/forbid-elements -- Convert: a small ghost button, Button variant="ghost" size="sm"
                     <button
                       type="button"
                       onClick={() => setToast(null)}

@@ -114,6 +114,7 @@ export default function Tabs({
       {items.map((item) => {
         const active = item.key === value;
         return (
+          // eslint-disable-next-line react/forbid-elements -- Keep: the Tabs component's own tab button
           <button
             key={item.key}
             type="button"

@@ -225,6 +225,7 @@ export default function CommandPalette({
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[12vh]">
       {/* Backdrop is a real <button> so click-to-close is keyboard- and
           screen-reader-friendly and the a11y interaction rules are satisfied. */}
+      {/* eslint-disable-next-line react/forbid-elements -- Keep: the dialog backdrop, a full-screen close target */}
       <button
         type="button"
         aria-label="Close search"
@@ -274,6 +275,7 @@ export default function CommandPalette({
                   {group.name}
                 </div>
                 {group.items.map(({ item, index }) => (
+                  // eslint-disable-next-line react/forbid-elements -- Keep: an option in the palette's listbox (role=option)
                   <button
                     key={item.id}
                     type="button"

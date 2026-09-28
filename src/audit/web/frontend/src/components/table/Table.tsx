@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -29,6 +30,15 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  */
 
 /**
+ * Rounds a table part's corners when it is the first or last thing in a Card
+ * (`data-card`, ../ui.tsx), so its fill follows the card's corners instead of
+ * painting square ones over them. 7px is the card's radius (`rounded-xs`,
+ * 8px) less its 1px border. A part that clips (the scroll region) clips its
+ * rows to the same curve.
+ */
+const CARD_EDGE = "[[data-card]>&:first-child]:rounded-t-[7px] [[data-card]>&:last-child]:rounded-b-[7px]";
+
+/**
  * The one bar over every table, styled like a pager bar: what narrows the
  * rows (search, the Filter menu) on the left, the pager on the right, and
  * `footer` (the active filters) under both. It wraps on a narrow screen
@@ -44,7 +54,7 @@ export function TableBar({
   footer?: ReactNode;
 }) {
   return (
-    <div className="border-b border-border bg-surface-subtle">
+    <div className={cn("border-b border-border bg-surface-subtle", CARD_EDGE)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
         {children && <div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2">{children}</div>}
         {pager}
@@ -148,6 +158,7 @@ export function TableStatus({
     <div
       className={cn(
         "flex min-h-target flex-wrap items-center gap-x-3 border-b border-border bg-surface-subtle px-3 py-1 text-xs text-fg-muted",
+        CARD_EDGE,
         className,
       )}
     >
@@ -175,23 +186,86 @@ export function TableRegion({
   paged,
   busy,
   regionRef,
+  className,
   children,
 }: {
   label: string;
   paged?: Paged;
   busy?: boolean;
   regionRef?: Ref<HTMLDivElement>;
+  /**
+   * A frame, for a table inside another box: `rounded-xs border`. The frame
+   * goes here, not on the <table>: a table's own corners stay square
+   * (browsers ignore border-radius on a table with collapsed borders), and
+   * the region, which clips, clips the rows to its rounded corners.
+   */
+  className?: string;
   children: ReactNode;
 }) {
+  // Whether the table is wider than the region, so the region scrolls
+  // sideways. Measured whenever either changes size.
+  const [scrolls, setScrolls] = useState(false);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const setRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      setNode(element);
+      if (typeof regionRef === "function") regionRef(element);
+      else if (regionRef) (regionRef as { current: HTMLDivElement | null }).current = element;
+    },
+    [regionRef],
+  );
+  useEffect(() => {
+    if (!node) return;
+    const measure = () => setScrolls(node.scrollWidth > node.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    for (const child of Array.from(node.children)) observer.observe(child);
+    // Keyboard focus only: bring the table's top back into view when the
+    // browser's centring left it above the top bar (see the comment below).
+    const onFocus = (event: FocusEvent) => {
+      if (event.target !== node || !node.matches(":focus-visible")) return;
+      if (node.getBoundingClientRect().top < 88) node.scrollIntoView({ block: "start", behavior: "instant" });
+    };
+    node.addEventListener("focus", onFocus);
+    return () => {
+      observer.disconnect();
+      node.removeEventListener("focus", onFocus);
+    };
+  }, [node]);
   return (
     <div
-      ref={regionRef}
+      ref={setRef}
       role="region"
       aria-label={label}
       aria-busy={busy || undefined}
+      // In the tab order only while it scrolls sideways. A keyboard user needs
+      // focus on a region to scroll it (axe scrollable-region-focusable; WCAG
+      // 2.2 SC 2.1.1 Keyboard), but a table that fits had a tab stop that did
+      // nothing, one more for every table on the way to its links. It stays
+      // focusable from code (-1): a table takes focus when the control that
+      // reordered it goes away ("Back to recommended order"), so focus is
+      // not lost to the page.
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-      tabIndex={0}
-      className="overflow-x-auto focus:outline-none focus-visible:shadow-focus"
+      tabIndex={scrolls ? 0 : -1}
+      // A browser brings a focused element into view by centring it when it
+      // is off the screen, so tabbing to a table taller than the window
+      // dropped the reader in its middle, away from the header row that
+      // names the columns: a jump the reader did not ask for (SC 3.2.1 On
+      // Focus, Level A, is about that kind of surprise, paraphrased). On
+      // keyboard focus, when the table's top has gone above the top bar,
+      // its top is brought back into view, just under the bar (the 72px
+      // topbar and 16px of room: scroll-mt-[88px]); see the effect above.
+      // A mouse click inside it moves nothing.
+      // `relative`: screen-reader-only text in a cell is positioned
+      // absolutely (`sr-only`). Without a positioned region it was placed
+      // against the page, outside this clip, and on a phone widened the whole
+      // page (615px at 320), so it scrolled sideways (SC 1.4.10 Reflow).
+      className={cn(
+        "relative scroll-mt-[88px] overflow-x-auto focus:outline-none focus-visible:shadow-focus",
+        CARD_EDGE,
+        className,
+      )}
     >
       {paged ? <div {...paged.hold}>{children}</div> : children}
     </div>
@@ -245,9 +319,10 @@ type HeaderProps = Omit<ThHTMLAttributes<HTMLTableCellElement>, "scope" | "child
  *
  * The cell does not forbid wrapping, so a tight table stays inside its
  * region. By default (`wrap="chip"`) the label stays on one line and the
- * chip drops under it. With `wrap="words"` the label's words wrap and the
- * arrow or chip follows the last word, for long labels ("Views opened by
- * clicking") in a table with many columns.
+ * chip drops under it. With `wrap="words"` the label's words wrap, the
+ * arrow stays on the line of the last word and the chip goes under the
+ * label, for long labels ("Views opened by clicking") in a table with many
+ * columns.
  */
 export function SortHeader<K extends string>({
   column,
@@ -288,7 +363,6 @@ export function SortHeader<K extends string>({
         key={`${sort.column}-${sort.direction}`}
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-umich-blue px-1.5 py-px text-2xs font-semibold normal-case tracking-normal text-fg-inverse motion-safe:animate-sort-pop",
-          words && "ml-1 align-middle",
         )}
       >
         <Arrow className="h-3 w-3 shrink-0" aria-hidden />
@@ -319,18 +393,30 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target items-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          "group inline-flex min-h-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          // Words at the foot of the target, not its middle: with the cell
+          // bottom-aligned, the last line of every label then sits on one
+          // line, right over the column's data, however many lines each
+          // label takes. The target keeps its full height (SC 2.5.5).
+          words ? "items-end pb-1.5" : "items-center",
           !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
           "text-center",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
         {words ? (
-          // One inline run, so the indicator sits after the last word.
-          <span>
-            {label}
-            {indicator}
-          </span>
+          // The arrow follows the last word and never parts from it: an
+          // arrow alone on a line of its own reads as a separate thing. The
+          // chip is wider, so it has a line of its own under the label,
+          // rather than widening the column it sorts.
+          active ? (
+            <span>
+              {label}
+              <span className="mt-0.5 flex justify-center">{indicator}</span>
+            </span>
+          ) : (
+            <span>{withLastWord(label, indicator)}</span>
+          )
         ) : (
           <>
             <span className="whitespace-nowrap">{label}</span>
@@ -339,6 +425,31 @@ export function SortHeader<K extends string>({
         )}
       </button>
     </th>
+  );
+}
+
+/**
+ * ``label`` with ``after`` kept on one line with its last word ("Images with
+ * [text ⇅]"). A label that is not plain text is left as it is.
+ */
+function withLastWord(label: ReactNode, after: ReactNode): ReactNode {
+  if (typeof label !== "string") {
+    return (
+      <>
+        {label}
+        {after}
+      </>
+    );
+  }
+  const cut = label.trimEnd().lastIndexOf(" ");
+  return (
+    <>
+      {cut >= 0 && label.slice(0, cut + 1)}
+      <span className="whitespace-nowrap">
+        {label.slice(cut + 1)}
+        {after}
+      </span>
+    </>
   );
 }
 

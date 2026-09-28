@@ -88,6 +88,7 @@ export default function ScanTypeTabs({
           const selected = tabMode === mode;
           const disabled = tabMode === "login" && Boolean(disabledReason);
           return (
+            // eslint-disable-next-line react/forbid-elements -- Keep: a tab of the Scan type tabs (role=tab)
             <button
               key={tabMode}
               ref={(element) => {

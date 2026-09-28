@@ -45,8 +45,8 @@ const GROUP_FIELDS: Record<GroupKey, readonly FieldKey[]> = {
  * in words what will run, so nothing has to be scrolled past to start. A
  * failed submit opens the group that holds a named field (the limits, or
  * Fast scan under Speed), so the alert's link lands on a visible control.
- * Start and Cancel are at the top right of the page (`SubmitBar`, in the
- * route's header), and Reset at the top right of the rail.
+ * Start and Cancel (`actions`) are pinned at the foot of the rail, and
+ * Reset at its top right. Why the foot of the rail: see `SubmitBar`.
  *
  * It is the tab panel, and it is keyed on the mode by the route, so a tab
  * change re-mounts it and it drops in (`animate-drop-in`, 300 ms, off under
@@ -65,6 +65,7 @@ export default function ScanForm({
   urlInputRef,
   beforeGroups,
   afterGroups,
+  actions,
 }: {
   policy: ScanPolicy;
   settings: ScanSettings;
@@ -83,6 +84,8 @@ export default function ScanForm({
   urlInputRef?: Ref<HTMLInputElement>;
   beforeGroups?: ReactNode;
   afterGroups?: ReactNode;
+  /** Start and Cancel (`SubmitBar`), pinned at the foot of the rail. */
+  actions?: ReactNode;
 }) {
   const urlError = errors.find((error) => error.field === "url")?.message;
   const groupProps = { settings, update, policy, capabilities, errors, fieldIds };
@@ -108,7 +111,6 @@ export default function ScanForm({
       title={GROUPS[key].legend}
       open={open.has(key)}
       onOpenChange={setGroupOpen(key)}
-      className="rounded-md"
     >
       {children}
     </Disclosure>
@@ -164,10 +166,11 @@ export default function ScanForm({
           onReset={onReset}
           className="mt-5 lg:sticky lg:top-24 lg:mt-0"
         >
-          {/* What happens after Start, which sits at the top right of the
-              page; this note is that button's description. */}
+          {actions}
+          {/* What happens after Start; this note is that button's
+              description. */}
           {policy.submitNote && (
-            <p id={SUBMIT_NOTE_ID} className="text-xs text-fg-muted">
+            <p id={SUBMIT_NOTE_ID} className="mt-3 text-xs text-fg-muted">
               {policy.submitNote}
             </p>
           )}

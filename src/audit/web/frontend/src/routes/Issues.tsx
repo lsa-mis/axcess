@@ -40,6 +40,7 @@ import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
 import { ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
+import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
 import {
   FINDING_TYPES,
@@ -133,11 +134,12 @@ export default function IssuesRoute() {
   // keystroke is still pending would otherwise write a snapshot taken before
   // that keystroke — and the search term the reader just typed disappears
   // from the URL (and from a shared or reloaded link) the moment they touch
-  // a filter.
+  // a filter. React Router's `previous` is the last render's query string,
+  // not the live one, so the address itself is read (liveSearchParams).
   const setParam = (key: string, value: string) => {
     setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
+      () => {
+        const next = liveSearchParams();
         if (value) next.set(key, value);
         else next.delete(key);
         return next;
@@ -151,8 +153,8 @@ export default function IssuesRoute() {
   // back what the first removed. The search and the sort stay.
   const resetFilters = () => {
     setParams(
-      (previous) => {
-        const next = new URLSearchParams(previous);
+      () => {
+        const next = liveSearchParams();
         for (const key of ["conformance", "type", "finding_type", "page"]) next.delete(key);
         return next;
       },
@@ -292,6 +294,7 @@ export default function IssuesRoute() {
                 </span>
               )}
               {sort && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
                 <button
                   type="button"
                   onClick={recommend}

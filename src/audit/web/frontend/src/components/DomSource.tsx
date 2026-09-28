@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import FlaggedStepper from "./FlaggedStepper";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Button } from "./ui";
 
@@ -217,41 +218,7 @@ export default function DomSource({
             // Previous / Next step through the flagged elements in document
             // order; the count between them says where you are. One element
             // still gets a single "Jump" so the control matches the job.
-            <span
-              role="group"
-              aria-label="Flagged elements"
-              className="inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
-            >
-              <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
-                {markStarts.length === 1
-                  ? "1 flagged element"
-                  : `Flagged element ${current + 1} of ${markStarts.length}`}
-              </span>
-              {markStarts.length > 1 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="min-h-target"
-                  aria-label="Previous flagged element"
-                  disabled={current === 0}
-                  onClick={() => goTo(current - 1)}
-                >
-                  <ChevronUp className="h-4 w-4" aria-hidden />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="min-h-target"
-                aria-label={markStarts.length > 1 ? "Next flagged element" : "Jump to flagged element"}
-                disabled={markStarts.length > 1 && current === markStarts.length - 1}
-                onClick={() => goTo(markStarts.length > 1 ? current + 1 : 0)}
-              >
-                <ChevronDown className="h-4 w-4" aria-hidden />
-              </Button>
-            </span>
+            <FlaggedStepper count={markStarts.length} index={current} onGo={goTo} />
           )}
           <Button type="button" size="sm" className="min-h-target" onClick={copy} aria-live="polite">
             {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}

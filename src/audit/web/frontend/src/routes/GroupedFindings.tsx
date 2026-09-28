@@ -220,6 +220,7 @@ function GroupCard({
 
   return (
     <Card className="overflow-hidden">
+      {/* eslint-disable-next-line react/forbid-elements -- Convert: a card-header disclosure, the job of Disclosure in ui.tsx */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -461,6 +462,7 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
             opening row 3 doesn't change row 4. Collapsed by default
             because most findings appear on 1-3 pages and the row stays
             scannable; expanded reveals every page + alt + above-fold. */}
+        {/* eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled disclosure; needs a link variant on Button */}
         <button
           type="button"
           onClick={() => setShowPages((v) => !v)}

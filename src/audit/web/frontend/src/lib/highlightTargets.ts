@@ -82,7 +82,16 @@ export type Located =
   /** One element, or several for an Alfa record that names several. */
   | { status: "found"; elements: Element[]; how: "selector" | "xpath" | "markup" | "place" }
   | { status: "ambiguous"; candidates: number }
-  | { status: "missing" };
+  | { status: "missing" }
+  /** Where no saved copy holds it (see ``unreachableLocator``): said, never guessed. */
+  | { status: "unreachable"; where: Unreachable };
+
+/**
+ * Where a flagged element is that no saved copy holds: inside a component's
+ * own page code (``shadow``, shadow DOM), or inside another page shown within
+ * this one (``frame``, an iframe).
+ */
+export type Unreachable = "shadow" | "frame";
 
 /** One highlighted element, in document order, and the occurrences it stands for. */
 export type HighlightStep = { targets: number[] };
@@ -97,6 +106,8 @@ export type HighlightResult = {
   total: number;
   /** Occurrences whose markup appears in several places and could not be pinned. */
   ambiguous: number;
+  /** Occurrences where no saved copy holds them, by where they are. */
+  unreachable: Record<Unreachable, number>;
   /** One entry per highlighted element, in document order: what Previous / Next step through. */
   steps: HighlightStep[];
 };
@@ -176,12 +187,18 @@ export function findTargetElement(doc: Document, target: Target): Element | null
   return located.status === "found" ? located.elements[0] : null;
 }
 
-/** How many of ``targets`` are located in ``html``, without re-serializing. */
+/**
+ * How many of ``targets`` are located in ``html``, without re-serializing.
+ * One that no saved copy can hold counts too: it is not missing from this
+ * one, so the state picker does not call it "No longer here".
+ */
 export function countFound(html: string | null, targets: Target[]): number {
   if (!html || targets.length === 0) return 0;
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
-    return locateTargets(doc, targets).filter((located) => located.status === "found").length;
+    return locateTargets(doc, targets).filter(
+      (located) => located.status === "found" || located.status === "unreachable",
+    ).length;
   } catch {
     return 0;
   }
@@ -195,12 +212,21 @@ export function countFound(html: string | null, targets: Target[]): number {
  * one the reader is on.
  */
 export function buildHighlightedHtml(html: string | null, targets: Target[]): HighlightResult {
-  const none = { found: 0, located: 0, total: targets.length, ambiguous: 0, steps: [] };
+  const none = {
+    found: 0,
+    located: 0,
+    total: targets.length,
+    ambiguous: 0,
+    unreachable: { shadow: 0, frame: 0 },
+    steps: [],
+  };
   if (!html) return { srcDoc: "", ...none };
   if (targets.length === 0) return { srcDoc: html, ...none };
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
     const located = locateTargets(doc, targets);
+    const unreachable = { shadow: 0, frame: 0 };
+    for (const result of located) if (result.status === "unreachable") unreachable[result.where] += 1;
     const byElement = new Map<Element, number[]>();
     located.forEach((result, index) => {
       if (result.status !== "found") return;
@@ -211,7 +237,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
       }
     });
     const ambiguous = located.filter((result) => result.status === "ambiguous").length;
-    if (byElement.size === 0) return { srcDoc: html, ...none, ambiguous };
+    if (byElement.size === 0) return { srcDoc: html, ...none, ambiguous, unreachable };
     const ordered = [...byElement.keys()].sort(documentOrder);
     for (const element of ordered) {
       if (element instanceof HTMLElement || element instanceof SVGElement) markElement(element);
@@ -222,6 +248,7 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
       located: located.filter((result) => result.status === "found").length,
       total: targets.length,
       ambiguous,
+      unreachable,
       steps: ordered.map((element) => ({ targets: byElement.get(element) ?? [] })),
     };
   } catch {
@@ -232,6 +259,9 @@ export function buildHighlightedHtml(html: string | null, targets: Target[]): Hi
 /** Outline a flagged element and keep it visible whatever the page's own styles say. */
 export function markElement(el: HTMLElement | SVGElement): void {
   el.classList.add(HIGHLIGHT_CLASS);
+  // The whole page is not outlined: a ring round the edge of the saved copy
+  // marks nothing in it (see ``spotlight``).
+  if (isWholePage(el)) return;
   // Inset, not outset: a flagged element filling an `overflow: hidden`
   // ancestor (the image-tile pattern) has an outset ring drawn entirely
   // outside the clip box, so it is never painted.
@@ -244,20 +274,49 @@ export function markElement(el: HTMLElement | SVGElement): void {
   let parent = el.parentElement;
   while (parent && parent !== el.ownerDocument.documentElement) {
     forceVisible(parent);
+    openSection(parent, el);
     parent = parent.parentElement;
   }
 }
 
+/** Set on a ``<details>`` section the inspector opened (see ``openSection``). */
+const OPENED = "data-axcess-opened";
+
+/**
+ * Open ``section`` when it is a closed ``<details>`` that hides ``el``.
+ *
+ * A closed section shows only its summary, so a flagged element inside it
+ * has no box of its own, and the numbered box landed somewhere else. This
+ * is a saved copy, not the site: opening it changes nothing a visitor sees,
+ * and it is what a reader would do on the live page to reach the element.
+ * The table under the toolbar says the section was opened, so the reader
+ * knows the page does not start that way. Rejected: leaving it closed and
+ * saying so, which shows the reader nothing. An element in the section's own
+ * summary shows while it is closed, so that section stays as it is.
+ */
+function openSection(section: Element, el: Element): void {
+  if (section.tagName.toLowerCase() !== "details" || section.hasAttribute("open")) return;
+  const summary = Array.from(section.children).find((child) => child.tagName.toLowerCase() === "summary");
+  if (summary?.contains(el)) return;
+  section.setAttribute("open", "");
+  section.setAttribute(OPENED, "");
+}
+
 /** Set the element the reader is on apart from the other flagged ones, or put it back. */
 export function markCurrent(el: HTMLElement | SVGElement, current: boolean): void {
+  if (current) el.setAttribute("data-axcess-current", "");
+  else el.removeAttribute("data-axcess-current");
+  if (isWholePage(el)) return;
   el.style.setProperty(
     "outline",
     current ? `3px solid ${CURRENT_OUTLINE}` : `2px dashed ${FLAGGED_OUTLINE}`,
     "important",
   );
   el.style.setProperty("outline-offset", current ? "-3px" : "-2px", "important");
-  if (current) el.setAttribute("data-axcess-current", "");
-  else el.removeAttribute("data-axcess-current");
+}
+
+function isWholePage(el: Element): boolean {
+  return el === el.ownerDocument.documentElement || el === el.ownerDocument.body;
 }
 
 /**
@@ -279,6 +338,35 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
  * panel scrolled away and left the box behind, stuck at the top or bottom of
  * the panel over something else. Now the box covers only the part of the
  * element its panels show, and is hidden while none of it is shown.
+ *
+ * An element with no box of its own is marked where ``boxPlace`` says, on
+ * what stands for it.
+ *
+ * A link that wraps onto a second line gets a ring on each line, with the
+ * label on the first. One rectangle around it covered both lines and the
+ * words beside them, so the reader could not see which words are the link.
+ * The dimming is drawn once, around all the lines: a dimmed ring per line
+ * would dim the other lines, and stack. Rejected: an outline that follows
+ * the text's shape exactly, which needs a drawn path per line and says no
+ * more than the rings do.
+ *
+ * An element placed off the screen until it has focus (a skip link) is shown
+ * as it looks focused (``showAsFocused``). One that stays off the screen gets
+ * no box: a box off the screen shows the reader nothing.
+ *
+ * A part of the page that cuts off what does not fit without scrolling (a
+ * carousel's window, a menu bar: ``overflow: hidden``) cuts the box too, so
+ * it covers only the part that shows, and there is none when nothing shows.
+ * The whole box was drawn over the slide or menu items beside it, marking
+ * what the reader saw instead of the flagged element. Rejected: scrolling
+ * such a part to the element, which would show the page as no visitor sees
+ * it (see ``scrollPanels``), and drawing the box anyway, as before.
+ *
+ * The whole page (``<html>``, ``<body>``) gets no box. A box around the whole
+ * document dimmed nothing, since nothing is outside it, and put its label off
+ * the top of the view, so it looked like a stray frame. Rejected: a box
+ * around the frame's view, which would say the element is what happens to be
+ * on screen. The table under the toolbar says it is the whole page instead.
  */
 export function spotlight(
   el: HTMLElement | null,
@@ -301,39 +389,70 @@ export function spotlight(
   tag.textContent = label;
   box.appendChild(tag);
   owner.documentElement.appendChild(box);
-  const panels = scrollPanels(el);
+  let panelsOf: Element | null = null;
+  let panels: HTMLElement[] = [];
 
   let lastSize: string | null = null;
   let lastPlace: string | null = null;
+  let triedFocus = false;
   const place = () => {
-    const rect = el.getBoundingClientRect();
-    const size = `${rect.width},${rect.height}`;
+    // Once per box, and again only when asked for (Previous, Next, Jump):
+    // when a stylesheet arriving late moves it off the screen, too.
+    if (!triedFocus && hidesUntilFocused(el)) {
+      triedFocus = true;
+      showAsFocused(el);
+    }
+    const own = el.getBoundingClientRect();
+    const { on, lines, note } = boxPlace(el);
+    const size = `${own.width},${own.height},${note}`;
     if (size !== lastSize) {
       lastSize = size;
       onPlace?.(el);
     }
-    const shown = shownPart(rect, panels);
-    const where = shown
-      ? [shown.left, shown.top, shown.width, shown.height, view.scrollX, view.scrollY].join()
+    if (on !== panelsOf) {
+      panelsOf = on;
+      panels = scrollPanels(on);
+    }
+    const parts = drawsNoBox(note)
+      ? []
+      : lines.map((line) => shownPart(line, panels)).filter((part): part is ShownPart => part !== null);
+    const where = parts.length
+      ? [...parts.flatMap((part) => [part.left, part.top, part.width, part.height]), view.scrollX, view.scrollY].join()
       : "hidden";
     if (where === lastPlace) return;
     lastPlace = where;
-    if (!shown) {
+    if (parts.length === 0) {
       box.style.setProperty("display", "none", "important");
       return;
     }
-    let { width, height } = shown;
-    let left = shown.left + view.scrollX;
-    let top = shown.top + view.scrollY;
-    if (width < SPOTLIGHT_MIN) {
-      left -= (SPOTLIGHT_MIN - width) / 2;
-      width = SPOTLIGHT_MIN;
-    }
-    if (height < SPOTLIGHT_MIN) {
-      top -= (SPOTLIGHT_MIN - height) / 2;
-      height = SPOTLIGHT_MIN;
-    }
+    // Page coordinates, each at least SPOTLIGHT_MIN on each side.
+    const pieces = parts.map((part) => {
+      let { width, height } = part;
+      let left = part.left + view.scrollX;
+      let top = part.top + view.scrollY;
+      if (width < SPOTLIGHT_MIN) {
+        left -= (SPOTLIGHT_MIN - width) / 2;
+        width = SPOTLIGHT_MIN;
+      }
+      if (height < SPOTLIGHT_MIN) {
+        top -= (SPOTLIGHT_MIN - height) / 2;
+        height = SPOTLIGHT_MIN;
+      }
+      return { left, top, width, height };
+    });
+    const left = Math.min(...pieces.map((piece) => piece.left));
+    const top = Math.min(...pieces.map((piece) => piece.top));
+    const width = Math.max(...pieces.map((piece) => piece.left + piece.width)) - left;
+    const height = Math.max(...pieces.map((piece) => piece.top + piece.height)) - top;
     const pad = 4;
+    const ring = {
+      "box-sizing": "border-box",
+      border: `3px solid ${CURRENT_OUTLINE}`,
+      "border-radius": "4px",
+    };
+    const single = pieces.length === 1;
+    // One piece: the box is the ring. Several (a wrapped link): the box only
+    // dims around them all, and each line gets a ring of its own.
     setStyles(box, {
       display: "block",
       position: "absolute",
@@ -341,25 +460,52 @@ export function spotlight(
       top: `${top - pad}px`,
       width: `${width + pad * 2}px`,
       height: `${height + pad * 2}px`,
-      "box-sizing": "border-box",
-      border: `3px solid ${CURRENT_OUTLINE}`,
-      "border-radius": "4px",
-      "box-shadow": `0 0 0 3px ${CURRENT_RING}, 0 0 0 100vmax ${CURRENT_DIM}`,
+      ...(single ? ring : { "box-sizing": "border-box", border: "0", "border-radius": "4px" }),
+      "box-shadow": single
+        ? `0 0 0 3px ${CURRENT_RING}, 0 0 0 100vmax ${CURRENT_DIM}`
+        : `0 0 0 100vmax ${CURRENT_DIM}`,
       "pointer-events": "none",
       "z-index": "2147483647",
       margin: "0",
       padding: "0",
     });
-    // The label sits above the box, or inside its top when the element is
-    // at the top of the frame's view.
-    const above = top - view.scrollY - pad > 30;
+    for (const old of Array.from(box.querySelectorAll("[data-axcess-line]"))) old.remove();
+    if (!single) {
+      // As far out as the one-piece ring, so no ring covers the text.
+      const linePad = pad;
+      // Inside the box, which has no border: offsets from its padding edge.
+      for (const piece of pieces) {
+        const line = owner.createElement("div");
+        line.setAttribute("data-axcess-line", "");
+        setStyles(line, {
+          position: "absolute",
+          left: `${piece.left - linePad - (left - pad)}px`,
+          top: `${piece.top - linePad - (top - pad)}px`,
+          width: `${piece.width + linePad * 2}px`,
+          height: `${piece.height + linePad * 2}px`,
+          ...ring,
+          "box-shadow": `0 0 0 3px ${CURRENT_RING}`,
+          margin: "0",
+          padding: "0",
+        });
+        box.appendChild(line);
+      }
+    }
+    // The label sits above the first line's box, or inside its top when that
+    // is at the top of the frame's view. After the lines, so it is drawn
+    // over their rings.
+    const first = pieces[0];
+    const above = first.top - view.scrollY - pad > 30;
+    const labelLeft = single ? -3 : first.left - pad - (left - pad);
+    const labelTop = single ? 0 : first.top - pad - (top - pad);
     setStyles(tag, {
       position: "absolute",
-      left: "-3px",
-      top: above ? "-29px" : "0",
+      left: `${labelLeft}px`,
+      top: `${above ? labelTop - 29 : labelTop}px`,
+      "z-index": "1",
       background: CURRENT_OUTLINE,
       color: "#ffffff",
-      font: "600 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
+      font: "600 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif",
       "letter-spacing": "normal",
       "text-transform": "none",
       padding: "2px 8px",
@@ -381,7 +527,10 @@ export function spotlight(
     frame = requestAnimationFrame(follow);
   };
   follow();
-  stopFollowing.set(owner, () => cancelAnimationFrame(frame));
+  stopFollowing.set(owner, () => {
+    cancelAnimationFrame(frame);
+    undoFocusStyle(el);
+  });
 }
 
 const stopFollowing = new WeakMap<Document, () => void>();
@@ -413,11 +562,510 @@ export function scrollPanels(el: Element): HTMLElement[] {
   return panels;
 }
 
+/**
+ * Why the box is not simply around the flagged element itself, for the table
+ * under the toolbar. Null when it is.
+ *
+ * - ``contents``: styled ``display: contents``, so only what it holds is
+ *   drawn. The box goes around that.
+ * - ``list-box``: an ``<option>`` of a closed list box (``<select>``). The box
+ *   goes on the list box.
+ * - ``image-map``: an ``<area>`` of an image map. The box goes on the part of
+ *   its image the area covers.
+ * - ``whole-page``: ``<html>`` or ``<body>``, as for a rule about the page
+ *   itself (axe's html-has-lang). No box and no dimming (see ``spotlight``).
+ * - ``focus-only``: off the screen until it has focus, as a skip link is.
+ *   Shown, and boxed, as it looks focused (``showAsFocused``).
+ * - ``off-screen``: off the screen, and focus does not bring it back. No box.
+ * - ``part-clipped``: a part of the page around it that does not scroll (a
+ *   carousel, a menu bar) cuts part of it off. The box covers what shows.
+ * - ``clipped``: such a part cuts all of it off. No box.
+ * - ``opened``: it is inside a closed ``<details>`` section, which the
+ *   inspector opened in the saved copy (see ``openSection``).
+ * - ``hidden``: not displayed in the saved copy (``display: none``), as in a
+ *   tab that was not open. No box: it has no place on the page to mark, and
+ *   showing it would change the page around it. Its page states may show it.
+ * - ``canvas``: a drawing area (``<canvas>``). The saved copy runs no
+ *   scripts, so a browser shows the area's backup (fallback) content in its
+ *   place, not the drawing (see ``drawnOnCanvas``). The box is round that.
+ */
+export type BoxNote =
+  | "contents"
+  | "list-box"
+  | "image-map"
+  | "whole-page"
+  | "focus-only"
+  | "focus-unread"
+  | "off-screen"
+  | "part-clipped"
+  | "clipped"
+  | "opened"
+  | "hidden"
+  | "canvas";
+
+/** The notes for which no box is drawn at all. */
+export function drawsNoBox(note: BoxNote | null): boolean {
+  return (
+    note === "whole-page" ||
+    note === "off-screen" ||
+    note === "focus-unread" ||
+    note === "clipped" ||
+    note === "hidden"
+  );
+}
+
+/** A rectangle in the frame's view. */
+export type BoxRect = { left: number; top: number; right: number; bottom: number; width: number; height: number };
+
+/**
+ * Where the numbered box goes for ``el``: the element it is drawn over (the
+ * flagged one, or what shows for it), the rectangle, and why when it is not
+ * the element's own.
+ *
+ * An element without a box of its own reports an empty rectangle at the top
+ * left of the frame, and the box used to jump there, over whatever the page
+ * had in that corner. Rejected: drawing no box for these. The reader can see
+ * what stands for each one (the buttons a ``display: contents`` wrapper holds,
+ * the list box an option is in, the hotspot of an image map), so the box goes
+ * there and the table says so in words. Not colour or position alone: WCAG
+ * 2.2 SC 1.3.3 Sensory Characteristics (Level A), paraphrased, says
+ * instructions do not rely on shape or location alone.
+ */
+export function boxPlace(el: Element): BoxPlace {
+  const placed = boxPlaceOf(el);
+  const lines = placed.lines ?? [placed.rect];
+  if (drawsNoBox(placed.note)) return { ...placed, lines };
+  // Cut to what the parts of the page around it show (see ``clippingParts``).
+  const parts = clippingParts(placed.on);
+  if (parts.length === 0) return { ...placed, lines };
+  const shown = lines.map((line) => clipTo(line, parts)).filter((line): line is BoxRect => line !== null);
+  if (shown.length === 0) return { ...placed, lines: [], note: "clipped" };
+  const rect = clipTo(placed.rect, parts) ?? shown[0];
+  const cut = rect.width < placed.rect.width - 0.5 || rect.height < placed.rect.height - 0.5;
+  return { ...placed, rect, lines: shown, note: placed.note ?? (cut ? "part-clipped" : null) };
+}
+
+/**
+ * The parts of the page around ``el`` that cut it off without scrolling
+ * (``overflow: hidden`` or ``clip``), and on which axes. Only those that
+ * cut it off in the browser: an element placed by ``position: absolute`` is
+ * cut off only by its positioned ancestor (its containing block) and those
+ * above it, and one placed by ``position: fixed`` by none. The body's
+ * overflow belongs to the window unless the root sets its own.
+ *
+ * Only those inside the nearest panel that scrolls (see ``scrollPanels``):
+ * what a part outside it cuts off (an app's page, fixed to the window's
+ * height, around its scrolling sidebar) comes into view as the panel
+ * scrolls, as it would in the window.
+ */
+function clippingParts(el: Element): { node: Element; x: boolean; y: boolean }[] {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view) return [];
+  const parts: { node: Element; x: boolean; y: boolean }[] = [];
+  const bodyIsWindow = view.getComputedStyle(doc.documentElement).overflow === "visible";
+  let position = view.getComputedStyle(el).position;
+  if (position === "fixed") return parts;
+  let placedAbove = position === "absolute";
+  for (let node = el.parentElement; node && node !== doc.documentElement; node = node.parentElement) {
+    const style = view.getComputedStyle(node);
+    if (placedAbove) {
+      if (!holdsPlacedElements(style)) continue;
+      placedAbove = false;
+    }
+    if (node === doc.body && bodyIsWindow) break;
+    // Overflow does not apply to an inline element (a browser's own styles
+    // give a <canvas> showing its backup content ``overflow: clip``).
+    const applies = style.display !== "inline" && style.display !== "contents";
+    const x = applies && /hidden|clip/.test(style.overflowX);
+    const y = applies && /hidden|clip/.test(style.overflowY);
+    if (x || y) parts.push({ node, x, y });
+    // A panel that scrolls on one axis can still cut off on the other.
+    if (/(auto|scroll|overlay)/.test(`${style.overflowX} ${style.overflowY}`)) break;
+    position = style.position;
+    if (position === "fixed") break;
+    if (position === "absolute") placedAbove = true;
+  }
+  return parts;
+}
+
+/** True when an element is the containing block of absolutely placed elements inside it. */
+function holdsPlacedElements(style: CSSStyleDeclaration): boolean {
+  return (
+    style.position !== "static" ||
+    style.transform !== "none" ||
+    style.perspective !== "none" ||
+    style.filter !== "none" ||
+    /paint|layout|strict|content/.test(style.contain) ||
+    /transform|perspective|filter/.test(style.willChange)
+  );
+}
+
+/** ``rect`` cut to each part's inside (its padding box), or null when nothing is left. */
+function clipTo(rect: BoxRect, parts: { node: Element; x: boolean; y: boolean }[]): BoxRect | null {
+  let { left, top, right, bottom } = rect;
+  for (const { node, x, y } of parts) {
+    const outer = node.getBoundingClientRect();
+    const insideLeft = outer.left + node.clientLeft;
+    const insideTop = outer.top + node.clientTop;
+    if (x) {
+      left = Math.max(left, insideLeft);
+      right = Math.min(right, insideLeft + node.clientWidth);
+    }
+    if (y) {
+      top = Math.max(top, insideTop);
+      bottom = Math.min(bottom, insideTop + node.clientHeight);
+    }
+  }
+  // Equal edges still count: an empty element is shown where it sits.
+  if (right < left || bottom < top) return null;
+  return plainRect({ left, top, right, bottom });
+}
+
+/**
+ * Where the box goes: the element it is drawn over, the whole rectangle, one
+ * rectangle per line for an inline element that wraps (see ``spotlight``),
+ * and why when it is not simply the element's own box.
+ */
+export type BoxPlace = { on: Element; rect: BoxRect; lines: BoxRect[]; note: BoxNote | null };
+
+function boxPlaceOf(el: Element): Omit<BoxPlace, "lines"> & { lines?: BoxRect[] } {
+  const doc = el.ownerDocument;
+  const tag = el.tagName.toLowerCase();
+  if (isWholePage(el)) {
+    return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "whole-page" };
+  }
+  if (tag === "area") {
+    const image = mapImage(el);
+    if (image) return { on: image, rect: areaRect(el, image), note: "image-map" };
+  }
+  if (el.getClientRects().length === 0) {
+    if (doc.defaultView?.getComputedStyle(el).display === "contents") {
+      // A range over its children is the box every one of them draws.
+      const range = doc.createRange();
+      range.selectNodeContents(el);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) return { on: el, rect: plainRect(rect), note: "contents" };
+    }
+    if (tag === "option" || tag === "optgroup") {
+      const select = el.closest("select");
+      if (select && select.getClientRects().length > 0) {
+        return { on: select, rect: plainRect(select.getBoundingClientRect()), note: "list-box" };
+      }
+    }
+    if (notDisplayed(el)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "hidden" };
+  }
+  if (el.hasAttribute(FOCUS_STYLED)) return { on: el, rect: plainRect(el.getBoundingClientRect()), note: "focus-only" };
+  if (isOffScreen(el)) {
+    // A focusable element off the screen is most often a skip link whose
+    // focused look Axcess could not read (see showAsFocused).
+    const note = el.matches(FOCUSABLE) ? "focus-unread" : "off-screen";
+    return { on: el, rect: plainRect(el.getBoundingClientRect()), note };
+  }
+  const note = tag === "canvas" ? "canvas" : el.parentElement?.closest(`details[${OPENED}]`) ? "opened" : null;
+  return { on: el, rect: plainRect(el.getBoundingClientRect()), lines: lineRects(el), note };
+}
+
+/**
+ * True when the page in ``doc`` draws on a drawing area (``<canvas>``) of
+ * some size: at least 100 by 100 pixels by its own width and height (a
+ * browser's default is 300 by 150), so a 1-pixel canvas a script uses behind
+ * the scenes does not count.
+ *
+ * A page draws on a canvas with scripts, and the saved copy runs none, so
+ * a browser shows the canvas's backup (fallback) content in its place, or
+ * nothing, and nothing the page drew (a game's buttons, a chart's labels)
+ * can be outlined. Measured by its attributes, because without scripts the
+ * canvas takes the size of its backup content, not its own.
+ */
+export function drawnOnCanvas(doc: Document): boolean {
+  return Array.from(doc.getElementsByTagName("canvas")).some((canvas) => {
+    const size = (name: string, fallback: number) => {
+      const value = Number.parseInt(canvas.getAttribute(name) ?? "", 10);
+      return Number.isFinite(value) && value >= 0 ? value : fallback;
+    };
+    return size("width", 300) >= 100 && size("height", 150) >= 100;
+  });
+}
+
+/** True when ``el`` or an element around it is ``display: none``. */
+function notDisplayed(el: Element): boolean {
+  const view = el.ownerDocument.defaultView;
+  if (!view) return false;
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    if (view.getComputedStyle(node).display === "none") return true;
+  }
+  return false;
+}
+
+/**
+ * The lines an inline element (a link in a sentence) is drawn on, when it
+ * wraps onto more than one; else undefined. Empty fragments at a line's end
+ * are left out.
+ */
+function lineRects(el: Element): BoxRect[] | undefined {
+  if (el.ownerDocument.defaultView?.getComputedStyle(el).display !== "inline") return undefined;
+  const lines = Array.from(el.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+  return lines.length > 1 ? lines.map(plainRect) : undefined;
+}
+
+/**
+ * True when ``el`` lies wholly above or left of the page, where no scrolling
+ * reaches (``left: -9999px``, the usual way to hide a skip link).
+ */
+function isOffScreen(el: Element): boolean {
+  const view = el.ownerDocument.defaultView;
+  if (!view) return false;
+  const rect = el.getBoundingClientRect();
+  // An empty element at the page's top left is where it sits, not off it.
+  return (rect.left < 0 && rect.right + view.scrollX <= 0) || (rect.top < 0 && rect.bottom + view.scrollY <= 0);
+}
+
+/**
+ * True when ``el`` may be one of the elements a page hides until it has
+ * focus: off the screen, or cut to nothing by its own ``clip`` or
+ * ``clip-path`` (the "visually hidden until focused" pattern).
+ */
+function hidesUntilFocused(el: Element): boolean {
+  if (el.hasAttribute(FOCUS_STYLED) || isWholePage(el)) return false;
+  const style = el.ownerDocument.defaultView?.getComputedStyle(el);
+  if (!style) return false;
+  return isOffScreen(el) || (style.clip !== "auto" && style.clip !== "") || style.clipPath !== "none";
+}
+
+/** Elements a keyboard can reach, for "focus-unread". */
+const FOCUSABLE = "a[href], button, input, select, textarea, summary, [tabindex]";
+
+/** Set on an element while it is shown with its focus styles. */
+const FOCUS_STYLED = "data-axcess-focus-style";
+/** Each such element's own inline styles before, to put back. */
+const focusStyleUndo = new WeakMap<Element, { name: string; value: string; priority: string }[]>();
+
+/**
+ * Show ``el`` as it looks when it has focus, so the box can go where a
+ * keyboard user sees it. True when that brings it on screen.
+ *
+ * A skip link is placed off the screen until it has keyboard focus, and the
+ * box followed it there, so the reader saw nothing. Its look with focus is
+ * read from the saved copy's own style rules (`:focus`, `:focus-visible`)
+ * and set on the element while the box is on it; nothing is focused.
+ *
+ * Rejected: focusing the element. Focus alone stays only while the saved
+ * copy has the reader's focus, so it would have to take their focus from the
+ * inspector. And focusing it for an instant, reading its styles and putting
+ * focus straight back (the first version of this) still reports two focus
+ * changes to assistive technology, so a screen reader could announce "Skip
+ * to main content, link" and then the reader's own control again, for
+ * nothing they did. Moving focus by itself is what a reader must be able to
+ * count on a page not doing: WCAG 2.2 SC 3.2.1 On Focus and SC 2.4.3 Focus
+ * Order (both Level A) are about exactly that kind of surprise (paraphrased).
+ *
+ * The cost: a stylesheet loaded from another site cannot be read (the
+ * browser forbids it), so a skip link styled only there gets no box, and the
+ * table says it is off the screen and that a page often shows such a link
+ * only with keyboard focus ("focus-unread"). Only rules whose `:focus` is on
+ * the element itself count, not on a parent (`.menu:focus a`), and
+ * `:focus-within` is left alone.
+ */
+function showAsFocused(el: Element): boolean {
+  const declared = focusRuleStyles(el);
+  if (!declared || declared.size === 0) return false;
+  const style = (el as HTMLElement | SVGElement).style;
+  const undo: { name: string; value: string; priority: string }[] = [];
+  for (const [name, value] of declared) {
+    // The outline is the inspector's own mark; a transition would only
+    // replay the change.
+    if (name.startsWith("outline") || name.startsWith("transition")) continue;
+    undo.push({ name, value: style.getPropertyValue(name), priority: style.getPropertyPriority(name) });
+    style.setProperty(name, value, "important");
+  }
+  if (undo.length === 0) return false;
+  focusStyleUndo.set(el, undo);
+  el.setAttribute(FOCUS_STYLED, "");
+  if (isOffScreen(el)) {
+    undoFocusStyle(el);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The declarations of every readable style rule that styles ``el`` when it
+ * has focus, in the order the page gives them (a later one wins), or null
+ * when there are none. Media and supports blocks count only when they apply.
+ */
+function focusRuleStyles(el: Element): Map<string, string> | null {
+  const doc = el.ownerDocument;
+  const view = doc.defaultView;
+  if (!view) return null;
+  const out = new Map<string, string>();
+  const visit = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      if ("selectorText" in rule && "style" in rule) {
+        const styleRule = rule as CSSStyleRule;
+        if (styleRule.selectorText.includes(":focus") && focusedSubjectMatches(el, styleRule.selectorText)) {
+          for (let i = 0; i < styleRule.style.length; i += 1) {
+            const name = styleRule.style[i];
+            out.set(name, styleRule.style.getPropertyValue(name));
+          }
+        }
+        continue;
+      }
+      if ("media" in rule && "cssRules" in rule) {
+        const media = (rule as CSSMediaRule).media.mediaText;
+        if (!media || view.matchMedia(media).matches) visit((rule as CSSMediaRule).cssRules);
+        continue;
+      }
+      if ("conditionText" in rule && "cssRules" in rule) {
+        let applies = false;
+        try {
+          applies = view.CSS.supports((rule as CSSSupportsRule).conditionText);
+        } catch {
+          applies = false;
+        }
+        if (applies) visit((rule as CSSSupportsRule).cssRules);
+        continue;
+      }
+      // Cascade layers (@layer { }) hold rules too.
+      if ("cssRules" in rule && "name" in rule) visit((rule as unknown as CSSGroupingRule).cssRules);
+    }
+  };
+  for (const sheet of Array.from(doc.styleSheets)) {
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue; // loaded from another site: the browser will not let it be read
+    }
+    if (sheet.media.mediaText && !view.matchMedia(sheet.media.mediaText).matches) continue;
+    visit(rules);
+  }
+  return out.size > 0 ? out : null;
+}
+
+/**
+ * True when one selector in ``selectorText`` puts `:focus` or
+ * `:focus-visible` on its last part (the element it styles) and, with those
+ * taken away, matches ``el``: `.skip:focus`, `a.skip-link:focus-visible`,
+ * not `.menu:focus a`.
+ */
+function focusedSubjectMatches(el: Element, selectorText: string): boolean {
+  const focus = /:focus(?:-visible)?(?![-\w])/g;
+  for (const selector of splitTopLevel(selectorText, ",")) {
+    const parts = splitCompounds(selector.trim());
+    const subject = parts[parts.length - 1] ?? "";
+    if (!focus.test(subject)) continue;
+    focus.lastIndex = 0;
+    const stripped = selector.replace(focus, "").trim();
+    focus.lastIndex = 0;
+    try {
+      if (el.matches(stripped || "*")) return true;
+    } catch {
+      // Not a selector this browser reads; skip it.
+    }
+  }
+  return false;
+}
+
+/** ``text`` split on ``separator`` outside brackets and quotes. */
+function splitTopLevel(text: string, separator: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote && text[i - 1] !== "\\") quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "(" || c === "[") depth += 1;
+    else if (c === ")" || c === "]") depth -= 1;
+    else if (c === separator && depth === 0) {
+      out.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(text.slice(start));
+  return out;
+}
+
+/** A selector's compound parts, split at its combinators (space, >, +, ~). */
+function splitCompounds(selector: string): string[] {
+  const spaced = selector.replace(/\s*([>+~])\s*/g, " ");
+  return splitTopLevel(spaced, " ").filter(Boolean);
+}
+
+/** Put back the element's own styles after ``showAsFocused``. */
+function undoFocusStyle(el: Element): void {
+  const undo = focusStyleUndo.get(el);
+  if (!undo) return;
+  const style = (el as HTMLElement | SVGElement).style;
+  for (const { name, value, priority } of undo) {
+    if (value) style.setProperty(name, value, priority);
+    else style.removeProperty(name);
+  }
+  focusStyleUndo.delete(el);
+  el.removeAttribute(FOCUS_STYLED);
+}
+
+function plainRect(rect: DOMRect | Omit<BoxRect, "width" | "height">): BoxRect {
+  const { left, top, right, bottom } = rect;
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+/** The image an ``<area>``'s map belongs to (``<img usemap="#name">``), or null. */
+function mapImage(area: Element): Element | null {
+  const map = area.closest("map");
+  const name = map?.getAttribute("name") || map?.id;
+  if (!map || !name) return null;
+  const images = Array.from(map.ownerDocument.querySelectorAll("img[usemap], object[usemap]"));
+  // HTML compares the name after the "#" without regard to ASCII case.
+  const wanted = `#${name.toLowerCase()}`;
+  return images.find((image) => image.getAttribute("usemap")?.trim().toLowerCase() === wanted) ?? null;
+}
+
+/**
+ * The part of ``image`` an ``<area>`` covers: the bounding box of its shape,
+ * in the image's own pixels from its top left, kept inside the image. The
+ * whole image for ``default``, and for coordinates it cannot read.
+ */
+function areaRect(area: Element, image: Element): BoxRect {
+  const outer = image.getBoundingClientRect();
+  const style = image.ownerDocument.defaultView?.getComputedStyle(image);
+  const left = outer.left + image.clientLeft + parseFloat(style?.paddingLeft ?? "0");
+  const top = outer.top + image.clientTop + parseFloat(style?.paddingTop ?? "0");
+  const whole = plainRect(outer);
+  const shape = (area.getAttribute("shape") ?? "rect").trim().toLowerCase();
+  const coords = (area.getAttribute("coords") ?? "")
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
+  if (coords.some((n) => !Number.isFinite(n))) return whole;
+  let box: [number, number, number, number] | null = null;
+  if ((shape === "rect" || shape === "rectangle") && coords.length >= 4) {
+    const [x1, y1, x2, y2] = coords;
+    box = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
+  } else if ((shape === "circle" || shape === "circ") && coords.length >= 3) {
+    box = [coords[0] - coords[2], coords[1] - coords[2], coords[0] + coords[2], coords[1] + coords[2]];
+  } else if ((shape === "poly" || shape === "polygon") && coords.length >= 6) {
+    const xs = coords.filter((_, i) => i % 2 === 0);
+    const ys = coords.filter((_, i) => i % 2 === 1);
+    box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  }
+  if (!box) return whole;
+  const clamp = (n: number, low: number, high: number) => Math.min(Math.max(n, low), high);
+  return plainRect({
+    left: clamp(left + box[0], whole.left, whole.right),
+    top: clamp(top + box[1], whole.top, whole.bottom),
+    right: clamp(left + box[2], whole.left, whole.right),
+    bottom: clamp(top + box[3], whole.top, whole.bottom),
+  });
+}
+
+type ShownPart = { left: number; top: number; width: number; height: number };
+
 /** The part of ``rect`` that its scrolling ``panels`` show, or null when none of it is shown. */
-function shownPart(
-  rect: DOMRect,
-  panels: HTMLElement[],
-): { left: number; top: number; width: number; height: number } | null {
+function shownPart(rect: BoxRect, panels: HTMLElement[]): ShownPart | null {
   let { left, top, right, bottom } = rect;
   for (const panel of panels) {
     if (!panel.isConnected) continue;
@@ -446,6 +1094,8 @@ export type ElementDescription = {
   text: string;
   width: number;
   height: number;
+  /** Why the box is somewhere other than around it, or null. */
+  where: BoxNote | null;
 };
 
 export function describeElement(el: Element): ElementDescription {
@@ -477,10 +1127,11 @@ export function describeElement(el: Element): ElementDescription {
   const text = normalizeWhitespace(nameOrText(el));
   const rect = el.getBoundingClientRect();
   return {
-    kind,
+    kind: isWholePage(el) ? `The whole page (<${tag}> element)` : kind,
     text: text.length > 80 ? `${text.slice(0, 79).trimEnd()}…` : text,
     width: Math.round(rect.width),
     height: Math.round(rect.height),
+    where: boxPlace(el).note,
   };
 }
 
@@ -559,6 +1210,8 @@ function locateByLocator(doc: Document, target: Target): Located | null {
   const { selector, snippet } = target;
   if (!selector) return null;
   if (isAlfaJsonSelector(selector)) return locateAlfa(doc, selector);
+  const where = unreachableLocator(doc, selector);
+  if (where) return { status: "unreachable", where };
   let matches: Element[];
   try {
     matches = Array.from(doc.querySelectorAll(selector));
@@ -578,6 +1231,42 @@ function locateByLocator(doc: Document, target: Target): Located | null {
   // element), or several do (identical elements the selector cannot tell
   // apart): the markup walk decides, and says "ambiguous" when it cannot.
   return null;
+}
+
+/**
+ * Whether ``selector`` names an element no saved copy holds, and where.
+ *
+ * axe names an element with one locator per frame it is in, and one inside a
+ * component's shadow DOM with a list of locators, one per component
+ * (``[["#host", "button"]]``). The scan joins the frames with " > " and
+ * stores such a list as Python writes it: ``['#host', 'button']``. The saved
+ * copy is the page's own code: it keeps neither the shadow DOM nor the pages
+ * inside frames. Such a locator found nothing, and the markup step then
+ * outlined any element elsewhere that looked the same, a guess.
+ *
+ * - ``shadow``: a part starts with ``['`` or ``["``, which no CSS selector
+ *   can (an attribute selector's name is never quoted).
+ * - ``frame``: the whole selector matches nothing, and the part before a
+ *   " > " matches only frames (``iframe``, ``frame``). No real selector
+ *   reaches inside one: a frame has no child elements in the page's code.
+ */
+function unreachableLocator(doc: Document, selector: string): Unreachable | null {
+  if (/(^|\s>\s)\[\s*['"]/.test(selector.trim())) return "shadow";
+  const parts = selector.split(" > ");
+  if (parts.length < 2 || safeQuery(doc, selector).length > 0) return null;
+  for (let i = 1; i < parts.length; i += 1) {
+    const before = safeQuery(doc, parts.slice(0, i).join(" > "));
+    if (before.length > 0 && before.every((el) => /^i?frame$/i.test(el.tagName))) return "frame";
+  }
+  return null;
+}
+
+function safeQuery(doc: Document, selector: string): Element[] {
+  try {
+    return Array.from(doc.querySelectorAll(selector));
+  } catch {
+    return [];
+  }
 }
 
 /** The elements an image locator counts, by kind. */

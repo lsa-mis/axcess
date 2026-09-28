@@ -223,6 +223,103 @@ Rules:
 7. When you change wording, update the UI tests that pin it, without
    weakening any assertion. Update `docs/glossary.md` if a term changes.
 
+## UX rationale and accessibility review
+
+The frontend's design decisions are recorded as comments beside the code
+that carries them: why a layout, order, control, placement or visibility
+was chosen, what was rejected, and the standard it rests on. Examples: the
+comment on the Reports route (`routes/Scans.tsx`), the shared table parts
+(`components/table/Table.tsx`), `Card` and `StatCard` (`components/ui.tsx`),
+`SubmitBar`, and the Inspector's page-state picker. These comments are how
+the reasons reach the next agent or developer. Treat them as requirements.
+
+**Read before you change.** Before editing any frontend file, read the
+rationale comments on the component or route you are changing and on the
+shared components it uses. Keep what they require. If your change would
+go against one, say so to the developer and ask before you change it; do
+not quietly undo a recorded decision.
+
+**Write when you decide.** Every UX choice you make gets a rationale
+comment where the code is, in the same change:
+
+1. What the design does, in one or two sentences.
+2. Why, including the option you rejected and why it lost.
+3. The standard it rests on, precisely: WCAG 2.2 success criterion number,
+   name and level (for example "SC 2.4.11 Focus Not Obscured (Minimum),
+   Level AA"), WCAG technique IDs (H39, H63), the WAI-ARIA Authoring
+   Practices pattern, W3C COGA "Making Content Usable", or the repo's own
+   plain-language rules. Give the URL for anything outside WCAG.
+4. Quote only text you are sure is exact, such as a success criterion's
+   normative wording. Mark everything else as a paraphrase. Never invent a
+   quotation or a criterion.
+
+Update the comment when the behaviour changes, and delete a rationale that
+no longer describes the code. A stale rationale is worse than none.
+
+**Review every frontend change for accessibility.** Hold each change,
+including one the developer asked for, to the most accessible design you
+know, not just to passing axe:
+
+- WCAG 2.2 Level AA as the floor. Meet AAA where this repo already does:
+  44 px targets (`min-h-target`, SC 2.5.5), 7:1 text contrast in every
+  theme (SC 1.4.6), plain language (SC 3.1.5).
+- The WAI-ARIA Authoring Practices pattern for the widget, and native
+  HTML before ARIA.
+- Keyboard order that follows the reading order (SC 2.4.3), focus that is
+  never hidden behind sticky content (SC 2.4.11), and nothing that needs
+  sideways scrolling at 320 px except data tables (SC 1.4.10).
+- COGA: one way to do one thing, related content grouped, the same word
+  for the same thing, and no duplicate controls for one function.
+
+**Reuse before you build.** Use the existing component for the job before
+writing a new one: `components/ui.tsx` (Card, Button, LinkButton, Select,
+Disclosure, StatCard, PageHeader), `components/table/` (TableBar,
+TableRegion, Table, SortHeader, Row, Cell), `TablePagination`, and the
+labels in `lib/terms.ts` and `lib/labels.ts`. Search for one before you
+write markup. If none fits, extend the closest one compatibly (a prop, a
+variant) so every screen gets the change, rather than restyling a copy in
+one place. A new component needs a reason in its rationale comment: which
+existing one was considered and why it could not be extended.
+`make lint` enforces the common case: a raw `<button>`, `<table>` or
+`<select>` outside the shared components fails (`react/forbid-elements`).
+Where one is really needed, disable the rule on that line with a reason
+starting "Keep:" (a widget's own part, such as a tab); one that should be
+converted starts "Convert:" and names what to use. `grep -rn "Convert:"`
+lists the conversions still owed.
+
+**Keep the interface consistent.** The same function looks and behaves
+the same everywhere, and is named with the same words: the same control
+for the same kind of choice, actions in the same place, the same card,
+table and status patterns. WCAG 2.2 SC 3.2.3 Consistent Navigation and SC
+3.2.4 Consistent Identification (both Level AA) are the floor. The shared
+components and the terms table are how this repo meets them, which is
+one more reason to reuse them. If one screen needs to differ from the
+pattern, say why in its rationale comment.
+
+**Native HTML before ARIA.** Use the element whose built-in meaning and
+behaviour you need (`<button>`, `<a href>`, `<table>` with `<th scope>`
+and `<caption>`, `<label>`, `<fieldset>` and `<legend>`, `<details>`,
+`<dialog>`, headings, lists) instead of a `<div>` with a role. This is the
+first rule of the W3C's "Using ARIA"
+(https://www.w3.org/TR/using-aria/#rule1, paraphrased): if a native
+element or attribute already has the semantics and behaviour you need,
+use it rather than adding ARIA. The WAI-ARIA Authoring Practices put the
+risk plainly: "No ARIA is better than bad ARIA." Add ARIA only for a real
+gap that HTML cannot fill, and then exactly as the APG pattern specifies.
+Examples of real gaps: `aria-expanded` on a disclosure button,
+`aria-sort` on a sortable header, `aria-describedby` for a description, a
+`role="status"` live region. Never add a role that repeats the element's
+own (`role="button"` on a `<button>`), and never use ARIA to hide a
+problem that better markup would fix.
+
+If a requested change, or code you touch, is not the most accessible
+option or is weaker UX than a known alternative, **tell the developer in
+your reply**. Name the problem, the criterion or principle, and the better
+option. Ask before building the weaker design. If they choose it anyway,
+build it and record the tradeoff and their decision in the rationale
+comment. Do not silently comply, and do not silently "fix" things outside
+the task. Report them.
+
 ## Verification
 
 Run the narrowest relevant tests during development, then the appropriate

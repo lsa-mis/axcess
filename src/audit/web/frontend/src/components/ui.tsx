@@ -54,8 +54,13 @@ export function Card({
   children: ReactNode;
   className?: string;
 } & React.HTMLAttributes<HTMLDivElement>) {
+  // `data-card` lets a part that fills the card's edge (a table's bar, its
+  // scrolling rows) round its own corners to match (see CARD_EDGE in
+  // table/Table.tsx). The card does not clip its content to its corners: that
+  // would also cut off the focus ring of anything at its edge (SC 2.4.7).
   return (
     <div
+      data-card=""
       className={cn(
         "rounded-xs border border-border bg-surface shadow-card",
         className,
@@ -471,7 +476,17 @@ export function Disclosure({
 
   return (
     <div className={cn("rounded-xs border border-border bg-surface", className)}>
-      <div className={cn("flex items-center rounded-xs", open ? "bg-surface-muted" : "hover:bg-surface-muted/60")}>
+      {/* The header's fill takes the box's own corners (inherit), so it
+          follows them whatever they are: rounded on its own, square as a
+          middle row of a stack (ReportNote), rounded on one side as a
+          stack's first or last row. All four while closed; only the top two
+          while open, where it meets the content under it. */}
+      <div
+        className={cn(
+          "flex items-center",
+          open ? "rounded-t-[inherit] bg-surface-muted" : "rounded-[inherit] hover:bg-surface-muted/60",
+        )}
+      >
       {createElement(
         `h${headingLevel}`,
         { className: "m-0 min-w-0 flex-1" },

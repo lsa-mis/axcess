@@ -443,16 +443,18 @@ async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
     assert "in another page state" in text
 
 
-async def test_occurrences_in_other_page_states_are_counted_and_one_click_away(
+async def test_occurrences_in_other_page_states_are_counted_under_the_one_picker(
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """The picker shows one page state; a line under it names the others.
+    """The picker shows one page state; a sentence under it counts the others.
 
     Occurrences revealed by a click were out of sight until the reviewer
-    opened the Page state list, so nothing said the page held more. The line
-    counts them and links to each state that has some.
+    opened the Page state list, so nothing said the page held more. A
+    sentence counts them and points to the picker, which lists those states
+    with their counts. It is the picker's description. There is no second
+    control for the same choice (the pill links it replaced).
     """
     db_path, _, scan_id = seeded_db
     page_id, state_key = _seed_two_state_issue(db_path, scan_id)
@@ -463,21 +465,29 @@ async def test_occurrences_in_other_page_states_are_counted_and_one_click_away(
             "?issue=axe:aria-required-parent&state=",
             wait_until="domcontentloaded",
         )
-        others = page.get_by_role("navigation", name="Other page states with occurrences")
-        await playwright_async.expect(others).to_contain_text(
-            "1 more occurrence appears only after clicking:", timeout=15000
+        from_load = (
+            "1 more occurrence appears only after clicking a control, in 1 page state. "
+            "Choose it in the Page state list."
         )
-        link = others.get_by_role("link", name="After clicking “Filter”: 1 occurrence", exact=True)
-        await link.click()
-
+        await playwright_async.expect(page.get_by_text(from_load, exact=True)).to_be_visible(
+            timeout=15000
+        )
         picker = page.get_by_role("combobox", name="Page state")
-        await playwright_async.expect(picker).to_have_attribute("data-value", state_key)
-        # From the revealed state, the way back is page load.
-        await playwright_async.expect(others).to_contain_text(
-            "1 more occurrence in another page state:"
+        await playwright_async.expect(picker).to_have_accessible_description(
+            re.compile(re.escape(from_load))
         )
         await playwright_async.expect(
-            others.get_by_role("link", name="At page load: 1 occurrence", exact=True)
-        ).to_be_visible()
+            page.get_by_role("navigation", name="Other page states with occurrences")
+        ).to_have_count(0)
+
+        await picker.click()
+        await page.locator(f'[role="option"][data-value="{state_key}"]').click()
+        await playwright_async.expect(picker).to_have_attribute("data-value", state_key)
+        # From the revealed state, the other one is page load.
+        from_state = "1 more occurrence is in another page state. Choose it in the Page state list."
+        await playwright_async.expect(page.get_by_text(from_state, exact=True)).to_be_visible()
+        await playwright_async.expect(picker).to_have_accessible_description(
+            re.compile(re.escape(from_state))
+        )
     finally:
         await page.context.close()

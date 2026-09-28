@@ -55,7 +55,7 @@ export default function ProtectedScanSteps({
 
   return (
     <section
-      className={`rounded-md border border-border bg-surface p-5 shadow-card ${className}`}
+      className={`rounded-xs border border-border bg-surface p-5 shadow-card ${className}`}
       aria-labelledby="protected-scan-steps-title"
     >
       <div className="max-w-3xl">
