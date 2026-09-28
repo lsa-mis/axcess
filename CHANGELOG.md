@@ -91,6 +91,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- The breadcrumb's focus ring showed only its sides: the trail clips so a
+  shortened name cannot spill, and it cut the ring off at the top and
+  bottom. The whole ring now shows around the focused link.
 - An issue's page: the Pages with this issue table was inset from the page
   edges. It now spans the same width as the Issues table, lined up with
   the title.

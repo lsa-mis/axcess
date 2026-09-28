@@ -421,7 +421,15 @@ export default function ReportCrumb() {
   // It used to be a filled chip, which looked like a button you could press.
   return (
     <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
-      <ol ref={listRef} className="flex min-w-0 items-center gap-x-1 overflow-hidden">
+      {/* The list clips (overflow-hidden) so a cut crumb cannot spill, and
+          its links are a full target tall, so a focus ring drawn outside a
+          link was cut off at the list's edges: only its sides showed.
+          3px of padding, the ring's width, gives the ring room inside the
+          clip, and the same negative margin keeps the trail where it was
+          (SC 2.4.7 Focus Visible, and 2.4.13 Focus Appearance, Level AAA:
+          the whole ring must show). The width budget below leaves the
+          padding out. */}
+      <ol ref={listRef} className="-m-[3px] flex min-w-0 items-center gap-x-1 overflow-hidden p-[3px]">
         <Crumb to="/scans" first>
           {/* The root is never cut: it is short, and it is not measured. */}
           <span className="whitespace-nowrap">Reports</span>
@@ -521,7 +529,11 @@ function useLongestFirstCap(
       // Everything that is not measured text: "Reports", separators,
       // padding, gaps, and the report number. It does not change with the cap.
       const fixed = last.right - first.left - shown;
-      const budget = list.clientWidth - fixed - 1;
+      // clientWidth counts the list's padding (room for focus rings), which
+      // the crumbs cannot use.
+      const style = getComputedStyle(list);
+      const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const budget = list.clientWidth - padding - fixed - 1;
       if (natural.reduce((sum, width) => sum + width, 0) <= budget) {
         setCap(null);
         return;
