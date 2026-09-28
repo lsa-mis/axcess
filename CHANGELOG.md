@@ -52,7 +52,8 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
   itself, spaced apart, instead of in a white panel cut by lines. The
   table is the one card under the title, and the numbers look like the
   other number readouts in the app. Every colour still has at least 7:1
-  contrast.
+  contrast. More space above and below the four, and between them, than
+  inside each one, so they read as one group without a box.
 - Every card and panel has the same rounded corners, 8 pixels, like the
   Last scanned card. Several used to look square-cornered because what was
   inside painted square corners over the card's rounded ones: a table's bar

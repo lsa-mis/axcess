@@ -31,7 +31,7 @@ function SummaryStat({
       <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
       <dd
         className={cn(
-          "order-1 text-3xl font-semibold leading-none tabular-nums",
+          "order-1 mb-1 text-3xl font-semibold leading-none tabular-nums",
           flag ? "text-sev-major" : "text-umich-blue",
         )}
       >
@@ -93,8 +93,16 @@ export function ReportSummary({
           the page free of what does not help). Every colour here is at least
           7:1 on the page background, in light and dark and every
           colour-vision setting (WCAG 2.2 SC 1.4.6 Contrast (Enhanced), Level
-          AAA), so taking the white away costs no contrast. */}
-      <dl className="grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
+          AAA), so taking the white away costs no contrast.
+
+          Without a panel, space alone has to say what belongs together
+          (proximity), so the space outside the group is clearly larger than
+          the space inside it: 32px above (with the header's margin) and
+          below it, 48px between columns on a wide screen (32px on a narrow
+          one, where width is short) and 32px between rows, against 8px from
+          a number to its name and 4px from the name to its sentence, which
+          read as one unit. */}
+      <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-8 lg:grid-cols-4 lg:gap-x-12">
         <SummaryStat
           label="Pages checked"
           value={scan.page_count}
@@ -115,7 +123,7 @@ export function ReportSummary({
       {/* What was checked leads the notes: whether the scan checked
           something comes before what its labels mean. The count stays on
           the closed row, so the fact is on screen without opening anything. */}
-      <ReportNotes className="mt-6">
+      <ReportNotes className="mt-8">
         <ReportNote
           id="report-coverage"
           title="What was checked"
