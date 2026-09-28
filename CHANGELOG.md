@@ -83,8 +83,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 - New scan: every settings group is an accordion row, closed on arrival. A
   failed submit opens the group that holds the field it names.
-- New scan: Start scan and Cancel sit at the top right of the page, beside
-  its title. Enter in the address field still starts the scan.
+- New scan: Start scan and Cancel sit at the foot of the summary beside the
+  form, where they stay in view while you scroll the settings, and after
+  the form on a narrow screen. They were at the top of the page, which
+  scrolled away and came before every field in keyboard order. Enter in
+  the address field still starts the scan.
 
 ### Fixed
 

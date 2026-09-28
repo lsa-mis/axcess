@@ -148,7 +148,7 @@ async def test_enter_in_the_address_field_starts_the_scan(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """Start is in the page header, outside the form, and still its default button.
+    """Start is at the foot of the summary rail, and still the form's default button.
 
     It names the form it submits, so Enter in a field submits as before: an
     empty address shows the alert rather than doing nothing.
@@ -362,16 +362,29 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_be_visible()
 
-    # Start and Cancel are at the top right, beside the page title, and
-    # Start still submits the form it sits outside of.
+    # Start and Cancel are at the foot of the summary rail, beside the form,
+    # not in the page header; they come after the fields in keyboard order,
+    # and they stay in view as the page scrolls. Start still names the form.
     heading = await page.get_by_role("heading", name="New scan", level=1).bounding_box()
     start_button = page.get_by_role("button", name=re.compile(r"^(Start scan|Open browser)"))
     start = await start_button.bounding_box()
     url = await page.locator("#scan-url").bounding_box()
     assert heading and start and url
-    assert start["y"] < url["y"], "Start sits above the form"
-    assert start["x"] > url["x"] + url["width"] / 2, "Start sits on the right"
-    assert abs(start["y"] - heading["y"]) < 40, "Start is on the title's row"
+    assert start["x"] > url["x"] + url["width"], "Start sits in the rail, right of the form"
+    assert start["y"] > heading["y"] + 40, "Start is not on the title's row"
+    after_url = await page.evaluate(
+        """() => {
+          const url = document.getElementById('scan-url');
+          const start = [...document.querySelectorAll('button')].find(
+            (b) => /^(Start scan|Open browser)/.test(b.textContent.trim()));
+          return !!(url.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING);
+        }"""
+    )
+    assert after_url, "Start comes after the fields in keyboard order"
+    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    await playwright_async.expect(start_button).to_be_in_viewport()
+    await page.evaluate("window.scrollTo(0, 0)")
+    await playwright_async.expect(start_button).to_be_in_viewport()
     await playwright_async.expect(start_button).to_have_attribute("form", "scan-form")
     await playwright_async.expect(
         page.get_by_role("button", name="Cancel", exact=True)
