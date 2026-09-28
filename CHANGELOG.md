@@ -42,6 +42,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Inspector: the box of page-state links under the Page state picker is now
+  one sentence: "3 more occurrences are in 2 other page states. Choose one
+  in the Page state list." The links repeated the picker, which already
+  lists those page states with their counts. Screen readers hear the
+  sentence as the picker's description.
 - Issues: the four numbers over the table (Pages checked, Occurrences
   found, Issues found, Page states opened by clicking) sit on the page
   itself, spaced apart, instead of in a white panel cut by lines. The

@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
@@ -810,6 +810,7 @@ export default function InspectorRoute() {
           <Select
             id="inspect-state"
             label="Page state"
+            aria-describedby={elsewhere.length > 0 ? ELSEWHERE_ID : undefined}
             value={stateKey ?? ""}
             onChange={(next) => navigate(stateHref(next || null), { replace: true })}
             options={[
@@ -855,33 +856,28 @@ export default function InspectorRoute() {
         </div>
       )}
 
-      {/* The picker shows one page state at a time, so occurrences in the
-          others were out of sight: nothing said a click had revealed more.
-          This line counts them and links to each state that holds some. */}
+      {/* Where else this issue is, in one sentence, not a second control.
+
+          The picker shows one page state at a time, so occurrences in the
+          others were out of sight: nothing said a click had revealed more
+          (eb39b33). That was first fixed with a box of pill links, one per
+          page state holding occurrences. But while reviewing an issue the
+          picker lists exactly those page states, with the same counts, so
+          the pills were a second control for the same choice. Two ways to
+          do one thing make a reader work out whether they differ (W3C COGA,
+          "Making Content Usable", https://www.w3.org/TR/coga-usable/:
+          keep the interface simple and consistent), and a pill per click
+          path wraps into a large block on a busy page, where the select
+          scales to dozens of states. So the select is the one control, and
+          this sentence says what it holds. It is the select's description
+          (aria-describedby), so a screen reader hears it on the control
+          too. The term stays "page state": docs/plain-language.md lists
+          "interaction state" as a word not to use. */}
       {elsewhere.length > 0 && (
-        <nav
-          aria-label="Other page states with occurrences"
-          className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xs border border-umich-blue/30 bg-umich-blue/5 px-3 py-2 text-sm"
-        >
-          <Layers className="h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
-          <span className="font-semibold text-fg">
-            {elsewhereCount.toLocaleString()} more occurrence{elsewhereCount === 1 ? "" : "s"}{" "}
-            {activeStateKey
-              ? `in ${elsewhere.length === 1 ? "another page state" : "other page states"}:`
-              : `${elsewhereCount === 1 ? "appears" : "appear"} only after clicking:`}
-          </span>
-          {elsewhere.map((state) => (
-            <Link
-              key={state.key || "load"}
-              to={stateHref(state.key || null)}
-              replace
-              className="inline-flex min-h-target items-center rounded-full border border-umich-blue/40 bg-surface px-3 text-xs font-semibold text-umich-blue underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
-            >
-              {state.label}
-              {occurrencesHere(state.count)}
-            </Link>
-          ))}
-        </nav>
+        <p id={ELSEWHERE_ID} className="-mt-1 mb-3 flex items-start gap-2 text-sm text-fg">
+          <Layers className="mt-0.5 h-4 w-4 shrink-0 text-umich-blue" aria-hidden />
+          <span>{elsewhereSentence(elsewhereCount, elsewhere.length, Boolean(activeStateKey))}</span>
+        </p>
       )}
 
       <Tabs
@@ -1445,6 +1441,25 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
  * wrong with this capture. Screen readers get sentence case, as with
  * ``MissingChip``.
  */
+/** The sentence under the Page state picker, and the picker's description. */
+const ELSEWHERE_ID = "inspect-state-elsewhere";
+
+/**
+ * "3 more occurrences are in 2 other page states. Choose one in the Page
+ * state list." From page load, the others all come after a click, so it
+ * says so. Counts and states are both given: a state can hold several.
+ */
+function elsewhereSentence(occurrences: number, states: number, inClickedState: boolean): string {
+  const many = occurrences === 1 ? "1 more occurrence" : `${occurrences.toLocaleString()} more occurrences`;
+  const where = states === 1 ? "1 page state" : `${states} page states`;
+  const choose = states === 1 ? "Choose it in the Page state list." : "Choose one in the Page state list.";
+  if (inClickedState) {
+    const others = states === 1 ? "another page state" : `${states} other page states`;
+    return `${many} ${occurrences === 1 ? "is" : "are"} in ${others}. ${choose}`;
+  }
+  return `${many} ${occurrences === 1 ? "appears" : "appear"} only after clicking a control, in ${where}. ${choose}`;
+}
+
 function IssueNotHereChip() {
   return (
     <span className="sev-chip shrink-0 bg-surface-muted text-fg-muted">
