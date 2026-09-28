@@ -562,29 +562,33 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
 });
 
 function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
+  // Framed by its own scroll region (see TableRegion's className): rounded
+  // corners the rows are clipped to, and a wide list scrolls here rather
+  // than widening the whole reports table.
   return (
-    <Table
-      className="rounded-xs border border-border bg-surface"
-      captionClassName="px-2 py-2 text-left text-sm font-semibold text-fg"
-      caption={`All scans for ${label}, most recent first`}
-    >
-      <TableHead>
-        <tr>
-          <ColumnHeader>Report</ColumnHeader>
-          <ColumnHeader>Status</ColumnHeader>
-          <ColumnHeader>Started</ColumnHeader>
-          <ColumnHeader>Pages</ColumnHeader>
-          <ColumnHeader>Images with text</ColumnHeader>
-          <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
-          <ColumnHeader>Actions</ColumnHeader>
-        </tr>
-      </TableHead>
-      <tbody>
-        {site.scans.map((scan, index) => (
-          <ScanRow key={scan.id} scan={scan} index={index} isHeadline={scan.id === site.most_recent_completed?.id} />
-        ))}
-      </tbody>
-    </Table>
+    <TableRegion label={`All scans for ${label}`} className="rounded-xs border border-border bg-surface">
+      <Table
+        captionClassName="px-3 py-2 text-left text-sm font-semibold text-fg"
+        caption={`All scans for ${label}, most recent first`}
+      >
+        <TableHead>
+          <tr>
+            <ColumnHeader>Report</ColumnHeader>
+            <ColumnHeader>Status</ColumnHeader>
+            <ColumnHeader>Started</ColumnHeader>
+            <ColumnHeader>Pages</ColumnHeader>
+            <ColumnHeader>Images with text</ColumnHeader>
+            <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
+            <ColumnHeader>Actions</ColumnHeader>
+          </tr>
+        </TableHead>
+        <tbody>
+          {site.scans.map((scan, index) => (
+            <ScanRow key={scan.id} scan={scan} index={index} isHeadline={scan.id === site.most_recent_completed?.id} />
+          ))}
+        </tbody>
+      </Table>
+    </TableRegion>
   );
 }
 

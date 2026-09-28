@@ -188,14 +188,14 @@ export default function ScanSummaryCard({
   }, [digest]);
 
   return (
-    <div className={cn("rounded-md border border-border bg-surface shadow-card", className)}>
+    <div className={cn("rounded-xs border border-border bg-surface shadow-card", className)}>
       <aside
         ref={scrollRef}
         aria-labelledby="scan-summary-title"
         // A scrolling region must be reachable by keyboard (as TableRegion).
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={scrolls ? 0 : undefined}
-        className="rounded-md focus:outline-none focus-visible:shadow-focus lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
+        className="rounded-[7px] focus:outline-none focus-visible:shadow-focus lg:max-h-[calc(100vh-14rem)] lg:overflow-y-auto"
       >
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 pt-5">
           <h2

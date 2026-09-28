@@ -120,12 +120,8 @@ function LedgerTable({
     ...methods.filter((method) => !ranKeys.has(method.key)),
   ];
   return (
-    <TableRegion label="Checks in this scan">
-      <Table
-        caption={CAPTION}
-        captionClassName="px-2 pb-2 text-left text-sm text-fg-muted"
-        className="min-w-[40rem] rounded-xs border border-border"
-      >
+    <TableRegion label="Checks in this scan" className="rounded-xs border border-border">
+      <Table caption={CAPTION} captionClassName="px-3 py-2 text-left text-sm text-fg-muted" className="min-w-[40rem]">
         <TableHead>
           <tr>
             <ColumnHeader>Check</ColumnHeader>

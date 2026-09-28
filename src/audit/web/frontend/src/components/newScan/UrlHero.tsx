@@ -48,7 +48,7 @@ export default function UrlHero({
   const scopeId = `${id}-scope`;
   const errorId = `${id}-error`;
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border bg-surface p-4 sm:p-5">
+    <div className="flex flex-col gap-2 rounded-xs border border-border bg-surface p-4 sm:p-5">
       <label htmlFor={id} className="text-sm font-semibold text-fg">
         {label}
       </label>

@@ -42,6 +42,17 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Every card and panel has the same rounded corners, 8 pixels, like the
+  Last scanned card. Several used to look square-cornered because what was
+  inside painted square corners over the card's rounded ones: a table's bar
+  and last row, the first and last rows of the report's "What was checked"
+  box, and the saved copy's bar in the Inspector. The small tables inside
+  a section or an expanded site (the checks list, a site's scans) were
+  square too: a table's own corners cannot be rounded, so the frame is now
+  on the box around it. A site's list of scans now scrolls sideways in its
+  own box when it is wide, instead of widening the whole Reports table. The
+  New scan settings, sign-in scan panels and summary used 6 pixels, and an
+  open section's header had rounded corners where it meets its content.
 - Reports: a simpler table, with one header row. The number of scans sits
   under each site's name ("7 scans, 4 completed"), so every column is about
   the latest completed scan, and one sentence over the table says so. That

@@ -108,7 +108,6 @@ export default function ScanForm({
       title={GROUPS[key].legend}
       open={open.has(key)}
       onOpenChange={setGroupOpen(key)}
-      className="rounded-md"
     >
       {children}
     </Disclosure>

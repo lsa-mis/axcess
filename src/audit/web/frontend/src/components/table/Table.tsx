@@ -29,6 +29,15 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  */
 
 /**
+ * Rounds a table part's corners when it is the first or last thing in a Card
+ * (`data-card`, ../ui.tsx), so its fill follows the card's corners instead of
+ * painting square ones over them. 7px is the card's radius (`rounded-xs`,
+ * 8px) less its 1px border. A part that clips (the scroll region) clips its
+ * rows to the same curve.
+ */
+const CARD_EDGE = "[[data-card]>&:first-child]:rounded-t-[7px] [[data-card]>&:last-child]:rounded-b-[7px]";
+
+/**
  * The one bar over every table, styled like a pager bar: what narrows the
  * rows (search, the Filter menu) on the left, the pager on the right, and
  * `footer` (the active filters) under both. It wraps on a narrow screen
@@ -44,7 +53,7 @@ export function TableBar({
   footer?: ReactNode;
 }) {
   return (
-    <div className="border-b border-border bg-surface-subtle">
+    <div className={cn("border-b border-border bg-surface-subtle", CARD_EDGE)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
         {children && <div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2">{children}</div>}
         {pager}
@@ -148,6 +157,7 @@ export function TableStatus({
     <div
       className={cn(
         "flex min-h-target flex-wrap items-center gap-x-3 border-b border-border bg-surface-subtle px-3 py-1 text-xs text-fg-muted",
+        CARD_EDGE,
         className,
       )}
     >
@@ -175,12 +185,20 @@ export function TableRegion({
   paged,
   busy,
   regionRef,
+  className,
   children,
 }: {
   label: string;
   paged?: Paged;
   busy?: boolean;
   regionRef?: Ref<HTMLDivElement>;
+  /**
+   * A frame, for a table inside another box: `rounded-xs border`. The frame
+   * goes here, not on the <table>: a table's own corners stay square
+   * (browsers ignore border-radius on a table with collapsed borders), and
+   * the region, which clips, clips the rows to its rounded corners.
+   */
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -191,7 +209,7 @@ export function TableRegion({
       aria-busy={busy || undefined}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
-      className="overflow-x-auto focus:outline-none focus-visible:shadow-focus"
+      className={cn("overflow-x-auto focus:outline-none focus-visible:shadow-focus", CARD_EDGE, className)}
     >
       {paged ? <div {...paged.hold}>{children}</div> : children}
     </div>

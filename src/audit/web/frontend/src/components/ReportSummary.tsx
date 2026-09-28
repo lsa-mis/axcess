@@ -135,16 +135,7 @@ export function ReportSummary({
  * is one more row here, not one more line on the page.
  */
 export function ReportNotes({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "mb-6 divide-y divide-border rounded-xs border border-border bg-surface shadow-card",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <Card className={cn("mb-6 divide-y divide-border", className)}>{children}</Card>;
 }
 
 /**
@@ -164,7 +155,16 @@ export function ReportNote({
   children: ReactNode;
 }) {
   return (
-    <Disclosure id={id} title={title} meta={meta} headingLevel={2} className="rounded-none border-0">
+    // Square between rows; the first and last round their outer corners to
+    // the card's (8px less its 1px border), so their fill does not paint
+    // square corners over it.
+    <Disclosure
+      id={id}
+      title={title}
+      meta={meta}
+      headingLevel={2}
+      className="rounded-none border-0 first:rounded-t-[7px] last:rounded-b-[7px]"
+    >
       {children}
     </Disclosure>
   );

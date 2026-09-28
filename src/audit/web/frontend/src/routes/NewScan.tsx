@@ -282,7 +282,7 @@ export default function NewScanRoute() {
           urlInputRef={urlInputRef}
           beforeGroups={
             mode === "login" ? (
-              <div className="rounded-md border border-border bg-surface p-3">
+              <div className="rounded-xs border border-border bg-surface p-3">
                 <Checkbox
                   id={FIELD_IDS.authorized}
                   checked={authorized}
