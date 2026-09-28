@@ -42,6 +42,16 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Reports: a simpler table, with one header row. The number of scans sits
+  under each site's name ("7 scans, 4 completed"), so every column is about
+  the latest completed scan, and one sentence over the table says so. That
+  replaces the "Most recent completed scan" header over six columns, its
+  blue shading, and the Scans column; the table no longer sorts by number
+  of scans. Completed comes right after Site. "Open latest scan" is a link
+  rather than a button in every row. The order is no longer a line of its
+  own, because the sorted column's chip shows it; screen readers still hear
+  it when it changes. The search count sits beside the search box. A sort
+  arrow stays beside its label's last word instead of on a line of its own.
 - Inspector: what the numbered box is on is a short table, with the same
   labels in the same places as you step: what it is, its text or label, its
   size, and its element locator. A long locator shows its end, the element

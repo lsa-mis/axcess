@@ -245,9 +245,10 @@ type HeaderProps = Omit<ThHTMLAttributes<HTMLTableCellElement>, "scope" | "child
  *
  * The cell does not forbid wrapping, so a tight table stays inside its
  * region. By default (`wrap="chip"`) the label stays on one line and the
- * chip drops under it. With `wrap="words"` the label's words wrap and the
- * arrow or chip follows the last word, for long labels ("Views opened by
- * clicking") in a table with many columns.
+ * chip drops under it. With `wrap="words"` the label's words wrap, the
+ * arrow stays on the line of the last word and the chip goes under the
+ * label, for long labels ("Views opened by clicking") in a table with many
+ * columns.
  */
 export function SortHeader<K extends string>({
   column,
@@ -288,7 +289,6 @@ export function SortHeader<K extends string>({
         key={`${sort.column}-${sort.direction}`}
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-umich-blue px-1.5 py-px text-2xs font-semibold normal-case tracking-normal text-fg-inverse motion-safe:animate-sort-pop",
-          words && "ml-1 align-middle",
         )}
       >
         <Arrow className="h-3 w-3 shrink-0" aria-hidden />
@@ -319,18 +319,30 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target items-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          "group inline-flex min-h-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          // Words at the foot of the target, not its middle: with the cell
+          // bottom-aligned, the last line of every label then sits on one
+          // line, right over the column's data, however many lines each
+          // label takes. The target keeps its full height (SC 2.5.5).
+          words ? "items-end pb-1.5" : "items-center",
           !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
           "text-center",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
         {words ? (
-          // One inline run, so the indicator sits after the last word.
-          <span>
-            {label}
-            {indicator}
-          </span>
+          // The arrow follows the last word and never parts from it: an
+          // arrow alone on a line of its own reads as a separate thing. The
+          // chip is wider, so it has a line of its own under the label,
+          // rather than widening the column it sorts.
+          active ? (
+            <span>
+              {label}
+              <span className="mt-0.5 flex justify-center">{indicator}</span>
+            </span>
+          ) : (
+            <span>{withLastWord(label, indicator)}</span>
+          )
         ) : (
           <>
             <span className="whitespace-nowrap">{label}</span>
@@ -339,6 +351,31 @@ export function SortHeader<K extends string>({
         )}
       </button>
     </th>
+  );
+}
+
+/**
+ * ``label`` with ``after`` kept on one line with its last word ("Images with
+ * [text ⇅]"). A label that is not plain text is left as it is.
+ */
+function withLastWord(label: ReactNode, after: ReactNode): ReactNode {
+  if (typeof label !== "string") {
+    return (
+      <>
+        {label}
+        {after}
+      </>
+    );
+  }
+  const cut = label.trimEnd().lastIndexOf(" ");
+  return (
+    <>
+      {cut >= 0 && label.slice(0, cut + 1)}
+      <span className="whitespace-nowrap">
+        {label.slice(cut + 1)}
+        {after}
+      </span>
+    </>
   );
 }
 

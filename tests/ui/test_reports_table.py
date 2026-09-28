@@ -92,16 +92,30 @@ async def test_reports_table_keyboard_and_columns(
     sites = [_site(index, count) for index in reversed(range(site_count))]
     page = await _open_reports(new_page, sites)
     table = page.get_by_role("table", name="Public reports by site", exact=False)
-    await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_have_text(
-        ["Site", "Scans", "Most recent completed scan"]
-    )
+    # One header row (a simple table: scope="col" only, no column group),
+    # and every column after Site is about the latest completed scan, as the
+    # sentence over the table and its caption say.
+    await playwright_async.expect(table.locator("thead tr")).to_have_count(1)
+    await playwright_async.expect(table.locator("thead th[scope='colgroup']")).to_have_count(0)
+    await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
-    await playwright_async.expect(table.locator("thead tr").nth(1).locator("th")).to_contain_text(
-        ["Pages", "Issues", "Images with text", "Page states", "Completed", "Report"]
+    await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
+        ["Site", "Completed", "Pages", "Issues", "Images with text", "Page states", "Report"]
     )
-    completed = table.locator("thead tr").nth(1).locator("th").nth(4)
+    await playwright_async.expect(
+        page.get_by_text(
+            "Each row shows the report from the site\u2019s most recent completed scan.", exact=True
+        )
+    ).to_be_visible()
+    completed = table.locator("thead th").nth(1)
     await playwright_async.expect(completed).to_have_attribute("aria-sort", "descending")
     await playwright_async.expect(completed).to_contain_text("new → old")
+    # The order is still announced, in a live region, though no longer shown
+    # as a line of its own: the chip shows it.
+    order = page.get_by_role("status").filter(has_text="Sorted by")
+    await playwright_async.expect(order).to_have_text("Sorted by Completed, newest first.")
+    box = await order.bounding_box()
+    assert box and box["width"] <= 1 and box["height"] <= 1, box
     await playwright_async.expect(table.locator(":scope > tbody > tr")).to_have_count(
         min(10, site_count)
     )
@@ -110,19 +124,20 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row.get_by_role("rowheader")).to_contain_text(
         f"site{newest}.example"
     )
+    # How many scans the site has sits under its name, not in a column.
+    await playwright_async.expect(row.get_by_role("rowheader")).to_contain_text(
+        "2 scans, 1 completed"
+    )
     headline_id = 7 + 2 * (newest - 1)
     # The site's newest run was interrupted ("Stopped"); the row shows only
-    # the completed one, and every grouped cell names the group.
+    # the completed one.
     await playwright_async.expect(row).not_to_contain_text("Stopped")
-    await playwright_async.expect(row.locator("td").nth(0)).to_have_text("2")
+    await playwright_async.expect(row.locator("td")).to_have_count(6)
+    await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text("5")
     await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(count))
     await playwright_async.expect(row.locator("td").nth(4)).to_have_text("4")
-    for cell in range(1, 7):
-        await playwright_async.expect(row.locator("td").nth(cell)).to_have_attribute(
-            "headers", re.compile(r"\breports-completed-group\b")
-        )
     open_link = row.get_by_role(
         "link",
         name=f"Open latest scan of site{newest}.example, the most recent completed scan",
@@ -221,6 +236,25 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(link).to_be_focused()
     await page.keyboard.press("Enter")
     await page.wait_for_url(f"**/app/scans/{headline_id}/issues")
+
+
+async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
+    """The order is said in a live region (SC 4.1.3), not in a visible line."""
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    page = await _open_reports(new_page, [_site(index, 1) for index in reversed(range(3))])
+    order = page.get_by_role("status").filter(has_text="Sorted by")
+    await playwright_async.expect(order).to_have_text("Sorted by Completed, newest first.")
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    await table.get_by_role("button", name="Pages", exact=False).click()
+    await playwright_async.expect(order).to_contain_text("Sorted by Pages")
+    await playwright_async.expect(table.locator("thead th").nth(2)).not_to_have_attribute(
+        "aria-sort", "none"
+    )
+    # The Scans column, and sorting by it, are gone.
+    await playwright_async.expect(
+        table.locator("thead").get_by_role("button", name=re.compile(r"^Scans\b"))
+    ).to_have_count(0)
 
 
 async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> None:

@@ -35,7 +35,6 @@ import {
   TableHead,
   TableRegion,
   TableSearch,
-  TableStatus,
   TableBar,
   rowBand,
 } from "../components/table/Table";
@@ -59,19 +58,68 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * A row shows one scan: the site's most recent *completed* run, the only
  * one whose numbers stand for the site. Interrupted, failed and running
  * scans never reach the row; they are listed, with every other scan, when
- * the site is expanded. Which scan the numbers come from is carried three
- * ways so no one depends on the shading: a spanning header over the group,
- * `headers` on each grouped cell so a screen reader reads the group name
- * with the value, and the help text above the table.
+ * the site is expanded.
  *
  * Expanding a site lists all of its scans with the per-report actions
  * (All issues, Delete) the flat list used to carry.
+ *
+ * Why the table looks the way it does (keep these when you change it):
+ *
+ * - One header row. The table used to have a second row, "Most recent
+ *   completed scan", over six of its columns. The W3C WAI Tables Tutorial
+ *   (https://www.w3.org/WAI/tutorials/tables/) calls that a table with
+ *   multi-level headers, which needs `scope="colgroup"` or `headers` and
+ *   `id` on every cell (WCAG technique H43); a table with one header row
+ *   needs only `scope="col"` (technique H63). Screen readers support the
+ *   simple form best, and it is the one sighted readers scan fastest. The
+ *   group existed only because one column (Scans) was not about the latest
+ *   scan. Scans now sits under the site's name, so every column is about the
+ *   same scan, and the caption says so once, in words.
+ * - A sentence over the table says where the numbers come from, and the
+ *   caption (technique H39, the table's accessible name) says it too. WCAG
+ *   2.2 SC 1.3.1 Info and Relationships (Level A): "Information, structure,
+ *   and relationships conveyed through presentation can be programmatically
+ *   determined or are available in text." The sentence sits outside the
+ *   scrolling region, not in a visible caption: WCAG 2.2 SC 1.4.10 Reflow
+ *   (Level AA) asks that content be usable at 320 CSS pixels "without
+ *   requiring scrolling in two dimensions", and excepts only content that
+ *   needs a two-dimensional layout, such as the table's data. A caption
+ *   scrolls sideways with the table and was cut off at 320 pixels.
+ * - No visible "Sorted by" line. The sorted header already shows the order
+ *   in words (the chip), and `aria-sort` gives it to a screen reader, as in
+ *   the WAI-ARIA Authoring Practices sortable table
+ *   (https://www.w3.org/WAI/ARIA/apg/patterns/table/examples/sortable-table/).
+ *   A change of `aria-sort` is not announced reliably, so the new order is
+ *   still said in a live region that is visually hidden. WCAG 2.2 SC 4.1.3
+ *   Status Messages (Level AA): "In content implemented using markup
+ *   languages, status messages can be programmatically determined through
+ *   role or properties such that they can be presented to the user by
+ *   assistive technologies without receiving focus." It asks for status
+ *   messages to be announced, not shown. Other tables keep the visible
+ *   line because it carries more there (filters, "Back to recommended
+ *   order"); here it only repeated the chip.
+ * - The search count sits beside the search box, visibly and in its own
+ *   live region, shown only while there is a search: the result of an
+ *   action next to the action (W3C COGA, "Making Content Usable",
+ *   https://www.w3.org/TR/coga-usable/: one idea per chunk, and help people
+ *   see what just happened).
+ * - Rows expand with a disclosure button (`aria-expanded`, `aria-controls`)
+ *   in the row header and a detail row under it, not a `treegrid` and not
+ *   columns that open and close. Hidden columns change a table's shape
+ *   under a screen reader, and `treegrid` needs grid keyboard handling
+ *   that screen readers support unevenly. See Adrian Roselli, "Table with
+ *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ * - "Open latest scan" is a link, styled as one, because it goes to a
+ *   page; a button acts on this one. One quiet link per row rather than an
+ *   outlined button in every row, which outweighed the numbers. Its
+ *   accessible name starts with its visible words (WCAG 2.2 SC 2.5.3 Label
+ *   in Name, Level A: "the name contains the text that is presented
+ *   visually").
  */
-type SortKey = "site" | "scans" | "pages" | "issues" | "images" | "states" | "completed";
+type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
 
 const SORT_KINDS: Record<SortKey, SortKind> = {
   site: "text",
-  scans: "number",
   pages: "number",
   issues: "number",
   images: "number",
@@ -81,7 +129,6 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
 
 const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
-  scans: "Scans",
   pages: "Pages",
   issues: "Issues",
   images: "Images with text",
@@ -89,17 +136,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   completed: "Completed",
 };
 
-// Ids for the two-level header. Grouped cells name both through `headers`.
-const GROUP_HEADER_ID = "reports-completed-group";
-const COLUMN_HEADER_IDS = {
-  pages: "reports-col-pages",
-  issues: "reports-col-issues",
-  images: "reports-col-images",
-  states: "reports-col-states",
-  completed: "reports-col-completed",
-  report: "reports-col-report",
-} as const;
-const TOTAL_COLUMNS = 8;
+const TOTAL_COLUMNS = 7;
 
 /**
  * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
@@ -115,8 +152,6 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
   switch (key) {
     case "site":
       return siteLabel(site.site_url).toLowerCase();
-    case "scans":
-      return site.scan_count;
     case "pages":
       return completed ? completed.page_count : null;
     case "issues":
@@ -269,63 +304,56 @@ export default function ScansRoute() {
               anywhere; this is for narrowing a long list in place. */}
           <TableBar pager={<TablePagination label="Public reports" noun="sites" {...sitePages} />}>
             <TableSearch label="Search sites" id="site-search" value={search} onChange={setSearch} />
+            {/* Always mounted, so the count is announced when it changes;
+                empty, and so invisible, while there is no search. */}
+            <p role="status" className="text-xs text-fg-muted">
+              {query &&
+                `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
+            </p>
           </TableBar>
-          <TableStatus
-            actions={
-              // Always mounted, so the count is announced when it changes.
-              <p role="status">
-                {query &&
-                  `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
-              </p>
-            }
-          >
+          {/* The order, for screen readers only: the sorted header's chip
+              shows it (SC 4.1.3, see the comment on this route). */}
+          <p role="status" className="sr-only">
             Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
-          </TableStatus>
+          </p>
+          {/* Outside the region, so it wraps at 320 pixels rather than
+              scrolling sideways with the table (SC 1.4.10). */}
+          <p className="px-4 pb-2 pt-3 text-sm text-fg-muted">
+            Each row shows the report from the site’s most recent completed scan.
+          </p>
           <TableRegion label="Public reports table" paged={sitePages}>
             <Table
-              className="min-w-[56rem]"
-              caption="Public reports by site. Grouped columns come from each site’s most recent completed scan."
+              className="min-w-[48rem]"
+              caption="Public reports by site. Each row shows the report from the site’s most recent completed scan."
             >
               <TableHead>
+                {/* One header row (H63): see the comment on this route. */}
                 <tr>
                   <SortHeader
                     column="site"
                     kind="text"
-                    rowSpan={2}
                     wrap="words"
                     className="sticky left-0 z-[2] bg-surface-muted align-bottom"
                     {...sortProps}
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  <SortHeader column="scans" kind="number" rowSpan={2} wrap="words" className="align-bottom" {...sortProps}>
-                    {SORT_LABELS.scans}
-                  </SortHeader>
-                  <ColumnHeader
-                    id={GROUP_HEADER_ID}
-                    scope="colgroup"
-                    colSpan={6}
-                    className="border-l-2 border-umich-blue bg-umich-blue/10 pb-1 pt-2 text-xs text-fg-accent"
-                  >
-                    Most recent completed scan
-                  </ColumnHeader>
-                </tr>
-                <tr>
-                  {(["pages", "issues", "images", "states", "completed"] as const).map((column) => (
+                  {(["completed", "pages", "issues", "images", "states"] as const).map((column) => (
                     <SortHeader
                       key={column}
                       column={column}
                       kind={SORT_KINDS[column]}
-                      id={COLUMN_HEADER_IDS[column]}
                       wrap="words"
-                      className={cn("bg-umich-blue/10", column === "pages" && "border-l-2 border-umich-blue")}
+                      className="align-bottom"
                       {...sortProps}
                     >
                       {SORT_LABELS[column]}
                     </SortHeader>
                   ))}
-                  <ColumnHeader id={COLUMN_HEADER_IDS.report} className="whitespace-nowrap bg-umich-blue/10">
-                    Report
+                  <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
+                    {/* The height of a sort button, words at its foot like theirs,
+                        so its label lines up with them. */}
+                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Report</span>
                   </ColumnHeader>
                 </tr>
               </TableHead>
@@ -442,9 +470,6 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
   const label = siteLabel(site.site_url);
   const completed = site.most_recent_completed;
   const detailId = `${rowId}-scans`;
-  const grouped = (column: keyof typeof COLUMN_HEADER_IDS) =>
-    `${rowId} ${GROUP_HEADER_ID} ${COLUMN_HEADER_IDS[column]}`;
-  const groupCell = "bg-umich-blue/[0.04]";
   return (
     <>
       <Row index={index}>
@@ -473,21 +498,26 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               <span className="block break-words font-semibold text-fg underline-offset-2 group-hover:underline" title={withoutUserinfo(site.site_url)}>
                 <BreakableUrl text={label} />
               </span>
+              {/* All the site's scans, here rather than in a column: every
+                  column is about the latest completed scan (one header row). */}
               <span className="block text-xs text-fg-muted">
-                {site.completed_count} completed
+                {`${site.scan_count.toLocaleString()} ${site.scan_count === 1 ? "scan" : "scans"}, ${site.completed_count.toLocaleString()} completed`}
               </span>
             </span>
           </button>
         </RowHeader>
-        <Cell numeric className="text-fg">
-          {site.scan_count.toLocaleString()}
-        </Cell>
         {completed ? (
           <>
-            <Cell numeric headers={grouped("pages")} className={cn(groupCell, "border-l-2 border-umich-blue text-fg")}>
+            <Cell
+              className="whitespace-nowrap text-center text-fg"
+              title={completed.finished_at ?? completed.started_at ?? undefined}
+            >
+              {relativeTime(completed.finished_at ?? completed.started_at)}
+            </Cell>
+            <Cell numeric className="text-fg">
               {completed.page_count.toLocaleString()}
             </Cell>
-            <Cell numeric headers={grouped("issues")} className={groupCell}>
+            <Cell numeric>
               <Link
                 to={`/scans/${completed.id}/issues`}
                 className="report-link inline-flex min-h-target items-center px-1 font-semibold"
@@ -496,35 +526,25 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                 {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
               </Link>
             </Cell>
-            <Cell numeric headers={grouped("images")} className={cn(groupCell, "text-fg")}>
+            <Cell numeric className="text-fg">
               {completed.finding_count.toLocaleString()}
             </Cell>
-            <Cell numeric headers={grouped("states")} className={cn(groupCell, "text-fg")}>
+            <Cell numeric className="text-fg">
               {(completed.dom_state_count ?? 0).toLocaleString()}
             </Cell>
-            <Cell
-              headers={grouped("completed")}
-              className={cn(groupCell, "whitespace-nowrap text-center text-xs text-fg-muted")}
-              title={completed.finished_at ?? completed.started_at ?? undefined}
-            >
-              {relativeTime(completed.finished_at ?? completed.started_at)}
-            </Cell>
-            <Cell headers={grouped("report")} className={cn(groupCell, "whitespace-nowrap text-center")}>
-              <LinkButton
+            <Cell className="whitespace-nowrap text-center">
+              {/* A link styled as a link: it goes to a page (SC 2.5.3 for its name). */}
+              <Link
                 to={`/scans/${completed.id}`}
-                variant="secondary"
+                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
                 aria-label={`Open latest scan of ${label}, the most recent completed scan`}
               >
                 Open latest scan
-              </LinkButton>
+              </Link>
             </Cell>
           </>
         ) : (
-          <Cell
-            colSpan={6}
-            headers={`${rowId} ${GROUP_HEADER_ID}`}
-            className={cn(groupCell, "border-l-2 border-umich-blue text-fg-muted")}
-          >
+          <Cell colSpan={6} className="text-fg-muted">
             No completed scan yet. Expand the site to open its other scans.
           </Cell>
         )}
