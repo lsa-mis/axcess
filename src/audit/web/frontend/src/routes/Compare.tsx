@@ -295,6 +295,7 @@ function Comparison({
           return (
             // The hint on the button, not the tag inside it: a hint shows
             // for the element that has focus, and only the button takes it.
+            // eslint-disable-next-line react/forbid-elements -- Keep: a filter toggle chip (aria-pressed) in a chip row
             <button
               key={key}
               type="button"
@@ -403,6 +404,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
   return (
     <Card className="mb-5 overflow-hidden">
       <h2 className="m-0">
+        {/* eslint-disable-next-line react/forbid-elements -- Convert: a heading disclosure, the job of Disclosure in ui.tsx */}
         <button
           type="button"
           id="coverage-notes-button"
@@ -475,6 +477,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
             <h3 id="coverage-table-heading" className="mt-6 font-semibold">What each check covered</h3>
             {/* Ruled on every side: the eye follows a check across to both scans
                 without losing the row, as in the report's other tables. */}
+            {/* eslint-disable-next-line react/forbid-elements -- Convert: a hand-built table; use Table, TableHead, Row and Cell */}
             <table
               aria-labelledby="coverage-table-heading"
               className="mt-2 w-full max-w-3xl border-collapse border border-border-strong text-sm"

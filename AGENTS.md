@@ -280,6 +280,12 @@ write markup. If none fits, extend the closest one compatibly (a prop, a
 variant) so every screen gets the change, rather than restyling a copy in
 one place. A new component needs a reason in its rationale comment: which
 existing one was considered and why it could not be extended.
+`make lint` enforces the common case: a raw `<button>`, `<table>` or
+`<select>` outside the shared components fails (`react/forbid-elements`).
+Where one is really needed, disable the rule on that line with a reason
+starting "Keep:" (a widget's own part, such as a tab); one that should be
+converted starts "Convert:" and names what to use. `grep -rn "Convert:"`
+lists the conversions still owed.
 
 **Keep the interface consistent.** The same function looks and behaves
 the same everywhere, and is named with the same words: the same control

@@ -213,6 +213,7 @@ function ProgressCard({
       </ol>
 
       <div className="mt-5 border-t border-border pt-3">
+        {/* eslint-disable-next-line react/forbid-elements -- Convert: a text disclosure button, Button variant="ghost" */}
         <button
           type="button"
           aria-expanded={open}

@@ -62,6 +62,7 @@ export default function TrendChart({
         </div>
         <div role="group" aria-label="Chart measure" className="inline-flex rounded-xs border border-border bg-surface-subtle p-1">
           {(Object.keys(MEASURES) as Measure[]).map((key) => (
+            // eslint-disable-next-line react/forbid-elements -- Keep: a segment of the chart's measure switch (aria-pressed)
             <button
               key={key}
               type="button"

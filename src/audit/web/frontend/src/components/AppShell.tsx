@@ -418,6 +418,7 @@ function Sidebar({
             </span>
           </>
         )}
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
         <button
           type="button"
           aria-label={
@@ -515,6 +516,7 @@ function TopBar({
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
           type="button"
           aria-label={
@@ -586,6 +588,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
         </ul>
       </nav>
       <div className="mt-1 grid grid-cols-2 gap-1 border-t border-white/20 pt-1">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
         <button
           type="button"
           onClick={onSearch}

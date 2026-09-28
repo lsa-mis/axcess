@@ -64,6 +64,7 @@ export default function SettingsRoute() {
                   <li key={preset.id}>
                     {/* A toggle: aria-pressed says on or off, and the tick
                         and filled pill show it without relying on colour. */}
+                    {/* eslint-disable-next-line react/forbid-elements -- Keep: a preset toggle pill (aria-pressed); there is no shared toggle-pill component */}
                     <button
                       type="button"
                       aria-pressed={on}

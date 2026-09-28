@@ -533,6 +533,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               the whole block is one button. Its name starts with what it
               does and then reads the visible text, so a voice-control user
               can say what they see (SC 2.5.3). */}
+          {/* eslint-disable-next-line react/forbid-elements -- Keep: the whole row header is the disclosure button (site name and chevron) */}
           <button
             type="button"
             aria-expanded={expanded}

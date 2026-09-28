@@ -294,6 +294,7 @@ export default function IssuesRoute() {
                 </span>
               )}
               {sort && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
                 <button
                   type="button"
                   onClick={recommend}

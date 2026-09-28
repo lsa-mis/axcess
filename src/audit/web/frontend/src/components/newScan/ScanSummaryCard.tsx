@@ -228,6 +228,7 @@ export default function ScanSummaryCard({
                 pressed, so focus moves to the summary's heading rather than
                 being left on nothing. */}
             {!unchanged && onReset && (
+              // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
               <button
                 type="button"
                 onClick={() => {

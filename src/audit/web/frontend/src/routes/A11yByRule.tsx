@@ -227,6 +227,7 @@ function RuleGroupCard({
 
   return (
     <Card className="overflow-hidden">
+      {/* eslint-disable-next-line react/forbid-elements -- Convert: a card-header disclosure, the job of Disclosure in ui.tsx */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

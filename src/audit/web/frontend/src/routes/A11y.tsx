@@ -393,6 +393,7 @@ function DrillDownView({
               <>
                 {" "}
                 have the status <strong>{STATUS_LABEL[status]}</strong>.{" "}
+                {/* eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button */}
                 <button
                   type="button"
                   onClick={() => onStatusFilterChange("")}

@@ -955,6 +955,7 @@ export default function InspectorRoute() {
                 />
               )}
               {checkLayout && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
                 <button
                   type="button"
                   aria-pressed={!asChecked}
@@ -965,6 +966,7 @@ export default function InspectorRoute() {
                 </button>
               )}
               {hasTarget && (
+                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
                 <button
                   type="button"
                   onClick={toggleHighlights}
