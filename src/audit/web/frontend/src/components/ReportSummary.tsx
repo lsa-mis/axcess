@@ -102,7 +102,7 @@ export function ReportSummary({
           one, where width is short) and 32px between rows, against 8px from
           a number to its name and 4px from the name to its sentence, which
           read as one unit. */}
-      <dl className="mt-5 grid grid-cols-2 gap-x-8 gap-y-8 lg:grid-cols-4 lg:gap-x-12">
+      <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 lg:grid-cols-4 lg:gap-x-12">
         <SummaryStat
           label="Pages checked"
           value={scan.page_count}

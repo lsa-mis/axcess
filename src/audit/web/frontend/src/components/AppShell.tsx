@@ -337,6 +337,13 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
  * About and Settings are places, but reference ones: they sit at the foot of
  * the sidebar with feedback rather than among the working sections, so the
  * nav above stays the places the work happens.
+ *
+ * Settings was considered right under Reports, where it would be found at
+ * a glance. It stays here: moving it would mix the app's own utilities into
+ * the places a reader works, and the foot group does not scroll away, so it
+ * is always in view anyway. What WCAG asks is that the order never changes
+ * from page to page (SC 3.2.3 Consistent Navigation, Level AA), which one
+ * fixed foot group gives.
  */
 const FOOT_PLACES = [
   { to: "/about", label: "About", name: "About Axcess", icon: Info },
