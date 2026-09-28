@@ -271,6 +271,41 @@ know, not just to passing axe:
 - COGA: one way to do one thing, related content grouped, the same word
   for the same thing, and no duplicate controls for one function.
 
+**Reuse before you build.** Use the existing component for the job before
+writing a new one: `components/ui.tsx` (Card, Button, LinkButton, Select,
+Disclosure, StatCard, PageHeader), `components/table/` (TableBar,
+TableRegion, Table, SortHeader, Row, Cell), `TablePagination`, and the
+labels in `lib/terms.ts` and `lib/labels.ts`. Search for one before you
+write markup. If none fits, extend the closest one compatibly (a prop, a
+variant) so every screen gets the change, rather than restyling a copy in
+one place. A new component needs a reason in its rationale comment: which
+existing one was considered and why it could not be extended.
+
+**Keep the interface consistent.** The same function looks and behaves
+the same everywhere, and is named with the same words: the same control
+for the same kind of choice, actions in the same place, the same card,
+table and status patterns. WCAG 2.2 SC 3.2.3 Consistent Navigation and SC
+3.2.4 Consistent Identification (both Level AA) are the floor. The shared
+components and the terms table are how this repo meets them, which is
+one more reason to reuse them. If one screen needs to differ from the
+pattern, say why in its rationale comment.
+
+**Native HTML before ARIA.** Use the element whose built-in meaning and
+behaviour you need (`<button>`, `<a href>`, `<table>` with `<th scope>`
+and `<caption>`, `<label>`, `<fieldset>` and `<legend>`, `<details>`,
+`<dialog>`, headings, lists) instead of a `<div>` with a role. This is the
+first rule of the W3C's "Using ARIA"
+(https://www.w3.org/TR/using-aria/#rule1, paraphrased): if a native
+element or attribute already has the semantics and behaviour you need,
+use it rather than adding ARIA. The WAI-ARIA Authoring Practices put the
+risk plainly: "No ARIA is better than bad ARIA." Add ARIA only for a real
+gap that HTML cannot fill, and then exactly as the APG pattern specifies.
+Examples of real gaps: `aria-expanded` on a disclosure button,
+`aria-sort` on a sortable header, `aria-describedby` for a description, a
+`role="status"` live region. Never add a role that repeats the element's
+own (`role="button"` on a `<button>`), and never use ARIA to hide a
+problem that better markup would fix.
+
 If a requested change, or code you touch, is not the most accessible
 option or is weaker UX than a known alternative, **tell the developer in
 your reply**. Name the problem, the criterion or principle, and the better
