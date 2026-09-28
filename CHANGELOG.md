@@ -42,6 +42,10 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Inspector and page code view: stepping through flagged elements uses two
+  labelled buttons, Previous and Next (Jump when there is only one), each
+  with its own border, beside the count "Flagged element 1 of 3". They were
+  two arrows in one box with the count.
 - Back returns you to where you were. Open a report from Reports and press
   Back: the table keeps its order, search, page and opened sites, and the
   page is scrolled where you left it. The Reports view is kept in the page

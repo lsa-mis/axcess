@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
+import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
 import type { PageEvidence } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -944,44 +945,14 @@ export default function InspectorRoute() {
                     : copyName}
               </span>
               {!highlightPending && showHighlights && highlightedCount > 0 && (
-                // Previous / Next step through the outlined elements in
-                // document order, as in the Page code (DOM) tab; the count between
-                // them says where you are.
-                <span
-                  role="group"
-                  aria-label="Flagged elements"
-                  className="ml-auto inline-flex items-center gap-1 rounded-xs border border-border bg-surface pl-2"
-                >
-                  <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
-                    {highlightedCount === 1
-                      ? "1 flagged element"
-                      : `Flagged element ${pageMark + 1} of ${highlightedCount}`}
-                  </span>
-                  {highlightedCount > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="min-h-target"
-                      aria-label="Previous flagged element"
-                      disabled={pageMark === 0}
-                      onClick={() => goToPageMark(pageMark - 1)}
-                    >
-                      <ChevronUp className="h-4 w-4" aria-hidden />
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="min-h-target"
-                    aria-label={highlightedCount > 1 ? "Next flagged element" : "Jump to flagged element"}
-                    disabled={highlightedCount > 1 && pageMark === highlightedCount - 1}
-                    onClick={() => goToPageMark(highlightedCount > 1 ? pageMark + 1 : 0)}
-                  >
-                    <ChevronDown className="h-4 w-4" aria-hidden />
-                  </Button>
-                </span>
+                // Previous / Next through the outlined elements, the same
+                // control as the Page code (DOM) tab's (FlaggedStepper).
+                <FlaggedStepper
+                  count={highlightedCount}
+                  index={pageMark}
+                  onGo={goToPageMark}
+                  className="ml-auto"
+                />
               )}
               {checkLayout && (
                 <button
