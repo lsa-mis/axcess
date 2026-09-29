@@ -39,6 +39,35 @@
 # "Making Content Usable": the same word for the same thing,
 # https://www.w3.org/TR/coga-usable/).
 
+# The footer ("Axcess 0.61", bottom left). MUI draws it with two controls
+# in the branding grey: 1028 disabled, 1256 coloured /BRANDING, #a0a0a0 on
+# #f0f0f0, 2.29:1 (installer_contrast.py), below SC 1.4.3's 4.5:1. When the
+# window opens, 1028 is hidden and 1256 takes Windows' own button text and
+# face colours (SYSCLR 18 and 15), about 18:1, which also follow a
+# high-contrast theme. Leaving the footer blank was tried and rejected:
+# the empty controls stayed, named with a space, and Axe.Windows reported
+# them ("The Name property must not contain only whitespace").
+!macro axcessReadableFooter
+  Push $0
+  GetDlgItem $0 $HWNDPARENT 1028
+  ShowWindow $0 0
+  GetDlgItem $0 $HWNDPARENT 1256
+  SetCtlColors $0 SYSCLR:18 SYSCLR:15
+  Pop $0
+!macroend
+
+!ifndef BUILD_UNINSTALLER
+  !define MUI_CUSTOMFUNCTION_GUIINIT axcessReadableFooter
+  Function axcessReadableFooter
+    !insertmacro axcessReadableFooter
+  FunctionEnd
+!else
+  !define MUI_CUSTOMFUNCTION_UNGUIINIT un.axcessReadableFooter
+  Function un.axcessReadableFooter
+    !insertmacro axcessReadableFooter
+  FunctionEnd
+!endif
+
 !macro customHeader
   # The version people see: 0.61, not the packaged 0.61.0 (see
   # displayVersion in src/updates.cjs).
@@ -55,10 +84,8 @@
   !pragma warning disable 6030
 
   # Every screen
-  # No footer text: NSIS draws it as disabled grey, #a0a0a0 on #f0f0f0,
-  # 2.29:1 (installer_contrast.py), below SC 1.4.3's 4.5:1, with no way to
-  # restyle it. The version is in the last screen's title instead.
-  LangString ^Branding ${LANG_ENGLISH} " "
+  # The footer. axcessReadableFooter (below) draws it in readable colours.
+  LangString ^Branding ${LANG_ENGLISH} "Axcess ${AXCESS_DISPLAY_VERSION}"
   LangString ^ClickNext ${LANG_ENGLISH} "Choose Next to continue."
   LangString ^ClickInstall ${LANG_ENGLISH} "When you are ready, choose Install."
   LangString ^ClickUninstall ${LANG_ENGLISH} "When you are ready, choose Uninstall."
@@ -107,7 +134,7 @@
 
   # Last screen. $INSTDIR is filled in when the screen shows: the Squirrel
   # installer never said where Axcess went.
-  LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Axcess ${AXCESS_DISPLAY_VERSION} is installed"
+  LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Axcess is installed"
   # Short: the "Open Axcess now" checkbox sits under this text, and it hid
   # a last line ("Choose Finish to close setup.") in the runner's
   # screenshot. A long folder path wraps to a second line.
