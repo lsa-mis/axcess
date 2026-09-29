@@ -24,6 +24,7 @@ function release(overrides = {}) {
       { name: "Axcess-0.1.57-arm64.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg` },
       { name: "Axcess-darwin-arm64-0.1.57.zip", browser_download_url: `${DOWNLOAD}/Axcess-darwin-arm64-0.1.57.zip` },
       { name: "Axcess-0.1.57-Setup.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe` },
+      { name: "Axcess-0.1.57-x86_64.AppImage", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-x86_64.AppImage` },
       {
         name: "Axcess-0.1.57-Windows-x64-portable.zip",
         browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-x64-portable.zip`,
@@ -171,5 +172,13 @@ test("Windows releases name the portable zip for a copy Setup did not install", 
     assets: [{ name: "Axcess-0.1.57-Windows-x64-portable.zip", browser_download_url: "https://evil.example/a.zip" }],
   });
   assert.equal(describeRelease(elsewhere, { platform: "win32", arch: "x64" }).zipUrl, null);
+});
+
+test("Linux releases resolve to the AppImage for the running architecture", () => {
+  const described = describeRelease(release(), { platform: "linux", arch: "x64" });
+  assert.equal(described.appImageUrl, `${DOWNLOAD}/Axcess-0.1.57-x86_64.AppImage`);
+  assert.equal(described.zipUrl, null);
+  assert.equal(describeRelease(release(), { platform: "linux", arch: "arm64" }).appImageUrl, null);
+  assert.equal(describeRelease(release(), { platform: "win32", arch: "x64" }).appImageUrl, null);
 });
 

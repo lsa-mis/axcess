@@ -466,6 +466,30 @@ async function offerZipDownload(release) {
   }
 }
 
+// An AppImage is one file; the new version replaces it. Browsers save
+// downloads without permission to run, hence the step that allows it. The
+// reports are in ~/.config/Axcess, so the new file finds them.
+async function offerAppImageDownload(release) {
+  const current = process.env.APPIMAGE ? ` (${process.env.APPIMAGE})` : "";
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail:
+      `You are running ${buildLabel()}. To update: choose Download and wait for it to ` +
+      `finish. Quit Axcess. Put the new file where the old one is${current} and delete ` +
+      "the old one. Allow the new file to run: in your file manager, open its " +
+      "Properties and turn on \"Allow executing file as program\", or run " +
+      "chmod +x on it. Then open it. Your reports stay where they are.",
+    buttons: ["Download", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0 && isReleaseAssetUrl(release.appImageUrl)) {
+    void shell.openExternal(release.appImageUrl);
+  }
+}
+
 // Best-effort and silent: offline, rate-limited, or malformed responses just
 // mean no prompt this launch. Runs after the workbench is showing so it never
 // delays startup.
@@ -488,6 +512,8 @@ async function checkForUpdates() {
     else if (method === "download" && release.zipUrl) await offerZipDownload(release);
   } else if (process.platform === "darwin" && release.dmgUrl) {
     await offerMacDownload(release);
+  } else if (process.platform === "linux" && release.appImageUrl) {
+    await offerAppImageDownload(release);
   }
 }
 
