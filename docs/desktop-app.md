@@ -35,7 +35,7 @@ Typical data locations are:
 
 ### The Linux AppImage
 
-`Axcess-<version>-x86_64.AppImage` is the whole app in one file. The release
+`Axcess-<version>-Linux.AppImage` is the whole app in one file. The release
 builds it on Ubuntu 22.04 (`build-linux` in `desktop-build.yml`), so it runs
 on distributions with glibc 2.35 or newer: Ubuntu 22.04, Debian 12, Fedora
 36 and later. Forge packages the app; `scripts/make-linux-appimage.cjs` has
@@ -56,13 +56,13 @@ sandbox on Ubuntu as well.
 
 Data is in `~/.config/Axcess`, as for any Linux build. The AppImage
 runtime's own `--appimage-portable-config` puts it in a folder beside the
-file instead (`Axcess-<version>-x86_64.AppImage.config`); Axcess needs no
+file instead (`Axcess-<version>-Linux.AppImage.config`); Axcess needs no
 code for that. Updates are offered as a download of the new AppImage
 (`offerAppImageDownload` in `main.cjs`).
 
 ### The portable zip (Windows)
 
-`Axcess-<version>-Windows-x64-portable.zip` is the same app without an
+`Axcess-<version>-Windows-Portable.zip` is the same app without an
 installer. It ships with a folder named `Axcess data` beside `Axcess.exe`,
 and while that folder is there Axcess runs in portable mode
 (`portableDataDir` in `desktop/src/runtime.cjs`): reports, stored images,
@@ -231,13 +231,13 @@ Do not distribute these preview builds as a production U-M application.
 also be started by hand. Each run takes the next two-part version after the
 last release: `0.60`, then `0.61`, and on to `0.69`, then `0.70` (the git
 commit is recorded in the package's `config.buildCommit`). On `main`, it then
-publishes the macOS DMG and zip, the Windows `-Setup.exe` with its
+publishes the macOS DMG and zip, the Windows `-Windows-Installer.exe` with its
 `.blockmap`, and the Windows update feed `latest.yml` as GitHub Release
 `desktop-v0.61`. The package itself carries the version as semver (`0.61.0`),
 which npm and electron-updater need.
 
 Each release also carries version-less copies,
-`Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`, so the
+`Axcess-Mac-Apple-Silicon.dmg` and `Axcess-Windows-Installer.exe`, so the
 public site's download buttons can use the permanent links
 `https://github.com/lsa-mis/axcess/releases/latest/download/<name>`. The ten
 newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`

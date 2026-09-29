@@ -174,7 +174,7 @@ jobs:
         shell: pwsh
         working-directory: desktop
         run: |
-          $installer = (Get-ChildItem out/make/nsis/*-Setup.exe | Select-Object -First 1).FullName
+          $installer = (Get-ChildItem out/make/nsis/*-Windows-Installer.exe | Select-Object -First 1).FullName
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-installer-accessibility.ps1 -Installer $installer -OutputDirectory out/installer-a11y
           exit $LASTEXITCODE
       # Axe.Windows does not measure colour contrast: this measures every
@@ -277,20 +277,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name '*-Setup.exe.blockmap' -o -name 'latest.yml' -o -name '*.AppImage' \) -exec cp {} release/ \;
+          # Named in plain words by releaseFileName (desktop/src/updates.cjs):
+          # who each file is for and what it is, not CPU codes.
+          find artifacts -type f \( -name 'Axcess-*-Mac-*.dmg' -o -name 'Axcess-*-Windows-Installer.exe' -o -name 'Axcess-*-Windows-Installer.exe.blockmap' -o -name 'Axcess-*-Windows-Portable.zip' -o -name 'Axcess-*-Linux.AppImage' -o -name 'latest.yml' \) -exec cp {} release/ \;
+          # Forge names the macOS zip Axcess-darwin-arm64-<semver>.zip; it is
+          # published under the DMG's plain name.
+          find artifacts -type f -name 'Axcess-darwin-arm64-*.zip' -exec cp {} "release/Axcess-$VERSION-Mac-Apple-Silicon.zip" \;
           ls -l release
           # latest.yml is the Windows update feed: installed copies read it
           # to find and check the new installer (src/updates.cjs).
-          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" "Axcess-$VERSION-Windows-x64-portable.zip" "Axcess-$VERSION-x86_64.AppImage" latest.yml; do
+          for required in "Axcess-$VERSION-Mac-Apple-Silicon.dmg" "Axcess-$VERSION-Windows-Installer.exe" "Axcess-$VERSION-Windows-Portable.zip" "Axcess-$VERSION-Linux.AppImage" latest.yml; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
           # Version-less copies give the public site permanent download links:
           # https://github.com/lsa-mis/axcess/releases/latest/download/<name>
           # always resolves to the newest release's asset of that name.
-          cp "release/Axcess-$VERSION-arm64.dmg" release/Axcess-macOS-AppleSilicon.dmg
-          cp "release/Axcess-$VERSION-Setup.exe" release/Axcess-Windows-x64-Setup.exe
-          cp "release/Axcess-$VERSION-Windows-x64-portable.zip" release/Axcess-Windows-x64-portable.zip
-          cp "release/Axcess-$VERSION-x86_64.AppImage" release/Axcess-Linux-x86_64.AppImage
+          for kind in Mac-Apple-Silicon.dmg Windows-Installer.exe Windows-Portable.zip Linux.AppImage; do
+            cp "release/Axcess-$VERSION-$kind" "release/Axcess-$kind"
+          done
           ls -l release
       - name: Create or update the release
         shell: bash
@@ -309,10 +313,10 @@ jobs:
           }
           Built by workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
 
-          Installed copies of Axcess offer this build on their next launch. The macOS build is an ad-hoc signed preview: right-click Axcess and choose Open on first launch."
+          Axcess offers this version the next time it opens. This is a preview: Apple has not checked it (notarization), and Windows does not know who made it (code signing), so each asks you to approve it the first time. The steps are at https://lsa-mis.github.io/axcess/get-started/#first-launch."
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft \
-              --title "Axcess preview $VERSION" --notes "$notes"
+              --title "Axcess $VERSION (preview)" --notes "$notes"
           fi
           gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
           # Publishing last keeps releases/latest pointing at a complete asset set.

@@ -21,15 +21,15 @@ function release(overrides = {}) {
     draft: false,
     prerelease: false,
     assets: [
-      { name: "Axcess-0.1.57-arm64.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg` },
+      { name: "Axcess-0.1.57-Mac-Apple-Silicon.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg` },
       { name: "Axcess-darwin-arm64-0.1.57.zip", browser_download_url: `${DOWNLOAD}/Axcess-darwin-arm64-0.1.57.zip` },
-      { name: "Axcess-0.1.57-Setup.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe` },
-      { name: "Axcess-0.1.57-x86_64.AppImage", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-x86_64.AppImage` },
+      { name: "Axcess-0.1.57-Windows-Installer.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Installer.exe` },
+      { name: "Axcess-0.1.57-Linux.AppImage", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Linux.AppImage` },
       {
-        name: "Axcess-0.1.57-Windows-x64-portable.zip",
-        browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-x64-portable.zip`,
+        name: "Axcess-0.1.57-Windows-Portable.zip",
+        browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Portable.zip`,
       },
-      { name: "Axcess-0.1.57-Setup.exe.blockmap", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe.blockmap` },
+      { name: "Axcess-0.1.57-Windows-Installer.exe.blockmap", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Installer.exe.blockmap` },
       { name: "latest.yml", browser_download_url: `${DOWNLOAD}/latest.yml` },
     ],
     ...overrides,
@@ -61,7 +61,7 @@ test("release tags map to versions", () => {
 });
 
 test("only HTTPS asset downloads from this repository may be opened", () => {
-  assert.equal(isReleaseAssetUrl(`${DOWNLOAD}/Axcess-0.1.57-arm64.dmg`), true);
+  assert.equal(isReleaseAssetUrl(`${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg`), true);
   assert.equal(isReleaseAssetUrl("http://github.com/lsa-mis/axcess/releases/download/x/y.dmg"), false);
   assert.equal(isReleaseAssetUrl("https://github.com/lsa-mis/axcess/releases/latest"), false);
   assert.equal(isReleaseAssetUrl("https://github.com/lsa-mis/axcess/releases/download/"), false);
@@ -75,7 +75,7 @@ test("macOS releases resolve to the DMG for the running architecture", () => {
   const described = describeRelease(release(), { platform: "darwin", arch: "arm64" });
   assert.equal(described.version, "0.1.57");
   assert.equal(described.tag, "desktop-v0.1.57");
-  assert.equal(described.dmgUrl, `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg`);
+  assert.equal(described.dmgUrl, `${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg`);
   assert.equal(described.feedUrl, null);
 
   const intel = describeRelease(release(), { platform: "darwin", arch: "x64" });
@@ -84,7 +84,7 @@ test("macOS releases resolve to the DMG for the running architecture", () => {
 
 test("a DMG hosted somewhere other than the release is ignored", () => {
   const tampered = release({
-    assets: [{ name: "Axcess-0.1.57-arm64.dmg", browser_download_url: "https://evil.example/a.dmg" }],
+    assets: [{ name: "Axcess-0.1.57-Mac-Apple-Silicon.dmg", browser_download_url: "https://evil.example/a.dmg" }],
   });
   assert.equal(describeRelease(tampered, { platform: "darwin", arch: "arm64" }).dmgUrl, null);
 });
@@ -165,18 +165,18 @@ test("a release with only the old Squirrel feed is not a Windows update", () => 
 
 test("Windows releases name the portable zip for a copy Setup did not install", () => {
   const described = describeRelease(release(), { platform: "win32", arch: "x64" });
-  assert.equal(described.zipUrl, `${DOWNLOAD}/Axcess-0.1.57-Windows-x64-portable.zip`);
+  assert.equal(described.zipUrl, `${DOWNLOAD}/Axcess-0.1.57-Windows-Portable.zip`);
   assert.equal(describeRelease(release(), { platform: "win32", arch: "arm64" }).zipUrl, null);
   assert.equal(describeRelease(release(), { platform: "darwin", arch: "arm64" }).zipUrl, null);
   const elsewhere = release({
-    assets: [{ name: "Axcess-0.1.57-Windows-x64-portable.zip", browser_download_url: "https://evil.example/a.zip" }],
+    assets: [{ name: "Axcess-0.1.57-Windows-Portable.zip", browser_download_url: "https://evil.example/a.zip" }],
   });
   assert.equal(describeRelease(elsewhere, { platform: "win32", arch: "x64" }).zipUrl, null);
 });
 
 test("Linux releases resolve to the AppImage for the running architecture", () => {
   const described = describeRelease(release(), { platform: "linux", arch: "x64" });
-  assert.equal(described.appImageUrl, `${DOWNLOAD}/Axcess-0.1.57-x86_64.AppImage`);
+  assert.equal(described.appImageUrl, `${DOWNLOAD}/Axcess-0.1.57-Linux.AppImage`);
   assert.equal(described.zipUrl, null);
   assert.equal(describeRelease(release(), { platform: "linux", arch: "arm64" }).appImageUrl, null);
   assert.equal(describeRelease(release(), { platform: "win32", arch: "x64" }).appImageUrl, null);

@@ -127,7 +127,7 @@ On macOS, `npm run make` runs the resource and runtime checks through the
   `desktop/scripts/stamp-version.cjs` does the stamp rather than `npm version`,
   which refuses to set the version a package already has (`0.60.0`).
 - Everything a person sees uses the two-part version: the release tag
-  `desktop-v0.61`, the release title `Axcess preview 0.61`, the installer
+  `desktop-v0.61`, the release title `Axcess 0.61 (preview)`, the installer
   names, and the app's own label, `0.61 (abc1234)`, in its update dialogs and
   the launcher log (`displayVersion`).
 - In git, `desktop/package.json` stays at `0.60.0`, so every local build shows
@@ -143,12 +143,17 @@ The `publish` job ("Publish preview release") runs only on `main`, and only
 after both build jobs succeed. It uses the workflow's built-in token, so no
 repository secrets are involved.
 
-1. **Collect the installers.** It copies every `*.dmg`, `*.zip`,
-   `*-Setup.exe`, `*-Setup.exe.blockmap`, and `latest.yml` file from the two
-   artifacts. It stops if `Axcess-0.61-arm64.dmg`, `Axcess-0.61-Setup.exe`,
-   or `latest.yml` is missing.
-2. **Add version-less copies.** It adds `Axcess-macOS-AppleSilicon.dmg` and
-   `Axcess-Windows-x64-Setup.exe` as copies of this build's installers. The
+1. **Collect the installers.** It copies the files named by
+   `releaseFileName` in `desktop/src/updates.cjs`, in plain words, from the
+   artifacts: `Axcess-0.61-Mac-Apple-Silicon.dmg`,
+   `Axcess-0.61-Windows-Installer.exe` with its `.blockmap`,
+   `Axcess-0.61-Windows-Portable.zip`, `Axcess-0.61-Linux.AppImage` and
+   `latest.yml`, plus Forge's macOS zip renamed
+   `Axcess-0.61-Mac-Apple-Silicon.zip`. It stops if one of the first four or
+   `latest.yml` is missing.
+2. **Add version-less copies.** It adds `Axcess-Mac-Apple-Silicon.dmg`,
+   `Axcess-Windows-Installer.exe`, `Axcess-Windows-Portable.zip` and
+   `Axcess-Linux.AppImage` as copies of this build's files. The
    site's download buttons link to
    `https://github.com/lsa-mis/axcess/releases/latest/download/<name>`
    (`DOWNLOAD_MACOS` and `DOWNLOAD_WINDOWS` in `site/build.py`), so they
@@ -298,7 +303,7 @@ release from the site.
    install steps and links to the site's
    [first-launch steps](https://lsa-mis.github.io/axcess/get-started/#first-launch).
 2. **Download** opens the disk image that matches the Mac's CPU architecture
-   (`-arm64.dmg`) in the default browser. The app opens only HTTPS download
+   (`-Mac-Apple-Silicon.dmg`) in the default browser. The app opens only HTTPS download
    links under this repository's releases.
 3. The dialog tells them to quit Axcess, open the disk image, drag Axcess to
    Applications, and choose Replace.
@@ -376,12 +381,14 @@ has to make because the workflow does not.
 
 ### Confirm the release
 
-1. On the Releases page, confirm that "Axcess preview 0.61" is marked
+1. On the Releases page, confirm that "Axcess 0.61 (preview)" is marked
    Latest and has these files:
-   - `Axcess-0.61-arm64.dmg` and the macOS `.zip`;
-   - `Axcess-0.61-Setup.exe`, its `.blockmap`, and `latest.yml`;
-   - `Axcess-0.61-Windows-x64-portable.zip`;
-   - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
+   - `Axcess-0.61-Mac-Apple-Silicon.dmg` and `Axcess-0.61-Mac-Apple-Silicon.zip`;
+   - `Axcess-0.61-Windows-Installer.exe`, its `.blockmap`, and `latest.yml`;
+   - `Axcess-0.61-Windows-Portable.zip` and `Axcess-0.61-Linux.AppImage`;
+   - the version-less copies `Axcess-Mac-Apple-Silicon.dmg`,
+     `Axcess-Windows-Installer.exe`, `Axcess-Windows-Portable.zip` and
+     `Axcess-Linux.AppImage`.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
 
@@ -417,7 +424,7 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    - Windows: choose **Update now**, wait for "Update ready", and choose
      **Restart now**.
    - macOS: choose **Download**, confirm the browser downloads the new
-     `-arm64.dmg` from this repository's releases, and replace the app.
+     `-Mac-Apple-Silicon.dmg` from this repository's releases, and replace the app.
    - On both, check the version as in step 2 and confirm your earlier reports
      are still listed.
 
@@ -437,11 +444,12 @@ Releases page, so treat the numbers as estimates:
 
 | File | Who downloads it |
 | --- | --- |
-| `latest.yml` and `Axcess-0.61-Setup.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
-| `Axcess-0.61-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
-| `Axcess-macOS-AppleSilicon.dmg`, `Axcess-Windows-x64-Setup.exe` and `Axcess-Windows-x64-portable.zip` | The site's download links, which always point at the latest release |
-| `Axcess-0.61-Windows-x64-portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
-| The macOS `.zip` | Only people who download it by hand from the Releases page. Neither the app nor the site links to it. |
+| `latest.yml` and `Axcess-0.61-Windows-Installer.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
+| `Axcess-0.61-Mac-Apple-Silicon.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-Mac-Apple-Silicon.dmg`, `Axcess-Windows-Installer.exe` and `Axcess-Windows-Portable.zip` | The site's download links, which always point at the latest release |
+| `Axcess-0.61-Windows-Portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
+| `Axcess-0.61-Linux.AppImage` | Mostly Linux copies after someone chooses **Download** in their update dialog |
+| `Axcess-0.61-Mac-Apple-Silicon.zip` | Only people who download it by hand from the Releases page. Neither the app nor the site links to it. |
 
 These counts miss:
 

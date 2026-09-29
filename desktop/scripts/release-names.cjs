@@ -1,37 +1,40 @@
 /**
- * The installer names a desktop release publishes.
- *
- * electron-builder.config.cjs and make-windows-installer.cjs name the
- * Windows Setup.exe and portable zip, and make-macos-dmg.cjs the DMG, with these, from the packaged version (0.61.0 reads as 0.61). The
- * publish job in desktop-build.yml then requires `Axcess-$VERSION-arm64.dmg`,
- * `Axcess-$VERSION-Setup.exe` and `Axcess-$VERSION-Windows-x64-portable.zip`, where $VERSION is the two-part version
- * the version job picked. CI's release dry run runs this with
- * `--expect <version>` to check the two agree before anything merges.
+ * The file names a desktop release publishes, from the packaged version
+ * (0.61.0 reads as 0.61): make-macos-dmg.cjs names the DMG,
+ * electron-builder.config.cjs the Windows installer and the AppImage, and
+ * make-windows-installer.cjs the portable zip, all with these. The publish
+ * job in desktop-build.yml then requires
+ * `Axcess-$VERSION-Mac-Apple-Silicon.dmg`, `Axcess-$VERSION-Windows-Installer.exe`,
+ * `Axcess-$VERSION-Windows-Portable.zip` and `Axcess-$VERSION-Linux.AppImage`,
+ * where $VERSION is the two-part version the version job picked. CI's
+ * release dry run runs this with `--expect <version>` to check they agree
+ * before anything merges.
  *
  *   node scripts/release-names.cjs                 # print the names
  *   node scripts/release-names.cjs --expect 0.61   # exit 1 if they differ
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { displayVersion } = require("../src/updates.cjs");
+const { displayVersion, releaseFileName } = require("../src/updates.cjs");
 
+// The names come from releaseFileName in src/updates.cjs, the rule the
+// installed app also uses to find its next file, so they cannot drift.
 function dmgName(packageVersion, arch) {
-  return `Axcess-${displayVersion(packageVersion)}-${arch}.dmg`;
+  return releaseFileName("mac", arch, displayVersion(packageVersion));
 }
 
 function setupExeName(packageVersion) {
-  return `Axcess-${displayVersion(packageVersion)}-Setup.exe`;
+  return releaseFileName("windows-installer", "x64", displayVersion(packageVersion));
 }
 
 /** The Windows zip that runs without installing (portable mode). */
 function portableZipName(packageVersion, arch = "x64") {
-  return `Axcess-${displayVersion(packageVersion)}-Windows-${arch}-portable.zip`;
+  return releaseFileName("windows-portable", arch, displayVersion(packageVersion));
 }
 
-/** The Linux AppImage, named with the architecture as AppImages are: x86_64. */
+/** The Linux AppImage. */
 function appImageName(packageVersion, arch = "x64") {
-  const machine = { x64: "x86_64", arm64: "aarch64" }[arch] || arch;
-  return `Axcess-${displayVersion(packageVersion)}-${machine}.AppImage`;
+  return releaseFileName("linux", arch, displayVersion(packageVersion));
 }
 
 module.exports = { appImageName, dmgName, portableZipName, setupExeName };
@@ -52,10 +55,10 @@ if (require.main === module) {
     const version = args[at + 1];
     // The publish job's own patterns, in desktop-build.yml.
     const wanted = [
-      `Axcess-${version}-arm64.dmg`,
-      `Axcess-${version}-Setup.exe`,
-      `Axcess-${version}-Windows-x64-portable.zip`,
-      `Axcess-${version}-x86_64.AppImage`,
+      `Axcess-${version}-Mac-Apple-Silicon.dmg`,
+      `Axcess-${version}-Windows-Installer.exe`,
+      `Axcess-${version}-Windows-Portable.zip`,
+      `Axcess-${version}-Linux.AppImage`,
     ];
     const wrong = wanted.filter((name, index) => name !== names[index]);
     if (wrong.length) {

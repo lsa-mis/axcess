@@ -23,7 +23,7 @@ A pass does not mean the installer meets WCAG; the screen-reader check in
 docs/internal/releases.md still applies.
 
   powershell -NoProfile -ExecutionPolicy Bypass -File check-installer-accessibility.ps1 `
-    -Installer out\make\nsis\Axcess-0.61-Setup.exe -OutputDirectory out\installer-a11y
+    -Installer out\make\nsis\Axcess-0.61-Windows-Installer.exe -OutputDirectory out\installer-a11y
 #>
 param(
   [Parameter(Mandatory = $true)] [string] $Installer,

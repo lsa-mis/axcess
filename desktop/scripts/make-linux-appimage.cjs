@@ -3,7 +3,7 @@
  * (`npm run package` writes out/Axcess-linux-<arch>). electron-builder only
  * wraps that folder, as it does for the Windows installer; see
  * electron-builder.config.cjs for the AppImage toolset and why. Writes
- * out/make/appimage/Axcess-<version>-x86_64.AppImage.
+ * out/make/appimage/Axcess-<version>-Linux.AppImage.
  *
  * Runs on Linux. The release builds it on the oldest Ubuntu it supports:
  * the AppImage runs on distros with that glibc or newer.

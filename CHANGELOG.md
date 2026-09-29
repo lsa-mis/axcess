@@ -57,6 +57,13 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Download files are named in plain words, for who each is for and what
+  it is, not processor codes: Axcess-0.61-Mac-Apple-Silicon.dmg,
+  Axcess-0.61-Windows-Installer.exe, Axcess-0.61-Windows-Portable.zip and
+  Axcess-0.61-Linux.AppImage (they were -arm64.dmg, -Setup.exe,
+  -Windows-x64-portable.zip and -x86_64.AppImage). A Mac with an earlier
+  preview installed is not offered this one: download it from the Get
+  started page once. Releases are titled "Axcess 0.61 (preview)".
 - Windows installer: a standard setup wizard replaces the screen that showed
   only an animation. It asks who to install Axcess for (only you, with no
   administrator permission, or everyone on the computer), shows the folder

@@ -86,42 +86,15 @@ function describeRelease(release, { platform, arch }) {
   const assets = Array.isArray(release.assets) ? release.assets : [];
   const names = new Set(assets.map((asset) => asset && asset.name));
 
-  let dmgUrl = null;
-  if (platform === "darwin") {
-    const dmg = assets.find(
-      (asset) =>
-        asset &&
-        typeof asset.name === "string" &&
-        asset.name.endsWith(`-${arch}.dmg`) &&
-        isReleaseAssetUrl(asset.browser_download_url),
-    );
-    dmgUrl = dmg ? dmg.browser_download_url : null;
-  }
-
-  // The portable zip for a copy Setup did not install (windowsUpdateMethod).
-  let zipUrl = null;
-  if (platform === "win32") {
-    const zip = assets.find(
-      (asset) =>
-        asset &&
-        asset.name === `Axcess-${version}-Windows-${arch}-portable.zip` &&
-        isReleaseAssetUrl(asset.browser_download_url),
-    );
-    zipUrl = zip ? zip.browser_download_url : null;
-  }
-
-  // The AppImage for this architecture (x64 is published as x86_64).
-  let appImageUrl = null;
-  if (platform === "linux") {
-    const machine = { x64: "x86_64", arm64: "aarch64" }[arch] || arch;
-    const appImage = assets.find(
-      (asset) =>
-        asset &&
-        asset.name === `Axcess-${version}-${machine}.AppImage` &&
-        isReleaseAssetUrl(asset.browser_download_url),
-    );
-    appImageUrl = appImage ? appImage.browser_download_url : null;
-  }
+  // The file this copy can run, by the one naming rule (releaseFileName).
+  const url = (name) => {
+    const asset = name && assets.find((candidate) => candidate && candidate.name === name);
+    return asset && isReleaseAssetUrl(asset.browser_download_url) ? asset.browser_download_url : null;
+  };
+  const dmgUrl = platform === "darwin" ? url(releaseFileName("mac", arch, version)) : null;
+  // The portable zip, for a copy Setup did not install (windowsUpdateMethod).
+  const zipUrl = platform === "win32" ? url(releaseFileName("windows-portable", arch, version)) : null;
+  const appImageUrl = platform === "linux" ? url(releaseFileName("linux", arch, version)) : null;
 
   const feedUrl =
     platform === "win32" && names.has("latest.yml")
@@ -129,6 +102,33 @@ function describeRelease(release, { platform, arch }) {
       : null;
 
   return { tag, version, dmgUrl, zipUrl, appImageUrl, feedUrl, pageUrl: RELEASES_PAGE_URL };
+}
+
+/**
+ * What a release file is called: who it is for and what it is, in words
+ * people read, "Axcess-0.61-Windows-Installer.exe", not CPU codes (arm64,
+ * x64, x86_64). The processor is named only where it decides whether the
+ * file runs, the Mac's (Apple Silicon or Intel). Windows and Linux have one
+ * build each, for 64-bit Intel and AMD processors, which the download page
+ * states; a processor with no build has no name, so a copy on it is never
+ * offered a file it cannot run. With no version, the name the site links
+ * to, which always resolves to the newest release.
+ *
+ * `kind` is "mac", "windows-installer", "windows-portable" or "linux".
+ * Hyphens rather than spaces: GitHub rewrites spaces in file names.
+ */
+function releaseFileName(kind, arch, version = null) {
+  const prefix = version ? `Axcess-${version}` : "Axcess";
+  if (kind === "mac") {
+    const processor = { arm64: "Apple-Silicon", x64: "Intel" }[arch];
+    return processor ? `${prefix}-Mac-${processor}.dmg` : null;
+  }
+  if (arch !== "x64") return null;
+  return {
+    "windows-installer": `${prefix}-Windows-Installer.exe`,
+    "windows-portable": `${prefix}-Windows-Portable.zip`,
+    linux: `${prefix}-Linux.AppImage`,
+  }[kind] ?? null;
 }
 
 /** True when `release` (from describeRelease) is strictly newer than the running app. */
@@ -188,5 +188,6 @@ module.exports = {
   nextReleaseVersion,
   packageVersion,
   parseVersion,
+  releaseFileName,
   releaseVersion,
 };

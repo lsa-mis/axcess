@@ -2,8 +2,8 @@
  * Build the Windows installer and the portable zip from the app Forge
  * already packaged (`npm run package` writes out/Axcess-win32-<arch>).
  * electron-builder only wraps that folder; see electron-builder.config.cjs
- * for why. Writes out/make/nsis/Axcess-<version>-Setup.exe, its .blockmap
- * and latest.yml, then out/make/zip/Axcess-<version>-Windows-<arch>-portable.zip:
+ * for why. Writes out/make/nsis/Axcess-<version>-Windows-Installer.exe, its .blockmap
+ * and latest.yml, then out/make/zip/Axcess-<version>-Windows-Portable.zip:
  * the same app with an "Axcess data" folder beside Axcess.exe, which puts it
  * in portable mode (portableDataDir in src/runtime.cjs).
  *
