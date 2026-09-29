@@ -37,17 +37,13 @@ $AxeVersion = "2.4.2"
 $AxeSha256 = "AECA43F41C89B3FFB1DB84011539E609ECD7CB3BADD6E78FADA2ADA327D10A64"
 $AxeUrl = "https://github.com/microsoft/axe-windows/releases/download/v$AxeVersion/AxeWindowsCLI-$AxeVersion.zip"
 
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, UIAutomationClientsideProviders
-# The .NET UI Automation client sees standard Win32 controls (NSIS's
-# buttons, radios, checkboxes) as generic panes unless Windows' client-side
-# proxies are registered. Screen readers and Axe.Windows use native UI
-# Automation, which has them built in.
-try {
-  [System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly(
-    [UIAutomationClientsideProviders.UIAutomationClientSideProviders].Assembly.GetName())
-} catch {
-  Write-Host "Client-side UI Automation proxies not registered ($($_.Exception.Message)); buttons are clicked with Win32 messages instead."
-}
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+# The .NET UI Automation client sees NSIS's standard Win32 controls as
+# generic panes, with no Invoke or Toggle pattern: it lacks the Win32
+# proxies native UI Automation has (registering the managed ones failed on
+# the runner). The names are right, so controls are found by name and
+# clicked with Win32 messages. Screen readers and Axe.Windows use native UI
+# Automation and see the real control types.
 $Automation = [System.Windows.Automation.AutomationElement]
 $Scope = [System.Windows.Automation.TreeScope]
 
