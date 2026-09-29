@@ -57,8 +57,15 @@ _AXE_TAGS = [
 ]
 
 
-async def _run_axe(page: Any) -> list[dict[str, Any]]:
+# WCAG 2.2 Level A and AA only: the gate for the sweeps that cover every
+# screen (test_accessibility_sweep.py, test_accessibility_static_pages.py).
+_AXE_TAGS_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"]
+
+
+async def _run_axe(page: Any, tags: list[str] | None = None) -> list[dict[str, Any]]:
     """Return the list of axe violations for the current page.
+
+    ``tags`` defaults to ``_AXE_TAGS``, the AAA pack.
 
     It waits for running CSS transitions first. axe measures the colours on
     screen, and a tab or button still fading between two states (Tailwind's
@@ -78,7 +85,7 @@ async def _run_axe(page: Any) -> list[dict[str, Any]]:
             });
             return res.violations;
         }""",
-        _AXE_TAGS,
+        tags or _AXE_TAGS,
     )
     return list(result)
 

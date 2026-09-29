@@ -181,9 +181,10 @@ for:
 - detection evaluations (`.github/workflows/detection-evals.yml`), which run
   on pull requests and pushes that touch detection code, rules, or quality
   tests, and weekly;
-- the browser and integration suites, which run only on CI's daily schedule,
-  on a manual CI run, or when a pull request has the `run-browser-tests`
-  label.
+- the integration suites, which run only on CI's daily schedule, on a
+  manual CI run, or when a pull request has the `run-browser-tests` label.
+  (The accessibility and Playwright UI suites run on every pull request and
+  push to `main`, but the desktop build does not wait for them either.)
 
 So a commit on `main` that fails CI still ships, as long as it touches the
 build paths and both installers build. **Make sure CI is green before you
@@ -335,10 +336,10 @@ has to make because the workflow does not.
    no pull request job ran before.
 2. If the pull request changes the desktop app or its build, confirm the
    "Desktop application build" run on it built both installers.
-3. If the change touches the crawler, a
-   [browser check](../glossary.md#browser-check), or the review app, add the
-   `run-browser-tests` label. That runs the "Browser and integration suites"
-   job on the pull request.
+3. Confirm the "Accessibility and Playwright UI suites" job passed. If the
+   change touches the crawler or a
+   [browser check](../glossary.md#browser-check), also add the
+   `run-browser-tests` label, which runs the "Integration suites" job.
 4. If "Detection evaluations" ran on the pull request, confirm it passed.
 5. Write the merge commit message as release notes. Its body becomes the
    "What changed" section.
