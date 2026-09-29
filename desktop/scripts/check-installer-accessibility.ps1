@@ -37,9 +37,25 @@ $AxeVersion = "2.4.2"
 $AxeSha256 = "AECA43F41C89B3FFB1DB84011539E609ECD7CB3BADD6E78FADA2ADA327D10A64"
 $AxeUrl = "https://github.com/microsoft/axe-windows/releases/download/v$AxeVersion/AxeWindowsCLI-$AxeVersion.zip"
 
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, UIAutomationClientsideProviders
+# The .NET UI Automation client sees standard Win32 controls (NSIS's
+# buttons, radios, checkboxes) as generic panes unless Windows' client-side
+# proxies are registered. Screen readers and Axe.Windows use native UI
+# Automation, which has them built in.
+try {
+  [System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly(
+    [UIAutomationClientsideProviders.UIAutomationClientSideProviders].Assembly.GetName())
+} catch {
+  Write-Host "Client-side UI Automation proxies not registered ($($_.Exception.Message)); buttons are clicked with Win32 messages instead."
+}
 $Automation = [System.Windows.Automation.AutomationElement]
 $Scope = [System.Windows.Automation.TreeScope]
+
+Add-Type -Namespace Win32 -Name Native -MemberDefinition @"
+[DllImport("user32.dll")] public static extern System.IntPtr SendMessage(System.IntPtr hWnd, uint msg, System.IntPtr wParam, System.IntPtr lParam);
+"@
+$BM_CLICK = 0x00F5
+$BM_SETCHECK = 0x00F1
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $OutputDirectory = (Resolve-Path $OutputDirectory).Path
@@ -62,12 +78,10 @@ function Wait-TopWindow([scriptblock] $Match, [string] $What, [int] $Seconds = 1
   throw "No $What window after $Seconds seconds."
 }
 
-function Find-Control($Window, [string] $Name, $Type) {
-  $conditions = [System.Windows.Automation.Condition[]] @(
-    [System.Windows.Automation.PropertyCondition]::new($Automation::ControlTypeProperty, $Type),
-    [System.Windows.Automation.PropertyCondition]::new($Automation::NameProperty, $Name)
-  )
-  $condition = [System.Windows.Automation.AndCondition]::new($conditions)
+# Found by name alone: the script must not depend on which control type the
+# client reports. Axe.Windows judges the control types itself.
+function Find-Control($Window, [string] $Name) {
+  $condition = [System.Windows.Automation.PropertyCondition]::new($Automation::NameProperty, $Name)
   return $Window.FindFirst($Scope::Descendants, $condition)
 }
 
@@ -76,7 +90,7 @@ function Wait-Button($Window, [string[]] $Names, [int] $Seconds = 120) {
   $deadline = (Get-Date).AddSeconds($Seconds)
   while ((Get-Date) -lt $deadline) {
     foreach ($name in $Names) {
-      $button = Find-Control $Window $name ([System.Windows.Automation.ControlType]::Button)
+      $button = Find-Control $Window $name
       # Not IsOffscreen: on a CI desktop nobody watches, Windows can report
       # every control as off screen.
       if ($button -and $button.Current.IsEnabled) { return $button }
@@ -92,7 +106,12 @@ function Wait-Button($Window, [string[]] $Names, [int] $Seconds = 120) {
 }
 
 function Invoke-Button($Button) {
-  $Button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+  $invoke = $null
+  if ($Button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref] $invoke)) {
+    $invoke.Invoke()
+  } else {
+    [Win32.Native]::SendMessage([System.IntPtr] $Button.Current.NativeWindowHandle, $BM_CLICK, [System.IntPtr]::Zero, [System.IntPtr]::Zero) | Out-Null
+  }
 }
 
 $script:failures = @()
@@ -126,10 +145,14 @@ Invoke-Button $install
 $finish = Wait-Button $window @("Finish") 600
 Invoke-Scan $window "setup-3-installed"
 # Do not start Axcess: its backend would still be running at uninstall.
-$open = Find-Control $window "Open Axcess now" ([System.Windows.Automation.ControlType]::CheckBox)
+$open = Find-Control $window "Open Axcess now"
 if ($open) {
-  $toggle = $open.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
-  if ($toggle.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) { $toggle.Toggle() }
+  $toggle = $null
+  if ($open.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref] $toggle)) {
+    if ($toggle.Current.ToggleState -eq [System.Windows.Automation.ToggleState]::On) { $toggle.Toggle() }
+  } else {
+    [Win32.Native]::SendMessage([System.IntPtr] $open.Current.NativeWindowHandle, $BM_SETCHECK, [System.IntPtr]::Zero, [System.IntPtr]::Zero) | Out-Null
+  }
 }
 Invoke-Button $finish
 if (-not $setup.WaitForExit(60000)) { throw "Setup did not close after Finish." }
