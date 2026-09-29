@@ -9,6 +9,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Added
 
+- Linux: Axcess as an AppImage, the whole app in one file, for 64-bit
+  Linux from 2022 on (Ubuntu 22.04, Debian 12, Fedora 36 or newer), with
+  text recognition built in. On Ubuntu 23.10 and later it opens with the
+  browser sandbox off, because Ubuntu blocks it for AppImages. When a new
+  version is out, Axcess offers the new file to download.
 - Windows, without installing: a zip of Axcess for computers where you
   cannot install programs, or to carry Axcess and its reports on a USB
   drive. Axcess keeps everything in the "Axcess data" folder next to

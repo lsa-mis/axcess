@@ -28,12 +28,23 @@ function portableZipName(packageVersion, arch = "x64") {
   return `Axcess-${displayVersion(packageVersion)}-Windows-${arch}-portable.zip`;
 }
 
-module.exports = { dmgName, portableZipName, setupExeName };
+/** The Linux AppImage, named with the architecture as AppImages are: x86_64. */
+function appImageName(packageVersion, arch = "x64") {
+  const machine = { x64: "x86_64", arm64: "aarch64" }[arch] || arch;
+  return `Axcess-${displayVersion(packageVersion)}-${machine}.AppImage`;
+}
+
+module.exports = { appImageName, dmgName, portableZipName, setupExeName };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
-  const names = [dmgName(pkg.version, "arm64"), setupExeName(pkg.version), portableZipName(pkg.version)];
+  const names = [
+    dmgName(pkg.version, "arm64"),
+    setupExeName(pkg.version),
+    portableZipName(pkg.version),
+    appImageName(pkg.version),
+  ];
   const at = args.indexOf("--expect");
   if (at === -1) {
     console.log(names.join("\n"));
@@ -44,6 +55,7 @@ if (require.main === module) {
       `Axcess-${version}-arm64.dmg`,
       `Axcess-${version}-Setup.exe`,
       `Axcess-${version}-Windows-x64-portable.zip`,
+      `Axcess-${version}-x86_64.AppImage`,
     ];
     const wrong = wanted.filter((name, index) => name !== names[index]);
     if (wrong.length) {

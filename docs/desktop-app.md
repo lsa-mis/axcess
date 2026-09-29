@@ -33,6 +33,33 @@ Typical data locations are:
 | Windows, portable zip | `Axcess data/data/`, beside `Axcess.exe` |
 | Linux | `~/.config/Axcess/data/` |
 
+### The Linux AppImage
+
+`Axcess-<version>-x86_64.AppImage` is the whole app in one file. The release
+builds it on Ubuntu 22.04 (`build-linux` in `desktop-build.yml`), so it runs
+on distributions with glibc 2.35 or newer: Ubuntu 22.04, Debian 12, Fedora
+36 and later. Forge packages the app; `scripts/make-linux-appimage.cjs` has
+electron-builder wrap it, and `verify-packaged.cjs` then runs the bundled
+backend's checks. Tesseract is bundled by `scripts/bundle-tesseract-linux.sh`:
+the real executable, every library it needs except glibc's, and English
+data, behind a `bin/tesseract` wrapper that points it at its own libraries.
+
+It uses electron-builder's static AppImage runtime (`toolsets.appimage` in
+`electron-builder.config.cjs`), which needs no libfuse2. Its launcher keeps
+Chromium's sandbox on, and turns it off only when user namespaces are
+unavailable (`unshare -Ur true` fails), as on Ubuntu 23.10 and later, where
+AppArmor restricts them; otherwise the app would not start there. That was
+a deliberate choice: there, a saved copy of a scanned page opened in the
+Page inspector is not isolated by the sandbox, and the Get started page
+says so. A DEB package could install an AppArmor profile and keep the
+sandbox on Ubuntu as well.
+
+Data is in `~/.config/Axcess`, as for any Linux build. The AppImage
+runtime's own `--appimage-portable-config` puts it in a folder beside the
+file instead (`Axcess-<version>-x86_64.AppImage.config`); Axcess needs no
+code for that. Updates are offered as a download of the new AppImage
+(`offerAppImageDownload` in `main.cjs`).
+
 ### The portable zip (Windows)
 
 `Axcess-<version>-Windows-x64-portable.zip` is the same app without an
@@ -151,8 +178,8 @@ rounded, padded app icon with outlined letters (no installed font required).
 The canonical desktop artwork is `desktop/assets/axcess.svg`.
 
 Committed native assets cover the macOS application/Dock (`axcess.icns`),
-Windows executable and Setup installer (`axcess.ico`), and Linux window and
-DEB/RPM launcher (`axcess.png`). The same mark appears on startup and error
+Windows executable and Setup installer (`axcess.ico`), and Linux window,
+AppImage and DEB/RPM launcher (`axcess.png`). The same mark appears on startup and error
 screens, and in the macOS development Dock. Packaging verifies all assets
 are present; ordinary builds do not require an icon-generation toolchain.
 
@@ -189,8 +216,6 @@ builds are unsigned. Before institutional rollout:
 
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
-- bundle and verify an equivalent OCR runtime before enabling a Linux release
-  job;
 - sign the update channel so macOS can install updates in place (see
   below), or document managed-software deployment;
 - run U-M security and privacy review on the packaged binaries;

@@ -206,6 +206,7 @@ merge.** See the [quality gates in CONTRIBUTING.md](../../CONTRIBUTING.md#qualit
 | --- | --- | --- |
 | macOS | Ad-hoc signed (identity `-`), hardened runtime off, not notarized | People approve the app on first launch. The app cannot update itself in place, because Squirrel.Mac refuses apps that are not Developer ID signed. |
 | Windows | Unsigned | People approve it on first launch. The app can update in place through electron-updater and the NSIS installer. |
+| Linux | Unsigned AppImage | People allow the file to run (file Properties, or `chmod +x`). The app offers the new AppImage to download; it does not update in place. |
 
 The workflow sets none of the signing variables below and holds no
 certificate. The desktop app guide's
@@ -481,8 +482,9 @@ Build on the operating system you are targeting. These are the `make` targets:
 
 A few things to know:
 
-- On Linux, `make desktop-package` stops at `make desktop-ocr`, because the
-  OCR bundling script supports only macOS (Windows has its own script).
+- On Linux, `make desktop-ocr` needs Tesseract installed first
+  (`sudo apt-get install tesseract-ocr tesseract-ocr-eng`), and
+  `make desktop-package` builds the AppImage (`npm run make:linux`).
 - Local builds are version `0.60`, and local macOS builds are ad-hoc signed
   unless you set the
   [signing variables](#settings-for-when-credentials-exist).
@@ -556,13 +558,9 @@ version-less links described in [The publish job](#the-publish-job).
   - The header comment in `desktop/src/updates.cjs` and a comment at the top
     of `.github/workflows/ci.yml` say every push to `main` publishes a
     release. Only pushes that change the build paths do.
-  - The desktop app guide's
-    [local installer section](../desktop-app.md#build-a-local-installer) says
-    to create Linux builds on Linux, but `make desktop-package` stops at the
-    OCR step there.
-- **Only two platforms are released:** Apple Silicon macOS and Windows x64.
-  The Forge config has Linux makers, but there is no Linux build job, and the
-  desktop app guide asks for a verified OCR runtime first.
+- **Three platforms are released:** Apple Silicon macOS, Windows x64 (the
+  installer and the portable zip), and Linux x64 as an AppImage. The Forge
+  config's DEB and RPM makers have no build job.
 - **The site can drift from its source.** No test compares the committed HTML
   with the output of `site/build.py`, and the deploy publishes whatever is
   committed.

@@ -196,9 +196,70 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-linux:
+    name: Linux x64 AppImage
+    needs: version
+    # The oldest Ubuntu GitHub offers: an AppImage runs on distros whose
+    # glibc is as new as the build machine's or newer (Ubuntu 22.04 has
+    # 2.35), since the PyInstaller backend and bundled Tesseract use the
+    # host's glibc.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            src/audit/web/frontend/package-lock.json
+            src/audit/alfa_runner/package-lock.json
+      - run: npm ci
+        working-directory: src/audit/web/frontend
+      - run: npm run build
+        working-directory: src/audit/web/frontend
+      - run: npm ci
+        working-directory: src/audit/alfa_runner
+      - run: npm ci
+        working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
+      - run: uv sync --group desktop
+      - name: Bundle Chromium
+        # --with-deps installs the system libraries Chromium needs on this
+        # runner, for verify-packaged; desktop Linux systems have them.
+        shell: bash
+        run: PLAYWRIGHT_BROWSERS_PATH="$PWD/desktop/playwright-browsers" uv run playwright install --with-deps chromium
+      - name: Bundle Tesseract OCR
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+          desktop/scripts/bundle-tesseract-linux.sh
+      - name: Bundle Python backend
+        run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      # Forge packages the app; electron-builder wraps it in the AppImage
+      # (scripts/make-linux-appimage.cjs); verify-packaged then runs the
+      # bundled backend's own checks, OCR included.
+      - name: Package desktop AppImage
+        working-directory: desktop
+        run: npm run make:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axcess-linux-x64
+          path: desktop/out/make/**
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
     name: Publish preview release
-    needs: [version, build-macos, build-windows]
+    needs: [version, build-macos, build-windows, build-linux]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -216,11 +277,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name '*-Setup.exe.blockmap' -o -name 'latest.yml' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name '*-Setup.exe.blockmap' -o -name 'latest.yml' -o -name '*.AppImage' \) -exec cp {} release/ \;
           ls -l release
           # latest.yml is the Windows update feed: installed copies read it
           # to find and check the new installer (src/updates.cjs).
-          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" "Axcess-$VERSION-Windows-x64-portable.zip" latest.yml; do
+          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" "Axcess-$VERSION-Windows-x64-portable.zip" "Axcess-$VERSION-x86_64.AppImage" latest.yml; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
           # Version-less copies give the public site permanent download links:
@@ -229,6 +290,7 @@ jobs:
           cp "release/Axcess-$VERSION-arm64.dmg" release/Axcess-macOS-AppleSilicon.dmg
           cp "release/Axcess-$VERSION-Setup.exe" release/Axcess-Windows-x64-Setup.exe
           cp "release/Axcess-$VERSION-Windows-x64-portable.zip" release/Axcess-Windows-x64-portable.zip
+          cp "release/Axcess-$VERSION-x86_64.AppImage" release/Axcess-Linux-x86_64.AppImage
           ls -l release
       - name: Create or update the release
         shell: bash

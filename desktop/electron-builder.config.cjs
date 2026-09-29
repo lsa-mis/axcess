@@ -1,6 +1,6 @@
 const path = require("node:path");
 const packageJson = require("./package.json");
-const { setupExeName } = require("./scripts/release-names.cjs");
+const { appImageName, setupExeName } = require("./scripts/release-names.cjs");
 
 /**
  * The Windows installer. electron-builder does not package the app: Forge
@@ -25,6 +25,28 @@ module.exports = {
   // publish job uploads. The build never publishes (`publish: "never"` in
   // make-windows-installer.cjs); desktop-build.yml uploads the release.
   publish: [{ provider: "github", owner: "lsa-mis", repo: "axcess" }],
+  toolsets: {
+    // The static AppImage runtime, not the default legacy one (0.0.0): it
+    // needs no libfuse2, which current Fedora and Ubuntu leave out, and its
+    // AppRun turns Chromium's sandbox off only where the kernel blocks the
+    // user namespaces it needs (Ubuntu 23.10 and later), after probing with
+    // `unshare -Ur true`. The legacy toolset's desktop entry always passed
+    // --no-sandbox. Chosen with the developer: sandboxed wherever it works.
+    appimage: "1.0.3",
+  },
+  linux: {
+    target: [{ target: "AppImage", arch: ["x64"] }],
+    icon: path.join("assets", "axcess.png"),
+    // Forge's executable name; electron-builder would guess the package name.
+    executableName: "Axcess",
+    category: "Development",
+    // The desktop entry's Comment, shown in app menus; the default would
+    // be package.json's "Local-first accessibility auditing workbench".
+    description: "Check websites for accessibility problems, on your computer",
+  },
+  appImage: {
+    artifactName: appImageName(packageJson.version),
+  },
   win: {
     target: [{ target: "nsis", arch: ["x64"] }],
     icon: path.join("assets", "axcess.ico"),
