@@ -77,9 +77,16 @@ function Wait-Button($Window, [string[]] $Names, [int] $Seconds = 120) {
   while ((Get-Date) -lt $deadline) {
     foreach ($name in $Names) {
       $button = Find-Control $Window $name ([System.Windows.Automation.ControlType]::Button)
-      if ($button -and $button.Current.IsEnabled -and -not $button.Current.IsOffscreen) { return $button }
+      # Not IsOffscreen: on a CI desktop nobody watches, Windows can report
+      # every control as off screen.
+      if ($button -and $button.Current.IsEnabled) { return $button }
     }
     Start-Sleep -Milliseconds 500
+  }
+  Write-Host "Window '$($Window.Current.Name)' (class $($Window.Current.ClassName)) holds:"
+  foreach ($element in $Window.FindAll($Scope::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+    $c = $element.Current
+    Write-Host "  $($c.ControlType.ProgrammaticName) '$($c.Name)' enabled=$($c.IsEnabled) offscreen=$($c.IsOffscreen)"
   }
   throw "None of the buttons '$($Names -join "', '")' appeared within $Seconds seconds."
 }
