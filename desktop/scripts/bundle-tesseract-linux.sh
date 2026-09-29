@@ -32,11 +32,26 @@ if [[ -z "$TESSERACT" ]]; then
 fi
 TESSERACT="$(readlink -f "$TESSERACT")"
 
-# Tesseract names its language folder: List of available languages in "/usr/share/tesseract-ocr/4.00/tessdata/"
-TESSDATA_SOURCE="$(tesseract --list-langs 2>&1 | sed -n 's/.*"\(.*\)".*/\1/p' | head -n 1)"
-TESSDATA_SOURCE="${TESSDATA_SOURCE%/}"
-if [[ ! -f "$TESSDATA_SOURCE/eng.traineddata" ]]; then
-  echo "Tesseract English language data is missing: $TESSDATA_SOURCE (sudo apt-get install tesseract-ocr-eng)" >&2
+# The language folder: Tesseract 5 names it in --list-langs ('List of
+# available languages in "/usr/share/tessdata/"'); Tesseract 4, as on
+# Ubuntu 22.04, does not, so the usual places are tried after it.
+TESSDATA_SOURCE=""
+shopt -s nullglob
+for candidate in \
+  "$(tesseract --list-langs 2>&1 | sed -n 's/.*"\(.*\)".*/\1/p' | head -n 1)" \
+  "${TESSDATA_PREFIX:-}" \
+  /usr/share/tesseract-ocr/*/tessdata \
+  /usr/share/tessdata \
+  /usr/local/share/tessdata; do
+  candidate="${candidate%/}"
+  if [[ -n "$candidate" && -f "$candidate/eng.traineddata" ]]; then
+    TESSDATA_SOURCE="$candidate"
+    break
+  fi
+done
+shopt -u nullglob
+if [[ -z "$TESSDATA_SOURCE" ]]; then
+  echo "Tesseract English language data is missing (sudo apt-get install tesseract-ocr-eng)." >&2
   exit 1
 fi
 
