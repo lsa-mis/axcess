@@ -37,6 +37,11 @@ MINIMUM = 4.5
 MIN_PIXELS = 4
 # Win32 classes whose box includes a frame Windows draws around the text.
 FRAMED = {"Button": 3, "Edit": 3}
+# SC 1.4.3 exempts text in an inactive user interface component, such as
+# the greyed Back and Cancel on the last screen. Disabled static text is
+# still text people read (NSIS draws its footer that way), so only
+# controls are exempt.
+CONTROLS = {"Button", "Edit", "ComboBox", "ListBox"}
 
 RGB = tuple[int, int, int]
 
@@ -99,6 +104,8 @@ def measure_screen(png: Path) -> list[Measurement]:
     image = Image.open(png)
     results = []
     for element in elements:
+        if not element.get("enabled", True) and element.get("className") in CONTROLS:
+            continue
         inset = FRAMED.get(element.get("className", ""), 0)
         box = (
             element["left"] + inset,

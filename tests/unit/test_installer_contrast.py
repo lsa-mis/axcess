@@ -97,3 +97,20 @@ def test_a_screen_of_good_text_passes(tmp_path: Path) -> None:
     # PowerShell's Set-Content -Encoding UTF8 writes a byte-order mark.
     (tmp_path / "setup-2.json").write_text(json.dumps([element]), encoding="utf-8-sig")
     assert contrast_check.main(str(tmp_path)) == 0
+
+
+def test_disabled_buttons_are_exempt_but_disabled_text_is_not(tmp_path: Path) -> None:
+    image = Image.new("RGB", (100, 50), FACE)
+    draw = ImageDraw.Draw(image)
+    _text(draw, 10, 5, (0xA0, 0xA0, 0xA0))  # greyed "Back" button
+    _text(draw, 10, 30, (0xA0, 0xA0, 0xA0))  # greyed footer text
+    image.save(tmp_path / "setup-3.png")
+    base = {"left": 0, "width": 100, "height": 20, "enabled": False}
+    elements = [
+        {**base, "name": "< Back", "className": "Button", "top": 0},
+        {**base, "name": "Axcess 0.64", "className": "Static", "top": 25},
+    ]
+    (tmp_path / "setup-3.json").write_text(json.dumps(elements), encoding="utf-8")
+    [result] = contrast_check.measure_screen(tmp_path / "setup-3.png")
+    assert result.name == "Axcess 0.64"
+    assert not result.passes
