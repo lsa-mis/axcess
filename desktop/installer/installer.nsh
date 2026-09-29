@@ -39,6 +39,16 @@
 # "Making Content Usable": the same word for the same thing,
 # https://www.w3.org/TR/coga-usable/).
 
+# Sharp at every display scale. electron-builder's template does not set
+# this, so the installer declared itself not DPI-aware, and at 125%, 150%
+# or 200% (usual on laptops) Windows stretched it like a picture and every
+# word came out blurred. DPI-aware, it draws at the screen's resolution and
+# NSIS sizes its dialogs in dialog units, so text and layout scale together
+# (SC 1.4.4 Resize Text rests on text that stays legible when enlarged).
+# NSIS 3.0.4 offers system-DPI awareness only: moved to a monitor with a
+# different scale, the window is scaled by Windows again.
+ManifestDPIAware true
+
 # The footer ("Axcess 0.61", bottom left). MUI draws it with two controls
 # in the branding grey: 1028 disabled, 1256 coloured /BRANDING, #a0a0a0 on
 # #f0f0f0, 2.29:1 (installer_contrast.py), below SC 1.4.3's 4.5:1. When the
