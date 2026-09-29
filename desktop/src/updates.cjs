@@ -72,6 +72,7 @@ function releaseVersion(tag) {
  * running platform. Returns null when the payload is not a usable release.
  *
  * - `dmgUrl` (darwin): the DMG built for this CPU architecture, if published.
+ * - `zipUrl` (win32): the portable zip for this CPU architecture, if published.
  * - `feedUrl` (win32): the release's asset directory, which electron-updater
  *   reads `latest.yml` and the NSIS installer it names from. Only set when
  *   the release actually carries a `latest.yml` file.
@@ -96,12 +97,24 @@ function describeRelease(release, { platform, arch }) {
     dmgUrl = dmg ? dmg.browser_download_url : null;
   }
 
+  // The portable zip for a copy Setup did not install (windowsUpdateMethod).
+  let zipUrl = null;
+  if (platform === "win32") {
+    const zip = assets.find(
+      (asset) =>
+        asset &&
+        asset.name === `Axcess-${version}-Windows-${arch}-portable.zip` &&
+        isReleaseAssetUrl(asset.browser_download_url),
+    );
+    zipUrl = zip ? zip.browser_download_url : null;
+  }
+
   const feedUrl =
     platform === "win32" && names.has("latest.yml")
       ? `https://github.com/${REPOSITORY}/releases/download/${encodeURIComponent(tag)}`
       : null;
 
-  return { tag, version, dmgUrl, feedUrl, pageUrl: RELEASES_PAGE_URL };
+  return { tag, version, dmgUrl, zipUrl, feedUrl, pageUrl: RELEASES_PAGE_URL };
 }
 
 /** True when `release` (from describeRelease) is strictly newer than the running app. */

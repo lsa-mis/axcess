@@ -8,6 +8,8 @@ const {
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
+  portableDataDir,
+  windowsUpdateMethod,
   zoomActionFor,
   MAX_ZOOM_LEVEL,
   MIN_ZOOM_LEVEL,
@@ -184,3 +186,21 @@ test("mouse back/forward side buttons step through history, nothing else does", 
     assert.equal(historyStepFor(command), null, String(command));
   }
 });
+
+test("a Windows copy with an Axcess data folder beside it is portable", () => {
+  const exe = path.join("/portable", "Axcess", "Axcess.exe");
+  const folder = path.join("/portable", "Axcess", "Axcess data");
+  const has = (found) => (candidate) => candidate === found;
+  assert.equal(portableDataDir({ execPath: exe, platform: "win32", exists: has(folder) }), folder);
+  assert.equal(portableDataDir({ execPath: exe, platform: "win32", exists: () => false }), null);
+  // Not yet on macOS or Linux, even with the folder there.
+  assert.equal(portableDataDir({ execPath: exe, platform: "darwin", exists: has(folder) }), null);
+});
+
+test("only a copy Setup installed updates in place", () => {
+  const exe = path.join("/Programs", "Axcess", "Axcess.exe");
+  const uninstaller = path.join("/Programs", "Axcess", "Uninstall Axcess.exe");
+  assert.equal(windowsUpdateMethod({ execPath: exe, exists: (p) => p === uninstaller }), "installer");
+  assert.equal(windowsUpdateMethod({ execPath: exe, exists: () => false }), "download");
+});
+

@@ -69,6 +69,37 @@ function contentSecurityPolicy() {
   ].join("; ");
 }
 
+/**
+ * The folder that makes a copy of Axcess portable, beside Axcess.exe.
+ * The Windows zip ships with it; the installer does not.
+ */
+const PORTABLE_DATA_FOLDER = "Axcess data";
+
+/**
+ * Where a portable copy keeps everything (reports, settings, logs, the
+ * browser profile, temporary files), or null for a copy that keeps them in
+ * the user's profile (%APPDATA%\Axcess). A copy is portable when the
+ * folder exists beside its executable, so moving the whole folder moves
+ * Axcess with its reports, and deleting the data folder turns a zip copy
+ * back into an ordinary one. Windows only for now.
+ */
+function portableDataDir({ execPath, platform, exists }) {
+  if (platform !== "win32") return null;
+  const folder = path.join(path.dirname(execPath), PORTABLE_DATA_FOLDER);
+  return exists(folder) ? folder : null;
+}
+
+/**
+ * How this Windows copy gets a new version: "installer" when Setup
+ * installed it (its uninstaller is beside it) and electron-updater can
+ * install in place, "download" for any other copy (the zip), which is
+ * offered the new zip instead. Running Setup from a zip copy would install
+ * a second Axcess elsewhere and leave this one as it was.
+ */
+function windowsUpdateMethod({ execPath, exists }) {
+  return exists(path.join(path.dirname(execPath), "Uninstall Axcess.exe")) ? "installer" : "download";
+}
+
 function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, packaged }) {
   const dataRoot = path.join(userDataPath, "data");
   const ocrRoot = path.join(resourcesPath, "ocr-runtime");
@@ -194,6 +225,7 @@ function startupFailureDetails({ error, backendOutput, exitCode, logPath, packag
 
 module.exports = {
   MAX_ZOOM_LEVEL,
+  PORTABLE_DATA_FOLDER,
   MIN_ZOOM_LEVEL,
   ZOOM_STEP,
   OutputTail,
@@ -203,6 +235,8 @@ module.exports = {
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
+  portableDataDir,
+  windowsUpdateMethod,
   zoomActionFor,
   startupFailureDetails,
 };

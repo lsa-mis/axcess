@@ -30,7 +30,39 @@ Typical data locations are:
 | --- | --- |
 | macOS | `~/Library/Application Support/Axcess/data/` |
 | Windows | `%APPDATA%/Axcess/data/` |
+| Windows, portable zip | `Axcess data/data/`, beside `Axcess.exe` |
 | Linux | `~/.config/Axcess/data/` |
+
+### The portable zip (Windows)
+
+`Axcess-<version>-Windows-x64-portable.zip` is the same app without an
+installer. It ships with a folder named `Axcess data` beside `Axcess.exe`,
+and while that folder is there Axcess runs in portable mode
+(`portableDataDir` in `desktop/src/runtime.cjs`): reports, stored images,
+settings, logs, the browser profile, crash reports and temporary files
+(`TEMP` and `TMP`, inherited by the backend, Playwright and Chromium) all
+go into it, not into `%APPDATA%`. Moving the folder that holds both moves
+Axcess with its reports. Deleting `Axcess data` makes the copy an ordinary
+one that uses `%APPDATA%`.
+
+What it cannot promise, and what the folder's `About this folder.txt`
+tells people:
+
+- Windows itself still records a little about any program it runs, such
+  as recent apps and prefetch data.
+- The reports database uses SQLite's WAL mode, which does not work on a
+  network drive. A USB drive works, but unplugging it while Axcess is open
+  can damage the database.
+- Reports can hold screenshots of scanned pages, including pages behind a
+  sign-in, so the folder needs the same care as those pages.
+
+If Axcess cannot write to the folder (unzipped somewhere read-only), it
+says so and stops, rather than writing to `%APPDATA%` after all. A zip copy
+cannot update itself: its update dialog opens the new zip and says how to
+move the `Axcess data` folder into it (`offerZipDownload` in `main.cjs`).
+Only a copy with Setup's uninstaller beside it updates in place
+(`windowsUpdateMethod`). A portable copy and an installed one can run at
+the same time, each with its own reports.
 
 ## Development
 

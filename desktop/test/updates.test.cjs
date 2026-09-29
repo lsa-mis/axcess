@@ -24,6 +24,10 @@ function release(overrides = {}) {
       { name: "Axcess-0.1.57-arm64.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg` },
       { name: "Axcess-darwin-arm64-0.1.57.zip", browser_download_url: `${DOWNLOAD}/Axcess-darwin-arm64-0.1.57.zip` },
       { name: "Axcess-0.1.57-Setup.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe` },
+      {
+        name: "Axcess-0.1.57-Windows-x64-portable.zip",
+        browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-x64-portable.zip`,
+      },
       { name: "Axcess-0.1.57-Setup.exe.blockmap", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe.blockmap` },
       { name: "latest.yml", browser_download_url: `${DOWNLOAD}/latest.yml` },
     ],
@@ -157,3 +161,15 @@ test("a release with only the old Squirrel feed is not a Windows update", () => 
   });
   assert.equal(describeRelease(squirrelOnly, { platform: "win32", arch: "x64" }).feedUrl, null);
 });
+
+test("Windows releases name the portable zip for a copy Setup did not install", () => {
+  const described = describeRelease(release(), { platform: "win32", arch: "x64" });
+  assert.equal(described.zipUrl, `${DOWNLOAD}/Axcess-0.1.57-Windows-x64-portable.zip`);
+  assert.equal(describeRelease(release(), { platform: "win32", arch: "arm64" }).zipUrl, null);
+  assert.equal(describeRelease(release(), { platform: "darwin", arch: "arm64" }).zipUrl, null);
+  const elsewhere = release({
+    assets: [{ name: "Axcess-0.1.57-Windows-x64-portable.zip", browser_download_url: "https://evil.example/a.zip" }],
+  });
+  assert.equal(describeRelease(elsewhere, { platform: "win32", arch: "x64" }).zipUrl, null);
+});
+

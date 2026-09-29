@@ -13,8 +13,11 @@ const {
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
+  portableDataDir,
+  windowsUpdateMethod,
   zoomActionFor,
   startupFailureDetails,
+  PORTABLE_DATA_FOLDER,
 } = require("./runtime.cjs");
 const {
   RELEASES_API_URL,
@@ -28,6 +31,34 @@ const packageJson = require("../package.json");
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
 const UPDATE_FETCH_TIMEOUT_MS = 10_000;
+
+// Portable mode (the Windows zip): with "Axcess data" beside Axcess.exe,
+// everything Axcess writes goes there instead of %APPDATA%\Axcess: the
+// reports and their images, settings, logs, the browser profile, crash
+// reports, and temporary files (TEMP and TMP, which the backend, Playwright
+// and Chromium inherit). Set before anything reads userData, the
+// single-instance lock included, so a portable copy and an installed one
+// each keep their own reports. Windows itself still records a few things
+// about any program it runs (recent apps, prefetch).
+const portableData = app.isPackaged
+  ? portableDataDir({ execPath: process.execPath, platform: process.platform, exists: fs.existsSync })
+  : null;
+// A data folder Axcess cannot write to (unzipped somewhere read-only) stops
+// it with a message, rather than quietly writing to %APPDATA% after all.
+let portableDataUnwritable = null;
+if (portableData) {
+  app.setPath("userData", portableData);
+  app.setPath("crashDumps", path.join(portableData, "crash reports"));
+  const temporary = path.join(portableData, "temporary files");
+  try {
+    fs.mkdirSync(temporary, { recursive: true });
+    fs.accessSync(portableData, fs.constants.W_OK);
+    process.env.TEMP = temporary;
+    process.env.TMP = temporary;
+  } catch (error) {
+    portableDataUnwritable = error;
+  }
+}
 const repoRoot = path.resolve(__dirname, "../..");
 const appIcon = path.join(__dirname, "../assets/axcess.png");
 let mainWindow = null;
@@ -407,6 +438,34 @@ async function offerMacDownload(release) {
   }
 }
 
+// A copy from the zip cannot update itself: electron-updater's installer
+// would put a second Axcess somewhere else. The dialog opens the new zip
+// and says how to move to it; in portable mode that means carrying the
+// data folder over, or the new copy starts with no reports.
+async function offerZipDownload(release) {
+  const folder = path.dirname(process.execPath);
+  const steps = portableData
+    ? `To update: choose Download and wait for it to finish. Quit Axcess. ` +
+      `Unzip the new version into a new folder. Then move the "${PORTABLE_DATA_FOLDER}" ` +
+      `folder from this copy (${folder}) into the new folder, replacing the one there, ` +
+      "so your reports come with you. Open Axcess.exe in the new folder."
+    : "To update: choose Download and wait for it to finish. Quit Axcess. " +
+      "Unzip the new version into a new folder and open Axcess.exe there. " +
+      "Your reports are in your user folder, so the new copy finds them.";
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail: `You are running ${buildLabel()}. ${steps}`,
+    buttons: ["Download", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0 && isReleaseAssetUrl(release.zipUrl)) {
+    void shell.openExternal(release.zipUrl);
+  }
+}
+
 // Best-effort and silent: offline, rate-limited, or malformed responses just
 // mean no prompt this launch. Runs after the workbench is showing so it never
 // delays startup.
@@ -423,8 +482,10 @@ async function checkForUpdates() {
   }
   if (!isNewerRelease(release, app.getVersion())) return;
   updateOffered = true;
-  if (process.platform === "win32" && release.feedUrl) {
-    await offerWindowsUpdate(release);
+  if (process.platform === "win32") {
+    const method = windowsUpdateMethod({ execPath: process.execPath, exists: fs.existsSync });
+    if (method === "installer" && release.feedUrl) await offerWindowsUpdate(release);
+    else if (method === "download" && release.zipUrl) await offerZipDownload(release);
   } else if (process.platform === "darwin" && release.dmgUrl) {
     await offerMacDownload(release);
   }
@@ -453,7 +514,17 @@ async function launch() {
   void checkForUpdates().catch(() => {});
 }
 
-if (!app.requestSingleInstanceLock()) {
+if (portableDataUnwritable) {
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      "Axcess cannot save to its data folder",
+      `Axcess keeps everything in "${portableData}", and it cannot write there ` +
+        `(${portableDataUnwritable.message}).\n\nMove the Axcess folder to a place you can ` +
+        "change, such as Documents or Desktop, and open it again.",
+    );
+    app.quit();
+  });
+} else if (!app.requestSingleInstanceLock()) {
   logLauncher("another Axcess is already running; handing this launch to it");
   app.quit();
 } else {
