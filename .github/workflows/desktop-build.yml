@@ -177,6 +177,11 @@ jobs:
           $installer = (Get-ChildItem out/make/nsis/*-Setup.exe | Select-Object -First 1).FullName
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-installer-accessibility.ps1 -Installer $installer -OutputDirectory out/installer-a11y
           exit $LASTEXITCODE
+      # Axe.Windows does not measure colour contrast: this measures every
+      # text element on the screenshots the step above saved, 4.5:1 or
+      # better (SC 1.4.3). The screenshots are uploaded with the scans.
+      - name: Check the installer's text contrast
+        run: uv run --no-sync python desktop/scripts/installer_contrast.py desktop/out/installer-a11y
       - uses: actions/upload-artifact@v4
         if: always()
         with:

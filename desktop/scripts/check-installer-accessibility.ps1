@@ -49,7 +49,9 @@ $Scope = [System.Windows.Automation.TreeScope]
 
 Add-Type -Namespace Win32 -Name Native -MemberDefinition @"
 [DllImport("user32.dll")] public static extern System.IntPtr SendMessage(System.IntPtr hWnd, uint msg, System.IntPtr wParam, System.IntPtr lParam);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);
 "@
+Add-Type -AssemblyName System.Drawing
 $BM_CLICK = 0x00F5
 $BM_SETCHECK = 0x00F1
 
@@ -110,9 +112,38 @@ function Invoke-Button($Button) {
   }
 }
 
+# A screenshot of the screen and, beside it, every named element with its
+# place on that screenshot. Axe.Windows does not measure colour contrast;
+# installer_contrast.py does, from these two files (SC 1.4.3), and the
+# screenshots are for reading the wording as people see it.
+function Save-Screen($Window, [string] $Screen) {
+  [Win32.Native]::SetForegroundWindow([System.IntPtr] $Window.Current.NativeWindowHandle) | Out-Null
+  Start-Sleep -Milliseconds 500
+  $box = $Window.Current.BoundingRectangle
+  $left = [int] $box.Left; $top = [int] $box.Top
+  $bitmap = New-Object System.Drawing.Bitmap ([int] $box.Width), ([int] $box.Height)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  $graphics.CopyFromScreen($left, $top, 0, 0, $bitmap.Size)
+  $bitmap.Save((Join-Path $OutputDirectory "$Screen.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+  $graphics.Dispose(); $bitmap.Dispose()
+  $elements = @()
+  foreach ($element in $Window.FindAll($Scope::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+    $c = $element.Current
+    $r = $c.BoundingRectangle
+    if (-not $c.Name -or $c.IsOffscreen -or $r.IsEmpty -or $r.Width -lt 2 -or $r.Height -lt 2) { continue }
+    $elements += [ordered] @{
+      name = $c.Name; className = $c.ClassName; enabled = $c.IsEnabled
+      left = [int] ($r.Left - $left); top = [int] ($r.Top - $top)
+      width = [int] $r.Width; height = [int] $r.Height
+    }
+  }
+  ConvertTo-Json -InputObject @($elements) -Depth 3 | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$Screen.json")
+}
+
 $script:failures = @()
 function Invoke-Scan($Window, [string] $Screen) {
   Start-Sleep -Seconds 1  # let the page finish drawing
+  Save-Screen $Window $Screen
   $processId = $Window.Current.ProcessId
   $handle = $Window.Current.NativeWindowHandle
   Write-Host "::group::Axe.Windows: $Screen (process $processId, window $handle)"
