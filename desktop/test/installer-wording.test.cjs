@@ -90,7 +90,8 @@ test("installer text is in sentence case", () => {
 });
 
 test("every installer string starts with a capital letter", () => {
-  const failures = strings.filter(([, text]) => !/^[A-Z0-9<]/.test(visible(text).trim()));
+  // A string of one space is left blank on purpose (the footer, ^Branding).
+  const failures = strings.filter(([, text]) => text.trim() && !/^[A-Z0-9<]/.test(visible(text).trim()));
   assert.deepEqual(failures.map(([name]) => name), []);
 });
 

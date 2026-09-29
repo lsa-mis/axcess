@@ -55,7 +55,10 @@
   !pragma warning disable 6030
 
   # Every screen
-  LangString ^Branding ${LANG_ENGLISH} "Axcess ${AXCESS_DISPLAY_VERSION}"
+  # No footer text: NSIS draws it as disabled grey, #a0a0a0 on #f0f0f0,
+  # 2.29:1 (installer_contrast.py), below SC 1.4.3's 4.5:1, with no way to
+  # restyle it. The version is in the last screen's title instead.
+  LangString ^Branding ${LANG_ENGLISH} " "
   LangString ^ClickNext ${LANG_ENGLISH} "Choose Next to continue."
   LangString ^ClickInstall ${LANG_ENGLISH} "When you are ready, choose Install."
   LangString ^ClickUninstall ${LANG_ENGLISH} "When you are ready, choose Uninstall."
@@ -104,15 +107,18 @@
 
   # Last screen. $INSTDIR is filled in when the screen shows: the Squirrel
   # installer never said where Axcess went.
-  LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Axcess is installed"
-  LangString MUI_TEXT_FINISH_INFO_TEXT ${LANG_ENGLISH} "Axcess is installed in this folder:$\r$\n$INSTDIR$\r$\n$\r$\nOpen it from the Start menu or from the shortcut on your desktop.$\r$\n$\r$\nChoose Finish to close setup."
+  LangString MUI_TEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Axcess ${AXCESS_DISPLAY_VERSION} is installed"
+  # Short: the "Open Axcess now" checkbox sits under this text, and it hid
+  # a last line ("Choose Finish to close setup.") in the runner's
+  # screenshot. A long folder path wraps to a second line.
+  LangString MUI_TEXT_FINISH_INFO_TEXT ${LANG_ENGLISH} "Axcess is installed in this folder:$\r$\n$INSTDIR$\r$\n$\r$\nOpen it from the Start menu or from the shortcut on your desktop."
   LangString MUI_TEXT_FINISH_RUN ${LANG_ENGLISH} "&Open Axcess now"
 
   # Uninstall. Scans live in %APPDATA%\Axcess\data, outside the install
   # folder, and deleteAppDataOnUninstall is false, so they stay. Say so,
   # and say how to delete them: it is a privacy fact.
   LangString MUI_UNTEXT_WELCOME_INFO_TITLE ${LANG_ENGLISH} "Uninstall Axcess"
-  LangString MUI_UNTEXT_WELCOME_INFO_TEXT ${LANG_ENGLISH} "This removes the Axcess app from this computer.$\r$\n$\r$\nYour reports stay, in %APPDATA%\Axcess\data. Axcess finds them again if you install it later. To delete them too, delete that folder after you uninstall.$\r$\n$\r$\nClose Axcess before you continue. $_CLICK"
+  LangString MUI_UNTEXT_WELCOME_INFO_TEXT ${LANG_ENGLISH} "This removes the Axcess app from this computer.$\r$\n$\r$\nYour reports stay in your user folder (%APPDATA%\Axcess\data). Axcess finds them again if you install it later. To delete them too, delete that folder after you uninstall.$\r$\n$\r$\nClose Axcess first, if it is open. $_CLICK"
   LangString MUI_UNTEXT_UNINSTALLING_TITLE ${LANG_ENGLISH} "Uninstalling Axcess"
   LangString MUI_UNTEXT_UNINSTALLING_SUBTITLE ${LANG_ENGLISH} "This can take a minute."
   LangString MUI_UNTEXT_FINISH_TITLE ${LANG_ENGLISH} "Axcess is uninstalled"
@@ -120,7 +126,7 @@
   LangString MUI_UNTEXT_ABORT_TITLE ${LANG_ENGLISH} "Axcess was not uninstalled"
   LangString MUI_UNTEXT_ABORT_SUBTITLE ${LANG_ENGLISH} "Uninstall stopped. Try again from Windows Settings, in Apps."
   LangString MUI_UNTEXT_FINISH_INFO_TITLE ${LANG_ENGLISH} "Axcess is uninstalled"
-  LangString MUI_UNTEXT_FINISH_INFO_TEXT ${LANG_ENGLISH} "The Axcess app is removed from this computer.$\r$\n$\r$\nYour reports are still in %APPDATA%\Axcess\data.$\r$\n$\r$\nChoose Finish to close."
+  LangString MUI_UNTEXT_FINISH_INFO_TEXT ${LANG_ENGLISH} "The Axcess app is removed from this computer.$\r$\n$\r$\nYour reports are still in your user folder (%APPDATA%\Axcess\data).$\r$\n$\r$\nChoose Finish to close."
   LangString areYouSureToUninstall ${LANG_ENGLISH} "Uninstall Axcess from this computer? Your reports stay on this computer.$\r$\n$\r$\nChoose OK to uninstall, or Cancel to keep Axcess."
 
   # Messages (electron-builder's messages.yml)
