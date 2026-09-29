@@ -115,10 +115,19 @@ function Invoke-Scan($Window, [string] $Screen) {
   Start-Sleep -Seconds 1  # let the page finish drawing
   $processId = $Window.Current.ProcessId
   $handle = $Window.Current.NativeWindowHandle
-  Write-Host "::group::Axe.Windows: $Screen"
-  & $axe --processid $processId --scanrootwindowhandle $handle --scanid $Screen `
-    --outputdirectory $OutputDirectory --alwayssavetestfile --verbosity verbose
+  Write-Host "::group::Axe.Windows: $Screen (process $processId, window $handle)"
+  $output = & $axe --processid $processId --scanrootwindowhandle $handle --scanid $Screen `
+    --outputdirectory $OutputDirectory --alwayssavetestfile --verbosity verbose 2>&1
   $code = $LASTEXITCODE
+  $output | ForEach-Object { Write-Host "  $_" }
+  if ($code -eq 2) {
+    # Could not complete with the window handle: scan the whole process.
+    Write-Host "Scan by window failed (exit 2); scanning process $processId instead."
+    $output = & $axe --processid $processId --scanid $Screen `
+      --outputdirectory $OutputDirectory --alwayssavetestfile --verbosity verbose 2>&1
+    $code = $LASTEXITCODE
+    $output | ForEach-Object { Write-Host "  $_" }
+  }
   Write-Host "::endgroup::"
   switch ($code) {
     0 { Write-Host "$Screen`: no errors found" }
