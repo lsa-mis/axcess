@@ -34,7 +34,11 @@ module.exports = {
     // Per-user by default, like the Squirrel install it replaces, so no
     // administrator is needed; the wizard also offers every account.
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    // Off: not because the folder is fixed, but because NSIS's own folder
+    // page left its field without an accessible name (Axe.Windows, SC
+    // 4.1.2). installer/installer.nsh adds a folder screen in its place,
+    // with a labelled field and Browse (customPageAfterChangeDir).
+    allowToChangeInstallationDirectory: false,
     artifactName: setupExeName(packageJson.version),
     shortcutName: "Axcess",
     uninstallDisplayName: "Axcess",

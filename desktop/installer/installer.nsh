@@ -86,11 +86,12 @@
   # Folder
   LangString MUI_TEXT_DIRECTORY_TITLE ${LANG_ENGLISH} "Choose a folder"
   LangString MUI_TEXT_DIRECTORY_SUBTITLE ${LANG_ENGLISH} "Choose where to install Axcess."
-  LangString ^DirText ${LANG_ENGLISH} "Setup installs Axcess in the folder below. To use a different folder, choose Browse. $_CLICK"
-  LangString ^DirSubText ${LANG_ENGLISH} "Install folder"
   LangString ^DirBrowseText ${LANG_ENGLISH} "Choose the folder to install Axcess in:"
-  LangString ^SpaceRequired ${LANG_ENGLISH} "Space needed: "
-  LangString ^SpaceAvailable ${LANG_ENGLISH} "Free space: "
+  # The folder screen below (customPageAfterChangeDir).
+  LangString axcessFolderIntro ${LANG_ENGLISH} "Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install."
+  LangString axcessFolderLabel ${LANG_ENGLISH} "Install &folder:"
+  LangString axcessSpaceNeeded ${LANG_ENGLISH} "Space needed: about $1 MB"
+  LangString axcessFolderEmpty ${LANG_ENGLISH} "Choose a folder to install Axcess in, then choose Install."
 
   # Installing
   LangString MUI_TEXT_INSTALLING_TITLE ${LANG_ENGLISH} "Installing Axcess"
@@ -158,3 +159,80 @@
 
   !pragma warning pop
 !macroend
+
+# The folder screen. electron-builder's (NSIS's standard directory page)
+# frames the folder field with a group box, and Windows does not take a
+# group box as a field's name: Axe.Windows found the field with no name
+# ("The Name property of a focusable element must not be null"), so a
+# screen reader said "edit" and the path, not what it is for (SC 1.3.1
+# Info and Relationships and SC 4.1.2 Name, Role, Value, Level A). That
+# page has no hook for code, so electron-builder.config.cjs turns it off
+# (allowToChangeInstallationDirectory: false) and this screen takes its
+# place. A visible label sits right before the field, which is how Win32
+# names a field (the label's text becomes the field's accessible name, as
+# <label for> does on the web). Alt+F on the label moves to the field.
+# The rest matches the old page: Browse, the space needed, the same
+# header, and the same rule that Axcess gets a folder of its own.
+!macro customPageAfterChangeDir
+  !ifndef BUILD_UNINSTALLER
+    !include nsDialogs.nsh
+    !include StrContains.nsh
+    Var axcessFolderField
+
+    Page custom axcessFolderPageShow axcessFolderPageLeave
+
+    Function axcessFolderPageShow
+      # An update (electron-updater runs Setup with --updated) keeps the folder.
+      ${if} ${isUpdated}
+        Abort
+      ${endif}
+      !insertmacro MUI_HEADER_TEXT "$(MUI_TEXT_DIRECTORY_TITLE)" "$(MUI_TEXT_DIRECTORY_SUBTITLE)"
+      nsDialogs::Create 1018
+      Pop $0
+      ${if} $0 == error
+        Abort
+      ${endif}
+      ${NSD_CreateLabel} 0u 0u 300u 26u "$(axcessFolderIntro)"
+      Pop $0
+      # The label immediately before the field names it.
+      ${NSD_CreateLabel} 0u 36u 300u 10u "$(axcessFolderLabel)"
+      Pop $0
+      ${NSD_CreateDirRequest} 0u 48u 238u 13u "$INSTDIR"
+      Pop $axcessFolderField
+      ${NSD_CreateBrowseButton} 244u 47u 56u 15u "$(^BrowseBtn)"
+      Pop $0
+      ${NSD_OnClick} $0 axcessFolderBrowse
+      # Section 0 is electron-builder's install section; its size is in KB.
+      SectionGetSize 0 $1
+      IntOp $1 $1 / 1024
+      ${NSD_CreateLabel} 0u 70u 300u 10u "$(axcessSpaceNeeded)"
+      Pop $0
+      ${NSD_SetFocus} $axcessFolderField
+      nsDialogs::Show
+    FunctionEnd
+
+    Function axcessFolderBrowse
+      ${NSD_GetText} $axcessFolderField $0
+      nsDialogs::SelectFolderDialog "$(^DirBrowseText)" "$0"
+      Pop $0
+      ${if} $0 != error
+        ${NSD_SetText} $axcessFolderField "$0"
+      ${endif}
+    FunctionEnd
+
+    Function axcessFolderPageLeave
+      ${NSD_GetText} $axcessFolderField $0
+      ${if} $0 == ""
+        MessageBox MB_OK|MB_ICONEXCLAMATION "$(axcessFolderEmpty)"
+        Abort
+      ${endif}
+      StrCpy $INSTDIR $0
+      # As electron-builder's own folder page does (instFilesPre).
+      ${StrContains} $1 "${APP_FILENAME}" $INSTDIR
+      ${if} $1 == ""
+        StrCpy $INSTDIR "$INSTDIR\${APP_FILENAME}"
+      ${endif}
+    FunctionEnd
+  !endif
+!macroend
+
