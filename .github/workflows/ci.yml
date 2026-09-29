@@ -151,9 +151,13 @@ jobs:
           cache-dependency-path: src/audit/web/frontend/package-lock.json
       - name: Install locked dependencies
         run: uv sync --frozen --no-install-project
-      - name: Install Chromium
+      - name: Install Chromium and Tesseract
+        # Tesseract too: the New scan form shows the image text check as on
+        # only when Tesseract is installed, and its UI tests expect that.
         run: |
           uv run --no-sync playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr
       - name: Build the review UI
         # The Playwright UI tests drive the built SPA served at /app/.
         run: |
