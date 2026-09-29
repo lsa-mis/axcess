@@ -119,7 +119,11 @@ else
 endif
 
 desktop-package: desktop-install desktop-backend desktop-browsers desktop-ocr ## Build this platform's installer
+ifeq ($(OS),Windows_NT)
+	cd $(DESKTOP) && npm run make:windows
+else
 	cd $(DESKTOP) && npm run make
+endif
 
 test: ## Run full test suite
 	$(PY) pytest

@@ -60,12 +60,16 @@ test("native icon assets include high-resolution PNG, multi-size ICO, and ICNS",
   for (const type of ["ic07", "ic08", "ic09", "ic10"]) assert.ok(types.includes(type));
 });
 
+test("the Windows installer uses the Axcess icon", () => {
+  const config = require("../electron-builder.config.cjs");
+  assert.equal(path.join(root, config.win.icon), asset("ico"));
+});
+
 test("every desktop packaging target uses the Axcess assets", () => {
   for (const platform of ["darwin", "win32", "linux"]) {
     const config = configFor(platform);
     assert.equal(config.packagerConfig.icon, path.join(root, "assets", "axcess"));
     const makers = config.makers;
-    assert.equal(makers.find((m) => m.name.endsWith("maker-squirrel")).config.setupIcon, asset("ico"));
     for (const maker of ["maker-deb", "maker-rpm"]) {
       assert.equal(makers.find((m) => m.name.endsWith(maker)).config.options.icon, asset("png"));
     }

@@ -1,12 +1,18 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
-const packageJson = require("./package.json");
-const { setupExeName } = require("./scripts/release-names.cjs");
 
 const resources = ["backend-dist", "playwright-browsers", "ocr-runtime"]
   .map((name) => path.join(__dirname, name))
   .filter((candidate) => fs.existsSync(candidate));
+// electron-updater reads resources/app-update.yml before it downloads an
+// update. electron-builder writes that file only when it packages the app
+// itself; here Forge packages and electron-builder only wraps the result
+// into the Windows installer (scripts/make-windows-installer.cjs), so the
+// file ships as a resource. macOS does not use electron-updater.
+if (process.platform !== "darwin") {
+  resources.push(path.join(__dirname, "assets", "app-update.yml"));
+}
 const macSigningIdentity = process.env.AXCESS_MAC_SIGN_IDENTITY || "-";
 const isReleaseSigned = macSigningIdentity !== "-";
 
@@ -105,17 +111,9 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     { name: "@electron-forge/maker-zip", platforms: ["darwin"] },
-    {
-      name: "@electron-forge/maker-squirrel",
-      platforms: ["win32"],
-      config: {
-        setupIcon: path.join(__dirname, "assets", "axcess.ico"),
-        // Forge's default is "Axcess-<version> Setup.exe"; GitHub rewrites the
-        // space when it becomes a release asset name. The version is the one
-        // people see (0.61); the .nupkg inside keeps the packaged semver.
-        setupExe: setupExeName(packageJson.version),
-      },
-    },
+    // No Windows maker: the Windows installer is electron-builder's NSIS
+    // target, built from Forge's packaged app by
+    // scripts/make-windows-installer.cjs (`npm run make:windows`).
     {
       name: "@electron-forge/maker-deb",
       platforms: ["linux"],

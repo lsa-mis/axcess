@@ -66,8 +66,10 @@ Both jobs use Python 3.13 and Node 22 and run the same steps in this order:
 7. Freeze the Python backend with PyInstaller (`desktop/backend.spec`) into
    `desktop/backend-dist`.
 8. Package with Electron Forge. macOS runs `npm run make` with up to three
-   attempts. Windows runs `npm run premake`, `electron-forge make`, and
-   `scripts/verify-packaged.cjs` as separate commands.
+   attempts. Windows runs `npm run make:windows`: Forge packages the app,
+   `scripts/make-windows-installer.cjs` has electron-builder wrap that folder
+   in the NSIS installer and write `latest.yml`, and
+   `scripts/verify-packaged.cjs` checks the packaged app.
 9. Upload everything under `desktop/out/make/` as the workflow artifact.
 
 The finished app carries the frozen backend (with the built review app, the
@@ -111,7 +113,7 @@ On macOS, `npm run make` runs the resource and runtime checks through the
   `desktop-v*` tags and runs `desktop/scripts/next-version.cjs`, which
   `nextReleaseVersion` in `desktop/src/updates.cjs` backs. Its unit tests pin
   the steps.
-- npm and Squirrel.Windows need three-part versions, so each build stamps
+- npm and electron-updater need three-part versions, so each build stamps
   `desktop/package.json` with the same version as semver: `0.61.0` for `0.61`,
   `1.0.0` for `1.00`. The commit SHA goes into `config.buildCommit`.
   `desktop/scripts/stamp-version.cjs` does the stamp rather than `npm version`,
@@ -134,9 +136,9 @@ after both build jobs succeed. It uses the workflow's built-in token, so no
 repository secrets are involved.
 
 1. **Collect the installers.** It copies every `*.dmg`, `*.zip`,
-   `*-Setup.exe`, `RELEASES`, and `*.nupkg` file from the two artifacts. It
-   stops if `Axcess-0.61-arm64.dmg`, `Axcess-0.61-Setup.exe`, or `RELEASES`
-   is missing.
+   `*-Setup.exe`, `*-Setup.exe.blockmap`, and `latest.yml` file from the two
+   artifacts. It stops if `Axcess-0.61-arm64.dmg`, `Axcess-0.61-Setup.exe`,
+   or `latest.yml` is missing.
 2. **Add version-less copies.** It adds `Axcess-macOS-AppleSilicon.dmg` and
    `Axcess-Windows-x64-Setup.exe` as copies of this build's installers. The
    site's download buttons link to
@@ -194,7 +196,7 @@ merge.** See the [quality gates in CONTRIBUTING.md](../../CONTRIBUTING.md#qualit
 | Platform | Today | What it means |
 | --- | --- | --- |
 | macOS | Ad-hoc signed (identity `-`), hardened runtime off, not notarized | People approve the app on first launch. The app cannot update itself in place, because Squirrel.Mac refuses apps that are not Developer ID signed. |
-| Windows | Unsigned | People approve it on first launch. The app can update in place through Squirrel.Windows. |
+| Windows | Unsigned | People approve it on first launch. The app can update in place through electron-updater and the NSIS installer. |
 
 The workflow sets none of the signing variables below and holds no
 certificate. The desktop app guide's
@@ -224,8 +226,9 @@ The config stops the build with an error when:
   certificate;
 - `AXCESS_REQUIRE_NOTARIZATION=1` is set without credentials.
 
-For Windows, the Squirrel maker config sets only the installer icon and file
-name. There are no Authenticode signing settings yet. Example signing commands
+For Windows, `desktop/electron-builder.config.cjs` sets the installer icon,
+file name, and wizard options. There are no Authenticode signing settings
+yet. Example signing commands
 are in the desktop app guide's
 [update channel section](../desktop-app.md#update-channel). Never commit Apple
 credentials to the repository.
@@ -267,12 +270,15 @@ release from the site.
 ### What people see on Windows
 
 1. An "Update available" dialog with **Update now** and **Later**.
-2. After **Update now**, Electron's Squirrel updater downloads the new package
-   from the release's files in the background. The app only offers this when
-   the release has a `RELEASES` file.
+2. After **Update now**, electron-updater reads the release's `latest.yml`
+   and downloads the installer it names in the background, checking its
+   SHA-512. The app only offers this when the release has a `latest.yml`
+   file.
 3. When the download finishes, an "Update ready" dialog offers
-   **Restart now** and **Later**. The dialog says the update takes effect the
-   next time Axcess starts if they choose Later.
+   **Restart now** and **Later**. **Restart now** runs the installer silently
+   into the same folder and starts Axcess again. **Later** installs it
+   silently when Axcess quits, so the update takes effect the next time
+   Axcess starts, as the dialog says.
 4. If the update fails, an "Update failed" dialog shows the error and points
    to the latest release on GitHub.
 
@@ -292,21 +298,22 @@ part is the release check itself.
 
 ### Tests for the update logic
 
-`desktop/test/updates.test.cjs` has 10 tests for the helpers in `updates.cjs`:
+`desktop/test/updates.test.cjs` has 15 tests for the helpers in `updates.cjs`:
 
 - version parsing, and comparing versions as numbers rather than text;
 - mapping release tags to versions;
 - the allowlist of download links the app may open;
 - choosing the disk image for the running CPU architecture, and ignoring one
   hosted anywhere else;
-- the Windows update location, which needs a `RELEASES` file;
+- the Windows update location, which needs a `latest.yml` file, and
+  ignoring a release that has only the old Squirrel `RELEASES` file;
 - skipping drafts, prereleases, and unrelated tags;
 - offering only strictly newer releases;
 - the GitHub API URL.
 
 They run with `npm test` in `desktop/`, which both CI's "Desktop launcher
 tests" job and `make desktop-test` call. The flow in `main.cjs` (when the
-check runs, the dialogs, the Squirrel calls, and opening the browser) has no
+check runs, the dialogs, the electron-updater calls, and opening the browser) has no
 unit tests; `npm test` only checks that file's syntax. The
 [smoke test](#smoke-test-both-platforms) covers it by hand.
 
@@ -362,7 +369,7 @@ has to make because the workflow does not.
 1. On the Releases page, confirm that "Axcess preview 0.61" is marked
    Latest and has these files:
    - `Axcess-0.61-arm64.dmg` and the macOS `.zip`;
-   - `Axcess-0.61-Setup.exe`, `RELEASES`, and the `.nupkg` package;
+   - `Axcess-0.61-Setup.exe`, its `.blockmap`, and `latest.yml`;
    - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
@@ -377,6 +384,10 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    approve the first launch as its steps describe. Confirm the review app
    opens rather than the
    ["Axcess could not start" page](../desktop-app.md#axcess-could-not-start).
+   On Windows, also check the setup wizard against the Get started steps:
+   the "who to install for" choice, the folder screen, and **Run Axcess** on
+   the last screen. Run it once with a screen reader (NVDA or Narrator) and
+   confirm each screen and the finished message are read out.
 2. **Version.** Confirm the launcher log's "starting backend" line shows
    `version 0.61 (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
@@ -414,10 +425,10 @@ Releases page, so treat the numbers as estimates:
 
 | File | Who downloads it |
 | --- | --- |
-| `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
+| `latest.yml` and `Axcess-0.61-Setup.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
 | `Axcess-0.61-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
 | `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
-| `Axcess-0.61-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
+| The macOS `.zip` | Only people who download it by hand from the Releases page. Neither the app nor the site links to it. |
 
 These counts miss:
 
@@ -454,7 +465,7 @@ Build on the operating system you are targeting. These are the `make` targets:
 | `make desktop-backend` | Builds the review app, installs the Alfa runner, and freezes the backend into `desktop/backend-dist`. |
 | `make desktop-browsers` | Installs Playwright's Chromium into `desktop/playwright-browsers`. |
 | `make desktop-ocr` | Bundles Tesseract into `desktop/ocr-runtime`. Install Tesseract first: `brew install tesseract` on macOS; on Windows the script suggests `choco install tesseract`. |
-| `make desktop-package` | Runs the install, backend, browsers, and OCR targets, then `npm run make`. Installers land under `desktop/out/`. |
+| `make desktop-package` | Runs the install, backend, browsers, and OCR targets, then `npm run make` (`npm run make:windows` on Windows). Installers land under `desktop/out/make/`. |
 
 A few things to know:
 

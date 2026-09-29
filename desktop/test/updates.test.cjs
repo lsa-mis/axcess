@@ -24,8 +24,8 @@ function release(overrides = {}) {
       { name: "Axcess-0.1.57-arm64.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg` },
       { name: "Axcess-darwin-arm64-0.1.57.zip", browser_download_url: `${DOWNLOAD}/Axcess-darwin-arm64-0.1.57.zip` },
       { name: "Axcess-0.1.57-Setup.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe` },
-      { name: "RELEASES", browser_download_url: `${DOWNLOAD}/RELEASES` },
-      { name: "Axcess-0.1.57-full.nupkg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-full.nupkg` },
+      { name: "Axcess-0.1.57-Setup.exe.blockmap", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe.blockmap` },
+      { name: "latest.yml", browser_download_url: `${DOWNLOAD}/latest.yml` },
     ],
     ...overrides,
   };
@@ -84,12 +84,12 @@ test("a DMG hosted somewhere other than the release is ignored", () => {
   assert.equal(describeRelease(tampered, { platform: "darwin", arch: "arm64" }).dmgUrl, null);
 });
 
-test("Windows releases resolve to the Squirrel feed directory", () => {
+test("Windows releases resolve to the electron-updater feed directory", () => {
   const described = describeRelease(release(), { platform: "win32", arch: "x64" });
   assert.equal(described.feedUrl, DOWNLOAD);
   assert.equal(described.dmgUrl, null);
 
-  const withoutFeed = release({ assets: release().assets.filter((asset) => asset.name !== "RELEASES") });
+  const withoutFeed = release({ assets: release().assets.filter((asset) => asset.name !== "latest.yml") });
   assert.equal(describeRelease(withoutFeed, { platform: "win32", arch: "x64" }).feedUrl, null);
 });
 
@@ -146,4 +146,14 @@ test("a two-part release is newer than the builds before it", () => {
   assert.equal(compareVersions("0.60", "0.1.33"), 1);
   assert.equal(compareVersions("0.61", "0.61.0"), 0);
   assert.equal(compareVersions("1.00", "0.99.0"), 1);
+});
+
+test("a release with only the old Squirrel feed is not a Windows update", () => {
+  const squirrelOnly = release({
+    assets: [
+      ...release().assets.filter((asset) => asset.name !== "latest.yml"),
+      { name: "RELEASES", browser_download_url: `${DOWNLOAD}/RELEASES` },
+    ],
+  });
+  assert.equal(describeRelease(squirrelOnly, { platform: "win32", arch: "x64" }).feedUrl, null);
 });

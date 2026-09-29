@@ -9,7 +9,7 @@
  *
  * `version` is what people see: the tag (`desktop-v0.61`), the release
  * title and the installer names. `package_version` is the semver npm and
- * Squirrel.Windows need in package.json.
+ * electron-updater need in package.json.
  */
 const { nextReleaseVersion, packageVersion } = require("../src/updates.cjs");
 

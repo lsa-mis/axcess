@@ -42,6 +42,13 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Windows installer: a standard setup wizard replaces the screen that showed
+  only an animation. It asks who to install Axcess for (only you, with no
+  administrator password, or everyone on the computer), shows the folder and
+  lets you change it, and says when it is done. Updates still install in
+  place from the update dialog. Uninstalling keeps your scans. A copy
+  installed by the old installer is not offered updates; uninstall it and
+  install the new version.
 - Inspector and page code view: stepping through flagged elements uses two
   labelled buttons, Previous and Next (Jump when there is only one), each
   with its own border, beside the count "Flagged element 1 of 3". They were

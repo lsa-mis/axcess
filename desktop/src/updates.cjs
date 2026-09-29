@@ -7,9 +7,9 @@
  * .github/workflows/desktop-build.yml and `nextReleaseVersion`). The packaged app asks the GitHub
  * API for the latest release once per launch and compares it with its own
  * stamped version. What it can do with a newer release depends on the
- * platform: Squirrel.Windows installs in-app from the release's asset
- * directory, while macOS only opens the DMG download because Squirrel.Mac
- * refuses to update an app that is not Developer ID signed.
+ * platform: on Windows electron-updater installs it in place from the
+ * release's asset directory, while macOS only opens the DMG download because
+ * Squirrel.Mac refuses to update an app that is not Developer ID signed.
  */
 const REPOSITORY = "lsa-mis/axcess";
 const RELEASES_API_URL = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -72,9 +72,9 @@ function releaseVersion(tag) {
  * running platform. Returns null when the payload is not a usable release.
  *
  * - `dmgUrl` (darwin): the DMG built for this CPU architecture, if published.
- * - `feedUrl` (win32): the release's asset directory, which Squirrel.Windows
- *   reads `RELEASES` and the `.nupkg` packages from. Only set when the
- *   release actually carries a `RELEASES` file.
+ * - `feedUrl` (win32): the release's asset directory, which electron-updater
+ *   reads `latest.yml` and the NSIS installer it names from. Only set when
+ *   the release actually carries a `latest.yml` file.
  */
 function describeRelease(release, { platform, arch }) {
   if (!release || typeof release !== "object" || release.draft || release.prerelease) return null;
@@ -97,7 +97,7 @@ function describeRelease(release, { platform, arch }) {
   }
 
   const feedUrl =
-    platform === "win32" && names.has("RELEASES")
+    platform === "win32" && names.has("latest.yml")
       ? `https://github.com/${REPOSITORY}/releases/download/${encodeURIComponent(tag)}`
       : null;
 
@@ -113,7 +113,7 @@ function isNewerRelease(release, currentVersion) {
 /**
  * How a version reads to people: two parts, "0.61", with two digits after
  * the point, so 0.69 is followed by 0.70 and 0.99 by 1.00. npm and
- * Squirrel.Windows need three-part semver, so the package itself carries
+ * electron-updater need three-part semver, so the package itself carries
  * "0.61.0" (and "1.0.0" for 1.00); this drops the ".0" again. A version
  * from before the two-part scheme ("0.1.33") is shown as it is.
  */

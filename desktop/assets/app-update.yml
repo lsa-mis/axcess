@@ -1,0 +1,8 @@
+# Read by electron-updater from resources/app-update.yml. The app sets the
+# feed for each update itself (the exact release's download folder, see
+# offerWindowsUpdate in src/main.cjs), so the provider below is a fallback.
+# updaterCacheDirName names the download cache under %LOCALAPPDATA%.
+provider: github
+owner: lsa-mis
+repo: axcess
+updaterCacheDirName: axcess-updater

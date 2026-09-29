@@ -161,13 +161,12 @@ jobs:
           desktop/scripts/bundle-tesseract-windows.ps1
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      # Forge packages the app; electron-builder wraps it in the NSIS
+      # installer and writes latest.yml (scripts/make-windows-installer.cjs).
       - name: Package desktop installer
         shell: pwsh
         working-directory: desktop
-        run: |
-          npm run premake
-          npm exec electron-forge make
-          node scripts/verify-packaged.cjs
+        run: npm run make:windows
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-windows-x64
@@ -195,9 +194,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name 'RELEASES' -o -name '*.nupkg' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*-Setup.exe' -o -name '*-Setup.exe.blockmap' -o -name 'latest.yml' \) -exec cp {} release/ \;
           ls -l release
-          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" RELEASES; do
+          # latest.yml is the Windows update feed: installed copies read it
+          # to find and check the new installer (src/updates.cjs).
+          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" latest.yml; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
           # Version-less copies give the public site permanent download links:

@@ -80,8 +80,20 @@ The release build has five layers:
 3. Bundle the Python backend with PyInstaller.
 4. Bundle the matching Playwright Chromium and a relocatable Tesseract OCR
    runtime with English language data.
-5. Create an installer with Electron Forge, then launch every bundled runtime
-   from inside the finished application as a release gate.
+5. Package the app with Electron Forge and create the installer, then launch
+   every bundled runtime from inside the finished application as a release
+   gate. macOS gets a DMG from Forge. Windows gets an NSIS installer from
+   electron-builder, which wraps Forge's packaged folder without changing it
+   (`npm run make:windows`; see `desktop/electron-builder.config.cjs`).
+
+The Windows installer is a standard setup wizard. It asks whether to install
+only for the current user (the default, no administrator needed) or for
+everyone on the computer, then shows the install folder and lets people
+change it. A per-user install goes to
+`%LOCALAPPDATA%\Programs\Axcess` by default. Uninstalling keeps scans,
+because they live in `%APPDATA%\Axcess\data`. For managed deployment, the
+installer runs silently with `/S`; add `/allusers` to install for every
+account or `/D=<folder>` (last on the command line) to choose the folder.
 
 Run:
 
@@ -162,9 +174,10 @@ Do not distribute these preview builds as a production U-M application.
 also be started by hand. Each run takes the next two-part version after the
 last release: `0.60`, then `0.61`, and on to `0.69`, then `0.70` (the git
 commit is recorded in the package's `config.buildCommit`). On `main`, it then
-publishes the macOS DMG and zip, the Windows `-Setup.exe`, and the Squirrel
-`RELEASES` and `.nupkg` files as GitHub Release `desktop-v0.61`. The package
-itself carries the version as semver (`0.61.0`), which npm and Squirrel need.
+publishes the macOS DMG and zip, the Windows `-Setup.exe` with its
+`.blockmap`, and the Windows update feed `latest.yml` as GitHub Release
+`desktop-v0.61`. The package itself carries the version as semver (`0.61.0`),
+which npm and electron-updater need.
 
 Each release also carries version-less copies,
 `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`, so the
@@ -183,10 +196,11 @@ has offered an update, it does not check again until the app restarts.
 Nothing happens offline, on a rate-limited response, or when the build is
 current. When a newer build exists:
 
-- **Windows** offers *Update now*. Electron's Squirrel updater downloads the
-  new package from the release's asset directory and installs it in place; the
-  app only restarts when the user chooses *Restart now* (or on its next
-  launch).
+- **Windows** offers *Update now*. electron-updater reads `latest.yml` from
+  the release's asset directory, downloads the installer it names (only the
+  changed blocks when it still has the installed version's block map), and
+  checks its SHA-512. *Restart now* runs the installer silently into the same
+  folder and starts Axcess again; *Later* installs it when Axcess quits.
 - **macOS** offers *Download*, which opens the new DMG in the browser. Apple's
   Squirrel.Mac updater refuses to update an app that is not Developer ID
   signed, so in-place installation on macOS waits for signing and

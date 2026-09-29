@@ -1,9 +1,4 @@
-const { app, autoUpdater, BrowserWindow, dialog, session, shell } = require("electron");
-
-// Squirrel.Windows relaunches the app with --squirrel-install / -updated /
-// -obsolete flags while it installs or updates; those runs must exit at once
-// instead of opening a window over the installer.
-if (require("electron-squirrel-startup")) app.quit();
+const { app, BrowserWindow, dialog, session, shell } = require("electron");
 
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -340,8 +335,10 @@ async function fetchLatestRelease() {
   return response.json();
 }
 
-// Squirrel.Windows installs the new version in place; the user chooses when
-// the restart that activates it happens.
+// electron-updater downloads the NSIS installer named in the release's
+// latest.yml and runs it silently into the folder Axcess is installed in;
+// the user chooses when the restart that activates it happens. Loaded here,
+// not at the top, because macOS never uses it.
 async function offerWindowsUpdate(release) {
   const { response } = await dialog.showMessageBox(ownerWindow(), {
     type: "info",
@@ -356,7 +353,9 @@ async function offerWindowsUpdate(release) {
   });
   if (response !== 0) return;
 
-  autoUpdater.once("update-downloaded", async () => {
+  const { NsisUpdater } = require("electron-updater");
+  const updater = new NsisUpdater({ provider: "generic", url: release.feedUrl });
+  updater.once("update-downloaded", async () => {
     const { response: restart } = await dialog.showMessageBox(ownerWindow(), {
       type: "info",
       title: "Update ready",
@@ -368,9 +367,10 @@ async function offerWindowsUpdate(release) {
       defaultId: 0,
       cancelId: 1,
     });
-    if (restart === 0) autoUpdater.quitAndInstall();
+    // Silent, and start Axcess again once the new version is in place.
+    if (restart === 0) updater.quitAndInstall(true, true);
   });
-  autoUpdater.once("error", (error) => {
+  updater.once("error", (error) => {
     void dialog.showMessageBox(ownerWindow(), {
       type: "warning",
       title: "Update failed",
@@ -379,8 +379,9 @@ async function offerWindowsUpdate(release) {
       buttons: ["OK"],
     });
   });
-  autoUpdater.setFeedURL({ url: release.feedUrl });
-  autoUpdater.checkForUpdates();
+  // The check downloads the update as soon as it finds it (autoDownload).
+  // A failure also reaches the "error" handler above, which tells the user.
+  updater.checkForUpdates().catch(() => {});
 }
 
 // Squirrel.Mac refuses to update an app that is not Developer ID signed, and
