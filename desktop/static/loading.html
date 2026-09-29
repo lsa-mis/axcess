@@ -30,6 +30,15 @@
       .ring { transform-box: view-box; transform-origin: center; animation: spin-ring 1.6s linear infinite; }
       @keyframes spin-ring { to { transform: rotate(360deg); } }
       p { margin: 0; font-size: 1rem; font-weight: 500; }
+      /* The first-launch note. The screen runs no script (its policy is
+         default-src 'none'), so main.cjs opens it as loading.html#first-launch
+         when there is no database yet, and :target shows the note; otherwise
+         it is display: none, so neither seen nor read. It sits inside the
+         status region, read with "Loading". Plain language: the main point
+         first, one short sentence (docs/plain-language.md). #374151 on
+         #F7F9FC is about 10:1 (SC 1.4.3 and 1.4.6). */
+      .first-launch { display: none; max-width: 22rem; text-align: center; font-weight: 400; }
+      .first-launch:target { display: block; }
       @media (prefers-reduced-motion: reduce) { .ring { animation: none; } }
     </style>
   </head>
@@ -43,6 +52,7 @@
         <path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016" />
       </svg>
       <p>Loading</p>
+      <p id="first-launch" class="first-launch">The first time Axcess opens, this can take a minute or two.</p>
     </main>
   </body>
 </html>

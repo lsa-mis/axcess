@@ -109,6 +109,20 @@ test("the loading screen inlines the mark and fetches nothing", () => {
   assert.match(html, /prefers-reduced-motion/);
 });
 
+test("the loading screen tells a first launch that it can take longer", () => {
+  const html = startupScreen("loading");
+  // Inside the status region, so it is read with "Loading".
+  const status = html.match(/<main role="status"[\s\S]*?<\/main>/);
+  assert.ok(status, "expected the status region");
+  assert.match(status[0], /<p id="first-launch" class="first-launch">The first time Axcess opens, this can take a minute or two\.<\/p>/);
+  // Shown only as the page's target, since the screen runs no script.
+  assert.match(html, /\.first-launch \{ display: none;/);
+  assert.match(html, /\.first-launch:target \{ display: block; \}/);
+  assert.doesNotMatch(html, /<script\b/);
+  const main = fs.readFileSync(path.join(root, "src", "main.cjs"), "utf8");
+  assert.match(main, /isFirstLaunch\(\) \? \{ hash: "first-launch" \}/);
+});
+
 test("the bundled logo carries no text, raster, script, or remote import", () => {
   const svg = fs.readFileSync(asset("svg"), "utf8");
   assert.doesNotMatch(svg, /<text\b|<image\b|<script\b|@import/);

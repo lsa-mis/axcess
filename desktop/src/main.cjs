@@ -517,6 +517,19 @@ async function checkForUpdates() {
   }
 }
 
+// The first launch: no database yet, so the backend creates it and brings it
+// to the current schema, and the system checks the new app (Gatekeeper on
+// macOS, Defender on Windows). All of that makes the wait longer, and the
+// loading screen says so (static/loading.html, #first-launch). Checked once,
+// before the backend starts; a later window in the same run is not a first.
+let firstLaunch = null;
+function isFirstLaunch() {
+  if (firstLaunch === null) {
+    firstLaunch = !fs.existsSync(path.join(app.getPath("userData"), "data", "audit.db"));
+  }
+  return firstLaunch;
+}
+
 async function launch() {
   failureShown = false;
   mainWindow = createWindow();
@@ -525,7 +538,7 @@ async function launch() {
   // then aborts that load, and Electron rejects the *new* loadURL with the old
   // page's ERR_ABORTED (-3). Let the loading page settle first.
   const loadingShown = mainWindow
-    .loadFile(path.join(__dirname, "../static/loading.html"))
+    .loadFile(path.join(__dirname, "../static/loading.html"), isFirstLaunch() ? { hash: "first-launch" } : {})
     .catch(() => {});
   if (!backendProcess || !backendOrigin) {
     const port = await findOpenPort();
@@ -533,6 +546,7 @@ async function launch() {
     startBackend(port);
   }
   await waitForBackend(backendOrigin);
+  firstLaunch = false;
   await loadingShown;
   if (mainWindow && !mainWindow.isDestroyed()) {
     await mainWindow.loadURL(`${backendOrigin}/app/`);

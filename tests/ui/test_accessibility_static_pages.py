@@ -43,6 +43,10 @@ _PAGES = [
     *(pytest.param(page.as_uri(), id=str(page.relative_to(_ROOT))) for page in _SITE_PAGES),
     pytest.param((_DESKTOP / "loading.html").as_uri(), id="desktop/static/loading.html"),
     pytest.param(
+        f"{(_DESKTOP / 'loading.html').as_uri()}#first-launch",
+        id="desktop/static/loading.html#first-launch",
+    ),
+    pytest.param(
         f"{(_DESKTOP / 'error.html').as_uri()}?{_ERROR_QUERY}", id="desktop/static/error.html"
     ),
 ]
@@ -67,5 +71,20 @@ async def test_static_page_has_no_axe_violations(
         await page.goto(url, wait_until="load")
         violations = await _run_axe(page, _AXE_TAGS_AA)
         assert not violations, f"{url} ({scheme}, {width}px):\n{_render_violations(violations)}"
+    finally:
+        await page.context.close()
+
+
+@pytest.mark.parametrize("first", [False, True])
+async def test_the_loading_screen_mentions_a_first_launch_only_then(
+    new_page: Any, first: bool
+) -> None:
+    """main.cjs opens loading.html#first-launch when there is no database yet."""
+    page = await new_page(bypass_csp=True)
+    try:
+        url = (_DESKTOP / "loading.html").as_uri() + ("#first-launch" if first else "")
+        await page.goto(url, wait_until="load")
+        note = page.get_by_role("status").get_by_text("The first time Axcess opens")
+        assert await note.is_visible() is first
     finally:
         await page.context.close()

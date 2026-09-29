@@ -9,6 +9,10 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Added
 
+- Desktop app: the first time Axcess opens, the loading screen says
+  "The first time Axcess opens, this can take a minute or two." under
+  "Loading", since that first start sets up the reports database and the
+  system checks the new app.
 - Linux: Axcess as an AppImage, the whole app in one file, for 64-bit
   Linux from 2022 on (Ubuntu 22.04, Debian 12, Fedora 36 or newer), with
   text recognition built in. On Ubuntu 23.10 and later it opens with the
