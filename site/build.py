@@ -38,6 +38,7 @@ LATEST_RELEASE = f"{RELEASES}/latest"
 DOWNLOAD_MACOS = f"{LATEST_RELEASE}/download/Axcess-macOS-AppleSilicon.dmg"
 DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-Setup.exe"
 DOWNLOAD_WINDOWS_PORTABLE = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-portable.zip"
+DOWNLOAD_LINUX = f"{LATEST_RELEASE}/download/Axcess-Linux-x86_64.AppImage"
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
@@ -1522,13 +1523,13 @@ def get_started() -> str:
         <h3>Desktop app (recommended)</h3>
         <p>One app that bundles everything: the workbench, the browser, both rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
-          <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
+          <li>macOS on Apple Silicon (M1 and later), Windows 10 or 11 (64-bit), and 64-bit Linux from 2022 on (for example Ubuntu 22.04, Debian 12 or Fedora 36, or newer)</li>
           <li>A development preview, published automatically when the app changes</li>
           <li>Free, with no account or sign-in needed to download</li>
         </ul>
-        <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a></p>
+        <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a> <a class="btn btn-primary" href="{DOWNLOAD_LINUX}">Download for Linux</a></p>
         <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
-        <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> Both macOS and Windows show a warning on first launch that you need to approve.', "callout-maize", "warn")}</div>
+        <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> macOS and Windows show a warning on first launch that you need to approve, and on Linux you allow the file to run.', "callout-maize", "warn")}</div>
       </article>
       <article class="card">
         {icon("cpu")}
@@ -1578,6 +1579,16 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
           <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
           <li>Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess, move the whole folder.</li>
         </ol>
+      </article>
+      <article class="card">
+        <h4>On Linux</h4>
+        <ol style="margin:.75rem 0 0;padding-left:1.25rem">
+          <li>Select <strong>Download for Linux</strong> and wait for <code>Axcess-Linux-x86_64.AppImage</code> to finish downloading. It is the whole app in one file.</li>
+          <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
+          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-Linux-x86_64.AppImage</code> in a terminal.</li>
+          <li>Double-click it to open Axcess.</li>
+        </ol>
+        <p class="small" style="margin-top:.75rem">Ubuntu 23.10 and later do not let an AppImage use the browser sandbox that keeps web pages apart from the rest of your computer. There, Axcess opens with that sandbox off, so open only saved copies of sites you trust in the Page inspector. On other Linux systems it stays on.</p>
       </article>
     </div>
     <div style="margin-top:1.5rem">{callout("<strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a>", "", "info")}</div>
