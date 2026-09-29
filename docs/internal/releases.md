@@ -70,7 +70,15 @@ Both jobs use Python 3.13 and Node 22 and run the same steps in this order:
    `scripts/make-windows-installer.cjs` has electron-builder wrap that folder
    in the NSIS installer and write `latest.yml`, and
    `scripts/verify-packaged.cjs` checks the packaged app.
-9. Upload everything under `desktop/out/make/` as the workflow artifact.
+9. On Windows, check the installer's accessibility:
+   `desktop/scripts/check-installer-accessibility.ps1` installs Axcess on
+   the runner, runs Microsoft's Axe.Windows (pinned by version and SHA-256)
+   on each setup and uninstall screen through UI Automation, and removes
+   it. An error fails the build, so that installer is not published. The
+   `.a11ytest` files are uploaded as `axcess-windows-installer-accessibility`
+   and open in Accessibility Insights for Windows. Like axe-core, it finds
+   only what a tool can detect; the smoke test's screen-reader check stays.
+10. Upload everything under `desktop/out/make/` as the workflow artifact.
 
 The finished app carries the frozen backend (with the built review app, the
 bundled [axe-core](../glossary.md#axe-core) script, and the Alfa runner's

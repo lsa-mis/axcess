@@ -167,6 +167,23 @@ jobs:
         shell: pwsh
         working-directory: desktop
         run: npm run make:windows
+      # Axe.Windows scans each setup and uninstall screen through UI
+      # Automation, installing and removing Axcess on this runner. An error
+      # fails the build, so an installer with one is never published.
+      - name: Check the installer's accessibility
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $installer = (Get-ChildItem out/make/nsis/*-Setup.exe | Select-Object -First 1).FullName
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-installer-accessibility.ps1 -Installer $installer -OutputDirectory out/installer-a11y
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: axcess-windows-installer-accessibility
+          path: desktop/out/installer-a11y/**
+          if-no-files-found: ignore
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-windows-x64
