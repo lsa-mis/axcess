@@ -169,7 +169,12 @@ function Invoke-Scan($Window, [string] $Screen) {
 
 # Install
 $setup = Start-Process -FilePath (Resolve-Path $Installer).Path -PassThru
-$window = Wait-TopWindow { param($w) $w.Current.ProcessId -eq $setup.Id } "setup"
+# The wizard itself: Setup can own a nameless helper window first, and
+# taking that one left the script with no buttons to find.
+$window = Wait-TopWindow {
+  param($w)
+  $w.Current.ProcessId -eq $setup.Id -and $w.Current.ClassName -eq "#32770" -and $w.Current.Name -like "Axcess Setup*"
+} "setup"
 $next = Wait-Button $window @("Next >")
 Invoke-Scan $window "setup-1-who-can-use-axcess"
 Invoke-Button $next
@@ -198,7 +203,10 @@ if (-not $setup.WaitForExit(60000)) { throw "Setup did not close after Finish." 
 $uninstaller = Join-Path $env:LOCALAPPDATA "Programs\Axcess\Uninstall Axcess.exe"
 if (-not (Test-Path $uninstaller)) { throw "No uninstaller at ${uninstaller}. Did Setup install for the current user?" }
 Start-Process -FilePath $uninstaller | Out-Null
-$window = Wait-TopWindow { param($w) $w.Current.Name -like "Axcess Uninstall*" } "uninstall"
+$window = Wait-TopWindow {
+  param($w)
+  $w.Current.ClassName -eq "#32770" -and $w.Current.Name -like "Axcess Uninstall*"
+} "uninstall"
 $start = Wait-Button $window @("Uninstall", "Next >")
 Invoke-Scan $window "uninstall-1-start"
 Invoke-Button $start
