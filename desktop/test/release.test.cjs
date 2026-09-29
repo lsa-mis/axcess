@@ -3,13 +3,14 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { dmgName, setupExeName } = require("../scripts/release-names.cjs");
+const { dmgName, portableZipName, setupExeName } = require("../scripts/release-names.cjs");
 const { stamp } = require("../scripts/stamp-version.cjs");
 
 test("installers are named with the version people see", () => {
   assert.equal(dmgName("0.61.0", "arm64"), "Axcess-0.61-arm64.dmg");
   assert.equal(setupExeName("0.61.0"), "Axcess-0.61-Setup.exe");
   assert.equal(setupExeName("1.0.0"), "Axcess-1.00-Setup.exe");
+  assert.equal(portableZipName("0.61.0"), "Axcess-0.61-Windows-x64-portable.zip");
 });
 
 function packageFolder(version) {

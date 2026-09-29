@@ -379,6 +379,7 @@ has to make because the workflow does not.
    Latest and has these files:
    - `Axcess-0.61-arm64.dmg` and the macOS `.zip`;
    - `Axcess-0.61-Setup.exe`, its `.blockmap`, and `latest.yml`;
+   - `Axcess-0.61-Windows-x64-portable.zip`;
    - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
@@ -437,7 +438,8 @@ Releases page, so treat the numbers as estimates:
 | --- | --- |
 | `latest.yml` and `Axcess-0.61-Setup.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
 | `Axcess-0.61-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
-| `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
+| `Axcess-macOS-AppleSilicon.dmg`, `Axcess-Windows-x64-Setup.exe` and `Axcess-Windows-x64-portable.zip` | The site's download links, which always point at the latest release |
+| `Axcess-0.61-Windows-x64-portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
 | The macOS `.zip` | Only people who download it by hand from the Releases page. Neither the app nor the site links to it. |
 
 These counts miss:

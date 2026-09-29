@@ -9,6 +9,12 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Added
 
+- Windows, without installing: a zip of Axcess for computers where you
+  cannot install programs, or to carry Axcess and its reports on a USB
+  drive. Axcess keeps everything in the "Axcess data" folder next to
+  Axcess.exe, so moving the folder moves your reports too. When a new
+  version is out, Axcess offers the new zip and says how to bring the data
+  folder along. Do not keep it on a network drive.
 - New scan: **Scan every page it finds**, for public scans. There is no page
   limit; the scan ends when it runs out of pages in scope within the link
   depth. Sign-in scans keep their cap.

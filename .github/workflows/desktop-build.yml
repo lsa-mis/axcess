@@ -220,7 +220,7 @@ jobs:
           ls -l release
           # latest.yml is the Windows update feed: installed copies read it
           # to find and check the new installer (src/updates.cjs).
-          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" latest.yml; do
+          for required in "Axcess-$VERSION-arm64.dmg" "Axcess-$VERSION-Setup.exe" "Axcess-$VERSION-Windows-x64-portable.zip" latest.yml; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
           # Version-less copies give the public site permanent download links:
@@ -228,6 +228,7 @@ jobs:
           # always resolves to the newest release's asset of that name.
           cp "release/Axcess-$VERSION-arm64.dmg" release/Axcess-macOS-AppleSilicon.dmg
           cp "release/Axcess-$VERSION-Setup.exe" release/Axcess-Windows-x64-Setup.exe
+          cp "release/Axcess-$VERSION-Windows-x64-portable.zip" release/Axcess-Windows-x64-portable.zip
           ls -l release
       - name: Create or update the release
         shell: bash
