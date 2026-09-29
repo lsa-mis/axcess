@@ -420,10 +420,18 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
             SVG text
           </span>
         ) : finding.content_hash ? (
+          // The thumbnail is the row's only link to the image's page, so its
+          // alt names where it goes ("Open image #12", the terms table's
+          // "Image #12"): with alt="" the link had no name at all (SC 2.4.4
+          // Link Purpose (In Context) and SC 4.1.2 Name, Role, Value, both
+          // Level A; technique H30). A description of the picture was
+          // rejected: it is the scanned site's image, and the link's job is
+          // to say where it leads.
           <Link to={`/findings/${finding.id}`} className="inline-block">
+            {/* eslint-disable-next-line jsx-a11y/img-redundant-alt -- "image" names the record the link opens ("Image #12", docs/plain-language.md), not the picture */}
             <img
               src={blobUrl(finding.content_hash)}
-              alt=""
+              alt={`Open image #${finding.id}`}
               loading="lazy"
               decoding="async"
               className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"

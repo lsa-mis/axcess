@@ -118,6 +118,8 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Images, grouped by issue: each thumbnail links to its image's page, and
+  a screen reader now reads that link as "Open image #12". It had no name.
 - Issues and Reports: a filter chosen while the search box was still
   catching up with your typing could be lost. Both are kept now.
 - Tabbing to a long table scrolled the page to the table's middle, away from
