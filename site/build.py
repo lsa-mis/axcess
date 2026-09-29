@@ -37,6 +37,7 @@ LATEST_RELEASE = f"{RELEASES}/latest"
 # so these links always fetch the newest build without a GitHub sign-in.
 DOWNLOAD_MACOS = f"{LATEST_RELEASE}/download/Axcess-macOS-AppleSilicon.dmg"
 DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-Setup.exe"
+DOWNLOAD_WINDOWS_PORTABLE = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-portable.zip"
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
@@ -1570,6 +1571,13 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
+        <h5 style="margin-top:1rem">Without installing</h5>
+        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. <a href="{DOWNLOAD_WINDOWS_PORTABLE}">Download the Windows zip (no install)</a>.</p>
+        <ol class="small" style="margin:.5rem 0 0;padding-left:1.25rem">
+          <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
+          <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
+          <li>Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess, move the whole folder.</li>
+        </ol>
       </article>
     </div>
     <div style="margin-top:1.5rem">{callout("<strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a>", "", "info")}</div>
