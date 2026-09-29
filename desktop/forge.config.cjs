@@ -96,6 +96,8 @@ module.exports = {
       /\/backend-dist(?:\/|$)/,
       /\/playwright-browsers(?:\/|$)/,
       /\/out(?:\/|$)/,
+      // Installer wording, read by electron-builder at build time only.
+      /\/installer(?:\/|$)/,
       /\/test(?:\/|$)/,
     ],
     osxSign:

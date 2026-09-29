@@ -44,8 +44,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 - Windows installer: a standard setup wizard replaces the screen that showed
   only an animation. It asks who to install Axcess for (only you, with no
-  administrator password, or everyone on the computer), shows the folder and
-  lets you change it, and says when it is done. Updates still install in
+  administrator permission, or everyone on the computer), shows the folder
+  and lets you change it, and says where Axcess is installed when it is
+  done. Every word in the installer and uninstaller is plain English. Updates still install in
   place from the update dialog. Uninstalling keeps your scans. A copy
   installed by the old installer is not offered updates; uninstall it and
   install the new version.

@@ -41,5 +41,14 @@ module.exports = {
     // Scans live in %APPDATA%\Axcess\data, outside the install folder.
     // Uninstalling or reinstalling the app keeps them.
     deleteAppDataOnUninstall: false,
+    // Every word the wizard, its messages and the uninstaller show, in
+    // plain language (docs/plain-language.md). See the file for why.
+    include: path.join("installer", "installer.nsh"),
+    // English only, like the app. electron-builder's default builds 26
+    // languages and Windows picks one by its display language, but only the
+    // NSIS page text is translated: on a German Windows the wizard mixed
+    // German with electron-builder's own English, and none of the wording
+    // in installer.nsh reached it.
+    multiLanguageInstaller: false,
   },
 };

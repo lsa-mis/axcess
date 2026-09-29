@@ -385,9 +385,10 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    opens rather than the
    ["Axcess could not start" page](../desktop-app.md#axcess-could-not-start).
    On Windows, also check the setup wizard against the Get started steps:
-   the "who to install for" choice, the folder screen, and **Run Axcess** on
-   the last screen. Run it once with a screen reader (NVDA or Narrator) and
-   confirm each screen and the finished message are read out.
+   the "who to install for" choice, the folder screen, and **Open Axcess
+   now** on the last screen, which also shows the install folder. Run it
+   once with a screen reader (NVDA or Narrator) and confirm each screen and
+   the finished message are read out.
 2. **Version.** Confirm the launcher log's "starting backend" line shows
    `version 0.61 (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
