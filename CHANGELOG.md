@@ -129,6 +129,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Reports: a site's very first scan now shows while it runs. Starting it
+  and going straight back to Reports showed "No reports yet" until the
+  page was reloaded.
 - Images, grouped by issue: each thumbnail links to its image's page, and
   a screen reader now reads that link as "Open image #12". It had no name.
 - Public site, Get started: the yellow note in the download card had grey

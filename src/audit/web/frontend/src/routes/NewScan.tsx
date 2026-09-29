@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { Checkbox, PageHeader } from "../components/ui";
 import LocalLoginScan from "../components/LocalLoginScan";
@@ -175,16 +175,27 @@ export default function NewScanRoute() {
     }
   }, [localAnalysisCapability.data, settings.skip_semantic, settings.skip_vlm]);
 
+  // A new scan changes the scan list, so the list is marked out of date, as
+  // quick retry and delete already do. Only navigating, Reports showed its
+  // cached list for its five fresh seconds, and a list with no running scan
+  // does not refresh itself: before a site's first scan, "No reports yet".
+  const queryClient = useQueryClient();
   const createPublic = useMutation({
     mutationFn: (payload: ScanSettings) => api.createScan(payload),
-    onSuccess: ({ scan_id }) => navigate(`/scans/${scan_id}`),
+    onSuccess: ({ scan_id }) => {
+      void queryClient.invalidateQueries({ queryKey: ["scans"] });
+      navigate(`/scans/${scan_id}`);
+    },
     onError: (reason: unknown) =>
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
   });
   const createLogin = useMutation({
     mutationFn: (payload: ScanSettings) =>
       api.createLocalLoginScan(toLocalLoginPayload(payload, { imageAck })),
-    onSuccess: ({ scan_id }) => navigate(`/scans/new?mode=login&scan=${scan_id}`, { replace: true }),
+    onSuccess: ({ scan_id }) => {
+      void queryClient.invalidateQueries({ queryKey: ["scans"] });
+      navigate(`/scans/new?mode=login&scan=${scan_id}`, { replace: true });
+    },
     onError: (reason: unknown) =>
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
   });
