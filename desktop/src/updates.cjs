@@ -7,9 +7,9 @@
  * .github/workflows/desktop-build.yml and `nextReleaseVersion`). The packaged app asks the GitHub
  * API for the latest release once per launch and compares it with its own
  * stamped version. What it can do with a newer release depends on the
- * platform: Squirrel.Windows installs in-app from the release's asset
- * directory, while macOS only opens the DMG download because Squirrel.Mac
- * refuses to update an app that is not Developer ID signed.
+ * platform: on Windows electron-updater installs it in place from the
+ * release's asset directory, while macOS only opens the DMG download because
+ * Squirrel.Mac refuses to update an app that is not Developer ID signed.
  */
 const REPOSITORY = "lsa-mis/axcess";
 const RELEASES_API_URL = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -72,9 +72,11 @@ function releaseVersion(tag) {
  * running platform. Returns null when the payload is not a usable release.
  *
  * - `dmgUrl` (darwin): the DMG built for this CPU architecture, if published.
- * - `feedUrl` (win32): the release's asset directory, which Squirrel.Windows
- *   reads `RELEASES` and the `.nupkg` packages from. Only set when the
- *   release actually carries a `RELEASES` file.
+ * - `zipUrl` (win32): the portable zip for this CPU architecture, if published.
+ * - `appImageUrl` (linux): the AppImage for this CPU architecture, if published.
+ * - `feedUrl` (win32): the release's asset directory, which electron-updater
+ *   reads `latest.yml` and the NSIS installer it names from. Only set when
+ *   the release actually carries a `latest.yml` file.
  */
 function describeRelease(release, { platform, arch }) {
   if (!release || typeof release !== "object" || release.draft || release.prerelease) return null;
@@ -84,24 +86,49 @@ function describeRelease(release, { platform, arch }) {
   const assets = Array.isArray(release.assets) ? release.assets : [];
   const names = new Set(assets.map((asset) => asset && asset.name));
 
-  let dmgUrl = null;
-  if (platform === "darwin") {
-    const dmg = assets.find(
-      (asset) =>
-        asset &&
-        typeof asset.name === "string" &&
-        asset.name.endsWith(`-${arch}.dmg`) &&
-        isReleaseAssetUrl(asset.browser_download_url),
-    );
-    dmgUrl = dmg ? dmg.browser_download_url : null;
-  }
+  // The file this copy can run, by the one naming rule (releaseFileName).
+  const url = (name) => {
+    const asset = name && assets.find((candidate) => candidate && candidate.name === name);
+    return asset && isReleaseAssetUrl(asset.browser_download_url) ? asset.browser_download_url : null;
+  };
+  const dmgUrl = platform === "darwin" ? url(releaseFileName("mac", arch, version)) : null;
+  // The portable zip, for a copy Setup did not install (windowsUpdateMethod).
+  const zipUrl = platform === "win32" ? url(releaseFileName("windows-portable", arch, version)) : null;
+  const appImageUrl = platform === "linux" ? url(releaseFileName("linux", arch, version)) : null;
 
   const feedUrl =
-    platform === "win32" && names.has("RELEASES")
+    platform === "win32" && names.has("latest.yml")
       ? `https://github.com/${REPOSITORY}/releases/download/${encodeURIComponent(tag)}`
       : null;
 
-  return { tag, version, dmgUrl, feedUrl, pageUrl: RELEASES_PAGE_URL };
+  return { tag, version, dmgUrl, zipUrl, appImageUrl, feedUrl, pageUrl: RELEASES_PAGE_URL };
+}
+
+/**
+ * What a release file is called: who it is for and what it is, in words
+ * people read, "Axcess-0.61-Windows-Installer.exe", not CPU codes (arm64,
+ * x64, x86_64). The processor is named only where it decides whether the
+ * file runs, the Mac's (Apple Silicon or Intel). Windows and Linux have one
+ * build each, for 64-bit Intel and AMD processors, which the download page
+ * states; a processor with no build has no name, so a copy on it is never
+ * offered a file it cannot run. The site matches the part after the version
+ * (data-release-file in site/build.py).
+ *
+ * `kind` is "mac", "windows-installer", "windows-portable" or "linux".
+ * Hyphens rather than spaces: GitHub rewrites spaces in file names.
+ */
+function releaseFileName(kind, arch, version = null) {
+  const prefix = version ? `Axcess-${version}` : "Axcess";
+  if (kind === "mac") {
+    const processor = { arm64: "Apple-Silicon", x64: "Intel" }[arch];
+    return processor ? `${prefix}-Mac-${processor}.dmg` : null;
+  }
+  if (arch !== "x64") return null;
+  return {
+    "windows-installer": `${prefix}-Windows-Installer.exe`,
+    "windows-portable": `${prefix}-Windows-Portable.zip`,
+    linux: `${prefix}-Linux.AppImage`,
+  }[kind] ?? null;
 }
 
 /** True when `release` (from describeRelease) is strictly newer than the running app. */
@@ -111,43 +138,45 @@ function isNewerRelease(release, currentVersion) {
 }
 
 /**
- * How a version reads to people: two parts, "0.61", with two digits after
- * the point, so 0.69 is followed by 0.70 and 0.99 by 1.00. npm and
- * Squirrel.Windows need three-part semver, so the package itself carries
- * "0.61.0" (and "1.0.0" for 1.00); this drops the ".0" again. A version
- * from before the two-part scheme ("0.1.33") is shown as it is.
+ * Versions are semver, MAJOR.MINOR.PATCH, and read as they are: "0.2.3".
+ * The team chooses the release line, MAJOR.MINOR ("0.2", config.releaseLine
+ * in desktop/package.json); every release published from main counts up
+ * the last part (nextReleaseVersion). Moving to 0.3.0 or 1.0.0 is a
+ * deliberate one-line change there, never the side effect of a merge, and
+ * each line names an audience: 0.1 developers, 0.2 the U-M ITS
+ * accessibility team, 0.3 a wider pilot, 1.0 university-wide
+ * (docs/internal/releases.md). The
+ * scheme before this one (0.60, 0.61 ...) added 0.01 per merge, a build
+ * counter that looked like a version and would have reached 1.00 by itself.
  */
 function displayVersion(version) {
   const parts = parseVersion(version);
-  if (!parts) return String(version);
-  if (parts.length === 3 && parts[2] !== 0) return parts.join(".");
-  return `${parts[0]}.${String(parts[1] ?? 0).padStart(2, "0")}`;
+  return parts ? parts.join(".") : String(version);
 }
 
-/** The semver a two-part version is packaged as: "0.61" -> "0.61.0", "1.00" -> "1.0.0". */
+/** The version as package.json carries it: the same three parts, checked. */
 function packageVersion(version) {
   const parts = parseVersion(version);
-  if (!parts || parts.length !== 2) throw new Error(`Not a two-part version: ${version}`);
-  return `${parts[0]}.${parts[1]}.0`;
+  if (!parts || parts.length !== 3) throw new Error(`Not a three-part version: ${version}`);
+  return parts.join(".");
 }
 
 /**
- * The version of the next release, given the release tags that exist: one
- * step after the highest two-part tag ("desktop-v0.60" -> "0.61",
- * "desktop-v0.99" -> "1.00"), or `first` when there is none yet. Tags of
- * the old three-part scheme ("desktop-v0.1.33") do not count.
+ * The version of the next release on `line` ("0.2"), given the release
+ * tags that exist: one step after the highest "desktop-v0.2.N"
+ * ("desktop-v0.2.3" -> "0.2.4"), or "0.2.0" when the line has none yet.
+ * Tags of other lines, and of the schemes before (desktop-v0.63,
+ * desktop-v0.1.33), do not count.
  */
-function nextReleaseVersion(tags, first = "0.60") {
+function nextReleaseVersion(tags, line) {
+  if (!/^\d+\.\d+$/.test(String(line))) throw new Error(`Not a release line (MAJOR.MINOR): ${line}`);
+  const pattern = new RegExp(`^desktop-v${line.replace(".", "\\.")}\\.(\\d+)$`);
   let highest = null;
   for (const tag of tags) {
-    const match = /^desktop-v(\d+)\.(\d{2})$/.exec(String(tag).trim());
-    if (!match) continue;
-    const step = Number(match[1]) * 100 + Number(match[2]);
-    if (highest === null || step > highest) highest = step;
+    const match = pattern.exec(String(tag).trim());
+    if (match && (highest === null || Number(match[1]) > highest)) highest = Number(match[1]);
   }
-  if (highest === null) return first;
-  const next = highest + 1;
-  return `${Math.floor(next / 100)}.${String(next % 100).padStart(2, "0")}`;
+  return `${line}.${highest === null ? 0 : highest + 1}`;
 }
 
 module.exports = {
@@ -161,5 +190,6 @@ module.exports = {
   nextReleaseVersion,
   packageVersion,
   parseVersion,
+  releaseFileName,
   releaseVersion,
 };

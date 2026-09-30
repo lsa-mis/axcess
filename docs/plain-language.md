@@ -37,6 +37,14 @@ readers; this page tells contributors which words to use.
 10. **Concrete examples** for anything abstract: "for example, a menu that
     opens when you click it".
 11. **Sentence case** for everything. No "please", no double negatives.
+    Buttons and controls too: "Start a scan", not "Start A Scan". Names
+    keep their capitals ("Axcess", "Excel"), and so do the named terms in
+    the table below ("Needs review", "Best practice", "Click-Through").
+    Two tests enforce this: `tests/ui/test_control_label_case.py` reads
+    every control on the main screens of the review app, and
+    `desktop/test/installer-wording.test.cjs` reads every string of the
+    Windows installer. A new name or term goes in their allowed lists; a
+    Title Case label does not.
 12. **Never drop a limit or a safety fact** to make text shorter. Say it
     more simply instead. Axcess never claims a site meets WCAG.
 

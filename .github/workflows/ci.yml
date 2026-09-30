@@ -4,11 +4,14 @@ name: CI
 # on main. Until this existed nothing ran pytest, ruff, mypy or the frontend
 # checks, while desktop-build publishes a release from every push to main.
 #
-# Browser-driven suites (tests/integration and the Playwright files under
-# tests/ui, auto-marked `browser` by tests/conftest.py) need Chromium, the
-# fixture site and minutes of wall clock; they run in the `browser-suites`
-# job only on a schedule, on demand, or when a pull request carries the
-# `run-browser-tests` label.
+# The Playwright files under tests/ui (auto-marked `browser` by
+# tests/conftest.py) hold every axe-core check of the review app, the
+# desktop screens and the public site, and the sentence-case check of
+# control labels. They run in the `accessibility` job on every pull request
+# and push to main, so an automated WCAG 2.2 Level A or AA failure blocks
+# the merge (about 13 minutes). The crawl-driven integration suites need the
+# fixture site and longer; they run in `browser-suites` only on a schedule,
+# on demand, or when a pull request carries the `run-browser-tests` label.
 
 on:
   pull_request:
@@ -131,8 +134,46 @@ jobs:
       - name: Check the installer names the publish job requires
         run: node desktop/scripts/release-names.cjs --expect "${{ steps.pick.outputs.version }}"
 
+  accessibility:
+    name: Accessibility and Playwright UI suites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/audit/web/frontend/package-lock.json
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - name: Install Chromium and Tesseract
+        # Tesseract too: the New scan form shows the image text check as on
+        # only when Tesseract is installed, and its UI tests expect that.
+        run: |
+          uv run --no-sync playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr
+      - name: Build the review UI
+        # The Playwright UI tests drive the built SPA served at /app/.
+        run: |
+          npm ci
+          npm run build
+        working-directory: src/audit/web/frontend
+      - name: Install the pinned Alfa runner
+        run: npm ci
+        working-directory: src/audit/alfa_runner
+      - name: Run Playwright UI suites
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest -p no:cacheprovider tests/ui -m browser
+
   browser-suites:
-    name: Browser and integration suites
+    name: Integration suites
     if: >-
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
@@ -172,7 +213,3 @@ jobs:
         env:
           PYTHONPATH: src
         run: uv run --no-sync pytest -p no:cacheprovider tests/integration
-      - name: Run Playwright UI suites
-        env:
-          PYTHONPATH: src
-        run: uv run --no-sync pytest -p no:cacheprovider tests/ui -m browser

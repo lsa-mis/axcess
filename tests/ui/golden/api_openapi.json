@@ -1,6 +1,6 @@
 {
   "openapi": "3.1.0",
-  "info": {"title": "Axcess", "version": "0.60"},
+  "info": {"title": "Axcess", "version": "0.2.0"},
   "paths": {
     "/api/protected-scans": {
       "get": {

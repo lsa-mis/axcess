@@ -8,7 +8,7 @@ the test gates, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## How a desktop release ships today
 
-![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS and Windows apps in parallel and publishes a GitHub release marked latest. Installed apps check for it on launch; Windows can update in place and macOS opens the new disk image. No tests gate publishing and builds are not notarized; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
+![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS, Windows and Linux apps in parallel, stamped with the next version, such as 0.2.1 after 0.2.0, and publishes a GitHub release marked latest with one file per platform. Installed apps check for it on launch: Windows can update in place, and macOS and Linux open the new file to download. No tests gate publishing, and builds are not notarized or signed; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
 
 In short: a merge to `main` that changes app code builds both installers and
 publishes them as the latest GitHub release, and installed copies offer that
@@ -66,9 +66,19 @@ Both jobs use Python 3.13 and Node 22 and run the same steps in this order:
 7. Freeze the Python backend with PyInstaller (`desktop/backend.spec`) into
    `desktop/backend-dist`.
 8. Package with Electron Forge. macOS runs `npm run make` with up to three
-   attempts. Windows runs `npm run premake`, `electron-forge make`, and
-   `scripts/verify-packaged.cjs` as separate commands.
-9. Upload everything under `desktop/out/make/` as the workflow artifact.
+   attempts. Windows runs `npm run make:windows`: Forge packages the app,
+   `scripts/make-windows-installer.cjs` has electron-builder wrap that folder
+   in the NSIS installer and write `latest.yml`, and
+   `scripts/verify-packaged.cjs` checks the packaged app.
+9. On Windows, check the installer's accessibility:
+   `desktop/scripts/check-installer-accessibility.ps1` installs Axcess on
+   the runner, runs Microsoft's Axe.Windows (pinned by version and SHA-256)
+   on each setup and uninstall screen through UI Automation, and removes
+   it. An error fails the build, so that installer is not published. The
+   `.a11ytest` files are uploaded as `axcess-windows-installer-accessibility`
+   and open in Accessibility Insights for Windows. Like axe-core, it finds
+   only what a tool can detect; the smoke test's screen-reader check stays.
+10. Upload everything under `desktop/out/make/` as the workflow artifact.
 
 The finished app carries the frozen backend (with the built review app, the
 bundled [axe-core](../glossary.md#axe-core) script, and the Alfa runner's
@@ -103,29 +113,55 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
 ### Version numbers and tags
 
-- Versions have two parts: `0.60`, then `0.61`, and so on. After `0.69` comes
-  `0.70`, and after `0.99` comes `1.00`. Each release is one step after the
-  highest two-part release tag, so every push to `main` that publishes moves
-  the version up by one.
+- Versions are semver, three parts: `0.2.0`, then `0.2.1`, `0.2.2`, and so
+  on. The first two parts are the release line, which the team chooses:
+  `config.releaseLine` in `desktop/package.json`, now `0.2`. Every release
+  published from `main` counts up the last part. Moving to `0.3.0` or `1.0.0`
+  is a deliberate change of that one setting (and of `version` beside it),
+  never the side effect of a merge.
 - The workflow's first job, **Choose the release version**, reads the
   `desktop-v*` tags and runs `desktop/scripts/next-version.cjs`, which
-  `nextReleaseVersion` in `desktop/src/updates.cjs` backs. Its unit tests pin
-  the steps.
-- npm and Squirrel.Windows need three-part versions, so each build stamps
-  `desktop/package.json` with the same version as semver: `0.61.0` for `0.61`,
-  `1.0.0` for `1.00`. The commit SHA goes into `config.buildCommit`.
-  `desktop/scripts/stamp-version.cjs` does the stamp rather than `npm version`,
-  which refuses to set the version a package already has (`0.60.0`).
-- Everything a person sees uses the two-part version: the release tag
-  `desktop-v0.61`, the release title `Axcess preview 0.61`, the installer
-  names, and the app's own label, `0.61 (abc1234)`, in its update dialogs and
-  the launcher log (`displayVersion`).
-- In git, `desktop/package.json` stays at `0.60.0`, so every local build shows
-  version `0.60`. `pyproject.toml` and `audit.__version__` say `0.60`.
-- Before September 2026 the scheme was `0.1.<run number>`: tags up to
-  `desktop-v0.1.33` use it. They do not count toward the next version, and
-  `0.60` sorts above every one of them, so installed copies still see the
-  next release as newer.
+  `nextReleaseVersion` in `desktop/src/updates.cjs` backs: one step after the
+  highest `desktop-v0.2.N` tag, or `0.2.0` when the line has none. Tags of
+  other lines and of the earlier schemes do not count. Its unit tests pin the
+  steps.
+- Each release line says who it is for. Change `config.releaseLine` (and
+  `version` beside it, as `<line>.0`) when the audience widens:
+
+  | Line | Who it is for | How they get it |
+  | --- | --- | --- |
+  | `0.1` | Developers | Branch builds: the workflow artifacts of a manual or pull request run, never published |
+  | `0.2` | The U-M ITS accessibility team | Releases published from `main` |
+  | `0.3` | A wider pilot, such as selected departments | Releases published from `main` |
+  | `1.0` | University-wide | Releases published from `main`, signed and notarized (see [Before an institutional rollout](#before-an-institutional-rollout)) |
+
+  University-wide is `1.0` rather than `0.4`: most readers take a version
+  below 1.0 as early or pilot software, and 1.0 as ready and supported.
+  A line labels the audience a version is meant for; it does not limit who
+  can get it. Every published release is public on GitHub, and there is one
+  update channel, so every installed copy is offered the newest release,
+  whichever line it is on. Changes in the code, large ones included, ship
+  within a line as the next number; changing the line is a decision about
+  the audience. Separate channels (a pilot group kept on one line while
+  others try the next) would need a release flag and an app setting, which
+  do not exist yet.
+- Each build stamps `desktop/package.json` with that version and puts the
+  commit SHA in `config.buildCommit`. `desktop/scripts/stamp-version.cjs` does
+  the stamp rather than `npm version`, which refuses to set the version a
+  package already has.
+- Everything a person sees shows the version as it is: the release tag
+  `desktop-v0.2.3`, the release title `Axcess 0.2.3 (preview)`, the file
+  names, the installer's footer, and the app's own label, `0.2.3 (abc1234)`,
+  in its update dialogs and the launcher log (`displayVersion`).
+- In git, `desktop/package.json` stays at the line's first version, `0.2.0`,
+  so every local build shows `0.2.0`. `pyproject.toml`, `audit.__version__`
+  and the review app's `package.json` say `0.2.0` too.
+- Two schemes came before: `0.1.<run number>` (up to `desktop-v0.1.34`), then
+  `0.60`, `0.61` ... (up to `desktop-v0.63`), which added 0.01 per merge, a
+  build counter that looked like a version and would have reached `1.00` by
+  itself. Installed copies of `0.60` to `0.63` are not offered `0.2.x`,
+  because `0.2.0` is the lower number; those previews were not widely
+  released, and their users install once from the Get started page.
 
 ### The publish job
 
@@ -133,23 +169,25 @@ The `publish` job ("Publish preview release") runs only on `main`, and only
 after both build jobs succeed. It uses the workflow's built-in token, so no
 repository secrets are involved.
 
-1. **Collect the installers.** It copies every `*.dmg`, `*.zip`,
-   `*-Setup.exe`, `RELEASES`, and `*.nupkg` file from the two artifacts. It
-   stops if `Axcess-0.61-arm64.dmg`, `Axcess-0.61-Setup.exe`, or `RELEASES`
-   is missing.
-2. **Add version-less copies.** It adds `Axcess-macOS-AppleSilicon.dmg` and
-   `Axcess-Windows-x64-Setup.exe` as copies of this build's installers. The
-   site's download buttons link to
-   `https://github.com/lsa-mis/axcess/releases/latest/download/<name>`
-   (`DOWNLOAD_MACOS` and `DOWNLOAD_WINDOWS` in `site/build.py`), so they
-   always fetch the newest release. If you rename these files, change those
-   constants and regenerate the site in the same pull request.
-3. **Create a draft, upload, then publish.** If no release exists for tag
-   `desktop-v0.61` yet, it creates one as a draft at the built commit. It
+1. **Collect the installers.** It copies the files named by
+   `releaseFileName` in `desktop/src/updates.cjs`, in plain words, from the
+   artifacts: `Axcess-0.2.3-Mac-Apple-Silicon.dmg`,
+   `Axcess-0.2.3-Windows-Installer.exe` with its `.blockmap`,
+   `Axcess-0.2.3-Windows-Portable.zip`, `Axcess-0.2.3-Linux.AppImage` and
+   `latest.yml`: one file per platform, and the two the Windows updater
+   reads. It stops if any is missing, or if there are more than these six.
+   There is no second name for any file. The site's download links open
+   `https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
+   points each at its file in that release by the part of the name after the
+   version (`data-release-file` in `site/build.py`). If you rename a kind of
+   file, change `releaseFileName` and those attributes in the same pull
+   request.
+2. **Create a draft, upload, then publish.** If no release exists for tag
+   `desktop-v0.2.3` yet, it creates one as a draft at the built commit. It
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
-4. **Prune.** It keeps the 10 newest `desktop-v*` releases and deletes older
+3. **Prune.** It keeps the 10 newest `desktop-v*` releases and deletes older
    ones along with their tags.
 
 ### Release notes
@@ -179,9 +217,10 @@ for:
 - detection evaluations (`.github/workflows/detection-evals.yml`), which run
   on pull requests and pushes that touch detection code, rules, or quality
   tests, and weekly;
-- the browser and integration suites, which run only on CI's daily schedule,
-  on a manual CI run, or when a pull request has the `run-browser-tests`
-  label.
+- the integration suites, which run only on CI's daily schedule, on a
+  manual CI run, or when a pull request has the `run-browser-tests` label.
+  (The accessibility and Playwright UI suites run on every pull request and
+  push to `main`, but the desktop build does not wait for them either.)
 
 So a commit on `main` that fails CI still ships, as long as it touches the
 build paths and both installers build. **Make sure CI is green before you
@@ -194,7 +233,8 @@ merge.** See the [quality gates in CONTRIBUTING.md](../../CONTRIBUTING.md#qualit
 | Platform | Today | What it means |
 | --- | --- | --- |
 | macOS | Ad-hoc signed (identity `-`), hardened runtime off, not notarized | People approve the app on first launch. The app cannot update itself in place, because Squirrel.Mac refuses apps that are not Developer ID signed. |
-| Windows | Unsigned | People approve it on first launch. The app can update in place through Squirrel.Windows. |
+| Windows | Unsigned | People approve it on first launch. The app can update in place through electron-updater and the NSIS installer. |
+| Linux | Unsigned AppImage | People allow the file to run (file Properties, or `chmod +x`). The app offers the new AppImage to download; it does not update in place. |
 
 The workflow sets none of the signing variables below and holds no
 certificate. The desktop app guide's
@@ -224,8 +264,9 @@ The config stops the build with an error when:
   certificate;
 - `AXCESS_REQUIRE_NOTARIZATION=1` is set without credentials.
 
-For Windows, the Squirrel maker config sets only the installer icon and file
-name. There are no Authenticode signing settings yet. Example signing commands
+For Windows, `desktop/electron-builder.config.cjs` sets the installer icon,
+file name, and wizard options. There are no Authenticode signing settings
+yet. Example signing commands
 are in the desktop app guide's
 [update channel section](../desktop-app.md#update-channel). Never commit Apple
 credentials to the repository.
@@ -262,17 +303,20 @@ release from the site.
 - Drafts and prereleases are ignored. So are tags that are not a plain dotted
   version, optionally prefixed with `desktop-v` or `v`.
 - The app offers a release only when its version is strictly newer, compared
-  as numbers (`0.61` is newer than `0.60.0` and than `0.1.33`).
+  as numbers (`0.2.10` is newer than `0.2.9`, and `0.2.0` than `0.1.34`).
 
 ### What people see on Windows
 
 1. An "Update available" dialog with **Update now** and **Later**.
-2. After **Update now**, Electron's Squirrel updater downloads the new package
-   from the release's files in the background. The app only offers this when
-   the release has a `RELEASES` file.
+2. After **Update now**, electron-updater reads the release's `latest.yml`
+   and downloads the installer it names in the background, checking its
+   SHA-512. The app only offers this when the release has a `latest.yml`
+   file.
 3. When the download finishes, an "Update ready" dialog offers
-   **Restart now** and **Later**. The dialog says the update takes effect the
-   next time Axcess starts if they choose Later.
+   **Restart now** and **Later**. **Restart now** runs the installer silently
+   into the same folder and starts Axcess again. **Later** installs it
+   silently when Axcess quits, so the update takes effect the next time
+   Axcess starts, as the dialog says.
 4. If the update fails, an "Update failed" dialog shows the error and points
    to the latest release on GitHub.
 
@@ -282,7 +326,7 @@ release from the site.
    install steps and links to the site's
    [first-launch steps](https://lsa-mis.github.io/axcess/get-started/#first-launch).
 2. **Download** opens the disk image that matches the Mac's CPU architecture
-   (`-arm64.dmg`) in the default browser. The app opens only HTTPS download
+   (`-Mac-Apple-Silicon.dmg`) in the default browser. The app opens only HTTPS download
    links under this repository's releases.
 3. The dialog tells them to quit Axcess, open the disk image, drag Axcess to
    Applications, and choose Replace.
@@ -292,21 +336,22 @@ part is the release check itself.
 
 ### Tests for the update logic
 
-`desktop/test/updates.test.cjs` has 10 tests for the helpers in `updates.cjs`:
+`desktop/test/updates.test.cjs` has 15 tests for the helpers in `updates.cjs`:
 
 - version parsing, and comparing versions as numbers rather than text;
 - mapping release tags to versions;
 - the allowlist of download links the app may open;
 - choosing the disk image for the running CPU architecture, and ignoring one
   hosted anywhere else;
-- the Windows update location, which needs a `RELEASES` file;
+- the Windows update location, which needs a `latest.yml` file, and
+  ignoring a release that has only the old Squirrel `RELEASES` file;
 - skipping drafts, prereleases, and unrelated tags;
 - offering only strictly newer releases;
 - the GitHub API URL.
 
 They run with `npm test` in `desktop/`, which both CI's "Desktop launcher
 tests" job and `make desktop-test` call. The flow in `main.cjs` (when the
-check runs, the dialogs, the Squirrel calls, and opening the browser) has no
+check runs, the dialogs, the electron-updater calls, and opening the browser) has no
 unit tests; `npm test` only checks that file's syntax. The
 [smoke test](#smoke-test-both-platforms) covers it by hand.
 
@@ -324,14 +369,14 @@ has to make because the workflow does not.
    `desktop/package.json`, and checks the installer names against the ones
    the publish job requires, with the same scripts a release uses
    (`next-version.cjs`, `stamp-version.cjs`, `release-names.cjs` in
-   `desktop/scripts/`). The first 0.60 build failed at the stamp step, which
+   `desktop/scripts/`). The first 0.60 build (of the earlier scheme) failed at the stamp step, which
    no pull request job ran before.
 2. If the pull request changes the desktop app or its build, confirm the
    "Desktop application build" run on it built both installers.
-3. If the change touches the crawler, a
-   [browser check](../glossary.md#browser-check), or the review app, add the
-   `run-browser-tests` label. That runs the "Browser and integration suites"
-   job on the pull request.
+3. Confirm the "Accessibility and Playwright UI suites" job passed. If the
+   change touches the crawler or a
+   [browser check](../glossary.md#browser-check), also add the
+   `run-browser-tests` label, which runs the "Integration suites" job.
 4. If "Detection evaluations" ran on the pull request, confirm it passed.
 5. Write the merge commit message as release notes. Its body becomes the
    "What changed" section.
@@ -359,11 +404,13 @@ has to make because the workflow does not.
 
 ### Confirm the release
 
-1. On the Releases page, confirm that "Axcess preview 0.61" is marked
+1. On the Releases page, confirm that "Axcess 0.2.3 (preview)" is marked
    Latest and has these files:
-   - `Axcess-0.61-arm64.dmg` and the macOS `.zip`;
-   - `Axcess-0.61-Setup.exe`, `RELEASES`, and the `.nupkg` package;
-   - `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe`.
+   - `Axcess-0.2.3-Mac-Apple-Silicon.dmg`;
+   - `Axcess-0.2.3-Windows-Installer.exe`, its `.blockmap`, and `latest.yml`;
+   - `Axcess-0.2.3-Windows-Portable.zip` and `Axcess-0.2.3-Linux.AppImage`;
+   - nothing else, apart from the source code archives GitHub adds to every
+     release.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
 
@@ -377,15 +424,20 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    approve the first launch as its steps describe. Confirm the review app
    opens rather than the
    ["Axcess could not start" page](../desktop-app.md#axcess-could-not-start).
+   On Windows, also check the setup wizard against the Get started steps:
+   the "who to install for" choice, the folder screen, and **Open Axcess
+   now** on the last screen, which also shows the install folder. Run it
+   once with a screen reader (NVDA or Narrator) and confirm each screen and
+   the finished message are read out.
 2. **Version.** Confirm the launcher log's "starting backend" line shows
-   `version 0.61 (<short SHA>)` for the new build. The desktop app guide
+   `version 0.2.3 (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
    - The review app has no screen that shows the version. The update dialog
-     says "You are running 0.61 (<short SHA>)", but only when it offers a
+     says "You are running 0.2.3 (<short SHA>)", but only when it offers a
      newer release, so support should ask a user for the launcher log line.
    - On macOS, also open **Axcess > About Axcess** and note whether it shows
-     `0.61 (<short SHA>)`: the launcher sets the About panel's version to the
-     two-part label. The desktop code never replaces Electron's default menu,
+     `0.2.3 (<short SHA>)`: the launcher sets the About panel's version to the
+     version label. The desktop code never replaces Electron's default menu,
      which should include that item, but nobody has checked it on a Mac yet.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
@@ -394,7 +446,7 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    - Windows: choose **Update now**, wait for "Update ready", and choose
      **Restart now**.
    - macOS: choose **Download**, confirm the browser downloads the new
-     `-arm64.dmg` from this repository's releases, and replace the app.
+     `-Mac-Apple-Silicon.dmg` from this repository's releases, and replace the app.
    - On both, check the version as in step 2 and confirm your earlier reports
      are still listed.
 
@@ -405,7 +457,7 @@ GitHub's download count for each release file. Record the counts before the
 release is pruned, because deleting a release deletes its counts:
 
 ```bash
-gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.61 \
+gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.2.3 \
   --jq '.assets[] | [.name, .download_count] | @tsv'
 ```
 
@@ -414,10 +466,10 @@ Releases page, so treat the numbers as estimates:
 
 | File | Who downloads it |
 | --- | --- |
-| `RELEASES` and the `.nupkg` package | Windows apps after someone chooses **Update now** in the update dialog |
-| `Axcess-0.61-arm64.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
-| `Axcess-macOS-AppleSilicon.dmg` and `Axcess-Windows-x64-Setup.exe` | The site's download buttons, which always point at the latest release |
-| `Axcess-0.61-Setup.exe` and the macOS `.zip` | Only people who download them by hand from the Releases page. Neither the app nor the site links to them. |
+| `latest.yml` and `Axcess-0.2.3-Windows-Installer.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
+| `Axcess-0.2.3-Mac-Apple-Silicon.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-0.2.3-Windows-Portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
+| `Axcess-0.2.3-Linux.AppImage` | Mostly Linux copies after someone chooses **Download** in their update dialog |
 
 These counts miss:
 
@@ -454,13 +506,14 @@ Build on the operating system you are targeting. These are the `make` targets:
 | `make desktop-backend` | Builds the review app, installs the Alfa runner, and freezes the backend into `desktop/backend-dist`. |
 | `make desktop-browsers` | Installs Playwright's Chromium into `desktop/playwright-browsers`. |
 | `make desktop-ocr` | Bundles Tesseract into `desktop/ocr-runtime`. Install Tesseract first: `brew install tesseract` on macOS; on Windows the script suggests `choco install tesseract`. |
-| `make desktop-package` | Runs the install, backend, browsers, and OCR targets, then `npm run make`. Installers land under `desktop/out/`. |
+| `make desktop-package` | Runs the install, backend, browsers, and OCR targets, then `npm run make` (`npm run make:windows` on Windows). Installers land under `desktop/out/make/`. |
 
 A few things to know:
 
-- On Linux, `make desktop-package` stops at `make desktop-ocr`, because the
-  OCR bundling script supports only macOS (Windows has its own script).
-- Local builds are version `0.60`, and local macOS builds are ad-hoc signed
+- On Linux, `make desktop-ocr` needs Tesseract installed first
+  (`sudo apt-get install tesseract-ocr tesseract-ocr-eng`), and
+  `make desktop-package` builds the AppImage (`npm run make:linux`).
+- Local builds are version `0.2.0`, and local macOS builds are ad-hoc signed
   unless you set the
   [signing variables](#settings-for-when-credentials-exist).
 - A packaged local build therefore offers the latest published release when
@@ -505,8 +558,9 @@ exists. `uv run python site/volume.py` writes it from your local
 `data/audit.db` as aggregate totals. Like everything under `site/` except
 `build.py`, it is published.
 
-The download buttons need no site rebuild for a new release. They use the
-version-less links described in [The publish job](#the-publish-job).
+The download links need no site rebuild for a new release: they open the
+newest release, and `site.js` finds its files (see
+[The publish job](#the-publish-job)).
 
 ## Known gaps
 
@@ -533,13 +587,9 @@ version-less links described in [The publish job](#the-publish-job).
   - The header comment in `desktop/src/updates.cjs` and a comment at the top
     of `.github/workflows/ci.yml` say every push to `main` publishes a
     release. Only pushes that change the build paths do.
-  - The desktop app guide's
-    [local installer section](../desktop-app.md#build-a-local-installer) says
-    to create Linux builds on Linux, but `make desktop-package` stops at the
-    OCR step there.
-- **Only two platforms are released:** Apple Silicon macOS and Windows x64.
-  The Forge config has Linux makers, but there is no Linux build job, and the
-  desktop app guide asks for a verified OCR runtime first.
+- **Three platforms are released:** Apple Silicon macOS, Windows x64 (the
+  installer and the portable zip), and Linux x64 as an AppImage. The Forge
+  config's DEB and RPM makers have no build job.
 - **The site can drift from its source.** No test compares the committed HTML
   with the output of `site/build.py`, and the deploy publishes whatever is
   committed.

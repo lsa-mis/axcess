@@ -1,9 +1,4 @@
-const { app, autoUpdater, BrowserWindow, dialog, session, shell } = require("electron");
-
-// Squirrel.Windows relaunches the app with --squirrel-install / -updated /
-// -obsolete flags while it installs or updates; those runs must exit at once
-// instead of opening a window over the installer.
-if (require("electron-squirrel-startup")) app.quit();
+const { app, BrowserWindow, dialog, session, shell } = require("electron");
 
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -18,8 +13,11 @@ const {
   isAxcessUrl,
   isSafeExternalUrl,
   nextZoomLevel,
+  portableDataDir,
+  windowsUpdateMethod,
   zoomActionFor,
   startupFailureDetails,
+  PORTABLE_DATA_FOLDER,
 } = require("./runtime.cjs");
 const {
   RELEASES_API_URL,
@@ -33,6 +31,34 @@ const packageJson = require("../package.json");
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
 const UPDATE_FETCH_TIMEOUT_MS = 10_000;
+
+// Portable mode (the Windows zip): with "Axcess data" beside Axcess.exe,
+// everything Axcess writes goes there instead of %APPDATA%\Axcess: the
+// reports and their images, settings, logs, the browser profile, crash
+// reports, and temporary files (TEMP and TMP, which the backend, Playwright
+// and Chromium inherit). Set before anything reads userData, the
+// single-instance lock included, so a portable copy and an installed one
+// each keep their own reports. Windows itself still records a few things
+// about any program it runs (recent apps, prefetch).
+const portableData = app.isPackaged
+  ? portableDataDir({ execPath: process.execPath, platform: process.platform, exists: fs.existsSync })
+  : null;
+// A data folder Axcess cannot write to (unzipped somewhere read-only) stops
+// it with a message, rather than quietly writing to %APPDATA% after all.
+let portableDataUnwritable = null;
+if (portableData) {
+  app.setPath("userData", portableData);
+  app.setPath("crashDumps", path.join(portableData, "crash reports"));
+  const temporary = path.join(portableData, "temporary files");
+  try {
+    fs.mkdirSync(temporary, { recursive: true });
+    fs.accessSync(portableData, fs.constants.W_OK);
+    process.env.TEMP = temporary;
+    process.env.TMP = temporary;
+  } catch (error) {
+    portableDataUnwritable = error;
+  }
+}
 const repoRoot = path.resolve(__dirname, "../..");
 const appIcon = path.join(__dirname, "../assets/axcess.png");
 let mainWindow = null;
@@ -340,8 +366,10 @@ async function fetchLatestRelease() {
   return response.json();
 }
 
-// Squirrel.Windows installs the new version in place; the user chooses when
-// the restart that activates it happens.
+// electron-updater downloads the NSIS installer named in the release's
+// latest.yml and runs it silently into the folder Axcess is installed in;
+// the user chooses when the restart that activates it happens. Loaded here,
+// not at the top, because macOS never uses it.
 async function offerWindowsUpdate(release) {
   const { response } = await dialog.showMessageBox(ownerWindow(), {
     type: "info",
@@ -356,7 +384,9 @@ async function offerWindowsUpdate(release) {
   });
   if (response !== 0) return;
 
-  autoUpdater.once("update-downloaded", async () => {
+  const { NsisUpdater } = require("electron-updater");
+  const updater = new NsisUpdater({ provider: "generic", url: release.feedUrl });
+  updater.once("update-downloaded", async () => {
     const { response: restart } = await dialog.showMessageBox(ownerWindow(), {
       type: "info",
       title: "Update ready",
@@ -368,9 +398,10 @@ async function offerWindowsUpdate(release) {
       defaultId: 0,
       cancelId: 1,
     });
-    if (restart === 0) autoUpdater.quitAndInstall();
+    // Silent, and start Axcess again once the new version is in place.
+    if (restart === 0) updater.quitAndInstall(true, true);
   });
-  autoUpdater.once("error", (error) => {
+  updater.once("error", (error) => {
     void dialog.showMessageBox(ownerWindow(), {
       type: "warning",
       title: "Update failed",
@@ -379,8 +410,9 @@ async function offerWindowsUpdate(release) {
       buttons: ["OK"],
     });
   });
-  autoUpdater.setFeedURL({ url: release.feedUrl });
-  autoUpdater.checkForUpdates();
+  // The check downloads the update as soon as it finds it (autoDownload).
+  // A failure also reaches the "error" handler above, which tells the user.
+  updater.checkForUpdates().catch(() => {});
 }
 
 // Squirrel.Mac refuses to update an app that is not Developer ID signed, and
@@ -406,6 +438,58 @@ async function offerMacDownload(release) {
   }
 }
 
+// A copy from the zip cannot update itself: electron-updater's installer
+// would put a second Axcess somewhere else. The dialog opens the new zip
+// and says how to move to it; in portable mode that means carrying the
+// data folder over, or the new copy starts with no reports.
+async function offerZipDownload(release) {
+  const folder = path.dirname(process.execPath);
+  const steps = portableData
+    ? `To update: choose Download and wait for it to finish. Quit Axcess. ` +
+      `Unzip the new version into a new folder. Then move the "${PORTABLE_DATA_FOLDER}" ` +
+      `folder from this copy (${folder}) into the new folder, replacing the one there, ` +
+      "so your reports come with you. Open Axcess.exe in the new folder."
+    : "To update: choose Download and wait for it to finish. Quit Axcess. " +
+      "Unzip the new version into a new folder and open Axcess.exe there. " +
+      "Your reports are in your user folder, so the new copy finds them.";
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail: `You are running ${buildLabel()}. ${steps}`,
+    buttons: ["Download", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0 && isReleaseAssetUrl(release.zipUrl)) {
+    void shell.openExternal(release.zipUrl);
+  }
+}
+
+// An AppImage is one file; the new version replaces it. Browsers save
+// downloads without permission to run, hence the step that allows it. The
+// reports are in ~/.config/Axcess, so the new file finds them.
+async function offerAppImageDownload(release) {
+  const current = process.env.APPIMAGE ? ` (${process.env.APPIMAGE})` : "";
+  const { response } = await dialog.showMessageBox(ownerWindow(), {
+    type: "info",
+    title: "Update available",
+    message: `Axcess ${release.version} is available.`,
+    detail:
+      `You are running ${buildLabel()}. To update: choose Download and wait for it to ` +
+      `finish. Quit Axcess. Put the new file where the old one is${current} and delete ` +
+      "the old one. Allow the new file to run: in your file manager, open its " +
+      "Properties and turn on \"Allow executing file as program\", or run " +
+      "chmod +x on it. Then open it. Your reports stay where they are.",
+    buttons: ["Download", "Later"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0 && isReleaseAssetUrl(release.appImageUrl)) {
+    void shell.openExternal(release.appImageUrl);
+  }
+}
+
 // Best-effort and silent: offline, rate-limited, or malformed responses just
 // mean no prompt this launch. Runs after the workbench is showing so it never
 // delays startup.
@@ -422,11 +506,28 @@ async function checkForUpdates() {
   }
   if (!isNewerRelease(release, app.getVersion())) return;
   updateOffered = true;
-  if (process.platform === "win32" && release.feedUrl) {
-    await offerWindowsUpdate(release);
+  if (process.platform === "win32") {
+    const method = windowsUpdateMethod({ execPath: process.execPath, exists: fs.existsSync });
+    if (method === "installer" && release.feedUrl) await offerWindowsUpdate(release);
+    else if (method === "download" && release.zipUrl) await offerZipDownload(release);
   } else if (process.platform === "darwin" && release.dmgUrl) {
     await offerMacDownload(release);
+  } else if (process.platform === "linux" && release.appImageUrl) {
+    await offerAppImageDownload(release);
   }
+}
+
+// The first launch: no database yet, so the backend creates it and brings it
+// to the current schema, and the system checks the new app (Gatekeeper on
+// macOS, Defender on Windows). All of that makes the wait longer, and the
+// loading screen says so (static/loading.html, #first-launch). Checked once,
+// before the backend starts; a later window in the same run is not a first.
+let firstLaunch = null;
+function isFirstLaunch() {
+  if (firstLaunch === null) {
+    firstLaunch = !fs.existsSync(path.join(app.getPath("userData"), "data", "audit.db"));
+  }
+  return firstLaunch;
 }
 
 async function launch() {
@@ -437,7 +538,7 @@ async function launch() {
   // then aborts that load, and Electron rejects the *new* loadURL with the old
   // page's ERR_ABORTED (-3). Let the loading page settle first.
   const loadingShown = mainWindow
-    .loadFile(path.join(__dirname, "../static/loading.html"))
+    .loadFile(path.join(__dirname, "../static/loading.html"), isFirstLaunch() ? { hash: "first-launch" } : {})
     .catch(() => {});
   if (!backendProcess || !backendOrigin) {
     const port = await findOpenPort();
@@ -445,6 +546,7 @@ async function launch() {
     startBackend(port);
   }
   await waitForBackend(backendOrigin);
+  firstLaunch = false;
   await loadingShown;
   if (mainWindow && !mainWindow.isDestroyed()) {
     await mainWindow.loadURL(`${backendOrigin}/app/`);
@@ -452,7 +554,17 @@ async function launch() {
   void checkForUpdates().catch(() => {});
 }
 
-if (!app.requestSingleInstanceLock()) {
+if (portableDataUnwritable) {
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      "Axcess cannot save to its data folder",
+      `Axcess keeps everything in "${portableData}", and it cannot write there ` +
+        `(${portableDataUnwritable.message}).\n\nMove the Axcess folder to a place you can ` +
+        "change, such as Documents or Desktop, and open it again.",
+    );
+    app.quit();
+  });
+} else if (!app.requestSingleInstanceLock()) {
   logLauncher("another Axcess is already running; handing this launch to it");
   app.quit();
 } else {

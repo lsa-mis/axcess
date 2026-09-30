@@ -35,8 +35,21 @@ RELEASES = f"{REPO}/releases"
 LATEST_RELEASE = f"{RELEASES}/latest"
 # Version-less asset names are uploaded by .github/workflows/desktop-build.yml
 # so these links always fetch the newest build without a GitHub sign-in.
-DOWNLOAD_MACOS = f"{LATEST_RELEASE}/download/Axcess-macOS-AppleSilicon.dmg"
-DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-x64-Setup.exe"
+# Each release holds one file per platform, named with its version
+# (Axcess-0.64-Windows-Installer.exe, releaseFileName in
+# desktop/src/updates.cjs), so there is no fixed name to link to. A download
+# link goes to the newest release's page, which lists the files and works
+# without scripts; assets/site.js then points it at the file itself, found
+# by the part of its name after the version (data-release-file).
+def download_link(kind: str, text: str, css: str = "") -> str:
+    cls = f' class="{css}"' if css else ""
+    return f'<a{cls} href="{LATEST_RELEASE}" data-release-file="{kind}">{text}</a>'
+
+
+def release_file_name(kind: str) -> str:
+    """The file's name as the steps show it; site.js puts in the version."""
+    return f'<code data-release-name="{kind}">Axcess-(version)-{kind}</code>'
+
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
@@ -1521,13 +1534,13 @@ def get_started() -> str:
         <h3>Desktop app (recommended)</h3>
         <p>One app that bundles everything: the workbench, the browser, both rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
-          <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
+          <li>macOS on Apple Silicon (M1 and later), Windows 10 or 11 (64-bit), and 64-bit Linux from 2022 on (for example Ubuntu 22.04, Debian 12 or Fedora 36, or newer)</li>
           <li>A development preview, published automatically when the app changes</li>
           <li>Free, with no account or sign-in needed to download</li>
         </ul>
-        <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a></p>
+        <p class="btn-row">{download_link("Mac-Apple-Silicon.dmg", "Download for macOS", "btn btn-primary")} {download_link("Windows-Installer.exe", "Download for Windows", "btn btn-primary")} {download_link("Linux.AppImage", "Download for Linux", "btn btn-primary")}</p>
         <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
-        <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> Both macOS and Windows show a warning on first launch that you need to approve.', "callout-maize", "warn")}</div>
+        <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> macOS and Windows show a warning on first launch that you need to approve, and on Linux you allow the file to run.', "callout-maize", "warn")}</div>
       </article>
       <article class="card">
         {icon("cpu")}
@@ -1548,7 +1561,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for macOS</strong> and wait for <code>Axcess-macOS-AppleSilicon.dmg</code> to finish downloading.</li>
+          <li>Select <strong>Download for macOS</strong> and wait for {release_file_name("Mac-Apple-Silicon.dmg")} to finish downloading.</li>
           <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
           <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
           <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
@@ -1560,14 +1573,33 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Windows</strong> and wait for <code>Axcess-Windows-x64-Setup.exe</code> to finish downloading.</li>
+          <li>Select <strong>Download for Windows</strong> and wait for {release_file_name("Windows-Installer.exe")} to finish downloading.</li>
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Wait while Axcess installs. There are no setup screens, and it opens by itself when it is done.</li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
+        <h5 style="margin-top:1rem">Without installing</h5>
+        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. {download_link("Windows-Portable.zip", "Download the portable Windows zip (no install)")}.</p>
+        <ol class="small" style="margin:.5rem 0 0;padding-left:1.25rem">
+          <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
+          <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
+          <li>Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess, move the whole folder.</li>
+        </ol>
+      </article>
+      <article class="card">
+        <h4>On Linux</h4>
+        <ol style="margin:.75rem 0 0;padding-left:1.25rem">
+          <li>Select <strong>Download for Linux</strong> and wait for {release_file_name("Linux.AppImage")} to finish downloading. It is the whole app in one file.</li>
+          <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
+          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a terminal.</li>
+          <li>Double-click it to open Axcess.</li>
+        </ol>
+        <p class="small" style="margin-top:.75rem">Ubuntu 23.10 and later do not let an AppImage use the browser sandbox that keeps web pages apart from the rest of your computer. There, Axcess opens with that sandbox off, so open only saved copies of sites you trust in the Page inspector. On other Linux systems it stays on.</p>
       </article>
     </div>
     <div style="margin-top:1.5rem">{callout("<strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a>", "", "info")}</div>

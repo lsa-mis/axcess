@@ -62,13 +62,13 @@
         <h3>Desktop app (recommended)</h3>
         <p>One app that bundles everything: the workbench, the browser, both rule engines, and text recognition. No Python, Node, or other developer tools needed.</p>
         <ul class="checks" style="margin:1rem 0">
-          <li>macOS on Apple Silicon (M1 and later) and Windows 10 or 11 (64-bit)</li>
+          <li>macOS on Apple Silicon (M1 and later), Windows 10 or 11 (64-bit), and 64-bit Linux from 2022 on (for example Ubuntu 22.04, Debian 12 or Fedora 36, or newer)</li>
           <li>A development preview, published automatically when the app changes</li>
           <li>Free, with no account or sign-in needed to download</li>
         </ul>
-        <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-macOS-AppleSilicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-x64-Setup.exe">Download for Windows</a></p>
+        <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Mac-Apple-Silicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Windows-Installer.exe">Download for Windows</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Linux.AppImage">Download for Linux</a></p>
         <p class="small" id="latest-release" data-latest-release="https://github.com/lsa-mis/axcess/releases/latest">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="https://github.com/lsa-mis/axcess/releases">the releases page</a>.</p>
-        <div style="margin-top:1rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> Both macOS and Windows show a warning on first launch that you need to approve.</p></div></div>
+        <div style="margin-top:1rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> macOS and Windows show a warning on first launch that you need to approve, and on Linux you allow the file to run.</p></div></div>
       </article>
       <article class="card">
         <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></span>
@@ -89,7 +89,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for macOS</strong> and wait for <code>Axcess-macOS-AppleSilicon.dmg</code> to finish downloading.</li>
+          <li>Select <strong>Download for macOS</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
           <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
           <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
           <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
@@ -101,14 +101,33 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Windows</strong> and wait for <code>Axcess-Windows-x64-Setup.exe</code> to finish downloading.</li>
+          <li>Select <strong>Download for Windows</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish downloading.</li>
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Wait while Axcess installs. There are no setup screens, and it opens by itself when it is done.</li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
+        <h5 style="margin-top:1rem">Without installing</h5>
+        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. <a href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Windows-Portable.zip">Download the portable Windows zip (no install)</a>.</p>
+        <ol class="small" style="margin:.5rem 0 0;padding-left:1.25rem">
+          <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
+          <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
+          <li>Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess, move the whole folder.</li>
+        </ol>
+      </article>
+      <article class="card">
+        <h4>On Linux</h4>
+        <ol style="margin:.75rem 0 0;padding-left:1.25rem">
+          <li>Select <strong>Download for Linux</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the whole app in one file.</li>
+          <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
+          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a terminal.</li>
+          <li>Double-click it to open Axcess.</li>
+        </ol>
+        <p class="small" style="margin-top:.75rem">Ubuntu 23.10 and later do not let an AppImage use the browser sandbox that keeps web pages apart from the rest of your computer. There, Axcess opens with that sandbox off, so open only saved copies of sites you trust in the Page inspector. On other Linux systems it stays on.</p>
       </article>
     </div>
     <div style="margin-top:1.5rem"><div class="callout "><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><p><strong>Optional AI checks</strong> need a separately installed local service called Ollama and models you download yourself. Skip this at first: every browser-based check runs without it. <a href='../privacy/'>How the optional AI stays local.</a></p></div></div>

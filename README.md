@@ -52,8 +52,11 @@ rather than replace them. See
 
 Download the desktop preview:
 
-- [Axcess for macOS (Apple Silicon)](https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-macOS-AppleSilicon.dmg)
-- [Axcess for Windows 10 or 11 (64-bit)](https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-x64-Setup.exe)
+- [The newest release](https://github.com/lsa-mis/axcess/releases/latest), with one file for each system:
+  `Axcess-<version>-Mac-Apple-Silicon.dmg` (macOS, Apple Silicon),
+  `Axcess-<version>-Windows-Installer.exe` (Windows 10 or 11, 64-bit),
+  `Axcess-<version>-Windows-Portable.zip` (Windows, without installing) and
+  `Axcess-<version>-Linux.AppImage` (64-bit Linux)
 
 The preview does not yet carry the signatures macOS and Windows look for
 (notarization and code signing), so they warn you the first time. Follow the

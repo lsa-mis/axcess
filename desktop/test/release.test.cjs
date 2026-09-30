@@ -3,13 +3,23 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { dmgName, setupExeName } = require("../scripts/release-names.cjs");
+const { appImageName, dmgName, portableZipName, setupExeName } = require("../scripts/release-names.cjs");
 const { stamp } = require("../scripts/stamp-version.cjs");
 
-test("installers are named with the version people see", () => {
-  assert.equal(dmgName("0.61.0", "arm64"), "Axcess-0.61-arm64.dmg");
-  assert.equal(setupExeName("0.61.0"), "Axcess-0.61-Setup.exe");
-  assert.equal(setupExeName("1.0.0"), "Axcess-1.00-Setup.exe");
+test("release files are named in plain words, with their version", () => {
+  assert.equal(dmgName("0.2.3", "arm64"), "Axcess-0.2.3-Mac-Apple-Silicon.dmg");
+  assert.equal(dmgName("0.2.3", "x64"), "Axcess-0.2.3-Mac-Intel.dmg");
+  assert.equal(setupExeName("0.2.3"), "Axcess-0.2.3-Windows-Installer.exe");
+  assert.equal(setupExeName("1.0.0"), "Axcess-1.0.0-Windows-Installer.exe");
+  assert.equal(portableZipName("0.2.3"), "Axcess-0.2.3-Windows-Portable.zip");
+  assert.equal(appImageName("0.2.3"), "Axcess-0.2.3-Linux.AppImage");
+  // No CPU codes in any of them.
+  for (const name of [dmgName("0.2.3", "arm64"), setupExeName("0.2.3"), portableZipName("0.2.3"), appImageName("0.2.3")]) {
+    assert.doesNotMatch(name, /arm64|x64|x86_64|aarch64|darwin|win32/);
+  }
+  // A processor with no build has no file.
+  assert.equal(portableZipName("0.2.3", "arm64"), null);
+  assert.equal(appImageName("0.2.3", "arm64"), null);
 });
 
 function packageFolder(version) {

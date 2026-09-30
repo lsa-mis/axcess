@@ -60,12 +60,16 @@ test("native icon assets include high-resolution PNG, multi-size ICO, and ICNS",
   for (const type of ["ic07", "ic08", "ic09", "ic10"]) assert.ok(types.includes(type));
 });
 
+test("the Windows installer uses the Axcess icon", () => {
+  const config = require("../electron-builder.config.cjs");
+  assert.equal(path.join(root, config.win.icon), asset("ico"));
+});
+
 test("every desktop packaging target uses the Axcess assets", () => {
   for (const platform of ["darwin", "win32", "linux"]) {
     const config = configFor(platform);
     assert.equal(config.packagerConfig.icon, path.join(root, "assets", "axcess"));
     const makers = config.makers;
-    assert.equal(makers.find((m) => m.name.endsWith("maker-squirrel")).config.setupIcon, asset("ico"));
     for (const maker of ["maker-deb", "maker-rpm"]) {
       assert.equal(makers.find((m) => m.name.endsWith(maker)).config.options.icon, asset("png"));
     }
@@ -103,6 +107,20 @@ test("the loading screen inlines the mark and fetches nothing", () => {
   // bounding box is what keeps the ring on-axis.
   assert.match(html, /transform-box: view-box/);
   assert.match(html, /prefers-reduced-motion/);
+});
+
+test("the loading screen tells a first launch that it can take longer", () => {
+  const html = startupScreen("loading");
+  // Inside the status region, so it is read with "Loading".
+  const status = html.match(/<main role="status"[\s\S]*?<\/main>/);
+  assert.ok(status, "expected the status region");
+  assert.match(status[0], /<p id="first-launch" class="first-launch">The first time Axcess opens, this can take a minute or two\.<\/p>/);
+  // Shown only as the page's target, since the screen runs no script.
+  assert.match(html, /\.first-launch \{ display: none;/);
+  assert.match(html, /\.first-launch:target \{ display: block; \}/);
+  assert.doesNotMatch(html, /<script\b/);
+  const main = fs.readFileSync(path.join(root, "src", "main.cjs"), "utf8");
+  assert.match(main, /isFirstLaunch\(\) \? \{ hash: "first-launch" \}/);
 });
 
 test("the bundled logo carries no text, raster, script, or remote import", () => {

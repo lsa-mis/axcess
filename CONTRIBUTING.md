@@ -71,12 +71,21 @@ schedule, and manual dispatch.
 | `frontend` | `npm run lint` and `npm run build` (the build is also the TypeScript check) |
 | `desktop-node` | `npm test` in `desktop/` |
 | `desktop-release-dry-run` | The release's version pick, `package.json` stamp, and installer-name check, with the scripts `desktop-build.yml` uses |
-| `browser-suites` | `pytest tests/integration` and `pytest tests/ui -m browser` |
+| `accessibility` | `pytest tests/ui -m browser`: every Playwright UI test, with every axe-core check |
+| `browser-suites` | `pytest tests/integration` |
+
+The `accessibility` job runs on every pull request and push to `main`. It
+holds the axe-core checks of the review app (every screen, both themes, at
+1280 and 320 px), of the desktop app's loading and error screens and of the
+public site, all against WCAG 2.2 Level A and AA, plus the sentence-case
+check of control labels. A failure there blocks the merge. A pass means axe
+found nothing it can detect, not that the app meets WCAG: the rest needs a
+person.
 
 The `browser-suites` job runs only on the daily schedule, on manual dispatch,
-or on a pull request labeled `run-browser-tests`. The axe-core tests of the app
-are browser tests, so they run only there. If your change touches the crawler,
-a browser check, or the UI, add the label so these suites run before merge.
+or on a pull request labeled `run-browser-tests`. If your change touches the
+crawler or a browser check, add the label so the integration suites run
+before merge.
 
 Other workflows:
 

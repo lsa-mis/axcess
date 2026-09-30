@@ -219,9 +219,10 @@ export function BlockedScanNotice({
             The website returned an error (HTTP {blocked.status_code})
           </strong>
           {blocked.title && <>, &ldquo;{blocked.title}&rdquo;</>}. Axcess could
-          not get past the start page, so report {scanId} is incomplete.{" "}
-          <Link to="/scans/new">Start a new scan</Link>. If the site needs you
-          to sign in, and you have permission, use a sign-in scan.
+          not get past the start page, so report {scanId} is incomplete. Try
+          again on a different network: <Link to="/scans/new">start a new scan</Link>.
+          If the site needs you to sign in, and you have permission, use a
+          sign-in scan.
         </div>
       </div>
     </Card>

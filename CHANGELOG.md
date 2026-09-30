@@ -1,14 +1,30 @@
 # Changelog
 
-Notable changes to Axcess, newest first. Versions have two parts: `0.60`,
-then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
-`main` is one step after the last. Before 0.60 desktop previews were
-`0.1.<run number>`, up to `desktop-v0.1.33`.
+Notable changes to Axcess, newest first. Versions are semver: the team
+chooses the release line (now 0.2), and each desktop release published from
+`main` counts up the last part, 0.2.0, 0.2.1 and on. Earlier previews were
+numbered `0.1.<run number>` (to 0.1.34), then 0.60 to 0.63, one step per
+merge.
 
 ## Unreleased
 
 ### Added
 
+- Desktop app: the first time Axcess opens, the loading screen says
+  "The first time Axcess opens, this can take a minute or two." under
+  "Loading", since that first start sets up the reports database and the
+  system checks the new app.
+- Linux: Axcess as an AppImage, the whole app in one file, for 64-bit
+  Linux from 2022 on (Ubuntu 22.04, Debian 12, Fedora 36 or newer), with
+  text recognition built in. On Ubuntu 23.10 and later it opens with the
+  browser sandbox off, because Ubuntu blocks it for AppImages. When a new
+  version is out, Axcess offers the new file to download.
+- Windows, without installing: a zip of Axcess for computers where you
+  cannot install programs, or to carry Axcess and its reports on a USB
+  drive. Axcess keeps everything in the "Axcess data" folder next to
+  Axcess.exe, so moving the folder moves your reports too. When a new
+  version is out, Axcess offers the new zip and says how to bring the data
+  folder along. Do not keep it on a network drive.
 - New scan: **Scan every page it finds**, for public scans. There is no page
   limit; the scan ends when it runs out of pages in scope within the link
   depth. Sign-in scans keep their cap.
@@ -42,6 +58,30 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Versions: 0.2.0 starts a release line the team chooses, and each release
+  counts up the last part (0.2.1, 0.2.2 ...). The previews 0.60 to 0.63
+  numbered each merge instead and would have reached 1.00 by themselves.
+  A copy of one of those is not offered 0.2.x: install it once from the Get
+  started page.
+- New scan button: it no longer turns grey on the New scan page. It looks
+  the same everywhere, and there a screen reader says it is the current
+  page.
+- Download files are named in plain words, for who each is for and what
+  it is, not processor codes: Axcess-0.61-Mac-Apple-Silicon.dmg,
+  Axcess-0.61-Windows-Installer.exe, Axcess-0.61-Windows-Portable.zip and
+  Axcess-0.61-Linux.AppImage (they were -arm64.dmg, -Setup.exe,
+  -Windows-x64-portable.zip and -x86_64.AppImage). A Mac with an earlier
+  preview installed is not offered this one: download it from the Get
+  started page once. Releases are titled "Axcess 0.61 (preview)", and
+  each holds just those four files and the two the Windows updater reads.
+- Windows installer: a standard setup wizard replaces the screen that showed
+  only an animation. It asks who to install Axcess for (only you, with no
+  administrator permission, or everyone on the computer), shows the folder
+  and lets you change it, and says where Axcess is installed when it is
+  done. Every word in the installer and uninstaller is plain English. Updates still install in
+  place from the update dialog. Uninstalling keeps your scans. A copy
+  installed by the old installer is not offered updates; uninstall it and
+  install the new version.
 - Inspector and page code view: stepping through flagged elements uses two
   labelled buttons, Previous and Next (Jump when there is only one), each
   with its own border, beside the count "Flagged element 1 of 3". They were
@@ -110,6 +150,14 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Fixed
 
+- Reports: a site's very first scan now shows while it runs. Starting it
+  and going straight back to Reports showed "No reports yet" until the
+  page was reloaded.
+- Images, grouped by issue: each thumbnail links to its image's page, and
+  a screen reader now reads that link as "Open image #12". It had no name.
+- Public site, Get started: the yellow note in the download card had grey
+  text, below the 7:1 contrast the site keeps for text. It is dark now,
+  like the same note everywhere else.
 - Issues and Reports: a filter chosen while the search box was still
   catching up with your typing could be lost. Both are kept now.
 - Tabbing to a long table scrolled the page to the table's middle, away from

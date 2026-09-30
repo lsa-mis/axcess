@@ -21,11 +21,16 @@ function release(overrides = {}) {
     draft: false,
     prerelease: false,
     assets: [
-      { name: "Axcess-0.1.57-arm64.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg` },
+      { name: "Axcess-0.1.57-Mac-Apple-Silicon.dmg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg` },
       { name: "Axcess-darwin-arm64-0.1.57.zip", browser_download_url: `${DOWNLOAD}/Axcess-darwin-arm64-0.1.57.zip` },
-      { name: "Axcess-0.1.57-Setup.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Setup.exe` },
-      { name: "RELEASES", browser_download_url: `${DOWNLOAD}/RELEASES` },
-      { name: "Axcess-0.1.57-full.nupkg", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-full.nupkg` },
+      { name: "Axcess-0.1.57-Windows-Installer.exe", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Installer.exe` },
+      { name: "Axcess-0.1.57-Linux.AppImage", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Linux.AppImage` },
+      {
+        name: "Axcess-0.1.57-Windows-Portable.zip",
+        browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Portable.zip`,
+      },
+      { name: "Axcess-0.1.57-Windows-Installer.exe.blockmap", browser_download_url: `${DOWNLOAD}/Axcess-0.1.57-Windows-Installer.exe.blockmap` },
+      { name: "latest.yml", browser_download_url: `${DOWNLOAD}/latest.yml` },
     ],
     ...overrides,
   };
@@ -56,7 +61,7 @@ test("release tags map to versions", () => {
 });
 
 test("only HTTPS asset downloads from this repository may be opened", () => {
-  assert.equal(isReleaseAssetUrl(`${DOWNLOAD}/Axcess-0.1.57-arm64.dmg`), true);
+  assert.equal(isReleaseAssetUrl(`${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg`), true);
   assert.equal(isReleaseAssetUrl("http://github.com/lsa-mis/axcess/releases/download/x/y.dmg"), false);
   assert.equal(isReleaseAssetUrl("https://github.com/lsa-mis/axcess/releases/latest"), false);
   assert.equal(isReleaseAssetUrl("https://github.com/lsa-mis/axcess/releases/download/"), false);
@@ -70,7 +75,7 @@ test("macOS releases resolve to the DMG for the running architecture", () => {
   const described = describeRelease(release(), { platform: "darwin", arch: "arm64" });
   assert.equal(described.version, "0.1.57");
   assert.equal(described.tag, "desktop-v0.1.57");
-  assert.equal(described.dmgUrl, `${DOWNLOAD}/Axcess-0.1.57-arm64.dmg`);
+  assert.equal(described.dmgUrl, `${DOWNLOAD}/Axcess-0.1.57-Mac-Apple-Silicon.dmg`);
   assert.equal(described.feedUrl, null);
 
   const intel = describeRelease(release(), { platform: "darwin", arch: "x64" });
@@ -79,17 +84,17 @@ test("macOS releases resolve to the DMG for the running architecture", () => {
 
 test("a DMG hosted somewhere other than the release is ignored", () => {
   const tampered = release({
-    assets: [{ name: "Axcess-0.1.57-arm64.dmg", browser_download_url: "https://evil.example/a.dmg" }],
+    assets: [{ name: "Axcess-0.1.57-Mac-Apple-Silicon.dmg", browser_download_url: "https://evil.example/a.dmg" }],
   });
   assert.equal(describeRelease(tampered, { platform: "darwin", arch: "arm64" }).dmgUrl, null);
 });
 
-test("Windows releases resolve to the Squirrel feed directory", () => {
+test("Windows releases resolve to the electron-updater feed directory", () => {
   const described = describeRelease(release(), { platform: "win32", arch: "x64" });
   assert.equal(described.feedUrl, DOWNLOAD);
   assert.equal(described.dmgUrl, null);
 
-  const withoutFeed = release({ assets: release().assets.filter((asset) => asset.name !== "RELEASES") });
+  const withoutFeed = release({ assets: release().assets.filter((asset) => asset.name !== "latest.yml") });
   assert.equal(describeRelease(withoutFeed, { platform: "win32", arch: "x64" }).feedUrl, null);
 });
 
@@ -115,35 +120,70 @@ test("the release lookup targets this repository over HTTPS", () => {
   assert.equal(RELEASES_API_URL, "https://api.github.com/repos/lsa-mis/axcess/releases/latest");
 });
 
-test("versions read as two parts, with two digits after the point", () => {
-  assert.equal(displayVersion("0.60.0"), "0.60");
-  assert.equal(displayVersion("0.61.0"), "0.61");
-  assert.equal(displayVersion("0.61"), "0.61");
-  assert.equal(displayVersion("1.0.0"), "1.00");
-  // The old per-build scheme keeps its third part.
-  assert.equal(displayVersion("0.1.33"), "0.1.33");
+test("versions are three-part semver and read as they are", () => {
+  assert.equal(displayVersion("0.2.0"), "0.2.0");
+  assert.equal(displayVersion("0.2.13"), "0.2.13");
+  assert.equal(displayVersion("1.0.0"), "1.0.0");
 });
 
-test("a two-part version is packaged as semver", () => {
-  assert.equal(packageVersion("0.61"), "0.61.0");
-  assert.equal(packageVersion("1.00"), "1.0.0");
-  assert.throws(() => packageVersion("0.61.0"));
+test("the package carries the same three-part version", () => {
+  assert.equal(packageVersion("0.2.4"), "0.2.4");
+  assert.throws(() => packageVersion("0.61"), /three-part/);
 });
 
-test("each release is one step after the highest two-part tag", () => {
-  assert.equal(nextReleaseVersion([]), "0.60");
-  // Only the old scheme so far: the first two-part release is 0.60.
-  assert.equal(nextReleaseVersion(["desktop-v0.1.33", "desktop-v0.1.32"]), "0.60");
-  assert.equal(nextReleaseVersion(["desktop-v0.60", "desktop-v0.1.33"]), "0.61");
-  assert.equal(nextReleaseVersion(["desktop-v0.61", "desktop-v0.69", "desktop-v0.62"]), "0.70");
-  assert.equal(nextReleaseVersion(["desktop-v0.99"]), "1.00");
-  assert.equal(nextReleaseVersion(["v0.75", "desktop-v0.6", "desktop-v0.64"]), "0.65");
+test("each release counts up the last part of the chosen line", () => {
+  // No release on the line yet: it starts at .0, whatever older tags exist.
+  assert.equal(nextReleaseVersion([], "0.2"), "0.2.0");
+  assert.equal(nextReleaseVersion(["desktop-v0.63", "desktop-v0.1.34"], "0.2"), "0.2.0");
+  assert.equal(nextReleaseVersion(["desktop-v0.2.0"], "0.2"), "0.2.1");
+  // Numbers, not text: 0.2.10 is after 0.2.9.
+  assert.equal(nextReleaseVersion(["desktop-v0.2.9", "desktop-v0.2.10", "desktop-v0.2.2"], "0.2"), "0.2.11");
+  // Another line's tags do not count; moving on is a deliberate change.
+  assert.equal(nextReleaseVersion(["desktop-v0.2.7", "desktop-v0.3.1"], "0.3"), "0.3.2");
+  assert.equal(nextReleaseVersion(["desktop-v0.2.7", "v0.2.9", "desktop-v0.22.1"], "0.2"), "0.2.8");
+  assert.throws(() => nextReleaseVersion([], "0.2.0"), /release line/);
 });
 
-test("a two-part release is newer than the builds before it", () => {
-  assert.equal(releaseVersion("desktop-v0.61"), "0.61");
-  assert.equal(compareVersions("0.61", "0.60.0"), 1);
-  assert.equal(compareVersions("0.60", "0.1.33"), 1);
-  assert.equal(compareVersions("0.61", "0.61.0"), 0);
-  assert.equal(compareVersions("1.00", "0.99.0"), 1);
+test("the chosen line is set in one place, package.json", () => {
+  const pkg = require("../package.json");
+  assert.match(pkg.config.releaseLine, /^\d+\.\d+$/);
+  assert.ok(pkg.version.startsWith(`${pkg.config.releaseLine}.`));
 });
+
+test("versions compare as numbers across the schemes", () => {
+  assert.equal(releaseVersion("desktop-v0.2.3"), "0.2.3");
+  assert.equal(compareVersions("0.2.10", "0.2.9"), 1);
+  assert.equal(compareVersions("0.2.0", "0.1.34"), 1);
+  // Copies of the old previews (0.60 to 0.63) are not offered 0.2.x.
+  assert.equal(compareVersions("0.2.0", "0.63.0"), -1);
+});
+
+test("a release with only the old Squirrel feed is not a Windows update", () => {
+  const squirrelOnly = release({
+    assets: [
+      ...release().assets.filter((asset) => asset.name !== "latest.yml"),
+      { name: "RELEASES", browser_download_url: `${DOWNLOAD}/RELEASES` },
+    ],
+  });
+  assert.equal(describeRelease(squirrelOnly, { platform: "win32", arch: "x64" }).feedUrl, null);
+});
+
+test("Windows releases name the portable zip for a copy Setup did not install", () => {
+  const described = describeRelease(release(), { platform: "win32", arch: "x64" });
+  assert.equal(described.zipUrl, `${DOWNLOAD}/Axcess-0.1.57-Windows-Portable.zip`);
+  assert.equal(describeRelease(release(), { platform: "win32", arch: "arm64" }).zipUrl, null);
+  assert.equal(describeRelease(release(), { platform: "darwin", arch: "arm64" }).zipUrl, null);
+  const elsewhere = release({
+    assets: [{ name: "Axcess-0.1.57-Windows-Portable.zip", browser_download_url: "https://evil.example/a.zip" }],
+  });
+  assert.equal(describeRelease(elsewhere, { platform: "win32", arch: "x64" }).zipUrl, null);
+});
+
+test("Linux releases resolve to the AppImage for the running architecture", () => {
+  const described = describeRelease(release(), { platform: "linux", arch: "x64" });
+  assert.equal(described.appImageUrl, `${DOWNLOAD}/Axcess-0.1.57-Linux.AppImage`);
+  assert.equal(described.zipUrl, null);
+  assert.equal(describeRelease(release(), { platform: "linux", arch: "arm64" }).appImageUrl, null);
+  assert.equal(describeRelease(release(), { platform: "win32", arch: "x64" }).appImageUrl, null);
+});
+

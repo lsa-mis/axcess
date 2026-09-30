@@ -29,17 +29,33 @@ async def _swipe(page: Any, dx: float, steps: int = 4) -> None:
     await page.wait_for_timeout(GESTURE_GAP_MS)
 
 
+async def _point_at_heading(page: Any) -> None:
+    """Rest the pointer on the page title, where nothing scrolls sideways.
+
+    The issue page renders its heading again shortly after it first shows,
+    and a box asked for in that moment came back None (one run in four;
+    waiting for the network to settle did not help). The box is asked for
+    until there is one. Focus is not affected: a new page focuses <main>.
+    """
+    heading = page.get_by_role("heading", level=1)
+    await playwright_async.expect(heading).to_be_visible()
+    box = None
+    for _ in range(50):
+        box = await heading.bounding_box()
+        if box is not None:
+            break
+        await page.wait_for_timeout(100)
+    assert box is not None
+    await page.mouse.move(box["x"] + 10, box["y"] + box["height"] / 2)
+
+
 async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str, str]:
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues_url = page.url
     table = page.get_by_role("table", name="Accessibility issues")
     await table.get_by_role("rowheader").get_by_role("link").first.click()
     await page.wait_for_url("**/issues/**")
-    await page.get_by_role("heading", level=1).wait_for()
-    # Over the page title: nothing there scrolls sideways.
-    box = await page.get_by_role("heading", level=1).bounding_box()
-    assert box is not None
-    await page.mouse.move(box["x"] + 10, box["y"] + box["height"] / 2)
+    await _point_at_heading(page)
     return issues_url, page.url
 
 
@@ -59,9 +75,7 @@ async def test_desktop_swipe_goes_back_and_forward(
     await _swipe(page, -240)
     await page.wait_for_url(issues_url)
 
-    box = await page.get_by_role("heading", level=1).bounding_box()
-    assert box is not None
-    await page.mouse.move(box["x"] + 10, box["y"] + box["height"] / 2)
+    await _point_at_heading(page)
     await _swipe(page, 240)
     await page.wait_for_url(issue_url)
 
