@@ -138,43 +138,42 @@ function isNewerRelease(release, currentVersion) {
 }
 
 /**
- * How a version reads to people: two parts, "0.61", with two digits after
- * the point, so 0.69 is followed by 0.70 and 0.99 by 1.00. npm and
- * electron-updater need three-part semver, so the package itself carries
- * "0.61.0" (and "1.0.0" for 1.00); this drops the ".0" again. A version
- * from before the two-part scheme ("0.1.33") is shown as it is.
+ * Versions are semver, MAJOR.MINOR.PATCH, and read as they are: "0.2.3".
+ * The team chooses the release line, MAJOR.MINOR ("0.2", config.releaseLine
+ * in desktop/package.json); every release published from main counts up
+ * the last part (nextReleaseVersion). Moving to 0.3.0 or 1.0.0 is a
+ * deliberate one-line change there, never the side effect of a merge. The
+ * scheme before this one (0.60, 0.61 ...) added 0.01 per merge, a build
+ * counter that looked like a version and would have reached 1.00 by itself.
  */
 function displayVersion(version) {
   const parts = parseVersion(version);
-  if (!parts) return String(version);
-  if (parts.length === 3 && parts[2] !== 0) return parts.join(".");
-  return `${parts[0]}.${String(parts[1] ?? 0).padStart(2, "0")}`;
+  return parts ? parts.join(".") : String(version);
 }
 
-/** The semver a two-part version is packaged as: "0.61" -> "0.61.0", "1.00" -> "1.0.0". */
+/** The version as package.json carries it: the same three parts, checked. */
 function packageVersion(version) {
   const parts = parseVersion(version);
-  if (!parts || parts.length !== 2) throw new Error(`Not a two-part version: ${version}`);
-  return `${parts[0]}.${parts[1]}.0`;
+  if (!parts || parts.length !== 3) throw new Error(`Not a three-part version: ${version}`);
+  return parts.join(".");
 }
 
 /**
- * The version of the next release, given the release tags that exist: one
- * step after the highest two-part tag ("desktop-v0.60" -> "0.61",
- * "desktop-v0.99" -> "1.00"), or `first` when there is none yet. Tags of
- * the old three-part scheme ("desktop-v0.1.33") do not count.
+ * The version of the next release on `line` ("0.2"), given the release
+ * tags that exist: one step after the highest "desktop-v0.2.N"
+ * ("desktop-v0.2.3" -> "0.2.4"), or "0.2.0" when the line has none yet.
+ * Tags of other lines, and of the schemes before (desktop-v0.63,
+ * desktop-v0.1.33), do not count.
  */
-function nextReleaseVersion(tags, first = "0.60") {
+function nextReleaseVersion(tags, line) {
+  if (!/^\d+\.\d+$/.test(String(line))) throw new Error(`Not a release line (MAJOR.MINOR): ${line}`);
+  const pattern = new RegExp(`^desktop-v${line.replace(".", "\\.")}\\.(\\d+)$`);
   let highest = null;
   for (const tag of tags) {
-    const match = /^desktop-v(\d+)\.(\d{2})$/.exec(String(tag).trim());
-    if (!match) continue;
-    const step = Number(match[1]) * 100 + Number(match[2]);
-    if (highest === null || step > highest) highest = step;
+    const match = pattern.exec(String(tag).trim());
+    if (match && (highest === null || Number(match[1]) > highest)) highest = Number(match[1]);
   }
-  if (highest === null) return first;
-  const next = highest + 1;
-  return `${Math.floor(next / 100)}.${String(next % 100).padStart(2, "0")}`;
+  return `${line}.${highest === null ? 0 : highest + 1}`;
 }
 
 module.exports = {

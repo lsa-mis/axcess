@@ -475,14 +475,14 @@ def board_release() -> str:
     s1 = step("1", "git_merge", "Merge to main",
               "With a change under:" + chips(["src/", "desktop/", "pyproject.toml", "uv.lock"])
               + "or the workflow file. A manual run also works.")
-    s2 = step("2", "wrench", "Build both apps",
+    s2 = step("2", "wrench", "Build the apps",
               chips(["desktop-build.yml"])
-              + "macOS (Apple Silicon) and Windows (x64) build in parallel, stamped with "
-              "the next version: " + span(mono("0.61", 18), white_space="nowrap")
-              + " after " + span(mono("0.60", 18), white_space="nowrap") + ".")
+              + "macOS (Apple Silicon), Windows and Linux build in parallel, stamped with "
+              "the next version: " + span(mono("0.2.1", 18), white_space="nowrap")
+              + " after " + span(mono("0.2.0", 18), white_space="nowrap") + ".")
     s3 = step("3", "package", "Publish job",
-              "Creates GitHub release " + mono("desktop-v0.61", 18) + ", marked latest. "
-              "Adds version-less download names. Keeps the 10 newest.")
+              "Creates GitHub release " + mono("desktop-v0.2.1", 18) + ", marked latest, "
+              "with one file per platform. Keeps the 10 newest.")
     s4 = step("4", "refresh", "App checks on launch",
               "The installed app asks GitHub for the latest release and offers a newer one.")
 
@@ -490,17 +490,19 @@ def board_release() -> str:
         return card(
             div(name, font_size=22, font_weight=800, color=NAVY)
             + div(body, font_size=19, line_height=1.42, color=INK, margin_top=6),
-            width=266, height=162, padding="14px 18px",
+            width=266, height=102, padding="12px 18px",
         )
 
     s5 = div(
-        platform("Windows", f"{q('Update now')}, download, then {q('Restart now')}.")
-        + platform("macOS", f"{q('Download')} opens the new disk image."),
+        platform("Windows", f"{q('Update now')}, then {q('Restart now')}.")
+        + platform("macOS", f"{q('Download')} opens the disk image.")
+        + platform("Linux", f"{q('Download')} opens the AppImage."),
         display="flex", flex_direction="column", gap=16, flex="none",
     )
     fork = svg(40, 340,
-               path_arrow([(2, 170), (16, 170), (16, 81), (39, 81)], "right")
-               + path_arrow([(16, 170), (16, 259), (39, 259)], "right"))
+               path_arrow([(2, 170), (16, 170), (16, 51), (39, 51)], "right")
+               + path_arrow([(16, 170), (39, 170)], "right")
+               + path_arrow([(16, 170), (16, 289), (39, 289)], "right"))
     arrow = div(arrow_h(40, 40), display="flex", align_items="center", width=40)
     lane = div(s1 + arrow + s2 + arrow + s3 + arrow + s4 + fork + s5, display="flex",
                margin_top=34, height=340)
@@ -509,8 +511,8 @@ def board_release() -> str:
                                            color=NAVY),
             display="flex", align_items="center", gap=10, flex="none", width=190)
         + div(bullet_item("No tests gate the publish job.")
-              + bullet_item("Builds are not notarized: macOS is ad-hoc signed, Windows is "
-                            "unsigned."),
+              + bullet_item("Builds are not notarized: macOS is ad-hoc signed, Windows and "
+                            "Linux are unsigned."),
               display="grid", grid_template_columns="0.8fr 1.2fr", gap=32),
         display="flex", align_items="center", gap=24, background=MAIZE_SOFT,
         border=f"2px solid {MAIZE_EDGE}", border_radius=16, padding="18px 26px",

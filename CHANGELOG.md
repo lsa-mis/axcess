@@ -1,9 +1,10 @@
 # Changelog
 
-Notable changes to Axcess, newest first. Versions have two parts: `0.60`,
-then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
-`main` is one step after the last. Before 0.60 desktop previews were
-`0.1.<run number>`, up to `desktop-v0.1.33`.
+Notable changes to Axcess, newest first. Versions are semver: the team
+chooses the release line (now 0.2), and each desktop release published from
+`main` counts up the last part, 0.2.0, 0.2.1 and on. Earlier previews were
+numbered `0.1.<run number>` (to 0.1.34), then 0.60 to 0.63, one step per
+merge.
 
 ## Unreleased
 
@@ -57,6 +58,11 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- Versions: 0.2.0 starts a release line the team chooses, and each release
+  counts up the last part (0.2.1, 0.2.2 ...). The previews 0.60 to 0.63
+  numbered each merge instead and would have reached 1.00 by themselves.
+  A copy of one of those is not offered 0.2.x: install it once from the Get
+  started page.
 - New scan button: it no longer turns grey on the New scan page. It looks
   the same everywhere, and there a screen reader says it is the current
   page.

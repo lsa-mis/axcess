@@ -42,9 +42,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # One step after the highest published two-part tag: desktop-v0.60,
-      # then 0.61 ... 0.69, 0.70. `version` is what people see; npm and
-      # Squirrel.Windows get it as semver (0.61.0) in `package_version`.
+      # The next version on the release line the team chose
+      # (config.releaseLine in desktop/package.json, "0.2"): one step after
+      # the highest desktop-v0.2.N tag, or 0.2.0 when there is none. Semver
+      # throughout, so `version` and `package_version` are the same.
       - id: pick
         name: Next version after the published releases
         shell: bash
@@ -82,7 +83,7 @@ jobs:
         shell: bash
         working-directory: desktop
         # The same script CI's release dry run calls on every pull request.
-        # (npm version refused 0.60, the version package.json already has.)
+        # (npm version refuses the version package.json already has.)
         run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
@@ -147,7 +148,7 @@ jobs:
         shell: bash
         working-directory: desktop
         # The same script CI's release dry run calls on every pull request.
-        # (npm version refused 0.60, the version package.json already has.)
+        # (npm version refuses the version package.json already has.)
         run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium

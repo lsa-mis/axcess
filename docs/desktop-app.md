@@ -228,13 +228,12 @@ Do not distribute these preview builds as a production U-M application.
 
 `desktop-build.yml` runs on every push to `main` that changes `desktop/**`,
 `src/**`, `pyproject.toml`, `uv.lock`, or the workflow file itself, and it can
-also be started by hand. Each run takes the next two-part version after the
-last release: `0.60`, then `0.61`, and on to `0.69`, then `0.70` (the git
-commit is recorded in the package's `config.buildCommit`). On `main`, it then
-publishes the macOS DMG and zip, the Windows `-Windows-Installer.exe` with its
-`.blockmap`, and the Windows update feed `latest.yml` as GitHub Release
-`desktop-v0.61`. The package itself carries the version as semver (`0.61.0`),
-which npm and electron-updater need.
+also be started by hand. Each run takes the next version on the release line
+the team chose (`config.releaseLine` in `desktop/package.json`, `0.2`):
+`0.2.0`, then `0.2.1`, and so on (the git commit is recorded in the package's
+`config.buildCommit`). On `main`, it then publishes the four files people
+download, the Windows installer's `.blockmap`, and the Windows update feed
+`latest.yml` as GitHub Release `desktop-v0.2.1`.
 
 Each release holds one file per platform and the two files the Windows
 updater reads, nothing else. The public site's download links open
@@ -265,7 +264,7 @@ current. When a newer build exists:
 
 The check is skipped for unpackaged development runs and whenever
 `AXCESS_DISABLE_UPDATE_CHECK=1` is set, which local packaged builds (always
-version `0.60`) may want. Only HTTPS asset downloads under this repository's
+version `0.2.0`) may want. Only HTTPS asset downloads under this repository's
 releases are ever handed to the system browser.
 
 For a release build on macOS, set `AXCESS_MAC_SIGN_IDENTITY` to the exact

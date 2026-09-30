@@ -8,7 +8,7 @@ the test gates, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## How a desktop release ships today
 
-![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS and Windows apps in parallel and publishes a GitHub release marked latest. Installed apps check for it on launch; Windows can update in place and macOS opens the new disk image. No tests gate publishing and builds are not notarized; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
+![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS, Windows and Linux apps in parallel, stamped with the next version, such as 0.2.1 after 0.2.0, and publishes a GitHub release marked latest with one file per platform. Installed apps check for it on launch: Windows can update in place, and macOS and Linux open the new file to download. No tests gate publishing, and builds are not notarized or signed; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
 
 In short: a merge to `main` that changes app code builds both installers and
 publishes them as the latest GitHub release, and installed copies offer that
@@ -113,29 +113,35 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
 ### Version numbers and tags
 
-- Versions have two parts: `0.60`, then `0.61`, and so on. After `0.69` comes
-  `0.70`, and after `0.99` comes `1.00`. Each release is one step after the
-  highest two-part release tag, so every push to `main` that publishes moves
-  the version up by one.
+- Versions are semver, three parts: `0.2.0`, then `0.2.1`, `0.2.2`, and so
+  on. The first two parts are the release line, which the team chooses:
+  `config.releaseLine` in `desktop/package.json`, now `0.2`. Every release
+  published from `main` counts up the last part. Moving to `0.3.0` or `1.0.0`
+  is a deliberate change of that one setting (and of `version` beside it),
+  never the side effect of a merge.
 - The workflow's first job, **Choose the release version**, reads the
   `desktop-v*` tags and runs `desktop/scripts/next-version.cjs`, which
-  `nextReleaseVersion` in `desktop/src/updates.cjs` backs. Its unit tests pin
-  the steps.
-- npm and electron-updater need three-part versions, so each build stamps
-  `desktop/package.json` with the same version as semver: `0.61.0` for `0.61`,
-  `1.0.0` for `1.00`. The commit SHA goes into `config.buildCommit`.
-  `desktop/scripts/stamp-version.cjs` does the stamp rather than `npm version`,
-  which refuses to set the version a package already has (`0.60.0`).
-- Everything a person sees uses the two-part version: the release tag
-  `desktop-v0.61`, the release title `Axcess 0.61 (preview)`, the installer
-  names, and the app's own label, `0.61 (abc1234)`, in its update dialogs and
-  the launcher log (`displayVersion`).
-- In git, `desktop/package.json` stays at `0.60.0`, so every local build shows
-  version `0.60`. `pyproject.toml` and `audit.__version__` say `0.60`.
-- Before September 2026 the scheme was `0.1.<run number>`: tags up to
-  `desktop-v0.1.33` use it. They do not count toward the next version, and
-  `0.60` sorts above every one of them, so installed copies still see the
-  next release as newer.
+  `nextReleaseVersion` in `desktop/src/updates.cjs` backs: one step after the
+  highest `desktop-v0.2.N` tag, or `0.2.0` when the line has none. Tags of
+  other lines and of the earlier schemes do not count. Its unit tests pin the
+  steps.
+- Each build stamps `desktop/package.json` with that version and puts the
+  commit SHA in `config.buildCommit`. `desktop/scripts/stamp-version.cjs` does
+  the stamp rather than `npm version`, which refuses to set the version a
+  package already has.
+- Everything a person sees shows the version as it is: the release tag
+  `desktop-v0.2.3`, the release title `Axcess 0.2.3 (preview)`, the file
+  names, the installer's footer, and the app's own label, `0.2.3 (abc1234)`,
+  in its update dialogs and the launcher log (`displayVersion`).
+- In git, `desktop/package.json` stays at the line's first version, `0.2.0`,
+  so every local build shows `0.2.0`. `pyproject.toml`, `audit.__version__`
+  and the review app's `package.json` say `0.2.0` too.
+- Two schemes came before: `0.1.<run number>` (up to `desktop-v0.1.34`), then
+  `0.60`, `0.61` ... (up to `desktop-v0.63`), which added 0.01 per merge, a
+  build counter that looked like a version and would have reached `1.00` by
+  itself. Installed copies of `0.60` to `0.63` are not offered `0.2.x`,
+  because `0.2.0` is the lower number; those previews were not widely
+  released, and their users install once from the Get started page.
 
 ### The publish job
 
@@ -145,9 +151,9 @@ repository secrets are involved.
 
 1. **Collect the installers.** It copies the files named by
    `releaseFileName` in `desktop/src/updates.cjs`, in plain words, from the
-   artifacts: `Axcess-0.61-Mac-Apple-Silicon.dmg`,
-   `Axcess-0.61-Windows-Installer.exe` with its `.blockmap`,
-   `Axcess-0.61-Windows-Portable.zip`, `Axcess-0.61-Linux.AppImage` and
+   artifacts: `Axcess-0.2.3-Mac-Apple-Silicon.dmg`,
+   `Axcess-0.2.3-Windows-Installer.exe` with its `.blockmap`,
+   `Axcess-0.2.3-Windows-Portable.zip`, `Axcess-0.2.3-Linux.AppImage` and
    `latest.yml`: one file per platform, and the two the Windows updater
    reads. It stops if any is missing, or if there are more than these six.
    There is no second name for any file. The site's download links open
@@ -157,7 +163,7 @@ repository secrets are involved.
    file, change `releaseFileName` and those attributes in the same pull
    request.
 2. **Create a draft, upload, then publish.** If no release exists for tag
-   `desktop-v0.61` yet, it creates one as a draft at the built commit. It
+   `desktop-v0.2.3` yet, it creates one as a draft at the built commit. It
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
@@ -277,7 +283,7 @@ release from the site.
 - Drafts and prereleases are ignored. So are tags that are not a plain dotted
   version, optionally prefixed with `desktop-v` or `v`.
 - The app offers a release only when its version is strictly newer, compared
-  as numbers (`0.61` is newer than `0.60.0` and than `0.1.33`).
+  as numbers (`0.2.10` is newer than `0.2.9`, and `0.2.0` than `0.1.34`).
 
 ### What people see on Windows
 
@@ -343,7 +349,7 @@ has to make because the workflow does not.
    `desktop/package.json`, and checks the installer names against the ones
    the publish job requires, with the same scripts a release uses
    (`next-version.cjs`, `stamp-version.cjs`, `release-names.cjs` in
-   `desktop/scripts/`). The first 0.60 build failed at the stamp step, which
+   `desktop/scripts/`). The first 0.60 build (of the earlier scheme) failed at the stamp step, which
    no pull request job ran before.
 2. If the pull request changes the desktop app or its build, confirm the
    "Desktop application build" run on it built both installers.
@@ -378,11 +384,11 @@ has to make because the workflow does not.
 
 ### Confirm the release
 
-1. On the Releases page, confirm that "Axcess 0.61 (preview)" is marked
+1. On the Releases page, confirm that "Axcess 0.2.3 (preview)" is marked
    Latest and has these files:
-   - `Axcess-0.61-Mac-Apple-Silicon.dmg`;
-   - `Axcess-0.61-Windows-Installer.exe`, its `.blockmap`, and `latest.yml`;
-   - `Axcess-0.61-Windows-Portable.zip` and `Axcess-0.61-Linux.AppImage`;
+   - `Axcess-0.2.3-Mac-Apple-Silicon.dmg`;
+   - `Axcess-0.2.3-Windows-Installer.exe`, its `.blockmap`, and `latest.yml`;
+   - `Axcess-0.2.3-Windows-Portable.zip` and `Axcess-0.2.3-Linux.AppImage`;
    - nothing else, apart from the source code archives GitHub adds to every
      release.
 2. Read the release notes and check that "What changed" makes sense to someone
@@ -404,14 +410,14 @@ Use an Apple Silicon Mac and a Windows x64 PC. These steps cover the
    once with a screen reader (NVDA or Narrator) and confirm each screen and
    the finished message are read out.
 2. **Version.** Confirm the launcher log's "starting backend" line shows
-   `version 0.61 (<short SHA>)` for the new build. The desktop app guide
+   `version 0.2.3 (<short SHA>)` for the new build. The desktop app guide
    lists the [launcher log locations](../desktop-app.md#axcess-could-not-start).
    - The review app has no screen that shows the version. The update dialog
-     says "You are running 0.61 (<short SHA>)", but only when it offers a
+     says "You are running 0.2.3 (<short SHA>)", but only when it offers a
      newer release, so support should ask a user for the launcher log line.
    - On macOS, also open **Axcess > About Axcess** and note whether it shows
-     `0.61 (<short SHA>)`: the launcher sets the About panel's version to the
-     two-part label. The desktop code never replaces Electron's default menu,
+     `0.2.3 (<short SHA>)`: the launcher sets the About panel's version to the
+     version label. The desktop code never replaces Electron's default menu,
      which should include that item, but nobody has checked it on a Mac yet.
 3. **A short scan.** Scan a small site you are authorized to test and open its
    report.
@@ -431,7 +437,7 @@ GitHub's download count for each release file. Record the counts before the
 release is pruned, because deleting a release deletes its counts:
 
 ```bash
-gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.61 \
+gh api repos/lsa-mis/axcess/releases/tags/desktop-v0.2.3 \
   --jq '.assets[] | [.name, .download_count] | @tsv'
 ```
 
@@ -440,10 +446,10 @@ Releases page, so treat the numbers as estimates:
 
 | File | Who downloads it |
 | --- | --- |
-| `latest.yml` and `Axcess-0.61-Windows-Installer.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
-| `Axcess-0.61-Mac-Apple-Silicon.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
-| `Axcess-0.61-Windows-Portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
-| `Axcess-0.61-Linux.AppImage` | Mostly Linux copies after someone chooses **Download** in their update dialog |
+| `latest.yml` and `Axcess-0.2.3-Windows-Installer.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
+| `Axcess-0.2.3-Mac-Apple-Silicon.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
+| `Axcess-0.2.3-Windows-Portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
+| `Axcess-0.2.3-Linux.AppImage` | Mostly Linux copies after someone chooses **Download** in their update dialog |
 
 These counts miss:
 
@@ -487,7 +493,7 @@ A few things to know:
 - On Linux, `make desktop-ocr` needs Tesseract installed first
   (`sudo apt-get install tesseract-ocr tesseract-ocr-eng`), and
   `make desktop-package` builds the AppImage (`npm run make:linux`).
-- Local builds are version `0.60`, and local macOS builds are ad-hoc signed
+- Local builds are version `0.2.0`, and local macOS builds are ad-hoc signed
   unless you set the
   [signing variables](#settings-for-when-credentials-exist).
 - A packaged local build therefore offers the latest published release when

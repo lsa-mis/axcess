@@ -23,7 +23,7 @@ function langStrings(source) {
 function visible(text) {
   return text
     .replace(/\$\\r\$\\n/g, "\n")
-    .replace(/\$\{[^}]+\}/g, "0.61")
+    .replace(/\$\{[^}]+\}/g, "0.2.3")
     .replace(/\$_CLICK/g, "")
     .replace(/\$(INSTDIR|0)/g, "C:\\Folder")
     .replace(/&/g, "");

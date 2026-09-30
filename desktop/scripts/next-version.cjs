@@ -2,15 +2,18 @@
  * Print the version the next desktop release takes, for the build workflow.
  *
  * Reads release tag names on stdin, one per line (`git ls-remote --tags`
- * output works too), and writes GitHub Actions output lines:
+ * output works too), and the release line the team chose from
+ * desktop/package.json (config.releaseLine, "0.2"), and writes GitHub
+ * Actions output lines:
  *
- *   version=0.61
- *   package_version=0.61.0
+ *   version=0.2.4
+ *   package_version=0.2.4
  *
- * `version` is what people see: the tag (`desktop-v0.61`), the release
- * title and the installer names. `package_version` is the semver npm and
- * electron-updater need in package.json.
+ * The two are the same now that versions are three-part semver; both stay
+ * so the workflow's steps keep their inputs. `version` names the tag
+ * (`desktop-v0.2.4`), the release title and the files.
  */
+const packageJson = require("../package.json");
 const { nextReleaseVersion, packageVersion } = require("../src/updates.cjs");
 
 let input = "";
@@ -24,6 +27,6 @@ process.stdin.on("end", () => {
     .map((line) => line.trim().split(/\s+/).pop() || "")
     .map((ref) => ref.replace(/^refs\/tags\//, ""))
     .filter(Boolean);
-  const version = nextReleaseVersion(tags);
+  const version = nextReleaseVersion(tags, packageJson.config.releaseLine);
   process.stdout.write(`version=${version}\npackage_version=${packageVersion(version)}\n`);
 });

@@ -120,37 +120,42 @@ test("the release lookup targets this repository over HTTPS", () => {
   assert.equal(RELEASES_API_URL, "https://api.github.com/repos/lsa-mis/axcess/releases/latest");
 });
 
-test("versions read as two parts, with two digits after the point", () => {
-  assert.equal(displayVersion("0.60.0"), "0.60");
-  assert.equal(displayVersion("0.61.0"), "0.61");
-  assert.equal(displayVersion("0.61"), "0.61");
-  assert.equal(displayVersion("1.0.0"), "1.00");
-  // The old per-build scheme keeps its third part.
-  assert.equal(displayVersion("0.1.33"), "0.1.33");
+test("versions are three-part semver and read as they are", () => {
+  assert.equal(displayVersion("0.2.0"), "0.2.0");
+  assert.equal(displayVersion("0.2.13"), "0.2.13");
+  assert.equal(displayVersion("1.0.0"), "1.0.0");
 });
 
-test("a two-part version is packaged as semver", () => {
-  assert.equal(packageVersion("0.61"), "0.61.0");
-  assert.equal(packageVersion("1.00"), "1.0.0");
-  assert.throws(() => packageVersion("0.61.0"));
+test("the package carries the same three-part version", () => {
+  assert.equal(packageVersion("0.2.4"), "0.2.4");
+  assert.throws(() => packageVersion("0.61"), /three-part/);
 });
 
-test("each release is one step after the highest two-part tag", () => {
-  assert.equal(nextReleaseVersion([]), "0.60");
-  // Only the old scheme so far: the first two-part release is 0.60.
-  assert.equal(nextReleaseVersion(["desktop-v0.1.33", "desktop-v0.1.32"]), "0.60");
-  assert.equal(nextReleaseVersion(["desktop-v0.60", "desktop-v0.1.33"]), "0.61");
-  assert.equal(nextReleaseVersion(["desktop-v0.61", "desktop-v0.69", "desktop-v0.62"]), "0.70");
-  assert.equal(nextReleaseVersion(["desktop-v0.99"]), "1.00");
-  assert.equal(nextReleaseVersion(["v0.75", "desktop-v0.6", "desktop-v0.64"]), "0.65");
+test("each release counts up the last part of the chosen line", () => {
+  // No release on the line yet: it starts at .0, whatever older tags exist.
+  assert.equal(nextReleaseVersion([], "0.2"), "0.2.0");
+  assert.equal(nextReleaseVersion(["desktop-v0.63", "desktop-v0.1.34"], "0.2"), "0.2.0");
+  assert.equal(nextReleaseVersion(["desktop-v0.2.0"], "0.2"), "0.2.1");
+  // Numbers, not text: 0.2.10 is after 0.2.9.
+  assert.equal(nextReleaseVersion(["desktop-v0.2.9", "desktop-v0.2.10", "desktop-v0.2.2"], "0.2"), "0.2.11");
+  // Another line's tags do not count; moving on is a deliberate change.
+  assert.equal(nextReleaseVersion(["desktop-v0.2.7", "desktop-v0.3.1"], "0.3"), "0.3.2");
+  assert.equal(nextReleaseVersion(["desktop-v0.2.7", "v0.2.9", "desktop-v0.22.1"], "0.2"), "0.2.8");
+  assert.throws(() => nextReleaseVersion([], "0.2.0"), /release line/);
 });
 
-test("a two-part release is newer than the builds before it", () => {
-  assert.equal(releaseVersion("desktop-v0.61"), "0.61");
-  assert.equal(compareVersions("0.61", "0.60.0"), 1);
-  assert.equal(compareVersions("0.60", "0.1.33"), 1);
-  assert.equal(compareVersions("0.61", "0.61.0"), 0);
-  assert.equal(compareVersions("1.00", "0.99.0"), 1);
+test("the chosen line is set in one place, package.json", () => {
+  const pkg = require("../package.json");
+  assert.match(pkg.config.releaseLine, /^\d+\.\d+$/);
+  assert.ok(pkg.version.startsWith(`${pkg.config.releaseLine}.`));
+});
+
+test("versions compare as numbers across the schemes", () => {
+  assert.equal(releaseVersion("desktop-v0.2.3"), "0.2.3");
+  assert.equal(compareVersions("0.2.10", "0.2.9"), 1);
+  assert.equal(compareVersions("0.2.0", "0.1.34"), 1);
+  // Copies of the old previews (0.60 to 0.63) are not offered 0.2.x.
+  assert.equal(compareVersions("0.2.0", "0.63.0"), -1);
 });
 
 test("a release with only the old Squirrel feed is not a Windows update", () => {

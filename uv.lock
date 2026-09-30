@@ -57,7 +57,7 @@ wheels = [
 
 [[package]]
 name = "audit"
-version = "0.60"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

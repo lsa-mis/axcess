@@ -1,13 +1,14 @@
 {
   "name": "axcess-desktop",
   "productName": "Axcess",
-  "version": "0.60.0",
+  "version": "0.2.0",
   "description": "Local-first accessibility auditing workbench",
   "author": "Axcess contributors",
   "private": true,
   "main": "src/main.cjs",
   "config": {
-    "forge": "./forge.config.cjs"
+    "forge": "./forge.config.cjs",
+    "releaseLine": "0.2"
   },
   "scripts": {
     "start": "electron-forge start",

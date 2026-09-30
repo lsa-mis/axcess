@@ -49,7 +49,7 @@
 # different scale, the window is scaled by Windows again.
 ManifestDPIAware true
 
-# The footer ("Axcess 0.61", bottom left). MUI draws it with two controls
+# The footer ("Axcess 0.2.3", bottom left). MUI draws it with two controls
 # in the branding grey: 1028 disabled, 1256 coloured /BRANDING, #a0a0a0 on
 # #f0f0f0, 2.29:1 (installer_contrast.py), below SC 1.4.3's 4.5:1. When the
 # window opens, 1028 is hidden and 1256 takes Windows' own button text and
@@ -79,23 +79,13 @@ ManifestDPIAware true
 !endif
 
 !macro customHeader
-  # The version people see: 0.61, not the packaged 0.61.0 (see
-  # displayVersion in src/updates.cjs).
-  !searchparse /noerrors "${VERSION}" "" AXCESS_V_MAJOR "." AXCESS_V_MINOR "." AXCESS_V_PATCH
-  !if "${AXCESS_V_PATCH}" != "0"
-    !define AXCESS_DISPLAY_VERSION "${VERSION}"
-  !else if ${AXCESS_V_MINOR} < 10
-    !define AXCESS_DISPLAY_VERSION "${AXCESS_V_MAJOR}.0${AXCESS_V_MINOR}"
-  !else
-    !define AXCESS_DISPLAY_VERSION "${AXCESS_V_MAJOR}.${AXCESS_V_MINOR}"
-  !endif
-
   !pragma warning push
   !pragma warning disable 6030
 
   # Every screen
   # The footer. axcessReadableFooter (below) draws it in readable colours.
-  LangString ^Branding ${LANG_ENGLISH} "Axcess ${AXCESS_DISPLAY_VERSION}"
+  # The version as it is, "0.2.3" (displayVersion in src/updates.cjs).
+  LangString ^Branding ${LANG_ENGLISH} "Axcess ${VERSION}"
   LangString ^ClickNext ${LANG_ENGLISH} "Choose Next to continue."
   LangString ^ClickInstall ${LANG_ENGLISH} "When you are ready, choose Install."
   LangString ^ClickUninstall ${LANG_ENGLISH} "When you are ready, choose Uninstall."
