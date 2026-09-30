@@ -321,17 +321,12 @@ jobs:
           gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
           # Publishing last keeps releases/latest pointing at a complete asset set.
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
-      # Only this release line's own older releases: 0.2.0 ... keeps the ten
-      # newest 0.2.x. Releases of earlier lines and schemes (0.1.x, 0.60 to
-      # 0.63, hidden as drafts) are never deleted by the workflow; decided
-      # with the developer. They are left or hidden by hand.
       - name: Prune old preview releases
         shell: bash
         run: |
           set -euo pipefail
-          line="${VERSION%.*}"
           gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
-            --jq "[.[] | select(.tagName | startswith(\"desktop-v${line}.\"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName" \
+            --jq '[.[] | select(.tagName | startswith("desktop-v"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' \
             | while read -r tag; do
                 [ -n "$tag" ] || continue
                 gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes

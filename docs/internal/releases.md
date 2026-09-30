@@ -187,11 +187,8 @@ repository secrets are involved.
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
-3. **Prune.** It keeps the 10 newest releases of the current line (for
-   0.2.x, `desktop-v0.2.*`) and deletes older ones of that line along with
-   their tags. Releases of earlier lines and schemes are never deleted by the
-   workflow: 0.1.x stays visible, and 0.60 to 0.63 were hidden as drafts by
-   hand.
+3. **Prune.** It keeps the 10 newest `desktop-v*` releases and deletes older
+   ones along with their tags.
 
 ### Release notes
 
@@ -574,7 +571,7 @@ newest release, and `site.js` finds its files (see
 - **The update flow in `main.cjs` has no automated tests.** Only the helpers
   in `updates.cjs` are tested.
 - **No rollback through the updater.** The app offers only strictly newer
-  versions, and releases older than the line's ten newest are deleted. The way out
+  versions, and releases older than the ten newest are deleted. The way out
   of a bad release is a new, fixed release.
 - **A build that cannot start its backend never checks for updates**, so it
   cannot offer its own fix.
