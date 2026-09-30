@@ -1,4 +1,8 @@
-"""Dynamic keyboard-trap probe (WCAG SC 2.1.2 No Keyboard Trap).
+"""Keyboard probes: traps (WCAG SC 2.1.2) and mouse-only controls (SC 2.1.1).
+
+``KeyboardProbe`` runs the SC 2.1.2 Tab walk below and, when given a
+``KeyboardOperabilityProbe``, the SC 2.1.1 check after it (see
+``operability.py``).
 
 Runs *inside* a live Playwright page after axe-core has finished, before
 the page closes. The probe presses Tab in a loop while watching
@@ -12,6 +16,7 @@ swallow the next Tab. Playwright is the only way.
 """
 
 from audit.analyzer.keyboard.base import KeyboardTrap
+from audit.analyzer.keyboard.operability import KeyboardOperabilityProbe
 from audit.analyzer.keyboard.probe import KeyboardProbe
 
-__all__ = ["KeyboardProbe", "KeyboardTrap"]
+__all__ = ["KeyboardOperabilityProbe", "KeyboardProbe", "KeyboardTrap"]

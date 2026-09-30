@@ -8,6 +8,7 @@ protected report is refused, and nothing credential-shaped is in the body.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,20 @@ def test_a_failed_or_stopped_scan_returns_its_own_settings(
     assert settings["whole_host"] is True
     assert settings["skip_keyboard"] is True
     assert (settings["axe_level"], settings["wcag_version"]) == ("AAA", "2.2")
+
+
+def test_the_advanced_keyboard_check_is_stored_and_returned(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    scan_id = _create(client, skip_keyboard=False, keyboard_advanced=True)
+    _stop(seeded_db[0], scan_id, "failed")
+    with connect(seeded_db[0]) as conn:
+        stored = json.loads(
+            conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+        )
+    assert (stored["keyboard_probe_enabled"], stored["keyboard_advanced"]) == (True, True)
+    settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
+    assert (settings["skip_keyboard"], settings["keyboard_advanced"]) == (False, True)
 
 
 def test_each_scan_answers_only_for_itself(

@@ -285,8 +285,9 @@ criteria:
     pipelines: [axe, keyboard]
     confidence: medium
     automated_check: >-
-      axe flags some keyboard-inaccessible patterns; the keyboard probe confirms
-      focus can move through the page.
+      axe flags some keyboard-inaccessible patterns; the keyboard check finds
+      controls with mouse handlers that Tab cannot reach or Enter/Space cannot
+      press, and its advanced mode operates each one to confirm it.
     manual_check: >-
       Confirm every control (menus, custom widgets, drag handles) is fully
       operable by keyboard, the deepest part of this SC is manual.

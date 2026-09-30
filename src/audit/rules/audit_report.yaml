@@ -8243,6 +8243,89 @@ image_findings:
 # ---------------------------------------------------------------------
 semantic_criteria:
 
+  "2.1.1":
+    title: "A control may work with a mouse but not with a keyboard"
+    # One card covers both keyboard-check rules; each keeps its own title.
+    rule_titles:
+      keyboard-mouse-only-control: "A control works with a mouse, but the Tab key cannot reach it"
+      keyboard-no-key-activation: "The Tab key reaches a control, but Enter and Space may do nothing"
+    wcag_sc: "2.1.1"
+    wcag_name: "Keyboard"
+    wcag_level: "A"
+    abilities_affected: [motor, vision]
+    what_happening: >-
+      The keyboard check reads the page code and finds elements that react to
+      the mouse, such as a <code>&lt;div&gt;</code> with a click handler. It
+      reports an element when the Tab key cannot reach it, or when the Tab key
+      reaches a custom control that has no key handler. It leaves out elements
+      with another keyboard path: a link or button inside or around them, a
+      control with the same name, arrow-key navigation in a group, or a
+      keyboard shortcut the page names. The advanced keyboard check also
+      clicks each element and presses Enter and Space. It then reports only
+      elements where the click did something and the keys could not do the
+      same.
+    why_matters: >-
+      People who use only a keyboard cannot use a control that works only with
+      a mouse. They include many blind people and people with physical
+      disabilities. People who use speech input or a switch often move through
+      a page the same way a keyboard does, so they are blocked too.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the live page and find the element in the element locator (CSS
+        selector). Click it and note what happens.
+      - >-
+        Reload the page and press Tab until you reach the element. If Tab
+        never reaches it, or Enter and Space do not do what the click did,
+        the problem is real. If another control on the page does the same
+        job and the keyboard can use it, set the status to Not a problem
+        (false positive).
+      - >-
+        Use a real control where you can: a <code>&lt;button&gt;</code> for
+        an action and an <code>&lt;a href&gt;</code> for a link. Both work
+        with the keyboard without extra code.
+      - >-
+        If the element must stay custom, give it
+        <code>tabindex="0"</code>, a role such as
+        <code>role="button"</code>, and a <code>keydown</code> handler that
+        runs the same action for Enter and Space.
+    fix_options:
+      - label: "Use a native button or link"
+        approach: >-
+          Replace the clickable element with a button or a link. The browser
+          then handles Tab, Enter and Space, and screen readers announce it.
+        watch_out: >-
+          Keep the look by styling the button. Remove the old click handler
+          from any wrapper so the action does not run twice.
+      - label: "Make the custom control keyboard operable"
+        approach: >-
+          Add tabindex="0", a role, an accessible name, and one key handler
+          that runs the click's action for Enter, and for Space on a button.
+        watch_out: >-
+          A link given role="button" must also work with Space, which links do
+          not do on their own.
+      - label: "Show hover content on focus too"
+        approach: >-
+          If the element opens a menu or tooltip on hover, open it on focus or
+          on Enter as well, and let Escape close it.
+        watch_out: >-
+          Content shown only with CSS :hover needs :focus-within or a script
+          for keyboard users.
+    verify_manual: >-
+      Put the mouse away. Press Tab until you reach the element, then press
+      Enter and, for a button, Space. Check that it does what a click does.
+      Also check any menu or pop-up window the element opens.
+    verify_automated: >-
+      Scan again with the keyboard check turned on, and see if the element is
+      still found. Turn on the advanced keyboard check to have Axcess click and
+      press keys on it for you.
+    acceptance: >-
+      Everything the element does with a mouse can also be done with the
+      keyboard alone, or another control that the keyboard can use does the
+      same job.
+    confidence_default: medium
+
   "2.1.2":
     title: "Keyboard focus may be stuck on one element"
     wcag_sc: "2.1.2"
@@ -8324,7 +8407,7 @@ semantic_criteria:
       before you reach the element. The check only tests the page as it loads,
       so also test menus and pop-up windows that you open.
     verify_automated: >-
-      Scan again with Check for keyboard traps turned on, and see if the
+      Scan again with Check keyboard access turned on, and see if the
       element is still found.
     acceptance: >-
       Every affected component lets keyboard users leave with a standard key,

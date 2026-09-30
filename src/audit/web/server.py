@@ -56,7 +56,7 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
-from audit.analyzer.keyboard import KeyboardProbe
+from audit.analyzer.keyboard import KeyboardOperabilityProbe, KeyboardProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
@@ -169,6 +169,7 @@ class LocalLoginScanRequest(BaseModel):
     wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
     skip_interaction: bool = False
     skip_keyboard: bool = False
+    keyboard_advanced: bool = False
     skip_responsive: bool = False
     skip_ocr: bool = True
     skip_vlm: bool = True
@@ -1269,6 +1270,7 @@ def create_app(
                 not body.skip_interaction and body.scan_engine in {"axe", "both"}
             ),
             keyboard_probe_enabled=not body.skip_keyboard,
+            keyboard_advanced=body.keyboard_advanced and not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
             visual_checks_enabled=False,
@@ -1501,6 +1503,7 @@ def create_app(
             "scan_engine": requested_engine,
             "skip_interaction": bool(body.get("skip_interaction")),
             "skip_keyboard": bool(body.get("skip_keyboard")),
+            "keyboard_advanced": bool(body.get("keyboard_advanced")),
             "skip_responsive": bool(body.get("skip_responsive")),
             "skip_semantic": bool(body.get("skip_semantic")),
             "skip_focus": bool(body.get("skip_focus")),
@@ -3058,6 +3061,8 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         # surface as the CLI's `--skip-semantic`.
         semantic_enabled=not bool(form.get("skip_semantic")),
         keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
+        keyboard_advanced=bool(form.get("keyboard_advanced"))
+        and not bool(form.get("skip_keyboard")),
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
@@ -3248,7 +3253,14 @@ async def _run_local_login_background(
             axe_level=config.axe_level,  # type: ignore[arg-type]
             wcag_version=config.wcag_version,
             keyboard_probe=(
-                KeyboardProbe(suppress_diagnostics=True) if config.keyboard_probe_enabled else None
+                KeyboardProbe(
+                    suppress_diagnostics=True,
+                    operability=KeyboardOperabilityProbe(
+                        advanced=config.keyboard_advanced, suppress_diagnostics=True
+                    ),
+                )
+                if config.keyboard_probe_enabled
+                else None
             ),
             responsive_probe=(
                 ResponsiveProbe(suppress_diagnostics=True)
@@ -3864,7 +3876,12 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "unit": "page",
             "verb": "checked",
             "coverage_known": coverage_version >= 1,
-            "description": "Presses Tab, Shift+Tab and Escape to find places focus gets stuck.",
+            "description": (
+                "Presses Tab and Shift+Tab to find places focus gets stuck, and finds "
+                "controls that work with a mouse but not from the keyboard."
+                if flag("keyboard_operability_version", default=False)
+                else "Presses Tab, Shift+Tab and Escape to find places focus gets stuck."
+            ),
             "caveat": "It does not replace a full keyboard test by a person.",
         },
         {

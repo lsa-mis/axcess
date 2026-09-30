@@ -1935,6 +1935,7 @@
           "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version", "default": "2.1"},
           "skip_interaction": {"type": "boolean", "title": "Skip Interaction", "default": false},
           "skip_keyboard": {"type": "boolean", "title": "Skip Keyboard", "default": false},
+          "keyboard_advanced": {"type": "boolean", "title": "Keyboard Advanced", "default": false},
           "skip_responsive": {"type": "boolean", "title": "Skip Responsive", "default": false},
           "skip_ocr": {"type": "boolean", "title": "Skip Ocr", "default": true},
           "skip_vlm": {"type": "boolean", "title": "Skip Vlm", "default": true},

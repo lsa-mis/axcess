@@ -1,0 +1,2875 @@
+{
+ "corpus": "edgecases",
+ "description": "shared-author development corpus; no unbiased accuracy or ranking claim",
+ "pages": {
+  "pages/binding.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 256.2,
+    "traps": [],
+    "walk_ms": 256.2
+   },
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": "e05",
+      "why": "weak"
+     },
+     {
+      "probe": null,
+      "why": "delegation root"
+     },
+     {
+      "probe": "e10",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e01",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e02",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e03",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e04",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e07",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e08",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e09",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "double-click listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e06",
+      "selector": "div#container > div:nth-of-type(1)",
+      "signals": [
+       "clickable styling under a delegated click listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 26.8,
+    "tested": 0,
+    "total_ms": 257.3,
+    "traps": [],
+    "walk_ms": 230.5
+   },
+   "C advanced": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": null,
+      "why": "delegation root"
+     },
+     {
+      "probe": "e10",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e01",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e02",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e03",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e04",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e07",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e08",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e09",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "double-click listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e05",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "clickable styling"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e06",
+      "selector": "div#container > div:nth-of-type(1)",
+      "signals": [
+       "clickable styling under a delegated click listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 6354.2,
+    "tested": 9,
+    "total_ms": 6587.9,
+    "traps": [],
+    "walk_ms": 233.7
+   }
+  },
+  "pages/decoys.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 273.9,
+    "traps": [],
+    "walk_ms": 273.9
+   },
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": "e80",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e81",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e82",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e83",
+      "why": "weak"
+     },
+     {
+      "probe": "e84",
+      "why": "weak"
+     },
+     {
+      "probe": "e85",
+      "why": "contained"
+     },
+     {
+      "probe": "e85a",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e86",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e86a",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e87b",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e87",
+      "why": "weak"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 16.7,
+    "tested": 0,
+    "total_ms": 286.5,
+    "traps": [],
+    "walk_ms": 269.8
+   },
+   "C advanced": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": "e80",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e81",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e82",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e85",
+      "why": "contained"
+     },
+     {
+      "probe": "e85a",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e86",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e86a",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e87b",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e87",
+      "why": "contained"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e83",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "clickable styling"
+      ],
+      "verdict": "dismissed"
+     },
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e84",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "clickable styling"
+      ],
+      "verdict": "dismissed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 2281.8,
+    "tested": 2,
+    "total_ms": 2520.8,
+    "traps": [],
+    "walk_ms": 239.0
+   }
+  },
+  "pages/effects.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 252.1,
+    "traps": [],
+    "walk_ms": 252.1
+   },
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": "e30",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e20",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e21",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e22",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e23",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e24",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e25",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e26",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e27",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e28",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e29",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 25.7,
+    "tested": 0,
+    "total_ms": 236.7,
+    "traps": [],
+    "walk_ms": 211.0
+   },
+   "C advanced": {
+    "considered": 11,
+    "drops": [
+     {
+      "probe": "e30",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e20",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it sent a request, opened a dialog or window, or started navigation, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e21",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed the page's URL, storage or drawing, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e22",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed the page's URL, storage or drawing, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e23",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e24",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "dismissed"
+     },
+     {
+      "evidence": "Measured: clicking it changed the page's URL, storage or drawing, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e25",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it showed 1 element, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e26",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e27",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "dismissed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e28",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e29",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 9198.9,
+    "tested": 10,
+    "total_ms": 9414.2,
+    "traps": [],
+    "walk_ms": 215.3
+   }
+  },
+  "pages/focus-redirect.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 337.8,
+    "traps": [],
+    "walk_ms": 337.8
+   },
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e110",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 15.4,
+    "tested": 0,
+    "total_ms": 226.2,
+    "traps": [],
+    "walk_ms": 210.8
+   },
+   "C advanced": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e110",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 715.5,
+    "tested": 1,
+    "total_ms": 959.4,
+    "traps": [],
+    "walk_ms": 243.9
+   }
+  },
+  "pages/geometry.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 301.9,
+    "traps": [],
+    "walk_ms": 301.9
+   },
+   "B standard": {
+    "considered": 14,
+    "drops": [
+     {
+      "probe": "e71",
+      "why": "covered"
+     },
+     {
+      "probe": "e64",
+      "why": "covered"
+     },
+     {
+      "probe": "e63",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e61",
+      "why": "offscreen"
+     },
+     {
+      "probe": "e65",
+      "why": "pointer-events"
+     },
+     {
+      "probe": "e66",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e67",
+      "why": "disabled"
+     },
+     {
+      "probe": "e68",
+      "why": "transparent"
+     },
+     {
+      "probe": "e69",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e70",
+      "why": "not rendered"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e72",
+      "selector": "html > body:nth-of-type(1) > p:nth-of-type(2) > span:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e62",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e73",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e60",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(14)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 27.9,
+    "tested": 0,
+    "total_ms": 287.9,
+    "traps": [],
+    "walk_ms": 260.0
+   },
+   "C advanced": {
+    "considered": 14,
+    "drops": [
+     {
+      "probe": "e71",
+      "why": "covered"
+     },
+     {
+      "probe": "e64",
+      "why": "covered"
+     },
+     {
+      "probe": "e63",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e61",
+      "why": "offscreen"
+     },
+     {
+      "probe": "e65",
+      "why": "pointer-events"
+     },
+     {
+      "probe": "e66",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e67",
+      "why": "disabled"
+     },
+     {
+      "probe": "e68",
+      "why": "transparent"
+     },
+     {
+      "probe": "e69",
+      "why": "not rendered"
+     },
+     {
+      "probe": "e70",
+      "why": "not rendered"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e72",
+      "selector": "html > body:nth-of-type(1) > p:nth-of-type(2) > span:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e62",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "dismissed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, but with focus on it Enter and Space did nothing.",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e73",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e60",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(14)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 5512.5,
+    "tested": 4,
+    "total_ms": 5771.7,
+    "traps": [],
+    "walk_ms": 259.2
+   }
+  },
+  "pages/graphical-controls.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 256.8,
+    "traps": [],
+    "walk_ms": 256.8
+   },
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e150",
+      "selector": "html > body:nth-of-type(1) > svg:nth-of-type(1) > g:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e151",
+      "selector": "html > body:nth-of-type(1) > canvas:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 14.0,
+    "tested": 0,
+    "total_ms": 228.5,
+    "traps": [],
+    "walk_ms": 214.5
+   },
+   "C advanced": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e150",
+      "selector": "html > body:nth-of-type(1) > svg:nth-of-type(1) > g:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e151",
+      "selector": "html > body:nth-of-type(1) > canvas:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 1433.7,
+    "tested": 2,
+    "total_ms": 1643.6,
+    "traps": [],
+    "walk_ms": 209.9
+   }
+  },
+  "pages/hover.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 290.0,
+    "traps": [],
+    "walk_ms": 290.0
+   },
+   "B standard": {
+    "considered": 2,
+    "drops": [
+     {
+      "probe": "e31",
+      "why": "weak"
+     },
+     {
+      "probe": "e32",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 12.2,
+    "tested": 0,
+    "total_ms": 337.2,
+    "traps": [],
+    "walk_ms": 325.0
+   },
+   "C advanced": {
+    "considered": 2,
+    "drops": [
+     {
+      "probe": "e32",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it showed 1 element, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e31",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "clickable styling"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 699.0,
+    "tested": 1,
+    "total_ms": 1017.4,
+    "traps": [],
+    "walk_ms": 318.4
+   }
+  },
+  "pages/iframe-tab-scope.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 283.0,
+    "traps": [],
+    "walk_ms": 283.0
+   },
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": true,
+      "kind": "unreachable",
+      "probe": "e140",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 17.6,
+    "tested": 0,
+    "total_ms": 239.1,
+    "traps": [],
+    "walk_ms": 221.5
+   },
+   "C advanced": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": true,
+      "kind": "unreachable",
+      "probe": "e140",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 22.0,
+    "tested": 0,
+    "total_ms": 282.8,
+    "traps": [],
+    "walk_ms": 260.8
+   }
+  },
+  "pages/keyboard.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 263.8,
+    "traps": [],
+    "walk_ms": 263.8
+   },
+   "B standard": {
+    "considered": 9,
+    "drops": [
+     {
+      "probe": "e40",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e41",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e42",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e43",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e46",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e48",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e44",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e45",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e47",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 30.8,
+    "tested": 0,
+    "total_ms": 282.7,
+    "traps": [],
+    "walk_ms": 251.9
+   },
+   "C advanced": {
+    "considered": 9,
+    "drops": [
+     {
+      "probe": "e40",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e41",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e42",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e43",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e46",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e48",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, but with focus on it Enter and Space did nothing.",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e44",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e45",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Enter or Space did what the click did.",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e47",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "dismissed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 5366.6,
+    "tested": 3,
+    "total_ms": 5597.8,
+    "traps": [],
+    "walk_ms": 231.2
+   }
+  },
+  "pages/native-proxy.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 247.7,
+    "traps": [],
+    "walk_ms": 247.7
+   },
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "label",
+      "probe": "e100",
+      "selector": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "signals": [
+       "label for a file the Tab key cannot reach"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 18.1,
+    "tested": 0,
+    "total_ms": 232.1,
+    "traps": [],
+    "walk_ms": 214.0
+   },
+   "C advanced": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "label",
+      "probe": "e100",
+      "selector": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "signals": [
+       "label for a file the Tab key cannot reach"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 721.1,
+    "tested": 1,
+    "total_ms": 981.6,
+    "traps": [],
+    "walk_ms": 260.5
+   }
+  },
+  "pages/pointer-gated.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 225.1,
+    "traps": [],
+    "walk_ms": 225.1
+   },
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e121",
+      "why": "disabled"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e120",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 14.3,
+    "tested": 0,
+    "total_ms": 243.8,
+    "traps": [],
+    "walk_ms": 229.5
+   },
+   "C advanced": {
+    "considered": 4,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e121",
+      "why": "disabled"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e120",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 741.7,
+    "tested": 1,
+    "total_ms": 1122.6,
+    "traps": [],
+    "walk_ms": 380.9
+   }
+  },
+  "pages/roving-tabindex.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 253.1,
+    "traps": [],
+    "walk_ms": 253.1
+   },
+   "B standard": {
+    "considered": 6,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e160",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e161",
+      "why": "roving"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e162",
+      "selector": "div#broken-toolbar > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e163",
+      "selector": "div#broken-toolbar > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 18.1,
+    "tested": 0,
+    "total_ms": 233.0,
+    "traps": [],
+    "walk_ms": 214.9
+   },
+   "C advanced": {
+    "considered": 6,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e160",
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e161",
+      "why": "roving"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e162",
+      "selector": "div#broken-toolbar > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e163",
+      "selector": "div#broken-toolbar > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 1407.2,
+    "tested": 2,
+    "total_ms": 1635.1,
+    "traps": [],
+    "walk_ms": 227.9
+   }
+  },
+  "pages/scale.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 257.3,
+    "traps": [],
+    "walk_ms": 257.3
+   },
+   "B standard": {
+    "considered": 122,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e90",
+      "selector": "div#grid > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e91",
+      "selector": "div#deep > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 141.8,
+    "tested": 0,
+    "total_ms": 363.6,
+    "traps": [],
+    "walk_ms": 221.8
+   },
+   "C advanced": {
+    "considered": 122,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e90",
+      "selector": "div#grid > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it changed text or state on the page, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e91",
+      "selector": "div#deep > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 1631.3,
+    "tested": 2,
+    "total_ms": 1889.2,
+    "traps": [],
+    "walk_ms": 257.9
+   }
+  },
+  "pages/shadow-tab-scope.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 252.6,
+    "traps": [],
+    "walk_ms": 252.6
+   },
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e130",
+      "selector": "button",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 14.6,
+    "tested": 0,
+    "total_ms": 237.7,
+    "traps": [],
+    "walk_ms": 223.1
+   },
+   "C advanced": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e130",
+      "selector": "button",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 17.4,
+    "tested": 0,
+    "total_ms": 236.3,
+    "traps": [],
+    "walk_ms": 218.9
+   }
+  },
+  "pages/tab-trap.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 50.4,
+    "traps": [
+     "button#trap"
+    ],
+    "walk_ms": 50.4
+   },
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e111",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 12.9,
+    "tested": 0,
+    "total_ms": 65.9,
+    "traps": [
+     "button#trap"
+    ],
+    "walk_ms": 53.0
+   },
+   "C advanced": {
+    "considered": 3,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "e111",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 13.1,
+    "tested": 0,
+    "total_ms": 62.7,
+    "traps": [
+     "button#trap"
+    ],
+    "walk_ms": 49.6
+   }
+  }
+ },
+ "provenance": {
+  "elapsed_s": 55.1,
+  "label": "final",
+  "operability_sha256": "2ed40db3175f4a6c4025f5241ef5d39c6fcbb2da1a6164bab74ad0f8e78379a5",
+  "playwright": "1.58.0",
+  "python": "3.14.7",
+  "utc": "2026-09-30T18:14:33.788747+00:00"
+ },
+ "scores": {
+  "A current": {
+   "errors": 0,
+   "f1": null,
+   "fn": 40,
+   "fn_ids": [
+    "e01",
+    "e02",
+    "e03",
+    "e04",
+    "e05",
+    "e06",
+    "e07",
+    "e08",
+    "e09",
+    "e100",
+    "e110",
+    "e111",
+    "e120",
+    "e121",
+    "e130",
+    "e131",
+    "e140",
+    "e150",
+    "e151",
+    "e162",
+    "e163",
+    "e20",
+    "e21",
+    "e22",
+    "e23",
+    "e25",
+    "e26",
+    "e28",
+    "e29",
+    "e31",
+    "e43",
+    "e44",
+    "e45",
+    "e60",
+    "e62",
+    "e71",
+    "e72",
+    "e73",
+    "e90",
+    "e91"
+   ],
+   "fp": 0,
+   "fp_ids": [],
+   "page_ms_max": 337.8,
+   "page_ms_mean": 253.4,
+   "page_ms_median": 256.8,
+   "precision": null,
+   "recall": 0.0,
+   "sum_ms": 3801.7,
+   "tp": 0,
+   "units": 74,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 253.4
+  },
+  "B standard": {
+   "errors": 0,
+   "f1": 0.8684210526315789,
+   "fn": 7,
+   "fn_ids": [
+    "e05",
+    "e111",
+    "e121",
+    "e131",
+    "e31",
+    "e43",
+    "e71"
+   ],
+   "fp": 3,
+   "fp_ids": [
+    "e24",
+    "e27",
+    "e47"
+   ],
+   "page_ms_max": 363.6,
+   "page_ms_mean": 250.5,
+   "page_ms_median": 239.1,
+   "precision": 0.9166666666666666,
+   "recall": 0.825,
+   "sum_ms": 3758.2,
+   "tp": 33,
+   "units": 74,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 223.4
+  },
+  "C advanced": {
+   "errors": 0,
+   "f1": 0.9189189189189189,
+   "fn": 6,
+   "fn_ids": [
+    "e111",
+    "e121",
+    "e131",
+    "e43",
+    "e62",
+    "e71"
+   ],
+   "fp": 0,
+   "fp_ids": [],
+   "page_ms_max": 9414.2,
+   "page_ms_mean": 2648.2,
+   "page_ms_median": 1635.1,
+   "precision": 1.0,
+   "recall": 0.85,
+   "sum_ms": 39723.1,
+   "tp": 34,
+   "units": 74,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 240.5
+  }
+ }
+}

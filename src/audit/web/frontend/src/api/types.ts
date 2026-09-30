@@ -330,6 +330,11 @@ export interface NewScanPayload {
   /** Skip clicking controls and re-running axe in newly revealed DOM states. */
   skip_interaction: boolean;
   skip_keyboard: boolean;
+  /**
+   * Keyboard (Advanced): operate each mouse-only control lead (click, then
+   * Enter and Space) to confirm or clear it. Needs the keyboard check.
+   */
+  keyboard_advanced: boolean;
   skip_responsive: boolean;
   /** Skip local-AI review of contextual criteria such as link purpose. */
   skip_semantic: boolean;
@@ -416,6 +421,7 @@ export interface LocalLoginScanPayload {
   /** Skip clicking controls and re-running axe in newly revealed DOM states. */
   skip_interaction: boolean;
   skip_keyboard: boolean;
+  keyboard_advanced: boolean;
   skip_responsive: boolean;
   skip_ocr: boolean;
   skip_vlm: boolean;

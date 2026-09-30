@@ -61,6 +61,19 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           label={SWITCHES.keyboard.label}
           hint={rendered ? SWITCHES.keyboard.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
+        <SwitchRow
+          checked={switchOn(settings, "keyboard_advanced")}
+          onChange={(on) => update(switchPatch(settings, "keyboard_advanced", on))}
+          disabled={!rendered || !switchOn(settings, "keyboard")}
+          label={SWITCHES.keyboard_advanced.label}
+          hint={
+            !rendered
+              ? "Needs a browser. Turn off Fast scan to use it."
+              : !switchOn(settings, "keyboard")
+                ? "Needs the keyboard check. Turn it on to use this."
+                : SWITCHES.keyboard_advanced.hint
+          }
+        />
         {!isFixed(policy, "skip_focus") && (
           <SwitchRow
             checked={switchOn(settings, "focus")}

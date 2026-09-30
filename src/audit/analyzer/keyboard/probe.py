@@ -56,6 +56,8 @@ from audit.analyzer.keyboard.base import (
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
+    from audit.analyzer.keyboard.operability import KeyboardOperabilityProbe
+
 log = logging.getLogger(__name__)
 
 
@@ -93,6 +95,9 @@ class KeyboardProbe:
     # Browser errors can include an authenticated URL or target text. The
     # protected companion opts into terse, non-evidence diagnostics instead.
     suppress_diagnostics: bool = False
+    # SC 2.1.1 mouse-only control check, run after the Tab walk so it can use
+    # the walk's visited set. None keeps this probe to SC 2.1.2 alone.
+    operability: KeyboardOperabilityProbe | None = None
 
     async def run(self, page: Page) -> list[KeyboardTrap]:
         """Probe ``page`` for keyboard traps. Returns a (possibly empty) list.
@@ -106,6 +111,9 @@ class KeyboardProbe:
             findings.extend(await self._probe_tab_walk(page))
         except Exception as exc:
             self._log_failure("tab_walk", exc)
+        if self.operability is not None:
+            # Never raises: it logs and returns what it has.
+            findings.extend(await self.operability.run(page))
         return findings
 
     # -----------------------------------------------------------------

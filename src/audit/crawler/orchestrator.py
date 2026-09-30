@@ -43,7 +43,7 @@ from audit.analyzer.interaction import (
     RevealedViolation,
     StateCapture,
 )
-from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
+from audit.analyzer.keyboard import KeyboardOperabilityProbe, KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
@@ -258,6 +258,12 @@ class CrawlConfig:
     # matters more than this evidence.
     keyboard_probe_enabled: bool = True
     keyboard_probe_max_focusable: int = 50
+    # SC 2.1.1 mouse-only controls, part of the keyboard check. Standard (the
+    # default) is static: one CDP listener query and one DOM read per frame.
+    # Advanced additionally clicks each lead, then tries Enter and Space, under
+    # the interaction probe's write/navigation guard; it costs seconds per page
+    # and is opt-in (``--keyboard-advanced``). See ``operability.py``.
+    keyboard_advanced: bool = False
     # Responsive/zoom/text-spacing probe (Phase 10). Three dynamic checks
     # on the live page: 320px reflow (SC 1.4.10), ~200% zoom text
     # clipping (SC 1.4.4), and the WCAG text-spacing override
@@ -526,6 +532,7 @@ async def run_crawl(
     if config.keyboard_probe_enabled:
         keyboard_probe = KeyboardProbe(
             max_focusable=config.keyboard_probe_max_focusable,
+            operability=KeyboardOperabilityProbe(advanced=config.keyboard_advanced),
         )
     # Responsive/zoom/text-spacing probe (SC 1.4.4/1.4.10/1.4.12) —
     # default on. Stateless like the keyboard probe.
@@ -843,6 +850,10 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "alfa_concurrency": config.alfa_concurrency,
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
+            # 1: the keyboard check also reports SC 2.1.1 mouse-only controls.
+            # Absent from older reports, whose keyboard check was SC 2.1.2 only.
+            "keyboard_operability_version": 1,
+            "keyboard_advanced": config.keyboard_advanced,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,
@@ -2108,7 +2119,8 @@ def _persist_keyboard(
         method="keyboard",
     )
     ctx.summary.keyboard_pages_probed += 1
-    ctx.summary.keyboard_traps_total += len(traps)
+    # SC 2.1.1 rows share this pipeline; the counter stays a count of traps.
+    ctx.summary.keyboard_traps_total += sum(1 for t in traps if t.criterion_sc == "2.1.2")
 
 
 @_batched_writes

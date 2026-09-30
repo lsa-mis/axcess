@@ -1,0 +1,2443 @@
+{
+ "corpus": "gds",
+ "description": "GDS Accessibility Tool Audit (MIT, Crown Copyright 2017); 6 IAF cases on one page, all 13 audited tools score 0/6",
+ "pages": {
+  "pages/test-cases.html": {
+   "A current": {
+    "leads": [],
+    "operability_ms": 0.0,
+    "total_ms": 1192.7,
+    "traps": [],
+    "walk_ms": 1192.7
+   },
+   "B standard": {
+    "considered": 283,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-real-link",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": "gds-lightbox-close",
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "weak"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-dropdown",
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-role-button",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "weak"
+     },
+     {
+      "probe": null,
+      "why": "weak"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "weak"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "gds-concertina",
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": null,
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": null,
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "gds-fake-button",
+      "selector": "div#webchat",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 180.6,
+    "tested": 0,
+    "total_ms": 1081.9,
+    "traps": [],
+    "walk_ms": 901.3
+   },
+   "C advanced": {
+    "considered": 283,
+    "drops": [
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-real-link",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": "gds-lightbox-close",
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "contained"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-dropdown",
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": "gds-role-button",
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "not rendered"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "contained"
+     },
+     {
+      "probe": null,
+      "why": "contained"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "contained"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     },
+     {
+      "probe": null,
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "evidence": "Measured: clicking it showed 5 elements, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "gds-concertina",
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it showed 8 elements, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": null,
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Measured: clicking it showed 4 elements, and the Tab key does not reach it.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": null,
+      "selector": "main#wrapper > div:nth-of-type(117) > dl:nth-of-type(1) > dt:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "confirmed"
+     },
+     {
+      "evidence": "Clicking it changed nothing Axcess could observe.",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "gds-fake-button",
+      "selector": "div#webchat",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "dismissed"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 4670.4,
+    "tested": 4,
+    "total_ms": 5590.0,
+    "traps": [],
+    "walk_ms": 919.6
+   }
+  }
+ },
+ "provenance": {
+  "elapsed_s": 9.7,
+  "label": "heldout1",
+  "operability_sha256": "fbce18ca33144ed036a14a7076c67a8b9ce9f9a891fe9fd6f17a6db646d4f69f",
+  "playwright": "1.58.0",
+  "python": "3.14.7",
+  "utc": "2026-09-30T17:43:00.100295+00:00"
+ },
+ "scores": {
+  "A current": {
+   "errors": 0,
+   "f1": null,
+   "fn": 6,
+   "fn_ids": [
+    "gds-concertina",
+    "gds-dropdown",
+    "gds-fake-button",
+    "gds-lightbox-close",
+    "gds-role-button",
+    "gds-tooltip"
+   ],
+   "fp": 0,
+   "fp_ids": [],
+   "page_ms_max": 1192.7,
+   "page_ms_mean": 1192.7,
+   "page_ms_median": 1192.7,
+   "precision": null,
+   "recall": 0.0,
+   "sum_ms": 1192.7,
+   "tp": 0,
+   "units": 8,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 1192.7
+  },
+  "B standard": {
+   "errors": 0,
+   "f1": 0.5,
+   "fn": 4,
+   "fn_ids": [
+    "gds-dropdown",
+    "gds-lightbox-close",
+    "gds-role-button",
+    "gds-tooltip"
+   ],
+   "fp": 0,
+   "fp_ids": [],
+   "page_ms_max": 1081.9,
+   "page_ms_mean": 1081.9,
+   "page_ms_median": 1081.9,
+   "precision": 1.0,
+   "recall": 0.3333333333333333,
+   "sum_ms": 1081.9,
+   "tp": 2,
+   "units": 8,
+   "unlabelled_flags": 2,
+   "walk_ms_mean": 901.3
+  },
+  "C advanced": {
+   "errors": 0,
+   "f1": 0.2857142857142857,
+   "fn": 5,
+   "fn_ids": [
+    "gds-dropdown",
+    "gds-fake-button",
+    "gds-lightbox-close",
+    "gds-role-button",
+    "gds-tooltip"
+   ],
+   "fp": 0,
+   "fp_ids": [],
+   "page_ms_max": 5590.0,
+   "page_ms_mean": 5590.0,
+   "page_ms_median": 5590.0,
+   "precision": 1.0,
+   "recall": 0.16666666666666666,
+   "sum_ms": 5590.0,
+   "tp": 1,
+   "units": 8,
+   "unlabelled_flags": 2,
+   "walk_ms_mean": 919.6
+  }
+ }
+}

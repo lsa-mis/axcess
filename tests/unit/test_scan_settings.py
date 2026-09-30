@@ -47,6 +47,8 @@ _CUSTOM_FORM: dict[str, Any] = {
     "scan_engine": "both",
     "skip_interaction": True,
     "skip_keyboard": True,
+    # Off because the keyboard check is: Advanced is a mode of it.
+    "keyboard_advanced": False,
     "skip_responsive": True,
     "skip_semantic": False,
     "skip_focus": True,
@@ -88,6 +90,7 @@ def test_the_form_defaults_round_trip() -> None:
         "scan_engine": "axe",
         "skip_interaction": False,
         "skip_keyboard": False,
+        "keyboard_advanced": False,
         "skip_responsive": False,
         "skip_semantic": True,
         "skip_focus": False,
@@ -97,6 +100,26 @@ def test_the_form_defaults_round_trip() -> None:
         "wcag_version": "2.1",
     }
     assert _round_trip(defaults) == defaults
+
+
+def test_keyboard_advanced_round_trips_and_needs_the_keyboard_check() -> None:
+    advanced = {**_CUSTOM_FORM, "skip_keyboard": False, "keyboard_advanced": True}
+    assert _round_trip(advanced) == advanced
+    config = server._build_crawl_config(advanced, Settings())
+    stored = json.loads(config_json_for_scan(config))
+    assert (stored["keyboard_advanced"], stored["keyboard_operability_version"]) == (True, 1)
+    # Asked for without the keyboard check, it cannot run, so it is not stored as on.
+    orphan = server._build_crawl_config({**_CUSTOM_FORM, "keyboard_advanced": True}, Settings())
+    assert orphan.keyboard_advanced is False
+
+
+def test_an_older_scan_reads_back_as_the_standard_keyboard_check() -> None:
+    snapshot = snapshot_from_config(
+        scan_id=4,
+        seed_url="https://old.example.test/",
+        config_json='{"keyboard_probe_enabled": true}',
+    )
+    assert (snapshot.settings.skip_keyboard, snapshot.settings.keyboard_advanced) == (False, False)
 
 
 def test_no_page_limit_round_trips_and_keeps_the_form_value() -> None:

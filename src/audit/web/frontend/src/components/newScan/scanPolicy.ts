@@ -61,6 +61,7 @@ const SETTING_KEYS = [
   "scan_engine",
   "skip_interaction",
   "skip_keyboard",
+  "keyboard_advanced",
   "skip_responsive",
   "skip_semantic",
   "skip_focus",
@@ -90,6 +91,7 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   scan_engine: "axe",
   skip_interaction: false,
   skip_keyboard: false,
+  keyboard_advanced: false,
   skip_responsive: false,
   skip_semantic: true,
   skip_focus: false,
@@ -279,6 +281,7 @@ export function toLocalLoginPayload(
     wcag_version: settings.wcag_version,
     skip_interaction: settings.skip_interaction,
     skip_keyboard: settings.skip_keyboard,
+    keyboard_advanced: settings.keyboard_advanced && !settings.skip_keyboard,
     skip_responsive: settings.skip_responsive,
     skip_ocr: settings.skip_ocr,
     skip_vlm: settings.skip_vlm,
@@ -299,6 +302,7 @@ export type SwitchKey =
   | "ignore_robots"
   | "click_through"
   | "keyboard"
+  | "keyboard_advanced"
   | "focus"
   | "responsive"
   | "skip_rendered_storage"
@@ -315,6 +319,7 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   ignore_robots: { field: "ignore_robots", inverted: false },
   click_through: { field: "skip_interaction", inverted: true },
   keyboard: { field: "skip_keyboard", inverted: true },
+  keyboard_advanced: { field: "keyboard_advanced", inverted: false },
   focus: { field: "skip_focus", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },
@@ -347,6 +352,8 @@ export function switchPatch(
   const patch: Partial<ScanSettings> = { [field]: inverted ? !on : on };
   if (key === "ocr" && !on) patch.skip_vlm = true;
   if (key === "static_only" && on) patch.skip_interaction = true;
+  // Advanced is a mode of the keyboard check, so it goes off with it.
+  if (key === "keyboard" && !on) patch.keyboard_advanced = false;
   void settings;
   return patch;
 }
@@ -367,7 +374,8 @@ export type CheckGroup = "checks" | "localAi";
 export type CheckItem = { key: SwitchKey; group: CheckGroup; label: string; on: boolean };
 
 const CHECKS: ReadonlyArray<{ key: SwitchKey; group: CheckGroup; label: string; needsBrowser?: true }> = [
-  { key: "keyboard", group: "checks", label: "Keyboard traps", needsBrowser: true },
+  { key: "keyboard", group: "checks", label: "Keyboard access", needsBrowser: true },
+  { key: "keyboard_advanced", group: "checks", label: "Keyboard (Advanced)", needsBrowser: true },
   { key: "focus", group: "checks", label: "Focus visibility", needsBrowser: true },
   { key: "responsive", group: "checks", label: "Responsive & zoom", needsBrowser: true },
   { key: "ocr", group: "localAi", label: "Image text (OCR)" },
@@ -385,7 +393,9 @@ export function checkInventory(settings: ScanSettings, policy: ScanPolicy): Chec
       switchOn(settings, check.key) &&
       !(check.needsBrowser && settings.static_only) &&
       // The vision model only reviews images OCR found text in.
-      !(check.key === "vision" && !switchOn(settings, "ocr")),
+      !(check.key === "vision" && !switchOn(settings, "ocr")) &&
+      // Advanced operates what the keyboard check finds.
+      !(check.key === "keyboard_advanced" && !switchOn(settings, "keyboard")),
   }));
 }
 

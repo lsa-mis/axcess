@@ -82,8 +82,14 @@ export const SWITCHES = {
       "Axcess opens controls on each page, then checks the content they show. This makes the scan take longer. It never submits forms, pays, or subscribes.",
   },
   keyboard: {
-    label: "Check for keyboard traps",
-    hint: "A keyboard trap is a control you can Tab into but not back out of. Adds 1–3 seconds per page.",
+    label: "Check keyboard access",
+    hint:
+      "Finds keyboard traps (a control you can Tab into but not back out of) and controls that work with a mouse but that the keyboard cannot reach or press (WCAG 2.1.1, 2.1.2). Adds 1–3 seconds per page.",
+  },
+  keyboard_advanced: {
+    label: "Keyboard (Advanced): try each control it finds",
+    hint:
+      "Clicks each control the keyboard check suspects, then tries Enter and Space, and reports only the ones that fail. Fewer false alarms and more found, but slower: up to 20 seconds more on each page where it finds something. It never submits forms, pays, or subscribes.",
   },
   focus: {
     label: "Check that keyboard focus is never hidden",
@@ -312,6 +318,7 @@ export const RAIL_LABELS = {
   include_subdomain: "Subdomains",
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
+  keyboard_advanced: "Advanced keyboard check",
   focus: CHECK_LABEL.focus,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,

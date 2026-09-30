@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SC 2.1.1 fixture: delegated clicks and hover-only menus</title>
+<style>
+  .panel { display: none; }
+  .menu:hover .panel { display: block; }
+  /* The same disclosure for the keyboard, written as one selector list. */
+  .both:hover .panel, .both:focus-within .panel { display: block; }
+  /* ...and written as a separate rule on another class of the trigger. */
+  .twin:hover .panel { display: block; }
+  .kb-open:focus-within .panel { display: block; }
+  .tip .bubble { display: none; }
+  .tip:hover .bubble { display: inline; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Delegation and hover</h1>
+  <!-- Leads. -->
+  <span data-t="closest" class="row-action">Archive row</span>
+  <p data-t="byid" id="by-id">Open the reading list</p>
+  <div data-t="jq" class="jq-action">Open with jQuery</div>
+  <div class="menu"><span data-t="hover">Products</span>
+    <div class="panel"><a href="#p1">Product one</a></div></div>
+
+  <!-- Not leads. -->
+  <div data-t="tracked" data-track="banner">Tracked banner text</div>
+  <div class="both"><a href="#s" data-t="both">Services</a>
+    <div class="panel"><a href="#s1">Service one</a></div></div>
+  <div class="twin kb-open"><a href="#t" data-t="twin">Tools</a>
+    <div class="panel"><a href="#t1">Tool one</a></div></div>
+  <span class="tip" data-t="tip">Term<span class="bubble">A definition</span></span>
+  <p id="out"></p>
+</main>
+<script>
+  const out = document.getElementById('out');
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.row-action')) out.textContent = 'archived';
+    if (event.target.id === 'by-id') out.textContent = 'reading list';
+  });
+  // A click tracker reads an attribute; reading is not a delegation test.
+  document.addEventListener('click', (event) => {
+    const tag = event.target.getAttribute('data-track');
+    if (tag) window.lastTracked = tag;
+  });
+  // jQuery's record of a delegated handler: $(document).on('click', '.jq-action', fn).
+  window.jQuery = function () {};
+  window.jQuery._data = (node, key) =>
+    node === document && key === 'events' ? { click: [{ selector: '.jq-action' }] } : undefined;
+</script>
+</body>
+</html>

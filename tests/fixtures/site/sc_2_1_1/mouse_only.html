@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SC 2.1.1 fixture: controls a mouse can use</title>
+<style>
+  .btnish { cursor: pointer; padding: 4px; margin: 4px; border: 1px solid #333; display: inline-block; }
+  .hidden-cb { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mouse-only controls</h1>
+  <!-- Leads: the keyboard cannot operate these. -->
+  <div data-t="fake" id="fake" class="btnish">Open grades</div>
+  <div data-t="nokey" id="nokey" class="btnish" tabindex="0">Focusable, no keys</div>
+  <input type="checkbox" id="cb" class="hidden-cb">
+  <label data-t="label" for="cb" class="btnish">Remember me</label>
+  <a data-t="blur" id="blur" href="#b" class="btnish">Focus goes away</a>
+  <a data-t="linkbtn" id="linkbtn" href="#lb" role="button" class="btnish">Link as button</a>
+  <div data-t="noop" id="noop" class="btnish">Does nothing</div>
+
+  <!-- Not leads: each has a keyboard path. -->
+  <button data-t="real" id="real" type="button">Real button</button>
+  <div data-t="good" id="good" class="btnish" tabindex="0" role="button">Good custom</div>
+  <div data-t="card" id="card" class="btnish"><a href="#card-link">Card link</a></div>
+  <div role="toolbar" id="bar">
+    <button type="button" tabindex="0">Bold</button>
+    <button data-t="rover" type="button" tabindex="-1" id="rover">Italic</button>
+  </div>
+  <div data-t="shortcut" id="shortcut" class="btnish" aria-keyshortcuts="Alt+S">Save draft</div>
+  <span data-t="decor" class="btnish">Styled only</span>
+
+  <p id="out" aria-live="polite"></p>
+</main>
+<script>
+  const out = document.getElementById('out');
+  const say = (text) => () => { out.textContent = text; };
+  document.getElementById('fake').addEventListener('click', say('grades'));
+  document.getElementById('nokey').addEventListener('click', say('nokey'));
+  document.getElementById('cb').addEventListener('change', say('remembered'));
+  const blur = document.getElementById('blur');
+  blur.addEventListener('focus', () => blur.blur());
+  blur.addEventListener('click', (e) => { e.preventDefault(); say('blurred')(); });
+  const linkbtn = document.getElementById('linkbtn');
+  linkbtn.addEventListener('click', (e) => { e.preventDefault(); say('link button')(); });
+  document.getElementById('noop').addEventListener('click', () => {});
+  const good = document.getElementById('good');
+  good.addEventListener('click', say('good'));
+  good.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); say('good')(); }
+  });
+  document.getElementById('card').addEventListener('click', say('card'));
+  document.getElementById('bar').addEventListener('keydown', () => {});
+  document.getElementById('rover').addEventListener('click', say('italic'));
+  document.getElementById('shortcut').addEventListener('click', say('saved'));
+</script>
+</body>
+</html>

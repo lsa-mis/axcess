@@ -512,6 +512,60 @@ def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
     assert "both left focus on the same element" in row.evidence_summary
 
 
+def test_mouse_only_controls_are_two_sc_2_1_1_issues_with_their_own_titles(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    from audit.analyzer.keyboard.operability import KeyboardOperabilityProbe, OperabilityLead
+    from audit.db import repo
+
+    scan_id = _seed_two_pipelines(tmp_db)
+    page = tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
+    probe = KeyboardOperabilityProbe()
+    leads = [
+        OperabilityLead(
+            kind="unreachable",
+            selector="div#fake",
+            html="<div id='fake'>Open</div>",
+            name="open",
+            signals=("mouse listener",),
+            strength=3,
+            testable=True,
+        ),
+        OperabilityLead(
+            kind="no_key_handler",
+            selector="div#nokey",
+            html="<div id='nokey'>Go</div>",
+            name="go",
+            signals=("mouse listener",),
+            strength=3,
+            testable=True,
+            verdict="confirmed",
+            evidence="Measured: clicking it showed 1 element, but keys did nothing.",
+        ),
+    ]
+    for lead in leads:
+        repo.upsert_keyboard_finding(
+            tmp_db,
+            page_id=int(page["id"]),
+            scan_id=scan_id,
+            **probe._finding(lead).to_repo_kwargs(),
+        )
+
+    rows = {
+        r.issue_key: r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "keyboard"
+    }
+    card = issues_mod._load_rules()["semantic_criteria"]["2.1.1"]
+    unreachable = rows["keyboard:keyboard-mouse-only-control"]
+    no_keys = rows["keyboard:keyboard-no-key-activation"]
+    assert unreachable.title == card["rule_titles"]["keyboard-mouse-only-control"]
+    assert no_keys.title == card["rule_titles"]["keyboard-no-key-activation"]
+    for row in (unreachable, no_keys):
+        assert (row.wcag_sc, row.conformance, row.review_lane) == ("2.1.1", "A", "expert_review")
+        assert row.fix_steps == tuple(card["fix_steps"])
+    assert "read the page code" in unreachable.evidence_summary
+    assert "clicked the element" in no_keys.evidence_summary
+
+
 def _seed_visual_motion_finding(
     conn: sqlite3.Connection,
     scan_id: int,

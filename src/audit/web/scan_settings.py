@@ -64,6 +64,8 @@ class ScanFormSettings(BaseModel):
     scan_engine: Literal["axe", "alfa", "both"]
     skip_interaction: bool
     skip_keyboard: bool
+    # Older clients and stored scans predate it; both mean the standard check.
+    keyboard_advanced: bool = False
     skip_responsive: bool
     skip_semantic: bool
     skip_focus: bool
@@ -176,6 +178,7 @@ def snapshot_from_config(
         scan_engine=engine,
         skip_interaction=not _flag(config, "interaction_checks_enabled", default=True),
         skip_keyboard=not _flag(config, "keyboard_probe_enabled", default=True),
+        keyboard_advanced=_flag(config, "keyboard_advanced", default=False),
         skip_responsive=not _flag(config, "responsive_checks_enabled", default=True),
         skip_semantic=not _flag(config, "semantic_enabled", default=False),
         skip_focus=not _flag(config, "focus_checks_enabled", default=True),

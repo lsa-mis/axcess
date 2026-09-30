@@ -62,13 +62,15 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         "DOM, runs on every page now that JS rendering is the default.",
     ),
     ShippedPipeline(
-        name="Keyboard-trap probe",
+        name="Keyboard probe",
         pipeline="keyboard",
-        engine="Deterministic Playwright (bidirectional Tab/Shift+Tab exit attempts)",
-        scs="2.1.2 No Keyboard Trap, conservative review leads",
+        engine="Deterministic Playwright (bidirectional Tab/Shift+Tab exit attempts; "
+        "CDP listener census for mouse-only controls, optional click/Enter/Space trials)",
+        scs="2.1.2 No Keyboard Trap and 2.1.1 Keyboard (mouse-only controls), review leads",
         needs_ai=False,
         note="Suppresses ordinary focus wrapping, small cycles, modal containment, "
-        "and opaque iframe/closed-shadow focus; every lead still needs expert confirmation.",
+        "and opaque iframe/closed-shadow focus. Mouse-only control leads are static "
+        "unless the advanced mode confirmed them; every lead still needs expert confirmation.",
     ),
     ShippedPipeline(
         name="Responsive / zoom probe",

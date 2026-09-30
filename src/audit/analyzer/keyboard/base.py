@@ -95,3 +95,11 @@ class KeyboardTrap:
             "pipeline": "keyboard",
             "criterion_sc": self.criterion_sc,
         }
+
+
+# SC 2.1.1 Keyboard: the operability probe (``operability.py``). Its rows use
+# the same ``KeyboardTrap`` shape, with the criterion fields overridden.
+RULE_UNREACHABLE = "keyboard-mouse-only-control"  # Tab cannot reach it
+RULE_NO_KEY_HANDLER = "keyboard-no-key-activation"  # Tab reaches it; no key handler
+SC_2_1_1 = "2.1.1"
+HELP_URL_2_1_1 = "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html"

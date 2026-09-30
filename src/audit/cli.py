@@ -380,6 +380,18 @@ def crawl(
             ),
         ),
     ] = False,
+    keyboard_advanced: Annotated[
+        bool,
+        typer.Option(
+            "--keyboard-advanced",
+            help=(
+                "Also operate each SC 2.1.1 mouse-only control lead: click it, "
+                "then try Enter and Space, and keep only leads the trial "
+                "confirms. Adds seconds per page with leads; the standard "
+                "static check always runs with the keyboard check."
+            ),
+        ),
+    ] = False,
     keyboard_max_focusable: Annotated[
         int,
         typer.Option(
@@ -543,6 +555,7 @@ def crawl(
             semantic_enabled=not skip_semantic,
             keyboard_probe_enabled=not skip_keyboard,
             keyboard_probe_max_focusable=keyboard_max_focusable,
+            keyboard_advanced=keyboard_advanced and not skip_keyboard,
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
             visual_checks_enabled=not skip_visual,

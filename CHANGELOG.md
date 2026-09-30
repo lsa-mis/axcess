@@ -10,6 +10,19 @@ merge.
 
 ### Added
 
+- Keyboard check: it now also finds controls that work with a mouse but not
+  from the keyboard (WCAG 2.1.1): elements with a click handler that the Tab
+  key cannot reach, and custom controls Tab reaches that have no key handler.
+  It also finds clicks the page handles for the whole document (including
+  jQuery's), and menus that open only when the mouse is over them (CSS
+  `:hover` with no keyboard equivalent). It reads the page's event listeners
+  and styles in a few steps, so it adds well under a second per page. The switch is now called **Check keyboard access**.
+- New scan: **Keyboard (Advanced)**, off by default. It clicks each control
+  the keyboard check suspects, then tries Enter and Space, and reports only
+  the ones that fail. It is slower, up to about 20 seconds more on a page
+  where it finds something, and never operates a control whose name looks
+  destructive. The comparison behind both is in
+  `experiments/tabbing/ab/RESULTS.md`.
 - Desktop app: the first time Axcess opens, the loading screen says
   "The first time Axcess opens, this can take a minute or two." under
   "Loading", since that first start sets up the reports database and the

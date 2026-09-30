@@ -47,7 +47,8 @@ _RAIL_NAME = {
     "Open menus, tabs, and pop-up windows (Click-Through)": (
         "Opens menus and pop-up windows (Click-Through)"
     ),
-    "Check for keyboard traps": "Keyboard check",
+    "Check keyboard access": "Keyboard check",
+    "Keyboard (Advanced): try each control it finds": "Advanced keyboard check",
     "Check that keyboard focus is never hidden": "Focus check",
     "Check narrow screens and zoom": "Zoom and layout check",
     "Read text inside images (OCR)": "Image text check",
@@ -178,7 +179,7 @@ async def test_fast_crawl_with_axe_blocks_start_with_an_inline_alert(
     fast = page.get_by_role("switch", name=re.compile(r"^Fast scan without a browser"))
     await fast.check()
     # Rendered-page checks switch themselves off and say why.
-    keyboard = page.get_by_role("switch", name=re.compile(r"^Check for keyboard traps"))
+    keyboard = page.get_by_role("switch", name=re.compile(r"^Check keyboard access"))
     await playwright_async.expect(keyboard).to_be_disabled()
     # Folded again: a failed submit must reopen it so the alert's link
     # lands on a visible switch.
@@ -225,7 +226,7 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
     await playwright_async.expect(digest).to_contain_text("Up to 300 pages, 10 clicks deep")
 
-    keyboard = page.get_by_role("switch", name=re.compile(r"^Check for keyboard traps"))
+    keyboard = page.get_by_role("switch", name=re.compile(r"^Check keyboard access"))
     await keyboard.uncheck()
     # Off moves it from Checks that run to Not included.
     await playwright_async.expect(summary).to_contain_text("Customized")
@@ -543,6 +544,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Pages behind a sign-in",
                 "Whole website",
                 "Subdomains",
+                "Advanced keyboard check",
                 "Vision model review",
                 "AI review",
                 "Motion and reading-order check",
@@ -558,6 +560,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
             [
                 "Pages on any other website",
                 "Whole signed-in website",
+                "Advanced keyboard check",
                 "Image text check",
                 "Vision model review",
             ],

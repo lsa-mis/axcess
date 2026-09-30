@@ -1,0 +1,3457 @@
+{
+ "corpus": "edgecases",
+ "description": "shared-author development corpus; no unbiased accuracy or ranking claim",
+ "pages": {
+  "pages/binding.html": {
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e05\" class=\"btnish\">delegated on document</div>",
+      "probe": "e05",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "why": "weak"
+     },
+     {
+      "html": "<div id=\"container\">\n  <div data-probe=\"e06\" class=\"btnish\">delegated on container</div>\n</div>",
+      "probe": null,
+      "sel": "div#container",
+      "why": "delegation root"
+     },
+     {
+      "html": "<button data-probe=\"e10\">native button, addEventListener</button>",
+      "probe": "e10",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e01",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e02",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e03",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e04",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e07",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e08",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e09",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "double-click listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e06",
+      "selector": "div#container > div:nth-of-type(1)",
+      "signals": [
+       "clickable styling under a delegated click listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 67.7,
+    "tested": 0,
+    "total_ms": 805.0,
+    "traps": [],
+    "walk_ms": 737.3
+   },
+   "B1 standard-v1": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e05\" class=\"btnish\">delegated on document</div>",
+      "probe": "e05",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "why": "weak"
+     },
+     {
+      "html": "<div id=\"container\">\n  <div data-probe=\"e06\" class=\"btnish\">delegated on container</div>\n</div>",
+      "probe": null,
+      "sel": "div#container",
+      "why": "delegation root"
+     },
+     {
+      "html": "<button data-probe=\"e10\">native button, addEventListener</button>",
+      "probe": "e10",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e01",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e02",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e03",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e04",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e07",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e08",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e09",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "double-click listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e06",
+      "selector": "div#container > div:nth-of-type(1)",
+      "signals": [
+       "clickable styling under a delegated click listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 59.6,
+    "tested": 0,
+    "total_ms": 832.2,
+    "traps": [],
+    "walk_ms": 772.6
+   }
+  },
+  "pages/decoys.html": {
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<button data-probe=\"e80\">native button</button>",
+      "probe": "e80",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<a href=\"#e81\" data-probe=\"e81\">real anchor</a>",
+      "probe": "e81",
+      "sel": "html > body:nth-of-type(1) > a:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e82\" class=\"btnish\" role=\"button\" tabindex=\"0\">role=button done correctly</div>",
+      "probe": "e82",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e83\" class=\"btnish\">cursor:pointer, no handler at all</div>",
+      "probe": "e83",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "weak"
+     },
+     {
+      "html": "<div data-probe=\"e84\" class=\"btn primary card\">class says button, no handler</div>",
+      "probe": "e84",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "why": "weak"
+     },
+     {
+      "html": "<div data-probe=\"e85\" class=\"card\" style=\"cursor:pointer;border:1px solid #bbb;padding:10px\">\n  clickable card wrapper\n ",
+      "probe": "e85",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "why": "contained"
+     },
+     {
+      "html": "<a href=\"#e85a\" data-probe=\"e85a\">the real link inside it</a>",
+      "probe": "e85a",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4) > a:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<label data-probe=\"e86\" for=\"chk\" style=\"cursor:pointer\">label for a checkbox</label>",
+      "probe": "e86",
+      "sel": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<input id=\"chk\" type=\"checkbox\" data-probe=\"e86a\">",
+      "probe": "e86a",
+      "sel": "input#chk",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e87b\"><span data-probe=\"e87\" style=\"cursor:pointer\">decorative span inside a button</span></button>",
+      "probe": "e87b",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<span data-probe=\"e87\" style=\"cursor:pointer\">decorative span inside a button</span>",
+      "probe": "e87",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2) > span:nth-of-type(1)",
+      "why": "weak"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 62.9,
+    "tested": 0,
+    "total_ms": 776.8,
+    "traps": [],
+    "walk_ms": 713.9
+   },
+   "B1 standard-v1": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<button data-probe=\"e80\">native button</button>",
+      "probe": "e80",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<a href=\"#e81\" data-probe=\"e81\">real anchor</a>",
+      "probe": "e81",
+      "sel": "html > body:nth-of-type(1) > a:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e82\" class=\"btnish\" role=\"button\" tabindex=\"0\">role=button done correctly</div>",
+      "probe": "e82",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e83\" class=\"btnish\">cursor:pointer, no handler at all</div>",
+      "probe": "e83",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "weak"
+     },
+     {
+      "html": "<div data-probe=\"e84\" class=\"btn primary card\">class says button, no handler</div>",
+      "probe": "e84",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "why": "weak"
+     },
+     {
+      "html": "<div data-probe=\"e85\" class=\"card\" style=\"cursor:pointer;border:1px solid #bbb;padding:10px\">\n  clickable card wrapper\n ",
+      "probe": "e85",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "why": "contained"
+     },
+     {
+      "html": "<a href=\"#e85a\" data-probe=\"e85a\">the real link inside it</a>",
+      "probe": "e85a",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4) > a:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<label data-probe=\"e86\" for=\"chk\" style=\"cursor:pointer\">label for a checkbox</label>",
+      "probe": "e86",
+      "sel": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<input id=\"chk\" type=\"checkbox\" data-probe=\"e86a\">",
+      "probe": "e86a",
+      "sel": "input#chk",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e87b\"><span data-probe=\"e87\" style=\"cursor:pointer\">decorative span inside a button</span></button>",
+      "probe": "e87b",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<span data-probe=\"e87\" style=\"cursor:pointer\">decorative span inside a button</span>",
+      "probe": "e87",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2) > span:nth-of-type(1)",
+      "why": "weak"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 51.8,
+    "tested": 0,
+    "total_ms": 820.6,
+    "traps": [],
+    "walk_ms": 768.8
+   }
+  },
+  "pages/effects.html": {
+   "B standard": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e30\" class=\"btnish\" tabindex=\"0\" role=\"button\">idempotent storage write</div>",
+      "probe": "e30",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e20",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e21",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e22",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e23",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e24",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e25",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e26",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e27",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e28",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e29",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 53.8,
+    "tested": 0,
+    "total_ms": 738.0,
+    "traps": [],
+    "walk_ms": 684.2
+   },
+   "B1 standard-v1": {
+    "considered": 11,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e30\" class=\"btnish\" tabindex=\"0\" role=\"button\">idempotent storage write</div>",
+      "probe": "e30",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e20",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e21",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e22",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e23",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e24",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e25",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e26",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e27",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e28",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e29",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 83.8,
+    "tested": 0,
+    "total_ms": 812.2,
+    "traps": [],
+    "walk_ms": 728.4
+   }
+  },
+  "pages/focus-redirect.html": {
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the action</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the action</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e110",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 57.7,
+    "tested": 0,
+    "total_ms": 805.4,
+    "traps": [],
+    "walk_ms": 747.7
+   },
+   "B1 standard-v1": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the action</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the action</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e110",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 48.6,
+    "tested": 0,
+    "total_ms": 715.6,
+    "traps": [],
+    "walk_ms": 667.0
+   }
+  },
+  "pages/geometry.html": {
+   "B standard": {
+    "considered": 14,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e64\" class=\"btnish\" style=\"position:absolute;top:0;left:0\">under a transparent overlay</div>",
+      "probe": "e64",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1)",
+      "why": "covered"
+     },
+     {
+      "html": "<div data-probe=\"e63\" style=\"width:0;height:0;cursor:pointer\"></div>",
+      "probe": "e63",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<div data-probe=\"e61\" style=\"position:absolute;left:-9999px;cursor:pointer\">off-canvas</div>",
+      "probe": "e61",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "why": "offscreen"
+     },
+     {
+      "html": "<div data-probe=\"e65\" class=\"btnish\" style=\"pointer-events:none\">pointer-events none</div>",
+      "probe": "e65",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "why": "pointer-events"
+     },
+     {
+      "html": "<div data-probe=\"e66\" class=\"btnish\">inside inert</div>",
+      "probe": "e66",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(8) > div:nth-of-type(1)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<button data-probe=\"e67\" disabled=\"\">disabled</button>",
+      "probe": "e67",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "disabled"
+     },
+     {
+      "html": "<div data-probe=\"e68\" class=\"btnish\" style=\"opacity:0\">opacity 0</div>",
+      "probe": "e68",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "why": "transparent"
+     },
+     {
+      "html": "<div data-probe=\"e69\" class=\"btnish\" style=\"visibility:hidden\">visibility hidden</div>",
+      "probe": "e69",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<div data-probe=\"e70\" class=\"btnish\" style=\"display:none\">display none</div>",
+      "probe": "e70",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "why": "not rendered"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e71",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e72",
+      "selector": "html > body:nth-of-type(1) > p:nth-of-type(2) > span:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e62",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e73",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e60",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(14)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 77.7,
+    "tested": 0,
+    "total_ms": 777.9,
+    "traps": [],
+    "walk_ms": 700.2
+   },
+   "B1 standard-v1": {
+    "considered": 14,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e71\" class=\"btnish\">inside a scroll container, needs scrolling</div>",
+      "probe": "e71",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "why": "covered"
+     },
+     {
+      "html": "<div data-probe=\"e64\" class=\"btnish\" style=\"position:absolute;top:0;left:0\">under a transparent overlay</div>",
+      "probe": "e64",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1)",
+      "why": "covered"
+     },
+     {
+      "html": "<div data-probe=\"e63\" style=\"width:0;height:0;cursor:pointer\"></div>",
+      "probe": "e63",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<div data-probe=\"e61\" style=\"position:absolute;left:-9999px;cursor:pointer\">off-canvas</div>",
+      "probe": "e61",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "why": "offscreen"
+     },
+     {
+      "html": "<div data-probe=\"e65\" class=\"btnish\" style=\"pointer-events:none\">pointer-events none</div>",
+      "probe": "e65",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "why": "pointer-events"
+     },
+     {
+      "html": "<div data-probe=\"e66\" class=\"btnish\">inside inert</div>",
+      "probe": "e66",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(8) > div:nth-of-type(1)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<button data-probe=\"e67\" disabled=\"\">disabled</button>",
+      "probe": "e67",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "disabled"
+     },
+     {
+      "html": "<div data-probe=\"e68\" class=\"btnish\" style=\"opacity:0\">opacity 0</div>",
+      "probe": "e68",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(9)",
+      "why": "transparent"
+     },
+     {
+      "html": "<div data-probe=\"e69\" class=\"btnish\" style=\"visibility:hidden\">visibility hidden</div>",
+      "probe": "e69",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(10)",
+      "why": "not rendered"
+     },
+     {
+      "html": "<div data-probe=\"e70\" class=\"btnish\" style=\"display:none\">display none</div>",
+      "probe": "e70",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(11)",
+      "why": "not rendered"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e72",
+      "selector": "html > body:nth-of-type(1) > p:nth-of-type(2) > span:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e62",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e73",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(12)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e60",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(14)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 77.3,
+    "tested": 0,
+    "total_ms": 714.3,
+    "traps": [],
+    "walk_ms": 637.0
+   }
+  },
+  "pages/graphical-controls.html": {
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the drawings</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the drawings</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e150",
+      "selector": "html > body:nth-of-type(1) > svg:nth-of-type(1) > g:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e151",
+      "selector": "html > body:nth-of-type(1) > canvas:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 56.5,
+    "tested": 0,
+    "total_ms": 724.2,
+    "traps": [],
+    "walk_ms": 667.7
+   },
+   "B1 standard-v1": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the drawings</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the drawings</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e150",
+      "selector": "html > body:nth-of-type(1) > svg:nth-of-type(1) > g:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e151",
+      "selector": "html > body:nth-of-type(1) > canvas:nth-of-type(1)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 47.5,
+    "tested": 0,
+    "total_ms": 797.7,
+    "traps": [],
+    "walk_ms": 750.2
+   }
+  },
+  "pages/hover.html": {
+   "B standard": {
+    "considered": 2,
+    "drops": [
+     {
+      "html": "<div class=\"menu\" data-probe=\"e31\" style=\"cursor:pointer\">\n  Products\n  <div class=\"panel\">CSS-only dropdown, mouse only",
+      "probe": "e31",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "weak"
+     },
+     {
+      "html": "<div class=\"menu2\" data-probe=\"e32\" tabindex=\"0\" style=\"cursor:pointer\">\n  Services\n  <div class=\"panel\">opens on hover ",
+      "probe": "e32",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 50.4,
+    "tested": 0,
+    "total_ms": 860.5,
+    "traps": [],
+    "walk_ms": 810.1
+   },
+   "B1 standard-v1": {
+    "considered": 2,
+    "drops": [
+     {
+      "html": "<div class=\"menu\" data-probe=\"e31\" style=\"cursor:pointer\">\n  Products\n  <div class=\"panel\">CSS-only dropdown, mouse only",
+      "probe": "e31",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "weak"
+     },
+     {
+      "html": "<div class=\"menu2\" data-probe=\"e32\" tabindex=\"0\" style=\"cursor:pointer\">\n  Services\n  <div class=\"panel\">opens on hover ",
+      "probe": "e32",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 30.5,
+    "tested": 0,
+    "total_ms": 737.0,
+    "traps": [],
+    "walk_ms": 706.5
+   }
+  },
+  "pages/iframe-tab-scope.html": {
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the frame</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the frame</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": true,
+      "kind": "unreachable",
+      "probe": "e140",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 70.1,
+    "tested": 0,
+    "total_ms": 800.9,
+    "traps": [],
+    "walk_ms": 730.8
+   },
+   "B1 standard-v1": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the frame</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the frame</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": true,
+      "kind": "unreachable",
+      "probe": "e140",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 41.1,
+    "tested": 0,
+    "total_ms": 763.6,
+    "traps": [],
+    "walk_ms": 722.5
+   }
+  },
+  "pages/keyboard.html": {
+   "B standard": {
+    "considered": 9,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e40\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + keydown Enter</div>",
+      "probe": "e40",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e41\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + Space only</div>",
+      "probe": "e41",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e42\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + keyup only</div>",
+      "probe": "e42",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e43\" class=\"btnish\" role=\"button\" tabindex=\"0\">Enter does something DIFFERENT</div>",
+      "probe": "e43",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e46\" class=\"btnish\" role=\"button\" tabindex=\"3\">positive tabindex + Enter</div>",
+      "probe": "e46",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e48\">native button baseline</button>",
+      "probe": "e48",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e44",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e45",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e47",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 73.4,
+    "tested": 0,
+    "total_ms": 823.5,
+    "traps": [],
+    "walk_ms": 750.1
+   },
+   "B1 standard-v1": {
+    "considered": 9,
+    "drops": [
+     {
+      "html": "<div data-probe=\"e40\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + keydown Enter</div>",
+      "probe": "e40",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e41\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + Space only</div>",
+      "probe": "e41",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e42\" class=\"btnish\" role=\"button\" tabindex=\"0\">click + keyup only</div>",
+      "probe": "e42",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(3)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e43\" class=\"btnish\" role=\"button\" tabindex=\"0\">Enter does something DIFFERENT</div>",
+      "probe": "e43",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(4)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<div data-probe=\"e46\" class=\"btnish\" role=\"button\" tabindex=\"3\">positive tabindex + Enter</div>",
+      "probe": "e46",
+      "sel": "html > body:nth-of-type(1) > div:nth-of-type(7)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e48\">native button baseline</button>",
+      "probe": "e48",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(1)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e44",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(5)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e45",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(6)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "no_key_handler",
+      "probe": "e47",
+      "selector": "html > body:nth-of-type(1) > div:nth-of-type(8)",
+      "signals": [
+       "mouse listener",
+       "role=button"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 62.5,
+    "tested": 0,
+    "total_ms": 819.9,
+    "traps": [],
+    "walk_ms": 757.4
+   }
+  },
+  "pages/native-proxy.html": {
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the picker</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<input id=\"upload\" type=\"file\" hidden=\"\">",
+      "probe": null,
+      "sel": "input#upload",
+      "why": "not rendered"
+     },
+     {
+      "html": "<button id=\"after\">After the picker</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "label",
+      "probe": "e100",
+      "selector": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "signals": [
+       "label for a file the Tab key cannot reach"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 54.9,
+    "tested": 0,
+    "total_ms": 784.3,
+    "traps": [],
+    "walk_ms": 729.4
+   },
+   "B1 standard-v1": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the picker</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<input id=\"upload\" type=\"file\" hidden=\"\">",
+      "probe": null,
+      "sel": "input#upload",
+      "why": "not rendered"
+     },
+     {
+      "html": "<button id=\"after\">After the picker</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "label",
+      "probe": "e100",
+      "selector": "html > body:nth-of-type(1) > label:nth-of-type(1)",
+      "signals": [
+       "label for a file the Tab key cannot reach"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 48.3,
+    "tested": 0,
+    "total_ms": 773.8,
+    "traps": [],
+    "walk_ms": 725.5
+   }
+  },
+  "pages/pointer-gated.html": {
+   "B standard": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the actions</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e121\" class=\"btnish\" disabled=\"\">Hover enables me</button>",
+      "probe": "e121",
+      "sel": "span#enable-zone > button:nth-of-type(1)",
+      "why": "disabled"
+     },
+     {
+      "html": "<button id=\"after\">After the actions</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e120",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 51.0,
+    "tested": 0,
+    "total_ms": 796.6,
+    "traps": [],
+    "walk_ms": 745.6
+   },
+   "B1 standard-v1": {
+    "considered": 4,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the actions</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e121\" class=\"btnish\" disabled=\"\">Hover enables me</button>",
+      "probe": "e121",
+      "sel": "span#enable-zone > button:nth-of-type(1)",
+      "why": "disabled"
+     },
+     {
+      "html": "<button id=\"after\">After the actions</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e120",
+      "selector": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 39.1,
+    "tested": 0,
+    "total_ms": 660.2,
+    "traps": [],
+    "walk_ms": 621.1
+   }
+  },
+  "pages/roving-tabindex.html": {
+   "B standard": {
+    "considered": 6,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the toolbars</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e160\" tabindex=\"0\">First working action</button>",
+      "probe": "e160",
+      "sel": "div#working-toolbar > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e161\" tabindex=\"-1\">Second working action</button>",
+      "probe": "e161",
+      "sel": "div#working-toolbar > button:nth-of-type(2)",
+      "why": "roving"
+     },
+     {
+      "html": "<button id=\"after\">After the toolbars</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e162",
+      "selector": "div#broken-toolbar > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e163",
+      "selector": "div#broken-toolbar > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 43.9,
+    "tested": 0,
+    "total_ms": 786.4,
+    "traps": [],
+    "walk_ms": 742.5
+   },
+   "B1 standard-v1": {
+    "considered": 6,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the toolbars</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e160\" tabindex=\"0\">First working action</button>",
+      "probe": "e160",
+      "sel": "div#working-toolbar > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e161\" tabindex=\"-1\">Second working action</button>",
+      "probe": "e161",
+      "sel": "div#working-toolbar > button:nth-of-type(2)",
+      "why": "roving"
+     },
+     {
+      "html": "<button id=\"after\">After the toolbars</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e162",
+      "selector": "div#broken-toolbar > button:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e163",
+      "selector": "div#broken-toolbar > button:nth-of-type(2)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 64.0,
+    "tested": 0,
+    "total_ms": 785.5,
+    "traps": [],
+    "walk_ms": 721.5
+   }
+  },
+  "pages/scale.html": {
+   "B standard": {
+    "considered": 122,
+    "drops": [
+     {
+      "html": "<button class=\"row-action btn\">act 0</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 1</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 2</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(3)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 3</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(4)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 4</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(5)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 5</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(6)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 6</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(7)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 7</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(8)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 8</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(9)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 9</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(10)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 10</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(11)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 11</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(12)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 12</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(13)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 13</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(14)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 14</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(15)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 15</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(16)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 16</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(17)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 17</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(18)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 18</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(19)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 19</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(20)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 20</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(21)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 21</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(22)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 22</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(23)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 23</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(24)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 24</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(25)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 25</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(26)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 26</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(27)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 27</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(28)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 28</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(29)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 29</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(30)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 30</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(31)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 31</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(32)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 32</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(33)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 33</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(34)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 34</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(35)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 35</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(36)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 36</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(37)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 37</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(38)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 38</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(39)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 39</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(40)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 40</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(41)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 41</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(42)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 42</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(43)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 43</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(44)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 44</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(45)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 45</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(46)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 46</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(47)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 47</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(48)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 48</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(49)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 49</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(50)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 50</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(51)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 51</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(52)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 52</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(53)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 53</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(54)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 54</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(55)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 55</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(56)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 56</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(57)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 57</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(58)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 58</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(59)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 59</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(60)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 60</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(61)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 61</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(62)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 62</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(63)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 63</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(64)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 64</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(65)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 65</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(66)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 66</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(67)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 67</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(68)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 68</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(69)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 69</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(70)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 70</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(71)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 71</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(72)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 72</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(73)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 73</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(74)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 74</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(75)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 75</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(76)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 76</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(77)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 77</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(78)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 78</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(79)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 79</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(80)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 80</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(81)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 81</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(82)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 82</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(83)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 83</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(84)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 84</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(85)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 85</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(86)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 86</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(87)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 87</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(88)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 88</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(89)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 89</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(90)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 90</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(91)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 91</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(92)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 92</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(93)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 93</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(94)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 94</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(95)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 95</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(96)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 96</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(97)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 97</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(98)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 98</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(99)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 99</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(100)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 100</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(101)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 101</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(102)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 102</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(103)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 103</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(104)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 104</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(105)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 105</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(106)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 106</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(107)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 107</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(108)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 108</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(109)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 109</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(110)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 110</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(111)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 111</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(112)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 112</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(113)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 113</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(114)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 114</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(115)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 115</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(116)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 116</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(117)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 117</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(118)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 118</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(119)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 119</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(120)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e90",
+      "selector": "div#grid > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e91",
+      "selector": "div#deep > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 323.9,
+    "tested": 0,
+    "total_ms": 3077.3,
+    "traps": [],
+    "walk_ms": 2753.4
+   },
+   "B1 standard-v1": {
+    "considered": 122,
+    "drops": [
+     {
+      "html": "<button class=\"row-action btn\">act 0</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(1)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 1</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 2</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(3)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 3</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(4)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 4</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(5)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 5</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(6)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 6</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(7)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 7</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(8)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 8</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(9)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 9</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(10)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 10</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(11)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 11</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(12)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 12</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(13)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 13</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(14)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 14</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(15)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 15</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(16)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 16</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(17)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 17</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(18)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 18</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(19)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 19</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(20)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 20</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(21)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 21</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(22)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 22</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(23)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 23</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(24)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 24</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(25)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 25</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(26)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 26</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(27)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 27</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(28)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 28</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(29)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 29</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(30)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 30</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(31)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 31</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(32)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 32</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(33)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 33</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(34)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 34</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(35)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 35</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(36)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 36</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(37)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 37</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(38)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 38</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(39)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 39</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(40)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 40</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(41)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 41</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(42)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 42</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(43)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 43</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(44)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 44</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(45)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 45</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(46)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 46</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(47)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 47</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(48)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 48</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(49)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 49</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(50)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 50</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(51)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 51</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(52)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 52</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(53)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 53</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(54)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 54</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(55)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 55</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(56)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 56</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(57)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 57</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(58)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 58</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(59)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 59</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(60)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 60</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(61)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 61</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(62)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 62</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(63)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 63</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(64)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 64</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(65)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 65</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(66)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 66</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(67)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 67</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(68)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 68</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(69)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 69</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(70)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 70</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(71)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 71</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(72)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 72</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(73)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 73</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(74)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 74</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(75)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 75</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(76)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 76</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(77)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 77</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(78)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 78</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(79)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 79</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(80)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 80</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(81)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 81</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(82)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 82</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(83)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 83</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(84)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 84</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(85)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 85</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(86)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 86</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(87)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 87</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(88)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 88</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(89)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 89</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(90)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 90</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(91)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 91</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(92)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 92</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(93)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 93</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(94)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 94</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(95)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 95</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(96)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 96</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(97)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 97</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(98)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 98</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(99)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 99</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(100)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 100</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(101)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 101</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(102)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 102</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(103)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 103</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(104)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 104</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(105)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 105</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(106)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 106</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(107)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 107</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(108)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 108</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(109)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 109</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(110)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 110</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(111)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 111</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(112)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 112</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(113)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 113</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(114)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 114</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(115)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 115</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(116)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 116</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(117)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 117</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(118)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 118</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(119)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button class=\"row-action btn\">act 119</button>",
+      "probe": null,
+      "sel": "div#grid > button:nth-of-type(120)",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e90",
+      "selector": "div#grid > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     },
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e91",
+      "selector": "div#deep > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 278.0,
+    "tested": 0,
+    "total_ms": 1056.1,
+    "traps": [],
+    "walk_ms": 778.1
+   }
+  },
+  "pages/shadow-tab-scope.html": {
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the components</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the components</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e130",
+      "selector": "button",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 61.9,
+    "tested": 0,
+    "total_ms": 768.5,
+    "traps": [],
+    "walk_ms": 706.6
+   },
+   "B1 standard-v1": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"before\">Before the components</button>",
+      "probe": null,
+      "sel": "button#before",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the components</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [
+     {
+      "also_probe": null,
+      "evidence": "",
+      "frame": false,
+      "kind": "unreachable",
+      "probe": "e130",
+      "selector": "button",
+      "signals": [
+       "mouse listener"
+      ],
+      "verdict": "lead"
+     }
+    ],
+    "limits": [],
+    "operability_ms": 45.4,
+    "tested": 0,
+    "total_ms": 695.8,
+    "traps": [],
+    "walk_ms": 650.4
+   }
+  },
+  "pages/tab-trap.html": {
+   "B standard": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"trap\">Stale focus-trap destination</button>",
+      "probe": null,
+      "sel": "button#trap",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e111\" class=\"btnish\">Run action outside the trap</button>",
+      "probe": "e111",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the action</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 51.9,
+    "tested": 0,
+    "total_ms": 136.0,
+    "traps": [
+     "button#trap"
+    ],
+    "walk_ms": 84.1
+   },
+   "B1 standard-v1": {
+    "considered": 3,
+    "drops": [
+     {
+      "html": "<button id=\"trap\">Stale focus-trap destination</button>",
+      "probe": null,
+      "sel": "button#trap",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button data-probe=\"e111\" class=\"btnish\">Run action outside the trap</button>",
+      "probe": "e111",
+      "sel": "html > body:nth-of-type(1) > button:nth-of-type(2)",
+      "why": "keyboard path"
+     },
+     {
+      "html": "<button id=\"after\">After the action</button>",
+      "probe": null,
+      "sel": "button#after",
+      "why": "keyboard path"
+     }
+    ],
+    "leads": [],
+    "limits": [],
+    "operability_ms": 44.5,
+    "tested": 0,
+    "total_ms": 123.9,
+    "traps": [
+     "button#trap"
+    ],
+    "walk_ms": 79.4
+   }
+  }
+ },
+ "provenance": {
+  "elapsed_s": 31.8,
+  "label": "v2final",
+  "operability_sha256": "c89ae9a49027f9755b7a7b82d4cd7f060cb73c84bca1186d4c6eef9f8d91dc10",
+  "playwright": "1.58.0",
+  "python": "3.14.7",
+  "utc": "2026-09-30T22:04:51.899888+00:00"
+ },
+ "scores": {
+  "B standard": {
+   "errors": 0,
+   "f1": 0.8831168831168831,
+   "fn": 6,
+   "fn_ids": [
+    "e05",
+    "e111",
+    "e121",
+    "e131",
+    "e31",
+    "e43"
+   ],
+   "fp": 3,
+   "fp_ids": [
+    "e24",
+    "e27",
+    "e47"
+   ],
+   "page_ms_max": 3077.3,
+   "page_ms_mean": 897.4,
+   "page_ms_median": 786.4,
+   "precision": 0.918918918918919,
+   "recall": 0.85,
+   "sum_ms": 13461.3,
+   "tp": 34,
+   "units": 74,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 820.2
+  },
+  "B1 standard-v1": {
+   "errors": 0,
+   "f1": 0.8684210526315789,
+   "fn": 7,
+   "fn_ids": [
+    "e05",
+    "e111",
+    "e121",
+    "e131",
+    "e31",
+    "e43",
+    "e71"
+   ],
+   "fp": 3,
+   "fp_ids": [
+    "e24",
+    "e27",
+    "e47"
+   ],
+   "page_ms_max": 1056.1,
+   "page_ms_mean": 740.6,
+   "page_ms_median": 773.8,
+   "precision": 0.9166666666666666,
+   "recall": 0.825,
+   "sum_ms": 11108.4,
+   "tp": 33,
+   "units": 74,
+   "unlabelled_flags": 0,
+   "walk_ms_mean": 672.4
+  }
+ }
+}

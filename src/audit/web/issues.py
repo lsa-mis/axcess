@@ -933,6 +933,24 @@ def _axe_issue_rows(
                     ),
                     "Scan again to measure leaving the component in both directions.",
                 )
+            elif g.get("wcag_sc") == "2.1.1":
+                default_title = "Control may work with a mouse but not a keyboard"
+                measured = any(
+                    str(f.get("failure_summary") or "").startswith("Measured:")
+                    for f in finding_rows
+                )
+                if measured:
+                    evidence_summary = (
+                        "The advanced keyboard check clicked the element and saw the page "
+                        "change, then found the keyboard could not do the same. Check it by "
+                        "hand before you report it."
+                    )
+                else:
+                    evidence_summary = (
+                        "The keyboard check read the page code: the element reacts to the "
+                        "mouse, and the keyboard seems unable to reach or press it. Try it "
+                        "with the mouse, then with Tab, Enter and Space."
+                    )
             else:
                 default_title = "Keyboard exit blocked in both directions"
                 evidence_summary = (
@@ -1081,7 +1099,8 @@ def _axe_issue_rows(
             IssueRow(
                 pipeline=pipeline,
                 issue_key=issue_key,
-                title=meta.get("title")
+                title=(meta.get("rule_titles") or {}).get(raw_rule_id)
+                or meta.get("title")
                 or (
                     default_title
                     if pipeline in {"alfa", "protected_image", "visual"}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>SC 2.1.1 fixture: every control works from the keyboard</title></head>
+<body>
+<main>
+  <h1>Keyboard-operable page</h1>
+  <nav><a href="#one">One</a> <a href="#two">Two</a></nav>
+  <button type="button" id="toggle" aria-expanded="false">Menu</button>
+  <ul id="menu" hidden><li><a href="#three">Three</a></li></ul>
+  <label><input type="checkbox"> Subscribe to nothing</label>
+  <div id="custom" role="button" tabindex="0">Custom but complete</div>
+  <p id="out"></p>
+</main>
+<script>
+  const toggle = document.getElementById('toggle');
+  toggle.addEventListener('click', () => {
+    const menu = document.getElementById('menu');
+    menu.hidden = !menu.hidden;
+    toggle.setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  const custom = document.getElementById('custom');
+  const act = () => { document.getElementById('out').textContent = 'done'; };
+  custom.addEventListener('click', act);
+  custom.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') act(); });
+  document.addEventListener('click', () => {});
+</script>
+</body>
+</html>
