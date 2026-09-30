@@ -274,8 +274,19 @@ const SIDEBAR_ROW_ACTIVE =
 /**
  * The one "Create New Scan" action. Scan type is chosen on the new-scan page,
  * so this stays mode-neutral: the shell never makes users pick a workflow
- * before they have seen the explanation for each option. On that page it is
- * shown but inert, since it would lead where the reader already is.
+ * before they have seen the explanation for each option.
+ *
+ * It looks and works the same on every screen, the New scan form included.
+ * There it is marked aria-current="page", a link to where the reader already
+ * is ("Start a new scan, current page, link"), and following it replaces the
+ * history entry, so it adds no extra step to Back. It used to turn grey and
+ * inert on the form (ghost, 50% opacity, aria-disabled, out of the tab
+ * order): that read as broken or unavailable rather than "you are here", and
+ * the shell's controls then differed from screen to screen. Changed at the
+ * developer's request. Rests on SC 3.2.4 Consistent Identification (Level
+ * AA): the same function is identified the same way wherever it appears;
+ * and W3C COGA, "Making Content Usable" (https://www.w3.org/TR/coga-usable/):
+ * the same control for the same job, everywhere.
  */
 function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?: string }) {
   const { pathname } = useLocation();
@@ -283,11 +294,11 @@ function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?:
   return (
     <LinkButton
       to="/scans/new"
-      variant={onNewScanForm ? "ghost" : "primary"}
+      variant="primary"
       size="md"
-      className={cn(className, onNewScanForm && "pointer-events-none opacity-50")}
-      aria-disabled={onNewScanForm || undefined}
-      tabIndex={onNewScanForm ? -1 : undefined}
+      className={className}
+      aria-current={onNewScanForm ? "page" : undefined}
+      replace={onNewScanForm}
       aria-label="Start a new scan"
       title="Start a new accessibility scan"
     >

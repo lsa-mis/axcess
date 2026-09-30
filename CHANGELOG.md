@@ -57,6 +57,9 @@ then `0.61` and on, `0.69` then `0.70`. Each desktop release published from
 
 ### Changed
 
+- New scan button: it no longer turns grey on the New scan page. It looks
+  the same everywhere, and there a screen reader says it is the current
+  page.
 - Download files are named in plain words, for who each is for and what
   it is, not processor codes: Axcess-0.61-Mac-Apple-Silicon.dmg,
   Axcess-0.61-Windows-Installer.exe, Axcess-0.61-Windows-Portable.zip and
