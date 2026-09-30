@@ -9,6 +9,11 @@
  *   version=0.2.4
  *   package_version=0.2.4
  *
+ * The line says who a release is for: 0.1 developers (branch builds only),
+ * 0.2 the U-M ITS accessibility team, 0.3 a wider pilot, 1.0 university-wide
+ * (docs/internal/releases.md, "Version numbers and tags"). Changing it is a
+ * decision about the audience, made by hand.
+ *
  * The two are the same now that versions are three-part semver; both stay
  * so the workflow's steps keep their inputs. `version` names the tag
  * (`desktop-v0.2.4`), the release title and the files.

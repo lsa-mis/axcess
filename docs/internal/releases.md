@@ -125,6 +125,26 @@ On macOS, `npm run make` runs the resource and runtime checks through the
   highest `desktop-v0.2.N` tag, or `0.2.0` when the line has none. Tags of
   other lines and of the earlier schemes do not count. Its unit tests pin the
   steps.
+- Each release line says who it is for. Change `config.releaseLine` (and
+  `version` beside it, as `<line>.0`) when the audience widens:
+
+  | Line | Who it is for | How they get it |
+  | --- | --- | --- |
+  | `0.1` | Developers | Branch builds: the workflow artifacts of a manual or pull request run, never published |
+  | `0.2` | The U-M ITS accessibility team | Releases published from `main` |
+  | `0.3` | A wider pilot, such as selected departments | Releases published from `main` |
+  | `1.0` | University-wide | Releases published from `main`, signed and notarized (see [Before an institutional rollout](#before-an-institutional-rollout)) |
+
+  University-wide is `1.0` rather than `0.4`: most readers take a version
+  below 1.0 as early or pilot software, and 1.0 as ready and supported.
+  A line labels the audience a version is meant for; it does not limit who
+  can get it. Every published release is public on GitHub, and there is one
+  update channel, so every installed copy is offered the newest release,
+  whichever line it is on. Changes in the code, large ones included, ship
+  within a line as the next number; changing the line is a decision about
+  the audience. Separate channels (a pilot group kept on one line while
+  others try the next) would need a release flag and an app setting, which
+  do not exist yet.
 - Each build stamps `desktop/package.json` with that version and puts the
   commit SHA in `config.buildCommit`. `desktop/scripts/stamp-version.cjs` does
   the stamp rather than `npm version`, which refuses to set the version a

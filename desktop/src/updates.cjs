@@ -142,7 +142,10 @@ function isNewerRelease(release, currentVersion) {
  * The team chooses the release line, MAJOR.MINOR ("0.2", config.releaseLine
  * in desktop/package.json); every release published from main counts up
  * the last part (nextReleaseVersion). Moving to 0.3.0 or 1.0.0 is a
- * deliberate one-line change there, never the side effect of a merge. The
+ * deliberate one-line change there, never the side effect of a merge, and
+ * each line names an audience: 0.1 developers, 0.2 the U-M ITS
+ * accessibility team, 0.3 a wider pilot, 1.0 university-wide
+ * (docs/internal/releases.md). The
  * scheme before this one (0.60, 0.61 ...) added 0.01 per merge, a build
  * counter that looked like a version and would have reached 1.00 by itself.
  */
