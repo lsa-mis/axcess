@@ -239,7 +239,8 @@ Each release holds one file per platform and the two files the Windows
 updater reads, nothing else. The public site's download links open
 `https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
 points each at its file there when the GitHub API answers. The ten
-newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`
+newest releases of the current line are kept, and older lines are never
+deleted; `https://github.com/lsa-mis/axcess/releases/latest`
 always points at the most recent one and needs no GitHub sign-in. Workflow
 artifacts are not a public download channel: GitHub requires a signed-in user
 to fetch them and deletes them after 14 days.
