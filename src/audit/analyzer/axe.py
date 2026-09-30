@@ -42,9 +42,11 @@ import hashlib
 import json
 import logging
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -69,14 +71,18 @@ Level = Literal["A", "AA", "AAA"]
 # This is intentionally a table, not parsing logic. Axe occasionally
 # coins a non-numeric tag (``EN-301-549``, ``ACT``, ``section508``) that
 # we want to ignore. Explicit list = explicit policy.
-_LEVEL_TAGS: dict[Level, frozenset[str]] = {
+#
+# The WCAG 2.1 table is the 2.2 table without the ``wcag22*`` tags: the
+# rules axe files under WCAG 2.2 test success criteria that 2.1 does not
+# have (target size, for example), so a 2.1 scan does not run them.
+_LEVEL_TAGS_21: dict[Level, frozenset[str]] = {
     "A": frozenset(
-        # WCAG 2.0/2.1/2.2 Level A
-        ["wcag2a", "wcag21a", "wcag22a"]
+        # WCAG 2.0/2.1 Level A
+        ["wcag2a", "wcag21a"]
     ),
     "AA": frozenset(
         # Each higher level inherits the lower one's tag set.
-        ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"]
+        ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
     ),
     "AAA": frozenset(
         [
@@ -85,15 +91,25 @@ _LEVEL_TAGS: dict[Level, frozenset[str]] = {
             "wcag2aaa",
             "wcag21a",
             "wcag21aa",
-            "wcag22a",
-            "wcag22aa",
         ]
     ),
 }
+_LEVEL_TAGS: dict[WcagVersion, dict[Level, frozenset[str]]] = {
+    "2.1": _LEVEL_TAGS_21,
+    "2.2": {
+        "A": _LEVEL_TAGS_21["A"] | {"wcag22a"},
+        "AA": _LEVEL_TAGS_21["AA"] | {"wcag22a", "wcag22aa"},
+        "AAA": _LEVEL_TAGS_21["AAA"] | {"wcag22a", "wcag22aa"},
+    },
+}
 
 
-def tags_for_level(level: Level) -> list[str]:
-    """Axe tag list to pass into ``axe.run`` for a given WCAG level.
+def tags_for_level(level: Level, version: WcagVersion = LEGACY_WCAG_VERSION) -> list[str]:
+    """Axe tag list to pass into ``axe.run`` for a WCAG level and version.
+
+    ``version`` "2.1" leaves out every ``wcag22*`` tag; "2.2" includes
+    them. The default is "2.2", the rule set every caller ran before the
+    version was selectable, so an unthreaded caller keeps its behavior.
 
     The list always includes ``best-practice``, axe's own recommended
     rules that don't map cleanly to a single SC but catch real bugs
@@ -101,7 +117,7 @@ def tags_for_level(level: Level) -> list[str]:
     findings are tagged ``best-practice`` and we surface them with
     ``wcag_level = None`` in the DB so the user can filter them out.
     """
-    return sorted(_LEVEL_TAGS[level] | {"best-practice"})
+    return sorted(_LEVEL_TAGS[version][level] | {"best-practice"})
 
 
 def _extract_wcag_scs(tags: list[str]) -> tuple[str | None, str | None, Level | None]:
@@ -223,7 +239,6 @@ class AxeAnalyzer:
     # can echo an authenticated URL, a fragment of a selector, or a response
     # detail. Public scans retain the existing actionable diagnostic output.
     suppress_diagnostics: bool = False
-    _injected: bool = field(default=False, init=False)
 
     @classmethod
     def from_bundled(
@@ -240,13 +255,19 @@ class AxeAnalyzer:
             suppress_diagnostics=suppress_diagnostics,
         )
 
-    async def run(self, page: Page, level: Level = "AA") -> list[AxeViolation]:
+    async def run(
+        self,
+        page: Page,
+        level: Level = "AA",
+        version: WcagVersion = LEGACY_WCAG_VERSION,
+    ) -> list[AxeViolation]:
         """Inject axe into ``page`` and return the flattened violations.
 
         ``level`` controls the tag pack: ``"AA"`` (default) catches every
-        rule axe knows for WCAG 2.0/2.1/2.2 Level A or AA, plus axe's
-        ``best-practice`` set. ``"AAA"`` adds the AAA rules; ``"A"``
-        narrows to Level A only.
+        rule axe knows for Level A or AA, plus axe's ``best-practice`` set.
+        ``"AAA"`` adds the AAA rules; ``"A"`` narrows to Level A only.
+        ``version`` picks the WCAG version those levels are read against:
+        "2.1" drops the rules axe files under WCAG 2.2 only.
         """
         # Execute the bundled source through Playwright's evaluation channel
         # instead of appending an inline <script>.  Authenticated applications
@@ -255,15 +276,37 @@ class AxeAnalyzer:
         # pages even though the auditor controls the browser.  page.evaluate
         # runs in Playwright's execution context, does not weaken or modify the
         # target's CSP, and keeps the bundle entirely local.
+        #
+        # Ask the page whether axe is already there before shipping half a
+        # megabyte of bundle across the CDP connection. The interaction probe
+        # re-runs this analyzer on the same page once per DOM-changing click,
+        # up to a hundred times, and every one of those used to re-send the
+        # whole bundle. A fresh navigation clears the JS context, so this
+        # cannot skip an injection the page actually needs.
+        #
+        # The check is a separate round trip rather than an in-page `eval` of
+        # the bundle, deliberately: eval inside the page is subject to the
+        # target's own script-src, which is the restriction the evaluation
+        # channel exists to avoid.
+        #
+        # It asks for the API this analyzer calls, not merely for the name.
+        # `window.axe` is an ordinary global that a target page is free to
+        # define for its own purposes; treating any truthy value as "axe is
+        # loaded" would skip the injection and then fail on `axe.run`, and
+        # the failure mode is a page reporting zero violations rather than
+        # an error. Under-reporting an accessibility scan is the one
+        # outcome worth an extra round trip to avoid.
+        already_loaded = "() => typeof window.axe?.run === 'function'"
         try:
-            await page.evaluate(self.axe_source)
+            if not await page.evaluate(already_loaded):
+                await page.evaluate(self.axe_source)
         except Exception as exc:
             if self.suppress_diagnostics:
                 log.warning("axe-core installation failed in protected context")
             else:
                 log.warning("axe-core installation failed on page: %s", exc)
             return []
-        tags = tags_for_level(level)
+        tags = tags_for_level(level, version)
         # axe.run returns the full result object; we only keep `violations`.
         # The `runOnly: {type: 'tag', values: tags}` filter is what gives
         # us the WCAG-tagged subset of axe's rule set.

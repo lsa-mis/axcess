@@ -30,7 +30,66 @@ Typical data locations are:
 | --- | --- |
 | macOS | `~/Library/Application Support/Axcess/data/` |
 | Windows | `%APPDATA%/Axcess/data/` |
+| Windows, portable zip | `Axcess data/data/`, beside `Axcess.exe` |
 | Linux | `~/.config/Axcess/data/` |
+
+### The Linux AppImage
+
+`Axcess-<version>-Linux.AppImage` is the whole app in one file. The release
+builds it on Ubuntu 22.04 (`build-linux` in `desktop-build.yml`), so it runs
+on distributions with glibc 2.35 or newer: Ubuntu 22.04, Debian 12, Fedora
+36 and later. Forge packages the app; `scripts/make-linux-appimage.cjs` has
+electron-builder wrap it, and `verify-packaged.cjs` then runs the bundled
+backend's checks. Tesseract is bundled by `scripts/bundle-tesseract-linux.sh`:
+the real executable, every library it needs except glibc's, and English
+data, behind a `bin/tesseract` wrapper that points it at its own libraries.
+
+It uses electron-builder's static AppImage runtime (`toolsets.appimage` in
+`electron-builder.config.cjs`), which needs no libfuse2. Its launcher keeps
+Chromium's sandbox on, and turns it off only when user namespaces are
+unavailable (`unshare -Ur true` fails), as on Ubuntu 23.10 and later, where
+AppArmor restricts them; otherwise the app would not start there. That was
+a deliberate choice: there, a saved copy of a scanned page opened in the
+Page inspector is not isolated by the sandbox, and the Get started page
+says so. A DEB package could install an AppArmor profile and keep the
+sandbox on Ubuntu as well.
+
+Data is in `~/.config/Axcess`, as for any Linux build. The AppImage
+runtime's own `--appimage-portable-config` puts it in a folder beside the
+file instead (`Axcess-<version>-Linux.AppImage.config`); Axcess needs no
+code for that. Updates are offered as a download of the new AppImage
+(`offerAppImageDownload` in `main.cjs`).
+
+### The portable zip (Windows)
+
+`Axcess-<version>-Windows-Portable.zip` is the same app without an
+installer. It ships with a folder named `Axcess data` beside `Axcess.exe`,
+and while that folder is there Axcess runs in portable mode
+(`portableDataDir` in `desktop/src/runtime.cjs`): reports, stored images,
+settings, logs, the browser profile, crash reports and temporary files
+(`TEMP` and `TMP`, inherited by the backend, Playwright and Chromium) all
+go into it, not into `%APPDATA%`. Moving the folder that holds both moves
+Axcess with its reports. Deleting `Axcess data` makes the copy an ordinary
+one that uses `%APPDATA%`.
+
+What it cannot promise, and what the folder's `About this folder.txt`
+tells people:
+
+- Windows itself still records a little about any program it runs, such
+  as recent apps and prefetch data.
+- The reports database uses SQLite's WAL mode, which does not work on a
+  network drive. A USB drive works, but unplugging it while Axcess is open
+  can damage the database.
+- Reports can hold screenshots of scanned pages, including pages behind a
+  sign-in, so the folder needs the same care as those pages.
+
+If Axcess cannot write to the folder (unzipped somewhere read-only), it
+says so and stops, rather than writing to `%APPDATA%` after all. A zip copy
+cannot update itself: its update dialog opens the new zip and says how to
+move the `Axcess data` folder into it (`offerZipDownload` in `main.cjs`).
+Only a copy with Setup's uninstaller beside it updates in place
+(`windowsUpdateMethod`). A portable copy and an installed one can run at
+the same time, each with its own reports.
 
 ## Development
 
@@ -49,6 +108,28 @@ make desktop-run
 Electron chooses an available loopback port. It does not use or expose port
 8765, and it does not enable the LAN-hosting access-token mode.
 
+Only one Axcess may run per user data folder. If an installed copy is already
+open, `make desktop-run` (or a second installed copy) exits at once and brings
+the running window forward instead of starting.
+
+### "Axcess could not start"
+
+The window shows this page when the local service exits, cannot be spawned,
+or never answers `/health` within 60 seconds. The page prints the launcher's
+reason and the service's last lines of output. The full record is in the
+launcher log, next to the service's own log:
+
+| Platform | Log file |
+| --- | --- |
+| macOS | `~/Library/Application Support/Axcess/data/logs/launcher.log` |
+| Windows | `%APPDATA%\Axcess\data\logs\launcher.log` |
+| Linux | `~/.config/Axcess/data/logs/launcher.log` |
+
+Every launch appends the exact backend command, the version, its output, and
+its exit code, so the file also shows which build failed. A development
+checkout usually fails because dependencies are missing; run
+`make desktop-setup` and retry.
+
 ## Build a local installer
 
 The release build has five layers:
@@ -58,8 +139,20 @@ The release build has five layers:
 3. Bundle the Python backend with PyInstaller.
 4. Bundle the matching Playwright Chromium and a relocatable Tesseract OCR
    runtime with English language data.
-5. Create an installer with Electron Forge, then launch every bundled runtime
-   from inside the finished application as a release gate.
+5. Package the app with Electron Forge and create the installer, then launch
+   every bundled runtime from inside the finished application as a release
+   gate. macOS gets a DMG from Forge. Windows gets an NSIS installer from
+   electron-builder, which wraps Forge's packaged folder without changing it
+   (`npm run make:windows`; see `desktop/electron-builder.config.cjs`).
+
+The Windows installer is a standard setup wizard. It asks whether to install
+only for the current user (the default, no administrator needed) or for
+everyone on the computer, then shows the install folder and lets people
+change it. A per-user install goes to
+`%LOCALAPPDATA%\Programs\Axcess` by default. Uninstalling keeps scans,
+because they live in `%APPDATA%\Axcess\data`. For managed deployment, the
+installer runs silently with `/S`; add `/allusers` to install for every
+account or `/D=<folder>` (last on the command line) to choose the folder.
 
 Run:
 
@@ -85,8 +178,8 @@ rounded, padded app icon with outlined letters (no installed font required).
 The canonical desktop artwork is `desktop/assets/axcess.svg`.
 
 Committed native assets cover the macOS application/Dock (`axcess.icns`),
-Windows executable and Setup installer (`axcess.ico`), and Linux window and
-DEB/RPM launcher (`axcess.png`). The same mark appears on startup and error
+Windows executable and Setup installer (`axcess.ico`), and Linux window,
+AppImage and DEB/RPM launcher (`axcess.png`). The same mark appears on startup and error
 screens, and in the macOS development Dock. Packaging verifies all assets
 are present; ordinary builds do not require an icon-generation toolchain.
 
@@ -117,18 +210,62 @@ from its integrity-checked ASAR archive.
 
 ## Release work still required
 
-The build produces local, unsigned installers. Before institutional rollout:
+Without signing credentials, the build produces preview installers: macOS
+builds are ad-hoc signed (not Developer ID signed or notarized), and Windows
+builds are unsigned. Before institutional rollout:
 
 - configure Apple Developer ID signing and notarization;
 - configure Windows Authenticode signing;
-- bundle and verify an equivalent OCR runtime before enabling a Linux release
-  job;
-- add a signed update channel or document managed-software deployment;
+- sign the update channel so macOS can install updates in place (see
+  below), or document managed-software deployment;
 - run U-M security and privacy review on the packaged binaries;
 - test installation, upgrade, rollback, database retention, and uninstall on
   each supported operating-system version.
 
-Do not distribute unsigned builds as a production U-M application.
+Do not distribute these preview builds as a production U-M application.
+
+## Update channel
+
+`desktop-build.yml` runs on every push to `main` that changes `desktop/**`,
+`src/**`, `pyproject.toml`, `uv.lock`, or the workflow file itself, and it can
+also be started by hand. Each run takes the next version on the release line
+the team chose (`config.releaseLine` in `desktop/package.json`, `0.2`):
+`0.2.0`, then `0.2.1`, and so on (the git commit is recorded in the package's
+`config.buildCommit`). On `main`, it then publishes the four files people
+download, the Windows installer's `.blockmap`, and the Windows update feed
+`latest.yml` as GitHub Release `desktop-v0.2.1`.
+
+Each release holds one file per platform and the two files the Windows
+updater reads, nothing else. The public site's download links open
+`https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
+points each at its file there when the GitHub API answers. The ten
+newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`
+always points at the most recent one and needs no GitHub sign-in. Workflow
+artifacts are not a public download channel: GitHub requires a signed-in user
+to fetch them and deletes them after 14 days.
+
+Each time a packaged Axcess launches, it asks the GitHub API for the latest
+release after the workbench has loaded, and compares it with its own version.
+On macOS it also checks when the app is reopened with no window open. Once it
+has offered an update, it does not check again until the app restarts.
+
+Nothing happens offline, on a rate-limited response, or when the build is
+current. When a newer build exists:
+
+- **Windows** offers *Update now*. electron-updater reads `latest.yml` from
+  the release's asset directory, downloads the installer it names (only the
+  changed blocks when it still has the installed version's block map), and
+  checks its SHA-512. *Restart now* runs the installer silently into the same
+  folder and starts Axcess again; *Later* installs it when Axcess quits.
+- **macOS** offers *Download*, which opens the new DMG in the browser. Apple's
+  Squirrel.Mac updater refuses to update an app that is not Developer ID
+  signed, so in-place installation on macOS waits for signing and
+  notarization; once those are configured the same release assets serve it.
+
+The check is skipped for unpackaged development runs and whenever
+`AXCESS_DISABLE_UPDATE_CHECK=1` is set, which local packaged builds (always
+version `0.2.0`) may want. Only HTTPS asset downloads under this repository's
+releases are ever handed to the system browser.
 
 For a release build on macOS, set `AXCESS_MAC_SIGN_IDENTITY` to the exact
 Developer ID Application identity available in the build keychain. Without

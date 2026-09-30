@@ -180,18 +180,29 @@ def by_sc(conn: sqlite3.Connection, scan_id: int) -> list[dict[str, Any]]:
             }
         )
 
-    # Now fill in each SC's true unique page count (re-query is cheap and
-    # avoids the wrong-sum trap above).
-    for sc, entry in by_sc_dict.items():
-        page_count_row = conn.execute(
+    # Fill in each SC's true unique page count. These cannot be summed from
+    # the per-rule counts above: one page can fail two rules under the same
+    # SC and would be counted twice.
+    #
+    # One grouped query for every SC rather than one query per SC. The
+    # per-SC version ran ~40 extra scans to answer a question a single
+    # GROUP BY answers, on an endpoint the report opens with.
+    page_counts = {
+        row["wcag_sc"]: int(row["n"])
+        for row in conn.execute(
             """
-            SELECT COUNT(DISTINCT page_id) AS n
+            SELECT wcag_sc, COUNT(DISTINCT page_id) AS n
               FROM page_a11y_findings
-             WHERE scan_id = ? AND wcag_sc IS ?
+             WHERE scan_id = ?
+             GROUP BY wcag_sc
             """,
-            (scan_id, sc),
-        ).fetchone()
-        entry["page_count"] = int(page_count_row["n"]) if page_count_row else 0
+            (scan_id,),
+        ).fetchall()
+    }
+    for sc, entry in by_sc_dict.items():
+        # `sc` may be None, which GROUP BY keys as NULL and sqlite3 returns
+        # as None, so the lookup matches the `IS` comparison this replaced.
+        entry["page_count"] = page_counts.get(sc, 0)
         # Sort rules within the SC: worst impact first, then page count.
         entry["rules"].sort(key=lambda x: (_IMPACT_RANK.get(x["impact"], 4), -x["page_count"]))
         entry.pop("page_count_set", None)
@@ -329,7 +340,7 @@ def grouped_by_rule(
         SELECT a.id, a.pipeline, a.engine_outcome, a.rule_id, a.wcag_sc, a.wcag_scs, a.wcag_level,
                a.impact, a.help, a.help_url, a.target_selector,
                a.failure_summary, a.html_snippet, a.engine_evidence_json, a.status,
-               a.revealed_by, a.screenshot_hash,
+               a.revealed_by, a.screenshot_hash, a.target_hash,
                p.id AS page_id, p.url_normalized AS page_url,
                p.title AS page_title
           FROM page_a11y_findings a
@@ -392,10 +403,14 @@ def grouped_by_rule(
                     "revealed_by": (str(r["revealed_by"]) if r["revealed_by"] else None),
                     "failure_summary": r["failure_summary"],
                     "html_snippet": r["html_snippet"],
+                    # The (rule, target, markup) identity the crawler already
+                    # dedupes on within a page. Equal hashes on two pages are
+                    # the same element, which the Issues view reports once.
+                    "target_hash": str(r["target_hash"] or ""),
                     "engine_evidence_json": r["engine_evidence_json"],
                     "status": str(r["status"]),
                     # Blob hash of the scan-time screenshot with the detected
-                    # location circled, the inline evidence the Issues view
+                    # location marked, the inline evidence the Issues view
                     # expands, so the reviewer never has to leave the list.
                     "screenshot_hash": (
                         str(r["screenshot_hash"]) if r["screenshot_hash"] else None

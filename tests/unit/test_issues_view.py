@@ -190,11 +190,17 @@ def test_adequate_unclassified_image_is_informational_with_real_page_count(
 
 
 def test_list_issues_priority_sort_default(tmp_db: sqlite3.Connection) -> None:
-    """Default sort is priority_desc — highest-impact row appears first."""
+    """Default sort is lane-first, then priority_desc within each lane.
+
+    A barrier always outranks a needs-review lead, which always outranks an
+    informational record, whatever their scores; the score only orders rows
+    inside a lane.
+    """
     scan_id = _seed_two_pipelines(tmp_db)
     rows = issues_mod.list_issues(tmp_db, scan_id)
-    priorities = [r.priority for r in rows]
-    assert priorities == sorted(priorities, reverse=True)
+    lane_rank = {"likely_barrier": 0, "expert_review": 1, "informational": 2}
+    keys = [(lane_rank[r.review_lane], -r.priority) for r in rows]
+    assert keys == sorted(keys)
 
 
 def test_list_issues_filters_by_conformance(tmp_db: sqlite3.Connection) -> None:
@@ -502,8 +508,8 @@ def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
     assert row.evidence_confidence == "medium"
     assert row.wcag_sc == "2.1.2"
     assert row.conformance == "A"
-    assert row.title == "Keyboard users can't escape this element"
-    assert "both remained" in row.evidence_summary
+    assert row.title == issues_mod._load_rules()["semantic_criteria"]["2.1.2"]["title"]
+    assert "both left focus on the same element" in row.evidence_summary
 
 
 def _seed_visual_motion_finding(
@@ -617,7 +623,7 @@ def test_alfa_rows_expose_rule_name_diagnostic_and_outcome_boundary(
     assert failed.wcag_name == "Link Purpose (In Context)"
     assert "link does not have an accessible name" in failed.title.lower()
     assert review.review_lane == "expert_review"
-    assert "this is not a failure" in review.evidence_summary.lower()
+    assert "that is not a failure" in review.evidence_summary.lower()
 
 
 def test_responsive_rows_get_their_own_pipeline_label(
@@ -645,7 +651,8 @@ def test_responsive_rows_get_their_own_pipeline_label(
     assert row.conformance == "AA"
     # The YAML card (semantic_criteria["1.4.10"]) supplies the curated
     # title + longform what/why/fix via the SC fallback.
-    assert "reflow" in row.title.lower() or "320" in row.title
+    assert row.title == issues_mod._load_rules()["semantic_criteria"]["1.4.10"]["title"]
+    assert not row.title.startswith("Responsive failure")
     assert row.description, "what_happening should come from the YAML card"
     assert row.fix_steps, "fix steps should come from the YAML card"
     assert row.responsibility == "dev"
@@ -674,3 +681,242 @@ def test_responsive_issue_detail_resolves_pages(
     # Verify steps come through from the YAML card.
     assert detail.verify_manual
     assert detail.help_url and "w3.org" in detail.help_url
+
+
+def _seed_shared_element(conn: sqlite3.Connection, *, selector: str, rule_id: str) -> int:
+    """One scan whose three pages all fail ``rule_id`` on identical markup."""
+    cur = conn.execute(
+        "INSERT INTO scans (seed_url, status, page_count, finding_count, "
+        "config_json) VALUES ('http://example.com/', 'completed', 3, 0, '{}')"
+    )
+    scan_id = int(cur.lastrowid or 0)
+    for index, path in enumerate(["", "my/", "notifications"]):
+        page_id = repo.upsert_page(
+            conn,
+            scan_id=scan_id,
+            url_normalized=f"http://example.com/{path}",
+            status_code=200,
+            title=f"Page {index}",
+            render_mode="js",
+            html_hash=str(index) * 64,
+        )
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings
+                (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+                 impact, help, help_url, target_selector, failure_summary,
+                 html_snippet, target_hash, status)
+            VALUES (?, ?, ?, '4.1.2', '4.1.2', 'A', 'serious',
+                'Dialogs must have an accessible name', 'https://example.invalid/rule',
+                ?, 'no name', '<div id="user_menu_modal" role="dialog">', 'same-hash', 'new')
+            """,
+            (page_id, scan_id, rule_id, selector),
+        )
+    return scan_id
+
+
+def test_element_repeated_across_pages_is_reported_once(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A shared component counts once, on its first page; raw rows remain."""
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 1
+    assert row.page_count == 1
+    assert row.high_confidence_occurrence_count == 1
+    assert row.status_summary["new"] == 1
+    assert len(row.finding_ids) == 1
+    assert len(row.repeat_finding_ids) == 2
+    assert row.repeat_page_count == 2
+    assert [loc.page_url for loc in row.locations] == ["http://example.com/"]
+    # Priority still reflects the three pages the component actually reaches.
+    assert row.priority == issues_mod._priority("serious", 3)
+
+    detail = issues_mod.get_issue_detail(tmp_db, scan_id, row.issue_key)
+    assert detail is not None
+    assert [p.page_url for p in detail.pages] == ["http://example.com/"]
+
+    stored = tmp_db.execute(
+        "SELECT COUNT(*) FROM page_a11y_findings WHERE scan_id = ?", (scan_id,)
+    ).fetchone()[0]
+    assert stored == 3
+
+
+def test_page_level_results_are_not_merged_across_pages(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A document-root target is a separate defect on every page."""
+    scan_id = _seed_shared_element(tmp_db, selector="html", rule_id="document-title")
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 3
+    assert row.page_count == 3
+    assert row.repeat_finding_ids == ()
+    assert row.repeat_page_count == 0
+
+
+def test_page_level_target_detection_covers_alfa_document_targets() -> None:
+    assert issues_mod._is_page_level_target('{"type":"document"}')
+    assert issues_mod._is_page_level_target('{"type":"element","path":"/html[1]/body[1]"}')
+    assert not issues_mod._is_page_level_target(
+        '{"type":"element","path":"/html[1]/body[1]/div[2]"}'
+    )
+    assert not issues_mod._is_page_level_target("#user_menu_modal")
+    # Stored Alfa paths are not always strings; they must not crash grouping.
+    assert not issues_mod._is_page_level_target('{"type":"element","path":["/html[1]"]}')
+
+
+def test_shared_hash_with_different_markup_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Probe hashes cover only the first 200 characters of markup.
+
+    Two elements that differ after that share a ``target_hash`` but are not
+    the same element; merging them would hide a real finding.
+    """
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET html_snippet = html_snippet || ' differs later' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.page_count == 2
+    assert len(row.repeat_finding_ids) == 1
+    assert row.repeat_page_count == 1
+
+
+def test_same_markup_under_a_different_selector_is_not_merged(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _seed_shared_element(tmp_db, selector="#user_menu_modal", rule_id="aria-dialog-name")
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET target_selector = '#other_modal' "
+        "WHERE scan_id = ? AND page_id = (SELECT MAX(page_id) FROM page_a11y_findings "
+        "WHERE scan_id = ?)",
+        (scan_id, scan_id),
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "axe")
+
+    assert row.occurrence_count == 2
+    assert row.repeat_page_count == 1
+
+
+# --------------------------------------------------------------------------
+# Finding types (WCAG, Click-Through, Alt Text).
+# --------------------------------------------------------------------------
+
+
+def _mark_revealed(conn: sqlite3.Connection, rule_id: str, *, first_only: bool = False) -> None:
+    """Record findings as reached by Click-Through (operating a control)."""
+    ids = [
+        int(row[0])
+        for row in conn.execute(
+            "SELECT id FROM page_a11y_findings WHERE rule_id = ? ORDER BY id", (rule_id,)
+        )
+    ]
+    for finding_id in ids[:1] if first_only else ids:
+        conn.execute(
+            "UPDATE page_a11y_findings SET revealed_by = 'Open menu', "
+            "revealed_state_key = 'nav|button|Open menu' WHERE id = ?",
+            (finding_id,),
+        )
+
+
+def test_finding_types_default_to_wcag_and_alt_text(tmp_db: sqlite3.Connection) -> None:
+    """Load-state DOM findings are WCAG; image findings are Alt Text."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    for row in rows:
+        if row.pipeline == "image":
+            assert row.finding_types == ("alt_text",)
+        else:
+            assert row.finding_types == ("wcag",)
+        assert row.click_through_occurrence_count == 0
+
+
+def test_click_through_only_group_is_click_through(tmp_db: sqlite3.Connection) -> None:
+    """Every occurrence behind a control: the group is Click-Through alone."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "image-alt")
+
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.issue_key == "axe:image-alt")
+    assert row.finding_types == ("click_through",)
+    assert row.click_through_occurrence_count == row.occurrence_count == 1
+
+
+def test_mixed_group_is_both_wcag_and_click_through_without_splitting(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """A rule seen at load and behind a click stays one row, of both types.
+
+    Splitting it would change the issue key, statuses, and cross-scan
+    comparison; the row says how many occurrences needed a click instead.
+    """
+    scan_id = _seed_two_pipelines(tmp_db)
+    before = {r.issue_key for r in issues_mod.list_issues(tmp_db, scan_id)}
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    assert {r.issue_key for r in rows} == before
+    contrast = next(r for r in rows if r.issue_key == "axe:color-contrast")
+    assert contrast.finding_types == ("wcag", "click_through")
+    assert contrast.occurrence_count == 2
+    assert contrast.click_through_occurrence_count == 1
+
+
+def test_finding_type_filter_and_breakdown(tmp_db: sqlite3.Connection) -> None:
+    """The filter matches any of a row's types; a mixed row counts under each."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    counts = issues_mod.finding_type_breakdown(rows)
+    assert counts == {"wcag": 2, "click_through": 1, "alt_text": 1}
+
+    click = issues_mod.list_issues(tmp_db, scan_id, finding_type="click_through")
+    assert [r.issue_key for r in click] == ["axe:color-contrast"]
+    wcag = {r.issue_key for r in issues_mod.list_issues(tmp_db, scan_id, finding_type="wcag")}
+    assert wcag == {"axe:color-contrast", "axe:image-alt"}
+    alt = issues_mod.list_issues(tmp_db, scan_id, finding_type="alt_text")
+    assert alt and all(r.pipeline == "image" for r in alt)
+    # No filter, no narrowing.
+    assert len(issues_mod.list_issues(tmp_db, scan_id, finding_type=None)) == len(rows)
+
+
+def test_lane_and_finding_type_filters_take_several_values(tmp_db: sqlite3.Connection) -> None:
+    """A list widens a filter: a row passes on any of the values, as ``conformance`` does."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    _mark_revealed(tmp_db, "color-contrast", first_only=True)
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+
+    types = ["click_through", "alt_text"]
+    several = issues_mod.list_issues(tmp_db, scan_id, finding_type=types)
+    assert {r.issue_key for r in several} == {
+        r.issue_key for r in rows if set(r.finding_types) & set(types)
+    }
+    assert "axe:image-alt" not in {r.issue_key for r in several}
+
+    lanes = {r.review_lane for r in rows}
+    assert len(lanes) > 1, lanes
+    kept = sorted(lanes)[:-1]
+    by_lane = issues_mod.list_issues(tmp_db, scan_id, review_lane=kept)
+    assert {r.issue_key for r in by_lane} == {r.issue_key for r in rows if r.review_lane in kept}
+    # A single string still reads as one value, not as its characters.
+    one = issues_mod.list_issues(tmp_db, scan_id, review_lane=kept[0])
+    assert {r.review_lane for r in one} == {kept[0]}
+    # An empty list is no filter.
+    assert len(issues_mod.list_issues(tmp_db, scan_id, finding_type=[])) == len(rows)
+
+
+def test_protected_image_leads_are_alt_text() -> None:
+    """Protected image-of-text leads sit beside DOM findings but are image evidence."""
+    assert issues_mod._dom_finding_types("protected_image", 3, 0) == ("alt_text",)
+    assert issues_mod._dom_finding_types("axe", 3, 0) == ("wcag",)
+    assert issues_mod._dom_finding_types("axe", 3, 3) == ("click_through",)
+    assert issues_mod._dom_finding_types("alfa", 3, 1) == ("wcag", "click_through")

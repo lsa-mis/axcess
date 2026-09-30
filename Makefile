@@ -114,12 +114,20 @@ desktop-browsers: ## Bundle the platform-matched Chromium used by Playwright
 desktop-ocr: ## Bundle the platform-matched relocatable Tesseract OCR runtime
 ifeq ($(OS),Windows_NT)
 	powershell -NoProfile -ExecutionPolicy Bypass -File "$(DESKTOP)/scripts/bundle-tesseract-windows.ps1"
+else ifeq ($(shell uname -s),Linux)
+	$(DESKTOP)/scripts/bundle-tesseract-linux.sh
 else
 	$(DESKTOP)/scripts/bundle-tesseract-macos.sh
 endif
 
 desktop-package: desktop-install desktop-backend desktop-browsers desktop-ocr ## Build this platform's installer
+ifeq ($(OS),Windows_NT)
+	cd $(DESKTOP) && npm run make:windows
+else ifeq ($(shell uname -s),Linux)
+	cd $(DESKTOP) && npm run make:linux
+else
 	cd $(DESKTOP) && npm run make
+endif
 
 test: ## Run full test suite
 	$(PY) pytest

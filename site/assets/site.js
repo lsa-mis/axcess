@@ -35,6 +35,47 @@
     sync();
   }
 
+  /* ---- Latest desktop release (get-started page) ----
+     Without this, each download link opens the newest release's page, which
+     lists its files. With the GitHub API reachable, it points each link at
+     its file in that release ([data-release-file], the part of the name
+     after the version), fills the version into the file names the steps
+     show ([data-release-name]), and adds the version and date. */
+  var latest = document.getElementById("latest-release");
+  if (latest && window.fetch) {
+    fetch("https://api.github.com/repos/lsa-mis/axcess/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rel) {
+        if (!rel || !rel.tag_name) { return; }
+        var version = String(rel.tag_name).replace(/^desktop-v/, "");
+        var assets = rel.assets || [];
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release-file]"), function (a) {
+          var name = "Axcess-" + version + "-" + a.getAttribute("data-release-file");
+          for (var i = 0; i < assets.length; i++) {
+            if (assets[i].name === name && assets[i].browser_download_url) { a.href = assets[i].browser_download_url; }
+          }
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release-name]"), function (code) {
+          code.textContent = "Axcess-" + version + "-" + code.getAttribute("data-release-name");
+        });
+        var when = rel.published_at ? new Date(rel.published_at) : null;
+        var date = when && !isNaN(when) ? when.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+        var link = document.createElement("a");
+        link.href = rel.html_url || latest.getAttribute("data-latest-release");
+        link.textContent = "version " + version;
+        latest.textContent = "";
+        latest.appendChild(document.createTextNode("Current build: "));
+        latest.appendChild(link);
+        latest.appendChild(document.createTextNode((date ? ", published " + date : "") + ". Release notes and earlier builds are on the "));
+        var all = document.createElement("a");
+        all.href = "https://github.com/lsa-mis/axcess/releases";
+        all.textContent = "releases page";
+        latest.appendChild(all);
+        latest.appendChild(document.createTextNode("."));
+      })
+      .catch(function () {});
+  }
+
   /* ---- Coverage explorer ---- */
   var explorer = document.getElementById("explorer");
   if (!explorer) { return; }

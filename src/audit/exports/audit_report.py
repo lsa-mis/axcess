@@ -39,10 +39,7 @@ import json
 import sqlite3
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from importlib import resources
 from typing import Any
-
-import yaml
 
 from audit import coverage_matrix, evaluation
 from audit.analyzer.alfa_evidence import (
@@ -53,6 +50,7 @@ from audit.analyzer.alfa_evidence import (
 from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
 from audit.web import issues as issues_mod
 
 # The framework caps the executive summary at 8 sentences. The renderer
@@ -69,9 +67,6 @@ MAX_LOCATIONS_PER_CARD = 10
 
 # How many worst pages to list in the hotspots table.
 MAX_HOTSPOTS = 10
-
-_RULES_FILE = "audit_report.yaml"
-_RULES_PACKAGE = "audit.rules"
 
 # Owner-type taxonomy used in the YAML. The renderer doesn't validate
 # beyond this, anything else from the YAML passes through verbatim so
@@ -148,7 +143,8 @@ _PIPELINE_COVERAGE = [
         "key": "alfa",
         "name": "Siteimprove Alfa",
         "method": "Independent ACT-rule evaluation on a separate local-browser capture.",
-        "checks": "ACT rules mapped to WCAG 2.2 at the selected level; unresolved "
+        # ``{wcag_version}`` is filled from the scan when the table renders.
+        "checks": "ACT rules mapped to WCAG {wcag_version} at the selected level; unresolved "
         "`cantTell` outcomes are review leads.",
         "confidence": "High for failed outcomes; `cantTell` is explicitly not a "
         "conformance failure.",
@@ -206,7 +202,7 @@ _PIPELINE_COVERAGE = [
     },
     {
         "key": "interaction",
-        "name": "Click-through DOM states",
+        "name": CLICK_THROUGH,
         "method": "Operates the page's own menus, tabs, dialogs, and disclosure "
         "controls, then re-runs the rule engine on each state a click reveals.",
         "checks": "Barriers that a page load never shows because the content only "
@@ -517,7 +513,7 @@ def render_audit_report(
     lines.append(f"_Generated {when.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} by Axcess._")
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
-    lines.append(f"**Audited against:** WCAG 2.2 Level {scan.axe_level}")
+    lines.append(f"**Audited against:** WCAG {scan.wcag_version} Level {scan.axe_level}")
     lines.append(f"**Pages crawled:** {scan.page_count}")
     lines.append(f"**Detection methods used:** {_methods_line(rows)}")
     lines.append("")
@@ -910,7 +906,13 @@ def _coverage_and_method(
                 ran = "n/a"
         else:
             ran = "✅ found issues" if p["key"] in pipelines_present else "n/a"
-        lines.append(f"| **{p['name']}** | {ran} | {p['checks']} | {p['confidence']} |")
+        checks = p["checks"].replace("{wcag_version}", scan.wcag_version)
+        if p["key"] == "focus" and scan.wcag_version == "2.1":
+            checks += (
+                " SC 2.4.11 is a WCAG 2.2 criterion, not required under WCAG 2.1; "
+                "its findings are reported as best practice."
+            )
+        lines.append(f"| **{p['name']}** | {ran} | {checks} | {p['confidence']} |")
     lines.append("")
     lines.append(
         "_A “n/a” means this method produced no findings on this scan, it may "
@@ -944,7 +946,7 @@ def _coverage_and_method(
 
 
 def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
-    """What the click-through probe reached, and what it could not.
+    """What Click-Through reached, and what it could not.
 
     A page count alone understates an application whose content appears after
     a click, so states are reported beside pages rather than folded into them.
@@ -952,7 +954,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
     tested less here" is the half of a coverage claim a reader cannot infer
     from a total, and it is the half that decides where manual testing goes.
     """
-    lines = ["### States behind a click", ""]
+    lines = [f"### {CLICK_THROUGH}: content behind a click", ""]
     lines.append(interaction.status_line)
     lines.append("")
     if not interaction.enabled:
@@ -966,7 +968,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
         lines.append(f"| Pages probed | {interaction.pages_probed} |")
         lines.append(f"| Controls found | {interaction.controls_found} |")
         lines.append(f"| Controls operated | {interaction.controls_operated} ({pct}) |")
-        lines.append(f"| Additional DOM states reached | {interaction.states_total} |")
+        lines.append(f"| {CLICK_THROUGH_STATES_LABEL} | {interaction.states_total} |")
         lines.append(f"| Findings visible only after a click | {interaction.findings_revealed} |")
         lines.append(f"| Controls refused as destructive | {interaction.blocked_controls} |")
         lines.append("")
@@ -979,7 +981,9 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
     if limited:
         lines.append("**Pages where the sweep stopped early**")
         lines.append("")
-        lines.append("| Page | Controls operated | States | Why it stopped |")
+        lines.append(
+            f"| Page | Controls operated | {CLICK_THROUGH_STATES_LABEL} | Why it stopped |"
+        )
         lines.append("|---|---|---|---|")
         for page in limited[:_MAX_LIMITED_PAGES]:
             lines.append(
@@ -989,7 +993,7 @@ def _dom_state_coverage(interaction: InteractionCoverage) -> list[str]:
         if len(limited) > _MAX_LIMITED_PAGES:
             lines.append(
                 f"| _…and {len(limited) - _MAX_LIMITED_PAGES} more page(s)_ | | | "
-                "_see the workbook's DOM States sheet_ |"
+                f"_see the workbook's {CLICK_THROUGH} sheet_ |"
             )
         lines.append("")
         lines.append(
@@ -1226,12 +1230,12 @@ def _render_card(idx: int, card: AuditCard) -> list[str]:
 
     lines.append("**What is happening:**")
     lines.append("")
-    lines.append(card.what_happening.strip())
+    lines.append(_strip_html(card.what_happening).strip())
     lines.append("")
 
     lines.append("**Why it matters:**")
     lines.append("")
-    lines.append(card.why_matters.strip())
+    lines.append(_strip_html(card.why_matters).strip())
     lines.append("")
 
     if card.abilities:
@@ -1809,38 +1813,52 @@ def _fix_options(meta: dict[str, Any]) -> tuple[FixOption, ...]:
 
 
 def _meta_for_row(row: Any, rules: dict[str, Any]) -> dict[str, Any]:
-    """Re-resolve the YAML card for a row (for verify/confidence fields).
+    """Re-resolve the YAML card for a row (for verify/confidence/fix options).
 
     ``list_issues`` already pulled description/why/fix/acceptance onto the
-    row, but not the verify_* / confidence_default fields, look them up
-    here by the same key scheme ``issues._rule_meta_for`` uses.
+    row, but not the verify_* / confidence_default / fix_options fields. The
+    issue page's own lookup finds them, so an Alfa rule or a browser check
+    resolves to the same card in an export as on screen.
     """
-    key = row.issue_key
-    if key.startswith("axe:"):
-        meta = rules.get("axe_rules", {}).get(key.removeprefix("axe:"), {})
-    elif key.startswith("semantic:"):
-        meta = rules.get("semantic_criteria", {}).get(key.removeprefix("semantic:"), {})
-    elif key.startswith("keyboard:"):
-        # Keyboard cards are keyed by SC in the YAML (semantic_criteria
-        # block today). Fall back to the row's SC.
-        meta = rules.get("semantic_criteria", {}).get(row.wcag_sc or "", {}) or rules.get(
-            "axe_rules", {}
-        ).get(row.wcag_sc or "", {})
-    else:  # image:
-        meta = rules.get("image_findings", {}).get(key.removeprefix("image:"), {})
-    return dict(meta) if isinstance(meta, dict) else {}
+    return issues_mod.rule_meta_for(row, rules)
 
 
 def _strip_html(text: str) -> str:
-    """Drop the inline <code>/<strong> tags the YAML uses for HTML rendering.
+    """Card prose as Markdown.
 
-    The audit report is Markdown/plain-text; the YAML's HTML markup would
-    render literally. Backtick the <code> spans, drop the rest.
+    The cards are written for the issue page, which renders ``<code>`` and
+    shows everything else as text: element names such as ``<li>`` stay as
+    written, and code carries ``&lt;``-style entities. A Markdown viewer would
+    read a bare ``<li>`` as HTML and show entities inside backticks as typed.
+    So ``<code>`` spans become code spans with their entities decoded, bare
+    element names become code spans, and emphasis tags are dropped.
     """
+    import html
     import re
 
-    text = re.sub(r"</?code>", "`", text)
-    return re.sub(r"</?(strong|em|b|i)>", "", text)
+    text = re.sub(r"</?(strong|em|b|i)>", "", text)
+    parts = re.split(r"<code>([\s\S]*?)</code>", text)
+    out: list[str] = []
+    for index, part in enumerate(parts):
+        if index % 2:
+            out.append(f"`{html.unescape(part)}`")
+        else:
+            part = html.unescape(part)
+            out.append(re.sub(r"<(/?[a-zA-Z][\w:-]*(?:\s[^<>]*)?)>", r"`<\1>`", part))
+    return "".join(out)
+
+
+def plain_text(text: str) -> str:
+    """Card prose as plain text, for a spreadsheet cell.
+
+    ``<code>`` and emphasis tags are dropped and entities decoded, so a cell
+    reads ``<img alt="">`` rather than ``<code>&lt;img alt=""&gt;</code>``.
+    Element names written as ``<li>`` stay: they read as meant in plain text.
+    """
+    import html
+    import re
+
+    return html.unescape(re.sub(r"</?(code|strong|em|b|i)>", "", text))
 
 
 def _md_escape(text: str) -> str:
@@ -1870,13 +1888,17 @@ def load_report_rules() -> dict[str, Any]:
 
 
 def _load_rules() -> dict[str, Any]:
-    """Read ``rules/audit_report.yaml`` once. Returns ``{}`` on parse error."""
-    try:
-        text = (resources.files(_RULES_PACKAGE) / _RULES_FILE).read_text(encoding="utf-8")
-        data = yaml.safe_load(text) or {}
-        return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, yaml.YAMLError):
-        return {}
+    """Read ``rules/audit_report.yaml``. Returns ``{}`` on parse error.
+
+    Delegates to the Issues projection's cached loader so the exports and
+    the API resolve an issue against the same authored copy, parsed once
+    per process. This module used to carry a byte-identical second reader,
+    which meant a workbook re-parsed 59 KB of YAML dozens of times and the
+    two surfaces could disagree if only one of them were updated.
+
+    The returned dict is shared and must be treated as read-only.
+    """
+    return issues_mod._load_rules()
 
 
 __all__ = [
@@ -1886,6 +1908,7 @@ __all__ = [
     "IssueLocation",
     "fix_options_for",
     "load_report_rules",
+    "plain_text",
     "render_audit_report",
 ]
 

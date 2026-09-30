@@ -1,0 +1,415 @@
+--- rich_scan.jira.csv
++++ rich_scan_DRAFT.jira.csv
+@@ -1,2 +1,2 @@
+-Summary,Description,Priority,Issue Type,Labels,Component
++Summary,Description,Priority,Issue Type,Labels,Component,Axcess export state
+ "WCAG 1.4.5: image of text, BUY WIDGETS NOW","**Severity:** critical  (priority score 9.10)
+@@ -14,3 +14,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/1",Highest,Bug,wcag-1-4-5 accessibility images-of-text sev-critical class-essential,Accessibility
++Review locally: http://127.0.0.1:8765/findings/1",Highest,Bug,wcag-1-4-5 accessibility images-of-text sev-critical class-essential,Accessibility,DRAFT
+ "WCAG 1.4.5: image of text, OPEN DAILY 9-5","**Severity:** minor  (priority score 3.69)
+@@ -25,3 +25,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/3",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor,Accessibility
++Review locally: http://127.0.0.1:8765/findings/3",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor,Accessibility,DRAFT
+ WCAG 1.4.5: inline SVG with visible text (minor),"**Severity:** minor  (priority score 3.10)
+@@ -36,3 +36,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/4",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor inline-svg,Accessibility
++Review locally: http://127.0.0.1:8765/findings/4",Medium,Bug,wcag-1-4-5 accessibility images-of-text sev-minor inline-svg,Accessibility,DRAFT
+ "WCAG 1.4.5: image of text, Acme Corp","**Severity:** info  (priority score 1.69)
+@@ -49,3 +49,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/findings/2",Lowest,Bug,wcag-1-4-5 accessibility images-of-text sev-info class-logo,Accessibility
++Review locally: http://127.0.0.1:8765/findings/2",Lowest,Bug,wcag-1-4-5 accessibility images-of-text sev-info class-logo,Accessibility,DRAFT
+ "WCAG fixture-rule-12, SC 1.3.1: https://example.org/","**Source:** axe-core
+@@ -62,3 +62,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-41",Highest,Bug,accessibility axe-fixture-rule-12 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-41",Highest,Bug,accessibility axe-fixture-rule-12 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-20, SC 1.3.1: https://example.org/","**Source:** axe-core
+@@ -75,3 +75,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-52",Highest,Bug,accessibility axe-fixture-rule-20 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-52",Highest,Bug,accessibility axe-fixture-rule-20 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-24, SC 1.3.1: https://example.org/","**Source:** axe-core
+@@ -88,3 +88,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-57",Highest,Bug,accessibility axe-fixture-rule-24 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-57",Highest,Bug,accessibility axe-fixture-rule-24 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-36, SC 1.3.1: https://example.org/","**Source:** axe-core
+@@ -101,3 +101,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-73",Highest,Bug,accessibility axe-fixture-rule-36 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-73",Highest,Bug,accessibility axe-fixture-rule-36 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG image-alt, SC 1.1.1: https://example.org/","**Source:** axe-core
+@@ -118,3 +118,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-5",Highest,Bug,accessibility axe-image-alt impact-critical wcag-1-1-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-5",Highest,Bug,accessibility axe-image-alt impact-critical wcag-1-1-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG keyboard-trap-stuck, SC 2.1.2: https://example.org/","**Source:** Keyboard probe
+@@ -131,3 +131,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-78",Highest,Bug,accessibility keyboard-keyboard-trap-stuck impact-critical wcag-2-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-78",Highest,Bug,accessibility keyboard-keyboard-trap-stuck impact-critical wcag-2-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-12, SC 1.3.1: https://example.org/about","**Source:** axe-core
+@@ -144,3 +144,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-42",Highest,Bug,accessibility axe-fixture-rule-12 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-42",Highest,Bug,accessibility axe-fixture-rule-12 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-16, SC 1.3.1: https://example.org/about","**Source:** axe-core
+@@ -157,3 +157,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-47",Highest,Bug,accessibility axe-fixture-rule-16 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-47",Highest,Bug,accessibility axe-fixture-rule-16 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-24, SC 1.3.1: https://example.org/about","**Source:** axe-core
+@@ -170,3 +170,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-58",Highest,Bug,accessibility axe-fixture-rule-24 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-58",Highest,Bug,accessibility axe-fixture-rule-24 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-36, SC 1.3.1: https://example.org/about","**Source:** axe-core
+@@ -183,3 +183,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-74",Highest,Bug,accessibility axe-fixture-rule-36 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-74",Highest,Bug,accessibility axe-fixture-rule-36 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-04, SC 1.3.1: https://example.org/blog","**Source:** axe-core
+@@ -196,3 +196,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-31",Highest,Bug,accessibility axe-fixture-rule-04 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-31",Highest,Bug,accessibility axe-fixture-rule-04 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-32, SC 1.3.1: https://example.org/contact","**Source:** axe-core
+@@ -209,3 +209,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-68",Highest,Bug,accessibility axe-fixture-rule-32 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-68",Highest,Bug,accessibility axe-fixture-rule-32 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-08, SC 1.3.1: https://example.org/products","**Source:** axe-core
+@@ -222,3 +222,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-36",Highest,Bug,accessibility axe-fixture-rule-08 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-36",Highest,Bug,accessibility axe-fixture-rule-08 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-28, SC 1.3.1: https://example.org/products","**Source:** axe-core
+@@ -235,3 +235,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-63",Highest,Bug,accessibility axe-fixture-rule-28 impact-critical wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-63",Highest,Bug,accessibility axe-fixture-rule-28 impact-critical wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG color-contrast, SC 1.4.3: https://example.org/","**Source:** axe-core
+@@ -252,3 +252,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-1",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-1",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility,DRAFT
+ "WCAG color-contrast, SC 1.4.3: https://example.org/","**Source:** axe-core
+@@ -265,3 +265,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-2",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-2",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-05, SC 2.4.7: https://example.org/","**Source:** axe-core
+@@ -278,3 +278,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-32",High,Bug,accessibility axe-fixture-rule-05 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-32",High,Bug,accessibility axe-fixture-rule-05 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-09, SC 2.4.7: https://example.org/","**Source:** axe-core
+@@ -291,3 +291,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-37",High,Bug,accessibility axe-fixture-rule-09 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-37",High,Bug,accessibility axe-fixture-rule-09 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-21, SC 2.4.7: https://example.org/","**Source:** axe-core
+@@ -304,3 +304,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-53",High,Bug,accessibility axe-fixture-rule-21 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-53",High,Bug,accessibility axe-fixture-rule-21 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-25, SC 2.4.7: https://example.org/","**Source:** axe-core
+@@ -317,3 +317,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-59",High,Bug,accessibility axe-fixture-rule-25 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-59",High,Bug,accessibility axe-fixture-rule-25 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-33, SC 2.4.7: https://example.org/","**Source:** axe-core
+@@ -330,3 +330,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-69",High,Bug,accessibility axe-fixture-rule-33 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-69",High,Bug,accessibility axe-fixture-rule-33 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -347,3 +347,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-6",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-6",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -364,3 +364,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-7",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-7",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -381,3 +381,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-8",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-8",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -398,3 +398,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-9",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-9",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -415,3 +415,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-10",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-10",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -432,3 +432,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-11",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-11",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -449,3 +449,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-12",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-12",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -466,3 +466,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-13",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-13",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -483,3 +483,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-14",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-14",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -500,3 +500,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-15",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-15",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -517,3 +517,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-16",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-16",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG link-name, SC 4.1.2: https://example.org/","**Source:** axe-core
+@@ -534,3 +534,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-17",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-17",High,Bug,accessibility axe-link-name impact-serious wcag-4-1-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG color-contrast, SC 1.4.3: https://example.org/about","**Source:** axe-core
+@@ -547,3 +547,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-3",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-3",High,Bug,accessibility axe-color-contrast impact-serious wcag-1-4-3 wcag-level-aa,Accessibility,DRAFT
+ "WCAG color-contrast-enhanced, SC 1.4.6: https://example.org/about","**Source:** axe-core
+@@ -560,3 +560,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-19",High,Bug,accessibility axe-color-contrast-enhanced impact-serious wcag-1-4-6 wcag-level-aaa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-19",High,Bug,accessibility axe-color-contrast-enhanced impact-serious wcag-1-4-6 wcag-level-aaa,Accessibility,DRAFT
+ "WCAG fixture-rule-01, SC 2.4.7: https://example.org/about","**Source:** axe-core
+@@ -573,3 +573,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-27",High,Bug,accessibility axe-fixture-rule-01 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-27",High,Bug,accessibility axe-fixture-rule-01 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-09, SC 2.4.7: https://example.org/about","**Source:** axe-core
+@@ -586,3 +586,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-38",High,Bug,accessibility axe-fixture-rule-09 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-38",High,Bug,accessibility axe-fixture-rule-09 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-21, SC 2.4.7: https://example.org/about","**Source:** axe-core
+@@ -599,3 +599,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-54",High,Bug,accessibility axe-fixture-rule-21 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-54",High,Bug,accessibility axe-fixture-rule-21 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-33, SC 2.4.7: https://example.org/about","**Source:** axe-core
+@@ -612,3 +612,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-70",High,Bug,accessibility axe-fixture-rule-33 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-70",High,Bug,accessibility axe-fixture-rule-33 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-29, SC 2.4.7: https://example.org/blog","**Source:** axe-core
+@@ -625,3 +625,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-64",High,Bug,accessibility axe-fixture-rule-29 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-64",High,Bug,accessibility axe-fixture-rule-29 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-17, SC 2.4.7: https://example.org/contact","**Source:** axe-core
+@@ -638,3 +638,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-48",High,Bug,accessibility axe-fixture-rule-17 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-48",High,Bug,accessibility axe-fixture-rule-17 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-13, SC 2.4.7: https://example.org/products","**Source:** axe-core
+@@ -651,3 +651,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-43",High,Bug,accessibility axe-fixture-rule-13 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-43",High,Bug,accessibility axe-fixture-rule-13 impact-serious wcag-2-4-7 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-empty-help, SC 1.3.1: https://example.org/","**Source:** axe-core
+@@ -663,3 +663,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-25",Medium,Bug,accessibility axe-fixture-empty-help impact-moderate wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-25",Medium,Bug,accessibility axe-fixture-empty-help impact-moderate wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-06, SC 3.3.2: https://example.org/","**Source:** axe-core
+@@ -676,3 +676,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-33",Medium,Bug,accessibility axe-fixture-rule-06 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-33",Medium,Bug,accessibility axe-fixture-rule-06 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-10, SC 3.3.2: https://example.org/","**Source:** axe-core
+@@ -689,3 +689,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-39",Medium,Bug,accessibility axe-fixture-rule-10 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-39",Medium,Bug,accessibility axe-fixture-rule-10 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-18, SC 3.3.2: https://example.org/","**Source:** axe-core
+@@ -702,3 +702,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-49",Medium,Bug,accessibility axe-fixture-rule-18 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-49",Medium,Bug,accessibility axe-fixture-rule-18 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-30, SC 3.3.2: https://example.org/","**Source:** axe-core
+@@ -715,3 +715,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-65",Medium,Bug,accessibility axe-fixture-rule-30 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-65",Medium,Bug,accessibility axe-fixture-rule-30 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG page-has-heading-one, best-practice: https://example.org/","**Source:** axe-core
+@@ -728,3 +728,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-20",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-20",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility,DRAFT
+ "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/","**Source:** Semantic analyzer
+@@ -745,3 +745,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-75",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-75",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-06, SC 3.3.2: https://example.org/about","**Source:** axe-core
+@@ -758,3 +758,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-34",Medium,Bug,accessibility axe-fixture-rule-06 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-34",Medium,Bug,accessibility axe-fixture-rule-06 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-18, SC 3.3.2: https://example.org/about","**Source:** axe-core
+@@ -771,3 +771,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-50",Medium,Bug,accessibility axe-fixture-rule-18 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-50",Medium,Bug,accessibility axe-fixture-rule-18 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-26, SC 3.3.2: https://example.org/about","**Source:** axe-core
+@@ -784,3 +784,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-60",Medium,Bug,accessibility axe-fixture-rule-26 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-60",Medium,Bug,accessibility axe-fixture-rule-26 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-30, SC 3.3.2: https://example.org/about","**Source:** axe-core
+@@ -797,3 +797,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-66",Medium,Bug,accessibility axe-fixture-rule-30 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-66",Medium,Bug,accessibility axe-fixture-rule-30 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG page-has-heading-one, best-practice: https://example.org/about","**Source:** axe-core
+@@ -810,3 +810,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-21",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-21",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility,DRAFT
+ "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/about","**Source:** Semantic analyzer
+@@ -827,3 +827,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-76",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-76",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-empty-help, SC 1.3.1: https://example.org/blog","**Source:** axe-core
+@@ -839,3 +839,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-26",Medium,Bug,accessibility axe-fixture-empty-help impact-moderate wcag-1-3-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-26",Medium,Bug,accessibility axe-fixture-empty-help impact-moderate wcag-1-3-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-14, SC 3.3.2: https://example.org/blog","**Source:** axe-core
+@@ -852,3 +852,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-44",Medium,Bug,accessibility axe-fixture-rule-14 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-44",Medium,Bug,accessibility axe-fixture-rule-14 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-34, SC 3.3.2: https://example.org/blog","**Source:** axe-core
+@@ -865,3 +865,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-71",Medium,Bug,accessibility axe-fixture-rule-34 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-71",Medium,Bug,accessibility axe-fixture-rule-34 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG region, best-practice: https://example.org/blog","**Source:** axe-core
+@@ -878,3 +878,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-24",Medium,Bug,accessibility axe-region impact-moderate axe-best-practice,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-24",Medium,Bug,accessibility axe-region impact-moderate axe-best-practice,Accessibility,DRAFT
+ "WCAG fixture-rule-02, SC 3.3.2: https://example.org/contact","**Source:** axe-core
+@@ -891,3 +891,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-28",Medium,Bug,accessibility axe-fixture-rule-02 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-28",Medium,Bug,accessibility axe-fixture-rule-02 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG fixture-rule-22, SC 3.3.2: https://example.org/contact","**Source:** axe-core
+@@ -904,3 +904,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-55",Medium,Bug,accessibility axe-fixture-rule-22 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-55",Medium,Bug,accessibility axe-fixture-rule-22 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility,DRAFT
+ "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/contact","**Source:** Semantic analyzer
+@@ -921,3 +921,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-77",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-77",Medium,Bug,accessibility semantic-semantic:2.4.4 impact-moderate wcag-2-4-4 wcag-level-a,Accessibility,DRAFT
+ "WCAG page-has-heading-one, best-practice: https://example.org/products","**Source:** axe-core
+@@ -934,3 +934,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-22",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-22",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility,DRAFT
+ "WCAG region, best-practice: https://example.org/products","**Source:** axe-core
+@@ -947,3 +947,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-23",Medium,Bug,accessibility axe-region impact-moderate axe-best-practice,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-23",Medium,Bug,accessibility axe-region impact-moderate axe-best-practice,Accessibility,DRAFT
+ "WCAG fixture-rule-03, SC 2.5.8: https://example.org/","**Source:** axe-core
+@@ -960,3 +960,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-29",Low,Bug,accessibility axe-fixture-rule-03 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-29",Low,Bug,accessibility axe-fixture-rule-03 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-15, SC 2.5.8: https://example.org/","**Source:** axe-core
+@@ -973,3 +973,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-45",Low,Bug,accessibility axe-fixture-rule-15 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-45",Low,Bug,accessibility axe-fixture-rule-15 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-27, SC 2.5.8: https://example.org/","**Source:** axe-core
+@@ -986,3 +986,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-61",Low,Bug,accessibility axe-fixture-rule-27 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-61",Low,Bug,accessibility axe-fixture-rule-27 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-35, SC 2.5.8: https://example.org/","**Source:** axe-core
+@@ -999,3 +999,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-72",Low,Bug,accessibility axe-fixture-rule-35 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-72",Low,Bug,accessibility axe-fixture-rule-35 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-03, SC 2.5.8: https://example.org/about","**Source:** axe-core
+@@ -1012,3 +1012,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-30",Low,Bug,accessibility axe-fixture-rule-03 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-30",Low,Bug,accessibility axe-fixture-rule-03 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-11, SC 2.5.8: https://example.org/about","**Source:** axe-core
+@@ -1025,3 +1025,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-40",Low,Bug,accessibility axe-fixture-rule-11 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-40",Low,Bug,accessibility axe-fixture-rule-11 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-15, SC 2.5.8: https://example.org/about","**Source:** axe-core
+@@ -1038,3 +1038,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-46",Low,Bug,accessibility axe-fixture-rule-15 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-46",Low,Bug,accessibility axe-fixture-rule-15 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-27, SC 2.5.8: https://example.org/about","**Source:** axe-core
+@@ -1051,3 +1051,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-62",Low,Bug,accessibility axe-fixture-rule-27 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-62",Low,Bug,accessibility axe-fixture-rule-27 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-31, SC 2.5.8: https://example.org/about","**Source:** axe-core
+@@ -1064,3 +1064,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-67",Low,Bug,accessibility axe-fixture-rule-31 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-67",Low,Bug,accessibility axe-fixture-rule-31 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-19, SC 2.5.8: https://example.org/blog","**Source:** axe-core
+@@ -1077,3 +1077,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-51",Low,Bug,accessibility axe-fixture-rule-19 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/5#finding-51",Low,Bug,accessibility axe-fixture-rule-19 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-07, SC 2.5.8: https://example.org/contact","**Source:** axe-core
+@@ -1090,3 +1090,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-35",Low,Bug,accessibility axe-fixture-rule-07 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-35",Low,Bug,accessibility axe-fixture-rule-07 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG fixture-rule-23, SC 2.5.8: https://example.org/products","**Source:** axe-core
+@@ -1103,3 +1103,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-56",Low,Bug,accessibility axe-fixture-rule-23 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-56",Low,Bug,accessibility axe-fixture-rule-23 impact-minor wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT
+ "WCAG sia-r2, SC 1.1.1: https://example.org/","**Source:** Siteimprove Alfa
+@@ -1115,3 +1115,3 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-79",Low,Bug,accessibility alfa-sia-r2 wcag-1-1-1 wcag-level-a,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-79",Low,Bug,accessibility alfa-sia-r2 wcag-1-1-1 wcag-level-a,Accessibility,DRAFT
+ "WCAG sia-r111, SC 2.5.8: https://example.org/about","**Source:** Siteimprove Alfa
+@@ -1127,2 +1127,2 @@
+ 
+-Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-80",Low,Bug,accessibility alfa-sia-r111 wcag-2-5-8 wcag-level-aa,Accessibility
++Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-80",Low,Bug,accessibility alfa-sia-r111 wcag-2-5-8 wcag-level-aa,Accessibility,DRAFT

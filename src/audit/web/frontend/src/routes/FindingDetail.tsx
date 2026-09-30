@@ -1,6 +1,6 @@
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { api, blobUrl } from "../api/client";
 import {
@@ -10,10 +10,24 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  Select,
   SeverityChip,
 } from "../components/ui";
 import type { FindingStatus } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableHead,
+  TableRegion,
+} from "../components/table/Table";
 import { requestStatusRationale } from "../statusDecision";
+import { usePreferences } from "../hooks/usePreferences";
+import { messageDuration } from "../lib/preferences";
+import { STATUS_HELP, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUSES: FindingStatus[] = [
   "new",
@@ -46,6 +60,16 @@ export default function FindingDetailRoute() {
   });
   const [status, setStatus] = useState<FindingStatus | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Settings > Session and message timing: 1.8s, five times that, or until
+  // the reader dismisses it.
+  const toastMs = messageDuration(usePreferences().messageTiming, 1800);
+  const showToast = useCallback(
+    (message: string) => {
+      setToast(message);
+      if (toastMs !== null) window.setTimeout(() => setToast(null), toastMs);
+    },
+    [toastMs],
+  );
 
   useEffect(() => {
     if (data) setStatus(data.status);
@@ -57,27 +81,24 @@ export default function FindingDetailRoute() {
     onSuccess: (_, { next }) => {
       qc.invalidateQueries({ queryKey: ["finding", id] });
       qc.invalidateQueries({ queryKey: ["findings"] });
-      setToast(`Status updated to ${next}`);
-      window.setTimeout(() => setToast(null), 1800);
+      showToast(`Status changed to ${STATUS_LABEL[next]}`);
     },
     onError: () => {
       setStatus(data?.status ?? null);
-      setToast("Status not saved");
-      window.setTimeout(() => setToast(null), 1800);
+      showToast("Status not saved. Try again.");
     },
   });
 
   const attemptSave = useCallback((next: FindingStatus) => {
-    const rationale = requestStatusRationale(next, `finding #${id}`);
+    const rationale = requestStatusRationale(next, `image #${id}`);
     if (rationale === null) {
       setStatus(data?.status ?? null);
-      setToast("Status unchanged");
-      window.setTimeout(() => setToast(null), 1800);
+      showToast("Status not changed");
       return;
     }
     setStatus(next);
     save.mutate({ next, rationale });
-  }, [data?.status, id, save]);
+  }, [data?.status, id, save, showToast]);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -99,6 +120,12 @@ export default function FindingDetailRoute() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [attemptSave]);
+  const occurrences = useMemo(() => data?.occurrences ?? [], [data]);
+  const resetKey = useMemo(
+    () => occurrences.map((o) => `${o.page_id}:${o.page_url}`).join(","),
+    [occurrences],
+  );
+  const paged = usePagedRows(occurrences, { resetKey });
 
   if (error) {
     return (
@@ -119,19 +146,18 @@ export default function FindingDetailRoute() {
         crumbs={[
           { label: "Reports", to: "/scans" },
           { label: `Report #${data.scan_id}`, to: `/scans/${data.scan_id}` },
-          { label: "Findings", to: `/scans/${data.scan_id}/findings` },
-          { label: `Finding #${data.id}` },
+          { label: "Images", to: `/scans/${data.scan_id}/findings` },
+          { label: `Image #${data.id}` },
         ]}
         title={
           <div className="flex items-center gap-3">
             <SeverityChip value={data.severity} />
-            <span>Finding #{data.id}</span>
+            <span>Image #{data.id}</span>
           </div>
         }
         subtitle={
           <span className="text-sm">
-            priority <strong>{data.priority_score.toFixed(2)}</strong> · WCAG{" "}
-            {data.wcag_criterion}
+            WCAG {data.wcag_criterion}
           </span>
         }
         actions={
@@ -140,7 +166,7 @@ export default function FindingDetailRoute() {
             variant="secondary"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to findings
+            Back to images
           </LinkButton>
         }
       />
@@ -149,9 +175,10 @@ export default function FindingDetailRoute() {
         <Card className="flex items-center justify-center overflow-hidden bg-[repeating-conic-gradient(theme(colors.border.DEFAULT)_0_25%,transparent_0_50%)] [background-size:24px_24px]">
           {data.has_svg_text ? (
             <div className="p-8 text-center">
-              <strong className="text-fg">Inline SVG</strong>
+              <strong className="text-fg">Graphic in the page code (inline SVG)</strong>
               <p className="mt-1 text-sm text-fg-muted">
-                Embedded directly in the page, no image file stored.
+                It is part of the page itself, so Axcess has no image file to
+                show.
               </p>
             </div>
           ) : data.content_hash ? (
@@ -163,45 +190,47 @@ export default function FindingDetailRoute() {
               // (jsx-a11y/img-redundant-alt). The wider page chrome makes
               // it clear *why* the graphic is on screen; the alt only needs
               // to convey what it is.
-              alt="Audited graphic"
+              alt="Graphic under review"
               className="max-h-[480px] w-full bg-white object-contain"
               {...(data.width ? { width: data.width } : {})}
               {...(data.height ? { height: data.height } : {})}
             />
           ) : (
             <div className="p-8 text-sm text-fg-muted">
-              No image blob available
+              No saved image file
             </div>
           )}
         </Card>
 
         <div className="flex flex-col gap-4">
           <Card className="p-4">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
-              Decision grid
+            <h2 className="mb-3 text-sm font-semibold text-fg-subtle">
+              What Axcess found
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <VerdictCell label="Image text (OCR)">
+              <VerdictCell label="Text read from image (OCR)">
                 {data.ocr_text ? (
                   <div className="whitespace-pre-wrap font-mono text-sm text-fg">
                     {data.ocr_text}
                     <div className="mt-1 text-xs text-fg-muted">
-                      confidence {Math.round(data.ocr_confidence ?? 0)}%
+                      Confidence: {Math.round(data.ocr_confidence ?? 0)}%
                     </div>
                   </div>
                 ) : (
-                  <em className="text-sm text-fg-subtle">no text detected</em>
+                  <em className="text-sm text-fg-subtle">No text found</em>
                 )}
               </VerdictCell>
-              <VerdictCell label="Alt attribute">
+              <VerdictCell label="Alt text">
                 <AltTag value={firstAlt} />
               </VerdictCell>
             </div>
             {(data.vlm_classification || data.vlm_rationale) && (
               <div className="mt-3">
-                <VerdictCell label="VLM classification">
+                <VerdictCell label="Image type, suggested by AI (vision model)">
                   <strong className="text-fg">
-                    {data.vlm_classification ?? "n/a"}
+                    {data.vlm_classification
+                      ? sentenceCase(data.vlm_classification)
+                      : "Not classified"}
                   </strong>
                   {data.vlm_rationale && (
                     <p className="mt-1 text-sm italic text-fg-muted">
@@ -213,7 +242,7 @@ export default function FindingDetailRoute() {
             )}
             {data.remediation_hint && (
               <div className="mt-3 rounded-xs border-l-2 border-umich-blue bg-umich-blue/5 p-3 text-sm text-fg">
-                <div className="mb-1 text-2xs font-semibold uppercase tracking-wide text-umich-blue">
+                <div className="mb-1 text-2xs font-semibold text-umich-blue">
                   Suggested fix
                 </div>
                 {data.remediation_hint}
@@ -222,15 +251,27 @@ export default function FindingDetailRoute() {
           </Card>
 
           <Card className="p-4">
-            <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold uppercase tracking-wide text-fg-subtle">
-              <span>Triage status</span>
+            <h2 className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-fg-subtle">
+              <span>Status</span>
               {toast && (
-                <span
-                  role="status"
-                  aria-live="polite"
-                  className="rounded-xs bg-umich-maize/60 px-2 py-0.5 text-2xs font-semibold text-umich-blue"
-                >
-                  {toast}
+                <span className="flex items-center gap-1">
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-xs bg-umich-maize/60 px-2 py-0.5 text-2xs font-semibold text-[#00274C] dark:bg-umich-maize"
+                  >
+                    {toast}
+                  </span>
+                  {toastMs === null && (
+                    // eslint-disable-next-line react/forbid-elements -- Convert: a small ghost button, Button variant="ghost" size="sm"
+                    <button
+                      type="button"
+                      onClick={() => setToast(null)}
+                      className="inline-flex min-h-target items-center rounded-xs px-2 text-2xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
+                    >
+                      Dismiss message
+                    </button>
+                  )}
                 </span>
               )}
             </h2>
@@ -241,91 +282,96 @@ export default function FindingDetailRoute() {
                 font-size for legibility, and Save uses `size="lg"` to
                 read as the page's primary CTA. */}
             <div className="flex flex-wrap items-center gap-3">
-              <label
-                htmlFor="status-select"
-                className="flex min-h-target items-center text-base font-semibold text-fg"
-              >
-                Status:
-              </label>
-              <select
+              <Select
                 id="status-select"
+                label="Change status to:"
                 value={status ?? data.status}
-                onChange={(e) => setStatus(e.target.value as FindingStatus)}
-                className="min-h-target rounded-xs border border-border bg-surface px-3 py-2 text-base text-fg focus:border-umich-blue focus:outline-none"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
+                onChange={(next) => setStatus(next as FindingStatus)}
+                options={STATUSES.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
+              />
               <Button
                 variant="primary"
                 size="lg"
                 onClick={() => status && attemptSave(status)}
                 disabled={save.isPending || status === data.status}
               >
-                Save
+                Save status
               </Button>
             </div>
+            {/* What the chosen status means, in words: a status is a person's
+                decision, and "Fixed" is not something Axcess checks. */}
+            <p className="mt-2 text-sm text-fg-muted">
+              <span className="font-semibold text-fg">{STATUS_OPTION_LABEL[status ?? data.status]}:</span>{" "}
+              {STATUS_HELP[status ?? data.status]}
+            </p>
             <p className="mt-2 text-2xs text-fg-muted">
-              Or press: <kbd>0</kbd>=new <kbd>1</kbd>=reviewing{" "}
-              <kbd>2</kbd>=in_progress <kbd>3</kbd>=remediated{" "}
-              <kbd>4</kbd>=accepted_risk <kbd>5</kbd>=false_positive
+              Or press a number key:{" "}
+              {Object.entries(STATUS_KEY_MAP).map(([key, value], index) => (
+                <span key={key}>
+                  {index > 0 && ", "}
+                  <kbd>{key}</kbd> {STATUS_OPTION_LABEL[value]}
+                </span>
+              ))}
+              .
             </p>
           </Card>
         </div>
       </div>
 
       {data.occurrences.length > 0 && (
-        <Card className="mt-6 overflow-hidden">
-          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <Card className="mt-6">
+          <div className="border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted">
             Appears on {data.occurrences.length} page
             {data.occurrences.length === 1 ? "" : "s"}
           </div>
-          <table className="w-full text-sm">
-            <thead className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
-              <tr>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Page
-                </th>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Alt text on that page
-                </th>
-                <th scope="col" className="px-4 py-2 text-left">
-                  Above fold
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {data.occurrences.map((o, i) => (
-                <tr key={i} className="hover:bg-surface-muted/60">
-                  <td className="px-4 py-2">
-                    <PageLink
-                      pageId={o.page_id}
-                      scanId={data.scan_id}
-                      pageUrl={o.page_url}
-                      pageTitle={null}
-                      origin="Finding"
-                      context={`Finding ${id}`}
-                      contextTo={`/findings/${id}`}
-                      backTo={`/findings/${id}`}
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    <AltTag value={o.alt_text} />
-                  </td>
-                  <td className="px-4 py-2 text-fg-muted">
-                    {o.above_fold ? "yes" : "no"}
-                  </td>
+          {paged.pages > 1 && (
+            <TableBar pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />} />
+          )}
+          <TableRegion label="Occurrences table" paged={paged}>
+            <Table caption={`Occurrences of image #${data.id}`}>
+              <TableHead>
+                <tr>
+                  <ColumnHeader>Page</ColumnHeader>
+                  <ColumnHeader>Alt text on that page</ColumnHeader>
+                  <ColumnHeader>Visible without scrolling</ColumnHeader>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((o, i) => (
+                  <Row key={i} index={(paged.page - 1) * paged.pageSize + i}>
+                    <Cell>
+                      <PageLink
+                        pageId={o.page_id}
+                        scanId={data.scan_id}
+                        pageUrl={o.page_url}
+                        pageTitle={null}
+                        origin={`Image #${id}`}
+                        context={`Image ${id}`}
+                        contextTo={`/findings/${id}`}
+                        backTo={`/findings/${id}`}
+                      />
+                    </Cell>
+                    <Cell>
+                      <AltTag value={o.alt_text} />
+                    </Cell>
+                    <Cell className="text-fg-muted">
+                      {o.above_fold ? "Yes" : "No"}
+                    </Cell>
+                  </Row>
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
         </Card>
       )}
     </>
   );
+}
+
+/** A stored value as sentence-case words: "no_meaningful_text" -> "No meaningful text". */
+function sentenceCase(value: string): string {
+  const words = value.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function VerdictCell({
@@ -337,7 +383,7 @@ function VerdictCell({
 }) {
   return (
     <div>
-      <div className="text-2xs font-semibold uppercase tracking-wide text-fg-subtle">
+      <div className="text-2xs font-semibold text-fg-subtle">
         {label}
       </div>
       <div className="mt-1">{children}</div>

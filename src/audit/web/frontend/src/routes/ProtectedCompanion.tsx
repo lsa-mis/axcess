@@ -1,4 +1,34 @@
+/**
+ * The protected report's own workspace: pair a companion agent, start and
+ * stop the run, and read progress.
+ *
+ * This is the most secret-handling screen in the app, and most of what looks
+ * like ceremony here is that. Three rules explain nearly all of it.
+ *
+ * 1. Nothing sensitive renders unless the identity it was created under is
+ *    still the current one. A pairing code and a certificate fingerprint are
+ *    each stored beside the identity fingerprint that produced them, and the
+ *    `visible*` values below resolve to nothing when those disagree. A shared
+ *    tab whose identity-aware proxy session changes users therefore shows the
+ *    new user nothing belonging to the previous one, without waiting for a
+ *    refetch to notice.
+ *
+ * 2. A pairing code is one-time and short-lived. It is cleared when it
+ *    expires, and eagerly when the tab is hidden or the page is about to
+ *    enter the back/forward cache, using flushSync so the DOM no longer holds
+ *    it before the snapshot is taken.
+ *
+ * 3. Mutation callbacks re-check the identity fingerprint before committing
+ *    anything to state. A request begun under one identity must not deliver
+ *    its result into a view that now belongs to another; the ref holds the
+ *    current value because the callback closes over a stale render.
+ *
+ * Queries here deliberately opt out of caching (`gcTime: 0`, and refetch on
+ * mount) so protected report data is not retained in the client cache after
+ * the view is closed.
+ */
 import { useEffect, useRef, useState } from "react";
+import { parseServerTime, serverDate } from "../lib/serverTime";
 import { flushSync } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,6 +58,7 @@ import {
   protectedQueryKey,
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
+import { CHECK_LABEL } from "../lib/terms";
 import type {
   ProtectedAgentEnrollmentResponse,
   ProtectedScanStatus,
@@ -38,40 +69,40 @@ const STATUS_COPY: Record<
   { label: string; detail: string; className: string }
 > = {
   awaiting_authentication: {
-    label: "Awaiting authentication",
-    detail: "Create a one-time pairing code, pair the local companion, then start the visible sign-in step.",
+    label: "Waiting for sign-in",
+    detail: "To start, create a one-time pairing code and pair the helper app. Then sign in yourself in the browser window it opens.",
     className: "border-umich-blue/40 bg-umich-blue/10 text-umich-blue",
   },
   authentication_required: {
-    label: "Authentication required",
-    detail: "The prior session expired or needs an additional manual step. Axcess did not attempt to re-authenticate for you.",
+    label: "Sign-in needed",
+    detail: "Your last sign-in ended, or the site needs another step from you. Axcess did not try to sign in again for you.",
     className: "border-sev-major/50 bg-sev-major-bg text-sev-major",
   },
   running: {
-    label: "Protected crawl running",
-    detail: "The paired companion is scanning only the approved scope. Browser session material remains on that computer.",
+    label: "Sign-in scan running",
+    detail: "The helper app is scanning only the approved pages. Your browser sign-in data (session) stays on that computer.",
     className: "border-umich-blue/40 bg-umich-blue/10 text-umich-blue",
   },
   completed: {
-    label: "Protected crawl completed",
-    detail: "Review the report through the protected access controls before sharing any output.",
+    label: "Sign-in scan complete",
+    detail: "Review the report here, behind its access controls, before you share any part of it.",
     className: "border-border bg-surface-muted text-fg-muted",
   },
   failed: {
-    label: "Protected crawl failed",
-    detail: "No automatic recovery or re-authentication occurred. Review the visible failure details in the report and begin a new authorized session if needed.",
+    label: "Sign-in scan failed",
+    detail: "Axcess did not retry or sign in again by itself. Read the failure details in the report. If needed, start a new sign-in that you are allowed to make.",
     className: "border-sev-critical/40 bg-sev-critical-bg text-sev-critical",
   },
   interrupted: {
-    label: "Protected crawl interrupted",
-    detail: "The protected crawl stopped before completion. The companion did not keep a reusable browser session.",
+    label: "Sign-in scan stopped",
+    detail: "The sign-in scan stopped before it finished. The helper app did not keep a browser sign-in that could be used again.",
     className: "border-sev-major/50 bg-sev-major-bg text-sev-major",
   },
 };
 
 function displayTime(value: string | null): string {
   if (!value) return "Not recorded";
-  const date = new Date(value);
+  const date = serverDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -192,7 +223,7 @@ export default function ProtectedCompanionRoute() {
         return;
       }
       setActionError(null);
-      setMessage("Pairing code generated. It is shown below only in this browser view.");
+      setMessage("Pairing code created. It appears below, only in this browser tab.");
       setPairing(result);
       setPairingIdentityFingerprint(identityFingerprint);
     },
@@ -210,7 +241,7 @@ export default function ProtectedCompanionRoute() {
       setCertificateIdentityFingerprint(null);
       enroll.reset();
       setMessage(
-        "Companion paired. Re-run the non-secret local command below whenever manual re-authentication is required.",
+        "Helper app paired. Whenever you need to sign in again, run the command below again. This command is not secret.",
       );
     }
   }, [
@@ -241,24 +272,32 @@ export default function ProtectedCompanionRoute() {
     protectedIdentity.isReady,
   ]);
 
+  // `useMutation` returns a fresh result object on every render, so depending
+  // on `enroll` re-runs these effects continuously: this screen re-renders on
+  // two 2-second polls. `reset` is bound once on the mutation observer and is
+  // stable, so depend on the method rather than the object. Without this the
+  // expiry timer below was cleared and rebuilt, and the three global
+  // listeners further down were removed and re-added, on every render.
+  const resetEnroll = enroll.reset;
+
   useEffect(() => {
-    if (visiblePairing) enroll.reset();
-  }, [enroll, visiblePairing]);
+    if (visiblePairing) resetEnroll();
+  }, [resetEnroll, visiblePairing]);
 
   useEffect(() => {
     if (!visiblePairing) return undefined;
-    const expiresAt = Date.parse(visiblePairing.expires_at);
+    const expiresAt = parseServerTime(visiblePairing.expires_at);
     const delay = Number.isFinite(expiresAt) ? Math.max(0, expiresAt - Date.now()) : 0;
     const timeout = window.setTimeout(() => {
       setPairing(null);
       setPairingIdentityFingerprint(null);
       setCertificateFingerprint("");
       setCertificateIdentityFingerprint(null);
-      enroll.reset();
-      setMessage("The one-time pairing code expired and was cleared from this browser view.");
+      resetEnroll();
+      setMessage("The one-time pairing code expired. Axcess removed it from this browser tab.");
     }, delay);
     return () => window.clearTimeout(timeout);
-  }, [enroll, visiblePairing]);
+  }, [resetEnroll, visiblePairing]);
 
   const startCompanion = useMutation({
     mutationKey: protectedMutationKey("companion-start", identityFingerprint, id),
@@ -269,8 +308,8 @@ export default function ProtectedCompanionRoute() {
       setActionError(null);
       setMessage(
         result.protection_status === "running"
-          ? "The protected companion is already running."
-          : "Manual companion handoff recorded. Run the local companion command; the browser is never started remotely.",
+          ? "The helper app is already running."
+          : "Ready for you to sign in. Run the helper app command on your computer. Axcess never opens the browser from the server.",
       );
       void queryClient.invalidateQueries({
         queryKey: protectedQueryKey("scan", identityFingerprint, id),
@@ -291,7 +330,7 @@ export default function ProtectedCompanionRoute() {
       if (latestIdentityFingerprint.current !== identityFingerprint) return;
       setActionError(null);
       setMessage(
-        "Redacted protected summary downloaded. Axcess did not keep a server-side copy; handle the downloaded file according to its classification.",
+        "Redacted summary downloaded. Axcess did not keep a copy on the server. Handle the file according to its data classification.",
       );
     },
     onError: (error: unknown) =>
@@ -304,7 +343,7 @@ export default function ProtectedCompanionRoute() {
     onSuccess: (result) => {
       if (latestIdentityFingerprint.current !== identityFingerprint) return;
       setActionError(null);
-      setMessage("Protected run stopped. The paired companion can no longer retrieve work or submit evidence.");
+      setMessage("Sign-in scan stopped. The helper app can no longer get pages to check or send results.");
       void queryClient.invalidateQueries({
         queryKey: protectedQueryKey("scan", identityFingerprint, id),
       });
@@ -337,7 +376,7 @@ export default function ProtectedCompanionRoute() {
         setCertificateFingerprint("");
         setCertificateIdentityFingerprint(null);
       });
-      enroll.reset();
+      resetEnroll();
     };
     const refreshProtectedIdentity = () => {
       void queryClient.invalidateQueries({
@@ -369,14 +408,14 @@ export default function ProtectedCompanionRoute() {
       window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [enroll, queryClient]);
+  }, [resetEnroll, queryClient]);
 
   if (!Number.isSafeInteger(id) || id <= 0) {
     return (
       <>
         <ProtectedCompanionHeader />
         <Card className="border-sev-critical/40 bg-sev-critical-bg p-4 text-sm text-sev-critical" role="alert">
-          This protected scan identifier is invalid.
+          This sign-in scan number is not valid. Check the address, or open the report from Reports.
         </Card>
       </>
     );
@@ -386,7 +425,7 @@ export default function ProtectedCompanionRoute() {
       <>
         <ProtectedCompanionHeader scanId={id} />
         <p className="text-sm text-fg-muted" aria-live="polite">
-          Checking protected-report access…
+          Checking that you can open this sign-in scan…
         </p>
       </>
     );
@@ -401,7 +440,7 @@ export default function ProtectedCompanionRoute() {
         >
           {protectedIdentity.error instanceof Error
             ? protectedIdentity.error.message
-            : "Protected-report access is unavailable."}
+            : "Axcess could not confirm your access to sign-in scans. Try again, or ask your administrator."}
         </Card>
       </>
     );
@@ -410,7 +449,7 @@ export default function ProtectedCompanionRoute() {
     return (
       <>
         <ProtectedCompanionHeader scanId={id} />
-        <p className="text-sm text-fg-muted" aria-live="polite">Loading protected scan…</p>
+        <p className="text-sm text-fg-muted" aria-live="polite">Loading sign-in scan…</p>
       </>
     );
   }
@@ -421,7 +460,7 @@ export default function ProtectedCompanionRoute() {
         <Card className="border-sev-critical/40 bg-sev-critical-bg p-4 text-sm text-sev-critical" role="alert">
           {protectedScan.error instanceof Error
             ? protectedScan.error.message
-            : "Protected scan details are unavailable. Confirm that you are using the protected report access path."}
+            : "Axcess could not load this sign-in scan. Check that you opened it through the protected sign-in scan address."}
         </Card>
       </>
     );
@@ -461,8 +500,8 @@ export default function ProtectedCompanionRoute() {
             </div>
           </div>
           <span
-            className={`inline-flex rounded-xs border px-2 py-1 text-2xs font-semibold uppercase tracking-wide ${status.className}`}
-            aria-label={`Protected scan status: ${status.label}`}
+            className={`inline-flex rounded-xs border px-2 py-1 text-2xs font-semibold ${status.className}`}
+            aria-label={`Sign-in scan status: ${status.label}`}
           >
             {status.label}
           </span>
@@ -476,16 +515,16 @@ export default function ProtectedCompanionRoute() {
               variant="secondary"
               disabled={stopProtectedScan.isPending}
               onClick={() => {
-                if (window.confirm("Stop this protected companion run? The paired companion certificate will be revoked for this report.")) {
+                if (window.confirm("Stop this sign-in scan? The helper app’s certificate will stop working for this report.")) {
                   setActionError(null);
                   setMessage(null);
                   stopProtectedScan.mutate();
                 }
               }}
             >
-              {stopProtectedScan.isPending ? "Stopping protected run…" : "Stop protected run"}
+              {stopProtectedScan.isPending ? "Stopping sign-in scan…" : "Stop sign-in scan"}
             </Button>
-            <p className="mt-2 text-xs text-fg-muted">Stopping invalidates the active companion lease; it does not remotely inspect or retain the browser session.</p>
+            <p className="mt-2 text-xs text-fg-muted">Stopping ends the helper app’s access to this scan (its lease). Axcess does not look into or keep the browser sign-in.</p>
           </div>
         )}
       </Card>
@@ -498,10 +537,10 @@ export default function ProtectedCompanionRoute() {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 id="protected-scan-progress-title" className="text-sm font-semibold text-fg">
-              Protected scan progress
+              Sign-in scan progress
             </h2>
             <p className="mt-1 text-xs text-fg-muted">
-              Counts update while the companion runs. Protected page addresses, selectors, and page text stay on the auditor’s computer.
+              The counts update while the helper app runs. Page addresses, element locators (CSS selectors), and page text stay on the computer that runs the helper app.
             </p>
           </div>
           {protectedScan.isFetching && (
@@ -513,15 +552,15 @@ export default function ProtectedCompanionRoute() {
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ProgressMetric label="Pages checked" value={scan.progress.pages_indexed} />
           <ProgressMetric label="Issue occurrences" value={scan.progress.issue_occurrences} />
-          <ProgressMetric label="axe-core" value={scan.progress.axe_occurrences} />
+          <ProgressMetric label={CHECK_LABEL.axe} value={scan.progress.axe_occurrences} />
           <ProgressMetric
-            label="Alfa failures / review"
+            label={`${CHECK_LABEL.alfa}: failed / needs review`}
             value={`${scan.progress.alfa_failed_occurrences} / ${scan.progress.alfa_review_occurrences}`}
           />
         </dl>
         {scan.progress.probe_occurrences > 0 && (
           <p className="mt-3 text-xs text-fg-muted">
-            Browser interaction probes recorded {scan.progress.probe_occurrences.toLocaleString()} additional occurrence{scan.progress.probe_occurrences === 1 ? "" : "s"}.
+            The keyboard, focus, and zoom and layout checks found {scan.progress.probe_occurrences.toLocaleString()} more occurrence{scan.progress.probe_occurrences === 1 ? "" : "s"}.
           </p>
         )}
       </Card>
@@ -557,16 +596,29 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <LaptopMinimal className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">Step 2</p>
-                <h2 className="mt-1 text-lg font-semibold text-fg">Connect the secure browser on this computer</h2>
+                <p className="text-xs font-semibold text-umich-blue">Step 2</p>
+                <h2 className="mt-1 text-lg font-semibold text-fg">Connect the helper app on your computer</h2>
                 <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-fg-muted">
-                  <li>Enter the SHA-256 fingerprint of the pre-provisioned companion certificate, then generate a one-time pairing code.</li>
-                  <li>On the auditor’s computer, run the pairing command and enter the code only in the local companion prompt.</li>
-                  <li>After pairing succeeds, run the companion crawl command. It opens a headed browser, where you complete 1FA or MFA directly with the target.</li>
-                  <li>After the approved post-login page is verified, the companion can begin the read-only crawl.</li>
+                  <li>Enter the ID of the helper app’s certificate (SHA-256 fingerprint). This certificate was set up in advance. Then create a one-time pairing code.</li>
+                  <li>On the computer that will run the scan, run the pairing command. Type the code only where the helper app asks for it.</li>
+                  <li>After pairing works, run the helper app’s scan command. It opens a browser window you can see. Sign in there, directly on the site, with a password or two-step sign-in (2FA).</li>
+                  <li>Axcess checks that you reached the approved page after sign-in. Then the helper app starts the scan. The scan only reads pages and does not change them.</li>
                 </ol>
                 <p className="mt-4 text-sm text-fg">
-                  Axcess never requests a password, OTP, push approval, passkey, recovery code, browser profile, cookie, or storage state. If the session expires, it stops and asks for another manual sign-in.
+                  Axcess never asks for any of these:
+                </p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-fg">
+                  <li>your password</li>
+                  <li>a one-time code (OTP)</li>
+                  <li>a phone approval (push approval)</li>
+                  <li>a passkey</li>
+                  <li>a recovery code</li>
+                  <li>your browser profile</li>
+                  <li>cookies</li>
+                  <li>saved browser data (storage state)</li>
+                </ul>
+                <p className="mt-2 text-sm text-fg">
+                  If your sign-in ends, the scan stops. It asks you to sign in again yourself.
                 </p>
               </div>
             </div>
@@ -577,7 +629,7 @@ export default function ProtectedCompanionRoute() {
               <div className="mt-5 space-y-3">
                 <div className="max-w-2xl">
                   <label htmlFor="companion-certificate-fingerprint" className="block text-sm font-semibold text-fg">
-                    Companion certificate SHA-256 fingerprint
+                    Helper app certificate ID (SHA-256 fingerprint)
                   </label>
                   <input
                     id="companion-certificate-fingerprint"
@@ -591,10 +643,10 @@ export default function ProtectedCompanionRoute() {
                     spellCheck={false}
                     className="mt-1 w-full rounded-xs border border-border bg-surface px-3 py-2 font-mono text-sm text-fg"
                     aria-describedby="companion-certificate-fingerprint-help"
-                    placeholder="AA:BB:… or 64 hexadecimal characters"
+                    placeholder="AA:BB:… or 64 characters, 0–9 and A–F"
                   />
                   <p id="companion-certificate-fingerprint-help" className="mt-1 text-xs text-fg-muted">
-                    This public certificate fingerprint binds the pairing code to one managed computer. Axcess never receives the certificate private key.
+                    This ID is public. It ties the pairing code to one managed computer. Axcess never receives the certificate’s private key.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -615,15 +667,15 @@ export default function ProtectedCompanionRoute() {
                     title={
                       mayStart
                         ? undefined
-                        : "Pairing is available only while the report needs manual authentication."
+                        : "You can pair only while the report is waiting for you to sign in."
                     }
                   >
                     <KeyRound className="h-4 w-4" aria-hidden />
-                    {enroll.isPending ? "Generating pairing code…" : "Generate pairing code"}
+                    {enroll.isPending ? "Creating pairing code…" : "Create pairing code"}
                   </Button>
                   {!mayStart && (
                     <span className="text-sm text-fg-muted">
-                      Pairing is not needed while this protected scan is {status.label.toLowerCase()}.
+                      You do not need to pair now. Status: {status.label}.
                     </span>
                   )}
                 </div>
@@ -638,7 +690,7 @@ export default function ProtectedCompanionRoute() {
                   setCertificateFingerprint("");
                   setCertificateIdentityFingerprint(null);
                   enroll.reset();
-                  setMessage("The pairing code is hidden. Generate a new code if you still need to pair a companion.");
+                  setMessage("The pairing code is hidden. To pair the helper app, create a new code.");
                 }}
               />
             )}
@@ -649,14 +701,14 @@ export default function ProtectedCompanionRoute() {
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
                 <div>
-                  <h2 className="text-base font-semibold text-fg">Protected review queue</h2>
+                  <h2 className="text-base font-semibold text-fg">Issues found by the sign-in scan</h2>
                   <p className="mt-1 text-sm text-fg-muted">
-                    Review grouped source/rule counts without exposing page locations, selectors, or screenshots.
+                    See how often each check and rule found a problem. This list does not show page addresses, element locators (CSS selectors), or screenshots.
                   </p>
                 </div>
               </div>
               <LinkButton to={`/scans/${id}/protected/issues`} variant="secondary" className="mt-4">
-                Open protected issue index
+                Open sign-in scan issues
               </LinkButton>
             </Card>
           )}
@@ -665,10 +717,10 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <Play className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-umich-blue">Step 3</p>
+                <p className="text-xs font-semibold text-umich-blue">Step 3</p>
                 <h2 className="mt-1 text-lg font-semibold text-fg">Open the browser and sign in</h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  Record the handoff, then run the local companion command shown above. Chromium opens visibly; complete password, passkey, or 2FA there, return to the terminal, and press Enter. Axcess verifies the resulting application page before scanning.
+                  First, select Prepare sign-in. Then run the helper app command shown above. A Chromium browser window opens. Sign in there with your password, passkey, or two-step sign-in (2FA). Then go back to the terminal and press Enter. Axcess checks the page you reached before it starts scanning.
                 </p>
               </div>
             </div>
@@ -684,38 +736,38 @@ export default function ProtectedCompanionRoute() {
                 }}
               >
                 <Play className="h-4 w-4" aria-hidden />
-                {startCompanion.isPending ? "Preparing sign-in…" : "Prepare visible sign-in"}
+                {startCompanion.isPending ? "Preparing sign-in…" : "Prepare sign-in"}
               </Button>
               {mayStart && !claimedCompanion && (
                 <span className="text-sm text-fg-muted">
-                  Pair the companion first. Then run its local command to begin the visible sign-in.
+                  Pair the helper app first. Then run its command on your computer to open the sign-in window.
                 </span>
               )}
             </div>
           </Card>
 
           <Card className="p-5">
-            <h2 className="text-base font-semibold text-fg">Approved scope commitment</h2>
+            <h2 className="text-base font-semibold text-fg">Approved sites (scope)</h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Exact origins are released only in the encrypted, scan-bound companion work item after mTLS verification. They are not retained or displayed in this report workspace.
+              Axcess does not show or keep the exact site addresses (origins) on this page. It sends them only to the helper app, encrypted and tied to this scan. It sends them only after it checks the helper app’s certificate (mTLS).
             </p>
             <ScopeSummary
-              label="Target origins"
+              label="Sites to scan"
               count={scan.target_origin_count}
               fingerprint={scan.target_scope_fingerprint}
             />
             <ScopeSummary
-              label="Manual sign-in origins"
+              label="Sign-in sites"
               count={scan.auth_origin_count}
               fingerprint={scan.auth_scope_fingerprint}
             />
             <ScopeSummary
-              label="Resource / CDN origins"
+              label="File and resource sites (CDN)"
               count={scan.cdn_origin_count}
               fingerprint={scan.cdn_scope_fingerprint}
             />
             <p className="mt-4 text-xs text-fg-muted">
-              Owner: <strong className="text-fg">{scan.target_owner}</strong> · Verified requester: <strong className="text-fg">{scan.authorized_by}</strong> · {scan.environment} · {scan.data_classification}
+              Site owner: <strong className="text-fg">{scan.target_owner}</strong> · Requested by (verified): <strong className="text-fg">{scan.authorized_by}</strong> · {scan.environment} · {scan.data_classification}
             </p>
           </Card>
         </div>
@@ -725,34 +777,34 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div>
-                <h2 className="text-base font-semibold text-fg">Evidence retention</h2>
+                <h2 className="text-base font-semibold text-fg">How long results are kept</h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  Detailed protected evidence is encrypted and automatically removed after its retention window. The scan’s non-sensitive audit record remains.
+                  Axcess encrypts the detailed results. It deletes them automatically after a set time. A basic record of the scan stays. That record has no sensitive details.
                 </p>
               </div>
             </div>
             <dl className="mt-4 space-y-3 text-sm">
               <div>
-                <dt className="font-medium text-fg">Scheduled cleanup</dt>
+                <dt className="font-medium text-fg">Scheduled deletion</dt>
                 <dd className="text-fg-muted" title={scan.cleanup_at}>{displayTime(scan.cleanup_at)}</dd>
               </div>
               <div>
-                <dt className="font-medium text-fg">Detailed evidence and attachments</dt>
+                <dt className="font-medium text-fg">Detailed results and attachments</dt>
                 <dd className="text-fg-muted">
                   {scan.is_evidence_available
-                    ? "Not retained or displayed by this v1 workflow"
-                    : "Retention period ended; only the aggregate index remains"}
+                    ? "Not kept or shown in this version"
+                    : "The time for keeping them has ended. Only the issue counts remain."}
                 </dd>
               </div>
               {scan.evidence_purged_at && (
                 <div>
-                  <dt className="font-medium text-fg">Evidence purged</dt>
+                  <dt className="font-medium text-fg">Detailed results deleted</dt>
                   <dd className="text-fg-muted" title={scan.evidence_purged_at}>{displayTime(scan.evidence_purged_at)}</dd>
                 </div>
               )}
               {scan.key_destroyed_at && (
                 <div>
-                  <dt className="font-medium text-fg">Evidence key unavailable</dt>
+                  <dt className="font-medium text-fg">Encryption key deleted</dt>
                   <dd className="text-fg-muted" title={scan.key_destroyed_at}>{displayTime(scan.key_destroyed_at)}</dd>
                 </div>
               )}
@@ -763,12 +815,12 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-sev-major" aria-hidden />
               <div>
-                <h2 className="text-base font-semibold text-fg">Protected-data limits</h2>
+                <h2 className="text-base font-semibold text-fg">Limits on sign-in scan data</h2>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-muted">
-                  <li>Webhooks, remote AI, MCP chat, and unrestricted exports are disabled.</li>
-                  <li>Local AI is {scan.allow_local_ai ? "explicitly approved only for bounded in-memory image leads" : "disabled for this report"}.</li>
-                  <li>Companion artifact and reviewer-attachment uploads are disabled in this release.</li>
-                  <li>The companion blocks mutating requests, downloads, pop-ups, workers, and unapproved destinations.</li>
+                  <li>These are turned off: automatic messages to other services (webhooks), AI on other servers, report chat (MCP), and exports with all details.</li>
+                  <li>AI on this computer (local AI) is {scan.allow_local_ai ? "approved only for limited image checks that stay in memory" : "turned off for this report"}.</li>
+                  <li>In this version, you cannot upload files from the helper app or attach files to a review.</li>
+                  <li>The helper app blocks requests that change data, downloads, pop-ups, background scripts (workers), and sites that are not approved.</li>
                 </ul>
               </div>
             </div>
@@ -778,14 +830,14 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div>
-                <h2 className="text-base font-semibold text-fg">Manual authentication review</h2>
+                <h2 className="text-base font-semibold text-fg">Check the sign-in steps yourself</h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  A successful manual sign-in lets the companion crawl; it does not automatically prove that sign-in or MFA meets WCAG 2.2 AA 3.3.8. Record an outcome only after reviewing each in-scope authentication step.
+                  Signing in lets the helper app scan. It does not prove that the sign-in steps meet the Web Content Accessibility Guidelines (WCAG). Check them against WCAG 3.3.8 Accessible Authentication (Minimum), Level AA, from WCAG 2.2. Record a result only after you review each sign-in step in scope.
                 </p>
               </div>
             </div>
             <LinkButton to={`/scans/${id}/protected/manual-checks`} variant="secondary" className="mt-4">
-              Record outcome-only review
+              Record manual check results
             </LinkButton>
           </Card>
 
@@ -793,9 +845,9 @@ export default function ProtectedCompanionRoute() {
             <div className="flex items-start gap-3">
               <Download className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
               <div>
-                <h2 className="text-base font-semibold text-fg">Authorized redacted export</h2>
+                <h2 className="text-base font-semibold text-fg">Download a redacted summary</h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  Download a minimal Markdown handoff only after this report is complete. It omits target URLs, page locations, selectors, screenshots, OCR text, and all browser or session material. This release has no in-app attachment uploads.
+                  You can download a short Markdown summary after the report is complete. Axcess removes private details from it (redacts it). The summary leaves out site URLs, page locations, element locators (CSS selectors), and screenshots. It also leaves out text read from images (OCR) and all browser and sign-in data. This version has no attachment uploads in the app.
                 </p>
               </div>
             </div>
@@ -813,30 +865,30 @@ export default function ProtectedCompanionRoute() {
                   mayExport
                     ? undefined
                     : scan.is_evidence_available
-                      ? "The protected report must be completed before its redacted summary can be exported."
-                      : "Detailed protected evidence has been purged, so no new protected export can be generated."
+                      ? "You can download the redacted summary after the sign-in scan is complete."
+                      : "Axcess deleted the detailed results, so it cannot make a new summary."
                 }
               >
                 <Download className="h-4 w-4" aria-hidden />
                 {downloadRedactedExport.isPending
-                  ? "Preparing redacted export…"
+                  ? "Preparing redacted summary…"
                   : "Download redacted summary"}
               </Button>
               {!mayExport && (
                 <span className="text-sm text-fg-muted">
                   {scan.is_evidence_available
-                    ? "Available after the protected crawl completes."
-                    : "No longer available after protected-evidence cleanup."}
+                    ? "Available after the sign-in scan is complete."
+                    : "No longer available. Axcess deleted the detailed results."}
                 </span>
               )}
             </div>
             <p className="mt-3 text-xs text-fg-muted">
-              This is an explicit protected action. Axcess records the authorized download but does not write an export or temporary file on the server. Downloaded copies are the recipient’s responsibility.
+              You start this download yourself. Axcess records that you downloaded the summary. It does not save the file, or a temporary copy, on the server. The person who has a downloaded copy is responsible for it.
             </p>
           </Card>
 
           <p className="px-1 text-xs text-fg-muted">
-            Need report context? Return to the <Link to={`/scans/${id}`} className="text-umich-blue underline underline-offset-2">scan overview</Link>. Do not put pairing codes in tickets, chat, exports, or screen recordings.
+            To see the whole report, go back to the <Link to={`/scans/${id}`} className="text-umich-blue underline underline-offset-2">report overview</Link>. Never put a pairing code in tickets, chat, exports, or screen recordings.
           </p>
         </div>
       </div>
@@ -850,13 +902,13 @@ function ProtectedCompanionHeader({ scanId }: { scanId?: number }) {
       crumbs={[
         { label: "Reports", to: "/scans" },
         ...(scanId ? [{ label: `Report #${scanId}`, to: `/scans/${scanId}` }] : []),
-        { label: "Protected companion" },
+        { label: "Sign-in scan" },
       ]}
-      title="Protected companion"
+      title="Sign-in scan"
       subtitle={
         scanId
-          ? `Manual sign-in and read-only crawl handoff for scan #${scanId}.`
-          : "Manual sign-in and read-only crawl handoff."
+          ? `Sign in yourself, then the helper app checks the pages for Report #${scanId}. The scan only reads pages.`
+          : "Sign in yourself, then the helper app checks the pages. The scan only reads pages."
       }
       actions={
         scanId ? (
@@ -885,23 +937,23 @@ function PairingCode({
         One-time pairing code, shown once
       </h3>
       <p className="mt-1 text-sm text-fg-muted">
-        Enter this only into the local companion prompt. Axcess will not copy it to your clipboard or show it again after you hide this section.
+        Type this code only where the helper app asks for it. Axcess does not copy it to your clipboard. After you hide this section, Axcess cannot show it again.
       </p>
       <dl className="mt-4 space-y-3">
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Pairing code</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Pairing code</dt>
           <dd>
-            <code className="mt-1 block break-all rounded-xs border border-border bg-surface px-3 py-2 text-base font-semibold tracking-[0.16em] text-fg">
+            <code className="mt-1 block break-all rounded-xs border border-border bg-surface px-3 py-2 text-base font-semibold text-fg">
               {pairing.pairing_code}
             </code>
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Expires</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Expires</dt>
           <dd className="mt-1 text-sm text-fg-muted" title={pairing.expires_at}>{displayTime(pairing.expires_at)}</dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">Local companion command</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Helper app command (to pair)</dt>
           <dd>
             <code className="mt-1 block overflow-x-auto rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
               {pairing.companion_command}
@@ -909,7 +961,7 @@ function PairingCode({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">After pairing</dt>
+          <dt className="text-xs font-semibold text-fg-subtle">Then run this to scan</dt>
           <dd>
             <code className="mt-1 block overflow-x-auto rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
               {pairing.companion_run_command}
@@ -918,7 +970,7 @@ function PairingCode({
         </div>
       </dl>
       <Button type="button" className="mt-4" onClick={onHide}>
-        I recorded it, hide pairing code
+        I entered it, hide pairing code
       </Button>
     </section>
   );
@@ -939,17 +991,17 @@ function PairedCompanion({
       aria-labelledby="paired-companion-heading"
     >
       <h3 id="paired-companion-heading" className="text-sm font-semibold text-fg">
-        Local companion paired
+        Helper app paired
       </h3>
       <p className="mt-1 text-sm text-fg-muted">
-        This report is bound to one companion certificate. Use the same local
-        command to begin a fresh visible sign-in after a session expires; no
-        new pairing code is needed or available.
+        This report works with one helper app certificate only. If your
+        sign-in ends, run the same command to sign in again. You do not need a
+        new pairing code, and you cannot get one.
       </p>
       <dl className="mt-4 space-y-3">
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-            Enrollment ID
+          <dt className="text-xs font-semibold text-fg-subtle">
+            Pairing ID (enrollment ID)
           </dt>
           <dd className="mt-1">
             <code className="block break-all rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
@@ -958,8 +1010,8 @@ function PairedCompanion({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-            Re-run on the paired computer
+          <dt className="text-xs font-semibold text-fg-subtle">
+            Run again on the paired computer
           </dt>
           <dd className="mt-1">
             <code className="block overflow-x-auto rounded-xs border border-border bg-surface px-3 py-2 text-xs text-fg">
@@ -985,10 +1037,10 @@ function ScopeSummary({
     <section className="mt-4" aria-label={label}>
       <h3 className="text-sm font-medium text-fg">{label}</h3>
       <p className="mt-1 text-sm text-fg-muted">
-        {count === 0 ? "None approved" : `${count} exact ${count === 1 ? "origin" : "origins"} approved`}
+        {count === 0 ? "None approved" : `${count} exact site ${count === 1 ? "address" : "addresses"} approved`}
       </p>
       <p className="mt-1 text-xs text-fg-subtle">
-        Scope tag: <code>{fingerprint ?? "Legacy scope redacted"}</code>
+        Scope tag: <code>{fingerprint ?? "Not shown for older scans"}</code>
       </p>
     </section>
   );

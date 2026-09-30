@@ -1,0 +1,493 @@
+"""The inspector must not blame drift for interaction-revealed findings.
+
+The highlight pass searches the *load-state* capture. An element the interaction
+probe only reached by operating a control was never in that capture, so failing
+to find it is the expected result, not evidence the site changed. These tests
+pin the two explanations apart: they are both real, and telling them apart is
+the whole point.
+"""
+
+from __future__ import annotations
+
+import gzip
+import re
+import sqlite3
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+
+import pytest
+
+from audit.db.schema import connect
+
+# One browser per module (tests/ui/conftest.py), so the tests run on the
+# module's event loop. Each ``new_page`` call still opens its own context.
+pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
+
+playwright_async = pytest.importorskip("playwright.async_api")
+
+#: A selector that cannot match the stored capture, so the highlight pass
+#: always misses — which is the branch under test.
+MISSING_SELECTOR = "#never-present-at-load"
+REVEALING_CONTROL = "Open booking dialog"
+
+
+def _seed_findings(db_path: Path, scan_id: int, *revealed_by: str | None) -> int:
+    """Add a11y findings whose targets are all absent from the capture.
+
+    One per ``revealed_by``, sharing a rule so the ``?issue=`` path gathers
+    them together the way a real multi-occurrence issue does.
+    """
+    conn = connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        page = conn.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
+        assert page is not None, "seeded scan has no pages"
+        for index, control in enumerate(revealed_by):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by) "
+                "VALUES (?, ?, 'aria-dialog-name', '4.1.2', 'A', 'serious', "
+                "'ARIA dialog nodes should have an accessible name', ?, 'no name', "
+                "?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    MISSING_SELECTOR,
+                    f'<div role="dialog" data-n="{index}"></div>',
+                    f"hash-{index}",
+                    control,
+                ),
+            )
+        conn.commit()
+        return int(page["id"])
+    finally:
+        conn.close()
+
+
+async def _inspector_text(new_page: Any, base: str, scan_id: int, page_id: int) -> str:
+    """Open the inspector on the unmatchable findings and return its text."""
+    url = f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-dialog-name"
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="networkidle")
+        # The highlight pass runs in requestIdleCallback, so the status
+        # line settles a beat after the document is ready.
+        await page.wait_for_timeout(1500)
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
+
+
+async def test_revealed_finding_names_its_control_instead_of_blaming_drift(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL)
+
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
+
+    assert REVEALING_CONTROL in text
+    assert "shows the page at page load" in text
+    # Stops at "flagged": the probe records that a violation was first reported
+    # after the control was operated, not that the element was absent before.
+    assert "first flagged after clicking" in text
+    # The load capture is not stale, and saying so blames the site for a fact
+    # about how the scan works.
+    assert "changed since the scan" not in text
+
+
+async def test_load_state_finding_still_reports_a_possible_change(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id = _seed_findings(db_path, scan_id, None)
+
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
+
+    # Nothing revealed this one, so it genuinely should have been in the
+    # capture and drift is the honest explanation.
+    assert "changed since the scan" in text
+    assert "shows the page at page load" not in text
+
+
+async def test_a_mixed_issue_keeps_both_explanations_open(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """One issue can span load-state and interaction-revealed occurrences.
+
+    Neither explanation covers the whole set then: the load-state occurrence
+    genuinely should have been matched, and the revealed one was never going to
+    be. Committing to either would misreport half the findings.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id = _seed_findings(db_path, scan_id, REVEALING_CONTROL, None)
+
+    text = await _inspector_text(new_page, live_server[0], scan_id, page_id)
+
+    assert "after a click on a control" in text
+    assert "changed since the scan" in text
+    # With drift still in play this is not the settled case, so it must not
+    # claim a specific control accounts for the miss.
+    assert "first flagged after clicking" not in text
+
+
+def _seed_two_state_issue(db_path: Path, scan_id: int) -> tuple[int, str]:
+    """One rule failing both at load and behind a control, on one page."""
+    state_key = "https://x.test/|#menu|Filter"
+    conn = connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        page = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+            "path_labels, encoding, dom) VALUES (?, ?, ?, 'Filter', '[\"Filter\"]', "
+            "'gzip', ?)",
+            (page["id"], scan_id, state_key, gzip.compress(b"<!doctype html><html></html>")),
+        )
+        for target, revealed_by, key in (
+            ("#at-load", None, None),
+            ("#after-click", "Filter", state_key),
+        ):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by, revealed_state_key) "
+                "VALUES (?, ?, 'aria-required-parent', '1.3.1', 'A', 'serious', "
+                "'Certain ARIA roles must be contained by particular parents', ?, "
+                "'bad parent', ?, ?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    target,
+                    '<a role="menuitem">' + target + "</a>",
+                    "hash" + target,
+                    revealed_by,
+                    key,
+                ),
+            )
+        conn.commit()
+        return int(page["id"]), state_key
+    finally:
+        conn.close()
+
+
+async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, state: str) -> str:
+    url = (
+        base + "/app/scans/" + str(scan_id) + "/pages/" + str(page_id) + "/inspect"
+        "?issue=axe:aria-required-parent&state=" + state
+    )
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="domcontentloaded")
+        # Wait for the document, not a fixed time: the seeded page has no
+        # stored capture, so page load is a live render of a few seconds.
+        await page.locator("#inspect-panel-page").wait_for(state="attached", timeout=30000)
+        # The highlight pass runs in requestIdleCallback.
+        await page.wait_for_timeout(1500)
+        # The evidence list sits closed below the page; open it so its
+        # occurrences are part of the text. A view with none of the issue's
+        # occurrences has no list to open.
+        evidence = page.get_by_role("button", name="Evidence from the scan", exact=True)
+        if await evidence.count():
+            await evidence.click()
+        return await page.locator("body").inner_text()
+    finally:
+        # One page at a time: close it now rather than at teardown.
+        await page.context.close()
+
+
+async def test_each_state_shows_only_the_occurrences_it_contains(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """One issue can fail both at load and behind a control.
+
+    The evidence list used to show every occurrence whichever state was
+    selected, so "At page load" listed markup that only exists after a click,
+    and a revealed state listed occurrences belonging to a different control.
+    That is the same mistake as the message this view was built to remove,
+    made by the panel underneath it.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    base = live_server[0]
+
+    at_load = await _evidence_text(new_page, base, scan_id, page_id, "")
+    assert "#at-load" in at_load
+    assert "#after-click" not in at_load
+    assert "in another page state" in at_load
+
+    revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
+    assert "#after-click" in revealed
+    # The load-state markup is usually still in the revealed document, but it
+    # is one finding: listing it again here presented one element per state.
+    assert "#at-load" not in revealed
+    assert "in another page state" in revealed
+
+
+async def test_a_load_only_issue_is_not_offered_once_per_state(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A shared header image flagged at load, on a page whose menus opened states.
+
+    Every revealed state still contains the image, and the picker used to
+    offer each of them with the same stored evidence, so one element read as
+    three. None of those states holds an occurrence of the issue.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, _ = _seed_two_state_issue(db_path, scan_id)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "DELETE FROM page_a11y_findings WHERE page_id = ? AND target_selector = ?",
+            (page_id, "#after-click"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
+
+    assert "#at-load" in text
+    assert "After clicking" not in text
+    assert "in another page state" not in text
+
+
+async def test_a_state_missing_its_element_is_labelled_at_the_picker(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The seeded state capture is an empty document, so its element is gone.
+
+    The finding stays listed; the picker says plainly that it is not here.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+
+    text = await _evidence_text(
+        new_page, live_server[0], scan_id, page_id, quote(state_key, safe="")
+    )
+
+    assert "#after-click" in text
+    assert "no longer here" in text.lower()
+
+
+async def test_a_state_holding_its_element_has_no_label(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE page_dom_states SET dom = ? WHERE page_id = ? AND state_key = ?",
+            (
+                gzip.compress(
+                    b'<!doctype html><html><body><a role="menuitem">#after-click</a></body></html>'
+                ),
+                page_id,
+                state_key,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    text = await _evidence_text(
+        new_page, live_server[0], scan_id, page_id, quote(state_key, safe="")
+    )
+
+    assert "A blue box with a yellow ring marks the flagged element" in text
+    assert "no longer here" not in text.lower()
+
+
+async def test_the_open_list_marks_a_missing_state_while_viewing_another(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Every offered state is checked, not only the one on screen."""
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    url = (
+        f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+        "?issue=axe:aria-required-parent&state="
+    )
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(url, wait_until="domcontentloaded")
+        picker = page.get_by_role("combobox", name="Page state")
+        await picker.click()
+        option = page.locator(f'[role="option"][data-value="{state_key}"]')
+        # The state's capture is fetched and checked in the background. The
+        # name is what a screen reader hears: sentence case, not the chip's
+        # uppercase styling, and separated from the state's own name.
+        await playwright_async.expect(option).to_have_accessible_name(
+            re.compile(r"^No longer here, After clicking"), timeout=10000
+        )
+    finally:
+        await page.context.close()
+
+
+def _seed_revealed_only_issue(db_path: Path, scan_id: int) -> tuple[int, str, str]:
+    """One rule found only after clicks, in two states.
+
+    The first state's capture no longer holds its element (the site
+    re-rendered); the second state's does. Nothing is found at page load.
+    """
+    gone, kept = "https://x.test/|#menu|Profile", "https://x.test/|#help|Help"
+    conn = connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        page = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        for key, label, dom in (
+            (gone, "Profile", b"<!doctype html><html><body></body></html>"),
+            (
+                kept,
+                "Help",
+                b'<!doctype html><html><body><a role="menuitem">#in-help</a></body></html>',
+            ),
+        ):
+            conn.execute(
+                "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+                "path_labels, encoding, dom) VALUES (?, ?, ?, ?, ?, 'gzip', ?)",
+                (page["id"], scan_id, key, label, f'["{label}"]', gzip.compress(dom)),
+            )
+        for target, label, key in (("#in-profile", "Profile", gone), ("#in-help", "Help", kept)):
+            conn.execute(
+                "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, "
+                "wcag_level, impact, help, target_selector, failure_summary, "
+                "html_snippet, target_hash, revealed_by, revealed_state_key) "
+                "VALUES (?, ?, 'aria-required-parent', '1.3.1', 'A', 'serious', "
+                "'Certain ARIA roles must be contained by particular parents', ?, "
+                "'bad parent', ?, ?, ?, ?)",
+                (
+                    page["id"],
+                    scan_id,
+                    target,
+                    '<a role="menuitem">' + target + "</a>",
+                    "hash" + target,
+                    label,
+                    key,
+                ),
+            )
+        conn.commit()
+        return int(page["id"]), gone, kept
+    finally:
+        conn.close()
+
+
+async def test_an_issue_found_only_after_clicks_opens_where_it_can_be_seen(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """No ?state=: open on the first state whose capture holds the element.
+
+    Landing on the page as it loaded showed a document that cannot contain
+    the defect, with a highlight that never finished. The first state here
+    has lost its element, so the inspector passes over it to the one that
+    has it, and says plainly that the issue is not in the page-load option.
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, _, kept = _seed_revealed_only_issue(db_path, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+            "?issue=axe:aria-required-parent",
+            wait_until="domcontentloaded",
+        )
+        picker = page.get_by_role("combobox", name="Page state")
+        await playwright_async.expect(picker).to_have_attribute("data-value", kept, timeout=10000)
+        await playwright_async.expect(
+            page.get_by_text("A blue box with a yellow ring marks the flagged element")
+        ).to_be_visible()
+        await picker.click()
+        load = page.locator('[role="option"][data-value=""]')
+        await playwright_async.expect(load).to_have_accessible_name(
+            re.compile(r"^Issue not here, At page load")
+        )
+    finally:
+        await page.context.close()
+
+
+async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, _, scan_id = seeded_db
+    page_id, _, _ = _seed_revealed_only_issue(db_path, scan_id)
+    text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
+    assert "Highlighting" not in text
+    assert "in another page state" in text
+
+
+async def test_occurrences_in_other_page_states_are_counted_under_the_one_picker(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The picker shows one page state; a sentence under it counts the others.
+
+    Occurrences revealed by a click were out of sight until the reviewer
+    opened the Page state list, so nothing said the page held more. A
+    sentence counts them and points to the picker, which lists those states
+    with their counts. It is the picker's description. There is no second
+    control for the same choice (the pill links it replaced).
+    """
+    db_path, _, scan_id = seeded_db
+    page_id, state_key = _seed_two_state_issue(db_path, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{live_server[0]}/app/scans/{scan_id}/pages/{page_id}/inspect"
+            "?issue=axe:aria-required-parent&state=",
+            wait_until="domcontentloaded",
+        )
+        from_load = (
+            "1 more occurrence appears only after clicking a control, in 1 page state. "
+            "Choose it in the Page state list."
+        )
+        await playwright_async.expect(page.get_by_text(from_load, exact=True)).to_be_visible(
+            timeout=15000
+        )
+        picker = page.get_by_role("combobox", name="Page state")
+        await playwright_async.expect(picker).to_have_accessible_description(
+            re.compile(re.escape(from_load))
+        )
+        await playwright_async.expect(
+            page.get_by_role("navigation", name="Other page states with occurrences")
+        ).to_have_count(0)
+
+        await picker.click()
+        await page.locator(f'[role="option"][data-value="{state_key}"]').click()
+        await playwright_async.expect(picker).to_have_attribute("data-value", state_key)
+        # From the revealed state, the other one is page load.
+        from_state = "1 more occurrence is in another page state. Choose it in the Page state list."
+        await playwright_async.expect(page.get_by_text(from_state, exact=True)).to_be_visible()
+        await playwright_async.expect(picker).to_have_accessible_description(
+            re.compile(re.escape(from_state))
+        )
+    finally:
+        await page.context.close()

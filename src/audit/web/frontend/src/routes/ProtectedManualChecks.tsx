@@ -1,9 +1,10 @@
 import { useEffect, useId, useState } from "react";
+import { serverDate } from "../lib/serverTime";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardCheck, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/client";
-import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { Button, Card, LinkButton, PageHeader, Select } from "../components/ui";
 import {
   protectedMutationKey,
   protectedQueryKey,
@@ -58,14 +59,14 @@ export default function ProtectedManualChecksRoute() {
   if (!validId) {
     return (
       <Card className="border-sev-critical/40 bg-sev-critical-bg p-4 text-sm text-sev-critical" role="alert">
-        This protected scan identifier is invalid.
+        This sign-in scan number is not valid. Check the address, or open the report from Reports.
       </Card>
     );
   }
   if (protectedIdentity.isChecking) {
     return (
       <p className="text-sm text-fg-muted" aria-live="polite">
-        Checking protected-report access…
+        Checking that you can open this sign-in scan…
       </p>
     );
   }
@@ -77,7 +78,7 @@ export default function ProtectedManualChecksRoute() {
       >
         {protectedIdentity.error instanceof Error
           ? protectedIdentity.error.message
-          : "Protected-report access is unavailable."}
+          : "Axcess could not confirm your access to sign-in scans. Try again, or ask your administrator."}
       </Card>
     );
   }
@@ -87,7 +88,7 @@ export default function ProtectedManualChecksRoute() {
     manualChecks.isLoading ||
     manualChecks.isFetching
   ) {
-    return <p className="text-sm text-fg-muted" aria-live="polite">Loading protected manual checks…</p>;
+    return <p className="text-sm text-fg-muted" aria-live="polite">Loading manual checks…</p>;
   }
   if (protectedScan.error || manualChecks.error || !protectedScan.data || !manualChecks.data) {
     const error = protectedScan.error ?? manualChecks.error;
@@ -95,7 +96,7 @@ export default function ProtectedManualChecksRoute() {
       <Card className="border-sev-critical/40 bg-sev-critical-bg p-4 text-sm text-sev-critical" role="alert">
         {error instanceof Error
           ? error.message
-          : "Protected manual checks are unavailable. Confirm that you have protected-report access."}
+          : "Axcess could not load the manual checks. Check that you have access to sign-in scans."}
       </Card>
     );
   }
@@ -114,14 +115,14 @@ export default function ProtectedManualChecksRoute() {
       <PageHeader
         crumbs={[
           { label: "Reports", to: "/scans" },
-          { label: `Protected scan #${id}`, to: `/scans/${id}/protected` },
-          { label: "Manual authentication review" },
+          { label: `Sign-in scan #${id}`, to: `/scans/${id}/protected` },
+          { label: "Manual checks" },
         ]}
-        title="Protected manual checks"
-        subtitle="Outcome-only WCAG review for an authorized protected report."
+        title="Manual checks for the sign-in scan"
+        subtitle="Record only a result, such as Pass or Fail, for each Web Content Accessibility Guidelines (WCAG) criterion."
         actions={
           <LinkButton to={`/scans/${id}/protected`} variant="secondary">
-            Protected report
+            Sign-in scan
           </LinkButton>
         }
       />
@@ -130,9 +131,9 @@ export default function ProtectedManualChecksRoute() {
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <div>
-            <h2 className="text-base font-semibold text-fg">Authentication accessibility requires a manual review</h2>
+            <h2 className="text-base font-semibold text-fg">Check the sign-in steps yourself</h2>
             <p className="mt-1 max-w-4xl text-sm text-fg-muted">
-              A companion can crawl after you complete 1FA or MFA, but that only confirms a temporary browser session. It does not automatically evaluate or pass WCAG 2.2 AA 3.3.8, Accessible Authentication (Minimum).
+              The helper app can scan after you sign in, with or without two-step sign-in (2FA). That only shows that a short-lived browser sign-in worked. It does not test or pass WCAG 3.3.8 Accessible Authentication (Minimum), Level AA, in WCAG 2.2.
             </p>
           </div>
         </div>
@@ -142,9 +143,9 @@ export default function ProtectedManualChecksRoute() {
         <div className="flex items-start gap-3">
           <LockKeyhole className="mt-0.5 h-5 w-5 shrink-0 text-sev-major" aria-hidden />
           <div>
-            <h2 className="text-base font-semibold text-fg">No protected evidence is entered here</h2>
+            <h2 className="text-base font-semibold text-fg">Do not enter private details here</h2>
             <p className="mt-1 max-w-4xl text-sm text-fg-muted">
-              This form records only a fixed outcome. Do not enter passwords, OTPs, passkeys, recovery codes, cookies, URLs, user information, screenshots, selectors, or detailed notes. This v1 workflow does not accept attachments; use the separately approved U-M evidence process when one is required.
+              This form saves only a result from a fixed list. Do not enter passwords, one-time codes (OTPs), passkeys, recovery codes, or cookies. Do not enter URLs, user information, screenshots, element locators (CSS selectors), or detailed notes. This version does not accept attachments. If you need to keep evidence, use the separately approved University of Michigan (U-M) evidence process.
             </p>
           </div>
         </div>
@@ -154,9 +155,9 @@ export default function ProtectedManualChecksRoute() {
         <div className="mb-3 flex items-start gap-2">
           <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <div>
-            <h2 id="protected-checks-heading" className="text-base font-semibold text-fg">WCAG 2.2 A/AA outcome matrix</h2>
+            <h2 id="protected-checks-heading" className="text-base font-semibold text-fg">Results for WCAG 2.2, Level A and AA</h2>
             <p className="mt-1 text-sm text-fg-muted">
-              “Not tested” and “Needs follow-up” are honest results. Use “Pass” only after the applicable manual review.
+              “Not tested” and “Needs follow-up” are honest results. Choose “Pass” only after you do the manual review for that criterion.
             </p>
           </div>
         </div>
@@ -173,7 +174,7 @@ export default function ProtectedManualChecksRoute() {
       </section>
 
       <p className="mt-5 text-xs text-fg-muted">
-        Need to re-authenticate or inspect protected-scan retention state? Return to the <Link to={`/scans/${id}/protected`} className="text-umich-blue underline underline-offset-2">protected report</Link>.
+        To sign in again, or to see how long results are kept, go back to the <Link to={`/scans/${id}/protected`} className="text-umich-blue underline underline-offset-2">sign-in scan</Link>.
       </p>
     </>
   );
@@ -211,7 +212,7 @@ function ProtectedManualCheckCard({
     gcTime: 0,
     onSuccess: () => {
       setError(null);
-      setMessage(`${check.criterion.sc} saved as ${OUTCOME_LABELS[outcome]}.`);
+      setMessage(`WCAG ${check.criterion.sc} saved as ${OUTCOME_LABELS[outcome]}.`);
       void queryClient.invalidateQueries({
         queryKey: protectedQueryKey(
           "manual-checks",
@@ -235,7 +236,7 @@ function ProtectedManualCheckCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 id={`${selectId}-heading`} className="font-semibold text-fg">
-            {check.criterion.sc} · {check.criterion.name}
+            WCAG {check.criterion.sc} {check.criterion.name}
           </h3>
           <p className="mt-1 max-w-4xl text-sm text-fg-muted">{check.criterion.manual_check}</p>
         </div>
@@ -246,7 +247,7 @@ function ProtectedManualCheckCard({
 
       {isAuthenticationCheck && (
         <p className="mt-3 rounded-xs border border-umich-blue/30 bg-umich-blue/5 p-3 text-sm text-fg">
-          This criterion is not evaluated by completing MFA for the crawl. Manually review every in-scope authentication step and its accessible alternatives before choosing an outcome.
+          Signing in with two-step sign-in (2FA) for the scan does not test this criterion. Before you choose a result, review each sign-in step in scope yourself. Also review its accessible alternatives.
         </p>
       )}
 
@@ -259,33 +260,32 @@ function ProtectedManualCheckCard({
           save.mutate();
         }}
       >
-        <label className="min-w-52 flex-1" htmlFor={selectId}>
-          <span className="mb-1 block text-sm font-semibold text-fg">Outcome</span>
-          <select
-            id={selectId}
-            value={outcome}
-            onChange={(event) => setOutcome(event.target.value as ManualOutcome)}
-            aria-describedby={statusId}
-            className="field"
-          >
-            {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
+        <Select
+          stacked
+          className="min-w-52 flex-1"
+          id={selectId}
+          label="Result"
+          value={outcome}
+          onChange={(next) => setOutcome(next as ManualOutcome)}
+          aria-describedby={statusId}
+          options={Object.entries(OUTCOME_LABELS).map(([value, label]) => ({
+            value,
+            label,
+          }))}
+        />
         <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? "Saving…" : "Save outcome"}
+          {save.isPending ? "Saving…" : "Save result"}
         </Button>
       </form>
 
       <div id={statusId} className="mt-3 text-sm" aria-live="polite">
         {error ? (
-          <p className="text-sev-critical" role="alert">Couldn’t save this outcome: {error}</p>
+          <p className="text-sev-critical" role="alert">Could not save this result: {error}</p>
         ) : message ? (
           <p className="text-fg-muted">{message}</p>
         ) : (
           <p className="text-fg-muted">
-            {check.tested_at ? `Last recorded ${displayTime(check.tested_at)}.` : "No outcome has been recorded."}
+            {check.tested_at ? `Last saved ${displayTime(check.tested_at)}.` : "No result saved yet."}
           </p>
         )}
       </div>
@@ -294,6 +294,6 @@ function ProtectedManualCheckCard({
 }
 
 function displayTime(value: string): string {
-  const date = new Date(value);
+  const date = serverDate(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }

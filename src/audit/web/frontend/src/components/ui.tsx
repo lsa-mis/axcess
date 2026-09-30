@@ -1,9 +1,11 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { createElement, forwardRef, useState } from "react";
-import { ChevronDown, ChevronRight, ScanEye } from "lucide-react";
+import { parseServerTime } from "../lib/serverTime";
+import { createElement, forwardRef, useEffect, useId, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
+import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
@@ -14,8 +16,31 @@ export function SeverityChip({ value }: { value: Severity }) {
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium uppercase tracking-wide text-fg-muted">
-      {value.replace(/_/g, " ")}
+    <span
+      title={STATUS_HELP[value]}
+      className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted"
+    >
+      {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/**
+ * A report's number as a small tinted tag, "Report #6", the form
+ * docs/plain-language.md uses for a numbered report. The word says what is
+ * numbered; a bare "#6" did not. The tint is translucent so the tag still
+ * shows on a hovered row or link; the transparent border draws in forced
+ * colors.
+ */
+export function ScanTag({ id, className }: { id: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center whitespace-nowrap rounded-2xs border border-transparent bg-fg/[0.08] px-1.5 font-sans text-2xs font-semibold tabular-nums",
+        className,
+      )}
+    >
+      Report #{id}
     </span>
   );
 }
@@ -29,8 +54,13 @@ export function Card({
   children: ReactNode;
   className?: string;
 } & React.HTMLAttributes<HTMLDivElement>) {
+  // `data-card` lets a part that fills the card's edge (a table's bar, its
+  // scrolling rows) round its own corners to match (see CARD_EDGE in
+  // table/Table.tsx). The card does not clip its content to its corners: that
+  // would also cut off the focus ring of anything at its edge (SC 2.4.7).
   return (
     <div
+      data-card=""
       className={cn(
         "rounded-xs border border-border bg-surface shadow-card",
         className,
@@ -42,7 +72,12 @@ export function Card({
   );
 }
 
-/** Compact metric surface with strong numeric hierarchy. */
+/** Compact metric readout with strong numeric hierarchy.
+ *
+ * Deliberately chrome-free: no card fill, border, shadow or accent rule. Four
+ * of these sit in a row, so a box around each one draws four rectangles the
+ * reader has to look past to reach the numbers -- the chrome competes with the
+ * data it frames. Spacing and type hierarchy do the grouping instead. */
 export function StatCard({
   label,
   value,
@@ -55,13 +90,13 @@ export function StatCard({
   tone?: "default" | "critical" | "major" | "minor" | "info";
 }) {
   return (
-    <Card className="relative overflow-hidden p-5 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-umich-blue">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-subtle">
+    <div className="px-1 py-2">
+      <div className="text-xs font-semibold text-fg-subtle">
         {label}
       </div>
       <div
         className={cn(
-          "mt-2 text-[2rem] font-semibold leading-none tracking-tight tabular-nums",
+          "mt-2 text-[2rem] font-semibold leading-none tracking-tight",
           tone === "critical" && "text-sev-critical",
           tone === "major" && "text-sev-major",
           tone === "minor" && "text-sev-minor",
@@ -72,7 +107,7 @@ export function StatCard({
         {value}
       </div>
       {hint && <div className="mt-2 text-xs text-fg-muted">{hint}</div>}
-    </Card>
+    </div>
   );
 }
 
@@ -273,6 +308,7 @@ export function LinkButton({
 }: LinkButtonProps) {
   return (
     <Link
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -314,6 +350,7 @@ export function DownloadLink({
 }: DownloadLinkProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -360,6 +397,7 @@ export function ExternalLinkButton({
 }: ExternalLinkButtonProps) {
   return (
     <a
+      data-button
       className={cn(
         BUTTON_BASE,
         SIZE_CLASSES[size],
@@ -398,7 +436,10 @@ export function Disclosure({
   title,
   headingLevel = 2,
   defaultOpen = false,
+  open: controlledOpen,
+  onOpenChange,
   icon,
+  meta,
   className,
   children,
 }: {
@@ -406,38 +447,74 @@ export function Disclosure({
   title: string;
   headingLevel?: 2 | 3;
   defaultOpen?: boolean;
+  /**
+   * Controlled mode, for a parent that must open the panel itself (a form
+   * whose error alert links to a field inside it). Omit both to let the
+   * disclosure keep its own state.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   icon?: ReactNode;
+  /**
+   * A short status shown at the right end of the header row ("3 of 4 on").
+   * It sits beside the button, not inside it, so the button's accessible
+   * name stays the title alone; give it its own text for a screen reader.
+   */
+  meta?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (update: (value: boolean) => boolean) => {
+    const next = update(open);
+    if (controlledOpen === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const buttonId = `${id}-button`;
   const panelId = `${id}-panel`;
-  const Caret = open ? ChevronDown : ChevronRight;
 
   return (
     <div className={cn("rounded-xs border border-border bg-surface", className)}>
+      {/* The header's fill takes the box's own corners (inherit), so it
+          follows them whatever they are: rounded on its own, square as a
+          middle row of a stack (ReportNote), rounded on one side as a
+          stack's first or last row. All four while closed; only the top two
+          while open, where it meets the content under it. */}
+      <div
+        className={cn(
+          "flex items-center",
+          open ? "rounded-t-[inherit] bg-surface-muted" : "rounded-[inherit] hover:bg-surface-muted/60",
+        )}
+      >
       {createElement(
         `h${headingLevel}`,
-        { className: "m-0" },
+        { className: "m-0 min-w-0 flex-1" },
         <button
           type="button"
           id={buttonId}
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
-          className={cn(
-            "flex min-h-target w-full items-center gap-2 rounded-xs px-4 py-3 text-left text-sm font-semibold text-fg",
-            open ? "bg-surface-muted" : "hover:bg-surface-muted/60",
-          )}
+          className="flex min-h-target w-full items-center gap-2 rounded-xs px-4 py-3 text-left text-sm font-semibold text-fg"
         >
-          <Caret className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+          {/* One caret, rotated when open: the turn is the only motion and
+              the state is also in aria-expanded and the panel itself. */}
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 shrink-0 text-fg-subtle transition-transform duration-200 motion-reduce:transition-none",
+              open && "rotate-90",
+            )}
+            aria-hidden
+          />
           {icon}
           {/* The title must be this button's only text node: the UI tests
               address it both by exact text and by accessible name. */}
           <span>{title}</span>
         </button>,
       )}
+      {meta && <div className="shrink-0 pr-4 text-xs font-semibold text-fg-subtle">{meta}</div>}
+      </div>
       <div
         id={panelId}
         role="region"
@@ -455,8 +532,8 @@ export function Disclosure({
 export function AltTag({ value }: { value: string | null }) {
   if (value === null) {
     return (
-      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sev-critical">
-        missing
+      <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
+        No alt text
       </span>
     );
   }
@@ -493,13 +570,13 @@ const SCAN_STATUS_CLASS: Record<ScanStatus, string> = {
 export function ScanStatusBadge({ value }: { value: ScanStatus }) {
   return (
     <span
-      aria-label={`Scan status: ${value}`}
+      aria-label={`Scan status: ${SCAN_STATUS_LABEL[value] ?? value}`}
       className={cn(
-        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide",
+        "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold",
         SCAN_STATUS_CLASS[value],
       )}
     >
-      {value}
+      {SCAN_STATUS_LABEL[value] ?? value}
     </span>
   );
 }
@@ -537,6 +614,7 @@ export function Checkbox({
   name,
   disabled = false,
   describedBy,
+  error,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -549,15 +627,28 @@ export function Checkbox({
   /**
    * Id of an element that explains the consequence of ticking this box,
    * for the authorization checkbox, the note describing what the visible
-   * browser does during sign-in. The `hint` prop is part of the label
-   * (and so of the accessible name); this is a description instead,
-   * which is the right relationship for a longer standing explanation.
+   * browser does during sign-in. Joined with the `hint`'s own id: both are
+   * descriptions, read on request, never part of the name.
    */
   describedBy?: string;
+  /** A problem with this choice, shown under the row and announced. */
+  error?: string;
 }) {
   const showWarning = tone === "warning" && checked;
+  // The hint used to sit inside the label and so inside the accessible
+  // name, which made every row's name a paragraph. It is a description now,
+  // the same relationship `describedBy` always had.
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
+  const description = [hint ? hintId : null, error ? errorId : null, describedBy]
+    .filter(Boolean)
+    .join(" ");
   return (
+    <div className="min-w-0">
     <label
+      htmlFor={inputId}
       className={cn(
         // Full-row hit target: SC 2.5.5 AAA (44×44).
         "group flex min-h-target items-start gap-3 rounded-xs border border-transparent px-2 py-2 text-sm",
@@ -571,10 +662,11 @@ export function Checkbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        id={id}
+        id={inputId}
         name={name}
         disabled={disabled}
-        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={description || undefined}
         // 22×22 visual control. Padding on the parent label provides the
         // 44×44 hit zone. Border-strong (#D1D5DB) gives ≥3:1 against the
         // surface for the unchecked state, SC 1.4.11.
@@ -592,10 +684,18 @@ export function Checkbox({
       <span className="flex flex-col gap-0.5 text-fg">
         <span className="leading-snug">{label}</span>
         {hint && (
-          <span className="text-xs leading-snug text-fg-muted">{hint}</span>
+          <span id={hintId} className="text-xs leading-snug text-fg-muted">
+            {hint}
+          </span>
         )}
       </span>
     </label>
+    {error && (
+      <p id={errorId} role="alert" className="ml-[42px] mt-0.5 text-xs font-semibold text-sev-major">
+        {error}
+      </p>
+    )}
+    </div>
   );
 }
 
@@ -607,7 +707,7 @@ export function Checkbox({
  *   • Primary affordance: page title (or URL when title is missing) is the
  *     link, and it opens the IN-APP page/DOM inspector, it no longer sends
  *     the reviewer to the live site in a new tab. The inspector re-renders
- *     the page and (when ``selector``/``issue`` is supplied) circles the
+ *     the page and (when ``selector``/``issue`` is supplied) outlines the
  *     flagged element, and it shows the loaded DOM.
  *   • Secondary affordances (small, muted): "open live page ↗" for the rare
  *     case the reviewer wants the real site, and "stored evidence" for the
@@ -618,6 +718,375 @@ export function Checkbox({
  * Centralizing this is what makes the link-sweep durable, every route that
  * shows a page URL uses <PageLink> and inherits the contract.
  */
+/** One option in a {@link Select}. */
+export type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  /**
+   * Shown before the label, in the list and in the closed box while chosen,
+   * such as a status chip. It is read as part of the option's name, so its
+   * meaning must be in its words, never in its color alone.
+   */
+  badge?: ReactNode;
+};
+
+/** How long a pause ends a type-to-find run, matching platform selects. */
+const TYPEAHEAD_RESET_MS = 500;
+
+/**
+ * The app's dropdown for choosing a value.
+ *
+ * Built as the WAI-ARIA APG *select-only combobox*, drawn like the Export
+ * panel so every dropdown in the app reads as one family.
+ *
+ * This replaced a native `<select>`. The native control was kept for as long
+ * as it could be, because the platform gets keyboard, typeahead, and focus
+ * right for free and custom listboxes are a routine source of the defects
+ * this tool exists to find. It could not stay: its open list is drawn by the
+ * OS, so it can neither match Export nor carry a status chip on an option
+ * (the inspector marks page states whose element is gone). Everything the
+ * native control did is therefore owned here and pinned by browser tests:
+ *
+ * - Focus never leaves the trigger; the highlighted option is conveyed with
+ *   `aria-activedescendant`, and the trigger's text is the chosen value.
+ * - Closed: Down, Up, Enter, and Space open the list on the chosen option;
+ *   Home and End open it on the first or last; typing opens it on a match.
+ * - Open: Up and Down move, Home, End, Page Up, and Page Down jump, Enter and
+ *   Space choose, Escape closes without choosing, and Tab chooses the
+ *   highlighted option and moves on, as the APG pattern specifies. Typing
+ *   jumps to the next option starting with what was typed.
+ * - Pointer: clicking an option chooses it; clicking away or focus leaving
+ *   the trigger closes the list.
+ *
+ * `label` is always rendered and always associated. Pass `hideLabel` for a
+ * control whose meaning is already obvious from its surroundings; the name
+ * stays available to a screen reader rather than being dropped.
+ *
+ * `stacked` puts the label above rather than beside it, for a filter bar of
+ * several controls where inline captions would eat the width the values need.
+ *
+ * `hint` sits between the label and the control and is wired to
+ * `aria-describedby`, so the explanation a sighted user reads before choosing
+ * is announced to everyone else as part of the same control.
+ *
+ * `data-value` on the trigger and on each option carries the raw value, so
+ * tests and tooling can pick an option without depending on its wording.
+ */
+export function Select({
+  label,
+  hideLabel = false,
+  stacked = false,
+  hint,
+  value,
+  onChange,
+  options,
+  id,
+  className,
+  disabled = false,
+  "aria-describedby": extraDescribedBy,
+}: {
+  label: string;
+  hideLabel?: boolean;
+  stacked?: boolean;
+  hint?: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  id?: string;
+  className?: string;
+  disabled?: boolean;
+  "aria-describedby"?: string;
+}) {
+  const generated = useId();
+  const triggerId = id ?? generated;
+  const hintId = `${triggerId}-hint`;
+  const listId = `${triggerId}-list`;
+  const labelId = `${triggerId}-label`;
+  const optionId = (index: number) => `${triggerId}-option-${index}`;
+  const describedBy = [hint ? hintId : null, extraDescribedBy].filter(Boolean).join(" ");
+
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const typeahead = useRef({ text: "", at: 0 });
+
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+  const enabled = (index: number) =>
+    index >= 0 && index < options.length && !options[index].disabled;
+  /** The nearest enabled option ``distance`` steps from ``from``, clamped. */
+  const move = (from: number, distance: number) => {
+    const direction = distance < 0 ? -1 : 1;
+    let target = from;
+    let remaining = Math.abs(distance);
+    for (let i = from + direction; i >= 0 && i < options.length && remaining > 0; i += direction) {
+      if (enabled(i)) {
+        target = i;
+        remaining -= 1;
+      }
+    }
+    return target;
+  };
+  const first = () => move(-1, 1);
+  const last = () => move(options.length, -1);
+
+  const openAt = (index: number) => {
+    setActive(enabled(index) ? index : first());
+    setOpen(true);
+  };
+  const choose = (index: number) => {
+    setOpen(false);
+    if (enabled(index) && options[index].value !== value) onChange(options[index].value);
+  };
+
+  /** The next option whose label starts with what has been typed. */
+  const findTyped = (key: string, from: number) => {
+    const now = Date.now();
+    const run = typeahead.current;
+    run.text = now - run.at > TYPEAHEAD_RESET_MS ? key : run.text + key;
+    run.at = now;
+    // Repeating one letter cycles through the options that start with it.
+    const repeated = [...run.text].every((char) => char === run.text[0]);
+    const needle = (repeated ? run.text[0] : run.text).toLowerCase();
+    const start = repeated || run.text.length === 1 ? from + 1 : from;
+    for (let offset = 0; offset < options.length; offset += 1) {
+      const index = (start + offset + options.length) % options.length;
+      if (enabled(index) && options[index].label.toLowerCase().startsWith(needle)) return index;
+    }
+    return -1;
+  };
+
+  useEffect(() => {
+    if (!open || active < 0) return;
+    document.getElementById(`${triggerId}-option-${active}`)?.scrollIntoView({ block: "nearest" });
+  }, [open, active, triggerId]);
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const { key } = event;
+    const printable = key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+    // Any other key ends a type-to-find run, so "n", Home, "i" finds "i".
+    if (!printable && !["Shift", "Control", "Alt", "Meta"].includes(key)) {
+      typeahead.current = { text: "", at: 0 };
+    }
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(key)) {
+        event.preventDefault();
+        openAt(selectedIndex);
+      } else if (key === "Home") {
+        event.preventDefault();
+        openAt(first());
+      } else if (key === "End") {
+        event.preventDefault();
+        openAt(last());
+      } else if (printable) {
+        const match = findTyped(key, selectedIndex);
+        if (match >= 0) openAt(match);
+      }
+      return;
+    }
+    // A space inside a type-to-find run is part of the text, not a choice.
+    const typing = Date.now() - typeahead.current.at <= TYPEAHEAD_RESET_MS;
+    if (key === "ArrowDown") {
+      event.preventDefault();
+      setActive(move(active, 1));
+    } else if (key === "ArrowUp") {
+      event.preventDefault();
+      if (event.altKey) choose(active);
+      else setActive(move(active, -1));
+    } else if (key === "Home") {
+      event.preventDefault();
+      setActive(first());
+    } else if (key === "End") {
+      event.preventDefault();
+      setActive(last());
+    } else if (key === "PageDown") {
+      event.preventDefault();
+      setActive(move(active, 10));
+    } else if (key === "PageUp") {
+      event.preventDefault();
+      setActive(move(active, -10));
+    } else if (key === "Enter" || (key === " " && !typing)) {
+      event.preventDefault();
+      choose(active);
+    } else if (key === "Escape") {
+      // Handled here, so a page-level Escape handler does not also fire.
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    } else if (key === "Tab") {
+      choose(active);
+    } else if (printable) {
+      const match = findTyped(key, active);
+      if (match >= 0) setActive(match);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "min-w-0",
+        stacked ? "flex flex-col gap-1" : "inline-flex items-center gap-2",
+        className,
+      )}
+    >
+      <label
+        id={labelId}
+        htmlFor={triggerId}
+        className={cn(
+          "shrink-0 font-semibold text-fg",
+          stacked ? "text-xs text-fg-subtle" : "text-sm",
+          hideLabel && "sr-only",
+        )}
+      >
+        {label}
+      </label>
+      {hint && (
+        <p id={hintId} className="text-xs text-fg-muted">
+          {hint}
+        </p>
+      )}
+      <div className="relative min-w-0">
+        <button
+          id={triggerId}
+          type="button"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
+          aria-describedby={describedBy || undefined}
+          data-value={value}
+          disabled={disabled}
+          onClick={() => (open ? setOpen(false) : openAt(selectedIndex))}
+          onKeyDown={onKeyDown}
+          // Clicks in the list keep focus here (see its onMouseDown), so a
+          // blur means focus really went elsewhere.
+          onBlur={() => setOpen(false)}
+          className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2.5 pl-3 pr-9 text-left text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {/* Every option is laid out invisibly in the same cell, so the box
+              is as wide as its longest option, as a native select is, and
+              does not change width with each choice. */}
+          <span className="grid">
+            {options.map((option) => (
+              <span
+                key={option.value}
+                aria-hidden
+                className="invisible col-start-1 row-start-1 flex items-center gap-2 whitespace-nowrap"
+              >
+                {option.badge}
+                {option.label}
+              </span>
+            ))}
+            <span className="col-start-1 row-start-1 flex min-w-0 items-center gap-2">
+              {selected?.badge}
+              <span className="truncate">{selected?.label ?? ""}</span>
+            </span>
+          </span>
+        </button>
+        <ChevronDown
+          className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted"
+          aria-hidden
+        />
+        {/* The Export panel's surface. Not focusable: focus stays on the
+            trigger, and mousedown is cancelled so clicking an option or the
+            scrollbar does not blur it. */}
+        <ul
+          id={listId}
+          role="listbox"
+          aria-labelledby={labelId}
+          hidden={!open}
+          onMouseDown={(event) => event.preventDefault()}
+          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface p-1.5 shadow-raised"
+        >
+          {options.map((option, index) => (
+            // Keyboard selection lives on the trigger, which keeps focus and
+            // points here with aria-activedescendant; options are never focused.
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+            <li
+              key={option.value}
+              id={optionId(index)}
+              role="option"
+              aria-selected={index === selectedIndex}
+              aria-disabled={option.disabled || undefined}
+              data-value={option.value}
+              onClick={() => enabled(index) && choose(index)}
+              onMouseMove={() => enabled(index) && index !== active && setActive(index)}
+              className={cn(
+                "flex min-h-target cursor-pointer items-center gap-2 rounded-2xs px-3 py-2 text-sm text-fg",
+                index === active && "bg-surface-muted outline outline-2 -outline-offset-2 outline-umich-blue",
+                index === selectedIndex && "font-semibold",
+                option.disabled && "cursor-not-allowed opacity-60",
+              )}
+            >
+              <Check
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  index === selectedIndex ? "text-umich-blue" : "invisible",
+                )}
+                aria-hidden
+              />
+              {option.badge}
+              <span>{option.label}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Add the "you came from here" pair to an in-app path.
+ *
+ * ``origin``/``back`` are what the topbar breadcrumb turns into a parent crumb
+ * (see ReportCrumb), and that crumb is the only way back in the desktop app,
+ * which has no browser back button. Existing query and hash are preserved, and
+ * an off-app target is returned untouched: `back` is only honoured for
+ * absolute in-app paths, so there is nothing to gain by decorating one.
+ */
+export function withReturnTrail(to: string, origin?: string, backTo?: string): string {
+  if (!origin || !backTo || !to.startsWith("/") || to.startsWith("//")) return to;
+  const [beforeHash, ...hashParts] = to.split("#");
+  const hash = hashParts.length ? `#${hashParts.join("#")}` : "";
+  const [path, query = ""] = beforeHash.split("?");
+  const params = new URLSearchParams(query);
+  params.set("origin", origin);
+  params.set("back", backTo);
+  return `${path}?${params.toString()}${hash}`;
+}
+
+/**
+ * Path to a page's stored evidence, carrying the view it was opened from.
+ *
+ * ``origin``/``back`` are what the topbar breadcrumb reads to draw the parent
+ * crumb (see ReportCrumb). Without them the trail on Page evidence stops at
+ * ``Reports › site › Page evidence``, and in the desktop app — which has no
+ * browser back button — there is then no way back to Issues at all. So every
+ * link into stored evidence carries its origin, the same contract the
+ * inspector links already follow.
+ */
+export function pageEvidencePath({
+  scanId,
+  pageId,
+  origin,
+  backTo,
+  hash,
+}: {
+  scanId: number;
+  pageId: number;
+  origin?: string;
+  backTo?: string;
+  /** Fragment to append, e.g. ``"#finding-12"``; query comes first. */
+  hash?: string;
+}): string {
+  const params = new URLSearchParams();
+  if (origin) params.set("origin", origin);
+  if (backTo) params.set("back", backTo);
+  const qs = params.toString();
+  return `/scans/${scanId}/pages/${pageId}${qs ? `?${qs}` : ""}${hash ?? ""}`;
+}
+
 export function PageLink({
   pageId,
   scanId,
@@ -639,7 +1108,7 @@ export function PageLink({
   pageTitle?: string | null;
   /** Show the raw URL as a microcopy line below the title. */
   showUrlBelow?: boolean;
-  /** Target selector to circle on the inspected page (when known directly). */
+  /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;
@@ -681,9 +1150,12 @@ export function PageLink({
           to={inspectTo}
           className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
         >
-          <ScanEye className="h-3.5 w-3.5 shrink-0 self-center text-fg-subtle" aria-hidden />
+          {/* self-start, not self-center: the flex line is as tall as the wrapped
+              title, so centring drops the icon into the gap between lines on
+              any title that wraps. Top-aligned it stays beside the first line. */}
+          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
-          <span className="sr-only">, opens the in-app page inspector</span>
+          <span className="sr-only">, opens in the page inspector</span>
         </Link>
       ) : (
         // Without a scan scope there is no in-app inspector to link to; keep
@@ -713,7 +1185,7 @@ export function PageLink({
           rel="noopener noreferrer"
           className="underline underline-offset-2 hover:text-fg"
         >
-          open live page ↗
+          Open live page ↗
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
         {scanId != null && (
@@ -722,10 +1194,10 @@ export function PageLink({
               ·
             </span>
             <Link
-              to={`/scans/${scanId}/pages/${pageId}`}
+              to={pageEvidencePath({ scanId, pageId, origin, backTo })}
               className="underline underline-offset-2 hover:text-fg"
             >
-              stored evidence
+              Page details
             </Link>
           </>
         )}
@@ -746,20 +1218,21 @@ export function PageLink({
  * the exact moment; this helper only formats, it doesn't render.
  */
 export function relativeTime(iso: string | null): string {
-  if (!iso) return "n/a";
-  const ts = Date.parse(iso);
-  if (Number.isNaN(ts)) return "n/a";
+  if (!iso) return "Not recorded";
+  const ts = parseServerTime(iso);
+  if (Number.isNaN(ts)) return "Not recorded";
+  const ago = (count: number, unit: string) => `${count} ${unit}${count === 1 ? "" : "s"} ago`;
   const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return ago(seconds, "second");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return ago(minutes, "minute");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return ago(hours, "hour");
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return ago(days, "day");
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
+  if (months < 12) return ago(months, "month");
   const years = Math.floor(days / 365);
-  return `${years}y ago`;
+  return ago(years, "year");
 }

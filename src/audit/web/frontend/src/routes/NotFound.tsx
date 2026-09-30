@@ -8,10 +8,10 @@ export default function NotFoundRoute() {
       title="Page not found"
       message={
         <>
-          No route matches <code>{loc.pathname}</code>. Use the sidebar to
-          navigate, or go back to the{" "}
-          <Link to="/" className="font-semibold text-umich-blue">
-            dashboard
+          There is no page at <code>{loc.pathname}</code>. Check the address,
+          or choose a page from the menu. You can also go to the{" "}
+          <Link to="/scans" className="font-semibold text-umich-blue">
+            reports
           </Link>
           .
         </>

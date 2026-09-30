@@ -1,0 +1,4 @@
+# Export goldens are compared byte for byte (tests/unit/test_export_goldens.py),
+# and some hold a deliberate bare carriage return. Never convert their line
+# endings on checkout, whatever core.autocrlf says.
+tests/unit/golden/** -text

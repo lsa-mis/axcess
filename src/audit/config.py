@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     blob_dir: Path = Field(default=Path("data/blobs"))
     log_dir: Path = Field(default=Path("data/logs"))
 
+    # Log an API request that takes at least this many milliseconds.
+    # Nothing timed requests before, so a slow endpoint was indistinguishable
+    # from a fast one until somebody waited for it. High enough that a normal
+    # session logs nothing; set to 0 to time every request.
+    slow_request_ms: float = 1000.0
+
     # Crawler
     default_rps: float = 2.0
     request_timeout_s: float = 30.0

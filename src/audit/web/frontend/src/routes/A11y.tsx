@@ -9,15 +9,33 @@ import {
   LinkButton,
   PageHeader,
   PageLink,
+  pageEvidencePath,
+  Select,
   StatCard,
 } from "../components/ui";
+import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11ySCGroup,
   AxeImpact,
   FindingStatus,
   Severity,
 } from "../api/types";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  Table,
+  TableBar,
+  TableEmpty,
+  TableHead,
+  TableRegion,
+  TableStatus,
+} from "../components/table/Table";
+import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
+import { useScanQuery } from "../hooks/useScanQuery";
+import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -58,11 +76,7 @@ export default function A11yRoute() {
     STATUS_OPTIONS.includes(rawStatus as FindingStatus) ? rawStatus : ""
   ) as FindingStatus | "";
 
-  const { data: scan, error: scanError } = useQuery({
-    queryKey: ["scan", id],
-    queryFn: () => api.getScan(id),
-    enabled: Number.isFinite(id),
-  });
+  const { data: scan, error: scanError } = useScanQuery(id);
   const { data: rollup, isLoading: rollupLoading } = useQuery({
     queryKey: ["a11y-rollup", id],
     queryFn: () => api.getA11yRollup(id),
@@ -99,8 +113,8 @@ export default function A11yRoute() {
   return (
     <>
       <PageHeader
-        title="WCAG DOM-engine findings"
-        subtitle={scan.seed_url}
+        title="Rule check issues by WCAG criterion"
+        subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <>
             {/* Group-by-rule is the actionable cut (one rule, one fix
@@ -114,7 +128,7 @@ export default function A11yRoute() {
               <ChevronRight className="h-4 w-4" aria-hidden />
             </LinkButton>
             <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
-              Image-of-text findings
+              Images (image text check)
               <ChevronRight className="h-4 w-4" aria-hidden />
             </LinkButton>
           </>
@@ -125,23 +139,23 @@ export default function A11yRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
         <StatCard
-          label="Axe pages"
+          label="Pages checked (axe)"
           value={coverage.axe_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
         <StatCard
-          label="Alfa pages"
+          label="Pages checked (Alfa)"
           value={coverage.alfa_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
-        <StatCard label="Axe violations" value={coverage.axe_violations_total} />
-        <StatCard label="Alfa failed" value={coverage.alfa_failed_total} />
-        <StatCard label="Alfa review leads" value={coverage.alfa_cant_tell_total} />
+        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
+        <StatCard label="Needs review (Alfa)" value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
         <StatCard label="Level AA" value={rollup.by_level.AA} tone="major" />
         <StatCard label="Level AAA" value={rollup.by_level.AAA} tone="minor" />
         <StatCard
-          label="Best-practice"
+          label="Best practice"
           value={rollup.by_level.best_practice}
           tone="info"
         />
@@ -149,11 +163,11 @@ export default function A11yRoute() {
 
       {noDomPagesScanned ? (
         <EmptyState
-          title="No pages were evaluated by a DOM engine"
-          message="Start a new scan and select axe-core, Siteimprove Alfa, or both. Axe requires Axcess browser rendering; Alfa can also run when static-only crawl mode is selected."
+          title="No rule check ran in this scan"
+          message="Start a new scan and choose Rule check (axe), Rule check (Alfa), or both. The axe check needs Axcess to open pages in a browser. The Alfa check also works in static-only mode, where the scan reads page code without a browser."
           action={
             <LinkButton to="/scans/new" variant="primary">
-              New scan
+              Start a new scan
             </LinkButton>
           }
         />
@@ -170,8 +184,8 @@ export default function A11yRoute() {
         />
       ) : rollup.groups.length === 0 ? (
         <EmptyState
-          title="No retained WCAG DOM-engine findings"
-          message="The selected engine(s) returned no failed or expert-review outcomes. Manual review is still required before making a conformance claim."
+          title="The rule checks found no issues"
+          message="The rule checks you chose found nothing that failed or needs review. A person still needs to test the site by hand. Automated checks alone cannot show that a site meets WCAG."
         />
       ) : (
         <RollupView scanId={id} groups={rollup.groups} />
@@ -185,7 +199,7 @@ function ScopeBanner() {
     <Card
       className="mb-4 border-umich-blue/30 bg-umich-blue/5 p-4"
       role="note"
-      aria-label="What this view shows"
+      aria-label="What this page shows"
     >
       <div className="flex items-start gap-3">
         <Info
@@ -193,15 +207,17 @@ function ScopeBanner() {
           aria-hidden
         />
         <p className="text-sm text-fg">
-          <strong>What this view shows.</strong> Each finding retains its source:
-          <strong> axe-core</strong> or <strong> Siteimprove Alfa</strong>. Axe
-          evaluates deterministic browser rules. Alfa evaluates independent
-          <strong> ACT (Accessibility Conformance Testing) rules</strong> on its
-          own local browser capture. Each standardized ACT rule checks one
-          specific condition and can return pass, fail, or <code>cantTell</code>.
-          A failed rule is evidence about that condition, not proof that the whole
-          page or site fails WCAG. A <code>cantTell</code> result needs an expert
-          decision.
+          <strong>What this page shows.</strong> Each occurrence names the check
+          that found it: <strong>Rule check (axe)</strong> or{" "}
+          <strong>Rule check (Alfa)</strong>. Both test pages against fixed
+          rules. Alfa is a separate tool. It opens its own copy of each page in a
+          browser on this computer and uses standard test rules
+          (<strong>ACT, Accessibility Conformance Testing</strong>). Each rule
+          tests one thing, for example that an image has alt text. A rule can
+          pass, fail, or say it cannot tell (<code>cantTell</code>). A failed rule
+          shows a problem with that one thing. It does not prove that the whole
+          page or site fails the Web Content Accessibility Guidelines (WCAG).
+          When a rule cannot tell, a person needs to review it.
         </p>
       </div>
     </Card>
@@ -211,8 +227,8 @@ function ScopeBanner() {
 function RollupView({ scanId, groups }: { scanId: number; groups: A11ySCGroup[] }) {
   return (
     <div className="space-y-3">
-      <h2 className="text-base font-semibold uppercase tracking-wide text-fg-subtle">
-        Failures by WCAG success criterion
+      <h2 className="text-base font-semibold text-fg-subtle">
+        Issues by WCAG criterion
       </h2>
       {groups.map((g) => (
         <SCGroupCard key={g.wcag_sc ?? "best-practice"} scanId={scanId} group={g} />
@@ -235,10 +251,10 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
               to={`/scans/${scanId}/a11y?${linkParams}`}
               className="text-umich-blue underline underline-offset-2"
             >
-              SC {group.wcag_sc}
+              WCAG {group.wcag_sc}
             </Link>
           ) : (
-            <span>Best-practice (no SC)</span>
+            <span>Best practice (no WCAG criterion)</span>
           )}
           {group.wcag_level && (
             <span className="ml-2 text-sm font-normal text-fg-muted">
@@ -248,7 +264,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
         </h3>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          violation{group.violation_count !== 1 ? "s" : ""} on{" "}
+          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -262,11 +278,12 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <code className="font-mono text-sm text-fg">{r.rule_id}</code>
               <span className="rounded-full bg-surface px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-                {r.pipeline === "alfa" ? "Siteimprove Alfa" : r.pipeline === "axe" ? "axe-core" : r.pipeline}
+                {CHECK_LABEL[r.pipeline] ?? r.pipeline}
               </span>
               {r.impact && <ImpactChip value={r.impact} />}
               <span className="text-xs text-fg-muted">
-                {r.violation_count} ×, on {r.page_count} page
+                {r.violation_count} occurrence{r.violation_count !== 1 ? "s" : ""} on{" "}
+                {r.page_count} page
                 {r.page_count !== 1 ? "s" : ""}
               </span>
             </div>
@@ -278,8 +295,9 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                 rel="noopener noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
               >
-                {r.pipeline === "alfa" ? "Alfa rule docs" : "rule docs"}{" "}
+                {r.pipeline === "alfa" ? "About this rule (Alfa)" : "About this rule"}{" "}
                 <ExternalLink className="h-3 w-3" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
               </a>
             )}
           </li>
@@ -308,14 +326,33 @@ function DrillDownView({
   onStatusFilterChange: (value: FindingStatus | "") => void;
   statusCounts: Record<FindingStatus, number>;
 }) {
+  // A new SC or status filter starts the table over at page 1.
+  const paged = usePagedRows(drill, { resetKey: `${wcagSc}|${status}` });
+  // The option labels carry the count so the triager can see at a glance
+  // how many occurrences sit in each status before choosing.
+  const filters: FilterGroup[] = [
+    {
+      key: "status",
+      label: "Status",
+      value: status,
+      options: [
+        { value: "", label: "All" },
+        ...STATUS_OPTIONS.map((s) => ({
+          value: s,
+          label: STATUS_OPTION_LABEL[s],
+          count: statusCounts[s] ?? 0,
+        })),
+      ],
+    },
+  ];
   return (
     <>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">
-          SC {wcagSc}
+          {wcagSc ? `WCAG ${wcagSc}` : "Best practice (no WCAG criterion)"}
           {group && (
             <span className="ml-2 text-sm font-normal text-fg-muted">
-              · {group.violation_count} violation
+              · {group.violation_count} occurrence
               {group.violation_count !== 1 ? "s" : ""} on {group.page_count}{" "}
               page{group.page_count !== 1 ? "s" : ""}
               {group.wcag_level && ` · Level ${group.wcag_level}`}
@@ -326,157 +363,140 @@ function DrillDownView({
           to={`/scans/${scanId}/a11y`}
           className="text-sm text-umich-blue underline underline-offset-2"
         >
-          ← Back to all SCs
+          ← Back to all WCAG criteria
         </Link>
       </div>
 
-      {/* Status filter, auto-applies on change, URL-persistent. The
-          option labels carry the count so the triager can see at a
-          glance how many findings sit in each bucket before clicking. */}
-      <Card className="mb-3 p-3">
-        <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-fg-subtle">
-          Status filter
-          <select
-            value={status}
-            onChange={(e) =>
-              onStatusFilterChange(e.target.value as FindingStatus | "")
-            }
-            className="mt-1 min-h-target rounded-xs border border-border bg-surface px-2 py-2 text-base font-normal normal-case tracking-normal text-fg focus:border-umich-blue focus:outline-none"
-          >
-            <option value="">all statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s.replace(/_/g, " ")} ({statusCounts[s] ?? 0})
-              </option>
-            ))}
-          </select>
-        </label>
-      </Card>
-
-      {loading ? (
-        <div className="text-fg-muted">Loading…</div>
-      ) : drill.length === 0 ? (
-        <Card className="p-4 text-sm text-fg-muted">
-          No drill-down rows
-          {status && (
-            <>
-              {" "}
-              matching status <strong>{status}</strong>.{" "}
-              <button
-                type="button"
-                onClick={() => onStatusFilterChange("")}
-                className="text-umich-blue underline underline-offset-2"
-              >
-                Show all statuses
-              </button>
-            </>
-          )}
-          {!status && <> for this SC.</>}
-        </Card>
-      ) : (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
-            <caption className="sr-only">
-              DOM-engine findings for SC {wcagSc}, sorted by impact
-            </caption>
-            <thead className="bg-surface-muted text-2xs uppercase tracking-wide text-fg-subtle">
-              <tr>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Rule
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Source
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Impact
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Page
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Target selector
-                </th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {drill.map((f) => (
-                <tr key={f.id} className="align-top">
-                  <td className="px-3 py-2">
-                    <code className="font-mono text-xs text-fg">
-                      {f.rule_id}
-                    </code>
-                    {f.help && (
-                      <div className="mt-1 text-xs text-fg-muted">
-                        {f.help.length > 140
-                          ? `${f.help.slice(0, 140)}…`
-                          : f.help}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-fg-muted">
-                    {f.pipeline === "alfa" ? "Siteimprove Alfa" : f.pipeline === "axe" ? "axe-core" : f.pipeline}
-                    {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
-                      <span className="mt-1 block">Needs expert review</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {f.impact ? <ImpactChip value={f.impact} /> : (
-                      <span className="text-fg-subtle">n/a</span>
-                    )}
-                  </td>
-                  <td className="max-w-xs px-3 py-2">
-                    <PageLink
-                      pageId={f.page_id}
-                      scanId={scanId}
-                      pageUrl={f.page_url}
-                      pageTitle={f.page_title}
-                      selector={f.target_selector}
-                      snippet={f.html_snippet}
-                      origin="DOM-engine findings"
-                      context={f.rule_id}
-                      backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <code className="block break-all font-mono text-2xs text-fg">
-                      {(f.target_display || f.target_selector).length > 90
-                        ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
-                        : (f.target_display || f.target_selector)}
-                    </code>
-                    {f.html_snippet && (
-                      <details className="mt-1">
-                        <summary className="cursor-pointer text-2xs text-fg-subtle">
-                          show HTML
-                        </summary>
-                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
-                          {f.html_snippet}
-                        </pre>
-                      </details>
-                    )}
-                    <AlfaEvidenceNote evidence={f} />
-                    <Link className="report-link inline-flex min-h-target items-center text-xs" to={`/scans/${scanId}/pages/${f.page_id}#finding-${f.id}`}>Open stored finding evidence</Link>
-                    {f.failure_summary && (
-                      <div className="mt-1 text-2xs text-fg-muted">
-                        {f.failure_summary}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StatusCell
-                      scanId={scanId}
-                      findingId={f.id}
-                      current={f.status}
-                    />
-                  </td>
+      {/* Status filter, auto-applies on change, URL-persistent. The card
+          and its bar stay up when nothing matches, so the filter that
+          emptied the table is still there to undo. */}
+      <Card>
+        <TableBar
+          pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />}
+          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
+        >
+          <FilterMenu
+            groups={filters}
+            onChange={(_key, value) => onStatusFilterChange(value as FindingStatus | "")}
+            onReset={() => onStatusFilterChange("")}
+          />
+        </TableBar>
+        <TableStatus>
+          {loading
+            ? "Loading…"
+            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "occurrence" : "occurrences"}, most serious impact first.`}
+        </TableStatus>
+        {loading ? null : drill.length === 0 ? (
+          <TableEmpty>
+            No occurrences
+            {status && (
+              <>
+                {" "}
+                have the status <strong>{STATUS_LABEL[status]}</strong>.{" "}
+                {/* eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button */}
+                <button
+                  type="button"
+                  onClick={() => onStatusFilterChange("")}
+                  className="text-umich-blue underline underline-offset-2"
+                >
+                  Show all statuses
+                </button>
+              </>
+            )}
+            {!status && <> for this WCAG criterion.</>}
+          </TableEmpty>
+        ) : (
+          <TableRegion label="Rule check occurrences table" paged={paged}>
+            <Table
+              caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
+            >
+              <TableHead>
+                <tr>
+                  <ColumnHeader>Rule</ColumnHeader>
+                  <ColumnHeader>Check</ColumnHeader>
+                  <ColumnHeader>Impact</ColumnHeader>
+                  <ColumnHeader>Page</ColumnHeader>
+                  <ColumnHeader>Element locator (CSS selector)</ColumnHeader>
+                  <ColumnHeader>Status</ColumnHeader>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((f, index) => (
+                  <Row key={f.id} index={(paged.page - 1) * paged.pageSize + index}>
+                    <Cell>
+                      <code className="font-mono text-xs text-fg">
+                        {f.rule_id}
+                      </code>
+                      {f.help && (
+                        <div className="mt-1 text-xs text-fg-muted">
+                          {f.help.length > 140
+                            ? `${f.help.slice(0, 140)}…`
+                            : f.help}
+                        </div>
+                      )}
+                    </Cell>
+                    <Cell className="text-xs text-fg-muted">
+                      {CHECK_LABEL[f.pipeline] ?? f.pipeline}
+                      {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
+                        <span className="mt-1 block">Needs review</span>
+                      )}
+                    </Cell>
+                    <Cell>
+                      {f.impact ? <ImpactChip value={f.impact} /> : (
+                        <span className="text-fg-muted">Does not apply</span>
+                      )}
+                    </Cell>
+                    <Cell className="max-w-xs">
+                      <PageLink
+                        pageId={f.page_id}
+                        scanId={scanId}
+                        pageUrl={f.page_url}
+                        pageTitle={f.page_title}
+                        selector={f.target_selector}
+                        snippet={f.html_snippet}
+                        origin="Rule check issues by WCAG criterion"
+                        context={f.rule_id}
+                        backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
+                      />
+                    </Cell>
+                    <Cell>
+                      <code className="block break-all font-mono text-2xs text-fg">
+                        {(f.target_display || f.target_selector).length > 90
+                          ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
+                          : (f.target_display || f.target_selector)}
+                      </code>
+                      {f.html_snippet && (
+                        <details className="mt-1">
+                          <summary className="cursor-pointer text-2xs text-fg-muted">
+                            Show element code (HTML)
+                          </summary>
+                          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
+                            {f.html_snippet}
+                          </pre>
+                        </details>
+                      )}
+                      <AlfaEvidenceNote evidence={f} />
+                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
+                      {f.failure_summary && (
+                        <div className="mt-1 text-2xs text-fg-muted">
+                          {f.failure_summary}
+                        </div>
+                      )}
+                    </Cell>
+                    <Cell>
+                      <StatusCell
+                        scanId={scanId}
+                        findingId={f.id}
+                        current={f.status}
+                      />
+                    </Cell>
+                  </Row>
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
+        )}
+      </Card>
     </>
   );
 }
@@ -512,37 +532,32 @@ function StatusCell({
   });
   return (
     <div className="flex flex-col gap-1">
-      <label className="sr-only" htmlFor={`status-${findingId}`}>
-        Triage status for finding {findingId}
-      </label>
-      <select
+      <Select
+        hideLabel
         id={`status-${findingId}`}
+        label={`Status for occurrence ${findingId}`}
         value={current}
-        onChange={(e) => {
-          const next = e.target.value as FindingStatus;
-          const rationale = requestStatusRationale(next, `finding #${findingId}`);
-          if (rationale === null) {
-            e.currentTarget.value = current;
-            return;
-          }
-          mutation.mutate({ next, rationale });
+        onChange={(next) => {
+          const rationale = requestStatusRationale(
+            next as FindingStatus,
+            `occurrence #${findingId}`,
+          );
+          // Declining the rationale leaves the value where it was. The select
+          // is controlled, so React restores it on the next render without the
+          // manual reset the uncontrolled version needed.
+          if (rationale === null) return;
+          mutation.mutate({ next: next as FindingStatus, rationale });
         }}
         disabled={mutation.isPending}
-        className="min-h-target rounded-xs border border-border bg-surface px-2 py-1 text-sm text-fg focus:border-umich-blue focus:outline-none disabled:opacity-60"
-      >
-        {STATUS_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {s.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
+        options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_OPTION_LABEL[s] }))}
+      />
       {mutation.isError ? (
         <span className="text-2xs text-sev-critical" role="alert">
-          Save failed
+          Status not saved. Try again.
         </span>
       ) : mutation.isSuccess ? (
-        <span className="text-2xs text-fg-subtle" role="status">
-          Saved
+        <span className="text-2xs text-fg-muted" role="status">
+          Status saved
         </span>
       ) : null}
     </div>
@@ -566,7 +581,7 @@ function ImpactChip({ value }: { value: AxeImpact }) {
   )[value];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-white bg-sev-${tone}-bg`}
+      className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
     >
       {value === "critical" && (
         <AlertTriangle className="h-3 w-3" aria-hidden />

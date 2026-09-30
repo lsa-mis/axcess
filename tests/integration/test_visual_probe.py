@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.ollama_base import OllamaError
 from audit.analyzer.visual import VisualProbe
@@ -65,25 +66,22 @@ _HTML = """<!doctype html><html lang=en><head><meta charset=utf-8></head><body>
 </body></html>"""
 
 
-@pytest.fixture
-async def page():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
+# The browser is one per module (tests/integration/conftest.py), so a test
+# that takes ``page`` must run on the module's event loop; each still gets its
+# own context. The module carries a synchronous test, which a module-wide
+# asyncio mark would warn about, so the loop scope is set per test instead.
+@pytest_asyncio.fixture(loop_scope="module")
+async def page(browser):  # type: ignore[no-untyped-def]
+    ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
     try:
-        browser = await pw.chromium.launch(headless=True)
-        ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
-        try:
-            p = await ctx.new_page()
-            await p.set_content(_HTML)
-            yield p
-        finally:
-            await browser.close()
+        p = await ctx.new_page()
+        await p.set_content(_HTML)
+        yield p
     finally:
-        await pw.stop()
+        await ctx.close()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_reports_mismatch(page) -> None:  # type: ignore[no-untyped-def]
     provider = _FakeVision(
         {"mismatch": True, "reason": "submit before fields", "confidence": "high"}
@@ -99,7 +97,7 @@ async def test_reports_mismatch(page) -> None:  # type: ignore[no-untyped-def]
     assert f.to_repo_kwargs()["pipeline"] == "visual"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_no_finding_when_order_is_fine(page) -> None:  # type: ignore[no-untyped-def]
     provider = _FakeVision({"mismatch": False, "reason": "", "confidence": "high"})
     findings = await VisualProbe(provider=provider).run(page)  # type: ignore[arg-type]
@@ -107,7 +105,7 @@ async def test_no_finding_when_order_is_fine(page) -> None:  # type: ignore[no-u
     assert provider.calls == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_vlm_error_is_swallowed(page) -> None:  # type: ignore[no-untyped-def]
     provider = _FakeVision(OllamaError("daemon down"))
     findings = await VisualProbe(provider=provider).run(page)  # type: ignore[arg-type]
@@ -123,7 +121,7 @@ _MOTION_HTML = """<!doctype html><html lang=en><body>
 </body></html>"""
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_motion_flags_autoplay_and_marquee(page) -> None:  # type: ignore[no-untyped-def]
     await page.set_content(_MOTION_HTML)
     # provider=None: the deterministic 2.2.2 check still runs (no VLM needed).
@@ -170,7 +168,7 @@ async def test_runtime_media_uses_distinct_wcag_criteria() -> None:
     assert all("Runtime playback measurement:" in finding.failure_summary for finding in findings)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="module")
 async def test_motion_clean_page_no_findings(page) -> None:  # type: ignore[no-untyped-def]
     # The default fixture (_HTML) has no autoplay/marquee → no motion findings.
     findings = await VisualProbe(provider=None).run(page)

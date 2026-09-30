@@ -16,10 +16,11 @@ import gzip
 import hashlib
 import json
 import sqlite3
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any, Protocol
-from urllib.parse import urljoin, urlsplit
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
+from functools import wraps
+from typing import Any, Concatenate, ParamSpec, Protocol, TypeVar
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 import structlog
@@ -36,7 +37,12 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
-from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe, RevealedViolation
+from audit.analyzer.interaction import (
+    DEFAULT_BLOCKED_LABELS,
+    InteractionProbe,
+    RevealedViolation,
+    StateCapture,
+)
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
@@ -46,7 +52,7 @@ from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
-from audit.crawler import url_policy
+from audit.crawler import live_progress, url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
@@ -59,10 +65,18 @@ from audit.crawler.robots import RobotsChecker
 from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
+from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
+from audit.wcag_version import (
+    DEFAULT_WCAG_VERSION,
+    WCAG_VERSIONS,
+    WcagVersion,
+    is_wcag_version,
+    stored_wcag_version,
+)
 
 log = get_logger(__name__)
 
@@ -72,7 +86,7 @@ JOB_KIND = "fetch"
 class AlfaPageAnalyzer(Protocol):
     """Narrow per-page Alfa contract, including authenticated adapters."""
 
-    async def run(self, url: str, *, level: str) -> AlfaResult: ...
+    async def run(self, url: str, *, level: str, version: str) -> AlfaResult: ...
 
 
 @dataclass(frozen=True)
@@ -93,7 +107,9 @@ class CrawlConfig:
     # So scope always comes from ``seed_url``; only the entry point moves.
     # ``None`` means "start at the seed", which is every unauthenticated crawl.
     start_url: str | None = None
-    max_pages: int = 500
+    # ``None`` is no page limit: the crawl ends when it runs out of in-scope
+    # pages within ``max_depth`` (New scan's "Scan every page it finds").
+    max_pages: int | None = 500
     max_depth: int = 10
     allow_subdomains: bool = False
     rps: float = 2.0
@@ -143,6 +159,42 @@ class CrawlConfig:
     # crawl when rendered-DOM checks aren't needed.
     js_enabled: bool = True
     js_eager: bool = True
+    # How long to keep waiting for network quiet after a page's `load`
+    # event, in milliseconds. The wait is a best effort and its timeout is
+    # suppressed, so this is a budget, not a deadline: when it expires the
+    # already-rendered DOM is used as-is.
+    #
+    # Was a hard-coded 10s. Any page holding a socket open -- a websocket, a
+    # poller, a chat widget, an analytics beacon -- never goes idle, so it
+    # spent the entire budget on every page and the crawl paid ten seconds
+    # per page for nothing. 2.5s covers ordinary deferred rendering; raise
+    # it for an application that genuinely settles late.
+    js_idle_timeout_ms: int = 2_500
+    # Fetch each page once when the browser is going to render it anyway.
+    #
+    # With `js_eager` on, the static HTTP response is fetched, its body read,
+    # and then discarded in favour of the rendered DOM, so every HTML page
+    # costs the target an extra request and a full extra body transfer.
+    # Enabling this skips that first fetch and renders directly, which
+    # measured about 11% faster over the fixture site with identical
+    # findings.
+    #
+    # Off by default, because it is not free:
+    #
+    #   * The static fetch is the only request a crawl currently paces. The
+    #     per-host limiter has never covered browser renders, so skipping
+    #     the static fetch means `rps` and `concurrency_per_host` stop
+    #     applying to the default crawl entirely. Moving the render under
+    #     the limiter restores the pacing but measured slower than doing
+    #     both fetches, because the limiter then gates the expensive step.
+    #   * Content type is only knowable after fetching. `_document_url`
+    #     below keeps obvious non-documents on the static path, but it is a
+    #     heuristic on the URL, so an extensionless PDF still reaches
+    #     Playwright.
+    #
+    # Turn it on for a crawl of a known all-HTML property where the target
+    # can take the load; leave it off when politeness settings matter.
+    skip_static_when_rendering: bool = False
     # Run Axcess' public Playwright browser in the background by default.
     # Local operators can opt into a headed window to watch page navigation.
     browser_headless: bool = True
@@ -164,6 +216,12 @@ class CrawlConfig:
     # or "AAA" (all). Best-practice rules are always included.
     axe_enabled: bool = True
     axe_level: str = "AA"
+    # The WCAG version ``axe_level`` is read against, for axe and Alfa
+    # alike: "2.1" (default, the current U-M standard) or "2.2". Stored in
+    # ``config_json``; a stored scan without it ran 2.2 (see
+    # ``audit.wcag_version``), and a crawl that takes over an existing row
+    # keeps that row's version rather than this one.
+    wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
     # Independent Siteimprove Alfa ACT-rule engine. It is opt-in because it
     # runs a second local-browser capture per page. It can run alongside axe
     # or alone; Axcess still owns scope, page inventory, and evidence storage.
@@ -236,7 +294,7 @@ class CrawlConfig:
     interaction_max_repeated: int = 20
     interaction_max_depth: int = 5
     # Per-finding element screenshots. When on (default), the JS fetcher
-    # captures a circled screenshot of each live-page finding's element
+    # captures an outlined screenshot of each live-page finding's element
     # at scan time; the orchestrator stores it in the blob store and threads
     # the hash onto the row, so the Excel report can embed the exact spot of
     # each issue. Bounded per page (see ``js_fetcher.MAX_SHOTS_PER_PAGE``);
@@ -248,7 +306,28 @@ class CrawlConfig:
     # inspector then always re-renders on demand. Finding evidence,
     # screenshots, and image blobs are unaffected.
     store_rendered_html: bool = True
+    # The row this crawl must write into, when the caller already created it.
+    # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
+    # this crawl" from the seed URL, and they do not work it out the same way.
+    # A caller that owns a row names it here instead of letting the second
+    # guess disagree with the first.
+    scan_id: int | None = None
+    # May a later crawl of the same seed adopt this row and keep writing into
+    # it? True for an ordinary crawl: its frontier lives in the database and is
+    # meant to survive a restart. False when the session behind the scan cannot
+    # be rebuilt. A manual sign-in holds its credentials in memory only, so a
+    # later anonymous run that adopted the row would append signed-out evidence
+    # to a signed-in report and overwrite the stored config that said it was
+    # one, leaving nothing in the record to show the two had been mixed.
+    resumable: bool = True
     search: SearchConfig | None = None
+
+    def __post_init__(self) -> None:
+        # Every entry point validates its own input first; this is the
+        # backstop that keeps an unknown version out of the engines and out
+        # of the stored config.
+        if not is_wcag_version(self.wcag_version):
+            raise ValueError(f"wcag_version must be one of {', '.join(WCAG_VERSIONS)}")
 
 
 @dataclass
@@ -326,6 +405,10 @@ async def run_crawl(
     scope = url_policy.build_scope(normalized_seed, whole_host=config.whole_host)
 
     scan_id = _ensure_scan(conn, normalized_seed, config)
+    # A crawl that took over an existing row runs the WCAG version that row
+    # started with; ``_ensure_scan`` kept it in the stored config. Read it
+    # back so every engine below uses the version the report will claim.
+    config = replace(config, wcag_version=_stored_scan_wcag_version(conn, scan_id))
     queue.reclaim_expired(conn)
     # If we're reusing a scan whose queue was built under different scope
     # rules (e.g. path-scope was added after the scan started, or the user
@@ -345,7 +428,7 @@ async def run_crawl(
     # problem, the configured scope does not cover where sign-in landed.
     entry_url = normalized_seed
     if config.start_url is not None:
-        candidate = url_policy.normalize(config.start_url)
+        candidate = _signed_in_entry_url(config.start_url)
         if candidate == normalized_seed:
             pass
         elif url_policy.is_in_scope(candidate, scope, allow_subdomains=config.allow_subdomains):
@@ -407,6 +490,7 @@ async def run_crawl(
     # zero axe findings.
     axe_analyzer: AxeAnalyzer | None = None
     axe_level: AxeLevel = "AA"
+    wcag_version: WcagVersion = config.wcag_version
     if config.axe_enabled:
         try:
             axe_analyzer = AxeAnalyzer.from_bundled()
@@ -468,9 +552,16 @@ async def run_crawl(
         interaction_probe = InteractionProbe(
             axe=axe_analyzer,
             level=axe_level,
+            version=wcag_version,
             max_clicks=config.interaction_max_clicks,
             max_repeated=config.interaction_max_repeated,
             max_depth=config.interaction_max_depth,
+            # A scan that opted out of storing rendered pages has opted out of
+            # storing revealed states too: they are the same documents, from
+            # the same site, and on the protected path they are captured after
+            # authentication. Refusing at the probe means the bytes are never
+            # held either, rather than being gathered and dropped at write.
+            capture_states=config.store_rendered_html,
             # a11y-crawler matches one list against both URLs and control
             # labels, so an operator who blocks "Sign out" is protected from
             # the link and the button alike. The probe's own label list stays
@@ -485,6 +576,7 @@ async def run_crawl(
             injected=js_fetcher,
             axe_analyzer=axe_analyzer,
             axe_level=axe_level,
+            wcag_version=wcag_version,
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
@@ -493,6 +585,7 @@ async def run_crawl(
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
             search_explorer=build_search_explorer(config, axe_analyzer),
+            idle_timeout_ms=config.js_idle_timeout_ms,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -558,6 +651,7 @@ async def run_crawl(
             except Exception as exc:
                 log.warning("synthesize.failed", scan_id=scan_id, error=str(exc))
         _finalize_scan(conn, scan_id, summary)
+        live_progress.forget(scan_id)
         if ocr_pool is not None:
             ocr_pool.shutdown()
         if js_holder is not None:
@@ -570,6 +664,29 @@ async def run_crawl(
     return summary
 
 
+def _signed_in_entry_url(start_url: str) -> str:
+    """Canonicalize where sign-in landed, without discarding its fragment.
+
+    ``normalize`` keeps a fragment only when it looks like a hash route,
+    ``#/route`` or ``#!/route``, because on an ordinary page ``#section`` is the
+    same document and has to dedupe with it. That rule is right for every link
+    the crawler discovers and wrong for this one URL: a sign-in that ended on
+    ``/#my-courses`` was rewritten to ``/``, which was the application's boot
+    screen. It carried no links, so the crawl finished after a single page and
+    never reached the signed-in area the auditor was standing in.
+
+    This URL is the one a human chose by being there when they confirmed
+    sign-in, so its exact route is evidence rather than a guess about what the
+    fragment means. Only the entry point is read this way; links found from it
+    normalize as usual, so ``#section`` anchors still dedupe.
+    """
+    canonical = url_policy.normalize(start_url)
+    fragment = urlsplit(start_url.strip()).fragment
+    if not fragment or urlsplit(canonical).fragment:
+        return canonical
+    return urlunsplit(urlsplit(canonical)._replace(fragment=fragment))
+
+
 def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=config.request_timeout_s,
@@ -579,18 +696,68 @@ def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
     )
 
 
+# True for a scan row a later crawl of the same seed is allowed to adopt. Both
+# row-discovery paths must agree, so the predicate is written once here and
+# imported by the web layer's ``_prepare_scan_row``. A row written before the
+# flag existed, or one whose config is not valid JSON, stays adoptable: the
+# absence of a refusal is not a refusal. Written as CASE rather than a guarded
+# AND because ``json_extract`` raises on malformed JSON and SQLite does not
+# promise to short-circuit AND, which would make one unreadable row fail every
+# later crawl's row discovery.
+RESUMABLE_SCAN_SQL = (
+    "CASE WHEN json_valid(config_json) "
+    "THEN COALESCE(json_extract(config_json, '$.resumable'), 1) ELSE 1 END != 0"
+)
+
+
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
+    # A caller that already owns a row names it, and no discovery runs at all.
+    if config.scan_id is not None:
+        owned = conn.execute("SELECT id FROM scans WHERE id = ?", (config.scan_id,)).fetchone()
+        if owned is None:
+            raise ValueError(f"scan row {config.scan_id} does not exist")
+        conn.execute(
+            "UPDATE scans SET status = 'running', finished_at = NULL, "
+            "failure_reason = NULL, config_json = ? WHERE id = ?",
+            (
+                config_json_for_scan(_keep_stored_wcag_version(conn, config.scan_id, config)),
+                config.scan_id,
+            ),
+        )
+        return config.scan_id
+    # ``running`` is always adopted: it is either the row the web layer just
+    # prepared for the progress view (which has no queued work yet) or a crawl
+    # whose process died without getting to write a status.
+    #
+    # ``interrupted`` is adopted only while work is still queued. That status
+    # covers two different events -- a crawl cancelled mid-flight, and a scan
+    # the operator stopped -- and the queue is what tells them apart, because
+    # stopping clears it. Without the distinction a stopped report that had
+    # already collected hundreds of pages was quietly adopted and flipped to
+    # completed by a run the operator thought was starting fresh.
     row = conn.execute(
-        """
+        f"""
         SELECT id FROM scans
-         WHERE seed_url = ? AND status IN ('running', 'interrupted')
+         WHERE seed_url = ?
            AND NOT EXISTS (
                SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id
            )
+           AND {RESUMABLE_SCAN_SQL}
+           AND (
+               status = 'running'
+               OR (
+                   status = 'interrupted'
+                   AND EXISTS (
+                       SELECT 1 FROM jobs
+                        WHERE jobs.state IN ('pending', 'leased')
+                          AND json_extract(jobs.payload_json, '$.scan_id') = scans.id
+                   )
+               )
+           )
          ORDER BY id DESC
          LIMIT 1
-        """,
+        """,  # noqa: S608, module constant only
         (seed_url,),
     ).fetchone()
     if row is not None:
@@ -598,7 +765,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         conn.execute(
             "UPDATE scans SET status = 'running', finished_at = NULL, failure_reason = NULL, "
             "config_json = ? WHERE id = ?",
-            (config_json_for_scan(config), scan_id),
+            (config_json_for_scan(_keep_stored_wcag_version(conn, scan_id, config)), scan_id),
         )
         return scan_id
 
@@ -610,6 +777,24 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
         (seed_url, _config_json(config)),
     )
     return int(cur.lastrowid or 0)
+
+
+def _stored_scan_wcag_version(conn: sqlite3.Connection, scan_id: int) -> WcagVersion:
+    """The WCAG version recorded on ``scans.config_json`` for ``scan_id``."""
+    row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    return stored_wcag_version(row["config_json"] if row is not None else None)
+
+
+def _keep_stored_wcag_version(
+    conn: sqlite3.Connection, scan_id: int, config: CrawlConfig
+) -> CrawlConfig:
+    """``config`` carrying the WCAG version of the row it is taking over.
+
+    A scan's version is fixed when the scan starts: its evidence so far was
+    gathered under that rule set, and a resumed crawl must not continue it
+    under another one. A row stored before the setting existed ran 2.2.
+    """
+    return replace(config, wcag_version=_stored_scan_wcag_version(conn, scan_id))
 
 
 def config_json_for_scan(config: CrawlConfig) -> str:
@@ -626,6 +811,9 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "max_pages": config.max_pages,
             "max_depth": config.max_depth,
             "allow_subdomains": config.allow_subdomains,
+            # Scope as chosen, so "Edit settings and retry" can put it back.
+            # Older rows omit it and read as False, the form's default.
+            "whole_host": config.whole_host,
             # Where the crawl began, when sign-in moved it off the seed. A
             # report that cannot say which page it started from cannot be
             # reproduced from its own record.
@@ -648,6 +836,8 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "vlm_enabled": config.vlm_enabled,
             "axe_enabled": config.axe_enabled,
             "axe_level": config.axe_level,
+            # Stored as given; readers go through ``stored_wcag_version``.
+            "wcag_version": config.wcag_version,
             "alfa_enabled": config.alfa_enabled,
             "alfa_timeout_s": config.alfa_timeout_s,
             "alfa_concurrency": config.alfa_concurrency,
@@ -665,7 +855,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
             "interaction_max_depth": config.interaction_max_depth,
+            # Whether per-finding element screenshots were taken. Absent from
+            # older reports, whose screenshot state can only be inferred by
+            # looking for blobs. A report that cannot say which evidence it
+            # was allowed to collect cannot explain the evidence it lacks.
+            "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
+            # Read back by the row-discovery predicate, not just by the UI.
+            "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
             # Version 1 means completed-page counters for semantic, keyboard,
             # and responsive checks are persisted on the scan row. Older
@@ -748,6 +945,7 @@ class _LazyJs:
         injected: JsFetcher | None = None,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: AxeLevel = "AA",
+        wcag_version: WcagVersion = DEFAULT_WCAG_VERSION,
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
@@ -756,12 +954,14 @@ class _LazyJs:
         capture_screenshots: bool = False,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
+        idle_timeout_ms: int | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
         self._owned = injected is None
         self._axe_analyzer = axe_analyzer
         self._axe_level: AxeLevel = axe_level
+        self._wcag_version: WcagVersion = wcag_version
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
@@ -770,6 +970,7 @@ class _LazyJs:
         self._capture_screenshots = capture_screenshots
         self._headless = headless
         self._search_explorer = search_explorer
+        self._idle_timeout_ms = idle_timeout_ms
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -777,6 +978,7 @@ class _LazyJs:
                 user_agent=self._user_agent,
                 axe_analyzer=self._axe_analyzer,
                 axe_level=self._axe_level,
+                wcag_version=self._wcag_version,
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
@@ -785,6 +987,7 @@ class _LazyJs:
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
                 search_explorer=self._search_explorer,
+                idle_timeout_ms=self._idle_timeout_ms,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -825,6 +1028,7 @@ def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> Searc
         can_visit=can_visit,
         axe=axe,
         level=config.axe_level,  # type: ignore[arg-type]
+        version=config.wcag_version,
     )
 
 
@@ -985,7 +1189,8 @@ async def _worker(ctx: _WorkerContext) -> None:
             continue
         ctx.in_flight += 1
         try:
-            await _process_job(ctx, job)
+            with live_progress.page(ctx.scan_id, str(job.payload["url"]), _tracked_checks(ctx)):
+                await _process_job(ctx, job)
             queue.complete(ctx.conn, job.id)
         except Exception as exc:  # record and move on
             log.warning("crawl.job_failed", id=job.id, error=str(exc))
@@ -995,8 +1200,36 @@ async def _worker(ctx: _WorkerContext) -> None:
             ctx.in_flight -= 1
 
 
+def _tracked_checks(ctx: _WorkerContext) -> list[str]:
+    """The checks the progress page follows for each page of this crawl.
+
+    Keyed as the report's method ledger keys them. A check listed here that
+    does not apply to a page (a browser check on a page that only loaded as
+    plain HTML) ends that page as not run.
+    """
+    config = ctx.config
+    checks: list[str] = []
+    if ctx.js is not None:
+        if config.axe_enabled:
+            checks.append("axe")
+        if config.keyboard_probe_enabled:
+            checks.append("keyboard")
+        if config.responsive_checks_enabled:
+            checks.append("responsive")
+        if config.interaction_checks_enabled and config.axe_enabled:
+            checks.append("interaction")
+    if ctx.alfa is not None:
+        checks.append("alfa")
+    if config.image_extraction_enabled and ctx.ocr is not None and ctx.vlm is not None:
+        checks.append("image")
+    if ctx.semantic_analyzers:
+        checks.append("semantic")
+    return checks
+
+
 def _page_limit_reached(ctx: _WorkerContext) -> bool:
-    return ctx.summary.pages_fetched >= ctx.config.max_pages
+    limit = ctx.config.max_pages
+    return limit is not None and ctx.summary.pages_fetched >= limit
 
 
 async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
@@ -1030,29 +1263,72 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # recoverable even when a later one fails or the process dies.
     log.info("crawl.navigating", url=url, depth=depth)
 
-    async with ctx.limiter.throttle(url):
-        if ctx.config.browser_only:
-            if ctx.js is None:
-                raise RuntimeError("Browser-only crawling requires an injected browser fetcher.")
-            try:
-                result = await (await ctx.js.get()).fetch(url)
-                render_mode = "js"
-            except FetchError:
-                log.warning("crawl.js_fetch_failed", protected_context=True)
-                ctx.summary.errors += 1
-                _record_page(ctx, url, status_code=None, result=None, render_mode="js")
-                return
-        else:
-            try:
-                result = await ctx.static.fetch(url)
-            except FetchError as exc:
-                log.warning("crawl.fetch_failed", url=url, error=str(exc))
-                ctx.summary.errors += 1
-                _record_page(ctx, url, status_code=None, result=None, render_mode="static")
-                return
+    if ctx.js is not None and _renders_without_static_fetch(ctx, url):
+        # One fetch, in the browser. The escalation below would otherwise
+        # pull the whole document over HTTP first and discard the body.
+        #
+        # Outside the per-host throttle, exactly where the escalation it
+        # replaces already ran. Browser renders have never been throttled;
+        # putting one under the limiter here would quietly change crawl
+        # politeness and cost about a second per page on a local target,
+        # which is a separate decision from fetching each page once.
+        try:
+            result = await (await ctx.js.get()).fetch(url)
+            render_mode = "js"
+        except FetchError as exc:
+            # Fall back to the plain fetch that was skipped. Escalation
+            # always had a static result to keep when the browser failed,
+            # and a degraded page beats no page at all.
+            log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            async with ctx.limiter.throttle(url):
+                try:
+                    result = await ctx.static.fetch(url)
+                except FetchError as static_exc:
+                    log.warning("crawl.fetch_failed", url=url, error=str(static_exc))
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+                    return
             render_mode = "static"
+    else:
+        async with ctx.limiter.throttle(url):
+            if ctx.config.browser_only:
+                if ctx.js is None:
+                    raise RuntimeError(
+                        "Browser-only crawling requires an injected browser fetcher."
+                    )
+                try:
+                    result = await (await ctx.js.get()).fetch(url)
+                    render_mode = "js"
+                except FetchError as exc:
+                    # The class only, never the message or the URL. A protected
+                    # target's address and a failure string can both carry session
+                    # detail, which is why this branch stays quiet where its public
+                    # sibling logs ``error=str(exc)``. Dropping the type as well
+                    # overcorrected: every cause -- DNS, a navigation timeout, a
+                    # closed context, the rendered-size cap -- arrived as one
+                    # indistinguishable line, and the UI could only tell the
+                    # operator to read a log that said nothing.
+                    log.warning(
+                        "crawl.js_fetch_failed",
+                        protected_context=True,
+                        error_type=type(exc).__name__,
+                    )
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="js")
+                    return
+            else:
+                try:
+                    result = await ctx.static.fetch(url)
+                except FetchError as exc:
+                    log.warning("crawl.fetch_failed", url=url, error=str(exc))
+                    ctx.summary.errors += 1
+                    _record_page(ctx, url, status_code=None, result=None, render_mode="static")
+                    return
+                render_mode = "static"
 
-    if not ctx.config.browser_only and ctx.js is not None and _should_escalate_to_js(ctx, result):
+    # Already rendered above (browser-only, or the direct-render path) means
+    # there is nothing to escalate.
+    if render_mode != "js" and ctx.js is not None and _should_escalate_to_js(ctx, result):
         try:
             js_fetcher = await ctx.js.get()
             result = await js_fetcher.fetch(url)
@@ -1105,16 +1381,17 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         and result.is_ok
         and page_id is not None
     ):
-        extraction = await process_page(
-            ctx.conn,
-            page_id=page_id,
-            scan_id=ctx.scan_id,
-            page_url=result.url,
-            body=result.body,
-            downloader=ctx.downloader,
-            ocr=ctx.ocr,
-            vlm=ctx.vlm,
-        )
+        with live_progress.check("image"):
+            extraction = await process_page(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                page_url=result.url,
+                body=result.body,
+                downloader=ctx.downloader,
+                ocr=ctx.ocr,
+                vlm=ctx.vlm,
+            )
         ctx.summary.images_persisted += extraction.images_persisted
         ctx.summary.svg_text_hits += extraction.svg_text_hits
         ctx.summary.image_errors += extraction.errors
@@ -1131,7 +1408,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # Persist axe-core violations attached by JsFetcher. Static fetches
         # never carry violations (axe needs a browser); we count an axe-page
         # only when violations is a real attached tuple, even an empty one
-        #, that distinguishes "we scanned and found nothing" from "we
+        # , that distinguishes "we scanned and found nothing" from "we
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
@@ -1149,7 +1426,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # never suggest both engines observed one identical DOM snapshot.
         if ctx.alfa is not None:
             try:
-                alfa_result = await ctx.alfa.run(result.url, level=ctx.config.axe_level)
+                with live_progress.check("alfa"):
+                    alfa_result = await ctx.alfa.run(
+                        result.url, level=ctx.config.axe_level, version=ctx.config.wcag_version
+                    )
                 _persist_alfa(
                     ctx,
                     page_id=page_id,
@@ -1230,6 +1510,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 findings=result.interaction_findings,
                 states=result.interaction_states,
                 screenshots=result.screenshots,
+                # A tuple, never None: this pass owns the page's states, and an
+                # empty one legitimately means it captured none this time.
+                captures=result.interaction_captures,
             )
             # The per-page ledger is written even when the sweep produced no
             # findings: "37 of 52 controls operated, stopped by the click
@@ -1264,7 +1547,8 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # adding contrast / focus-visible analyzers will check
         # ``render_mode == 'js'`` themselves before running.
         if ctx.semantic_analyzers:
-            await _run_semantic(ctx, page_id=page_id, result=result)
+            with live_progress.check("semantic"):
+                await _run_semantic(ctx, page_id=page_id, result=result)
 
     if not result.is_html or not result.is_ok:
         return
@@ -1409,6 +1693,107 @@ def _enqueue_children(
         log.info("crawl.enqueued", url=normalized, source=base_url, depth=depth)
 
 
+# File extensions a browser will download or hand to a viewer rather than
+# render as a document. Only consulted to decide whether to skip the static
+# fetch: everything here is served perfectly well by StaticFetcher, and
+# routing it through Playwright turns a cheap GET into a navigation that can
+# fail, open a viewer, or trigger a download prompt.
+_NON_DOCUMENT_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".tar",
+        ".rar",
+        ".7z",
+        ".dmg",
+        ".exe",
+        ".msi",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".csv",
+        ".rtf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".avif",
+        ".svg",
+        ".ico",
+        ".bmp",
+        ".tiff",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".mov",
+        ".webm",
+        ".ogg",
+        ".m4a",
+        ".m4v",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".json",
+        ".xml",
+        ".rss",
+        ".atom",
+        ".txt",
+        ".md",
+        ".css",
+        ".js",
+        ".map",
+    }
+)
+
+
+def _is_document_url(url: str) -> bool:
+    """Whether this URL plausibly names a document a browser should render.
+
+    A heuristic on the path's extension, and only ever used to keep obvious
+    non-documents on the static path. Content type is not knowable before
+    fetching, so an extensionless PDF still looks like a document here; the
+    cost of being wrong is one wasted navigation, not a wrong result.
+    """
+    path = urlsplit(url).path
+    dot = path.rfind(".")
+    if dot == -1 or "/" in path[dot:]:
+        return True
+    return path[dot:].lower() not in _NON_DOCUMENT_SUFFIXES
+
+
+def _renders_without_static_fetch(ctx: _WorkerContext, url: str) -> bool:
+    """Whether this page should go straight to the browser, skipping HTTP.
+
+    True only when the browser would render this URL anyway: ``js_eager``
+    makes :func:`_should_escalate_to_js` return True for every HTML
+    response, so the static fetch's body is read and then discarded. That
+    costs the target one extra request and one extra full body per page.
+
+    Restricted to document-looking URLs. The frontier holds every in-scope
+    ``href``, including PDFs, images and downloads, and those never escalate
+    to the browser on the two-step path; sending them through Playwright
+    would be a new behavior rather than a saved request.
+
+    Off unless ``skip_static_when_rendering`` is set; see that field for why
+    it is not the default. Not used for the browser-only path, which has its
+    own branch and its own quieter error handling for protected targets.
+    """
+    return (
+        ctx.config.skip_static_when_rendering
+        and ctx.config.js_eager
+        and not ctx.config.browser_only
+        and _is_document_url(url)
+    )
+
+
 def _should_escalate_to_js(ctx: _WorkerContext, result: FetchResult) -> bool:
     """Decide whether a static fetch result warrants a re-fetch via Playwright.
 
@@ -1447,6 +1832,34 @@ def _store_screenshot(
         return None
 
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _batched_writes(
+    fn: Callable[Concatenate[_WorkerContext, _P], _R],
+) -> Callable[Concatenate[_WorkerContext, _P], _R]:
+    """Commit a persistence helper's writes once instead of once per row.
+
+    The crawl connection is in autocommit mode, so each `upsert_*` call
+    below used to be its own transaction and its own WAL commit. A page
+    carrying a hundred axe violations paid for a hundred commits to write
+    one page's evidence.
+
+    Safe to apply only because every helper it decorates is synchronous.
+    All workers share one connection, so a transaction left open across an
+    `await` would swallow whatever the next worker wrote.
+    """
+
+    @wraps(fn)
+    def wrapper(ctx: _WorkerContext, /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with write_batch(ctx.conn):
+            return fn(ctx, *args, **kwargs)
+
+    return wrapper
+
+
+@_batched_writes
 def _persist_axe(
     ctx: _WorkerContext,
     *,
@@ -1456,10 +1869,13 @@ def _persist_axe(
 ) -> None:
     """Write the page's axe violations to the DB + bump the scan counters.
 
-    One DB statement per violation row keeps the code simple at the
-    expense of N writes per page. SQLite handles this trivially at our
-    scale (10k pages x ~10 violations = 100k inserts, all under one
-    transaction held open by the worker context).
+    One DB statement per violation row keeps the code simple. The
+    ``_batched_writes`` decorator makes the page's rows one commit rather
+    than one commit each; an earlier version of this docstring claimed the
+    worker already held such a transaction open, which was never true.
+
+    A per-row sqlite3 error logs and drops that row; the rest of the page
+    still lands.
     """
     for v in violations:
         try:
@@ -1498,6 +1914,7 @@ def _persist_axe(
     ctx.summary.axe_violations_total += len(violations)
 
 
+@_batched_writes
 def _persist_interaction(
     ctx: _WorkerContext,
     *,
@@ -1506,6 +1923,7 @@ def _persist_interaction(
     states: int,
     screenshots: Mapping[str, bytes],
     count_page: bool = True,
+    captures: tuple[StateCapture, ...] | None = None,
 ) -> None:
     """Write violations that only exist after a control was operated.
 
@@ -1515,7 +1933,31 @@ def _persist_interaction(
     hits ``ON CONFLICT``, and updates instead of inserting a second row.
     The probe filters those out before they ever reach this function, so
     the constraint is a backstop rather than the primary mechanism.
+
+    ``captures`` is the markup of the states these findings were first seen
+    in. ``None`` means this caller does not capture states at all (the
+    configured-search pass) and must leave whatever is stored alone; a tuple,
+    including an empty one, is the complete set for the page and replaces it.
+    That distinction matters on a re-fetch: ``upsert_page`` has just overwritten
+    the load-state HTML, so states held against the previous document would
+    otherwise survive it.
     """
+    if captures is not None:
+        try:
+            repo.replace_page_dom_states(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                page_id=page_id,
+                states=captures,
+            )
+        except (sqlite3.Error, ValueError) as exc:
+            # Evidence the report can do without. The findings below are not.
+            log.warning(
+                "interaction.states_persist_failed",
+                page_id=page_id,
+                error_type=type(exc).__name__,
+            )
+
     for revealed in findings:
         v = revealed.violation
         try:
@@ -1536,6 +1978,7 @@ def _persist_interaction(
                 target_hash=v.target_hash,
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
                 revealed_by=revealed.revealed_by,
+                revealed_state_key=revealed.state_key or None,
             )
         except sqlite3.Error as exc:
             log.warning(
@@ -1569,6 +2012,7 @@ def _persist_interaction(
     )
 
 
+@_batched_writes
 def _persist_alfa(
     ctx: _WorkerContext,
     *,
@@ -1627,6 +2071,7 @@ def _add_note_once(summary: CrawlSummary, note: str) -> None:
         summary.notes.append(note)
 
 
+@_batched_writes
 def _persist_keyboard(
     ctx: _WorkerContext,
     *,
@@ -1666,6 +2111,7 @@ def _persist_keyboard(
     ctx.summary.keyboard_traps_total += len(traps)
 
 
+@_batched_writes
 def _persist_responsive(
     ctx: _WorkerContext,
     *,
@@ -1704,6 +2150,7 @@ def _persist_responsive(
     ctx.summary.responsive_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_focus(
     ctx: _WorkerContext,
     *,
@@ -1732,6 +2179,7 @@ def _persist_focus(
     ctx.summary.focus_findings_total += len(findings)
 
 
+@_batched_writes
 def _persist_visual(
     ctx: _WorkerContext,
     *,
@@ -1788,6 +2236,7 @@ async def _run_semantic(
     _persist_semantic(ctx, page_id=page_id, findings=findings)
 
 
+@_batched_writes
 def _persist_semantic(
     ctx: _WorkerContext,
     *,
@@ -1796,9 +2245,9 @@ def _persist_semantic(
 ) -> None:
     """Upsert semantic findings into ``page_a11y_findings``.
 
-    Same row-by-row insert pattern as ``_persist_axe``, SQLite at our
-    scale handles 100k inserts cleanly. A per-row sqlite3 error logs
-    + drops; the rest of the page's findings still land.
+    Same row-by-row insert pattern as ``_persist_axe``, committed once per
+    page by ``_batched_writes``. A per-row sqlite3 error logs + drops; the
+    rest of the page's findings still land.
 
     Note: semantic findings carry no element screenshot, the semantic
     pass runs against the static HTML body with no live Playwright page,

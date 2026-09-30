@@ -60,12 +60,16 @@ test("native icon assets include high-resolution PNG, multi-size ICO, and ICNS",
   for (const type of ["ic07", "ic08", "ic09", "ic10"]) assert.ok(types.includes(type));
 });
 
+test("the Windows installer uses the Axcess icon", () => {
+  const config = require("../electron-builder.config.cjs");
+  assert.equal(path.join(root, config.win.icon), asset("ico"));
+});
+
 test("every desktop packaging target uses the Axcess assets", () => {
   for (const platform of ["darwin", "win32", "linux"]) {
     const config = configFor(platform);
     assert.equal(config.packagerConfig.icon, path.join(root, "assets", "axcess"));
     const makers = config.makers;
-    assert.equal(makers.find((m) => m.name.endsWith("maker-squirrel")).config.setupIcon, asset("ico"));
     for (const maker of ["maker-deb", "maker-rpm"]) {
       assert.equal(makers.find((m) => m.name.endsWith(maker)).config.options.icon, asset("png"));
     }
@@ -75,12 +79,51 @@ test("every desktop packaging target uses the Axcess assets", () => {
   }
 });
 
-test("startup screens reference the bundled logo without redundant accessible text", () => {
-  for (const screen of ["loading", "error"]) {
-    const html = fs.readFileSync(path.join(root, "static", `${screen}.html`), "utf8");
-    assert.match(html, /img-src 'self'/);
-    assert.match(html, /<img[^>]+src="\.\.\/assets\/axcess.svg"[^>]+alt=""/);
-  }
+const startupScreen = (screen) =>
+  fs.readFileSync(path.join(root, "static", `${screen}.html`), "utf8");
+
+test("the error screen references the bundled logo without redundant accessible text", () => {
+  const html = startupScreen("error");
+  assert.match(html, /img-src 'self'/);
+  assert.match(html, /<img[^>]+src="\.\.\/assets\/axcess.svg"[^>]+alt=""/);
+});
+
+// The loading screen draws the mark inline instead, because only part of it
+// moves: an <img> is an opaque document, so the ring inside it cannot be
+// animated on its own. Inline markup is not a fetch, so the screen needs no
+// img-src at all and keeps 'none' as its default.
+test("the loading screen inlines the mark and fetches nothing", () => {
+  const html = startupScreen("loading");
+  assert.doesNotMatch(html, /<img\b/);
+  assert.doesNotMatch(html, /img-src/);
+  assert.match(html, /<svg[^>]+aria-hidden="true"/);
+  // The ring and its node spin; the 'a' must stay out of the rotating group.
+  const ring = html.match(/<g class="ring">([\s\S]*?)<\/g>/);
+  assert.ok(ring, "expected a .ring group to rotate");
+  assert.match(ring[1], /A 12\.6 12\.6/);
+  assert.match(ring[1], /<circle/);
+  assert.doesNotMatch(ring[1], /C 16\.989/);
+  // Rotating about the viewBox centre (16,16) rather than the group's own
+  // bounding box is what keeps the ring on-axis.
+  assert.match(html, /transform-box: view-box/);
+  assert.match(html, /prefers-reduced-motion/);
+});
+
+test("the loading screen tells a first launch that it can take longer", () => {
+  const html = startupScreen("loading");
+  // Inside the status region, so it is read with "Loading".
+  const status = html.match(/<main role="status"[\s\S]*?<\/main>/);
+  assert.ok(status, "expected the status region");
+  assert.match(status[0], /<p id="first-launch" class="first-launch">The first time Axcess opens, this can take a minute or two\.<\/p>/);
+  // Shown only as the page's target, since the screen runs no script.
+  assert.match(html, /\.first-launch \{ display: none;/);
+  assert.match(html, /\.first-launch:target \{ display: block; \}/);
+  assert.doesNotMatch(html, /<script\b/);
+  const main = fs.readFileSync(path.join(root, "src", "main.cjs"), "utf8");
+  assert.match(main, /isFirstLaunch\(\) \? \{ hash: "first-launch" \}/);
+});
+
+test("the bundled logo carries no text, raster, script, or remote import", () => {
   const svg = fs.readFileSync(asset("svg"), "utf8");
   assert.doesNotMatch(svg, /<text\b|<image\b|<script\b|@import/);
 });

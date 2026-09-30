@@ -7,20 +7,16 @@
  *, e.g. to "Root URL", is a one-line change that can't leave a hint behind
  * saying something different from the label above it.
  */
-export const SITE_URL_LABEL = "Site URL";
+export const SITE_URL_LABEL = "Website address";
 
 /** The same thing in running prose, for hints and helper text. */
-export const SITE_URL_NOUN = "site URL";
-
-export const WHOLE_HOST_HINT = `Ignores the ${SITE_URL_NOUN}’s path, every page on the host is in scope.`;
-
-export const WHOLE_HOST_HINT_LOGIN = `Ignores the ${SITE_URL_NOUN}’s path, but never leaves the exact signed-in website origin.`;
+export const SITE_URL_NOUN = "website address";
 
 /**
  * Where the in-app "Send feedback" action goes.
  *
- * This is the only outbound link Axcess offers, it opens only when a person
- * clicks it, and nothing about the current scan is attached: Asana forms have
+ * Like the About page's resource links, it opens only when a person clicks
+ * it, and nothing about the current scan is attached: Asana forms have
  * no documented URL-prefill contract, so there is no supported way to carry
  * page context across, and inventing one would risk leaking a scanned URL.
  */

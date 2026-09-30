@@ -33,6 +33,20 @@ export interface ScanSummary {
   finished_at: string | null;
 }
 
+/** Every public report of one site (normalized seed scope), newest first.
+ *  The headline numbers come from `most_recent_completed` only: an
+ *  interrupted or failed crawl holds partial evidence. */
+export interface SiteGroup {
+  site_url: string;
+  scan_count: number;
+  completed_count: number;
+  most_recent: ScanSummary;
+  most_recent_completed: ScanSummary | null;
+  /** Unified issue groups in `most_recent_completed`; null when there is none. */
+  most_recent_completed_issue_count: number | null;
+  scans: ScanSummary[];
+}
+
 export interface ScanProgress {
   /** Durable pipeline stage derived from queue state; never an estimated percentage. */
   stage: "starting" | "scanning" | "preparing_report";
@@ -67,6 +81,26 @@ export interface ScanProgress {
     attempts: number;
     lease_until: string | null;
   }[];
+  /**
+   * The progress page's pages-by-checks rows: pages being checked, then the
+   * latest checked, then the next few waiting. Optional for a server that
+   * predates it.
+   */
+  page_checks?: ScanPageChecks[];
+}
+
+/** Where one check stands on one page of a running scan. */
+export type PageCheckState = "waiting" | "running" | "done" | "not_run";
+
+export interface ScanPageChecks {
+  url: string;
+  state: "checking" | "checked" | "waiting";
+  /**
+   * Each check the crawl follows, keyed as `ScanMethodCoverage.key`. Empty
+   * when the crawl's process has no record of the page (a command-line scan,
+   * or a restart): the row then has only the page's own state.
+   */
+  checks: Partial<Record<string, PageCheckState>>;
 }
 
 export interface ScanDetail extends ScanSummary {
@@ -97,6 +131,9 @@ export interface ScanDetail extends ScanSummary {
    * the detail page flag partial / static-only runs at a glance.
    */
   methods_used: ScanMethodCoverage[];
+  /** The WCAG version this scan was audited against. Scans stored before the
+   *  setting existed ran, and report, WCAG 2.2. */
+  wcag_version: WcagVersion;
   /** Present only for an identity-authorized protected report. */
   protection?: {
     mode: "protected";
@@ -258,10 +295,19 @@ export interface SearchConfig {
   timeout_ms: number;
 }
 
+/** WCAG version a scan checks against. 2.1 is the default (the current U-M
+ *  standard); the server rejects anything else. */
+export type WcagVersion = "2.1" | "2.2";
+
 export interface NewScanPayload {
   search?: SearchConfig | null;
   url: string;
   max_pages: number;
+  /**
+   * No page limit: the scan ends when it runs out of pages in scope within
+   * the link depth. `max_pages` then only keeps the form's value.
+   */
+  all_pages: boolean;
   max_depth: number;
   rps: number;
   workers: number;
@@ -298,6 +344,22 @@ export interface NewScanPayload {
    */
   skip_rendered_storage: boolean;
   axe_level: "A" | "AA" | "AAA";
+  wcag_version: WcagVersion;
+}
+
+/**
+ * `GET /api/scans/{id}/settings`: the settings a finished, failed or
+ * stopped scan ran with, in the New scan form's own shape, so the form can
+ * start again from them. Built server-side from an allow-list of scan
+ * settings: it never carries a password, cookie, token, sign-in session,
+ * the post-sign-in landing URL, or the authorization and image-storage
+ * confirmations, and the address has any `user:password@` removed.
+ */
+export interface ScanSettingsSnapshot {
+  scan_id: number;
+  /** Which New scan tab the settings belong to. */
+  mode: "public" | "login";
+  settings: NewScanPayload;
 }
 
 // ---------------------------------------------------------------
@@ -345,9 +407,12 @@ export interface LocalLoginScanPayload {
   /** Concurrent authenticated tabs; the local login API caps this at four. */
   workers: number;
   whole_host: boolean;
+  /** Keep the signed-in browser visible instead of transferring to headless Chromium. */
+  show_browser?: boolean;
   /** DOM rule engines run against the signed-in application scope. */
   scan_engine: ProtectedScanEngine;
   axe_level: "A" | "AA" | "AAA";
+  wcag_version: WcagVersion;
   /** Skip clicking controls and re-running axe in newly revealed DOM states. */
   skip_interaction: boolean;
   skip_keyboard: boolean;
@@ -365,7 +430,6 @@ export type LocalLoginScanStatus =
   | "awaiting_authentication"
   | "verifying_authentication"
   | "scanning"
-  | "authentication_required"
   | "completed"
   | "failed"
   | "interrupted";
@@ -374,6 +438,7 @@ export interface LocalLoginScanState {
   scan_id: number;
   status: LocalLoginScanStatus;
   error: string | null;
+  /** True once the login session has transferred to the headless scan browser. */
   browser_backgrounded?: boolean;
   message?: string;
 }
@@ -679,6 +744,8 @@ export type ConformanceLabel = "A" | "AA" | "AAA" | "BP";
 export type AbilityLabel = "vision" | "cognition" | "motor" | "hearing";
 export type ReviewLane = "likely_barrier" | "expert_review" | "informational";
 export type EvidenceConfidence = "high" | "medium" | "low";
+/** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
+export type FindingType = "wcag" | "click_through" | "alt_text";
 
 export interface IssueRow {
   pipeline: DetectionPipeline;
@@ -711,6 +778,18 @@ export interface IssueRow {
   help_url: string | null;
   /** First three exact location samples; occurrence_count remains the total. */
   locations: IssueLocation[];
+  /** The same element found again on later pages. The row reports each
+   *  element once, on its first page, so the counts and finding_ids above
+   *  exclude these repeats; the stored findings are unchanged. */
+  repeat_finding_ids: number[];
+  /** Extra pages those repeats reached beyond the pages listed. */
+  repeat_page_count: number;
+  /** In table order. A DOM rule group can be both "wcag" and
+   *  "click_through": some occurrences were there at page load, others only
+   *  after Click-Through operated a control. */
+  finding_types: FindingType[];
+  /** How many of occurrence_count only appeared after a control was used. */
+  click_through_occurrence_count: number;
 }
 
 export interface IssueLocation {
@@ -724,7 +803,7 @@ export interface IssueLocation {
    *  was present at page load. Without it the URL alone does not show a
    *  defect that only appears once a menu is opened. */
   revealed_by: string | null;
-  /** Blob hash of the scan-time screenshot with the location circled, when
+  /** Blob hash of the scan-time screenshot with the location marked, when
    *  one was captured, lets the evidence expand inline in the Issues view. */
   screenshot_hash: string | null;
   /** Captured outerHTML of the flagged element, shown as escaped source in
@@ -738,7 +817,7 @@ export interface IssuePage {
   page_title: string | null;
   occurrence_count: number;
   status_summary: Record<string, number>;
-  /** Circled scan-time screenshots, one for each locatable captured instance. */
+  /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
 }
 
@@ -760,6 +839,8 @@ export interface IssuesResponse {
   responsibility_counts: Record<string, number>;
   abilities_counts: Record<AbilityLabel | string, number>;
   review_lane_counts: Record<ReviewLane, number>;
+  /** Issue groups per finding type; a mixed group counts under each. */
+  finding_type_counts: Record<FindingType, number>;
   occurrence_counts: {
     all_evidence: number;
     high_confidence: number;
@@ -1000,6 +1081,14 @@ export interface PageEvidence {
     /** The control operated before this markup existed; null when the
      *  finding was present at page load. */
     revealed_by: string | null;
+    /** Which captured DOM state shows this finding, matching
+     *  `PageDomState.state_key`. Null for load-state findings and for reports
+     *  made before state capture. The label above cannot stand in for it:
+     *  several controls on a page can share an accessible name. */
+    revealed_state_key: string | null;
+    /** For an AI review finding, the element it is about, named the way a
+     *  browser can count it (the 3rd of 12 `a`). Null when not worked out. */
+    element_place: ElementPlace | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1013,7 +1102,36 @@ export interface PageEvidence {
     ocr_text: string | null;
     vlm_classification: Classification | null;
     vlm_rationale: string | null;
+    /** The Images with text issue this image is in; null when the scan made
+     *  no finding for it. */
+    issue_key: string | null;
+    /** Which element of the saved copy the image came from; null when the
+     *  page kept no copy or the copy disagrees with the stored occurrence. */
+    locator: ImageLocator | null;
+    /** In a <noscript> or <template> element, which the saved copy on
+     *  screen does not show (usually a lazy-loaded image's backup copy). */
+    hidden_in_copy: boolean;
   }>;
+}
+
+/** The `index`th of the `total` elements `selector` matches in the saved copy. */
+export interface ElementPlace {
+  selector: string;
+  index: number;
+  total: number;
+}
+
+/**
+ * The `index`th of the `total` elements of `kind` in the saved copy's body.
+ * `candidate` is the image address as its attribute wrote it; `text` is an
+ * inline SVG's drawn text. Both are checked before it is outlined.
+ */
+export interface ImageLocator {
+  kind: "img" | "source" | "svg";
+  index: number;
+  total: number;
+  candidate: string | null;
+  text: string | null;
 }
 
 // ---------------------------------------------------------------
@@ -1040,12 +1158,26 @@ export interface PageInspection {
    * says so instead of implying a missing capture.
    */
   store_rendered_html: boolean;
+  /**
+   * DOM states the interaction probe captured for this page, in the order it
+   * reached them. Metadata only — ask for one by `state_key` to get its
+   * markup, because the documents are large and a reviewer reads one at a
+   * time. Empty for pages where no click revealed a new finding, and for
+   * reports made before state capture.
+   */
+  states: PageDomState[];
   render: {
     ok: boolean;
-    /** "stored" = rendered HTML persisted at scan time; "live" = re-rendered now. */
-    source?: "stored" | "live";
-    /** Present when `ok` is false, why the live page could not be captured. */
+    /**
+     * "stored" = the page as it loaded, persisted at scan time;
+     * "live" = re-rendered now; "state" = markup captured after a control was
+     * operated.
+     */
+    source?: "stored" | "live" | "state";
+    /** Present when `ok` is false, why this document could not be served. */
     error?: string;
+    /** Echoed back when a specific state was requested, found or not. */
+    state_key?: string;
     final_url?: string;
     status_code?: number;
     dom_html?: string;
@@ -1054,11 +1186,27 @@ export interface PageInspection {
   };
 }
 
+export interface PageDomState {
+  /** Identifies the control's DOM location, not just its name: several
+   *  controls on a page can share an accessible name. */
+  state_key: string;
+  /** Accessible name of the control that was operated, for display. */
+  revealed_by: string;
+  /** Controls operated to arrive here, ending with this state's own. The
+   *  reproduction recipe for a reviewer working by hand. */
+  path_labels: string[];
+}
+
 
 export type ComparisonCategory = "new" | "still_detected" | "changed" | "no_longer_detected" | "cannot_compare";
+/** Where a group was found: only in the later report, only in the earlier one, or both. */
+export type ComparisonChange = "new" | "resolved" | "remaining";
 export interface ComparisonLink { label: string; url: string }
 export interface ComparisonSnapshot {
+  /** Every stored finding, cross-page repeats included (what location matching compares). */
   occurrences: number;
+  /** The group as the Issues table counts it, each element once. */
+  issue_occurrences: number;
   pages: number;
   statuses: Record<string, number>;
   outcomes: Record<string, number>;
@@ -1070,9 +1218,20 @@ export interface ComparisonRow {
   pipeline: string;
   title: string;
   category: ComparisonCategory;
+  change: ComparisonChange;
+  wcag_sc: string | null;
+  wcag_name: string | null;
+  conformance: ConformanceLabel;
   before: ComparisonSnapshot | null;
   after: ComparisonSnapshot | null;
   limitations: string[];
+}
+export interface ComparisonNote {
+  text: string;
+  /** The scans it is true of, earlier first; empty when it is about the pair. */
+  scans: number[];
+  /** True of one scan or the pair, so it can make a group look new or resolved. */
+  differs: boolean;
 }
 export interface ComparisonCoverageState {
   state: "complete" | "incomplete" | "unknown" | "disabled";
@@ -1084,10 +1243,49 @@ export interface ComparisonReport {
   current: { id: number; seed_url: string; started_at: string };
   baseline: { id: number; seed_url: string; started_at: string } | null;
   counts: Record<ComparisonCategory, number>;
+  changes: Record<ComparisonChange, number>;
+  before_totals: ComparisonTotals | null;
+  after_totals: ComparisonTotals;
   pipeline_counts: Record<string, number>;
+  /** Names, never values, of the detection settings that differ. */
+  settings_changed: string[];
   limitations: string[];
+  /** Each coverage note once, without those the coverage table states. */
+  notes: ComparisonNote[];
   rows: ComparisonRow[];
   total: number;
   page: number;
   page_size: number;
+}
+/** Issue groups and occurrences, counted as the Issues table counts them. */
+export interface ComparisonTotals { groups: number; occurrences: number }
+export interface SiteHistoryPoint extends ComparisonTotals {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+}
+/** Completed public reports of one site, oldest first. */
+export interface SiteHistory {
+  site_url: string;
+  /** Every completed report of the site; ``scans`` keeps the most recent. */
+  total: number;
+  scans: SiteHistoryPoint[];
+}
+
+/** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
+export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+export interface ExportFormatOption {
+  format: ExportFormat;
+  /** The downloaded file's name, ``_DRAFT`` marker included. */
+  filename: string;
+  /** Bytes of the file as the download route renders it now. */
+  size_bytes: number;
+}
+/** ``GET /api/scans/{id}/exports``: what each download will deliver. */
+export interface ExportOptions {
+  scan_id: number;
+  /** Every file downloads as a labeled draft: expert review is unfinished. */
+  draft: boolean;
+  evaluation_status: string;
+  formats: ExportFormatOption[];
 }

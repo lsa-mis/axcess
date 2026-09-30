@@ -3,18 +3,21 @@
 Builds a fresh tmp DB and blob store, seeds them with a few findings, and
 exposes a FastAPI ``TestClient`` so route-level tests don't need a browser.
 Playwright-based tests in ``test_accessibility_axe.py`` use the same seed
-data via a live uvicorn server.
+data via a live uvicorn server, and open their pages with ``new_page``.
 """
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
+import pytest_asyncio
 import uvicorn
 from fastapi.testclient import TestClient
 
@@ -22,19 +25,11 @@ from audit.blob_store import BlobStore
 from audit.db import repo
 from audit.db.schema import connect
 from audit.synthesizer.findings import synthesize_findings
+from audit.web import server as web_server
 from audit.web.server import create_app
 
-_MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
-
-
-def _apply_migrations(conn: sqlite3.Connection) -> None:
-    # Skip *.rollback.sql — those are yoyo-rollback scripts and must not
-    # run as part of forward setup. See the root conftest for the longer
-    # explanation; same issue, same fix.
-    for path in sorted(_MIGRATIONS.glob("*.sql")):
-        if path.name.endswith(".rollback.sql"):
-            continue
-        conn.executescript(path.read_text())
+if TYPE_CHECKING:
+    from playwright.async_api import Browser, BrowserContext, Page
 
 
 def _seed(conn: sqlite3.Connection, blob_dir: Path) -> int:
@@ -162,14 +157,16 @@ def _pixel_png(color: tuple[int, int, int] = (200, 200, 200)) -> bytes:
 
 
 @pytest.fixture
-def seeded_db(tmp_path: Path) -> tuple[Path, Path, int]:
+def seeded_db(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> tuple[Path, Path, int]:
     """Return ``(db_path, blob_dir, scan_id)`` with a seeded schema."""
     db_path = tmp_path / "audit.db"
     blob_dir = tmp_path / "blobs"
     blob_dir.mkdir()
     conn = connect(db_path)
     try:
-        _apply_migrations(conn)
+        migrate_db(conn)
         scan_id = _seed(conn, blob_dir)
     finally:
         conn.close()
@@ -187,8 +184,13 @@ def client(seeded_db: tuple[Path, Path, int]) -> TestClient:
 def live_server(seeded_db: tuple[Path, Path, int]) -> Iterator[tuple[str, int]]:
     """Run the FastAPI app on an ephemeral port in a background thread.
 
-    Yielded as ``(base_url, scan_id)``. Used by Playwright tests.
+    Yielded as ``(base_url, scan_id)``. Used by Playwright tests, which all
+    drive the SPA at /app/: without a built bundle the server answers the
+    shell with a 503 page, and each test would wait out its locator timeouts
+    (30 s apiece) instead of saying why.
     """
+    if not (web_server._FRONTEND_DIST / "index.html").exists():
+        pytest.skip("SPA bundle not built (run `npm run build`)")
     db_path, blob_dir, scan_id = seeded_db
     app = create_app(db_path=db_path, blob_dir=blob_dir)
     config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", access_log=False)
@@ -207,3 +209,114 @@ def live_server(seeded_db: tuple[Path, Path, int]) -> Iterator[tuple[str, int]]:
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def browser() -> AsyncIterator[Browser]:
+    """One Chromium for every test in a module.
+
+    Launching it costs more than many of the tests that use it. Tests reach it
+    through ``new_page``, never directly, so each one still starts from a
+    context of its own. Playwright objects belong to the event loop that
+    created them, so a module using this runs its tests on the module's loop:
+    ``pytest.mark.asyncio(loop_scope="module")``. Off that loop they hang
+    rather than fail. A bare ``@pytest.mark.asyncio`` on a test overrides the
+    module's mark and does exactly that, so tests/conftest.py refuses to
+    collect one.
+    """
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch()
+        try:
+            yield browser
+        finally:
+            await browser.close()
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def new_page(browser: Browser) -> AsyncIterator[Callable[..., Awaitable[Page]]]:
+    """``Browser.new_page`` for one test: a fresh context per page, closed after.
+
+    Takes the same options, so cookies, storage, permissions, routes and the
+    viewport never carry from one test, or one page, to the next. A helper
+    done with its page may close ``page.context`` itself; closing twice is a
+    no-op.
+    """
+    contexts: list[BrowserContext] = []
+
+    async def open_page(**options: Any) -> Page:
+        context = await browser.new_context(**options)
+        contexts.append(context)
+        return await context.new_page()
+
+    try:
+        yield open_page
+    finally:
+        for context in contexts:
+            await context.close()
+
+
+@pytest.fixture
+def choose_option() -> Callable[[Page, str, str], Awaitable[None]]:
+    """Pick ``value`` in the app's ``Select`` named ``label``, the way a pointer user does.
+
+    The app's dropdown is a custom combobox, not a native ``<select>``, so
+    Playwright's ``select_option`` does not apply. Options carry their raw
+    value in ``data-value``, so tests do not depend on option wording.
+    """
+
+    async def choose(page: Page, label: str, value: str) -> None:
+        box = page.get_by_role("combobox", name=label, exact=True)
+        await box.click()
+        list_id = await box.get_attribute("aria-controls")
+        await page.locator(f'[id="{list_id}"] [role="option"][data-value="{value}"]').click()
+        # The list closes under the pointer, leaving it over whatever was
+        # beneath the option; park it so no hover state leaks into the test.
+        await page.mouse.move(0, 0)
+
+    return choose
+
+
+@pytest.fixture
+def choose_filter() -> Callable[..., Awaitable[None]]:
+    """Make ``value`` the only choice in group ``group`` of a table's Filter menu.
+
+    See components/table/FilterMenu.tsx. Opens the menu if it is closed. In
+    a radio group it picks ``value``; in a checkbox group it checks
+    ``value`` and unchecks the rest, so a test reads the same either way.
+    ``""`` is "All": the radio of that name, or no box checked. Closes the
+    menu with Escape, as a keyboard user would, so it no longer covers the
+    table. Pass ``menu`` when a table names its button something other
+    than "Filter".
+    """
+    from playwright.async_api import expect
+
+    async def choose(page: Page, group: str, value: str, *, menu: str = "Filter") -> None:
+        # The button's name gains " 2 active" once filters apply.
+        button = page.get_by_role("button", name=re.compile(rf"^{re.escape(menu)}\b")).and_(
+            page.locator("[aria-controls][aria-expanded]")
+        )
+        if await button.get_attribute("aria-expanded") != "true":
+            await button.click()
+        panel = page.locator(f'[id="{await button.get_attribute("aria-controls")}"]')
+        fieldset = panel.get_by_role("group", name=group, exact=True)
+        # Click, then wait: the controls follow the table's state (often the
+        # URL, which the router updates after the click), so Playwright's
+        # `check()`, which reads the state at once, would fail.
+        boxes = fieldset.locator('input[type="checkbox"]')
+        if await boxes.count():
+            for index in range(await boxes.count()):
+                box = boxes.nth(index)
+                want = await box.get_attribute("data-value") == value
+                if await box.is_checked() != want:
+                    await box.click()
+                    await expect(box).to_be_checked(checked=want)
+        else:
+            radio = fieldset.locator(f'input[type="radio"][data-value="{value}"]')
+            await radio.click()
+            await expect(radio).to_be_checked()
+        await page.keyboard.press("Escape")
+        await page.mouse.move(0, 0)
+
+    return choose

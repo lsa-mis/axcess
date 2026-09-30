@@ -18,10 +18,12 @@ The fixture is built so each guarantee fails loudly rather than silently:
 from __future__ import annotations
 
 import asyncio
+import gzip
 import re
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.interaction import InteractionProbe
@@ -35,23 +37,13 @@ def _file_url(name: str) -> str:
 
 playwright = pytest.importorskip("playwright.async_api")
 
-
-@pytest.fixture
-async def browser():  # type: ignore[no-untyped-def]
-    from playwright.async_api import async_playwright
-
-    pw = await async_playwright().start()
-    try:
-        browser = await pw.chromium.launch(headless=True)
-        try:
-            yield browser
-        finally:
-            await browser.close()
-    finally:
-        await pw.stop()
+# One browser per module (tests/integration/conftest.py), so the tests run on
+# the module's event loop. Each still gets its own context from ``page``, and
+# the tests that take ``browser`` build and close their own.
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(loop_scope="module")
 async def page(browser):  # type: ignore[no-untyped-def]
     ctx = await browser.new_context(viewport={"width": 1440, "height": 900})
     try:
@@ -67,7 +59,6 @@ def axe() -> AxeAnalyzer:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_reveals_violation_that_only_exists_after_a_click(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The unlabelled input appears only after "Add another guest"."""
     await page.goto(_file_url("hidden_state.html"))
@@ -85,7 +76,6 @@ async def test_reveals_violation_that_only_exists_after_a_click(page, axe) -> No
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_load_state_violation_is_never_reported_again(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The core dedupe guarantee.
 
@@ -107,7 +97,6 @@ async def test_load_state_violation_is_never_reported_again(page, axe) -> None: 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_never_operates_a_destructive_control(page, axe) -> None:  # type: ignore[no-untyped-def]
     """ "Sign out" must not be clicked, and the page proves it."""
     await page.goto(_file_url("hidden_state.html"))
@@ -120,7 +109,6 @@ async def test_never_operates_a_destructive_control(page, axe) -> None:  # type:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_repeated_controls_are_sampled_not_exhausted(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Ten same-shaped buttons must not produce ten clicks."""
     await page.goto(_file_url("hidden_state.html"))
@@ -133,7 +121,6 @@ async def test_repeated_controls_are_sampled_not_exhausted(page, axe) -> None:  
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_click_budget_is_respected(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A tight budget bounds the work even on a page full of controls."""
     await page.goto(_file_url("hidden_state.html"))
@@ -150,7 +137,6 @@ async def test_click_budget_is_respected(page, axe) -> None:  # type: ignore[no-
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_control_is_operated_only_once(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Regression: the nested sweep must not re-click its own parent.
 
@@ -318,7 +304,15 @@ async def test_distinct_equal_named_controls_and_fixed_controls_are_clicked(page
           for (let i=0; i<8; i++) {
             const button = document.createElement('button');
             button.className = 'card'; button.textContent = 'Details';
-            button.onclick = () => window.clicked.push(i);
+            // Each card opens its own detail, so the cards are a shape that
+            // does something. A control that changes nothing is sampled a few
+            // times and then left alone, which is a different guarantee and
+            // has its own test; this one is about equal names at distinct
+            // locations being distinct controls.
+            button.onclick = () => {
+              window.clicked.push(i);
+              button.insertAdjacentHTML('afterend', '<p>Detail ' + i + '</p>');
+            };
             document.getElementById('cards').append(button);
           }
         </script>
@@ -410,10 +404,48 @@ async def test_network_writes_and_popups_are_blocked_without_affecting_other_tab
             for _, url in requests
         )
         assert "https://fixture.test/results" in result.urls
+        # "payment" is a blocked label, so this one is refused twice over.
         assert not any("/payment" in url for url in result.urls)
         # The temporary guard must not leak into later page work.
         await page.evaluate("fetch('/after', {method:'POST'})")
         assert ("POST", "https://fixture.test/after") in requests
+    finally:
+        await context.close()
+
+
+async def test_a_button_that_opens_a_tab_reports_where_it_pointed(browser) -> None:  # type: ignore[no-untyped-def]
+    """A new-tab control is the one link the DOM cannot tell the crawler about.
+
+    ``window.open`` and ``target="_blank"`` both reach the guard before their
+    popup has a frame, so they take its unattributable-request path. That path
+    correctly refuses to let the request through, and used to forget the URL
+    with it, which left pages reachable only from such a button invisible to
+    the crawl even when they sat inside its own scope.
+
+    Refusing the request and remembering the destination are separate things.
+    The frontier still applies scope, the blocklist, and its own dedupe before
+    fetching anything.
+    """
+    context = await browser.new_context(service_workers="block")
+    fetched: list[str] = []
+    html = """
+        <button id="open" onclick="window.open('/reports/summary')">Open summary</button>
+    """
+
+    async def fixture(route):  # type: ignore[no-untyped-def]
+        fetched.append(route.request.url)
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    await context.route("**/*", fixture)
+    page = await context.new_page()
+    try:
+        await page.goto("https://fixture.test/")
+        fetched.clear()
+        result = await InteractionProbe(axe=_NoopAxe(), settle_ms=10).run(page)  # type: ignore[arg-type]
+        assert "https://fixture.test/reports/summary" in result.urls
+        assert not any("/reports/summary" in url for url in fetched), (
+            "the popup must still be blocked from loading"
+        )
     finally:
         await context.close()
 
@@ -500,7 +532,6 @@ async def test_reopens_the_full_path_when_a_nested_menu_closes_all_ancestors(pag
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_coverage_counts_operated_controls_and_names_the_bound(page, axe) -> None:  # type: ignore[no-untyped-def]
     """A capped sweep must report what it left alone, not just what it did.
 
@@ -522,7 +553,6 @@ async def test_coverage_counts_operated_controls_and_names_the_bound(page, axe) 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_controls_revealed_by_a_click_are_counted_as_discovered(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Depth-limited exploration still records the controls it uncovered."""
     await page.goto(_file_url("nested_depth.html"))
@@ -541,7 +571,6 @@ async def test_controls_revealed_by_a_click_are_counted_as_discovered(page, axe)
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_is_closed_before_the_next_control_is_used(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Escape-closable and button-closable dialogs must both be cleared.
 
@@ -566,7 +595,6 @@ async def test_a_dialog_is_closed_before_the_next_control_is_used(page, axe) -> 
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_that_will_not_close_stops_the_page_and_is_reported(page, axe) -> None:  # type: ignore[no-untyped-def]
     """The stuck dialog must end the sweep rather than click through an overlay.
 
@@ -595,7 +623,6 @@ async def test_a_dialog_that_will_not_close_stops_the_page_and_is_reported(page,
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_controls_inside_a_dialog_are_still_explored_before_it_closes(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Closing the dialog must not cost the coverage inside it.
 
@@ -613,7 +640,6 @@ async def test_controls_inside_a_dialog_are_still_explored_before_it_closes(page
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_dialog_ignoring_escape_is_closed_by_its_own_close_control(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Escape is not the only exit, so a dialog that ignores it still closes.
 
@@ -639,7 +665,6 @@ async def test_a_dialog_ignoring_escape_is_closed_by_its_own_close_control(page,
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # type: ignore[no-untyped-def]
     """role="dialog" alone is not modal, and must not cost the rest of the page.
 
@@ -663,3 +688,171 @@ async def test_a_non_modal_dialog_never_stops_the_page(page, axe) -> None:  # ty
     assert await page.evaluate("() => document.getElementById('m-plain').hasAttribute('data-open')")
     clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
     assert int(clicks) == 1
+
+
+@pytest.mark.integration
+async def test_capture_records_the_state_a_finding_was_revealed_in(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Every revealed finding must be able to reach the markup it was found in.
+
+    The stored page HTML is the load state, so a click-revealed element is not
+    in it. A capture is what lets the inspector show that element at all, and
+    it is only useful if the finding can be matched back to one.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.findings, "fixture should reveal at least one violation"
+    assert result.captures, "a revealed finding must come with its state"
+    # Captures are the subset of states that held something new, never all of
+    # them, and never more than the caller asked to keep.
+    assert len(result.captures) <= result.states
+    by_key = {capture.state_key: capture for capture in result.captures}
+    for finding in result.findings:
+        assert finding.state_key in by_key, finding.revealed_by
+    for capture in result.captures:
+        assert gzip.decompress(capture.html).lstrip().lower().startswith(b"<!doctype")
+        # The chain ends with the control that produced this state, so the
+        # last entry always matches the label shown beside it.
+        assert capture.path_labels[-1] == capture.revealed_by
+
+
+@pytest.mark.integration
+async def test_a_failed_capture_costs_nothing_but_the_capture(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A capture that throws must not take the sweep down with it.
+
+    ``_operate`` runs the nested sweep, the dialog-dismissal loop and the
+    Escape unwind inside one ``try``. An exception escaping the capture would
+    skip dismissing a dialog the click just opened, and every later click would
+    land on that dialog's overlay while the ledger counted them as coverage.
+    ``page.content()`` throws in normal operation, so this is not hypothetical.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate("() => document.getElementById('stuck').remove()")
+
+    async def explode() -> str:
+        raise RuntimeError("page is navigating and changing the content")
+
+    page.content = explode  # type: ignore[method-assign]
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    assert result.captures == (), "the capture should have been abandoned"
+    # Everything the capture sits in front of still happened.
+    assert result.findings, "detection must be unaffected by a capture failure"
+    assert result.dialogs_opened == 2, "dialog cleanup ran"
+    assert result.dialogs_stuck == 0
+    clicks = await page.evaluate("() => document.getElementById('after-count').textContent")
+    assert int(clicks) == 1, "the sweep reached the control past the dialogs"
+
+
+@pytest.mark.integration
+async def test_a_grid_of_inert_controls_does_not_consume_the_page_budget(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """A date picker must not cost a page its whole sweep.
+
+    Its cells share one shape and answer a click by changing nothing, so the
+    repeat cap alone lets a page spend twenty clicks proving the same thing
+    twenty times. On a real authenticated scan that was most of the run: 40% of
+    every click produced no DOM change, weekday cells were clicked over a
+    hundred times each, and the controls that did hold defects came last.
+    """
+    await page.goto(_file_url("inert_grid.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe, max_clicks=30).run(page, baseline=baseline)
+
+    clicks = await page.evaluate("() => window.cellClicks")
+    assert clicks <= 4, f"kept clicking an inert grid ({clicks} times)"
+    assert "inert_controls" in result.limits, "the skip must be reported as a bound"
+    # The point of stopping early: the budget reaches the control that matters.
+    assert any(finding.revealed_by == "Open options" for finding in result.findings), (
+        "the inert grid crowded out the control that reveals a defect"
+    )
+
+
+@pytest.mark.integration
+async def test_a_small_group_of_controls_is_never_sampled(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """Three duds out of four is not evidence about the fourth.
+
+    Counterexample from review: giving up on a shape after three no-change
+    clicks lost a real defect when the shape had only four members and the
+    last one opened a panel. Sampling is an inference about a population, so
+    it must not run without one -- below the population floor every control is
+    tried, whatever the inert cutoff says.
+    """
+    await page.set_content(
+        """
+        <button class="op" id="a" onclick="void 0">Option A</button>
+        <button class="op" id="b" onclick="void 0">Option B</button>
+        <button class="op" id="c" onclick="void 0">Option C</button>
+        <button class="op" id="d">Option D</button>
+        <div id="panel" hidden><input id="unlabelled"></div>
+        <script>
+          document.getElementById('d').onclick = () => { panel.hidden = false; };
+        </script>
+        """
+    )
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe, settle_ms=0, max_inert_repeats=3).run(
+        page, baseline=baseline
+    )
+
+    assert any(f.violation.rule_id == "label" for f in result.findings), (
+        "the fourth control was skipped and its defect lost"
+    )
+
+
+@pytest.mark.integration
+async def test_a_revealed_element_is_photographed_while_its_state_is_open(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """The only moment the element is on screen.
+
+    The load-state screenshot pass runs after exploration, by which point the
+    sweep has closed the menus and dismissed the dialogs it opened. Every
+    interaction-revealed finding therefore reached the report with no
+    screenshot at all -- 1,128 of them on one real scan.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    seen: list[str] = []
+
+    async def shot(target_page, selector: str) -> bytes:  # type: ignore[no-untyped-def]
+        # Proves the element is actually present when the probe asks for it,
+        # rather than merely that a callback was invoked.
+        assert await target_page.locator(selector).first.count() == 1, selector
+        seen.append(selector)
+        return b"PNG:" + selector.encode()
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline, capture_screenshot=shot)
+
+    assert result.findings, "fixture should reveal a violation"
+    assert seen, "no revealed element was offered to the screenshot pass"
+    # Keyed by target_hash, which is what the repo layer looks them up by.
+    for finding in result.findings:
+        if finding.target_selector not in ("", "body", "html"):
+            assert finding.target_hash in result.screenshots, finding.revealed_by
+
+
+@pytest.mark.integration
+async def test_a_screenshot_failure_costs_nothing_but_the_screenshot(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """It sits ahead of the dialog-dismissal loop, like the DOM capture.
+
+    An exception escaping here would leave a modal open, and every later click
+    would land on its overlay while the ledger counted them as coverage.
+    """
+    await page.goto(_file_url("modal_dismissal.html"))
+    baseline = await axe.run(page, "AA")
+    await page.evaluate("() => document.getElementById('stuck').remove()")
+
+    async def explode(_page, _selector: str) -> bytes:  # type: ignore[no-untyped-def]
+        raise RuntimeError("screenshot timeout")
+
+    result = await InteractionProbe(axe=axe).run(
+        page, baseline=baseline, capture_screenshot=explode
+    )
+
+    assert result.screenshots == {}
+    assert result.findings, "detection must be unaffected"
+    assert result.dialogs_opened == 2, "dialog cleanup still ran"
+    assert result.dialogs_stuck == 0

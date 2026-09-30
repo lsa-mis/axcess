@@ -1,7 +1,7 @@
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import {
+  Info,
   LayoutDashboard,
-  ListChecks,
   Menu,
   MessageSquarePlus,
   PanelLeftClose,
@@ -9,14 +9,21 @@ import {
   Plus,
   Radar,
   Search,
+  Settings,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
-import { ExternalLinkButton, LinkButton } from "./ui";
+import { Button, LinkButton } from "./ui";
+import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
 import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import { useScrollRestoration } from "../hooks/useScrollRestoration";
+import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
+import { setPreference, usePreferences } from "../hooks/usePreferences";
+import PreferenceEffects from "./PreferenceEffects";
+import ShortcutsDialog from "./ShortcutsDialog";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -34,18 +41,16 @@ interface NavItem {
 }
 
 /**
- * Nav lists DESTINATIONS only. "New scan" is an action, not a place,
- * it lives in the topbar as the single global CTA, never in the nav.
- * (Earlier versions had it in both places plus per-page header buttons:
- * three simultaneous "New scan" affordances per screen.)
+ * Nav lists DESTINATIONS only. "New scan" is an action, not a place: it is
+ * the single global CTA at the top of the sidebar (the top bar on a phone,
+ * where the sidebar is hidden), never in the nav. (Earlier versions had it
+ * in several places plus per-page header buttons: three simultaneous
+ * "New scan" affordances per screen.) Search and feedback are actions too:
+ * they sit in the sidebar beside the nav, not inside it, so the landmark
+ * still lists only places.
  */
 const NAV: NavItem[] = [
-  {
-    to: "/",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    isActive: (p) => p === "/",
-  },
+  // The Dashboard is hidden for now; "/" redirects to Reports.
   {
     // ``Scans`` highlights for any /scans/* route INCLUDING the new-scan
     // form (it's contextually part of the scans section now that it has
@@ -58,82 +63,99 @@ const NAV: NavItem[] = [
     isActive: (p) =>
       p === "/scans" || p.startsWith("/scans/") || p.startsWith("/findings/"),
   },
-  {
-    to: "/tracking",
-    label: "Tracking",
-    icon: ListChecks,
-    isActive: (p) => p === "/tracking",
-  },
+  // The Product roadmap (/tracking) is hidden from the nav for now; the
+  // route still resolves for anyone with the direct link.
 ];
 
-/**
- * Brand mark: maize rounded square with blue "Ax", the product wordmark
- * (Axcess = access + the axe-core engine at its centre). Inverted relative
- * to the favicon (blue square, maize letters) because the sidebar is
- * already UMich blue.
- */
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        "flex shrink-0 select-none items-center justify-center rounded-[10px] bg-umich-maize font-black tracking-tighter text-umich-blue shadow-[0_5px_16px_rgba(255,203,5,0.18)]",
-        className,
-      )}
-    >
-      Ax
-    </span>
-  );
-}
+/** Alt+1..3, in this order (Settings > Keyboard lists the same). */
+const PLACE_SHORTCUTS: Record<string, string> = {
+  Digit1: "/scans",
+  Digit2: "/about",
+  Digit3: "/settings",
+};
 
-/** Remember the sidebar collapse across sessions; fail soft when storage is
- * unavailable (private mode / test environment). */
-function readSidebarPref(): boolean {
-  try {
-    return localStorage.getItem("axcess.sidebar.collapsed") === "1";
-  } catch {
-    return false;
-  }
+/** A single-character shortcut must never fire while someone is typing. */
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName);
 }
 
 /**
- * App shell: UMich-Blue sidebar with Maize accent for the active item,
- * topbar with the product name + the single global "New scan" CTA,
- * skip-link for a11y, main content area.
+ * App shell: UMich-Blue sidebar with Maize accent for the active item, the
+ * single global "New scan" CTA, search and feedback; topbar with the
+ * breadcrumb; skip-link for a11y, main content area.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarPref);
+  const prefs = usePreferences();
+  const sidebarCollapsed = prefs.sidebar === "collapsed";
+  const shortcutsOn = prefs.shortcuts === "on";
+  const navigate = useNavigate();
   const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [sidebarNote, setSidebarNote] = useState("");
   const previousPath = useRef(pathname);
   const routeLabel = routeTitle(pathname);
   const reportMatch = reportRouteMatch(pathname);
 
-  // Cmd/Ctrl+K opens the search-everything palette anywhere in the app.
+  // Two-finger swipe back/forward in the desktop app, which has no browser
+  // gesture of its own; a no-op in a browser tab, which does.
+  useSwipeNavigation();
+
+  // The rail's state is the Settings > Sidebar preference, so the toggle here
+  // and the setting there are one value.
+  const toggleSidebar = useCallback(
+    () => setPreference("sidebar", sidebarCollapsed ? "open" : "collapsed"),
+    [sidebarCollapsed],
+  );
+
+  // Cmd/Ctrl+K opens the search-everything palette anywhere in the app;
+  // Cmd/Ctrl+B shows or hides the sidebar; Alt+1..3 go to the three places
+  // and "?" lists them. All of it can be turned off in Settings, for readers
+  // whose assistive tech wants the keys.
   useEffect(() => {
+    if (!shortcutsOn) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && (event.key === "k" || event.key === "K")) {
         event.preventDefault();
         setCommandOpen((was) => !was);
+        return;
+      }
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        (event.key === "b" || event.key === "B")
+      ) {
+        // Below `md` the sidebar is not drawn at all (the top bar's menu
+        // stands in for it), so the key would flip an invisible setting.
+        if (!window.matchMedia("(min-width: 768px)").matches) return;
+        event.preventDefault();
+        toggleSidebar();
+        // The button says its state through aria-expanded, but a shortcut
+        // leaves focus where it was, so nothing else would tell a screen
+        // reader user the key did anything.
+        setSidebarNote(sidebarCollapsed ? "Sidebar shown" : "Sidebar hidden");
+        return;
+      }
+      if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+        // `code`, not `key`: on a Mac, Alt+1 types "¡".
+        const to = PLACE_SHORTCUTS[event.code];
+        if (to) {
+          event.preventDefault();
+          navigate(to);
+        }
+        return;
+      }
+      if (event.key === "?" && !event.metaKey && !event.ctrlKey && !isTyping(event.target)) {
+        event.preventDefault();
+        setShortcutsOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const toggleSidebar = () => {
-    setSidebarCollapsed((collapsed) => {
-      const next = !collapsed;
-      try {
-        localStorage.setItem("axcess.sidebar.collapsed", next ? "1" : "0");
-      } catch {
-        // Storage unavailable (private mode / tests), the toggle still works
-        // for the session, it just won't persist.
-      }
-      return next;
-    });
-  };
+  }, [navigate, shortcutsOn, sidebarCollapsed, toggleSidebar]);
 
   useEffect(() => {
     document.title = `${routeLabel} · Axcess`;
@@ -151,15 +173,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, routeLabel]);
 
-  useEffect(() => {
-    // Every route starts at the top. React Router keeps the previous page's
-    // offset by default, so opening a short page from a long one landed the
-    // reader partway down it. Deliberately not inside the focus effect above:
-    // that one runs in a requestAnimationFrame, which never fires while the
-    // tab is in the background, and where the page starts should not depend
-    // on whether anyone was watching it load.
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [pathname]);
+  // A new page starts at the top; Back and Forward return to where the
+  // reader was (see the hook). Deliberately not inside the focus effect
+  // above: that one runs in a requestAnimationFrame, which never fires while
+  // the tab is in the background, and where the page starts should not
+  // depend on whether anyone was watching it load.
+  useScrollRestoration();
 
   return (
     <div className="min-h-screen bg-surface-subtle">
@@ -171,19 +190,32 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </a>
 
       <div className="flex min-h-screen items-start">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={toggleSidebar}
+          toggleShortcut={shortcutsOn}
+          onSearch={() => setCommandOpen(true)}
+        />
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
-            sidebarCollapsed={sidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
-            onSearch={() => setCommandOpen(true)}
           />
-          {mobileNavOpen && <MobileNav pathname={pathname} />}
-          <div className="border-b border-border bg-surface px-2 py-1 md:hidden"><ReportCrumb /></div>
+          {mobileNavOpen && (
+            <MobileNav pathname={pathname} onSearch={() => setCommandOpen(true)} />
+          )}
+          {/* Sticky with the bar above it. Left in the scroll flow it slid
+              under the sticky top bar, and a crumb that is half-covered is a
+              target a thumb cannot reliably hit (SC 2.5.8) — it either sits
+              fully above the content or it does not show at all. */}
+          <div className="sticky top-[72px] z-10 border-b border-border bg-surface px-2 py-1 md:hidden">
+            <ReportCrumb />
+          </div>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
+          </div>
+          <div className="sr-only" role="status">
+            {sidebarNote}
           </div>
           <main
             id="main"
@@ -200,44 +232,238 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onClose={() => setCommandOpen(false)}
         scanId={reportMatch?.scanId ?? null}
       />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <PreferenceEffects />
     </div>
   );
 }
 
-function Sidebar({ collapsed }: { collapsed: boolean }) {
+/**
+ * The sidebar's two kinds of control look different on purpose, the way Zen's
+ * sidebar sets its button tiles apart from its tab list. New scan and Search
+ * are actions: two button tiles side by side at the top, in the app's own
+ * button styles. The places below them are flat full-width rows, one of
+ * which is lit as where you are.
+ */
+const SIDEBAR_TILE = "h-12 w-full px-2";
+
+/** One sidebar row, shared by the nav links and the feedback link. */
+const SIDEBAR_ROW =
+  "group relative flex min-h-target w-full items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]";
+const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-blue";
+/**
+ * The current place is a white card, the way Zen marks its selected tab:
+ * lighter than the sidebar, no outline. It was filled blue, which is the New
+ * scan button's colour, so the place you were in read as another button. No
+ * border keeps it apart from the bordered Search button, and the bar on its
+ * edge marks it by shape as well as by colour.
+ */
+const SIDEBAR_ROW_ACTIVE =
+  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue";
+
+/**
+ * Search and feedback: reachable from every screen, so they live in the
+ * shell. Search leads the sidebar, above the places it can take you;
+ * feedback closes it, out of the way of the work. Collapsed, both keep
+ * their full name on the control and in the tooltip.
+ *
+ * Feedback carries no scan context: Asana forms have no documented
+ * URL-prefill contract, so there is no supported way to attach the current
+ * page, and guessing at one could put a scanned URL into a third-party form.
+ */
+/**
+ * The one "Create New Scan" action. Scan type is chosen on the new-scan page,
+ * so this stays mode-neutral: the shell never makes users pick a workflow
+ * before they have seen the explanation for each option.
+ *
+ * It looks and works the same on every screen, the New scan form included.
+ * There it is marked aria-current="page", a link to where the reader already
+ * is ("Start a new scan, current page, link"), and following it replaces the
+ * history entry, so it adds no extra step to Back. It used to turn grey and
+ * inert on the form (ghost, 50% opacity, aria-disabled, out of the tab
+ * order): that read as broken or unavailable rather than "you are here", and
+ * the shell's controls then differed from screen to screen. Changed at the
+ * developer's request. Rests on SC 3.2.4 Consistent Identification (Level
+ * AA): the same function is identified the same way wherever it appears;
+ * and W3C COGA, "Making Content Usable" (https://www.w3.org/TR/coga-usable/):
+ * the same control for the same job, everywhere.
+ */
+function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?: string }) {
+  const { pathname } = useLocation();
+  const onNewScanForm = pathname === "/scans/new";
+  return (
+    <LinkButton
+      to="/scans/new"
+      variant="primary"
+      size="md"
+      className={className}
+      aria-current={onNewScanForm ? "page" : undefined}
+      replace={onNewScanForm}
+      aria-label="Start a new scan"
+      title="Start a new accessibility scan"
+    >
+      <Plus className="h-5 w-5 shrink-0" aria-hidden />
+      {/* "New scan" fits half the sidebar; the accessible name and tooltip
+          keep the full phrase, which contains these words (SC 2.5.3). */}
+      {!iconOnly && <span>New scan</span>}
+    </LinkButton>
+  );
+}
+
+function SearchAction({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={onSearch}
+      aria-label="Search everything (Cmd+K)"
+      title="Search everything (Cmd/Ctrl+K)"
+      className={SIDEBAR_TILE}
+    >
+      <Search className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>Search</span>}
+    </Button>
+  );
+}
+
+function FeedbackAction({ collapsed }: { collapsed: boolean }) {
+  return (
+    <a
+      href={FEEDBACK_FORM_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Give feedback (opens in a new tab)"
+      title="Give feedback (opens in a new tab)"
+      className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
+    >
+      <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>Give feedback</span>}
+    </a>
+  );
+}
+
+/**
+ * About and Settings are places, but reference ones: they sit at the foot of
+ * the sidebar with feedback rather than among the working sections, so the
+ * nav above stays the places the work happens.
+ *
+ * Settings was considered right under Reports, where it would be found at
+ * a glance. It stays here: moving it would mix the app's own utilities into
+ * the places a reader works, and the foot group does not scroll away, so it
+ * is always in view anyway. What WCAG asks is that the order never changes
+ * from page to page (SC 3.2.3 Consistent Navigation, Level AA), which one
+ * fixed foot group gives.
+ */
+const FOOT_PLACES = [
+  { to: "/about", label: "About", name: "About Axcess", icon: Info },
+  { to: "/settings", label: "Settings", name: "Settings", icon: Settings },
+] as const;
+
+function FootLink({
+  place,
+  collapsed,
+  active,
+}: {
+  place: (typeof FOOT_PLACES)[number];
+  collapsed: boolean;
+  active: boolean;
+}) {
+  const Icon = place.icon;
+  return (
+    <Link
+      to={place.to}
+      aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? place.name : undefined}
+      title={collapsed ? place.name : undefined}
+      className={cn(
+        SIDEBAR_ROW,
+        collapsed ? "justify-center px-2" : "px-3",
+        active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
+      )}
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>{place.label}</span>}
+    </Link>
+  );
+}
+
+function Sidebar({
+  collapsed,
+  onToggle,
+  toggleShortcut,
+  onSearch,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  /** Whether Cmd/Ctrl+B toggles it (keyboard shortcuts are on). */
+  toggleShortcut: boolean;
+  onSearch: () => void;
+}) {
   const { pathname } = useLocation();
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-[linear-gradient(180deg,#001E3C_0%,#00274C_52%,#00315F_100%)] text-fg-inverse shadow-[8px_0_30px_rgba(0,39,76,0.08)] transition-[width] duration-150 md:flex",
+        // Light neutral ramp drawn from the surface tokens. Everything on it
+        // uses the standard foreground ramp rather than the inverse one: at the
+        // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
+        // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,rgb(var(--c-sidebar-1))_0%,rgb(var(--c-sidebar-2))_52%,rgb(var(--c-sidebar-3))_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
         collapsed ? "w-16" : "w-64",
       )}
       aria-label="Primary"
     >
       <div
         className={cn(
-          "flex h-[72px] items-center gap-3 border-b border-white/10",
-          collapsed ? "justify-center px-2" : "px-5",
+          "flex h-[72px] items-center border-b border-border",
+          collapsed ? "justify-center px-2" : "gap-2 px-5",
         )}
       >
-        <BrandMark className="h-9 w-9 text-sm" />
+        {/* Collapsed, the rail is 64px: a 44px target and the wordmark cannot
+            both sit here, and the toggle has to win because it is the only way
+            back. Expanded, the brand leads and the toggle sits at the far end. */}
         {!collapsed && (
-          <div className="min-w-0">
-            <span className="block text-lg font-semibold leading-tight tracking-[-0.025em]">
+          <>
+            <BrandMark className="h-8 w-8 text-umich-blue" />
+            <span className="min-w-0 flex-1 truncate text-xl font-medium leading-tight tracking-[-0.025em]">
               Axcess
             </span>
-            <span className="block text-2xs font-medium tracking-wide text-surface-inverse-fg-subtle">
-              Accessibility workbench
-            </span>
-          </div>
+          </>
         )}
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
+        <button
+          type="button"
+          aria-label={
+            collapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
+          }
+          aria-expanded={!collapsed}
+          aria-keyshortcuts={toggleShortcut ? "Meta+B Control+B" : undefined}
+          title={
+            (collapsed ? "Expand sidebar" : "Collapse sidebar") +
+            (toggleShortcut ? " (⌘/Ctrl+B)" : "")
+          }
+          onClick={onToggle}
+          className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center rounded-xs text-fg-muted transition-colors hover:bg-umich-blue/10 hover:text-umich-blue"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-5 w-5" aria-hidden />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" aria-hidden />
+          )}
+        </button>
       </div>
-      <nav className={cn("flex-1 py-5", collapsed ? "px-2" : "px-3")}>
-        {!collapsed && (
-          <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.16em] text-surface-inverse-fg-subtle">
-            Workspace
-          </p>
+      {/* Actions first, as one row of button tiles: New scan (filled, the
+          primary action) beside Search. Collapsed, the rail is too narrow for
+          two, so they stack as icon-only tiles. */}
+      <div
+        className={cn(
+          "grid gap-2 pt-5",
+          collapsed ? "grid-cols-1 px-2" : "grid-cols-2 px-3",
         )}
+      >
+        <NewScanAction iconOnly={collapsed} className={SIDEBAR_TILE} />
+        <SearchAction collapsed={collapsed} onSearch={onSearch} />
+      </div>
+      <nav className={cn("flex-1 pb-5 pt-4", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
           {NAV.map((item) => {
             const Icon = item.icon;
@@ -253,11 +479,9 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
                   // and the slightly larger icon (h-5) plus base text reads
                   // as a primary surface, not a sub-list of links.
                   className={cn(
-                    "group relative flex min-h-target items-center gap-3 rounded-xs py-2.5 text-sm font-semibold no-underline transition-[background-color,color,box-shadow]",
+                    SIDEBAR_ROW,
                     collapsed ? "justify-center px-2" : "px-3",
-                    active
-                      ? "bg-white text-umich-blue shadow-[0_6px_18px_rgba(0,0,0,0.13)]"
-                      : "text-surface-inverse-fg-subtle hover:bg-white/10 hover:text-white",
+                    active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
                   )}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden />
@@ -268,17 +492,12 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
           })}
         </ul>
       </nav>
-      {/* Footer caption uses the `inverse-fg-subtle` token (#C9D4E0), at
-          10:1 against UMich Blue it clears AAA. Plain `text-white/60`
-          rendered as ~#99A9B7, which axe flagged at 6.24:1 (fails AAA). */}
-      {!collapsed && (
-        <div className="border-t border-white/10 px-5 py-4 text-2xs text-surface-inverse-fg-subtle">
-          <p className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-umich-maize" aria-hidden />
-            Local-first evidence workspace
-          </p>
-        </div>
-      )}
+      <div className={cn("space-y-1 border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
+        <FeedbackAction collapsed={collapsed} />
+        {FOOT_PLACES.map((place) => (
+          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to} />
+        ))}
+      </div>
     </aside>
   );
 }
@@ -288,56 +507,33 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
  * <route name>", which restated the <h1> sitting a few pixels below it,
  * two orientation lines saying the same thing, neither of which said
  * *which report* you were in. The breadcrumb above each page title is now
- * the single answer to "where am I", and this bar carries only the two
- * actions that belong on every screen.
+ * the single answer to "where am I", and on a desktop that is all this bar
+ * carries: "Create New Scan", search and feedback live in the sidebar. On a
+ * phone the sidebar is hidden, so the bar keeps the brand, the menu button
+ * and the new-scan action.
  */
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
-  sidebarCollapsed,
-  onToggleSidebar,
-  onSearch,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
-  onSearch: () => void;
 }) {
-  const { pathname } = useLocation();
-  const onNewScanForm = pathname === "/scans/new";
   return (
     <header
-      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-white/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
+      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
-      {/* Desktop sidebar toggle, reclaims the sidebar's 256px for wide views
-          such as the page inspector, while keeping nav one click away. */}
-      <button
-        type="button"
-        aria-label={
-          sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"
-        }
-        aria-expanded={!sidebarCollapsed}
-        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        onClick={onToggleSidebar}
-        className="hidden min-h-target min-w-target items-center justify-center rounded-xs text-fg-muted hover:bg-surface-muted hover:text-fg md:inline-flex"
-      >
-        {sidebarCollapsed ? (
-          <PanelLeftOpen className="h-5 w-5" aria-hidden />
-        ) : (
-          <PanelLeftClose className="h-5 w-5" aria-hidden />
-        )}
-      </button>
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
       <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
           type="button"
           aria-label={
             mobileNavOpen
-              ? "Close primary navigation"
-              : "Open primary navigation"
+              ? "Close menu"
+              : "Open menu"
           }
           aria-expanded={mobileNavOpen}
           aria-controls="mobile-primary-nav"
@@ -351,122 +547,129 @@ function TopBar({
           )}
         </button>
         <BrandMark className="h-8 w-8 text-xs" />
-        <span className="hidden font-semibold leading-tight text-fg sm:inline">
+        <span className="hidden font-medium leading-tight text-fg sm:inline">
           Axcess
         </span>
       </div>
-      {/* Scan type is chosen on the new-scan page. Keep one global action in
-          the shell so the header does not make users choose a workflow before
-          they have seen the explanation for each option.
-
-          "Send feedback" sits beside it because feedback is worth asking for
-          from every screen, and a single fixed home is easier to find than a
-          per-page control. It carries no scan context: Asana forms have no
-          documented URL-prefill contract, so there is no supported way to
-          attach the current page, and guessing at one could put a scanned
-          URL into a third-party form. */}
-      <div className="hidden min-w-0 md:block">
+      {/* flex-1: the trail's room is the bar's, not its own content's. The
+          crumbs are cut to fit this width, so a width that followed them
+          would shrink with every cut. */}
+      <div className="hidden min-w-0 flex-1 md:block">
         <ReportCrumb />
       </div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Search everything (Cmd+K)"
-          title="Search everything (Cmd/Ctrl+K)"
-          className="inline-flex min-h-target items-center gap-1.5 rounded-xs px-3 text-sm font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
-        >
-          <Search className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Search</span>
-        </button>
-        <ExternalLinkButton
-          href={FEEDBACK_FORM_URL}
-          variant="ghost"
-          size="md"
-          className="px-3"
-          aria-label="Give feedback (opens in a new tab)"
-          title="Give feedback (opens in a new tab)"
-        >
-          <MessageSquarePlus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Give feedback</span>
-        </ExternalLinkButton>
-        <LinkButton
-          to="/scans/new"
-          variant={onNewScanForm ? "ghost" : "primary"}
-          size="md"
-          className={cn(onNewScanForm && "pointer-events-none opacity-50")}
-          aria-disabled={onNewScanForm || undefined}
-          tabIndex={onNewScanForm ? -1 : undefined}
-          aria-label="Create New Scan"
-          title="Create a new accessibility scan"
-        >
-          <Plus className="h-5 w-5" aria-hidden />
-          <span className="hidden sm:inline">Create New Scan</span>
-        </LinkButton>
+      <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
+        <NewScanAction iconOnly />
       </div>
     </header>
   );
 }
 
-function MobileNav({ pathname }: { pathname: string }) {
+/** The sidebar's stand-in below md: the same places, then search, about, settings and feedback. */
+function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => void }) {
+  const action =
+    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold text-fg-inverse no-underline hover:bg-white/10";
   return (
-    <nav
+    <div
       id="mobile-primary-nav"
-      aria-label="Primary"
-      className="border-b border-border bg-umich-blue p-2 text-white shadow-card md:hidden"
+      className="border-b border-border bg-umich-blue p-2 text-fg-inverse shadow-card md:hidden"
     >
-      <ul className="grid grid-cols-3 gap-1">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const active = item.isActive(pathname);
+      <nav aria-label="Primary">
+        <ul className="grid grid-cols-3 gap-1">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const active = item.isActive(pathname);
+            return (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
+                    active
+                      ? "bg-surface text-umich-blue"
+                      : "text-fg-inverse hover:bg-white/10",
+                  )}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <div className="mt-1 grid grid-cols-2 gap-1 border-t border-white/20 pt-1">
+        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label="Search everything (Cmd+K)"
+          className={action}
+        >
+          <Search className="h-4 w-4" aria-hidden />
+          <span>Search</span>
+        </button>
+        {FOOT_PLACES.map((place) => {
+          const Icon = place.icon;
+          const active = pathname === place.to;
           return (
-            <li key={item.to}>
-              <Link
-                to={item.to}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
-                  active
-                    ? "bg-white text-umich-blue"
-                    : "text-white hover:bg-white/10",
-                )}
-              >
-                <Icon className="h-4 w-4" aria-hidden />
-                <span>{item.label}</span>
-              </Link>
-            </li>
+            <Link
+              key={place.to}
+              to={place.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(action, active && "bg-surface text-umich-blue hover:bg-surface")}
+            >
+              <Icon className="h-4 w-4" aria-hidden />
+              <span>{place.label}</span>
+            </Link>
           );
         })}
-      </ul>
-    </nav>
+        <a
+          href={FEEDBACK_FORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Give feedback (opens in a new tab)"
+          className={action}
+        >
+          <MessageSquarePlus className="h-4 w-4" aria-hidden />
+          <span>Give feedback</span>
+        </a>
+      </div>
+    </div>
   );
 }
 
 function routeTitle(pathname: string): string {
   const routes: Array<[RegExp, string]> = [
-    [/^\/$/, "Dashboard"],
+    [/^\/$/, "Reports"],
     [/^\/scans\/?$/, "Reports"],
     [/^\/scans\/new\/?$/, "New scan"],
     [/^\/scans\/protected\/new\/?$/, "New scan"],
-    [/^\/scans\/\d+\/protected\/manual-checks\/?$/, "Protected manual checks"],
-    [/^\/scans\/\d+\/protected\/issues\/?$/, "Protected issue index"],
-    [/^\/scans\/\d+\/protected\/?$/, "Protected companion"],
+    [/^\/scans\/\d+\/protected\/manual-checks\/?$/, "Manual checks for the sign-in scan"],
+    [/^\/scans\/\d+\/protected\/issues\/?$/, "Sign-in scan issues"],
+    [/^\/scans\/\d+\/protected\/?$/, "Sign-in scan"],
     [
       /^\/scans\/\d+\/(?:review|manual-checks|handoff)\/?$/,
       "Accessibility issues",
     ],
     [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
-    [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page evidence"],
+    [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
+    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/\d+\/screenshots\/?$/, "Issue screenshots"],
+    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
-    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Grouped image evidence"],
-    [/^\/scans\/\d+\/findings\/?$/, "Image evidence"],
-    [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "DOM-engine rules"],
-    [/^\/scans\/\d+\/a11y\/?$/, "DOM-engine evidence"],
-    [/^\/scans\/\d+\/diff\/?$/, "Verify changes"],
-    [/^\/scans\/\d+\/?$/, "Report overview"],
-    [/^\/findings\/\d+\/?$/, "Finding evidence"],
-    [/^\/tracking\/?$/, "Coverage tracking"],
+    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+    [/^\/scans\/\d+\/findings\/?$/, "Images"],
+    [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
+    [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
+    [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
+    // Only running and failed scans render here; a completed report
+    // redirects to its issue table.
+    [/^\/scans\/\d+\/?$/, "Scan status"],
+    [/^\/findings\/\d+\/?$/, "Image details"],
+    [/^\/tracking\/?$/, "Product roadmap"],
+    [/^\/about\/?$/, "About"],
+    [/^\/settings\/?$/, "Settings"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

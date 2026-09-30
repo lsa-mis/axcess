@@ -8,12 +8,17 @@ read-only MCP tools use the same scope and manual-test record.
 
 from __future__ import annotations
 
+import gzip
 import sqlite3
 from collections import defaultdict
 from typing import Any
 
 from audit import coverage_matrix
 from audit.analyzer.alfa_evidence import normalize_finding
+from audit.analyzer.semantic.extractor import locate_ordinals
+from audit.extractor.html_images import locate_image_refs
+from audit.extractor.svg_text import locate_inline_svg_text
+from audit.web import image_findings_queries
 
 OUTCOMES = frozenset({"not_started", "pass", "fail", "not_tested", "needs_follow_up"})
 EVALUATION_STATUSES = frozenset({"draft", "in_progress", "completed"})
@@ -464,7 +469,11 @@ def get_page_evidence(
                    -- it the evidence page lists a dialog that does not exist
                    -- until something is clicked, alongside findings that are
                    -- present on load, with nothing to tell them apart.
-                   revealed_by
+                   revealed_by,
+                   -- Which captured state to open in the inspector. The label
+                   -- above cannot decide that on its own: several controls on
+                   -- a page can answer to the same name.
+                   revealed_state_key
               FROM page_a11y_findings
              WHERE page_id = ? AND scan_id = ?
              ORDER BY CASE impact WHEN 'critical' THEN 0 WHEN 'serious' THEN 1
@@ -478,8 +487,8 @@ def get_page_evidence(
         dict(row)
         for row in conn.execute(
             """
-            SELECT pi.id AS occurrence_id, pi.alt_text, pi.context_snippet, pi.position,
-                   pi.above_fold, i.content_hash, i.src_url_canonical, i.mime,
+            SELECT pi.id AS occurrence_id, pi.image_id, pi.alt_text, pi.context_snippet,
+                   pi.position, pi.above_fold, i.content_hash, i.src_url_canonical, i.mime,
                    a.ocr_text, a.vlm_classification, a.vlm_rationale
               FROM page_images pi
               JOIN images i ON i.id = pi.image_id
@@ -490,4 +499,121 @@ def get_page_evidence(
             (page_id,),
         ).fetchall()
     ]
+    # Which Images with text issue each image belongs to, so the inspector
+    # can outline the images of the issue it was opened from. An image the
+    # scan made no finding for has no key.
+    issue_keys = image_findings_queries.issue_keys_for_images(
+        conn, scan_id, sorted({int(image["image_id"]) for image in images})
+    )
+    for image in images:
+        image["issue_key"] = issue_keys.get(int(image.pop("image_id")))
+    # The saved copy is the exact document the image check and the AI review
+    # read, so their own walks over it give back the element each occurrence
+    # came from. Read only when something needs it.
+    for finding in findings:
+        finding["element_place"] = None
+    for image in images:
+        image["locator"] = None
+        image["hidden_in_copy"] = False
+    ordinal = [
+        f
+        for f in findings
+        if f["pipeline"] == "semantic"
+        and not f.get("revealed_state_key")
+        and "[ord=" in (f.get("target_selector") or "")
+    ]
+    if images or ordinal:
+        saved = _saved_copy(conn, page_id)
+        if saved is not None:
+            _add_element_places(saved[0], ordinal)
+            _add_image_locators(saved[0], saved[1], images)
     return {"page": dict(page), "a11y_findings": findings, "image_occurrences": images}
+
+
+def _saved_copy(conn: sqlite3.Connection, page_id: int) -> tuple[bytes, str] | None:
+    """The page as the scan read it, and the address it was read at; None if not kept."""
+    row = conn.execute(
+        "SELECT rendered_html, final_url, url_normalized FROM pages WHERE id = ?", (page_id,)
+    ).fetchone()
+    if row is None or row["rendered_html"] is None:
+        return None
+    try:
+        body = gzip.decompress(row["rendered_html"])
+    except (OSError, EOFError):
+        return None
+    return body, str(row["final_url"] or row["url_normalized"])
+
+
+def _add_element_places(body: bytes, findings: list[dict[str, Any]]) -> None:
+    """Name the element each AI review ``[ord=N]`` finding is about.
+
+    The inspector finds it by its index among elements of its tag, after
+    checking the count. A finding the walk cannot confirm keeps no place and
+    is located by its markup, as before.
+    """
+    places = locate_ordinals(
+        body,
+        [
+            (
+                str(f["rule_id"]).removeprefix("semantic:"),
+                str(f["target_selector"]),
+                str(f.get("html_snippet") or ""),
+            )
+            for f in findings
+        ],
+    )
+    for finding, place in zip(findings, places, strict=True):
+        if place is not None:
+            finding["element_place"] = {
+                "selector": place.selector,
+                "index": place.index,
+                "total": place.total,
+            }
+
+
+def _add_image_locators(body: bytes, base_url: str, images: list[dict[str, Any]]) -> None:
+    """Say which element of the saved copy each image occurrence came from.
+
+    Running the extractor's own walk over the saved copy again gives back
+    each stored position's element. The inspector finds that element by its
+    index among elements of its kind and checks the count and the attribute
+    before outlining it. An occurrence gets no locator when the copy and the
+    stored occurrence disagree; the inspector then says it could not find it
+    rather than guess.
+    """
+    if not images:
+        return
+    refs = locate_image_refs(body, base_url)
+    svgs = locate_inline_svg_text(body)
+    for image in images:
+        position = int(image["position"])
+        # The extractor stores inline SVG hits after every image reference.
+        if position < len(refs):
+            element = refs[position]
+            if element.alt != image["alt_text"]:
+                continue
+            if element.place is None:
+                # A <noscript> or <template> copy (in practice the no-script
+                # fallback of a lazy-loaded image): not in the copy shown.
+                image["hidden_in_copy"] = True
+            else:
+                image["locator"] = {
+                    "kind": element.tag,
+                    "index": element.place.index,
+                    "total": element.place.total,
+                    "candidate": element.candidate,
+                    "text": None,
+                }
+        elif (svg := svgs.get(position - len(refs))) is not None:
+            if svg.visible_text != image["context_snippet"]:
+                continue
+            if svg.place is None:
+                image["hidden_in_copy"] = True
+            else:
+                image["locator"] = {
+                    "kind": "svg",
+                    "index": svg.place.index,
+                    "total": svg.place.total,
+                    "candidate": None,
+                    "text": svg.visible_text,
+                }

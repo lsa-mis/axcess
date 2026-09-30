@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import math
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
@@ -32,10 +33,12 @@ from audit.analyzer.interaction import (
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
+from audit.crawler import live_progress
 from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.search import SearchExplorer
 from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright, ViewportSize
@@ -45,7 +48,7 @@ log = get_logger(__name__)
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
-# Per-page cap on circled element screenshots. Each capture costs a
+# Per-page cap on outlined element screenshots. Each capture costs a
 # scroll + a screenshot (~50-150 ms); capping the count bounds the
 # crawl-time and storage cost on pathological findings-dense pages. One
 # hundred covers the ordinary "one image per issue instance" case while
@@ -53,46 +56,82 @@ _IDLE_TIMEOUT_MS = 10_000
 MAX_SHOTS_PER_PAGE = 100
 
 
-def _draw_issue_circle(
+# Location marker geometry, in image pixels. The outline sits _MARKER_GAP_PX
+# outside the element so it never covers the reported text or control: a
+# red stroke between two white halos, which keeps it visible on light, dark,
+# and red content alike.
+_MARKER_GAP_PX = 2
+_MARKER_HALO_PX = 2
+_MARKER_STROKE_PX = 3
+_MARKER_RED = (190, 0, 30, 255)
+_MARKER_WHITE = (255, 255, 255, 255)
+
+# Viewport box of an element's rendered content, or null to use its own box.
+# A block element spans its whole row even when its text is one short word,
+# so outlining the block would frame mostly blank space. The range around its
+# contents, clipped to the element, is what a reviewer needs to find. Controls
+# and replaced elements keep their own box: the control is what is reported.
+_CONTENT_BOX_JS = """
+(el) => {
+  const ownBox = 'img, svg, video, canvas, iframe, object, embed, '
+    + 'input, select, textarea, button, [role="button"]';
+  if (el.matches(ownBox)) return null;
+  if (!/\\S/.test(el.textContent || '')) return null;
+  const box = el.getBoundingClientRect();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const text = range.getBoundingClientRect();
+  const left = Math.max(text.left, box.left);
+  const top = Math.max(text.top, box.top);
+  const right = Math.min(text.right, box.right);
+  const bottom = Math.min(text.bottom, box.bottom);
+  if (right - left < 2 || bottom - top < 2) return null;
+  return {x: left, y: top, width: right - left, height: bottom - top};
+}
+"""
+
+
+def _draw_issue_outline(
     png: bytes,
     *,
-    center_x: float,
-    center_y: float,
-    target_width: float,
-    target_height: float,
+    left: float,
+    top: float,
+    width: float,
+    height: float,
 ) -> bytes:
-    """Draw a high-contrast circular location marker onto screenshot bytes.
+    """Outline the reported element on screenshot bytes.
 
-    The marker is applied after capture instead of mutating the audited DOM.
-    A white halo keeps the circle distinguishable on dark or red content; the
-    circular shape and the UI caption ensure the annotation does not rely on
-    color alone.
+    ``left``, ``top``, ``width`` and ``height`` locate the element in image
+    pixels. The rectangle follows the element's real extent, drawn just
+    outside it, so a reviewer sees exactly what was flagged and can still
+    read it. Edges beyond the image are clamped to it, so an element larger
+    than the capture is framed by the image border. The annotation is applied
+    after capture instead of mutating the audited DOM; the shape and the UI
+    caption keep the marker from relying on color alone.
     """
 
     with Image.open(io.BytesIO(png)) as source:
         image = source.convert("RGBA")
-    draw = ImageDraw.Draw(image)
-    available_radius = (
-        min(
-            center_x,
-            center_y,
-            image.width - center_x,
-            image.height - center_y,
-        )
-        - 4
-    )
-    if available_radius < 6:
+    if left >= image.width or top >= image.height or left + width <= 0 or top + height <= 0:
         return png
-    target_radius = max(24.0, min(48.0, max(target_width, target_height) / 2 + 10))
-    radius = int(min(target_radius, available_radius))
-    bounds = (
-        int(center_x - radius),
-        int(center_y - radius),
-        int(center_x + radius),
-        int(center_y + radius),
-    )
-    draw.ellipse(bounds, outline=(255, 255, 255, 255), width=10)
-    draw.ellipse(bounds, outline=(190, 0, 30, 255), width=5)
+    band = 2 * _MARKER_HALO_PX + _MARKER_STROKE_PX
+    reach = _MARKER_GAP_PX + band
+    x0, y0 = math.floor(left) - reach, math.floor(top) - reach
+    x1, y1 = math.ceil(left + width) + reach, math.ceil(top + height) + reach
+
+    def clamped(inset: int) -> tuple[int, int, int, int]:
+        return (
+            max(0, x0 + inset),
+            max(0, y0 + inset),
+            min(image.width - 1, x1 - inset),
+            min(image.height - 1, y1 - inset),
+        )
+
+    draw = ImageDraw.Draw(image)
+    # Pillow draws a rectangle's border inward from its bounds: the white band
+    # spans both halos, then the red stroke is painted over its middle.
+    draw.rectangle(clamped(0), outline=_MARKER_WHITE, width=band)
+    draw.rectangle(clamped(_MARKER_HALO_PX), outline=_MARKER_RED, width=_MARKER_STROKE_PX)
     output = io.BytesIO()
     image.save(output, format="PNG")
     return output.getvalue()
@@ -123,9 +162,10 @@ class JsFetcher:
         user_agent: str,
         viewport: ViewportSize | None = None,
         nav_timeout_ms: int = _NAV_TIMEOUT_MS,
-        idle_timeout_ms: int = _IDLE_TIMEOUT_MS,
+        idle_timeout_ms: int | None = None,
         axe_analyzer: AxeAnalyzer | None = None,
         axe_level: Level = "AA",
+        wcag_version: WcagVersion = LEGACY_WCAG_VERSION,
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
@@ -142,9 +182,12 @@ class JsFetcher:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
         self._nav_timeout_ms = nav_timeout_ms
-        self._idle_timeout_ms = idle_timeout_ms
+        # None means "use the module default"; the orchestrator passes the
+        # crawl's configured budget through unconditionally.
+        self._idle_timeout_ms = _IDLE_TIMEOUT_MS if idle_timeout_ms is None else idle_timeout_ms
         self._axe_analyzer = axe_analyzer
         self._axe_level: Level = axe_level
+        self._wcag_version: WcagVersion = wcag_version
         # SC 2.1.2 keyboard probe. When set, runs *after* the axe scan
         # (which is read-only) but before the page closes. Order
         # matters: the probe presses Tab/Esc and alters focus state,
@@ -168,7 +211,7 @@ class JsFetcher:
         # an opened menu. Off unless explicitly attached, it is the most
         # expensive pass here (one axe run per revealed state).
         self._interaction_probe = interaction_probe
-        # When set, capture a circled screenshot of each live-page
+        # When set, capture an outlined screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
         # Protected scans own one manually-authenticated BrowserContext in the
@@ -306,7 +349,10 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                axe_violations = await self._axe_analyzer.run(page, level=self._axe_level)
+                with live_progress.check("axe"):
+                    axe_violations = await self._axe_analyzer.run(
+                        page, level=self._axe_level, version=self._wcag_version
+                    )
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe
@@ -317,7 +363,8 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                keyboard_traps = await self._keyboard_probe.run(page)
+                with live_progress.check("keyboard"):
+                    keyboard_traps = await self._keyboard_probe.run(page)
             # Responsive probe LAST, it resizes the viewport and
             # injects CSS, so every read-only/quiet-DOM consumer must
             # already be done. Probe never raises; restores viewport.
@@ -354,7 +401,19 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                interaction = await self._interaction_probe.run(page, baseline=axe_violations)
+                with live_progress.check("interaction"):
+                    interaction = await self._interaction_probe.run(
+                        page,
+                        baseline=axe_violations,
+                        # The probe photographs a revealed element while its
+                        # state is still open; the pass below runs after the
+                        # sweep has closed everything it opened. Passing the
+                        # capture function per call keeps the shared probe
+                        # free of crawler details and of per-page state.
+                        capture_screenshot=(
+                            self._capture_element if self._capture_screenshots else None
+                        ),
+                    )
                 interaction_evaluated = interaction.evaluated
 
             responsive_findings: list[ResponsiveFinding] = []
@@ -363,14 +422,18 @@ class JsFetcher:
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                responsive_findings = await self._responsive_probe.run(page)
+                with live_progress.check("responsive"):
+                    responsive_findings = await self._responsive_probe.run(page)
 
             # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes
             # (the page is still live). One bad selector or a screenshot
             # failure must never break the crawl, so the whole loop is
             # wrapped: on any error we log and ship whatever we captured.
-            screenshots: dict[str, bytes] = {}
+            # Seeded with the probe's, which were taken in the states that
+            # revealed them. The loop below cannot retake these and must not
+            # overwrite them.
+            screenshots: dict[str, bytes] = dict(interaction.screenshots)
             if self._capture_screenshots:
                 try:
                     all_findings: list[Any] = [
@@ -379,6 +442,11 @@ class JsFetcher:
                         *focus_findings,
                         *visual_findings,
                         *responsive_findings,
+                        # Revealed findings whose element outlived the sweep --
+                        # content appended to the page rather than shown in a
+                        # dialog. Skipped by the `th in screenshots` guard when
+                        # the probe already photographed them.
+                        *interaction.findings,
                     ]
                     for finding in all_findings:
                         if len(screenshots) >= MAX_SHOTS_PER_PAGE:
@@ -394,7 +462,7 @@ class JsFetcher:
                             continue
                         if selector in ("", "body", "html", "(unknown)", "(none)"):
                             continue
-                        png = await self._capture_element(page, selector)
+                        png = await self._capture_element(page, selector, center=True)
                         if png:
                             screenshots[th] = png
                 except Exception as exc:
@@ -426,6 +494,7 @@ class JsFetcher:
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
+                interaction_captures=interaction.captures,
                 interaction_evaluated=interaction_evaluated,
                 interaction_controls=interaction.controls_discovered,
                 interaction_clicks_attempted=interaction.clicks_attempted,
@@ -455,15 +524,23 @@ class JsFetcher:
                 with contextlib.suppress(Exception):
                     await page.close()
 
-    async def _capture_element(self, page: Page, selector: str) -> bytes | None:
-        """Screenshot the element at ``selector`` with a circular marker.
+    async def _capture_element(
+        self, page: Page, selector: str, *, center: bool = False
+    ) -> bytes | None:
+        """Screenshot the element at ``selector`` with its location outlined.
 
-        Returns contextual PNG bytes with a circle centered on the detected
-        location, or ``None`` if the element is
-        missing, off-screen, too small, or anything goes wrong. The whole
-        body is defensive, an invalid CSS selector, a detached node, or a
-        screenshot timeout returns ``None`` rather than raising, so one bad
-        finding never breaks the page's capture pass.
+        Returns contextual PNG bytes with the element's rendered content
+        outlined, or ``None`` if the element is missing, off-screen, too
+        small, or anything goes wrong. The whole body is defensive, an
+        invalid CSS selector, a detached node, or a screenshot timeout
+        returns ``None`` rather than raising, so one bad finding never breaks
+        the page's capture pass.
+
+        ``center`` scrolls the element to the middle of the viewport first,
+        so the capture has context on every side even when the element sat
+        at a viewport edge. Only the final capture pass asks for it: the
+        interaction probe photographs revealed states, and a scroll there
+        could close a menu that dismisses itself on scroll.
         """
         try:
             loc = page.locator(selector).first
@@ -472,15 +549,28 @@ class JsFetcher:
             box = await loc.bounding_box()
             if box is None or box["width"] < 2 or box["height"] < 2:
                 return None
-            with contextlib.suppress(Exception):
-                await loc.scroll_into_view_if_needed(timeout=1500)
-            box = await loc.bounding_box()
-            if box is None:
-                return None
             # Keep enough nearby page context for the marker to be useful.
             # Annotation happens on the PNG, never in the audited page DOM.
             pad = 56
             vp = page.viewport_size or {"width": 1440, "height": 900}
+            with contextlib.suppress(Exception):
+                if center and box["height"] + 2 * pad <= vp["height"]:
+                    # "instant" overrides a page's smooth-scroll CSS, which
+                    # would otherwise leave the box measured mid-animation.
+                    await loc.evaluate(
+                        "el => el.scrollIntoView("
+                        "{block: 'center', inline: 'nearest', behavior: 'instant'})"
+                    )
+                else:
+                    await loc.scroll_into_view_if_needed(timeout=1500)
+            box = await loc.bounding_box()
+            if box is None:
+                return None
+            mark: Any = None
+            with contextlib.suppress(Exception):
+                mark = await loc.evaluate(_CONTENT_BOX_JS)
+            if not mark:
+                mark = box
             x = max(0, box["x"] - pad)
             y = max(0, box["y"] - pad)
             width = min(box["width"] + 2 * pad, vp["width"] - x)
@@ -488,14 +578,12 @@ class JsFetcher:
             if width < 2 or height < 2:
                 return None
             png = await page.screenshot(clip={"x": x, "y": y, "width": width, "height": height})
-            center_x = box["x"] + box["width"] / 2 - x
-            center_y = box["y"] + box["height"] / 2 - y
-            return _draw_issue_circle(
+            return _draw_issue_outline(
                 png,
-                center_x=center_x,
-                center_y=center_y,
-                target_width=box["width"],
-                target_height=box["height"],
+                left=mark["x"] - x,
+                top=mark["y"] - y,
+                width=mark["width"],
+                height=mark["height"],
             )
         except Exception:
             return None

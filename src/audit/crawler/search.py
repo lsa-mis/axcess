@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, RevealedViolation
 from audit.crawler import url_policy
+from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Locator, Page, Route
@@ -107,12 +108,14 @@ class SearchExplorer:
         can_visit: Callable[[str], bool],
         axe: AxeAnalyzer,
         level: Level = "AA",
+        version: WcagVersion = LEGACY_WCAG_VERSION,
     ) -> None:
         self.config = config
         self.entry_url = url_policy.normalize(config.page_url or entry_url)
         self.can_visit = can_visit
         self.axe = axe
         self.level = level
+        self.version = version
 
     async def run(self, page: Page, *, baseline: Sequence[AxeViolation]) -> SearchResult:
         urls: set[str] = set()
@@ -149,7 +152,7 @@ class SearchExplorer:
             if links:
                 for url in await rendered_links(page):
                     remember(url)
-            for finding in await self.axe.run(page, self.level):
+            for finding in await self.axe.run(page, self.level, self.version):
                 if finding.target_hash not in hashes:
                     hashes.add(finding.target_hash)
                     findings.append(RevealedViolation(finding, "Configured search"))

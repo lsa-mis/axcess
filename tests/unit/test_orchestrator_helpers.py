@@ -11,12 +11,14 @@ import gzip
 import json
 import sqlite3
 
+from audit.crawler import orchestrator
 from audit.crawler.orchestrator import (
     _MAX_STORED_HTML_BYTES,
     CrawlConfig,
     _compress_html,
     _previous_completed_scan,
     _purge_out_of_scope_jobs,
+    _signed_in_entry_url,
     config_json_for_scan,
 )
 from audit.crawler.url_policy import build_scope
@@ -170,3 +172,54 @@ def test_config_json_includes_rendered_storage_flag() -> None:
         )
     )
     assert opt_out["store_rendered_html"] is False
+
+
+def test_signed_in_entry_url_keeps_any_fragment_and_still_canonicalizes() -> None:
+    """The entry point is the one URL a human chose by standing on it.
+
+    ``normalize`` must keep guessing whether a fragment names a route, because
+    it runs on every discovered link and ``#main`` has to dedupe with the page
+    it sits on. Here there is nothing to guess: the auditor confirmed sign-in
+    on this exact URL, so whatever follows the ``#`` is the view they were
+    looking at, hash-router shape or not.
+    """
+    # The shape normalize already accepted.
+    assert _signed_in_entry_url("https://app.test/#/projects") == "https://app.test/#/projects"
+    # The shape it discarded, which collapsed scan 35's entry onto the seed.
+    assert _signed_in_entry_url("https://app.test/#my-courses") == "https://app.test/#my-courses"
+    # Everything else normalize does is still done.
+    assert (
+        _signed_in_entry_url("https://APP.Test:443/a?b=2&a=1#top")
+        == "https://app.test/a?a=1&b=2#top"
+    )
+    assert _signed_in_entry_url("https://app.test/page") == "https://app.test/page"
+
+
+def test_non_document_urls_stay_on_the_static_path() -> None:
+    """Skipping the static fetch must not send downloads through Playwright.
+
+    The frontier holds every in-scope href, not just pages. A PDF or an image
+    never escalates to the browser on the two-step path, so routing it there
+    would be a new behavior rather than a saved request.
+    """
+    for url in (
+        "https://example.com/report.pdf",
+        "https://example.com/logo.png",
+        "https://example.com/data.json",
+        "https://example.com/archive.ZIP",
+        "https://example.com/bundle.js",
+    ):
+        assert orchestrator._is_document_url(url) is False, url
+
+
+def test_document_urls_are_eligible_for_direct_render() -> None:
+    """Pages, extensionless paths and server-rendered templates all qualify."""
+    for url in (
+        "https://example.com/",
+        "https://example.com/about",
+        "https://example.com/about.html",
+        "https://example.com/index.php",
+        "https://example.com/a.b/nested",
+        "https://example.com/search?q=report.pdf",
+    ):
+        assert orchestrator._is_document_url(url) is True, url

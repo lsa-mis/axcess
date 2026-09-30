@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Inert grid regression</title>
+  </head>
+  <body>
+    <h1>Date picker</h1>
+    <!-- A month of day cells that answer a click by doing nothing to the DOM,
+         which is what a real date grid does until a date is committed. Each
+         has a distinct id, so they differ as controls while sharing one
+         structural shape once digits are collapsed. A sweep that keeps trying
+         them spends its whole click budget here and never reaches the menu
+         below, which does hold a defect. -->
+    <div id="calendar" role="grid" aria-label="September 2026">
+      <button type="button" id="cell-2026-09-01">Tuesday 1 September, 2026</button>
+      <button type="button" id="cell-2026-09-02">Wednesday 2 September, 2026</button>
+      <button type="button" id="cell-2026-09-03">Thursday 3 September, 2026</button>
+      <button type="button" id="cell-2026-09-04">Friday 4 September, 2026</button>
+      <button type="button" id="cell-2026-09-05">Saturday 5 September, 2026</button>
+      <button type="button" id="cell-2026-09-06">Sunday 6 September, 2026</button>
+      <button type="button" id="cell-2026-09-07">Monday 7 September, 2026</button>
+      <button type="button" id="cell-2026-09-08">Tuesday 8 September, 2026</button>
+      <button type="button" id="cell-2026-09-09">Wednesday 9 September, 2026</button>
+      <button type="button" id="cell-2026-09-10">Thursday 10 September, 2026</button>
+      <button type="button" id="cell-2026-09-11">Friday 11 September, 2026</button>
+      <button type="button" id="cell-2026-09-12">Saturday 12 September, 2026</button>
+      <button type="button" id="cell-2026-09-13">Sunday 13 September, 2026</button>
+      <button type="button" id="cell-2026-09-14">Monday 14 September, 2026</button>
+      <button type="button" id="cell-2026-09-15">Tuesday 15 September, 2026</button>
+      <button type="button" id="cell-2026-09-16">Wednesday 16 September, 2026</button>
+      <button type="button" id="cell-2026-09-17">Thursday 17 September, 2026</button>
+      <button type="button" id="cell-2026-09-18">Friday 18 September, 2026</button>
+      <button type="button" id="cell-2026-09-19">Saturday 19 September, 2026</button>
+      <button type="button" id="cell-2026-09-20">Sunday 20 September, 2026</button>
+      <button type="button" id="cell-2026-09-21">Monday 21 September, 2026</button>
+      <button type="button" id="cell-2026-09-22">Tuesday 22 September, 2026</button>
+      <button type="button" id="cell-2026-09-23">Wednesday 23 September, 2026</button>
+      <button type="button" id="cell-2026-09-24">Thursday 24 September, 2026</button>
+    </div>
+
+    <button type="button" id="open-panel">Open options</button>
+    <div id="panel" hidden>
+      <!-- The defect the sweep is supposed to find. -->
+      <input id="unlabelled" type="text" />
+    </div>
+
+    <script>
+      window.cellClicks = 0;
+      for (const cell of document.querySelectorAll('#calendar button')) {
+        // Deliberately no DOM mutation: the grid records the click and
+        // re-renders nothing, so the probe's before/after hash is identical.
+        cell.addEventListener('click', () => { window.cellClicks += 1; });
+      }
+      document.getElementById('open-panel').addEventListener('click', () => {
+        document.getElementById('panel').hidden = false;
+      });
+    </script>
+  </body>
+</html>

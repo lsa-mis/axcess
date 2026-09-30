@@ -10,6 +10,17 @@ on:
       - src/**
       - pyproject.toml
       - uv.lock
+  # A pull request that changes the desktop app or how it is built and
+  # released builds both installers too, so a packaging break shows before
+  # the merge rather than in the release after it. It never publishes: the
+  # publish job runs only on main. Changes under src/ alone do not trigger
+  # it (most pull requests), since each run costs macOS and Windows minutes.
+  pull_request:
+    paths:
+      - .github/workflows/desktop-build.yml
+      - desktop/**
+      - pyproject.toml
+      - uv.lock
   workflow_dispatch:
 
 permissions:
@@ -20,8 +31,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    name: Choose the release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+      package_version: ${{ steps.pick.outputs.package_version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The next version on the release line the team chose
+      # (config.releaseLine in desktop/package.json, "0.2"): one step after
+      # the highest desktop-v0.2.N tag, or 0.2.0 when there is none. Semver
+      # throughout, so `version` and `package_version` are the same.
+      - id: pick
+        name: Next version after the published releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --tags --refs origin 'desktop-v*' | node desktop/scripts/next-version.cjs | tee -a "$GITHUB_OUTPUT"
+
   build-macos:
     name: Apple Silicon macOS desktop artifact
+    needs: version
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +79,12 @@ jobs:
         working-directory: src/audit/alfa_runner
       - run: npm ci
         working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        # The same script CI's release dry run calls on every pull request.
+        # (npm version refuses the version package.json already has.)
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: bash
@@ -70,15 +110,17 @@ jobs:
             echo "Packaging failed; retrying (attempt $((attempt + 1)) of 3)."
             sleep $((attempt * 10))
           done
+      # Only the file people download; Forge's own zip stays behind.
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-macos-apple-silicon
-          path: desktop/out/make/**
+          path: desktop/out/make/*.dmg
           if-no-files-found: error
           retention-days: 14
 
   build-windows:
     name: Windows x64 desktop artifact
+    needs: version
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +144,12 @@ jobs:
         working-directory: src/audit/alfa_runner
       - run: npm ci
         working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        # The same script CI's release dry run calls on every pull request.
+        # (npm version refuses the version package.json already has.)
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
       - run: uv sync --group desktop
       - name: Bundle Chromium
         shell: pwsh
@@ -115,16 +163,171 @@ jobs:
           desktop/scripts/bundle-tesseract-windows.ps1
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      # Forge packages the app; electron-builder wraps it in the NSIS
+      # installer and writes latest.yml (scripts/make-windows-installer.cjs).
       - name: Package desktop installer
         shell: pwsh
         working-directory: desktop
+        run: npm run make:windows
+      # Axe.Windows scans each setup and uninstall screen through UI
+      # Automation, installing and removing Axcess on this runner. An error
+      # fails the build, so an installer with one is never published.
+      - name: Check the installer's accessibility
+        shell: pwsh
+        working-directory: desktop
         run: |
-          npm run premake
-          npm exec electron-forge make
-          node scripts/verify-packaged.cjs
+          $installer = (Get-ChildItem out/make/nsis/*-Windows-Installer.exe | Select-Object -First 1).FullName
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-installer-accessibility.ps1 -Installer $installer -OutputDirectory out/installer-a11y
+          exit $LASTEXITCODE
+      # Axe.Windows does not measure colour contrast: this measures every
+      # text element on the screenshots the step above saved, 4.5:1 or
+      # better (SC 1.4.3). The screenshots are uploaded with the scans.
+      - name: Check the installer's text contrast
+        run: uv run --no-sync python desktop/scripts/installer_contrast.py desktop/out/installer-a11y
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: axcess-windows-installer-accessibility
+          path: desktop/out/installer-a11y/**
+          if-no-files-found: ignore
+          retention-days: 14
+      # The installer with the two files its updates read, and the zip;
+      # not electron-builder's working files (builder-debug.yml).
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-windows-x64
-          path: desktop/out/make/**
+          path: |
+            desktop/out/make/nsis/*-Windows-Installer.exe
+            desktop/out/make/nsis/*-Windows-Installer.exe.blockmap
+            desktop/out/make/nsis/latest.yml
+            desktop/out/make/zip/*-Windows-Portable.zip
           if-no-files-found: error
           retention-days: 14
+
+  build-linux:
+    name: Linux x64 AppImage
+    needs: version
+    # The oldest Ubuntu GitHub offers: an AppImage runs on distros whose
+    # glibc is as new as the build machine's or newer (Ubuntu 22.04 has
+    # 2.35), since the PyInstaller backend and bundled Tesseract use the
+    # host's glibc.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            desktop/package-lock.json
+            src/audit/web/frontend/package-lock.json
+            src/audit/alfa_runner/package-lock.json
+      - run: npm ci
+        working-directory: src/audit/web/frontend
+      - run: npm run build
+        working-directory: src/audit/web/frontend
+      - run: npm ci
+        working-directory: src/audit/alfa_runner
+      - run: npm ci
+        working-directory: desktop
+      - name: Stamp build version
+        shell: bash
+        working-directory: desktop
+        run: node scripts/stamp-version.cjs "${{ needs.version.outputs.package_version }}" "${{ github.sha }}"
+      - run: uv sync --group desktop
+      - name: Bundle Chromium
+        # --with-deps installs the system libraries Chromium needs on this
+        # runner, for verify-packaged; desktop Linux systems have them.
+        shell: bash
+        run: PLAYWRIGHT_BROWSERS_PATH="$PWD/desktop/playwright-browsers" uv run playwright install --with-deps chromium
+      - name: Bundle Tesseract OCR
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+          desktop/scripts/bundle-tesseract-linux.sh
+      - name: Bundle Python backend
+        run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
+      # Forge packages the app; electron-builder wraps it in the AppImage
+      # (scripts/make-linux-appimage.cjs); verify-packaged then runs the
+      # bundled backend's own checks, OCR included.
+      - name: Package desktop AppImage
+        working-directory: desktop
+        run: npm run make:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axcess-linux-x64
+          path: desktop/out/make/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish preview release
+    needs: [version, build-macos, build-windows, build-linux]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: desktop-v${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # One file per platform, named in plain words with its version by
+          # releaseFileName (desktop/src/updates.cjs), and the two files the
+          # Windows updater reads: latest.yml (which installer is newest) and
+          # the installer's .blockmap (so an update downloads only what
+          # changed). Nothing else: no second name for the same file.
+          find artifacts -type f \( -name 'Axcess-*-Mac-*.dmg' -o -name 'Axcess-*-Windows-Installer.exe' -o -name 'Axcess-*-Windows-Installer.exe.blockmap' -o -name 'Axcess-*-Windows-Portable.zip' -o -name 'Axcess-*-Linux.AppImage' -o -name 'latest.yml' \) -exec cp {} release/ \;
+          ls -l release
+          for required in "Axcess-$VERSION-Mac-Apple-Silicon.dmg" "Axcess-$VERSION-Windows-Installer.exe" "Axcess-$VERSION-Windows-Installer.exe.blockmap" "Axcess-$VERSION-Windows-Portable.zip" "Axcess-$VERSION-Linux.AppImage" latest.yml; do
+            test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
+          done
+          test "$(ls release | wc -l)" -eq 6 || { echo "Expected exactly 6 release files:"; ls release; exit 1; }
+      - name: Create or update the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The whole commit message, not just its subject: the body of the
+          # commit on main is written as the release notes for that build.
+          message="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq .commit.message)"
+          subject="$(printf '%s\n' "$message" | head -n 1)"
+          body="$(printf '%s\n' "$message" | tail -n +2 | grep -viE '^(Co-Authored-By|Signed-off-by):' || true)"
+          notes="Preview build of \`main\` at ${GITHUB_SHA::7}: ${subject}
+          ${body:+
+          ## What changed
+
+          ${body}
+          }
+          Built by workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
+
+          Axcess offers this version the next time it opens. This is a preview: Apple has not checked it (notarization), and Windows does not know who made it (code signing), so each asks you to approve it the first time. The steps are at https://lsa-mis.github.io/axcess/get-started/#first-launch."
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft \
+              --title "Axcess $VERSION (preview)" --notes "$notes"
+          fi
+          gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          # Publishing last keeps releases/latest pointing at a complete asset set.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Prune old preview releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("desktop-v"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' \
+            | while read -r tag; do
+                [ -n "$tag" ] || continue
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+              done

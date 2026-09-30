@@ -1,0 +1,74 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-09-24T12:00:00Z"
+  },
+  "title": "Axcess architecture diagrams",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1600,
+      "h": 1100,
+      "title": "How a scan flows through Axcess"
+    },
+    "ReportGroups.dc.html": {
+      "x": 1680,
+      "y": 0,
+      "w": 1600,
+      "h": 900,
+      "title": "Where each result goes"
+    },
+    "LoginScan.dc.html": {
+      "x": 0,
+      "y": 1220,
+      "w": 1600,
+      "h": 900,
+      "title": "How a login scan works"
+    },
+    "PrivacyBoundary.dc.html": {
+      "x": 1680,
+      "y": 1220,
+      "w": 1600,
+      "h": 900,
+      "title": "What stays on your computer"
+    },
+    "ReleaseFlow.dc.html": {
+      "x": 0,
+      "y": 2240,
+      "w": 1600,
+      "h": 900,
+      "title": "How a desktop release ships"
+    },
+    "CodeMap.dc.html": {
+      "x": 1680,
+      "y": 2240,
+      "w": 1600,
+      "h": 1100,
+      "title": "Where the code lives"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "ReportGroups.dc.html",
+    "LoginScan.dc.html",
+    "PrivacyBoundary.dc.html",
+    "ReleaseFlow.dc.html",
+    "CodeMap.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "x": 0,
+      "y": -300,
+      "text": "Axcess architecture diagrams",
+      "kind": "title1",
+      "maxW": 3280
+    }
+  },
+  "designSystems": []
+}

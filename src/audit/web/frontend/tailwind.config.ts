@@ -23,69 +23,71 @@ import type { Config } from "tailwindcss";
  * SC 1.4.11. Solid Blue is 15:1 against white and the Maize fallback
  * (used on the dark sidebar) is 9.9:1 against UMich Blue.
  */
+/** A colour token backed by a `--c-*` variable of space-separated RGB channels. */
+const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
+      // Every colour is a CSS variable (RGB channels), defined per theme and
+      // contrast level in styles.css, so Settings can switch them at runtime
+      // and `/opacity` modifiers keep working. The light values there are
+      // the pinned ones documented above; change them there, not here.
       colors: {
-        // U-M primary palette (pinned — do not change without brand sign-off)
         umich: {
-          blue: "#00274C",
-          "blue-600": "#003a6c", // lighter blue for hover on blue surfaces
-          "blue-700": "#001e3c", // pressed
-          maize: "#FFCB05",
-          "maize-600": "#E6B704",
+          blue: v("umich-blue"),
+          "blue-600": v("umich-blue-600"),
+          "blue-700": v("umich-blue-700"),
+          maize: v("umich-maize"),
+          "maize-600": v("umich-maize-600"),
         },
-        // Semantic severity tokens — Phase 2 AAA-clean re-pick.
-        // Text color is paired with its bg-tint to hold ≥7:1.
         sev: {
-          critical: "#7A0000", // 9.41:1 on critical-bg, 11.49:1 on white
-          "critical-bg": "#FEE2E2",
-          major: "#6B2E00", // 8.91:1 on major-bg, 10.42:1 on white
-          "major-bg": "#FFEBC7", // slightly lighter than the old #FEF3C7 to lift the ratio
-          minor: "#4F4200", // 9.26:1 on minor-bg, 9.94:1 on white
-          "minor-bg": "#FEF9C3",
-          info: "#1F2937", // 11.86:1 on info-bg
-          "info-bg": "#E5E7EB",
+          critical: v("sev-critical"),
+          "critical-bg": v("sev-critical-bg"),
+          major: v("sev-major"),
+          "major-bg": v("sev-major-bg"),
+          minor: v("sev-minor"),
+          "minor-bg": v("sev-minor-bg"),
+          info: v("sev-info"),
+          "info-bg": v("sev-info-bg"),
         },
-        // Semantic surface tokens so components don't hardcode grays
+        ok: {
+          DEFAULT: v("ok"),
+          bg: v("ok-bg"),
+        },
         surface: {
-          DEFAULT: "#FFFFFF",
-          // Cool, quiet neutrals give the evidence-heavy workspace clear
-          // depth without competing with U-M blue or severity signals.
-          subtle: "#F7F9FC",
-          muted: "#F1F4F8",
-          raised: "#FFFFFF",
-          inverse: "#00274C",
-          // Sidebar-specific text colors so dark-on-blue pairs stay AAA.
-          "inverse-fg": "#FFFFFF", // 15:1 on UMich Blue
-          "inverse-fg-subtle": "#C9D4E0", // 10.02:1 on UMich Blue
+          DEFAULT: v("surface"),
+          subtle: v("surface-subtle"),
+          muted: v("surface-muted"),
+          raised: v("surface-raised"),
+          inverse: v("surface-inverse"),
+          "inverse-fg": v("surface-inverse-fg"),
+          "inverse-fg-subtle": v("surface-inverse-fg-subtle"),
         },
         border: {
-          DEFAULT: "#DCE3EC",
-          strong: "#B8C4D2",
-          focus: "#00274C",
+          DEFAULT: v("border"),
+          strong: v("border-strong"),
+          focus: v("border-focus"),
         },
         fg: {
-          DEFAULT: "#111827", // 17.74:1 on white
-          muted: "#374151", // 10.31:1 on white, 9.37:1 on muted (was #4B5563 — still AAA but tightened)
-          subtle: "#475263", // 7.91:1 on white, 7.19:1 on muted (was #6B7280 — failed AAA)
-          inverse: "#FFFFFF",
-          accent: "#00274C",
+          DEFAULT: v("fg"),
+          muted: v("fg-muted"),
+          subtle: v("fg-subtle"),
+          inverse: v("fg-inverse"),
+          accent: v("fg-accent"),
         },
       },
       fontFamily: {
-        sans: [
-          "-apple-system",
-          "BlinkMacSystemFont",
-          '"Segoe UI"',
-          "Roboto",
-          '"Helvetica Neue"',
-          "Arial",
-          "sans-serif",
-        ],
+        // Atkinson Hyperlegible leads both stacks; see `src/fonts.css` for why
+        // and for the offline constraint that makes it self-hosted. The system
+        // stack stays behind it so the UI still renders if a font file 404s.
+        // The stack itself is `--font-sans` in styles.css, so the Font
+        // setting can swap it without touching a class.
+        sans: ["var(--font-sans)"],
         mono: [
+          '"Atkinson Hyperlegible Mono"',
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",
@@ -101,22 +103,58 @@ const config: Config = {
           "0 18px 42px rgba(0, 39, 76, 0.12), 0 4px 12px rgba(0, 39, 76, 0.08)",
         // Focus ring: solid UMich Blue (15:1 on white; SC 1.4.11 needs ≥3:1).
         // Use `shadow-focus-inverse` for elements on the dark sidebar.
-        focus: "0 0 0 3px #00274C",
-        "focus-inverse": "0 0 0 3px #FFCB05",
+        focus: "0 0 0 3px rgb(var(--c-umich-blue))",
+        "focus-inverse": "0 0 0 3px rgb(var(--c-umich-maize))",
+      },
+      // The loading mark's crawl ring turns on its own axis. Spelled out here
+      // rather than reusing Tailwind's `animate-spin` + an arbitrary
+      // `[animation-duration:...]`, because `animate-spin` emits the
+      // `animation` shorthand and would reset the duration depending on which
+      // utility the sort happens to place last. 1.6s reads as patient rather
+      // than urgent; the wait is usually a few seconds of backend boot.
+      keyframes: {
+        "spin-ring": {
+          to: { transform: "rotate(360deg)" },
+        },
+        // The sort chip in a table header lands with a small pop when a
+        // column is chosen, so the eye is drawn to what just changed. Used
+        // behind `motion-safe:` only.
+        "sort-pop": {
+          from: { transform: "scale(0.7)", opacity: "0" },
+          to: { transform: "scale(1)", opacity: "1" },
+        },
+      },
+      animation: {
+        "spin-ring": "spin-ring 1.6s linear infinite",
+        "sort-pop": "sort-pop 180ms ease-out",
       },
       minHeight: {
         // WCAG 2.2 SC 2.5.5 AAA — every interactive target must be ≥44×44px.
-        target: "44px",
+        // Settings > Target size can raise `--target` to 52px.
+        target: "var(--target, 44px)",
       },
       minWidth: {
-        target: "44px",
+        target: "var(--target, 44px)",
       },
       borderRadius: {
         "2xs": "5px",
         xs: "8px",
       },
+      // A 14px floor: no text in the app is smaller than `sm`. WCAG sets no
+      // minimum size (SC 1.4.4 asks only that text survive 200% zoom), but
+      // low-vision guidance converges on ~16px body text, and an
+      // accessibility tool's readers are the people small text fails first.
+      // `2xs` (was 11px, then 12px) and `xs` (was 12px, then 13px) held
+      // about 240 uses of secondary text: hints, chips, captions, table
+      // notes. Lifting the tokens raises every one at once rather than
+      // editing each call site. The cost is that `2xs`, `xs` and `sm` are
+      // now one size, so secondary text stands apart by colour and weight
+      // (`text-fg-muted`, `font-semibold`), not by being smaller. Do not add
+      // a smaller size back, and do not use an arbitrary one (text-[12px])
+      // to get round the floor.
       fontSize: {
-        "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+        "2xs": ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 12px
+        xs: ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 13px
       },
     },
   },

@@ -16,7 +16,7 @@ from urllib.parse import unquote, urlsplit
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
-    from playwright.async_api import Dialog, Page, Route
+    from playwright.async_api import Dialog, Page, Request, Route
 
 log = get_logger(__name__)
 
@@ -57,6 +57,24 @@ async def exploration_guard(
     popups: set[Page] = set()
     pinned = urlsplit(page.url)
 
+    def remember(request: Request) -> None:
+        """Keep a destination the guard is about to refuse, for the frontier.
+
+        Refusing the request and forgetting where it pointed are separate
+        decisions. Every check that governs crawling still runs later, at
+        enqueue: scope, the blocklist, and whether the URL was already fetched
+        or queued for this scan.
+        """
+        if len(urls) >= 1000:
+            return
+        with suppress(Exception):
+            if (
+                request.is_navigation_request()
+                and request.method == "GET"
+                and safe_url(request.url, blocked_labels)
+            ):
+                urls.add(request.url)
+
     async def guard(route: Route) -> None:
         nonlocal blocked
         request = route.request
@@ -66,6 +84,13 @@ async def exploration_guard(
             # A popup's first request can precede its frame. Never let an
             # unattributable request bypass the guard. Crawl contexts block
             # service workers, so no worker request should need this path.
+            #
+            # Remember it anyway. This is the path every new-tab control takes,
+            # window.open and target="_blank" alike, and it is the only record
+            # of those pages: a button that opens a tab leaves no href in the
+            # DOM for link extraction to find, so dropping the request dropped
+            # the page from the crawl entirely, even inside the scan's scope.
+            remember(request)
             blocked += 1
             await route.abort("blockedbyclient")
             return
@@ -87,8 +112,7 @@ async def exploration_guard(
             or not permitted
             or not same_origin
         ):
-            if is_navigation and request.method == "GET" and permitted and len(urls) < 1000:
-                urls.add(request.url)
+            remember(request)
             blocked += 1
             if is_navigation:
                 # Aborting top-level navigation can replace the current DOM

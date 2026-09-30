@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import gzip
 import http.server
+import json
 import socketserver
 import sqlite3
 import threading
@@ -189,6 +190,55 @@ def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     # the hard invariant is that we respected the bound within worker count.
     assert summary.pages_fetched <= config.max_pages + config.workers
     assert summary.pages_fetched >= config.max_pages
+
+
+def test_crawl_with_no_page_limit_visits_every_page_in_scope(tmp_db: sqlite3.Connection) -> None:
+    """``max_pages=None`` ends the crawl only when the frontier runs dry.
+
+    Three crawls of the same site: one with a limit the site exceeds, one
+    with a limit it never reaches (so it sees the whole site), and one with
+    no limit. No limit must go past the first and match the second, so a
+    regression that read ``None`` as some default cap fails here.
+    """
+
+    def crawl(max_pages: int | None) -> CrawlSummary:
+        return asyncio.run(
+            run_crawl(
+                tmp_db,
+                CrawlConfig(
+                    js_eager=False,
+                    seed_url=base,
+                    max_pages=max_pages,
+                    rps=100.0,
+                    workers=2,
+                    vlm_enabled=False,
+                    semantic_enabled=False,
+                ),
+            )
+        )
+
+    with _serve() as base:
+        capped = crawl(3)
+        whole_site = crawl(50)
+        unlimited = crawl(None)
+
+    # The small limit bites: the crawl stops short of the whole site. Each
+    # worker checks the limit before it takes a page, so with two workers a
+    # crawl can pass it by one page; the limit is not exact under concurrency.
+    assert capped.status == "completed"
+    assert 3 <= capped.pages_fetched < whole_site.pages_fetched
+    # A limit of 50 is never reached here, so that crawl saw the whole site,
+    # and a crawl with no limit sees exactly the same pages.
+    assert whole_site.pages_fetched < 50
+    assert unlimited.status == "completed"
+    assert unlimited.pages_fetched > capped.pages_fetched
+    assert _page_urls(tmp_db, unlimited.scan_id) == _page_urls(tmp_db, whole_site.scan_id)
+    assert unlimited.pages_fetched == whole_site.pages_fetched
+    # Stored as no limit, so a stopped scan restarts without one.
+    stored = tmp_db.execute(
+        "SELECT config_json FROM scans WHERE id = ?", (unlimited.scan_id,)
+    ).fetchone()[0]
+    assert json.loads(stored).get("max_pages", "missing") is None
 
 
 def test_crawl_skips_out_of_scope_and_non_http(tmp_db: sqlite3.Connection) -> None:
@@ -489,6 +539,38 @@ def test_start_url_is_where_the_crawl_actually_begins(tmp_db: sqlite3.Connection
     assert f"{base}/about.html" not in urls, (
         "the crawl began at the seed and followed its links, ignoring start_url"
     )
+
+
+def test_start_url_keeps_the_fragment_sign_in_landed_on(tmp_db: sqlite3.Connection) -> None:
+    """Reproduces scan 35: a one-page report of an application's boot screen.
+
+    Sign-in ended on ``/#my-courses``. ``normalize`` drops a fragment that does
+    not look like a hash route, so the entry became ``/`` -- identical to the
+    seed, and in that application the pre-render splash. It carried no links,
+    so the crawl finished having captured a single page titled "Opening" and
+    never reached the signed-in area. Landing one directory deeper, as scan 36
+    did, produced nine pages from the same session and the same config.
+    """
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            start_url=f"{base}/#my-courses",
+            max_pages=50,
+            rps=100.0,
+            workers=2,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    urls = _page_urls(tmp_db, summary.scan_id)
+    assert f"{base}/#my-courses" in urls, (
+        "the crawl threw away the route sign-in landed on and began at the bare seed"
+    )
+    # Only the entry point is read this way. Links discovered from it still
+    # normalize, so an in-page anchor does not become a second page.
+    assert not [url for url in urls if "#" in url and url != f"{base}/#my-courses"]
 
 
 def test_start_url_does_not_narrow_the_configured_scope(tmp_db: sqlite3.Connection) -> None:

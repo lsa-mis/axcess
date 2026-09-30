@@ -122,6 +122,7 @@ kbd { font-family: var(--mono); font-size: .85em; border: 1px solid var(--line-s
 .hero .btn-ghost { border-color: rgba(255,255,255,.7); color: #fff; }
 .hero .btn-ghost:hover { background: rgba(255,255,255,.1); }
 .btn svg { width: 1.05em; height: 1.05em; }
+.btn-row { display: flex; flex-wrap: wrap; gap: .6rem; }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -252,7 +253,11 @@ section.band .btn-maize { color: var(--navy); }
 /* ---------- Callouts ---------- */
 .callout { border-radius: var(--radius); padding: 1.3rem 1.4rem 1.3rem 1.4rem; border: 1px solid var(--line); background: var(--soft); display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start; }
 .callout svg { width: 26px; height: 26px; color: var(--navy); margin-top: .1rem; }
-.callout p { margin: 0; }
+/* Callout text is the body ink wherever the callout sits. Inside a card,
+   .card p made it muted grey, 6.82:1 on the maize note: short of the 7:1
+   text contrast the site holds (SC 1.4.6 Contrast (Enhanced), Level AAA),
+   and unlike the same note outside a card. */
+.callout p { margin: 0; color: var(--ink); }
 .callout strong { color: var(--navy); }
 .callout-maize { background: var(--maize-soft); border-color: #f2d879; }
 .callout-navy { background: var(--navy); color: #fff; border-color: var(--navy); }

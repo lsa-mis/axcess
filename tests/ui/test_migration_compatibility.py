@@ -105,6 +105,42 @@ def test_public_report_apis_survive_pre_protected_schema(
         assert cancelled.status_code == 200
 
 
+def test_page_inspector_survives_schema_without_stored_html(tmp_path: Path) -> None:
+    """``pages.rendered_html`` arrived in 0027; naming it must stay optional.
+
+    The inspector route selected the column unconditionally, so on any database
+    that stopped earlier the query raised ``OperationalError`` straight out of
+    the handler as a 500. The honest answer on a schema with nowhere to store a
+    capture is the same as for a scan that opted out of storing one: fall
+    through to the on-demand render path.
+    """
+
+    db_path, blob_dir, scan_id, _ = _legacy_database(tmp_path)
+    conn = connect(db_path)
+    try:
+        assert not any(
+            row["name"] == "rendered_html"
+            for row in conn.execute("PRAGMA table_info(pages)").fetchall()
+        ), "fixture should predate migration 0027"
+        page = conn.execute(
+            "INSERT INTO pages "
+            "(scan_id, url_normalized, status_code, title, render_mode, html_hash) "
+            "VALUES (?, 'https://legacy.example/first', 200, 'Home', 'static', ?)",
+            (scan_id, "0" * 64),
+        )
+        page_id = int(page.lastrowid or 0)
+        conn.commit()
+    finally:
+        conn.close()
+
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect")
+
+    # A refusal is fine (no browser in this environment); a crash is not.
+    assert response.status_code < 500, response.text
+
+
 def test_partial_protected_migration_still_lists_public_reports(tmp_path: Path) -> None:
     """A table created by 0011 must hide its rows before later migrations finish."""
 

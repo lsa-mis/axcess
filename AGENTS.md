@@ -189,6 +189,137 @@ route and an end-to-end test for keyboard-only use.
    server, model timeout, malformed tool output, and deleted scan. Existing
    report browsing must remain usable in every one of these cases.
 
+## Interface language
+
+Every word a user sees or hears must be accessible plain language. That
+covers labels, headings, buttons, hints, messages, tooltips, `aria-label`,
+`title`, `alt`, placeholders, and export names. Write to these four standards:
+
+| Standard | What it asks for |
+| --- | --- |
+| ISO 24495-1:2023 | Readers can find what they need, understand it, and use it, and the content is relevant to them. |
+| U.S. Federal Plain Language Guidelines | Lead with the main point. Short sentences, active voice, examples, tables for comparisons. |
+| WCAG 3.1.3, 3.1.4, 3.1.5 (Level AAA) | Explain unusual words, spell out abbreviations, and keep text at about lower-secondary reading level. |
+| W3C COGA, "Making Content Usable" | One idea per chunk, concrete examples, and the same word for the same thing everywhere. |
+
+Rules:
+
+1. Follow `docs/plain-language.md`. Its terms table decides the word for
+   each concept: "occurrence", not "finding" or "instance"; "fix", not
+   "remediate"; "page state", not "DOM state". Do not invent synonyms.
+2. Show statuses, issue types, check names, and scan statuses through the
+   shared labels in `src/audit/web/frontend/src/lib/terms.ts`, never raw
+   values such as `in_progress`. Add a label there rather than writing a
+   local one.
+3. Put the plain phrase first and keep a technical term in parentheses for
+   developers: "page code (DOM)", "element locator (CSS selector)".
+4. Never drop a limitation, privacy, or safety fact to make text shorter.
+   Say it more simply. Never claim that a scan proves a site meets WCAG.
+5. Keep text accurate to the code. If a statement in the interface does not
+   match what the code does, stop and report it rather than guessing.
+6. Keep accessibility intact: an element's accessible name must contain its
+   visible text (WCAG 2.5.3), and shorter or longer text must not break the
+   layout at 320 px or 1280 px.
+7. When you change wording, update the UI tests that pin it, without
+   weakening any assertion. Update `docs/glossary.md` if a term changes.
+
+## UX rationale and accessibility review
+
+The frontend's design decisions are recorded as comments beside the code
+that carries them: why a layout, order, control, placement or visibility
+was chosen, what was rejected, and the standard it rests on. Examples: the
+comment on the Reports route (`routes/Scans.tsx`), the shared table parts
+(`components/table/Table.tsx`), `Card` and `StatCard` (`components/ui.tsx`),
+`SubmitBar`, and the Inspector's page-state picker. These comments are how
+the reasons reach the next agent or developer. Treat them as requirements.
+
+**Read before you change.** Before editing any frontend file, read the
+rationale comments on the component or route you are changing and on the
+shared components it uses. Keep what they require. If your change would
+go against one, say so to the developer and ask before you change it; do
+not quietly undo a recorded decision.
+
+**Write when you decide.** Every UX choice you make gets a rationale
+comment where the code is, in the same change:
+
+1. What the design does, in one or two sentences.
+2. Why, including the option you rejected and why it lost.
+3. The standard it rests on, precisely: WCAG 2.2 success criterion number,
+   name and level (for example "SC 2.4.11 Focus Not Obscured (Minimum),
+   Level AA"), WCAG technique IDs (H39, H63), the WAI-ARIA Authoring
+   Practices pattern, W3C COGA "Making Content Usable", or the repo's own
+   plain-language rules. Give the URL for anything outside WCAG.
+4. Quote only text you are sure is exact, such as a success criterion's
+   normative wording. Mark everything else as a paraphrase. Never invent a
+   quotation or a criterion.
+
+Update the comment when the behaviour changes, and delete a rationale that
+no longer describes the code. A stale rationale is worse than none.
+
+**Review every frontend change for accessibility.** Hold each change,
+including one the developer asked for, to the most accessible design you
+know, not just to passing axe:
+
+- WCAG 2.2 Level AA as the floor. Meet AAA where this repo already does:
+  44 px targets (`min-h-target`, SC 2.5.5), 7:1 text contrast in every
+  theme (SC 1.4.6), plain language (SC 3.1.5).
+- The WAI-ARIA Authoring Practices pattern for the widget, and native
+  HTML before ARIA.
+- Keyboard order that follows the reading order (SC 2.4.3), focus that is
+  never hidden behind sticky content (SC 2.4.11), and nothing that needs
+  sideways scrolling at 320 px except data tables (SC 1.4.10).
+- COGA: one way to do one thing, related content grouped, the same word
+  for the same thing, and no duplicate controls for one function.
+
+**Reuse before you build.** Use the existing component for the job before
+writing a new one: `components/ui.tsx` (Card, Button, LinkButton, Select,
+Disclosure, StatCard, PageHeader), `components/table/` (TableBar,
+TableRegion, Table, SortHeader, Row, Cell), `TablePagination`, and the
+labels in `lib/terms.ts` and `lib/labels.ts`. Search for one before you
+write markup. If none fits, extend the closest one compatibly (a prop, a
+variant) so every screen gets the change, rather than restyling a copy in
+one place. A new component needs a reason in its rationale comment: which
+existing one was considered and why it could not be extended.
+`make lint` enforces the common case: a raw `<button>`, `<table>` or
+`<select>` outside the shared components fails (`react/forbid-elements`).
+Where one is really needed, disable the rule on that line with a reason
+starting "Keep:" (a widget's own part, such as a tab); one that should be
+converted starts "Convert:" and names what to use. `grep -rn "Convert:"`
+lists the conversions still owed.
+
+**Keep the interface consistent.** The same function looks and behaves
+the same everywhere, and is named with the same words: the same control
+for the same kind of choice, actions in the same place, the same card,
+table and status patterns. WCAG 2.2 SC 3.2.3 Consistent Navigation and SC
+3.2.4 Consistent Identification (both Level AA) are the floor. The shared
+components and the terms table are how this repo meets them, which is
+one more reason to reuse them. If one screen needs to differ from the
+pattern, say why in its rationale comment.
+
+**Native HTML before ARIA.** Use the element whose built-in meaning and
+behaviour you need (`<button>`, `<a href>`, `<table>` with `<th scope>`
+and `<caption>`, `<label>`, `<fieldset>` and `<legend>`, `<details>`,
+`<dialog>`, headings, lists) instead of a `<div>` with a role. This is the
+first rule of the W3C's "Using ARIA"
+(https://www.w3.org/TR/using-aria/#rule1, paraphrased): if a native
+element or attribute already has the semantics and behaviour you need,
+use it rather than adding ARIA. The WAI-ARIA Authoring Practices put the
+risk plainly: "No ARIA is better than bad ARIA." Add ARIA only for a real
+gap that HTML cannot fill, and then exactly as the APG pattern specifies.
+Examples of real gaps: `aria-expanded` on a disclosure button,
+`aria-sort` on a sortable header, `aria-describedby` for a description, a
+`role="status"` live region. Never add a role that repeats the element's
+own (`role="button"` on a `<button>`), and never use ARIA to hide a
+problem that better markup would fix.
+
+If a requested change, or code you touch, is not the most accessible
+option or is weaker UX than a known alternative, **tell the developer in
+your reply**. Name the problem, the criterion or principle, and the better
+option. Ask before building the weaker design. If they choose it anyway,
+build it and record the tradeoff and their decision in the rationale
+comment. Do not silently comply, and do not silently "fix" things outside
+the task. Report them.
+
 ## Verification
 
 Run the narrowest relevant tests during development, then the appropriate
@@ -207,3 +338,41 @@ Do not run external crawls, pull models, or expose a network listener without
 the user's approval. For local development, `make run` serves the existing UI
 at `http://127.0.0.1:8765/app/`; production/LAN hosting must follow
 `docs/hosting.md` and use `AUDIT_ACCESS_TOKEN`.
+
+## Permissions
+
+Do without asking: read anything; create/edit files in this repo; delete
+**tracked, committed** files (recoverable from git history).
+
+Ask first: `rm` or edits outside this repo; discarding uncommitted work
+(`git checkout .`, `git clean -fd`, `git reset --hard`, `stash drop`) - note
+rule 1 above, this workspace often carries unrelated user changes; history
+rewrites (`push --force`, rebase on a shared branch); anything that leaves the
+machine or costs money (`git push`, PRs, publishing, package installs); `sudo`
+or any permission-bypass flag; reading credentials or `AUDIT_ACCESS_TOKEN`.
+
+If you cannot verify an action is reversible, treat it as irreversible.
+
+**If any premise in your task turns out to be wrong or impossible, stop and
+report that instead of working around it.** State what you **verified** (ran it,
+saw the output) separately from what you **assumed**. Do not report a task
+complete on the basis of code you did not run.
+
+## Session hygiene
+
+Context is re-sent in full on every turn, so a long session pays for its entire
+history repeatedly. Measured on this machine across 24 sessions and 2.54B
+tokens: cache reads were **94.9%** of all tokens while generated output was
+**0.42%**. Within a single session the last 10% of turns cost a median **5.2x**
+the first 10% - 18 of 18 sessions, no exceptions.
+
+This repo is the heaviest offender: its worst session reached **783k context**
+at **426k tokens per turn**.
+
+- One task per session. `/clear` before starting an unrelated task.
+- Above ~150k context every turn costs more even when cached.
+- Auto-compact is an overflow guard, not a cost control - measured median
+  **366k** context before it fires.
+- Hand work to another agent through a **git diff or a file**, never by
+  relaying conversation. Relayed conversation enters both context windows and
+  is then re-sent on every subsequent turn.

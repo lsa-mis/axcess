@@ -9,20 +9,19 @@ something is clicked, with nothing on the page saying so.
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 from audit import evaluation
 from audit.db import repo
 from audit.db.schema import connect
 
-_MIGRATIONS = Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
 
-
-def _scan_with_findings(tmp_path: Path) -> tuple[sqlite3.Connection, int, int]:
+def _scan_with_findings(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> tuple[sqlite3.Connection, int, int]:
     conn = connect(tmp_path / "audit.db")
-    for path in sorted(_MIGRATIONS.glob("*.sql")):
-        if not path.name.endswith(".rollback.sql"):
-            conn.executescript(path.read_text(encoding="utf-8"))
+    migrate_db(conn)
     scan_id = int(
         conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) "
@@ -65,8 +64,10 @@ def _scan_with_findings(tmp_path: Path) -> tuple[sqlite3.Connection, int, int]:
     return conn, scan_id, page_id
 
 
-def test_page_evidence_reports_which_control_revealed_a_finding(tmp_path: Path) -> None:
-    conn, scan_id, page_id = _scan_with_findings(tmp_path)
+def test_page_evidence_reports_which_control_revealed_a_finding(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> None:
+    conn, scan_id, page_id = _scan_with_findings(tmp_path, migrate_db)
     try:
         evidence = evaluation.get_page_evidence(conn, scan_id=scan_id, page_id=page_id)
         assert evidence is not None
@@ -81,13 +82,15 @@ def test_page_evidence_reports_which_control_revealed_a_finding(tmp_path: Path) 
         conn.close()
 
 
-def test_findings_group_into_load_state_and_one_group_per_control(tmp_path: Path) -> None:
+def test_findings_group_into_load_state_and_one_group_per_control(
+    tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]
+) -> None:
     """The grouping the evidence page renders, asserted on its source data.
 
     Load-state findings first, then one group per control in the order the
     probe reached them — the order an auditor reproduces them in.
     """
-    conn, scan_id, page_id = _scan_with_findings(tmp_path)
+    conn, scan_id, page_id = _scan_with_findings(tmp_path, migrate_db)
     try:
         evidence = evaluation.get_page_evidence(conn, scan_id=scan_id, page_id=page_id)
         assert evidence is not None

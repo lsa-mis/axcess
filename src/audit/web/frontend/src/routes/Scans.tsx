@@ -1,7 +1,7 @@
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ListChecks, PlusCircle, Search, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight, ListChecks, PlusCircle, Trash2 } from "lucide-react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { api } from "../api/client";
 import {
   protectedQueryKey,
@@ -14,31 +14,255 @@ import {
   LinkButton,
   PageHeader,
   ScanStatusBadge,
+  ScanTag,
   relativeTime,
 } from "../components/ui";
-import type { ProtectedScanSummary, ScanSummary } from "../api/types";
+import { withoutUserinfo } from "../components/ReportCrumb";
+import { cn } from "../lib/cn";
+import { liveSearchParams } from "../lib/liveSearchParams";
+import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
+import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
+import { confirmDestructive } from "../hooks/usePreferences";
+import BreakableUrl from "../components/BreakableUrl";
+import LastScannedSite from "../components/LastScannedSite";
+import {
+  Cell,
+  ColumnHeader,
+  Row,
+  RowHeader,
+  SortHeader,
+  Table,
+  TableHead,
+  TableRegion,
+  TableSearch,
+  TableBar,
+  rowBand,
+} from "../components/table/Table";
+import { parseSortParam, sortParam, sortWords, type Sort, type SortKind } from "../components/table/sort";
+
+/** A sign-in scan's progress, in the same words as the public scan badges. */
+const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
+  awaiting_authentication: "Waiting for sign-in",
+  authentication_required: "Sign-in needed",
+  running: "Scanning",
+  completed: "Complete",
+  failed: "Failed",
+  interrupted: "Stopped",
+};
 
 /**
- * Scans list, the SPA's home page. Each row tells the operator three
- * things at a glance: where the crawl is pointed, what state it's in
- * (color-coded badge), and how recently it ran. Per-row actions live at
- * the right edge so the row body stays scannable.
+ * Reports list, one row per site. A site is a normalized seed scope, the
+ * same key "compare to previous report" uses, and the server does the
+ * grouping so the two can never disagree.
  *
- * Running scans get a tinted background so they're impossible to miss
- * (and a pulsing badge from ScanStatusBadge as the secondary signal).
- * The Delete affordance is disabled for running scans, the backend
- * would 409 anyway, but disabling client-side avoids the round-trip.
+ * A row shows one scan: the site's most recent *completed* run, the only
+ * one whose numbers stand for the site. Interrupted, failed and running
+ * scans never reach the row; they are listed, with every other scan, when
+ * the site is expanded.
+ *
+ * Expanding a site lists all of its scans with the per-report actions
+ * (All issues, Delete) the flat list used to carry.
+ *
+ * Why the table looks the way it does (keep these when you change it):
+ *
+ * - One header row. The table used to have a second row, "Most recent
+ *   completed scan", over six of its columns. The W3C WAI Tables Tutorial
+ *   (https://www.w3.org/WAI/tutorials/tables/) calls that a table with
+ *   multi-level headers, which needs `scope="colgroup"` or `headers` and
+ *   `id` on every cell (WCAG technique H43); a table with one header row
+ *   needs only `scope="col"` (technique H63). Screen readers support the
+ *   simple form best, and it is the one sighted readers scan fastest. The
+ *   group existed only because one column (Scans) was not about the latest
+ *   scan. Scans now sits under the site's name, so every column is about the
+ *   same scan, and the caption says so once, in words.
+ * - A sentence over the table says where the numbers come from, and the
+ *   caption (technique H39, the table's accessible name) says it too. WCAG
+ *   2.2 SC 1.3.1 Info and Relationships (Level A): "Information, structure,
+ *   and relationships conveyed through presentation can be programmatically
+ *   determined or are available in text." The sentence sits outside the
+ *   scrolling region, not in a visible caption: WCAG 2.2 SC 1.4.10 Reflow
+ *   (Level AA) asks that content be usable at 320 CSS pixels "without
+ *   requiring scrolling in two dimensions", and excepts only content that
+ *   needs a two-dimensional layout, such as the table's data. A caption
+ *   scrolls sideways with the table and was cut off at 320 pixels.
+ * - No visible "Sorted by" line. The sorted header already shows the order
+ *   in words (the chip), and `aria-sort` gives it to a screen reader, as in
+ *   the WAI-ARIA Authoring Practices sortable table
+ *   (https://www.w3.org/WAI/ARIA/apg/patterns/table/examples/sortable-table/).
+ *   A change of `aria-sort` is not announced reliably, so the new order is
+ *   still said in a live region that is visually hidden. WCAG 2.2 SC 4.1.3
+ *   Status Messages (Level AA): "In content implemented using markup
+ *   languages, status messages can be programmatically determined through
+ *   role or properties such that they can be presented to the user by
+ *   assistive technologies without receiving focus." It asks for status
+ *   messages to be announced, not shown. Other tables keep the visible
+ *   line because it carries more there (filters, "Back to recommended
+ *   order"); here it only repeated the chip.
+ * - The search count sits beside the search box, visibly and in its own
+ *   live region, shown only while there is a search: the result of an
+ *   action next to the action (W3C COGA, "Making Content Usable",
+ *   https://www.w3.org/TR/coga-usable/: one idea per chunk, and help people
+ *   see what just happened).
+ * - Rows expand with a disclosure button (`aria-expanded`, `aria-controls`)
+ *   in the row header and a detail row under it, not a `treegrid` and not
+ *   columns that open and close. Hidden columns change a table's shape
+ *   under a screen reader, and `treegrid` needs grid keyboard handling
+ *   that screen readers support unevenly. See Adrian Roselli, "Table with
+ *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ * - Column order: the site that names the row, when its latest completed
+ *   scan finished, that scan's numbers, then the link to open it. The link
+ *   stays last, the usual place for a row's action: the row is read (by eye
+ *   or, cell by cell, by a screen reader) as "this site, as of then, with
+ *   these results", and only then offers to open it. It was considered as
+ *   the second column; that split the site from its date and numbers, and
+ *   the Issues count is already a link into the same report earlier in the
+ *   row. The Site column is sticky, so the row keeps its name when a narrow
+ *   screen scrolls the table sideways to reach the link.
+ * - "Open latest scan" is a link, styled as one, because it goes to a
+ *   page; a button acts on this one. One quiet link per row rather than an
+ *   outlined button in every row, which outweighed the numbers. Its
+ *   accessible name starts with its visible words (WCAG 2.2 SC 2.5.3 Label
+ *   in Name, Level A: "the name contains the text that is presented
+ *   visually").
  */
-const REPORTS_PER_PAGE = 10;
+type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
+
+const SORT_COLUMNS = ["site", "completed", "pages", "issues", "images", "states"] as const satisfies readonly SortKey[];
+const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
+
+const SORT_KINDS: Record<SortKey, SortKind> = {
+  site: "text",
+  pages: "number",
+  issues: "number",
+  images: "number",
+  states: "number",
+  completed: "date",
+};
+
+const SORT_LABELS: Record<SortKey, string> = {
+  site: "Site",
+  pages: "Pages",
+  issues: "Issues",
+  images: "Images with text",
+  states: CLICK_THROUGH_STATES_LABEL,
+  completed: "Completed",
+};
+
+const TOTAL_COLUMNS = 7;
+
+/**
+ * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
+ * visible. Any `user:password@` is dropped, as everywhere an address shows.
+ */
+export function siteLabel(siteUrl: string): string {
+  return withoutUserinfo(siteUrl).replace(/^https:\/\//, "").replace(/\/$/, "");
+}
+
+/** The sortable value; null sorts last in either direction. */
+function sortValue(site: SiteGroup, key: SortKey): number | string | null {
+  const completed = site.most_recent_completed;
+  switch (key) {
+    case "site":
+      return siteLabel(site.site_url).toLowerCase();
+    case "pages":
+      return completed ? completed.page_count : null;
+    case "issues":
+      return site.most_recent_completed_issue_count;
+    case "images":
+      return completed ? completed.finding_count : null;
+    case "states":
+      return completed ? completed.dom_state_count ?? 0 : null;
+    case "completed":
+      // Report ids increase with creation, so they order runs without a
+      // start time too.
+      return completed ? completed.id : null;
+  }
+}
+
+/** A site matches when its address, or any of its scans' start address,
+ *  contains the query. Case-insensitive; `query` is already lower case. */
+function matchesSearch(site: SiteGroup, query: string): boolean {
+  if (site.site_url.toLowerCase().includes(query)) return true;
+  return site.scans.some((scan) => scan.seed_url.toLowerCase().includes(query));
+}
+
+function sortSites(sites: SiteGroup[], { column, direction }: Sort<SortKey>): SiteGroup[] {
+  return [...sites].sort((a, b) => {
+    const left = sortValue(a, column);
+    const right = sortValue(b, column);
+    if (left === null || right === null) {
+      if (left === right) return b.most_recent.id - a.most_recent.id;
+      return left === null ? 1 : -1;
+    }
+    const diff = left < right ? -1 : left > right ? 1 : 0;
+    if (diff !== 0) return direction === "asc" ? diff : -diff;
+    return b.most_recent.id - a.most_recent.id;
+  });
+}
+
+// One empty list, so the memoized views below do not recompute while loading.
+const NO_SITES: SiteGroup[] = [];
+
+/** How often Reports refreshes while a scan is running. */
+const RUNNING_REFRESH_MS = 5_000;
 
 export default function ScansRoute() {
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [requestedPage, setPage] = useState(1);
-  const [requestedProtectedPage, setProtectedPage] = useState(1);
-  const { data: scans = [], isLoading, isError } = useQuery({
-    queryKey: ["scans"],
-    queryFn: api.listScans,
+  // The view lives in the URL, not in component state: the order
+  // (`?sort=`), the search (`?q=`), the sites opened (`?open=`, one per
+  // site) and the page (`?page=`, usePagedRows). Going to a report and
+  // pressing Back used to bring the table back sorted by date, unsearched
+  // and with every site closed, so the reader had to find their place
+  // again: a cost that falls hardest on keyboard and screen reader users,
+  // who find it by moving through the rows (W3C COGA, "Making Content
+  // Usable", https://www.w3.org/TR/coga-usable/: do not make people redo
+  // steps). Every change replaces the history entry rather than adding
+  // one, so Back leaves the page instead of undoing a sort or a click; and
+  // a copied link opens the same view. The Issues table keeps its view the
+  // same way.
+  const [params, setParams] = useSearchParams();
+  const rawSort = params.get("sort");
+  const sort = useMemo(() => parseSortParam(rawSort, SORT_COLUMNS) ?? DEFAULT_SORT, [rawSort]);
+  const search = params.get("q") ?? "";
+  const openKey = params.getAll("open").join("\n");
+  const expanded = useMemo<ReadonlySet<string>>(() => new Set(openKey ? openKey.split("\n") : []), [openKey]);
+  // Against the live query string, as on Issues: the search publishes on a
+  // debounce, so a snapshot taken at render could drop a pending keystroke
+  // or a site just opened (liveSearchParams says why `previous` cannot).
+  const updateParams = useCallback(
+    (change: (next: URLSearchParams) => void) =>
+      setParams(
+        () => {
+          const next = liveSearchParams();
+          change(next);
+          return next;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+  const setSort = (next: Sort<SortKey>) =>
+    updateParams((p) => {
+      if (next.column === DEFAULT_SORT.column && next.direction === DEFAULT_SORT.direction) p.delete("sort");
+      else p.set("sort", sortParam(next));
+    });
+  const setSearch = (next: string) =>
+    updateParams((p) => {
+      if (next) p.set("q", next);
+      else p.delete("q");
+    });
+  // Under the "scans" prefix so every existing invalidation of the scan
+  // list (create, cancel, delete) refreshes the grouped view as well.
+  const { data: sites = NO_SITES, isLoading, isError } = useQuery({
+    queryKey: ["scans", "sites"],
+    queryFn: api.listSites,
+    // While a scan runs, refresh so the list and the Last scanned card move on
+    // by themselves when it finishes; the desktop app gets no focus event to
+    // refetch on. Nothing running, nothing polled.
+    refetchInterval: (query) =>
+      query.state.data?.some((site) => site.scans.some((scan) => scan.status === "running"))
+        ? RUNNING_REFRESH_MS
+        : false,
   });
   const protectedIdentity = useProtectedIdentityContext();
   const protectedReports = useQuery({
@@ -54,19 +278,41 @@ export default function ScansRoute() {
     // misleading error card.
     retry: false,
   });
-  const protectedScans =
-    protectedIdentity.isReady && !protectedReports.isFetching
-      ? protectedReports.data?.reports ?? []
-      : [];
+  const protectedList = protectedReports.data?.reports;
+  const protectedShown = protectedIdentity.isReady && !protectedReports.isFetching;
+  // The same array until the data changes, so the pager does not re-measure
+  // its table on every render.
+  const protectedScans = useMemo(
+    () => (protectedShown ? protectedList ?? [] : []),
+    [protectedShown, protectedList],
+  );
 
   const query = search.trim().toLowerCase();
-  const filteredScans = scans.filter((scan) => !query || scan.seed_url.toLowerCase().includes(query) || `#${scan.id}`.includes(query));
-  const filteredProtectedScans = protectedScans.filter((report) => !query || `#${report.scan_id}`.includes(query));
+  // Filtered and sorted only when the sites, the search or the sort change,
+  // not on every render (expanding a site, a refetch that changed nothing).
+  const matchingSites = useMemo(
+    () => (query ? sites.filter((site) => matchesSearch(site, query)) : sites),
+    [sites, query],
+  );
+  const sortedSites = useMemo(() => sortSites(matchingSites, sort), [matchingSites, sort]);
+  const scanTotal = sites.reduce((total, site) => total + site.scan_count, 0);
 
-  const page = Math.min(requestedPage, Math.max(1, Math.ceil(filteredScans.length / REPORTS_PER_PAGE)));
-  const protectedPage = Math.min(requestedProtectedPage, Math.max(1, Math.ceil(filteredProtectedScans.length / REPORTS_PER_PAGE)));
-  const visibleScans = filteredScans.slice((page - 1) * REPORTS_PER_PAGE, page * REPORTS_PER_PAGE);
-  const visibleProtectedScans = filteredProtectedScans.slice((protectedPage - 1) * REPORTS_PER_PAGE, protectedPage * REPORTS_PER_PAGE);
+  // A new search or sort starts the table over at page 1.
+  const sitePages = usePagedRows(sortedSites, { resetKey: `${query}|${sort.column}|${sort.direction}` });
+  const protectedPages = usePagedRows(protectedScans, { param: "protectedPage" });
+
+  // Stable, so a site row that did not change skips re-rendering.
+  const toggleSite = useCallback(
+    (siteUrl: string) =>
+      updateParams((p) => {
+        const open = p.getAll("open");
+        p.delete("open");
+        const next = open.includes(siteUrl) ? open.filter((url) => url !== siteUrl) : [...open, siteUrl];
+        for (const url of next) p.append("open", url);
+      }),
+    [updateParams],
+  );
+  const sortProps = { sort, onSort: setSort };
 
   return (
     <>
@@ -74,40 +320,21 @@ export default function ScansRoute() {
           global CTA. The empty state below keeps its contextual one. */}
       <PageHeader
         title="Reports"
-        subtitle={isLoading ? "Loading…" : isError ? "Reports unavailable" : `${scans.length} public reports`}
+        subtitle={
+          isLoading
+            ? "Loading…"
+            : isError
+              ? "Reports could not be loaded"
+              : `${sites.length} ${sites.length === 1 ? "site" : "sites"} · ${scanTotal} ${scanTotal === 1 ? "scan" : "scans"}`
+        }
       />
 
-      <form role="search" aria-label="Search reports" className="mb-4 flex flex-wrap items-end gap-2" onSubmit={(event) => {
-        event.preventDefault();
-        setSearch(searchInput);
-        setPage(1);
-        setProtectedPage(1);
-      }}>
-        <div className="w-full sm:max-w-sm">
-          <label htmlFor="report-search" className="mb-1 block text-sm font-medium text-fg">Search reports</label>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" aria-hidden />
-            <input id="report-search" type="search" className="field rounded-lg pl-9" placeholder="Site URL or report #" value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
-          </div>
-        </div>
-        <Button type="submit" variant="primary" className="rounded-lg">
-          <Search className="h-4 w-4" aria-hidden /> Search
-        </Button>
-        {search && <Button type="button" variant="ghost" onClick={() => {
-          setSearchInput(""); setSearch(""); setPage(1); setProtectedPage(1);
-        }}>Clear search</Button>}
-      </form>
-      {query && <p role="status" className="mb-4 text-sm text-fg-muted">
-        {filteredScans.length} public reports{protectedIdentity.isReady ? ` and ${filteredProtectedScans.length} protected reports` : ""} match “{search.trim()}”. Protected reports are searched by report number only.
-      </p>}
-
-      <p id="reports-help" className="mb-4 text-sm text-fg-muted">
-        Findings are observations recorded during a scan. Related findings are grouped
-        into issues. Open All issues to review every detection method, affected pages,
-        and suggested fixes. The Image findings column counts only image-of-text evidence; zero
-        does not mean there are no other issues. DOM states are page states reached
-        by operating controls. Some findings need manual confirmation.
-      </p>
+      {/* No help paragraph above the table. It restated the "Most recent
+          completed scan" band and glossed each column, and as the table's
+          description a screen reader read all of it on every entry. The band,
+          the caption and each cell's `headers` say which scan the numbers
+          come from. */}
+      {!isLoading && !isError && <LastScannedSite sites={sites} />}
 
       {isError ? (
         <p role="alert" className="mb-4 text-sm text-sev-critical">
@@ -115,66 +342,106 @@ export default function ScansRoute() {
         </p>
       ) : isLoading ? (
         <p role="status">Loading reports…</p>
-      ) : scans.length === 0 && protectedScans.length === 0 ? (
+      ) : sites.length === 0 && protectedScans.length === 0 ? (
         <EmptyState
-          title="No scans yet"
-          message="Point the crawler at a URL to start auditing."
+          title="No reports yet"
+          message="Start a scan to check a website. Axcess makes a report when the scan finishes."
           action={
             <LinkButton to="/scans/new" variant="primary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> Create New Scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> Start a new scan
             </LinkButton>
           }
         />
       ) : (
         <Card>
-          {/* Keyboard users need focus on the overflow region to scroll the table. */}
-          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-          <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Public reports table" aria-describedby="reports-help" tabIndex={0}>
-            <table className="min-w-[58rem] w-full text-sm">
-              <caption className="sr-only">Public reports, newest first</caption>
-              <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+          {/* One small search, in the table's own bar: it filters the rows
+              below by site address. The ⌘K palette still finds anything
+              anywhere; this is for narrowing a long list in place. */}
+          <TableBar pager={<TablePagination label="Public reports" noun="sites" {...sitePages} />}>
+            <TableSearch label="Search sites" id="site-search" value={search} onChange={setSearch} />
+            {/* Always mounted, so the count is announced when it changes;
+                empty, and so invisible, while there is no search. */}
+            <p role="status" className="text-xs text-fg-muted">
+              {query &&
+                `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
+            </p>
+          </TableBar>
+          {/* The order, for screen readers only: the sorted header's chip
+              shows it (SC 4.1.3, see the comment on this route). */}
+          <p role="status" className="sr-only">
+            Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
+          </p>
+          {/* Outside the region, so it wraps at 320 pixels rather than
+              scrolling sideways with the table (SC 1.4.10). */}
+          <p className="px-4 pb-2 pt-3 text-sm text-fg-muted">
+            Each row shows the report from the site’s most recent completed scan.
+          </p>
+          <TableRegion label="Public reports table" paged={sitePages}>
+            <Table
+              className="min-w-[48rem]"
+              caption="Public reports by site. Each row shows the report from the site’s most recent completed scan."
+            >
+              <TableHead>
+                {/* One header row (H63): see the comment on this route. */}
                 <tr>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Report
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Site URL
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Pages
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    DOM states
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Image findings
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-left font-semibold">
-                    Started
-                  </th>
-                  <th scope="col" className="px-4 py-2 text-right font-semibold">
-                    Actions
-                  </th>
+                  <SortHeader
+                    column="site"
+                    kind="text"
+                    wrap="words"
+                    className="sticky left-0 z-[2] bg-surface-muted align-bottom"
+                    {...sortProps}
+                  >
+                    {SORT_LABELS.site}
+                  </SortHeader>
+                  {(["completed", "pages", "issues", "images", "states"] as const).map((column) => (
+                    <SortHeader
+                      key={column}
+                      column={column}
+                      kind={SORT_KINDS[column]}
+                      wrap="words"
+                      className="align-bottom"
+                      {...sortProps}
+                    >
+                      {SORT_LABELS[column]}
+                    </SortHeader>
+                  ))}
+                  <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
+                    {/* The height of a sort button, words at its foot like theirs,
+                        so its label lines up with them. */}
+                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Report</span>
+                  </ColumnHeader>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredScans.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-fg-muted">No public reports match your search.</td></tr>}
-                {visibleScans.map((s) => (
-                  <ScanRow key={s.id} scan={s} />
-                ))}
+              </TableHead>
+              <tbody>
+                {sortedSites.length === 0 && (
+                  <tr className="border-t border-border">
+                    <td colSpan={TOTAL_COLUMNS} className="p-6 text-center text-fg-muted">
+                      {query ? `No sites match “${search.trim()}”.` : "No public reports yet."}
+                    </td>
+                  </tr>
+                )}
+                {sitePages.pageRows.map((site, index) => {
+                  const position = (sitePages.page - 1) * sitePages.pageSize + index;
+                  return (
+                    <SiteRows
+                      key={site.site_url}
+                      site={site}
+                      index={position}
+                      rowId={`site-row-${position}`}
+                      expanded={expanded.has(site.site_url)}
+                      onToggle={toggleSite}
+                    />
+                  );
+                })}
               </tbody>
-            </table>
-          </div>
-          <ReportPagination label="Public reports" page={page} total={filteredScans.length} onPageChange={setPage} />
+            </Table>
+          </TableRegion>
         </Card>
       )}
 
       {protectedIdentity.isChecking && (
         <p className="mt-4 text-sm text-fg-muted" aria-live="polite">
-          Checking protected-report access…
+          Checking access to sign-in scans…
         </p>
       )}
 
@@ -183,50 +450,55 @@ export default function ScansRoute() {
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h2 id="protected-reports-heading" className="text-lg font-semibold text-fg">
-                Protected reports
+                Sign-in scans
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
-                Your authorized reports only. Target locations and detailed evidence are not listed here.
+                This list shows only the reports you are allowed to see. It does not show site addresses or detailed evidence.
               </p>
             </div>
             <LinkButton to="/scans/new?mode=login" variant="secondary">
-              <PlusCircle className="h-4 w-4" aria-hidden /> New login scan
+              <PlusCircle className="h-4 w-4" aria-hidden /> New sign-in scan
             </LinkButton>
           </div>
           {protectedReports.isFetching ? (
             <p className="text-sm text-fg-muted" aria-live="polite">
-              Loading your protected reports…
+              Loading your sign-in scans…
             </p>
           ) : protectedScans.length === 0 ? (
             <Card className="p-5 text-sm text-fg-muted">
-              No protected reports yet. Start one only after the target owner has authorized
-              the scope and a least-privilege audit account is ready.
+              No sign-in scans yet. Before you start one, the site owner must approve which
+              pages you scan. You also need a test account with only the access the scan
+              needs (least privilege).
             </Card>
           ) : (
             <Card>
-              {/* Keyboard users need focus on the overflow region to scroll the table. */}
-              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-              <div className="overflow-x-auto focus-visible:shadow-focus" role="region" aria-label="Protected reports table" tabIndex={0}>
-                <table className="min-w-[58rem] w-full text-sm">
-                  <caption className="sr-only">Your protected reports, newest activity first</caption>
-                  <thead className="bg-surface-muted text-xs uppercase tracking-wide text-fg-muted">
+              {protectedPages.pages > 1 && (
+                <TableBar pager={<TablePagination label="Sign-in scans" noun="sign-in scans" {...protectedPages} />} />
+              )}
+              <TableRegion label="Sign-in scans table" paged={protectedPages}>
+                <Table className="min-w-[58rem]" caption="Your sign-in scans, most recently updated first">
+                  <TableHead>
                     <tr>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Report</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Status</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Handling</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Pages</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Issue leads</th>
-                      <th scope="col" className="px-4 py-2 text-left font-semibold">Updated</th>
-                      <th scope="col" className="px-4 py-2 text-right font-semibold">Open</th>
+                      <ColumnHeader>Report</ColumnHeader>
+                      <ColumnHeader>Status</ColumnHeader>
+                      <ColumnHeader>Environment and data classification</ColumnHeader>
+                      <ColumnHeader>Pages</ColumnHeader>
+                      <ColumnHeader>Occurrences</ColumnHeader>
+                      <ColumnHeader>Updated</ColumnHeader>
+                      <ColumnHeader>Open</ColumnHeader>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {filteredProtectedScans.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-fg-muted">No protected reports match your search.</td></tr>}
-                    {visibleProtectedScans.map((report) => <ProtectedReportRow key={report.scan_id} report={report} />)}
+                  </TableHead>
+                  <tbody>
+                    {protectedPages.pageRows.map((report, index) => (
+                      <ProtectedReportRow
+                        key={report.scan_id}
+                        report={report}
+                        index={(protectedPages.page - 1) * protectedPages.pageSize + index}
+                      />
+                    ))}
                   </tbody>
-                </table>
-              </div>
-              <ReportPagination label="Protected reports" page={protectedPage} total={filteredProtectedScans.length} onPageChange={setProtectedPage} />
+                </Table>
+              </TableRegion>
             </Card>
           )}
         </section>
@@ -235,123 +507,218 @@ export default function ScansRoute() {
   );
 }
 
-function ReportPagination({ label, page, total, onPageChange }: {
-  label: string;
-  page: number;
-  total: number;
-  onPageChange: (page: number) => void;
+/**
+ * One site's summary row, plus its scan list when expanded. The expanded
+ * list is its own captioned table: a nested table keeps each scan's
+ * columns labelled, where extra rows in the outer table would sit under
+ * headers that describe a different scan. Memoized: expanding one site
+ * re-renders that site's rows, not every row on the page.
+ */
+const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle }: {
+  site: SiteGroup;
+  /** Position across pages, for the row stripe. */
+  index: number;
+  rowId: string;
+  expanded: boolean;
+  onToggle: (siteUrl: string) => void;
 }) {
-  const pages = Math.max(1, Math.ceil(total / REPORTS_PER_PAGE));
+  const label = siteLabel(site.site_url);
+  const completed = site.most_recent_completed;
+  const detailId = `${rowId}-scans`;
   return (
-    <nav aria-label={`${label} pagination`} className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
-      <p role="status" aria-atomic="true" className="text-sm text-fg-muted">
-        Showing {total === 0 ? 0 : (page - 1) * REPORTS_PER_PAGE + 1}–{Math.min(page * REPORTS_PER_PAGE, total)} of {total} reports · Page {page} of {pages}
-      </p>
-      <div className="flex gap-2">
-        <Button variant="secondary" aria-label={`Previous page of ${label.toLowerCase()}`} aria-disabled={page === 1} onClick={() => { if (page > 1) onPageChange(page - 1); }}>
-          Previous
-        </Button>
-        <Button variant="secondary" aria-label={`Next page of ${label.toLowerCase()}`} aria-disabled={page === pages} onClick={() => { if (page < pages) onPageChange(page + 1); }}>
-          Next
-        </Button>
-      </div>
-    </nav>
+    <>
+      <Row index={index}>
+        <RowHeader id={rowId} sticky className="min-w-52 max-w-xs py-1 font-normal">
+          {/* The site's name toggles its scans too, not only the chevron:
+              the whole block is one button. Its name starts with what it
+              does and then reads the visible text, so a voice-control user
+              can say what they see (SC 2.5.3). */}
+          {/* eslint-disable-next-line react/forbid-elements -- Keep: the whole row header is the disclosure button (site name and chevron) */}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={expanded ? detailId : undefined}
+            onClick={() => onToggle(site.site_url)}
+            className="group flex w-full items-start gap-1 rounded-xs text-left hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
+          >
+            <span className="inline-flex min-h-target min-w-target shrink-0 items-center justify-center text-fg-muted group-hover:text-fg">
+              <ChevronRight
+                className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", expanded && "rotate-90")}
+                aria-hidden
+              />
+            </span>
+            <span className="min-w-0 py-2">
+              <span className="sr-only">
+                {`${expanded ? "Hide" : "Show"} all ${site.scan_count} ${site.scan_count === 1 ? "scan" : "scans"} for `}
+              </span>
+              <span className="block break-words font-semibold text-fg underline-offset-2 group-hover:underline" title={withoutUserinfo(site.site_url)}>
+                <BreakableUrl text={label} />
+              </span>
+              {/* All the site's scans, here rather than in a column: every
+                  column is about the latest completed scan (one header row). */}
+              <span className="block text-xs text-fg-muted">
+                {`${site.scan_count.toLocaleString()} ${site.scan_count === 1 ? "scan" : "scans"}, ${site.completed_count.toLocaleString()} completed`}
+              </span>
+            </span>
+          </button>
+        </RowHeader>
+        {completed ? (
+          <>
+            <Cell
+              className="whitespace-nowrap text-center text-fg"
+              title={completed.finished_at ?? completed.started_at ?? undefined}
+            >
+              {relativeTime(completed.finished_at ?? completed.started_at)}
+            </Cell>
+            <Cell numeric className="text-fg">
+              {completed.page_count.toLocaleString()}
+            </Cell>
+            <Cell numeric>
+              <Link
+                to={`/scans/${completed.id}/issues`}
+                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                aria-label={`${(site.most_recent_completed_issue_count ?? 0).toLocaleString()} issues in Report #${completed.id}`}
+              >
+                {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+              </Link>
+            </Cell>
+            <Cell numeric className="text-fg">
+              {completed.finding_count.toLocaleString()}
+            </Cell>
+            <Cell numeric className="text-fg">
+              {(completed.dom_state_count ?? 0).toLocaleString()}
+            </Cell>
+            <Cell className="whitespace-nowrap text-center">
+              {/* A link styled as a link: it goes to a page (SC 2.5.3 for its name). */}
+              <Link
+                to={`/scans/${completed.id}`}
+                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                aria-label={`Open latest scan of ${label}, the most recent completed scan`}
+              >
+                Open latest scan
+              </Link>
+            </Cell>
+          </>
+        ) : (
+          <Cell colSpan={6} className="text-fg-muted">
+            No completed scan yet. Expand the site to open its other scans.
+          </Cell>
+        )}
+      </Row>
+      {expanded && (
+        // The site's stripe, and no rule above: it reads as part of the site row.
+        <tr id={detailId} className={rowBand(index)}>
+          <td colSpan={TOTAL_COLUMNS} className="px-4 pb-4 pt-2">
+            <SiteScansTable site={site} label={label} />
+          </td>
+        </tr>
+      )}
+    </>
   );
-}
+});
 
-function ProtectedReportRow({ report }: { report: ProtectedScanSummary }) {
+function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
+  // Framed by its own scroll region (see TableRegion's className): rounded
+  // corners the rows are clipped to, and a wide list scrolls here rather
+  // than widening the whole reports table.
   return (
-    <tr className="transition-colors hover:bg-surface-muted/60">
-      <th scope="row" className="whitespace-nowrap px-4 py-2 text-left font-mono text-xs text-fg-muted">#{report.scan_id}</th>
-      <td className="px-4 py-2"><span className="font-medium text-fg">{report.protection_status.replaceAll("_", " ")}</span></td>
-      <td className="px-4 py-2 text-fg-muted">{report.environment} · {report.data_classification}</td>
-      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.page_count.toLocaleString()}</td>
-      <td className="px-4 py-2 text-right tabular-nums text-fg">{report.issue_occurrences.toLocaleString()}</td>
-      <td className="px-4 py-2 text-xs text-fg-subtle" title={report.updated_at}>{relativeTime(report.updated_at)}</td>
-      <td className="px-4 py-2 text-right">
-        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open protected report ${report.scan_id}`}>
-          Open protected report
-        </LinkButton>
-      </td>
-    </tr>
+    <TableRegion label={`All scans for ${label}`} className="rounded-xs border border-border bg-surface">
+      <Table
+        captionClassName="px-3 py-2 text-left text-sm font-semibold text-fg"
+        caption={`All scans for ${label}, most recent first`}
+      >
+        <TableHead>
+          <tr>
+            <ColumnHeader>Report</ColumnHeader>
+            <ColumnHeader>Status</ColumnHeader>
+            <ColumnHeader>Started</ColumnHeader>
+            <ColumnHeader>Pages</ColumnHeader>
+            <ColumnHeader>Images with text</ColumnHeader>
+            <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
+            <ColumnHeader>Actions</ColumnHeader>
+          </tr>
+        </TableHead>
+        <tbody>
+          {site.scans.map((scan, index) => (
+            <ScanRow key={scan.id} scan={scan} index={index} isHeadline={scan.id === site.most_recent_completed?.id} />
+          ))}
+        </tbody>
+      </Table>
+    </TableRegion>
   );
 }
 
 /**
- * One scans-table row. Pulled out so the delete mutation's loading state
- * is local to the row that owns it, clicking delete on row 7 doesn't
- * grey out the buttons in row 8.
+ * One scan in a site's expanded list. Pulled out so the delete mutation's
+ * loading state is local to the row that owns it.
  */
-function ScanRow({ scan }: { scan: ScanSummary }) {
-  const isRunning = scan.status === "running";
+function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number; isHeadline: boolean }) {
   return (
-    <tr
-      className={
-        isRunning
-          ? "bg-umich-blue/5 transition-colors hover:bg-umich-blue/10"
-          : "transition-colors hover:bg-surface-muted/60"
-      }
-    >
-      <th scope="row" className="whitespace-nowrap px-4 py-2 text-left font-mono text-xs text-fg-muted">
+    <Row index={index}>
+      <RowHeader className="whitespace-nowrap py-1 text-xs font-normal tabular-nums text-fg-muted">
         <Link
           to={`/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+          title={withoutUserinfo(scan.seed_url)}
         >
-          <span className="sr-only">Open report </span>#{scan.id}
+          <span className="sr-only">Open </span>Report #{scan.id}
         </Link>
-      </th>
-      <td className="min-w-48 max-w-md break-all px-4 py-2 text-fg">
-        <Link
-          to={`/scans/${scan.id}`}
-          className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-          title={scan.seed_url}
-        >
-          {scan.seed_url}
-        </Link>
-      </td>
-      <td className="px-4 py-2">
+        {isHeadline && (
+          <span className="ml-2 font-sans text-xs font-normal text-fg-muted">
+            (shown in the site row)
+          </span>
+        )}
+      </RowHeader>
+      <Cell className="text-center">
         <ScanStatusBadge value={scan.status} />
-      </td>
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
-        {scan.page_count.toLocaleString()}
-      </td>
-      {/* States reached by operating controls, alongside pages: a scan of an
-          application is not described by its URL count alone. */}
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-fg">
-        {(scan.dom_state_count ?? 0).toLocaleString()}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
-        <span className="text-fg">{scan.finding_count.toLocaleString()}</span>
-      </td>
-      <td
-        className="whitespace-nowrap px-4 py-2 text-xs text-fg-subtle"
-        // Full ISO on hover gives precision when "2h ago" isn't enough,
-        // e.g. comparing two scans that both say "yesterday".
-        title={scan.started_at ?? undefined}
-      >
+      </Cell>
+      <Cell className="whitespace-nowrap text-center text-xs text-fg-muted" title={scan.started_at ?? undefined}>
         {relativeTime(scan.started_at)}
-      </td>
-      <td className="whitespace-nowrap px-4 py-2">
-        {/* Per-row actions kept at default `md` size (44px tall). The
-            earlier compressed `px-2 py-1 text-xs` style was the exact
-            SC 2.5.5 fail flagged by the discovery audit, destructive
-            controls in particular must be a real target. The action
-            cluster gets `gap-2` so the two controls don't visually
-            merge into one wide button. */}
-        <div className="flex items-center justify-end gap-2">
+      </Cell>
+      <Cell numeric className="text-fg">
+        {scan.page_count.toLocaleString()}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {scan.finding_count.toLocaleString()}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {(scan.dom_state_count ?? 0).toLocaleString()}
+      </Cell>
+      <Cell className="whitespace-nowrap py-1">
+        {/* Default `md` size (44px tall): destructive controls in
+            particular must be a real target (SC 2.5.5). */}
+        <div className="flex items-center justify-center gap-2">
           <LinkButton
             to={`/scans/${scan.id}/issues`}
             variant="ghost"
             className="report-link"
-            aria-label={`All issues for report ${scan.id}`}
+            aria-label={`All issues for Report #${scan.id}`}
           >
             <ListChecks className="h-4 w-4" aria-hidden />
             All issues
           </LinkButton>
           <DeleteScanButton scan={scan} />
         </div>
-      </td>
-    </tr>
+      </Cell>
+    </Row>
+  );
+}
+
+function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; index: number }) {
+  return (
+    <Row index={index}>
+      <RowHeader className="whitespace-nowrap text-xs font-normal text-fg-muted"><ScanTag id={report.scan_id} /></RowHeader>
+      <Cell><span className="font-medium text-fg">{PROTECTED_STATUS_LABEL[report.protection_status] ?? report.protection_status.replaceAll("_", " ")}</span></Cell>
+      <Cell className="text-fg-muted">{report.environment} · {report.data_classification}</Cell>
+      <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
+      <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
+      <Cell className="text-center text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
+      <Cell className="py-1 text-center">
+        <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open sign-in scan ${report.scan_id}`}>
+          Open sign-in scan
+        </LinkButton>
+      </Cell>
+    </Row>
   );
 }
 
@@ -386,9 +753,9 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       <Button
         variant="ghost"
         disabled
-        title="Cancel the running scan before deleting it."
+        title="Stop the scan before you delete this report."
         className="text-fg-subtle"
-        aria-label={`Delete scan ${scan.id} (disabled, scan is running)`}
+        aria-label={`Delete report ${scan.id} (not available while the scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
         Delete
@@ -402,16 +769,16 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled={mutation.isPending}
         className="text-sev-critical hover:bg-sev-critical-bg"
-        aria-label={`Delete scan ${scan.id}`}
+        aria-label={`Delete report ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".
           // Message includes the scan ID and seed URL so the user knows
           // exactly which scan they're about to remove.
-          const ok = window.confirm(
-            `Delete scan #${scan.id} (${scan.seed_url})?\n\n` +
-              "This permanently removes the scan, its pages, findings, and " +
-              "history. Image blobs are kept (they may be referenced by " +
-              "other scans). This cannot be undone.",
+          const ok = confirmDestructive(
+            `Delete report #${scan.id} (${siteLabel(scan.seed_url)})?\n\n` +
+              "This deletes the report for good, with its pages, issues, and " +
+              "history. You cannot undo this. Axcess keeps the saved image " +
+              "files, because other reports may use them.",
           );
           if (ok) mutation.mutate();
         }}

@@ -11,7 +11,9 @@ from __future__ import annotations
 import asyncio
 import csv
 import hashlib
+import json
 import sqlite3
+from collections.abc import Callable
 from io import BytesIO, StringIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -102,10 +104,11 @@ def test_favicon_svg_served(client: TestClient) -> None:
     resp = client.get("/favicon.svg")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    # The actual mark is a UMich-blue rounded rect with a maize T — assert
-    # the maize hex is present so a swap to a placeholder (or an empty
-    # file) is caught loudly rather than rendering a blank tab icon.
-    assert b"#FFCB05" in resp.content
+    # The mark is a stroked Axcess logo in UMich blue that turns white in
+    # dark mode -- assert the blue hex is present so a swap to a placeholder
+    # (or an empty file) is caught loudly rather than rendering a blank tab
+    # icon.
+    assert b"#00274C" in resp.content
 
 
 def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
@@ -114,7 +117,7 @@ def test_favicon_ico_aliased_to_svg(client: TestClient) -> None:
     resp = client.get("/favicon.ico")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
-    assert b"#FFCB05" in resp.content
+    assert b"#00274C" in resp.content
 
 
 # ------------------------------------------------------------------ /api/scans
@@ -155,10 +158,10 @@ def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, in
     assert body["blocked"] is None
     assert body["progress"] is None  # not running
     methods = {method["key"]: method for method in body["methods_used"]}
-    assert "Accessibility Conformance Testing" in methods["alfa"]["label"]
-    assert "specific accessibility conditions" in methods["alfa"]["description"]
+    assert methods["alfa"]["label"] == "Rule check (Alfa)"
+    assert "Accessibility Conformance Testing" in methods["alfa"]["description"]
     assert "not proof" in methods["alfa"]["caveat"]
-    assert methods["semantic"]["label"] == "Semantic review (local AI)"
+    assert methods["semantic"]["label"] == "AI review"
     assert "link purpose" in methods["semantic"]["description"]
     assert methods["semantic"]["state"] == "coverage_unknown"
     assert methods["semantic"]["result"] == "Coverage not recorded for this older scan"
@@ -222,9 +225,9 @@ def test_api_scan_detail_reports_actual_method_coverage(
     assert methods["keyboard"]["state"] == "checked"
     assert methods["responsive"]["state"] == "partial"
     assert methods["image"]["result"] == "No images found to analyze"
-    assert methods["interaction"]["label"] == "Click Through DOM States"
+    assert methods["interaction"]["label"] == "Click-Through"
     assert methods["interaction"]["state"] == "checked"
-    assert methods["interaction"]["result"] == "2 pages checked; 5 DOM states reached"
+    assert methods["interaction"]["result"] == "2 pages checked; 5 page states opened by clicking"
 
 
 def test_api_scan_detail_404(client: TestClient) -> None:
@@ -348,8 +351,9 @@ def test_local_login_scan_rejects_non_loopback_browser(client: TestClient) -> No
     )
 
 
+@pytest.mark.parametrize("show_browser", [False, True])
 def test_local_login_scan_starts_from_same_loopback_origin(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, show_browser: bool
 ) -> None:
     """The local UI can create its in-memory headed-browser handoff."""
 
@@ -400,9 +404,11 @@ def test_local_login_scan_starts_from_same_loopback_origin(
                 "max_depth": 4,
                 "rps": 0.5,
                 "workers": 4,
+                "show_browser": show_browser,
                 "whole_host": True,
                 "scan_engine": "both",
                 "axe_level": "AAA",
+                "wcag_version": "2.2",
                 "skip_interaction": True,
                 "skip_keyboard": True,
                 "skip_responsive": True,
@@ -419,11 +425,13 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert response.json()["scan_id"] != interrupted_scan_id
     config = captured["config"]
     assert isinstance(config, server.CrawlConfig)
+    assert config.browser_headless is (not show_browser)
     assert config.max_pages == 10
     assert config.max_depth == 4
     assert config.rps == 0.5
     assert config.whole_host is True
     assert config.axe_level == "AAA"
+    assert config.wcag_version == "2.2"
     assert config.axe_enabled is True
     assert config.interaction_checks_enabled is False
     assert config.keyboard_probe_enabled is False
@@ -433,6 +441,59 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.alfa_enabled is True
     assert config.browser_only is True
     assert config.image_extraction_enabled is False
+    # Signed-in findings are the hardest to review a second time: reproducing
+    # one means repeating the sign-in by hand. Capture their evidence by
+    # default, exactly as an anonymous scan does.
+    assert config.capture_screenshots is True
+
+
+def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declining to store rendered pages declines their screenshots too.
+
+    A marked element screenshot is a crop of the post-sign-in page it came
+    from. An auditor who asked Axcess not to keep those pages has asked not to
+    keep the crops either, so one opt-out governs both.
+    """
+
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app,
+        base_url="http://127.0.0.1:8765",
+        client=("127.0.0.1", 45678),
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "skip_rendered_storage": True,
+            },
+        )
+
+    assert response.status_code == 201
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.store_rendered_html is False
+    assert config.capture_screenshots is False
 
 
 def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
@@ -661,6 +722,34 @@ def test_prepare_scan_row_uses_crawler_seed_identity(
     assert count["n"] == 1
 
 
+def test_prepare_scan_row_leaves_a_signed_in_scan_alone(
+    seeded_db: tuple[Path, Path, int],
+) -> None:
+    """An ordinary scan must start its own report, not continue a signed-in one.
+
+    The other half of the same rule the crawler's ``_ensure_scan`` enforces.
+    Both paths hunt for a row to continue, so a scan that may not be continued
+    has to be invisible to both: whichever one still saw it would win the race
+    and merge signed-out pages into a signed-in report.
+    """
+
+    from audit.crawler.orchestrator import config_json_for_scan
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+    seed = "https://app.example.test/secure/"
+    signed_in_config = server.CrawlConfig(seed_url=seed, resumable=False)
+    signed_in_id = server._prepare_scan_row(db_path, signed_in_config, resume_interrupted=False)
+
+    anonymous_id = server._prepare_scan_row(db_path, server.CrawlConfig(seed_url=seed))
+
+    assert anonymous_id != signed_in_id
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (signed_in_id,)).fetchone()
+    assert row is not None
+    assert json.loads(row["config_json"]) == json.loads(config_json_for_scan(signed_in_config))
+
+
 def test_api_create_scan_respects_whole_host(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -874,6 +963,13 @@ def test_api_running_scan_includes_in_flight_and_recent(
     assert progress["stage"] == "scanning"
     assert progress["rendered_pages"] == 0
     assert progress["static_pages"] == 1
+    # This process is not crawling it, so the table rows say only what the
+    # queue and the pages table know: no check is claimed for any page.
+    assert progress["page_checks"] == [
+        {"url": "http://x/in-flight", "state": "checking", "checks": {}},
+        {"url": "http://x/finished", "state": "checked", "checks": {}},
+        {"url": "http://x/queued", "state": "waiting", "checks": {}},
+    ]
     assert progress["eta"] == {
         "state": "estimating",
         "min_seconds": None,
@@ -1083,23 +1179,18 @@ def test_api_delete_scan_409s_when_scan_is_running(
     assert row[0] == "running"
 
 
-def test_stale_running_scans_interrupted_on_server_boot(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_stale_running_scans_interrupted_on_server_boot(tmp_path, migrate_db) -> None:  # type: ignore[no-untyped-def]
     """When the app boots it marks every DB row stuck in 'running' as
     'interrupted', because the live task driving it is gone after a
     process restart."""
     import sqlite3 as _sqlite3
-    from pathlib import Path as _Path
 
     from audit.db.schema import connect as _connect
 
     db_path = tmp_path / "sweep.db"
-    migrations_dir = _Path(__file__).resolve().parents[2] / "src" / "audit" / "db" / "migrations"
     prep = _connect(db_path)
     try:
-        for p in sorted(migrations_dir.glob("*.sql")):
-            if p.name.endswith(".rollback.sql"):
-                continue
-            prep.executescript(p.read_text())
+        migrate_db(prep)
         prep.execute(
             "INSERT INTO scans (seed_url, status, config_json) "
             "VALUES ('http://stuck.example/', 'running', '{}')"
@@ -1177,7 +1268,7 @@ def test_blob_serves_png_bytes(client: TestClient, seeded_db: tuple[object, obje
 def test_blob_serves_a_finding_screenshot(
     client: TestClient, seeded_db: tuple[Path, Path, int]
 ) -> None:
-    """A circled finding screenshot is served even though it has no image row.
+    """A marked finding screenshot is served even though it has no image row.
 
     Finding screenshots are written straight to the content-addressed store by
     the crawler; they are evidence about an element, not image content lifted
@@ -1596,15 +1687,19 @@ def test_access_token_gate_blocks_and_admits(
     assert bad.get("/api/scans?token=nope").status_code == 401
 
 
+@pytest.mark.parametrize("headless", [True, False])
 async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    headless: bool,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """The verified landing URL must reach the crawl as ``start_url``.
 
-    ``verify_authenticated_target`` already validated where sign-in ended and
-    returned it; the handoff used to throw that value away and crawl the
-    pre-login seed, which for a login handoff is often the sign-in page
-    itself. This pins the wiring: the browser half is faked, because the real
+    ``enter_scan_mode`` reports where sign-in ended; the handoff used to throw
+    that value away and crawl the pre-login seed, which for a login handoff is
+    often the sign-in page itself. This pins the wiring: the browser half is
+    faked, because the real
     path needs Chromium and a human at the keyboard, but the config handed to
     ``run_crawl`` is the thing that was wrong.
     """
@@ -1613,15 +1708,10 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
     from audit.web import server as srv
 
     # The handoff writes the scan row itself once the crawl returns, so the
-    # database has to be real even though the browser is not. `tests` is not
-    # an importable package, so apply the forward migrations directly rather
-    # than reaching into conftest.
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
+    # database has to be real even though the browser is not.
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     seed = "https://app.example.edu/"
@@ -1637,17 +1727,19 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url=landed)
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return landed
+
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
+            assert headless, "a visible scan must never transfer to headless"
+            return tuple(SimpleNamespace() for _ in range(count))
 
         async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+            assert not headless
             return tuple(SimpleNamespace() for _ in range(count))
 
         async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
+            assert not headless
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             return SimpleNamespace()
@@ -1659,6 +1751,7 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
 
     config = CrawlConfig(
         seed_url=seed,
+        browser_headless=headless,
         alfa_enabled=False,
         image_extraction_enabled=False,
         vlm_enabled=False,
@@ -1676,6 +1769,8 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
     )
     # Scope must not have moved with it.
     assert captured["config"].seed_url == seed
+    assert captured["config"].browser_headless is headless
+    assert run.browser_backgrounded is headless
 
 
 def test_login_handoff_fails_when_every_page_was_a_sign_in_wall() -> None:
@@ -1731,7 +1826,9 @@ def test_login_handoff_still_completes_when_real_pages_were_scanned() -> None:
 
 
 async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """A login scan must actually operate the application's controls.
 
@@ -1746,12 +1843,9 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
     from audit.db.schema import connect
     from audit.web import server as srv
 
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     captured: dict[str, object] = {}
@@ -1763,17 +1857,11 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
-        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
-
-        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             captured.update(kwargs)
@@ -1805,7 +1893,9 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
 
 
 async def test_login_handoff_says_so_when_interaction_cannot_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    migrate_db: Callable[[sqlite3.Connection], None],
 ) -> None:
     """Choosing Alfa only leaves interaction enabled but inert — say so.
 
@@ -1818,12 +1908,9 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
     from audit.db.schema import connect
     from audit.web import server as srv
 
-    migrations = Path(srv.__file__).resolve().parents[1] / "db" / "migrations"
     db_path = tmp_path / "audit.db"
     schema_conn = connect(db_path)
-    for sql in sorted(migrations.glob("*.sql")):
-        if not sql.name.endswith(".rollback.sql"):
-            schema_conn.executescript(sql.read_text())
+    migrate_db(schema_conn)
     schema_conn.close()
 
     captured: dict[str, object] = {}
@@ -1835,17 +1922,11 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
-        def verify_authenticated_target(self):  # type: ignore[no-untyped-def]
-            return SimpleNamespace(url="https://app.example.edu/dashboard")
+        def enter_scan_mode(self):  # type: ignore[no-untyped-def]
+            return "https://app.example.edu/dashboard"
 
-        async def prepare_background_scan_pages(self, count):  # type: ignore[no-untyped-def]
+        async def switch_to_headless(self, count):  # type: ignore[no-untyped-def]
             return tuple(SimpleNamespace() for _ in range(count))
-
-        async def discard_manual_auth_page(self):  # type: ignore[no-untyped-def]
-            return None
-
-        async def minimize_for_background_scan(self, page):  # type: ignore[no-untyped-def]
-            return True
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
             captured.update(kwargs)
@@ -1874,3 +1955,186 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
     # No analyzer, so no probe — and the log carries the reason.
     assert captured.get("interaction_probe") is None
     assert captured.get("axe_analyzer") is None
+
+
+def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Stopping is not pausing.
+
+    A stopped scan used to keep its leased jobs, so the next crawl of the same
+    seed saw outstanding work, adopted the row, and flipped a report the
+    operator had deliberately ended to completed. Emptying the queue is what
+    makes the two tellable apart.
+    """
+    db_path, _, _ = seeded_db
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://stop.example.test/', 'running', 5, 0, '{}')"
+        )
+        scan_id = int(cur.lastrowid or 0)
+        for state in ("pending", "leased"):
+            conn.execute(
+                "INSERT INTO jobs (kind, payload_json, state, dedupe_key) VALUES "
+                "('fetch', ?, ?, ?)",
+                (
+                    json.dumps({"scan_id": scan_id, "url": "https://stop.example.test/x"}),
+                    state,
+                    f"{scan_id}:{state}",
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    assert client.post(f"/api/scans/{scan_id}/cancel").status_code == 200
+
+    conn = connect(db_path)
+    try:
+        assert (
+            conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+            == "interrupted"
+        )
+        left = conn.execute(
+            "SELECT COUNT(*) FROM jobs WHERE json_extract(payload_json, '$.scan_id') = ? "
+            "AND state IN ('pending', 'leased')",
+            (scan_id,),
+        ).fetchone()[0]
+        assert left == 0, "a stopped scan must leave no work for a later crawl to adopt"
+        # What it did collect is untouched.
+        assert (
+            conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0] == 5
+        )
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# WCAG version per scan: 2.1 by default, 2.2 on request, nothing else.
+# ---------------------------------------------------------------------------
+
+
+def _post_scan_capturing_config(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, **fields: object
+) -> tuple[int, dict[str, object]]:
+    from audit.web import server as _server
+
+    captured: dict[str, object] = {}
+
+    async def _capture(db_path, config):  # type: ignore[no-untyped-def]
+        captured["config"] = config
+
+    monkeypatch.setattr(_server, "_run_background_crawl", _capture)
+    resp = client.post(
+        "/api/scans",
+        json={"url": "https://example.test/docs", "max_pages": 1, **fields},
+    )
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(asyncio.sleep(0.05))
+    finally:
+        loop.close()
+    return resp.status_code, captured
+
+
+@pytest.mark.parametrize(("fields", "expected"), [({}, "2.1"), ({"wcag_version": "2.2"}, "2.2")])
+def test_api_create_scan_passes_the_wcag_version(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    fields: dict[str, object],
+    expected: str,
+) -> None:
+    status, captured = _post_scan_capturing_config(client, monkeypatch, **fields)
+    assert status == 201
+    config = captured["config"]
+    assert getattr(config, "wcag_version", None) == expected
+
+
+@pytest.mark.parametrize("bad", ["3.0", "2.0", "", 2.2, None])
+def test_api_create_scan_rejects_an_unknown_wcag_version(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, bad: object
+) -> None:
+    status, captured = _post_scan_capturing_config(client, monkeypatch, wcag_version=bad)
+    assert status == 422
+    assert "config" not in captured
+
+
+def _local_login_post(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, **fields: object
+) -> tuple[int, dict[str, object]]:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    class _NoNetworkSession:
+        def __init__(self, **_kwargs: object) -> None:
+            pass
+
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "approved_auth_origins": [],
+                "authorization_acknowledged": True,
+                **fields,
+            },
+        )
+    return response.status_code, captured
+
+
+def test_local_login_scan_defaults_to_wcag_21(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    status, captured = _local_login_post(seeded_db, monkeypatch)
+    assert status == 201
+    assert getattr(captured["config"], "wcag_version", None) == "2.1"
+
+
+@pytest.mark.parametrize("bad", ["3.0", "2.0", 2.1, None])
+def test_local_login_scan_rejects_an_unknown_wcag_version(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, bad: object
+) -> None:
+    status, captured = _local_login_post(seeded_db, monkeypatch, wcag_version=bad)
+    assert status == 422
+    assert "config" not in captured
+
+
+def test_scan_detail_reports_an_old_scan_as_wcag_22(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """The seeded scan predates the setting, so it ran, and reports, 2.2."""
+    _, _, scan_id = seeded_db
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert body["wcag_version"] == "2.2"
+    axe = next(method for method in body["methods_used"] if method["key"] == "axe")
+    assert axe["label"].startswith("Rule check (axe), WCAG 2.2 ")
+
+
+def test_scan_detail_reports_the_chosen_wcag_version(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET config_json = ? WHERE id = ?",
+            ('{"axe_level": "AA", "wcag_version": "2.1"}', scan_id),
+        )
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert body["wcag_version"] == "2.1"
+    axe = next(method for method in body["methods_used"] if method["key"] == "axe")
+    assert axe["label"] == "Rule check (axe), WCAG 2.1 Level AA"

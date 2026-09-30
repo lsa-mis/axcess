@@ -1,4 +1,8 @@
-"""DOM-state (click-through) coverage, projected once for every export.
+"""Click-Through coverage, projected once for every export.
+
+Internally the feature is the interaction probe and its page states are
+"DOM states" (``page_dom_states``); every sentence built here names it with
+:mod:`audit.labels` instead.
 
 Five export formats and the stakeholder report all need to answer the same
 question about the interaction probe, so they read it from here rather than
@@ -26,6 +30,8 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import dataclass, field
+
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES, click_through_states
 
 # Bounds the probe reports in ``scan_interaction_runs.limits``, mapped to
 # language a non-technical reader can act on. The probe stops deliberately;
@@ -130,24 +136,24 @@ class InteractionCoverage:
         """One sentence stating what the probe did, safe for any audience."""
         if not self.enabled:
             return (
-                "Click-through DOM state discovery was turned off for this scan, "
-                "so content that appears only after operating a control was not tested."
+                f"{CLICK_THROUGH} was turned off for this scan, so content that "
+                "appears only after operating a control was not tested."
             )
         if not self.ledger_recorded:
             return (
-                f"Click-through DOM state discovery reached {self.states_total} state(s) "
+                f"{CLICK_THROUGH} reached {click_through_states(self.states_total)} "
                 f"across {self.pages_probed} page(s). Per-page control coverage was not "
                 "recorded for this scan, so the share of controls operated is unknown."
             )
         if self.controls_found == 0:
             return (
-                f"Click-through DOM state discovery ran on {self.pages_probed} page(s) "
-                "and found no operable controls, so there were no additional states to test."
+                f"{CLICK_THROUGH} ran on {self.pages_probed} page(s) and found no "
+                f"operable controls, so there were no {CLICK_THROUGH_STATES} to test."
             )
         return (
-            f"Click-through DOM state discovery operated {self.controls_operated} of "
+            f"{CLICK_THROUGH} operated {self.controls_operated} of "
             f"{self.controls_found} control(s) across {self.pages_probed} page(s), "
-            f"reaching {self.states_total} additional DOM state(s) that a page load "
+            f"reaching {click_through_states(self.states_total)} that a page load "
             f"alone does not show. {self.findings_revealed} finding(s) in this report "
             "were visible only after a control was operated."
         )
@@ -161,7 +167,8 @@ class InteractionCoverage:
         if self.limited_pages:
             out.append(
                 f"{len(self.limited_pages)} page(s) hit a bound before every control was "
-                "operated, so their states are partially tested. They are listed below."
+                f"operated, so their {CLICK_THROUGH_STATES} are partially tested. "
+                "They are listed below."
             )
         if self.blocked_controls:
             out.append(
@@ -177,13 +184,13 @@ class InteractionCoverage:
         out.append(
             "Hover-only content, gestures, operating-system menus, closed shadow DOM, "
             "cross-origin embeds, and states with no observable DOM change are outside "
-            "what this probe can reach and still require manual testing."
+            f"what {CLICK_THROUGH} can reach and still require manual testing."
         )
-        # Stated wherever DOM-state numbers appear: the rescan comparison comes
+        # Stated wherever Click-Through numbers appear: the rescan comparison comes
         # from the image pipeline only, so a click-revealed barrier missing from
         # a later scan is not evidence that anyone fixed it.
         out.append(
-            "Click-revealed findings are not yet compared across scans. If one is absent "
+            f"{CLICK_THROUGH} findings are not yet compared across scans. If one is absent "
             "from a later report, confirm the fix directly, absence is not proof of repair."
         )
         return out

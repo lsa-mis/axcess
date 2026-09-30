@@ -5,6 +5,14 @@ const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 const resources = ["backend-dist", "playwright-browsers", "ocr-runtime"]
   .map((name) => path.join(__dirname, name))
   .filter((candidate) => fs.existsSync(candidate));
+// electron-updater reads resources/app-update.yml before it downloads an
+// update. electron-builder writes that file only when it packages the app
+// itself; here Forge packages and electron-builder only wraps the result
+// into the Windows installer (scripts/make-windows-installer.cjs), so the
+// file ships as a resource. macOS does not use electron-updater.
+if (process.platform !== "darwin") {
+  resources.push(path.join(__dirname, "assets", "app-update.yml"));
+}
 const macSigningIdentity = process.env.AXCESS_MAC_SIGN_IDENTITY || "-";
 const isReleaseSigned = macSigningIdentity !== "-";
 
@@ -88,6 +96,8 @@ module.exports = {
       /\/backend-dist(?:\/|$)/,
       /\/playwright-browsers(?:\/|$)/,
       /\/out(?:\/|$)/,
+      // Installer wording, read by electron-builder at build time only.
+      /\/installer(?:\/|$)/,
       /\/test(?:\/|$)/,
     ],
     osxSign:
@@ -103,11 +113,9 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     { name: "@electron-forge/maker-zip", platforms: ["darwin"] },
-    {
-      name: "@electron-forge/maker-squirrel",
-      platforms: ["win32"],
-      config: { setupIcon: path.join(__dirname, "assets", "axcess.ico") },
-    },
+    // No Windows maker: the Windows installer is electron-builder's NSIS
+    // target, built from Forge's packaged app by
+    // scripts/make-windows-installer.cjs (`npm run make:windows`).
     {
       name: "@electron-forge/maker-deb",
       platforms: ["linux"],

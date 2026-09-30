@@ -16,7 +16,7 @@ import httpx
 if TYPE_CHECKING:
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
-    from audit.analyzer.interaction import RevealedViolation
+    from audit.analyzer.interaction import RevealedViolation, StateCapture
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
@@ -71,6 +71,12 @@ class FetchResult:
     # defect, because it measures the coverage interaction added, not the
     # findings it happened to produce.
     interaction_states: int = 0
+    # Gzipped markup for the subset of those states that held a *new* finding,
+    # which the stored page HTML cannot contain: that is the load state, taken
+    # before the probe clicks anything. Always shorter than
+    # ``interaction_states`` and not a substitute for it -- a state nothing was
+    # found in is still coverage, it just has nothing to show.
+    interaction_captures: tuple[StateCapture, ...] = field(default=())
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)

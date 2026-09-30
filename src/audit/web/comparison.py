@@ -11,15 +11,21 @@ import json
 import sqlite3
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 
 from audit.analyzer.alfa_evidence import parse_evidence
 from audit.crawler import url_policy
+from audit.labels import CLICK_THROUGH_STATES
+from audit.wcag_version import stored_wcag_version
 from audit.web import image_findings_queries, issues
 
 Category = Literal["new", "still_detected", "changed", "no_longer_detected", "cannot_compare"]
+# The plain presence of a group in each report, for the Compare reports page:
+# only in the later report, only in the earlier one, or in both. ``Category``
+# keeps the stricter reading of the same row (whether coverage supports it).
+Change = Literal["new", "resolved", "remaining"]
 Pipeline = Literal["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"]
 CATEGORIES: tuple[Category, ...] = (
     "new",
@@ -38,6 +44,12 @@ PIPELINES: tuple[Pipeline, ...] = (
     "semantic",
     "image",
 )
+CHANGES: tuple[Change, ...] = ("new", "resolved", "remaining")
+# Every issue group of two reports fits: a group is one rule or image
+# classification, so the count is bounded by the rule catalogue, not the site.
+MAX_PAGE_SIZE = 500
+# Completed reports of one site drawn in the trend, most recent last.
+HISTORY_LIMIT = 20
 
 
 class ComparisonError(ValueError):
@@ -58,7 +70,12 @@ class EvidenceLink(BaseModel):
 
 
 class Snapshot(BaseModel):
+    # Every stored finding, cross-page repeats included: what the location
+    # matching compares.
     occurrences: int
+    # The same group as the Issues table counts it, each element once. What
+    # the Compare reports page shows, so its numbers match the report's.
+    issue_occurrences: int
     pages: int
     statuses: dict[str, int]
     outcomes: dict[str, int]
@@ -71,6 +88,10 @@ class ComparisonRow(BaseModel):
     pipeline: Pipeline
     title: str
     category: Category
+    change: Change
+    wcag_sc: str | None
+    wcag_name: str | None
+    conformance: str
     before: Snapshot | None
     after: Snapshot | None
     limitations: list[str]
@@ -88,14 +109,44 @@ class CoveragePair(BaseModel):
     after: MethodCoverage
 
 
+class CoverageNote(BaseModel):
+    """One coverage note, said once for whichever of the two scans it is true of.
+
+    ``limitations`` repeats a note per report; this is the same evidence for a
+    reader, without the notes the method coverage table already states.
+    """
+
+    text: str
+    # The scans it is true of, earlier first; empty when it is about the pair,
+    # such as the pages only one of them checked.
+    scans: list[int]
+    # True of one scan or of the pair, so it can make a group look new or
+    # resolved. A limit both scans share cannot, though it can hide issues.
+    differs: bool
+
+
+class GroupTotals(BaseModel):
+    """A report's issue groups and occurrences, counted as the Issues table does."""
+
+    groups: int
+    occurrences: int
+
+
 class ComparisonResponse(BaseModel):
     current: ReportIdentity
     baseline: ReportIdentity | None
     counts: dict[str, int]
+    # Rows by ``Change``, over every row, whatever the filters.
+    changes: dict[str, int]
+    before_totals: GroupTotals | None
+    after_totals: GroupTotals
     pipeline_counts: dict[str, int]
     coverage: list[CoveragePair] = Field(default_factory=list)
+    # Names, never values, of the detection settings that differ.
+    settings_changed: list[str] = Field(default_factory=list)
     limitations: list[str]
-    rows: list[ComparisonRow] = Field(max_length=50)
+    notes: list[CoverageNote] = Field(default_factory=list)
+    rows: list[ComparisonRow] = Field(max_length=MAX_PAGE_SIZE)
     total: int
     page: int
     page_size: int
@@ -112,8 +163,18 @@ def _protected(conn: sqlite3.Connection, scan_id: int) -> bool:
     )
 
 
-def _scope(seed_url: str) -> str:
-    return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+def site_scope(seed_url: str) -> str:
+    """Normalized seed scope: the key that makes two reports the same site.
+
+    An older report can carry a seed too malformed for ``urlsplit`` (a stray
+    "[" in the host). Its raw address is its scope, a site of its own, so one
+    such row cannot break the Reports list or every other report's
+    previous-report lookup.
+    """
+    try:
+        return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+    except ValueError:
+        return seed_url.strip()
 
 
 def _load_scan(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
@@ -139,9 +200,9 @@ def previous_scan_id(conn: sqlite3.Connection, scan: dict[str, Any]) -> int | No
         "ORDER BY julianday(started_at) DESC, id DESC",
         (str(scan["started_at"]), str(scan["started_at"]), int(scan["id"])),
     )
-    scope = _scope(str(scan["seed_url"]))
+    scope = site_scope(str(scan["seed_url"]))
     for row in rows:
-        if not _protected(conn, int(row["id"])) and _scope(str(row["seed_url"])) == scope:
+        if not _protected(conn, int(row["id"])) and site_scope(str(row["seed_url"])) == scope:
             return int(row["id"])
     return None
 
@@ -160,10 +221,31 @@ def _config(scan: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
+class HistoryPoint(BaseModel):
+    id: int
+    started_at: str
+    finished_at: str | None
+    groups: int
+    occurrences: int
+
+
+class SiteHistory(BaseModel):
+    """Completed public reports of one site, oldest first, for the trend."""
+
+    site_url: str
+    # Every completed public report of the site; ``scans`` keeps the latest.
+    total: int
+    scans: list[HistoryPoint] = Field(max_length=HISTORY_LIMIT)
+
+
 @dataclass
 class _Group:
     pipeline: Pipeline
     title: str
+    wcag_sc: str | None = None
+    wcag_name: str | None = None
+    conformance: str = "BP"
+    issue_occurrences: int = 0
     issue_links: list[EvidenceLink] = field(default_factory=list)
     evidence: list[EvidenceLink] = field(default_factory=list)
     signatures: Counter[tuple[str, ...]] = field(default_factory=Counter)
@@ -186,6 +268,7 @@ class _Group:
     def snapshot(self) -> Snapshot:
         return Snapshot(
             occurrences=sum(self.signatures.values()),
+            issue_occurrences=self.issue_occurrences,
             pages=len(self.pages),
             statuses=dict(self.statuses),
             outcomes=dict(self.outcomes),
@@ -194,20 +277,42 @@ class _Group:
         )
 
 
+def _group_key(row: issues.IssueRow) -> str:
+    """One Alfa rule is one group whichever outcome it had, so a finding that
+    moves between failed and cannot-tell is a change, not a new issue."""
+    key = row.issue_key
+    if row.pipeline == "alfa" and key.rsplit(":", 1)[-1] in {"failed", "cant_tell"}:
+        key = key.rsplit(":", 1)[0]
+    return key
+
+
+def _compared_rows(conn: sqlite3.Connection, scan_id: int) -> list[issues.IssueRow]:
+    return [row for row in issues.list_issues(conn, scan_id) if row.pipeline in PIPELINES]
+
+
 def _groups(conn: sqlite3.Connection, scan_id: int) -> dict[str, _Group]:
     grouped: dict[str, _Group] = {}
     ids: dict[tuple[str, int], str] = {}
-    for row in issues.list_issues(conn, scan_id):
-        if row.pipeline not in PIPELINES:
-            continue
-        key = row.issue_key
-        if row.pipeline == "alfa" and key.rsplit(":", 1)[-1] in {"failed", "cant_tell"}:
-            key = key.rsplit(":", 1)[0]
-        group = grouped.setdefault(key, _Group(pipeline=row.pipeline, title=row.title))
+    for row in _compared_rows(conn, scan_id):
+        key = _group_key(row)
+        group = grouped.setdefault(
+            key,
+            _Group(
+                # ``_compared_rows`` keeps only these pipelines.
+                pipeline=cast(Pipeline, row.pipeline),
+                title=row.title,
+                wcag_sc=row.wcag_sc,
+                wcag_name=row.wcag_name,
+                conformance=row.conformance,
+            ),
+        )
         if row.pipeline == "alfa":
             group.title = f"{row.wcag_name or 'ACT rule'} (Alfa {key.removeprefix('alfa:')})"
+        group.issue_occurrences += row.occurrence_count
         group.issue_links.append(EvidenceLink(label=row.title, url=row.detail_url))
-        for finding_id in row.finding_ids:
+        # A comparison matches locations page by page, so it needs the
+        # cross-page repeats the report itself lists only once.
+        for finding_id in (*row.finding_ids, *row.repeat_finding_ids):
             ids[(row.pipeline, finding_id)] = key
 
     # The canonical projection's location samples are intentionally only three
@@ -297,9 +402,23 @@ _FLAGS = {
 }
 
 
+@dataclass(frozen=True)
+class _Note:
+    """A coverage limit of one report, worded to stand without its number."""
+
+    scan_id: int
+    text: str
+    # The method coverage table already says it: a check that was off, ran
+    # on part of the site, or has no page count.
+    in_table: bool = False
+
+    def __str__(self) -> str:
+        return f"Report #{self.scan_id}: {self.text}"
+
+
 def _coverage(
     conn: sqlite3.Connection, scan: dict[str, Any], groups: dict[str, _Group]
-) -> tuple[set[str], dict[str, list[str]], list[str]]:
+) -> tuple[set[str], dict[str, list[str]], list[str], list[_Note]]:
     scan_id = int(scan["id"])
     cfg = _config(scan)
     rows = conn.execute(
@@ -307,57 +426,67 @@ def _coverage(
         (scan_id,),
     ).fetchall()
     pages = {url_policy.normalize(str(row["url_normalized"])) for row in rows}
+    notes: list[_Note] = []
+
+    def note(text: str, *, in_table: bool = False) -> str:
+        notes.append(_Note(scan_id, text, in_table))
+        return str(notes[-1])
+
     common: list[str] = []
     if not rows or any(
         not row["status_code"] or not 200 <= row["status_code"] < 300 for row in rows
     ):
-        common.append(f"Report #{scan_id} contains missing or unsuccessful page responses.")
+        common.append(note("Some pages were missing or did not load successfully."))
     if int(scan.get("error_count") or 0):
-        common.append(f"Report #{scan_id} recorded crawl or analysis errors.")
+        common.append(note("Errors were recorded while crawling or checking pages."))
     if int(scan.get("page_count") or 0) != len(rows):
-        common.append(f"Report #{scan_id} page coverage counts are inconsistent.")
+        common.append(note("The page count recorded does not match the pages stored."))
     if any(row["final_url"] for row in rows):
-        common.append(
-            f"Report #{scan_id} includes redirects; confirm the same content was checked."
-        )
+        common.append(note("Some pages redirected; confirm the same content was checked."))
     if cfg.get("search"):
         search = conn.execute(
             "SELECT status FROM scan_search_runs WHERE scan_id = ?", (scan_id,)
         ).fetchall()
         if not search or any(row["status"] != "completed" for row in search):
             common.append(
-                f"Report #{scan_id} has incomplete or unrecorded configured-search coverage."
+                note("The site search set up for the scan did not finish or was not recorded.")
             )
     by_pipeline: dict[str, list[str]] = {}
     for pipeline in PIPELINES:
         limitations: list[str] = []
         flag = _FLAGS.get(pipeline)
         if flag and cfg.get(flag) is False:
-            limitations.append(f"Report #{scan_id}: {pipeline} was disabled.")
+            limitations.append(note(f"{pipeline} was disabled.", in_table=True))
         elif pipeline in {"focus", "visual"}:
             limitations.append(
-                f"Report #{scan_id}: completed {pipeline} coverage was not recorded."
+                note(f"completed {pipeline} coverage was not recorded.", in_table=True)
             )
         elif pipeline == "image":
             # A shared cached analysis alone cannot prove it was evaluated in
             # this report. Historical schema has no per-report analysis ledger.
             limitations.append(
-                f"Report #{scan_id}: per-report image-analysis coverage was not recorded."
+                note("per-report image-analysis coverage was not recorded.", in_table=True)
             )
         else:
             checked = int(scan.get(_COUNTERS[pipeline]) or 0)
             if pipeline in {"semantic", "keyboard", "responsive"} and not cfg.get(
                 "method_coverage_version"
             ):
-                limitations.append(f"Report #{scan_id}: historical {pipeline} coverage is unknown.")
+                limitations.append(
+                    note(f"historical {pipeline} coverage is unknown.", in_table=True)
+                )
             elif not rows or checked < len(rows):
                 limitations.append(
-                    f"Report #{scan_id}: {pipeline} checked {checked} of {len(rows)} pages."
+                    note(f"{pipeline} checked {checked} of {len(rows)} pages.", in_table=True)
                 )
         if pipeline in {"keyboard", "responsive"} and not (flag and cfg.get(flag) is False):
+            # The table marks these counts "tried" and explains the word.
             limitations.append(
-                f"Report #{scan_id}: {pipeline} counters record page attempts; "
-                "per-check errors and probe limits were not recorded."
+                note(
+                    f"{pipeline} counters record page attempts; "
+                    "per-check errors and probe limits were not recorded.",
+                    in_table=True,
+                )
             )
         if pipeline == "alfa":
             stored = sum(
@@ -368,8 +497,10 @@ def _coverage(
             )
             if emitted > stored:
                 limitations.append(
-                    f"Report #{scan_id}: Alfa findings were capped or evidence is missing "
-                    f"({stored} of {emitted} stored)."
+                    note(
+                        "Some Siteimprove Alfa results were capped or lost their evidence: "
+                        f"{stored} of {emitted} were stored."
+                    )
                 )
         if pipeline == "axe" and cfg.get("interaction_checks_enabled"):
             has_ledger = conn.execute(
@@ -398,10 +529,29 @@ def _coverage(
                 )
             ):
                 limitations.append(
-                    f"Report #{scan_id}: interaction states were skipped, bounded, or not recorded."
+                    note(f"Some {CLICK_THROUGH_STATES} were skipped, cut short, or not recorded.")
                 )
         by_pipeline[pipeline] = limitations
-    return pages, by_pipeline, common
+    return pages, by_pipeline, common, notes
+
+
+def _pages(n: int) -> str:
+    return f"{n} page" if n == 1 else f"{n} pages"
+
+
+def _coverage_notes(
+    baseline_id: int, current_id: int, notes: list[_Note], pair: list[str]
+) -> list[CoverageNote]:
+    """Each note once, with the scans it is true of; differences first."""
+    scans: dict[str, set[int]] = {}
+    for item in notes:
+        if not item.in_table:
+            scans.setdefault(item.text, set()).add(item.scan_id)
+    result = [CoverageNote(text=text, scans=[], differs=True) for text in pair]
+    for text, ids in scans.items():
+        both = [scan_id for scan_id in (baseline_id, current_id) if scan_id in ids]
+        result.append(CoverageNote(text=text, scans=both, differs=len(both) == 1))
+    return sorted(result, key=lambda item: not item.differs)
 
 
 def _method_coverage(
@@ -437,8 +587,10 @@ def compare_reports(
     pipeline: Pipeline | None = None,
 ) -> ComparisonResponse:
     """Compare exactly two completed public reports without changing evidence."""
-    if page < 1 or not 1 <= page_size <= 50:
-        raise ComparisonError("Page must be positive and page_size must be between 1 and 50.", 422)
+    if page < 1 or not 1 <= page_size <= MAX_PAGE_SIZE:
+        raise ComparisonError(
+            f"Page must be positive and page_size must be between 1 and {MAX_PAGE_SIZE}.", 422
+        )
     if category is not None and category not in CATEGORIES:
         raise ComparisonError("Unknown comparison category.", 422)
     if pipeline is not None and pipeline not in PIPELINES:
@@ -448,11 +600,15 @@ def compare_reports(
         raise ComparisonError("Only completed reports can be compared.", 409)
     baseline_id = compare_to if compare_to is not None else previous_scan_id(conn, current)
     counts: dict[str, int] = dict.fromkeys(CATEGORIES, 0)
+    changes: dict[str, int] = dict.fromkeys(CHANGES, 0)
     if baseline_id is None:
         return ComparisonResponse(
             current=_identity(current),
             baseline=None,
             counts=counts,
+            changes=changes,
+            before_totals=None,
+            after_totals=_totals(conn, scan_id),
             pipeline_counts={},
             limitations=["Scan the same site again to compare with an earlier completed report."],
             rows=[],
@@ -465,7 +621,7 @@ def compare_reports(
         raise ComparisonError("Choose two different reports.")
     if baseline["status"] != "completed":
         raise ComparisonError("Only completed reports can be compared.", 409)
-    if _scope(str(current["seed_url"])) != _scope(str(baseline["seed_url"])):
+    if site_scope(str(current["seed_url"])) != site_scope(str(baseline["seed_url"])):
         raise ComparisonError("Reports must have the same normalized seed URL.")
     earlier = conn.execute(
         "SELECT julianday(?) < julianday(?) OR (julianday(?) = julianday(?) AND ? < ?)",
@@ -483,15 +639,25 @@ def compare_reports(
 
     before = _groups(conn, baseline_id)
     after = _groups(conn, scan_id)
-    old_pages, old_methods, old_common = _coverage(conn, baseline, before)
-    new_pages, new_methods, new_common = _coverage(conn, current, after)
+    old_pages, old_methods, old_common, old_notes = _coverage(conn, baseline, before)
+    new_pages, new_methods, new_common, new_notes = _coverage(conn, current, after)
     common = list(dict.fromkeys([*old_common, *new_common]))
+    pair_notes: list[str] = []
     if old_pages != new_pages:
         common.append(
             f"Page coverage changed: {len(old_pages - new_pages)} earlier pages missing; "
             f"{len(new_pages - old_pages)} additional pages."
         )
+        pair_notes.append(
+            f"The scans checked different pages: {_pages(len(old_pages - new_pages))} "
+            f"only in scan {baseline_id}, {_pages(len(new_pages - old_pages))} "
+            f"only in scan {scan_id}."
+        )
     old_cfg, new_cfg = _config(baseline), _config(current)
+    # A report stored before the version setting has no key but ran WCAG
+    # 2.2; compare what each scan actually ran, not whether the key exists.
+    for cfg in (old_cfg, new_cfg):
+        cfg["wcag_version"] = stored_wcag_version(cfg)
     # Do not echo configuration values: search inputs and provider fields can
     # contain private data. Only report names of changed detection settings.
     changed = sorted(
@@ -520,6 +686,8 @@ def compare_reports(
                 ]
             )
         )
+        change: Change = "new" if old is None else "resolved" if new is None else "remaining"
+        changes[change] += 1
         if old is None:
             result: Category = "cannot_compare" if limitations else "new"
         elif new is None:
@@ -537,6 +705,10 @@ def compare_reports(
                 pipeline=group.pipeline,
                 title=group.title,
                 category=result,
+                change=change,
+                wcag_sc=group.wcag_sc,
+                wcag_name=group.wcag_name,
+                conformance=group.conformance,
                 before=old.snapshot() if old else None,
                 after=new.snapshot() if new else None,
                 limitations=limitations,
@@ -564,6 +736,9 @@ def compare_reports(
         current=_identity(current),
         baseline=_identity(baseline),
         counts=counts,
+        changes=changes,
+        before_totals=_group_totals(before),
+        after_totals=_group_totals(after),
         pipeline_counts=pipeline_counts,
         coverage=[
             CoveragePair(
@@ -575,9 +750,72 @@ def compare_reports(
             )
             for p in PIPELINES
         ],
+        settings_changed=changed[:50],
         limitations=all_limitations,
+        notes=_coverage_notes(
+            baseline_id,
+            scan_id,
+            [
+                *old_notes,
+                *new_notes,
+                # A group's own evidence limits, from the scan that stored it.
+                *(_Note(baseline_id, t) for g in before.values() for t in sorted(g.limitations)),
+                *(_Note(scan_id, t) for g in after.values() for t in sorted(g.limitations)),
+            ],
+            pair_notes,
+        ),
         rows=selected[(page - 1) * page_size : page * page_size],
         total=len(selected),
         page=page,
         page_size=page_size,
+    )
+
+
+def _group_totals(groups: dict[str, _Group]) -> GroupTotals:
+    return GroupTotals(
+        groups=len(groups), occurrences=sum(g.issue_occurrences for g in groups.values())
+    )
+
+
+def _totals(conn: sqlite3.Connection, scan_id: int) -> GroupTotals:
+    """``_group_totals`` without reading every finding: the trend needs only counts."""
+    rows = _compared_rows(conn, scan_id)
+    return GroupTotals(
+        groups=len({_group_key(row) for row in rows}),
+        occurrences=sum(row.occurrence_count for row in rows),
+    )
+
+
+def site_history(
+    conn: sqlite3.Connection, scan_id: int, *, limit: int = HISTORY_LIMIT
+) -> SiteHistory:
+    """The completed public reports of ``scan_id``'s site, oldest first.
+
+    Ordered the way ``previous_scan_id`` picks a baseline (start time, then
+    id), so the point before a report in the trend is the report it is
+    compared with by default. Totals are the comparison's, so a point and the
+    Before or After of a comparison never disagree.
+    """
+    scan = _load_scan(conn, scan_id)
+    scope = site_scope(str(scan["seed_url"]))
+    same_site = [
+        row
+        for row in conn.execute(
+            "SELECT id, seed_url, started_at, finished_at FROM scans "
+            "WHERE status = 'completed' ORDER BY julianday(started_at), id"
+        )
+        if site_scope(str(row["seed_url"])) == scope and not _protected(conn, int(row["id"]))
+    ]
+    return SiteHistory(
+        site_url=scope,
+        total=len(same_site),
+        scans=[
+            HistoryPoint(
+                id=int(row["id"]),
+                started_at=str(row["started_at"]),
+                finished_at=str(row["finished_at"]) if row["finished_at"] else None,
+                **_totals(conn, int(row["id"])).model_dump(),
+            )
+            for row in same_site[-limit:]
+        ],
     )

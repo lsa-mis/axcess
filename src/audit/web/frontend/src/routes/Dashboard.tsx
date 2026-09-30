@@ -3,12 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, PlusCircle, ServerCrash } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "../components/ReportCrumb";
+import { REVIEW_TYPE_LABEL } from "../lib/terms";
 import {
   Card,
   EmptyState,
   LinkButton,
   PageHeader,
   ScanStatusBadge,
+  ScanTag,
   StatCard,
   relativeTime,
 } from "../components/ui";
@@ -51,11 +53,11 @@ export default function DashboardRoute() {
   return (
     <>
       <PageHeader
-        title="Workbench"
+        title="Dashboard"
         subtitle={
           completed.length === 0
-            ? "Scan a site, inspect the evidence, and produce a remediation report."
-            : `${completed.length} completed report${completed.length === 1 ? "" : "s"} · evidence for expert review, not a conformance verdict.`
+            ? "Scan a site, look at what the scan found, and make a report of what to fix."
+            : `${completed.length} completed report${completed.length === 1 ? "" : "s"} · results for an expert to review, not proof that a site meets accessibility rules.`
         }
       />
 
@@ -63,7 +65,7 @@ export default function DashboardRoute() {
         <Card className="mb-4 flex items-start gap-2 border-sev-critical/30 bg-sev-critical-bg p-4 text-sev-critical" role="alert">
           <ServerCrash className="mt-0.5 h-5 w-5" aria-hidden />
           <div className="text-sm">
-            <strong>Couldn&rsquo;t load scans.</strong>{" "}
+            <strong>Axcess could not load the reports.</strong>{" "}
             {error instanceof Error ? error.message : String(error)}
           </div>
         </Card>
@@ -73,9 +75,9 @@ export default function DashboardRoute() {
         <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 border-umich-blue/30 bg-umich-blue/5 p-4">
           <div className="flex items-center gap-2 text-sm">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-umich-maize" aria-hidden />
-            <strong className="text-fg">Scan #{running.id}</strong>
+            <strong className="text-fg">Scan {running.id}</strong>
             <span className="break-all text-fg-muted">
-              is crawling {siteLabel(running.seed_url)}
+              is scanning {siteLabel(running.seed_url)}
             </span>
           </div>
           {/* Plain inline Link is correct here, this is a body text link, not
@@ -94,8 +96,8 @@ export default function DashboardRoute() {
         <Card className="mb-5 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-fg-subtle">
-                Waiting on you · report #{latest.id} ·{" "}
+              <p className="text-2xs font-semibold text-fg-subtle">
+                Waiting for you · Report #{latest.id} ·{" "}
                 <span className="break-all normal-case tracking-normal text-fg-muted">
                   {siteLabel(latest.seed_url)}
                 </span>
@@ -105,15 +107,15 @@ export default function DashboardRoute() {
                   thing the reader actually has to clear. */}
               <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-fg sm:text-2xl">
                 {reviewLeads > 0
-                  ? `${reviewLeads} issue group${reviewLeads === 1 ? "" : "s"} need${reviewLeads === 1 ? "s" : ""} an expert decision`
+                  ? `${reviewLeads} issue${reviewLeads === 1 ? "" : "s"} need${reviewLeads === 1 ? "s" : ""} review`
                   : latestIssues.total_unfiltered > 0
-                    ? "Nothing is waiting on a human decision"
-                    : "No issue groups were detected"}
+                    ? "No issues need review"
+                    : "The checks found no issues"}
               </h2>
               <p className="mt-1.5 max-w-2xl text-sm leading-6 text-fg-muted">
                 {likelyBarriers > 0
-                  ? `${likelyBarriers} group${likelyBarriers === 1 ? " is" : "s are"} high-confidence enough to act on without confirmation. `
-                  : "No group in this report is high-confidence enough to act on without confirmation. "}
+                  ? `${likelyBarriers} issue${likelyBarriers === 1 ? " is a Barrier" : "s are Barriers"}: sure enough to fix without checking first. `
+                  : "No issue in this report is a Barrier (sure enough to fix without checking first). "}
                 {latestIssues.occurrence_counts.all_evidence.toLocaleString()} occurrences across{" "}
                 {latest.page_count.toLocaleString()} page
                 {latest.page_count === 1 ? "" : "s"}.
@@ -133,26 +135,26 @@ export default function DashboardRoute() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             label="Barriers"
-            value={latestIssues ? likelyBarriers : "n/a"}
-            hint="Newest report · act without confirmation"
+            value={latestIssues ? likelyBarriers : "Not available"}
+            hint="Newest report · fix without checking first"
           />
           <StatCard
-            label="Review leads"
-            value={latestIssues ? reviewLeads : "n/a"}
-            hint="Newest report · expert decision required"
+            label={REVIEW_TYPE_LABEL.expert_review}
+            value={latestIssues ? reviewLeads : "Not available"}
+            hint="Newest report · an expert must decide"
           />
           <StatCard
             label="Occurrences"
             value={
               latestIssues
                 ? latestIssues.occurrence_counts.all_evidence.toLocaleString()
-                : "n/a"
+                : "Not available"
             }
-            hint="Newest report · not a conformance score"
+            hint="Newest report · not an accessibility score"
           />
           <StatCard
             label="Completed reports"
-            value={isLoading ? "n/a" : completed.length}
+            value={isLoading ? "Loading" : completed.length}
             hint="All time"
           />
         </div>
@@ -173,8 +175,8 @@ export default function DashboardRoute() {
           </div>
           {scans.length === 0 ? (
             <EmptyState
-              title="No scans yet"
-              message="Run a crawl to see reports here."
+              title="No reports yet"
+              message="Start a scan to see reports here."
               action={
                 <LinkButton to="/scans/new" variant="primary" size="lg">
                   <PlusCircle className="h-5 w-5" aria-hidden /> New scan
@@ -194,9 +196,9 @@ export default function DashboardRoute() {
                         {siteLabel(s.seed_url)}
                       </span>
                       <span className="block text-xs text-fg-subtle">
-                        #{s.id} · {s.page_count.toLocaleString()} page
+                        <ScanTag id={s.id} /> · {s.page_count.toLocaleString()} page
                         {s.page_count === 1 ? "" : "s"} · {s.finding_count.toLocaleString()}{" "}
-                        finding{s.finding_count === 1 ? "" : "s"}
+                        image{s.finding_count === 1 ? "" : "s"} with text
                       </span>
                     </span>
                     <ScanStatusBadge value={s.status} />
@@ -216,10 +218,10 @@ export default function DashboardRoute() {
           three-bullet product tour that used to hold a third of this page. */}
       {!error && scans.length > 0 && (
         <p className="mt-4 max-w-3xl text-xs leading-relaxed text-fg-subtle">
-          Axcess reports what its checks observed and where. Automated results
-          are evidence for expert review, never a conformance decision, and a
-          method that did not run is not a passing result, each report&rsquo;s
-          overview lists exactly what was and was not checked.
+          Axcess reports what its checks found, and where. Automated results
+          are for an expert to review. They never prove that a site meets
+          accessibility rules. A check that did not run is not a pass. Each
+          report lists what was and was not checked, above its Issues table.
         </p>
       )}
     </>
