@@ -111,8 +111,8 @@ function describeRelease(release, { platform, arch }) {
  * file runs, the Mac's (Apple Silicon or Intel). Windows and Linux have one
  * build each, for 64-bit Intel and AMD processors, which the download page
  * states; a processor with no build has no name, so a copy on it is never
- * offered a file it cannot run. With no version, the name the site links
- * to, which always resolves to the newest release.
+ * offered a file it cannot run. The site matches the part after the version
+ * (data-release-file in site/build.py).
  *
  * `kind` is "mac", "windows-installer", "windows-portable" or "linux".
  * Hyphens rather than spaces: GitHub rewrites spaces in file names.

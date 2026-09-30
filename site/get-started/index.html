@@ -66,7 +66,7 @@
           <li>A development preview, published automatically when the app changes</li>
           <li>Free, with no account or sign-in needed to download</li>
         </ul>
-        <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Mac-Apple-Silicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-Installer.exe">Download for Windows</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Linux.AppImage">Download for Linux</a></p>
+        <p class="btn-row"><a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Mac-Apple-Silicon.dmg">Download for macOS</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Windows-Installer.exe">Download for Windows</a> <a class="btn btn-primary" href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Linux.AppImage">Download for Linux</a></p>
         <p class="small" id="latest-release" data-latest-release="https://github.com/lsa-mis/axcess/releases/latest">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="https://github.com/lsa-mis/axcess/releases">the releases page</a>.</p>
         <div style="margin-top:1rem"><div class="callout callout-maize"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></svg><p><strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> macOS and Windows show a warning on first launch that you need to approve, and on Linux you allow the file to run.</p></div></div>
       </article>
@@ -89,7 +89,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for macOS</strong> and wait for <code>Axcess-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
+          <li>Select <strong>Download for macOS</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
           <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
           <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
           <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
@@ -101,7 +101,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Windows</strong> and wait for <code>Axcess-Windows-Installer.exe</code> to finish downloading.</li>
+          <li>Select <strong>Download for Windows</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish downloading.</li>
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
@@ -112,7 +112,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
         <h5 style="margin-top:1rem">Without installing</h5>
-        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. <a href="https://github.com/lsa-mis/axcess/releases/latest/download/Axcess-Windows-Portable.zip">Download the portable Windows zip (no install)</a>.</p>
+        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. <a href="https://github.com/lsa-mis/axcess/releases/latest" data-release-file="Windows-Portable.zip">Download the portable Windows zip (no install)</a>.</p>
         <ol class="small" style="margin:.5rem 0 0;padding-left:1.25rem">
           <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
           <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
@@ -122,9 +122,9 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Linux</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Linux</strong> and wait for <code>Axcess-Linux.AppImage</code> to finish downloading. It is the whole app in one file.</li>
+          <li>Select <strong>Download for Linux</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the whole app in one file.</li>
           <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
-          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-Linux.AppImage</code> in a terminal.</li>
+          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a terminal.</li>
           <li>Double-click it to open Axcess.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">Ubuntu 23.10 and later do not let an AppImage use the browser sandbox that keeps web pages apart from the rest of your computer. There, Axcess opens with that sandbox off, so open only saved copies of sites you trust in the Page inspector. On other Linux systems it stays on.</p>

@@ -35,10 +35,21 @@ RELEASES = f"{REPO}/releases"
 LATEST_RELEASE = f"{RELEASES}/latest"
 # Version-less asset names are uploaded by .github/workflows/desktop-build.yml
 # so these links always fetch the newest build without a GitHub sign-in.
-DOWNLOAD_MACOS = f"{LATEST_RELEASE}/download/Axcess-Mac-Apple-Silicon.dmg"
-DOWNLOAD_WINDOWS = f"{LATEST_RELEASE}/download/Axcess-Windows-Installer.exe"
-DOWNLOAD_WINDOWS_PORTABLE = f"{LATEST_RELEASE}/download/Axcess-Windows-Portable.zip"
-DOWNLOAD_LINUX = f"{LATEST_RELEASE}/download/Axcess-Linux.AppImage"
+# Each release holds one file per platform, named with its version
+# (Axcess-0.64-Windows-Installer.exe, releaseFileName in
+# desktop/src/updates.cjs), so there is no fixed name to link to. A download
+# link goes to the newest release's page, which lists the files and works
+# without scripts; assets/site.js then points it at the file itself, found
+# by the part of its name after the version (data-release-file).
+def download_link(kind: str, text: str, css: str = "") -> str:
+    cls = f' class="{css}"' if css else ""
+    return f'<a{cls} href="{LATEST_RELEASE}" data-release-file="{kind}">{text}</a>'
+
+
+def release_file_name(kind: str) -> str:
+    """The file's name as the steps show it; site.js puts in the version."""
+    return f'<code data-release-name="{kind}">Axcess-(version)-{kind}</code>'
+
 WHITEPAPER = f"{REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md"
 DOCS = f"{REPO}/tree/main/docs"
 PORTFOLIO = "https://reganmaharjan.com.np/"
@@ -1527,7 +1538,7 @@ def get_started() -> str:
           <li>A development preview, published automatically when the app changes</li>
           <li>Free, with no account or sign-in needed to download</li>
         </ul>
-        <p class="btn-row"><a class="btn btn-primary" href="{DOWNLOAD_MACOS}">Download for macOS</a> <a class="btn btn-primary" href="{DOWNLOAD_WINDOWS}">Download for Windows</a> <a class="btn btn-primary" href="{DOWNLOAD_LINUX}">Download for Linux</a></p>
+        <p class="btn-row">{download_link("Mac-Apple-Silicon.dmg", "Download for macOS", "btn btn-primary")} {download_link("Windows-Installer.exe", "Download for Windows", "btn btn-primary")} {download_link("Linux.AppImage", "Download for Linux", "btn btn-primary")}</p>
         <p class="small" id="latest-release" data-latest-release="{LATEST_RELEASE}">The buttons always fetch the newest build. Release notes and earlier builds are on <a href="{RELEASES}">the releases page</a>.</p>
         <div style="margin-top:1rem">{callout('<strong>Read <a href="#first-launch">the installation steps below</a> before you open the app.</strong> macOS and Windows show a warning on first launch that you need to approve, and on Linux you allow the file to run.', "callout-maize", "warn")}</div>
       </article>
@@ -1550,7 +1561,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for macOS</strong> and wait for <code>Axcess-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
+          <li>Select <strong>Download for macOS</strong> and wait for {release_file_name("Mac-Apple-Silicon.dmg")} to finish downloading.</li>
           <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
           <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
           <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
@@ -1562,7 +1573,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Windows</strong> and wait for <code>Axcess-Windows-Installer.exe</code> to finish downloading.</li>
+          <li>Select <strong>Download for Windows</strong> and wait for {release_file_name("Windows-Installer.exe")} to finish downloading.</li>
           <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
           <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
@@ -1573,7 +1584,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
         <h5 style="margin-top:1rem">Without installing</h5>
-        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. <a href="{DOWNLOAD_WINDOWS_PORTABLE}">Download the portable Windows zip (no install)</a>.</p>
+        <p class="small">For a computer where you cannot install programs, or to keep Axcess and its reports on a USB drive. {download_link("Windows-Portable.zip", "Download the portable Windows zip (no install)")}.</p>
         <ol class="small" style="margin:.5rem 0 0;padding-left:1.25rem">
           <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
           <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
@@ -1583,9 +1594,9 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <article class="card">
         <h4>On Linux</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
-          <li>Select <strong>Download for Linux</strong> and wait for <code>Axcess-Linux.AppImage</code> to finish downloading. It is the whole app in one file.</li>
+          <li>Select <strong>Download for Linux</strong> and wait for {release_file_name("Linux.AppImage")} to finish downloading. It is the whole app in one file.</li>
           <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
-          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-Linux.AppImage</code> in a terminal.</li>
+          <li>Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a terminal.</li>
           <li>Double-click it to open Axcess.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">Ubuntu 23.10 and later do not let an AppImage use the browser sandbox that keeps web pages apart from the rest of your computer. There, Axcess opens with that sandbox off, so open only saved copies of sites you trust in the Page inspector. On other Linux systems it stays on.</p>

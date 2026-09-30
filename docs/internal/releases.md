@@ -148,23 +148,20 @@ repository secrets are involved.
    artifacts: `Axcess-0.61-Mac-Apple-Silicon.dmg`,
    `Axcess-0.61-Windows-Installer.exe` with its `.blockmap`,
    `Axcess-0.61-Windows-Portable.zip`, `Axcess-0.61-Linux.AppImage` and
-   `latest.yml`, plus Forge's macOS zip renamed
-   `Axcess-0.61-Mac-Apple-Silicon.zip`. It stops if one of the first four or
-   `latest.yml` is missing.
-2. **Add version-less copies.** It adds `Axcess-Mac-Apple-Silicon.dmg`,
-   `Axcess-Windows-Installer.exe`, `Axcess-Windows-Portable.zip` and
-   `Axcess-Linux.AppImage` as copies of this build's files. The
-   site's download buttons link to
-   `https://github.com/lsa-mis/axcess/releases/latest/download/<name>`
-   (`DOWNLOAD_MACOS` and `DOWNLOAD_WINDOWS` in `site/build.py`), so they
-   always fetch the newest release. If you rename these files, change those
-   constants and regenerate the site in the same pull request.
-3. **Create a draft, upload, then publish.** If no release exists for tag
+   `latest.yml`: one file per platform, and the two the Windows updater
+   reads. It stops if any is missing, or if there are more than these six.
+   There is no second name for any file. The site's download links open
+   `https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
+   points each at its file in that release by the part of the name after the
+   version (`data-release-file` in `site/build.py`). If you rename a kind of
+   file, change `releaseFileName` and those attributes in the same pull
+   request.
+2. **Create a draft, upload, then publish.** If no release exists for tag
    `desktop-v0.61` yet, it creates one as a draft at the built commit. It
    uploads every file with `--clobber`, then publishes the release and marks
    it latest. Publishing last keeps `releases/latest` pointing at a complete
    set of files.
-4. **Prune.** It keeps the 10 newest `desktop-v*` releases and deletes older
+3. **Prune.** It keeps the 10 newest `desktop-v*` releases and deletes older
    ones along with their tags.
 
 ### Release notes
@@ -383,12 +380,11 @@ has to make because the workflow does not.
 
 1. On the Releases page, confirm that "Axcess 0.61 (preview)" is marked
    Latest and has these files:
-   - `Axcess-0.61-Mac-Apple-Silicon.dmg` and `Axcess-0.61-Mac-Apple-Silicon.zip`;
+   - `Axcess-0.61-Mac-Apple-Silicon.dmg`;
    - `Axcess-0.61-Windows-Installer.exe`, its `.blockmap`, and `latest.yml`;
    - `Axcess-0.61-Windows-Portable.zip` and `Axcess-0.61-Linux.AppImage`;
-   - the version-less copies `Axcess-Mac-Apple-Silicon.dmg`,
-     `Axcess-Windows-Installer.exe`, `Axcess-Windows-Portable.zip` and
-     `Axcess-Linux.AppImage`.
+   - nothing else, apart from the source code archives GitHub adds to every
+     release.
 2. Read the release notes and check that "What changed" makes sense to someone
    outside the team.
 
@@ -446,10 +442,8 @@ Releases page, so treat the numbers as estimates:
 | --- | --- |
 | `latest.yml` and `Axcess-0.61-Windows-Installer.exe` | Windows apps after someone chooses **Update now** in the update dialog (they read `latest.yml`, then download the installer it names) |
 | `Axcess-0.61-Mac-Apple-Silicon.dmg` | Mostly macOS apps after someone chooses **Download** in the update dialog, which opens this file |
-| `Axcess-Mac-Apple-Silicon.dmg`, `Axcess-Windows-Installer.exe` and `Axcess-Windows-Portable.zip` | The site's download links, which always point at the latest release |
 | `Axcess-0.61-Windows-Portable.zip` | Zip copies of Axcess after someone chooses **Download** in their update dialog |
 | `Axcess-0.61-Linux.AppImage` | Mostly Linux copies after someone chooses **Download** in their update dialog |
-| `Axcess-0.61-Mac-Apple-Silicon.zip` | Only people who download it by hand from the Releases page. Neither the app nor the site links to it. |
 
 These counts miss:
 
@@ -538,8 +532,9 @@ exists. `uv run python site/volume.py` writes it from your local
 `data/audit.db` as aggregate totals. Like everything under `site/` except
 `build.py`, it is published.
 
-The download buttons need no site rebuild for a new release. They use the
-version-less links described in [The publish job](#the-publish-job).
+The download links need no site rebuild for a new release: they open the
+newest release, and `site.js` finds its files (see
+[The publish job](#the-publish-job)).
 
 ## Known gaps
 

@@ -109,10 +109,11 @@ jobs:
             echo "Packaging failed; retrying (attempt $((attempt + 1)) of 3)."
             sleep $((attempt * 10))
           done
+      # Only the file people download; Forge's own zip stays behind.
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-macos-apple-silicon
-          path: desktop/out/make/**
+          path: desktop/out/make/*.dmg
           if-no-files-found: error
           retention-days: 14
 
@@ -189,10 +190,16 @@ jobs:
           path: desktop/out/installer-a11y/**
           if-no-files-found: ignore
           retention-days: 14
+      # The installer with the two files its updates read, and the zip;
+      # not electron-builder's working files (builder-debug.yml).
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-windows-x64
-          path: desktop/out/make/**
+          path: |
+            desktop/out/make/nsis/*-Windows-Installer.exe
+            desktop/out/make/nsis/*-Windows-Installer.exe.blockmap
+            desktop/out/make/nsis/latest.yml
+            desktop/out/make/zip/*-Windows-Portable.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -253,7 +260,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: axcess-linux-x64
-          path: desktop/out/make/**
+          path: desktop/out/make/appimage/*.AppImage
           if-no-files-found: error
           retention-days: 14
 
@@ -277,25 +284,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          # Named in plain words by releaseFileName (desktop/src/updates.cjs):
-          # who each file is for and what it is, not CPU codes.
+          # One file per platform, named in plain words with its version by
+          # releaseFileName (desktop/src/updates.cjs), and the two files the
+          # Windows updater reads: latest.yml (which installer is newest) and
+          # the installer's .blockmap (so an update downloads only what
+          # changed). Nothing else: no second name for the same file.
           find artifacts -type f \( -name 'Axcess-*-Mac-*.dmg' -o -name 'Axcess-*-Windows-Installer.exe' -o -name 'Axcess-*-Windows-Installer.exe.blockmap' -o -name 'Axcess-*-Windows-Portable.zip' -o -name 'Axcess-*-Linux.AppImage' -o -name 'latest.yml' \) -exec cp {} release/ \;
-          # Forge names the macOS zip Axcess-darwin-arm64-<semver>.zip; it is
-          # published under the DMG's plain name.
-          find artifacts -type f -name 'Axcess-darwin-arm64-*.zip' -exec cp {} "release/Axcess-$VERSION-Mac-Apple-Silicon.zip" \;
           ls -l release
-          # latest.yml is the Windows update feed: installed copies read it
-          # to find and check the new installer (src/updates.cjs).
-          for required in "Axcess-$VERSION-Mac-Apple-Silicon.dmg" "Axcess-$VERSION-Windows-Installer.exe" "Axcess-$VERSION-Windows-Portable.zip" "Axcess-$VERSION-Linux.AppImage" latest.yml; do
+          for required in "Axcess-$VERSION-Mac-Apple-Silicon.dmg" "Axcess-$VERSION-Windows-Installer.exe" "Axcess-$VERSION-Windows-Installer.exe.blockmap" "Axcess-$VERSION-Windows-Portable.zip" "Axcess-$VERSION-Linux.AppImage" latest.yml; do
             test -f "release/$required" || { echo "Missing release asset: $required"; exit 1; }
           done
-          # Version-less copies give the public site permanent download links:
-          # https://github.com/lsa-mis/axcess/releases/latest/download/<name>
-          # always resolves to the newest release's asset of that name.
-          for kind in Mac-Apple-Silicon.dmg Windows-Installer.exe Windows-Portable.zip Linux.AppImage; do
-            cp "release/Axcess-$VERSION-$kind" "release/Axcess-$kind"
-          done
-          ls -l release
+          test "$(ls release | wc -l)" -eq 6 || { echo "Expected exactly 6 release files:"; ls release; exit 1; }
       - name: Create or update the release
         shell: bash
         run: |

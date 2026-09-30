@@ -36,8 +36,11 @@
   }
 
   /* ---- Latest desktop release (get-started page) ----
-     The download buttons already point at the newest build; this only
-     adds its version and date when the GitHub API is reachable. */
+     Without this, each download link opens the newest release's page, which
+     lists its files. With the GitHub API reachable, it points each link at
+     its file in that release ([data-release-file], the part of the name
+     after the version), fills the version into the file names the steps
+     show ([data-release-name]), and adds the version and date. */
   var latest = document.getElementById("latest-release");
   if (latest && window.fetch) {
     fetch("https://api.github.com/repos/lsa-mis/axcess/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
@@ -45,6 +48,16 @@
       .then(function (rel) {
         if (!rel || !rel.tag_name) { return; }
         var version = String(rel.tag_name).replace(/^desktop-v/, "");
+        var assets = rel.assets || [];
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release-file]"), function (a) {
+          var name = "Axcess-" + version + "-" + a.getAttribute("data-release-file");
+          for (var i = 0; i < assets.length; i++) {
+            if (assets[i].name === name && assets[i].browser_download_url) { a.href = assets[i].browser_download_url; }
+          }
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-release-name]"), function (code) {
+          code.textContent = "Axcess-" + version + "-" + code.getAttribute("data-release-name");
+        });
         var when = rel.published_at ? new Date(rel.published_at) : null;
         var date = when && !isNaN(when) ? when.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
         var link = document.createElement("a");

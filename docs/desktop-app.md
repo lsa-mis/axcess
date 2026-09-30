@@ -236,10 +236,10 @@ publishes the macOS DMG and zip, the Windows `-Windows-Installer.exe` with its
 `desktop-v0.61`. The package itself carries the version as semver (`0.61.0`),
 which npm and electron-updater need.
 
-Each release also carries version-less copies,
-`Axcess-Mac-Apple-Silicon.dmg` and `Axcess-Windows-Installer.exe`, so the
-public site's download buttons can use the permanent links
-`https://github.com/lsa-mis/axcess/releases/latest/download/<name>`. The ten
+Each release holds one file per platform and the two files the Windows
+updater reads, nothing else. The public site's download links open
+`https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
+points each at its file there when the GitHub API answers. The ten
 newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`
 always points at the most recent one and needs no GitHub sign-in. Workflow
 artifacts are not a public download channel: GitHub requires a signed-in user
