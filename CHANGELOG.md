@@ -17,6 +17,10 @@ merge.
   jQuery's), and menus that open only when the mouse is over them (CSS
   `:hover` with no keyboard equivalent). It reads the page's event listeners
   and styles in a few steps, so it adds well under a second per page. The switch is now called **Check keyboard access**.
+- Focus check: it now also finds controls that show no change at all when
+  they have keyboard focus (WCAG 2.4.7), the Tab key stopping on plain content
+  with `tabindex="0"`, and rows of controls whose Tab order differs from
+  their order on screen (2.4.3). It adds about a tenth of a second per page.
 - New scan: **Keyboard (Advanced)**, off by default. It clicks each control
   the keyboard check suspects, then tries Enter and Space, and reports only
   the ones that fail. It is slower, up to about 20 seconds more on a page

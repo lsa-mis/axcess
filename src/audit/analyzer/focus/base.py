@@ -15,10 +15,14 @@ from typing import Any
 # way it does for keyboard-trap-* / responsive-*.
 RULE_FOCUS_OBSCURED = "focus-not-obscured"  # SC 2.4.11
 RULE_POSITIVE_TABINDEX = "focus-order-positive-tabindex"  # SC 2.4.3 (WCAG F44)
+RULE_FOCUS_NOT_VISIBLE = "focus-not-visible"  # SC 2.4.7: nothing changes on focus
+RULE_NON_INTERACTIVE_STOP = "focus-order-non-interactive-stop"  # SC 2.4.3
+RULE_VISUAL_ORDER = "focus-order-visual-mismatch"  # SC 2.4.3: Tab order != visual order
 
 # Canonical WCAG "Understanding" pages per criterion this pipeline covers.
 HELP_URLS = {
     "2.4.3": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html",
+    "2.4.7": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html",
     "2.4.11": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html",
 }
 

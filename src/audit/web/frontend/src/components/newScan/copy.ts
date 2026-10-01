@@ -13,7 +13,7 @@
  */
 
 import { CLICK_THROUGH } from "../../lib/labels";
-import { CHECK_LABEL } from "../../lib/terms";
+import { CHECK_LABEL, KEYBOARD_ADVANCED_LABEL } from "../../lib/terms";
 
 export const TAB_PUBLIC = "Public website";
 export const TAB_LOGIN = "Site with a sign-in or two-step sign-in (2FA)";
@@ -94,7 +94,7 @@ export const SWITCHES = {
   focus: {
     label: "Check that keyboard focus is never hidden",
     hint:
-      "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
+      "Finds controls that show no focus outline at all (the box that shows where the keyboard is, WCAG 2.4.7), focus hidden behind sticky headers or footers, and a Tab order that differs from the order on screen (2.4.3). Hidden focus (2.4.11) is new in WCAG 2.2, so a WCAG 2.1 scan reports it as Best practice.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
@@ -318,7 +318,7 @@ export const RAIL_LABELS = {
   include_subdomain: "Subdomains",
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
-  keyboard_advanced: "Advanced keyboard check",
+  keyboard_advanced: KEYBOARD_ADVANCED_LABEL,
   focus: CHECK_LABEL.focus,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,

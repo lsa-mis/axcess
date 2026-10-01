@@ -61,6 +61,18 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           label={SWITCHES.keyboard.label}
           hint={rendered ? SWITCHES.keyboard.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
+        {/*
+          Keyboard (Advanced) is a second switch directly under the keyboard
+          check, not a third option on it: it is a slower mode of that check,
+          so it sits where the person just decided about the check, and it is
+          off and disabled, with a hint saying why, while the check is off
+          (one way to do one thing; W3C COGA "Making Content Usable",
+          https://www.w3.org/TR/coga-usable/, paraphrased). A pill group
+          (off / standard / advanced) was rejected: it would replace a switch
+          people already know and change the keyboard check's saved field.
+          A disabled control keeps its visible reason in the hint, never in
+          colour alone (SC 1.4.1 Use of Color, Level A).
+        */}
         <SwitchRow
           checked={switchOn(settings, "keyboard_advanced")}
           onChange={(on) => update(switchPatch(settings, "keyboard_advanced", on))}

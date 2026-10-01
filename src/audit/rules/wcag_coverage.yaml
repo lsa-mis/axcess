@@ -388,7 +388,8 @@ criteria:
     automated_check: >-
       The focus probe flags positive tabindex (WCAG failure F44), a manual
       tab order that overrides the natural DOM order and usually breaks the
-      sequence.
+      sequence; tabindex="0" on plain content with no role or handler; and
+      side-by-side controls whose Tab order differs from their order on screen.
     manual_check: >-
       Tab through the whole page and confirm the focus order preserves meaning
       and operability, the order can break without a positive tabindex (e.g.
@@ -482,10 +483,13 @@ criteria:
     name: "Focus Visible"
     level: AA
     method: partial
-    pipelines: [axe]
-    confidence: low
+    pipelines: [axe, focus]
+    confidence: medium
     automated_check: >-
-      axe has limited checks for suppressed focus indicators.
+      The focus probe focuses each control and reports those whose outline,
+      shadow, border, background, colour and underline (and those of their
+      parent, neighbours and label) do not change at all; it cannot judge
+      whether a change that does happen is visible enough.
     manual_check: >-
       Tab the whole page and confirm a clearly visible focus indicator on every
       interactive element, largely manual.

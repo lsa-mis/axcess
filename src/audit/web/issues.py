@@ -517,10 +517,14 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
     if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
-        # Dynamic-probe rows are carded by SC (one YAML card covers
-        # several rule_ids, e.g. all three keyboard-trap shapes).
-        # Check semantic_criteria first (where 2.1.2 and the responsive
-        # SCs live), then axe_rules for any author who keyed there.
+        # A rule with its own card (``probe_rules``) uses it. Otherwise
+        # dynamic-probe rows are carded by SC (one YAML card covers several
+        # rule_ids, e.g. all three keyboard-trap shapes): semantic_criteria
+        # first (where 2.1.2 and the responsive SCs live), then axe_rules
+        # for any author who keyed there.
+        own = rules.get("probe_rules", {}).get(row.issue_key.removeprefix(f"{row.pipeline}:"))
+        if isinstance(own, dict) and own:
+            return dict(own)
         sc = row.wcag_sc or ""
         meta = rules.get("semantic_criteria", {}).get(sc, {}) or rules.get("axe_rules", {}).get(
             sc, {}
@@ -838,6 +842,8 @@ def _axe_issue_rows(
             # with no card of its own borrows nothing: another criterion's
             # card is about a different check (the AI review's 3.3.2 card,
             # say) and would misdescribe the rule check (axe).
+            if pipeline in ("keyboard", "responsive", "focus", "visual"):
+                meta = rules.get("probe_rules", {}).get(raw_rule_id, {}) or meta
             if not meta and pipeline in ("keyboard", "responsive", "focus", "visual"):
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:

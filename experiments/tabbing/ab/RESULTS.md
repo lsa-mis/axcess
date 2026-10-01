@@ -245,3 +245,90 @@ read, so its rules are missed.
 Ship round 2 as Standard. On every development corpus it gains recall or
 holds it, with no new false positive. On the sealed set it matches round 1.
 Keep Advanced opt-in, for the reasons given above.
+
+## Round 3: the other benchmarks
+
+Two more local benchmarks speak to keyboard access and had not been used:
+**KAFE's Type 2 labels** (keyboard traps), and the **ten GDS "Keyboard access"
+cases** beyond the six inaccessible-functionality cases above. BAGEL's corpus
+was unreachable when the literature study checked, and NavA11y's dataset
+would need downloading; neither was used. **Every GDS result in this section
+is a development result**: the misses were read before the new rules were
+written.
+
+### Keyboard traps on KAFE (Type 2): no cheap fix found
+
+KAFE marks 9 of its 60 subjects as containing a trap; 5 are replayable here
+(`bowiestate`, `dell`, `dmv_ca`, `vk`, `wendys`). The shipped trap check finds
+**1 of 5** (`dell`) and flags **none of the other 48** replayable subjects.
+
+- On the other four, Tab and Shift+Tab from the page as loaded reach the same
+  stops and wrap normally. No trap appears in load-state keyboard navigation.
+  KAFE's crawl also presses Enter and explores the states it opens, so those
+  traps most likely sit inside opened menus or dialogs. Re-walking focus in
+  every revealed state is not cheap.
+- One cheap signal was tried and rejected: Tab and Shift+Tab reaching
+  different sets of stops (`tab_asymmetry.py`,
+  `results/kafe-ktf-tab-asymmetry.jsonl`). It fires on 2 of the 5 positives,
+  and one of them (`dell`) is already found. It also fires on 4 of the 48
+  negatives. Those 4 (`spotify`, `salesforce`, `raise`, `costco`) are subjects
+  where focus leaves the page into the browser's own UI, an instrument
+  effect. Net: +1 true positive for +4 false positives, so it was not shipped.
+
+### GDS keyboard-access cases: 5 → 8 of 16
+
+`gds_coverage.py` runs every check a default scan runs that bears on the
+keyboard (axe at AAA/WCAG 2.2, the focus probe, the keyboard check in both
+modes). It attributes each result to the GDS example it sits in
+(`results/gds-keyboard-coverage.json`). AAA colour contrast, which fires in
+every example, is left out.
+
+| GDS case | caught by |
+|---|---|
+| tabindex greater than 0 | axe `tabindex` (before this work) |
+| fake button / concertina / dropdown / link with role=button | the keyboard check (rounds 1–2) |
+| **focus not indicated visually** | new: `focus-not-visible` (SC 2.4.7) |
+| **focus assigned to a non-focusable element (tabindex=0)** | new: `focus-order-non-interactive-stop` (SC 2.4.3) |
+| **focus order in wrong order** | new: `focus-order-visual-mismatch` (SC 2.4.3) |
+| lightbox ×4 (close not focusable, focus not moved, not retained, Esc) | — needs the lightbox open; a Click-Through extension |
+| tooltips don't receive focus | — the corpora disagree: GDS counts it, fixtures/edgecases label it a 1.4.13 decoy |
+| keyboard trap | — its example page is not in the local GDS copy; its script blocks every key on one link, which the shipped trap check is built for |
+| accesskey used / alert shown briefly | — best practice / timing, not keyboard operability |
+
+None of the three new rules fires on GDS's other 126 cases.
+
+**The three new focus-probe rules** (`audit.analyzer.focus.probe`):
+
+- `focus-not-visible` (SC 2.4.7): focus each control (up to 400) and compare
+  every property a focus indicator can use. That covers outline (only when it
+  draws), shadow, border, background, colour, underline, weight, transform,
+  opacity and filter. It reads them on the control, its `::before`/`::after`,
+  its parent and grandparent, its neighbours and its labels. Transitions are
+  frozen while it runs. Text fields are left out, because the caret shows
+  focus. A Shift key press first lets `:focus-visible` polyfills show their
+  ring. One lead per tag-and-class shape, at most 10 per page.
+- `focus-order-non-interactive-stop` (SC 2.4.3): `tabindex="0"` on plain
+  content with no role, no ARIA, no title and no listener (checked over CDP),
+  that does not scroll and is not named like a control.
+- `focus-order-visual-mismatch` (SC 2.4.3): three or more sibling controls in
+  a container where two sharing a line are reached by Tab in the opposite
+  order to how they are shown (floats, flex `order`, `row-reverse`; RTL
+  aware).
+
+**On 53 real pages (the KAFE replays)**, the three rules cost a median of 53 ms
+per page (max 154 ms):
+
+- `focus-not-visible` fires on 20 pages (71 leads). An independent pixel check
+  (`focus_pixel_check.py`) screenshots each control before and after focus.
+  For **70 of the 70 leads it could measure**, no pixel changed within 10 px.
+  It cannot see an indicator drawn further away, and it says nothing about
+  whether a change that does happen is visible enough. An earlier version
+  disagreed on 3 leads. Two were the short `tag.class` selectors pointing at
+  a different element, now unique paths. One was a text field, whose caret
+  counts as an indicator; text fields are now excluded.
+- `focus-order-visual-mismatch` fires once (`alexa`): a submenu floated right,
+  whose links are shown in reverse order. That is a genuine mismatch.
+- `focus-order-non-interactive-stop` fires on none. An earlier version flagged
+  groupon's `tabindex="0"` `div.facebook-login-button`. That is a broken
+  control, not an extra stop, so elements named like controls are now
+  excluded.

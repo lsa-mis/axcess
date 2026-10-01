@@ -1,0 +1,45 @@
+{
+ "cases": {
+  "keyboard-access-alert-shows-for-a-short-time": [],
+  "keyboard-access-lightbox-close-button-doesnt-receive-focus": [],
+  "keyboard-access-focus-order-in-wrong-order": [
+   "focus:focus-order-visual-mismatch"
+  ],
+  "keyboard-access-tabindex-greater-than-0": [
+   "axe:tabindex"
+  ],
+  "keyboard-access-keyboard-focus-is-not-indicated-visually": [
+   "focus:focus-not-visible"
+  ],
+  "keyboard-access-keyboard-focus-assigned-to-a-non-focusable-element-using-tabindex0": [
+   "focus:focus-order-non-interactive-stop"
+  ],
+  "keyboard-access-concertina-items-dont-get-keyboard-focus": [
+   "keyboard-advanced:keyboard-mouse-only-control",
+   "keyboard:keyboard-mouse-only-control"
+  ],
+  "keyboard-access-keyboard-trap": [],
+  "keyboard-access-dropdown-navigation-only-the-top-level-items-receive-focus": [
+   "keyboard-advanced:keyboard-mouse-only-control",
+   "keyboard:keyboard-mouse-only-control"
+  ],
+  "keyboard-access-lightbox-esc-key-doesnt-close-the-lightbox": [],
+  "keyboard-access-link-with-a-rolebutton-does-not-work-with-space-bar": [
+   "keyboard-advanced:keyboard-no-key-activation",
+   "keyboard:keyboard-no-key-activation"
+  ],
+  "keyboard-access-tooltips-dont-receive-keyboard-focus": [],
+  "keyboard-access-accesskey-attribute-used": [],
+  "keyboard-access-lightbox-focus-is-not-moved-immediately-to-lightbox": [],
+  "keyboard-access-lightbox-focus-is-not-retained-within-the-lightbox": [],
+  "keyboard-access-fake-button-is-not-keyboard-accessible": [
+   "keyboard-advanced:keyboard-mouse-only-control",
+   "keyboard:keyboard-mouse-only-control"
+  ]
+ },
+ "outside keyboard cases": {
+  "focus:focus-order-positive-tabindex": [
+   "(outside any example)"
+  ]
+ }
+}

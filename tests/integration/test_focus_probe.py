@@ -77,3 +77,40 @@ async def test_flags_positive_tabindex_only(page) -> None:  # type: ignore[no-un
     assert f0.wcag_level == "A"
     assert "focus-order" in f0.help_url
     assert f0.to_repo_kwargs()["pipeline"] == "focus"
+
+
+async def test_flags_no_visible_focus_extra_stops_and_reordered_rows(page) -> None:  # type: ignore[no-untyped-def]
+    from audit.analyzer.focus.base import (
+        RULE_FOCUS_NOT_VISIBLE,
+        RULE_NON_INTERACTIVE_STOP,
+        RULE_VISUAL_ORDER,
+    )
+
+    await page.goto(_file_url("visibility_order.html"))
+    findings = await FocusProbe().run(page)
+    found: dict[str, list[str | None]] = {}
+    for f in findings:
+        found.setdefault(f.rule_id, []).append(
+            await page.locator(f.target_selector).get_attribute("id")
+        )
+    # Exactly one of each: the link with no focus style (not the default ring,
+    # the custom ring, the ring that fades in, the text field or the styled
+    # checkbox), the paragraph with tabindex="0" (not the scroller, the custom
+    # control or the described term) and the floated row (not the plain nav).
+    assert found == {
+        RULE_FOCUS_NOT_VISIBLE: ["none"],
+        RULE_NON_INTERACTIVE_STOP: ["stop"],
+        RULE_VISUAL_ORDER: ["broken"],
+    }
+    visible = next(f for f in findings if f.rule_id == RULE_FOCUS_NOT_VISIBLE)
+    assert (visible.criterion_sc, visible.wcag_level) == ("2.4.7", "AA")
+    assert visible.help_url.endswith("/focus-visible.html")
+    # The page is left as it was: no frozen transitions, no marker attributes.
+    assert await page.evaluate("document.querySelectorAll('[data-axcess-stop]').length") == 0
+    fade = "getComputedStyle(document.getElementById('fade')).transitionDuration"
+    assert await page.evaluate(fade) == "0.4s"
+
+
+async def test_the_newer_checks_can_be_turned_off(page) -> None:  # type: ignore[no-untyped-def]
+    await page.goto(_file_url("visibility_order.html"))
+    assert await FocusProbe(focus_order_checks=False).run(page) == []

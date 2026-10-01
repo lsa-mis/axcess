@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Focus fixture: visibility and order</title>
+<style>
+  .no-outline, .no-outline:focus { outline: none; }
+  .ring:focus { outline: none; box-shadow: 0 0 0 3px #1d70b8; }
+  .fade { transition: box-shadow 0.4s; }
+  .fade:focus { outline: none; box-shadow: 0 0 0 3px #1d70b8; }
+  .broken a { margin-left: 0.75em; }
+  .broken .first, .broken .third { float: left; }
+  .broken .second { float: right; }
+  .clear { clear: both; }
+  .sr { position: absolute; opacity: 0; }
+  .sr:focus + label { outline: 2px solid #1d70b8; }
+  .scroll { height: 40px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Visibility and order</h1>
+  <!-- Leads. -->
+  <a href="#none" id="none" class="no-outline">No focus style</a>
+  <div class="broken" id="broken">
+    <a class="first" href="#1">First</a><a class="second" href="#2">Second</a><a class="third" href="#3">Third</a>
+  </div>
+  <div class="clear"></div>
+  <p tabindex="0" id="stop">My favourite car</p>
+
+  <!-- Not leads. -->
+  <a href="#default" id="default">Browser focus ring</a>
+  <a href="#ring" id="ring" class="ring">Custom ring</a>
+  <a href="#fade" id="fade" class="fade">Ring that fades in</a>
+  <input type="text" id="field" class="no-outline" aria-label="Name">
+  <input type="checkbox" id="cb" class="sr"><label for="cb">Styled checkbox</label>
+  <nav><a href="#x">One</a> <a href="#y">Two</a> <a href="#z">Three</a></nav>
+  <div tabindex="0" class="scroll" id="scroller">line<br>line<br>line<br>line<br>line</div>
+  <div tabindex="0" id="custom">Custom with a handler</div>
+  <span tabindex="0" aria-describedby="def" id="term">Term</span><span id="def">A definition</span>
+</main>
+<script>
+  document.getElementById('custom').addEventListener('click', () => {});
+</script>
+</body>
+</html>

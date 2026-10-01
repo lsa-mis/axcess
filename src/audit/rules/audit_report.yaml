@@ -9318,6 +9318,170 @@ semantic_criteria:
 # both Alfa outcomes: failed, and "cannot tell", where a person decides.
 # Guidance only; see the header.
 # ---------------------------------------------------------------------
+# Cards for a browser-check rule that needs its own guidance, looked up by
+# rule id before the criterion's card (``semantic_criteria``).
+probe_rules:
+
+  focus-not-visible:
+    title: "Keyboard focus may not be visible on this control"
+    wcag_sc: "2.4.7"
+    wcag_name: "Focus Visible"
+    wcag_level: "AA"
+    abilities_affected: [motor, vision, cognition]
+    what_happening: >-
+      The focus check gives keyboard focus to each control on the page, up to
+      400 of them, and compares how it looks before and after. It reports a
+      control when nothing that could show focus changes: no outline, shadow,
+      border, background, colour or underline, on the control, its parent,
+      the elements beside it, or its label. A common cause is
+      <code>outline: none</code> with no other focus style. Text fields are
+      left out, because the blinking text cursor shows focus. The check
+      reports one control for each kind of control (tag and class), since one
+      style usually covers them all.
+    why_matters: >-
+      People who use a keyboard need to see which control has focus before
+      they press Enter or Space. Without it they lose their place, and may
+      press the wrong thing. This affects many people with physical
+      disabilities, people with low vision, and people with attention or
+      memory difficulties.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Open the live page, press Tab until you reach the control, and look
+        for any sign of focus.
+      - >-
+        Find the style that removes it, often <code>outline: none</code> or
+        <code>outline: 0</code> on <code>a</code>, <code>button</code> or
+        <code>*</code>.
+      - >-
+        Add a clear focus style instead, for example
+        <code>a:focus-visible, button:focus-visible { outline: 3px solid
+        #1d70b8; outline-offset: 2px; }</code>.
+    fix_options:
+      - label: "Bring back a focus outline"
+        approach: >-
+          Remove the rule that hides the outline, or replace it with a
+          :focus-visible style that has a strong colour and enough thickness.
+        watch_out: >-
+          The outline must stand out against the colours around it. A thin
+          grey ring on a grey background is hard to see.
+      - label: "Use another visible change"
+        approach: >-
+          A thick border, a shadow, or a strong change of background colour
+          also shows focus.
+        watch_out: >-
+          A small change of text colour alone is easy to miss, and people who
+          cannot see colour differences will not notice it.
+    verify_manual: >-
+      Press Tab through the page and check that you can always see which
+      control has focus, without using the mouse.
+    verify_automated: >-
+      Scan again with Check that keyboard focus is never hidden turned on, and
+      see if the control is still found.
+    acceptance: >-
+      Every control on the page shows a clearly visible change when it has
+      keyboard focus.
+    confidence_default: medium
+
+  focus-order-non-interactive-stop:
+    title: "The Tab key stops on something that is not a control"
+    wcag_sc: "2.4.3"
+    wcag_name: "Focus Order"
+    wcag_level: "A"
+    abilities_affected: [motor, vision]
+    what_happening: >-
+      The focus check finds plain content, such as a paragraph or a
+      <code>div</code>, with <code>tabindex="0"</code>, so the Tab key stops
+      on it. It has no role, no name or description, no event handlers, and
+      it does not scroll. A scrolling area does need
+      <code>tabindex="0"</code>, so the check leaves those out, and it also
+      leaves out elements named like controls, such as a class with "button"
+      in it.
+    why_matters: >-
+      Keyboard users stop on it and nothing happens when they press Enter, so
+      they wonder what they missed. Screen reader users hear text with no
+      purpose. Each extra stop also makes the page slower to move through.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Open the live page and press Tab until focus reaches the element.
+        Check whether it is meant to do anything.
+      - >-
+        If it is not a control, remove <code>tabindex="0"</code>.
+      - >-
+        If it should be a control, use a <code>&lt;button&gt;</code> or a
+        link, or give it a role and handlers for Enter and Space.
+    fix_options:
+      - label: "Remove the tab stop"
+        approach: >-
+          Delete tabindex="0" from content that people only read.
+        watch_out: >-
+          If a script moves focus to the element, for example after an error
+          message, use tabindex="-1" instead, which allows that without adding
+          a Tab stop.
+    verify_manual: >-
+      Press Tab through the page and check that focus stops only on things
+      you can use.
+    verify_automated: >-
+      Scan again with Check that keyboard focus is never hidden turned on, and
+      see if the element is still found.
+    acceptance: >-
+      The Tab key stops only on links, buttons, form fields and other
+      controls, and on areas that need focus to scroll.
+    confidence_default: medium
+
+  focus-order-visual-mismatch:
+    title: "The Tab order may not match the order on screen"
+    wcag_sc: "2.4.3"
+    wcag_name: "Focus Order"
+    wcag_level: "A"
+    abilities_affected: [motor, vision, cognition]
+    what_happening: >-
+      The focus check looks at groups of links or buttons that sit side by
+      side on one line. It reports a group when the Tab key reaches them in a
+      different order from the one they are shown in. The page code (DOM) has
+      them in one order, and the layout moves them, for example with
+      <code>float: right</code>, the flex <code>order</code> property or
+      <code>row-reverse</code>. WCAG 2.4.3 fails only if the new order
+      changes the meaning or makes the page harder to use, so a person must
+      decide.
+    why_matters: >-
+      Keyboard users who can see the screen expect focus to move the way they
+      read. When it jumps back and forth they lose their place. Screen reader
+      users hear the code order, which may not match what sighted colleagues
+      describe.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the live page, press Tab through the group, and watch the order.
+      - >-
+        If the order is confusing, change the order in the page code so it
+        matches the layout, and remove the CSS that reorders them.
+      - >-
+        If the order makes sense as it is, set the status to Not a problem
+        (false positive).
+    fix_options:
+      - label: "Put the page code in reading order"
+        approach: >-
+          Move the elements in the HTML so their order matches what people
+          see, then lay them out without float right, order or row-reverse.
+        watch_out: >-
+          Check other screen sizes too. A layout can reorder items on narrow
+          screens only.
+    verify_manual: >-
+      Press Tab through the group and check that focus moves in the order the
+      items are shown.
+    verify_automated: >-
+      Scan again with Check that keyboard focus is never hidden turned on, and
+      see if the group is still found.
+    acceptance: >-
+      Focus moves through the group in the order the items appear on screen,
+      or a person has confirmed the order still makes sense.
+    confidence_default: low
+
 alfa_rules:
 
   sia-r1:

@@ -58,6 +58,13 @@ export const CHECK_LABEL: Record<DetectionPipeline, string> = {
   protected_image: "Image text check",
 };
 
+/**
+ * The keyboard check's slower mode, which operates each control it suspects.
+ * It is a mode of the keyboard check, not a pipeline of its own, so it is not
+ * in `CHECK_LABEL`; it is named here so every screen uses the same words.
+ */
+export const KEYBOARD_ADVANCED_LABEL = "Advanced keyboard check";
+
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   running: "Scanning",

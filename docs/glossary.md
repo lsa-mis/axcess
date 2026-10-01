@@ -26,7 +26,8 @@ yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
 - Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow),
-  the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check),
+  the keyboard check ([keyboard traps](#keyboard-trap) and
+  [mouse-only controls](#mouse-only-control)), a [motion check](#motion-check),
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
   labels), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
@@ -322,6 +323,14 @@ readers](#screen-reader) cannot read it, and people cannot resize or restyle it.
 A spot where [keyboard focus](#keyboard-focus) gets stuck and Tab or Shift+Tab
 cannot move it away (WCAG 2.1.2). People who do not use a mouse are stranded
 there.
+
+### Mouse-only control
+
+A control that works when you click it but not from the keyboard: the Tab key
+cannot reach it, or it does nothing when you press Enter or Space (WCAG 2.1.1).
+An example is a `div` with a click handler and no `tabindex`. The keyboard
+check finds these from the page code. The **advanced keyboard check** also
+clicks each one and tries Enter and Space, which is slower but surer.
 
 ### Reflow
 

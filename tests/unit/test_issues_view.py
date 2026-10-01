@@ -566,6 +566,35 @@ def test_mouse_only_controls_are_two_sc_2_1_1_issues_with_their_own_titles(
     assert "clicked the element" in no_keys.evidence_summary
 
 
+def test_a_focus_rule_with_its_own_card_uses_it_everywhere(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    from audit.analyzer.focus.base import RULE_FOCUS_NOT_VISIBLE, FocusFinding
+    from audit.db import repo
+
+    scan_id = _seed_two_pipelines(tmp_db)
+    page = tmp_db.execute("SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)).fetchone()
+    finding = FocusFinding(
+        rule_id=RULE_FOCUS_NOT_VISIBLE,
+        target_selector="a#none",
+        failure_summary="Measured: nothing changes on focus.",
+        html_snippet="<a id='none' href='#'>x</a>",
+        help="Give every control a visible focus style.",
+        criterion_sc="2.4.7",
+        wcag_level="AA",
+    )
+    repo.upsert_focus_finding(
+        tmp_db, page_id=int(page["id"]), scan_id=scan_id, **finding.to_repo_kwargs()
+    )
+    row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "focus")
+    rules = issues_mod._load_rules()
+    card = rules["probe_rules"][RULE_FOCUS_NOT_VISIBLE]
+    assert (row.title, row.wcag_sc, row.conformance) == (card["title"], "2.4.7", "AA")
+    assert row.fix_steps == tuple(card["fix_steps"])
+    # Exports resolve the same card.
+    assert issues_mod.rule_meta_for(row, rules)["title"] == card["title"]
+
+
 def _seed_visual_motion_finding(
     conn: sqlite3.Connection,
     scan_id: int,
