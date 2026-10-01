@@ -1,0 +1,10 @@
+# Detector freeze before any NavA11y scoring. Written 2026-10-01T21:21:41Z, commit c549a4c, tree clean: 0 changed files under src/
+d3a6f129c198c0c633f7c62f4fafc4322065a0ba4ee233878b0c247dcdc7a837  src/audit/analyzer/focus/probe.py
+a3fb0f84ef54a9abbf8d88e7986b38e7d409a82fd225d2d47c9765be321cafe1  src/audit/analyzer/focus/base.py
+05accc7fb71fba8d0cce705a9e5f1d4569e92f5d57851ebf4bc264c957d3d58f  src/audit/analyzer/keyboard/operability.py
+6b2ec5958601b14afe330b3551ed021984e82566baf1f38ff018caa34c594d10  src/audit/analyzer/keyboard/probe.py
+88d68ac2a97fce5f5fdf099f67f3ebaba79c1e3d4c0ed0b3c28c534de5cd9d54  src/audit/analyzer/keyboard/base.py
+2ee682282d97f5e275bc74780686592929764e90b575e1f07842913f6c2c0349  src/audit/analyzer/interaction/dialogs.py
+e122dbe70e6762683415454533f171c38b931112f04bae18590be8e10907f224  src/audit/analyzer/interaction/probe.py
+d153e7c595990a4a05ebea680711eaf64745b6bfa8073a809a2cab08922b2752  src/audit/analyzer/axe.py
+b511cd9dec01c76f4b2ad1723b66b6db37d4c2eb4ed199076e1829d9ee7b75e3  src/audit/web/static/axe.min.js
