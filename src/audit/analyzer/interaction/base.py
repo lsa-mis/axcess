@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from audit.analyzer.axe import AxeViolation
+from audit.analyzer.keyboard.base import KeyboardTrap
 
 
 @dataclass(frozen=True)
@@ -151,3 +152,7 @@ class InteractionResult:
     #: Bounded, reproducible note about the first stuck dialog: which dialog,
     #: which control opened it, and what dismissal was tried.
     detail: str = ""
+    #: Keyboard results from the dialogs a click opened, in the keyboard
+    #: check's row shape (``pipeline='keyboard'``). Empty unless the probe was
+    #: built with ``dialog_checks``.
+    keyboard_findings: tuple[KeyboardTrap, ...] = ()

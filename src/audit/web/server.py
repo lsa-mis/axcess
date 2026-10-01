@@ -3236,6 +3236,7 @@ async def _run_local_login_background(
                     axe=login_axe,
                     level=config.axe_level,  # type: ignore[arg-type]
                     version=config.wcag_version,
+                    dialog_checks=config.keyboard_probe_enabled,
                     max_clicks=config.interaction_max_clicks,
                     max_repeated=config.interaction_max_repeated,
                     max_depth=config.interaction_max_depth,

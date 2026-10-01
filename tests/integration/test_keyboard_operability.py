@@ -55,6 +55,10 @@ async def test_standard_reports_the_mouse_only_controls_and_nothing_else(page) -
         "linkbtn": ("no_key_handler", "lead"),
         # Standard cannot tell an empty handler from a working one.
         "noop": ("unreachable", "lead"),
+        # WCAG F54: only mousedown; Enter and Space send a click.
+        "downonly": ("no_key_handler", "lead"),
+        # Same name as a reachable link that goes somewhere else.
+        "otherplace": ("unreachable", "lead"),
     }
 
 
@@ -63,7 +67,7 @@ async def test_advanced_confirms_real_failures_and_clears_the_rest(page) -> None
     confirmed = {name for name, (_kind, verdict) in leads.items() if verdict == "confirmed"}
     dismissed = {name for name, (_kind, verdict) in leads.items() if verdict == "dismissed"}
     # "Remember me" is not on the destructive-word list, so it is operated too.
-    assert confirmed == {"fake", "nokey", "label", "blur", "linkbtn"}
+    assert confirmed == {"fake", "nokey", "label", "blur", "linkbtn", "downonly", "otherplace"}
     # A handler that changes nothing, and styling with no handler at all.
     assert dismissed == {"noop", "decor"}
 

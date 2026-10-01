@@ -332,3 +332,147 @@ per page (max 154 ms):
   groupon's `tabindex="0"` `div.facebook-login-button`. That is a broken
   control, not an extra stop, so elements named like controls are now
   excluded.
+
+## Round 4: dialog checks in Click-Through
+
+The four GDS lightbox cases need the lightbox open, and Click-Through is the
+only pass that opens things. `src/audit/analyzer/interaction/dialogs.py` checks
+each dialog a click opened, in that page state:
+
+| rule | checks | criterion |
+|---|---|---|
+| `keyboard-dialog-focus-not-moved` | focus moved into the dialog | 2.4.3 |
+| `keyboard-dialog-focus-escapes` | in a modal, Tab (controls + 2 presses, up to 30) stays inside; not tested for a dialog declared non-modal, or one with more than 28 controls | 2.4.3 |
+| `keyboard-dialog-close-not-focusable` | a control named Close, Dismiss, Cancel or ×/X can get keyboard focus | 2.1.1 |
+| `keyboard-dialog-escape-does-not-close` | Escape closes it (best practice: another way out exists) | — |
+| `keyboard-dialog-no-keyboard-exit` | Escape fails, Tab is held inside, and no close control is reachable | 2.1.2 |
+
+**What counts as a dialog.** An element the click made visible that is either:
+
+- declared (`<dialog open>`, `role="dialog"`/`"alertdialog"`, `aria-modal`); or
+- an undeclared `position: fixed` box of at least 150 × 60 px.
+
+Left out: status messages, live regions, tooltips, menus and page landmarks
+(`header`, `footer`, `nav`, `aside`, `main`), and anything opened by a control
+with `aria-expanded` or a menu `aria-haspopup`. The disclosure and menu-button
+patterns keep focus on the button by design.
+
+**Order.** The open-state checks run before Click-Through's nested sweep inside
+the dialog, and Escape is pressed then too. The sweep often clicks the
+dialog's own Close button, which made an end-of-sweep Escape test see nothing.
+If Escape closed the dialog, the opener is clicked again so the sweep still
+runs. Up to 8 dialogs per page.
+
+**One Click-Through change made this reachable.** Click-Through did not click
+`<a href="#">`, though its own description step already treats such links as
+actions. Every GDS lightbox opener is one. It now does (`a[href="#"]`,
+`a[href=""]`).
+
+**GDS (development; the lightbox scripts were read first).** All 4 lightbox
+cases are caught, so the keyboard-access coverage is **12 of 16**. GDS labels one
+defect per case, but its script shows the defects co-occur, so each check is
+scored on per-check truth derived from `main.js`:
+
+| check | lightboxes that have the defect | caught | false positives |
+|---|---:|---:|---:|
+| focus not moved in | 4 | 4 | — |
+| Tab leaves | 4 | 4 | — |
+| close not focusable (two use a `<span>` close) | 2 | 2 | 0 of 2 |
+| Escape does not close | 1 | 1 | 0 of 3 |
+
+Nothing fires anywhere else on the GDS page.
+
+**53 real pages (KAFE replays, `dialogs_on_kafe.py`,
+`results/kafe-dialogs.jsonl`).** Two arms on each page: Click-Through as it
+was before this work, and as it is now.
+
+- Total Click-Through time went from 196 s to 204 s (+4%); the median per page
+  from 1.51 s to 1.67 s.
+- The dialog checks themselves took a median of **3 ms** per page (mean 13,
+  max 307).
+- The new `href="#"` candidates added 6 clicks and 3 page states across all
+  53 pages.
+- The first run produced **one lead, a false positive**: a fixed `<footer>`
+  on snapchat, flagged as a dialog with no keyboard exit. Two fixes followed:
+  - The footer had more links than the 12-press Tab budget, so "focus held"
+    was trivially true. Containment is now "unknown" when a dialog has more
+    controls than the budget, and the budget is 30.
+  - Page landmarks are no longer dialogs.
+  - A rerun of all 53 pages after both fixes
+    (`results/kafe-dialogs-v2.jsonl`) has **0 leads**, with the dialog
+    checks taking a median of 3 ms (max 67 ms).
+- These pages have no dialog labels, so 0 leads says nothing about recall on
+  them. It does say the checks stay quiet on 53 real pages.
+
+## Round 5: Ma11y mutants on 53 real pages
+
+**What was built.** The only benchmark type not yet used to score Standard
+was Ma11y's mutation testing, and so far it had produced one verified fault
+(on GDS). `mutants.py` applies Ma11y's three local keyboard operators, at
+runtime, to the 53 replayed KAFE pages:
+
+- **F42:** a link becomes `<span onclick>`.
+- **F54:** an inline `onclick` becomes `onmousedown`.
+- **F55:** a link gets `onfocus="this.blur()"`.
+
+**Targets.** It follows Ma11y's `applicable()` rules: visible, inside the
+viewport, not aria-hidden. It takes up to the first 3 targets per operator,
+and gives each mutant its own page load.
+
+**Scoring.** A mutant is detected when a Standard lead is on or inside it.
+Leads elsewhere on the mutated page that the unmutated page lacked are
+counted as collateral.
+
+**Verification matters on real pages.** Ma11y verifies each mutant
+behaviourally, and so does this harness. F55 must lose focus when focused.
+F54's mousedown must run, via a marker added to the handler. F42's span must
+be visible, and its handler must run when clicked.
+
+- A Content Security Policy that blocks inline handlers makes all three
+  operators inert. Every tesla mutant was inert, so it carries no fault.
+- 4 F42 spans were zero-size once the link's styling was gone, so no pointer
+  could reach them either.
+
+Those are excluded: **256 verified faults on 48 pages**. The other 5 pages had
+no target any operator applies to.
+
+| operator | verified | Standard round 2 | Standard round 5 |
+|---|---:|---:|---:|
+| F42 link → span onclick | 116 | 95 | **99** |
+| F54 onclick → onmousedown | 15 | 6 | **11** |
+| F55 onfocus blur | 125 | 100 | **104** |
+| **all** | **256** | **201 (78.5%)** | **214 (83.6%)** |
+
+Collateral: 1 lead on 1 mutated page, in both rounds. KAFE's 40 subjects
+(100% / 92%) and the sealed 13 (80% / 66.7%) are unchanged by round 5, and so
+are all four element corpora.
+
+**The two cheap rules round 5 adds.** Both came from reading round 2's
+misses, so the round-5 figure is a development result.
+
+- **Mouse-down-only controls (WCAG F54).** A control Tab reaches whose action
+  is on mousedown, mouseup or pointer events, with nothing handling `click`.
+  Enter and Space dispatch `click`. "Nothing handling click" means no
+  listener, no `onclick`, no React `onClick`, and no resolved delegation.
+  Links with a real address are left out, because Enter still follows them
+  and their mousedown is usually click tracking. So are text fields. This
+  takes F54 from 6 to 11 of 15.
+- **Twins must go to the same place.** A same-name reachable control no
+  longer dismisses a lead whose destination is known (a link's `href`, or a
+  URL in an inline `onclick`) unless it goes to the same destination. This
+  recovers 8 F42/F55 mutants whose twin went elsewhere.
+
+**What Standard still misses (42 of 256).**
+
+- **34 have a twin to the same destination.** The same link is reachable
+  elsewhere on the page, usually a header or footer copy. Ma11y counts the
+  mutant as a fault; under WCAG 2.1.1 the function is still operable by
+  keyboard. Counting these as not faults, Standard finds **214 of 222
+  (96.4%)**.
+- **4 F54 mutants keep a click handler bound another way:** Knockout's
+  `data-bind` click on live.com, and the consent library's listener on cnn.
+  Enter still runs that handler.
+- **4 on vk are past the per-page lead cap.** vk has more than 75 leads.
+
+Cost: unchanged in kind. The new rule reads listener bits the census already
+collects, and the twin check parses one attribute.

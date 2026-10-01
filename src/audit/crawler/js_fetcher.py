@@ -415,6 +415,10 @@ class JsFetcher:
                         ),
                     )
                 interaction_evaluated = interaction.evaluated
+                # Dialog checks run in states only Click-Through reaches, but
+                # they are keyboard results: they are written with the
+                # keyboard check's rows and get its screenshot pass.
+                keyboard_traps.extend(interaction.keyboard_findings)
 
             responsive_findings: list[ResponsiveFinding] = []
             if (

@@ -9482,6 +9482,242 @@ probe_rules:
       or a person has confirmed the order still makes sense.
     confidence_default: low
 
+  keyboard-dialog-focus-not-moved:
+    title: "Keyboard focus stays outside a dialog after it opens"
+    wcag_sc: "2.4.3"
+    wcag_name: "Focus Order"
+    wcag_level: "A"
+    abilities_affected: [motor, vision, cognition]
+    what_happening: >-
+      Click-Through clicked a control and a dialog opened: a declared dialog
+      (<code>role="dialog"</code>, <code>&lt;dialog&gt;</code>) or a box
+      fixed on the screen, such as a lightbox. Keyboard focus stayed on the
+      page behind it instead of moving into the dialog. Menus and disclosure
+      buttons (a button with <code>aria-expanded</code>) are left out, because
+      they keep focus on the button on purpose.
+    why_matters: >-
+      A keyboard user has to search the page to find the dialog, and a screen
+      reader user may not know it opened at all. If the dialog is added at the
+      end of the page code, they may have to press Tab through the whole page
+      to reach it.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the live page, press Tab to the control that opens the dialog,
+        and press Enter. Check where focus is.
+      - >-
+        When the dialog opens, move focus into it with a script, usually to
+        its first control or to its heading with <code>tabindex="-1"</code>.
+      - >-
+        When it closes, move focus back to the control that opened it.
+    fix_options:
+      - label: "Use the native dialog element"
+        approach: >-
+          Open a <dialog> with showModal(). The browser moves focus into it,
+          keeps it there, and closes it with Escape.
+        watch_out: >-
+          Give the dialog a name, for example with aria-labelledby pointing
+          at its heading.
+      - label: "Move focus with a script"
+        approach: >-
+          After showing the dialog, call focus() on its first control or its
+          heading.
+        watch_out: >-
+          Moving focus before the dialog is visible does not work; do it after
+          it is shown.
+    verify_manual: >-
+      Open the dialog with the keyboard and check that focus is inside it
+      straight away, and back on the opening control after you close it.
+    verify_automated: >-
+      Scan again with Click-Through and the keyboard check turned on, and see
+      if the dialog is still found.
+    acceptance: >-
+      When the dialog opens, keyboard focus moves into it.
+    confidence_default: medium
+
+  keyboard-dialog-focus-escapes:
+    title: "Tab moves focus out of an open dialog"
+    wcag_sc: "2.4.3"
+    wcag_name: "Focus Order"
+    wcag_level: "A"
+    abilities_affected: [motor, vision, cognition]
+    what_happening: >-
+      With a dialog open, Click-Through put focus on its first control and
+      pressed Tab, two more times than the dialog has controls (a dialog with
+      more than 28 controls is not tested). Focus moved to the page behind the dialog
+      while the dialog stayed open. A dialog marked
+      <code>role="dialog"</code> without <code>aria-modal</code> says it is
+      not modal, so it is left out. A box fixed on the screen that declares
+      nothing is treated as modal, so check whether it is meant to be.
+    why_matters: >-
+      Keyboard users end up on content hidden behind the dialog, which they
+      cannot see or use, and lose their place. Screen reader users hear the
+      page behind as if the dialog were not there.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the dialog with the keyboard and press Tab and Shift+Tab until
+        focus leaves it.
+      - >-
+        Keep focus inside while it is open: from the last control, Tab should
+        go to the first, and Shift+Tab from the first should go to the last.
+      - >-
+        If the dialog is not meant to block the page, mark it
+        <code>role="dialog"</code> without <code>aria-modal</code>, and make
+        sure people can return to it.
+    fix_options:
+      - label: "Use the native dialog element"
+        approach: >-
+          A <dialog> opened with showModal() makes the page behind it inert,
+          so focus cannot leave.
+        watch_out: >-
+          A <dialog> opened with show() is not modal and does not hold focus.
+      - label: "Make the page behind inert"
+        approach: >-
+          Set the inert attribute on the rest of the page while the dialog is
+          open, and remove it when the dialog closes.
+        watch_out: >-
+          Remember to remove inert on every way the dialog can close.
+    verify_manual: >-
+      Open the dialog and press Tab and Shift+Tab many times. Focus should
+      stay inside until you close it.
+    verify_automated: >-
+      Scan again with Click-Through and the keyboard check turned on, and see
+      if the dialog is still found.
+    acceptance: >-
+      While a modal dialog is open, Tab and Shift+Tab keep focus inside it.
+    confidence_default: medium
+
+  keyboard-dialog-close-not-focusable:
+    title: "A dialog's close control cannot get keyboard focus"
+    wcag_sc: "2.1.1"
+    wcag_name: "Keyboard"
+    wcag_level: "A"
+    abilities_affected: [motor, vision]
+    what_happening: >-
+      In a dialog Click-Through opened, there is a close control (named
+      Close, Dismiss, Cancel, or shown as an X), but the Tab key cannot reach
+      it. A common cause is a <code>&lt;span&gt;</code> or
+      <code>&lt;div&gt;</code> with a click handler instead of a button.
+    why_matters: >-
+      People who use only a keyboard cannot close the dialog with this
+      control. If Escape does not close it either, they are stuck in it.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Open the dialog and press Tab through it. Check whether focus ever
+        reaches the close control.
+      - >-
+        Make the close control a <code>&lt;button type="button"&gt;</code>,
+        with a name such as <code>aria-label="Close"</code> if it shows only
+        an X.
+    fix_options:
+      - label: "Use a button"
+        approach: >-
+          Replace the span or div with a button. The browser makes it
+          focusable and lets Enter and Space press it.
+        watch_out: >-
+          Keep the old click handler working on the new button, and remove
+          any duplicate handler on a wrapper.
+    verify_manual: >-
+      Open the dialog with the keyboard, press Tab to the close control, and
+      press Enter. The dialog should close.
+    verify_automated: >-
+      Scan again with Click-Through and the keyboard check turned on, and see
+      if the control is still found.
+    acceptance: >-
+      The dialog's close control can be reached with Tab and pressed with
+      Enter or Space.
+    confidence_default: medium
+
+  keyboard-dialog-escape-does-not-close:
+    title: "Escape does not close a dialog"
+    abilities_affected: [motor, vision, cognition]
+    what_happening: >-
+      In a dialog Click-Through opened, pressing Escape did not close it. The
+      dialog has another way out, such as a Close button the keyboard can
+      reach, or it lets focus leave, so this is best practice, not a WCAG
+      failure: people expect Escape to close a dialog. A dialog with no
+      keyboard way out at all is reported separately, as a keyboard trap.
+    why_matters: >-
+      Escape is the quickest way out of a dialog for keyboard and screen
+      reader users, and many expect it. When there is no other keyboard way
+      out, they are stuck.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Open the dialog with the keyboard and press Escape.
+      - >-
+        Add a <code>keydown</code> handler on the dialog that closes it when
+        the key is Escape, and moves focus back to the control that opened
+        it.
+    fix_options:
+      - label: "Use the native dialog element"
+        approach: >-
+          A <dialog> opened with showModal() closes with Escape without any
+          code.
+        watch_out: >-
+          If the dialog must not close without a choice, for example before
+          saving, tell people how to leave it.
+    verify_manual: >-
+      Open the dialog with the keyboard and press Escape. It should close and
+      put focus back on the control that opened it.
+    verify_automated: >-
+      Scan again with Click-Through and the keyboard check turned on, and see
+      if the dialog is still found.
+    acceptance: >-
+      Escape closes the dialog, or the dialog explains another way to leave
+      it with the keyboard.
+    confidence_default: medium
+
+  keyboard-dialog-no-keyboard-exit:
+    title: "Keyboard users cannot leave a dialog"
+    wcag_sc: "2.1.2"
+    wcag_name: "No Keyboard Trap"
+    wcag_level: "A"
+    abilities_affected: [motor, vision]
+    what_happening: >-
+      In a dialog Click-Through opened, Escape did not close it, Tab and
+      Shift+Tab kept focus inside it, and it has no close control the
+      keyboard can reach. Someone using only a keyboard has no way to leave
+      it.
+    why_matters: >-
+      People who use only a keyboard are stuck in the dialog, and everything
+      else on the page is out of their reach until they reload it.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the dialog with the keyboard and try Escape, Tab and Shift+Tab.
+      - >-
+        Give it a close control the keyboard can reach, such as a
+        <code>&lt;button type="button"&gt;Close&lt;/button&gt;</code>, and
+        close it on Escape too.
+      - >-
+        When it closes, move focus back to the control that opened it.
+    fix_options:
+      - label: "Use the native dialog element"
+        approach: >-
+          A <dialog> opened with showModal() closes with Escape and can hold a
+          normal Close button.
+        watch_out: >-
+          If closing needs a choice first, make every choice a button the
+          keyboard can reach.
+    verify_manual: >-
+      Open the dialog using only the keyboard, then leave it using only the
+      keyboard.
+    verify_automated: >-
+      Scan again with Click-Through and the keyboard check turned on, and see
+      if the dialog is still found.
+    acceptance: >-
+      A keyboard user can always close the dialog, with Escape or with a
+      close control they can reach.
+    confidence_default: medium
+
 alfa_rules:
 
   sia-r1:

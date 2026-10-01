@@ -32,12 +32,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.interaction import dialogs
 from audit.analyzer.interaction.base import (
     InteractionResult,
     RevealedViolation,
     StateCapture,
 )
+from audit.analyzer.interaction.dialogs import DEFAULT_MAX_DIALOG_CHECKS
 from audit.analyzer.interaction.safety import exploration_guard, safe_url
+from audit.analyzer.keyboard.base import KeyboardTrap
 from audit.logging import get_logger
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
@@ -119,12 +122,16 @@ DEFAULT_BLOCKED_LABELS: tuple[str, ...] = (
 
 # Native and explicitly semantic controls, including controls implemented as
 # placeholder anchors. Real links remain the crawler's responsibility.
+# ``a[href="#"]`` and ``a[href=""]`` go nowhere, so a script must be what
+# they do (a jQuery-era lightbox opener is the classic case); ``_DESCRIBE_JS``
+# already treats such links as actions rather than navigation.
 _CANDIDATE_SELECTOR = (
     'button, input[type="button"], input[type="checkbox"], input[type="radio"], '
     '[role="button"], [role="tab"], [role="menuitem"], [role="menuitemcheckbox"], '
     '[role="menuitemradio"], [role="treeitem"], [role="option"], '
     '[role="switch"], [role="checkbox"], [role="radio"], '
-    "details > summary, [aria-expanded], [aria-haspopup], [onclick], [tabindex]"
+    "details > summary, [aria-expanded], [aria-haspopup], [onclick], [tabindex], "
+    'a[href="#"], a[href=""]'
 )
 
 # Keep identity separate from the repeat-sampling shape. A broad selector such
@@ -253,6 +260,13 @@ _OPEN_DIALOGS_JS = r"""
   }
   return out;
 }
+"""
+
+# True for an opener that declares a disclosure or a menu: what it opens is
+# not a dialog. ``aria-haspopup="dialog"`` is the one popup that is.
+_DISCLOSURE_JS = """
+(el) => el.hasAttribute('aria-expanded') ||
+  /^(true|menu|listbox|tree|grid)$/.test(el.getAttribute('aria-haspopup') || '')
 """
 
 # Only unambiguously dismissive names. "OK", "Done" and "Continue" are left
@@ -387,6 +401,10 @@ class _Budget:
     #: Dialogs a click opened, and the count that would not close again.
     dialogs_opened: int = 0
     dialogs_stuck: int = 0
+    #: Keyboard results from the dialogs a click opened (``dialogs.py``), and
+    #: how many more dialogs this page may check.
+    keyboard_findings: list[KeyboardTrap] = field(default_factory=list)
+    dialog_checks_left: int = DEFAULT_MAX_DIALOG_CHECKS
     #: Set once a dialog refuses to close. Everything under it is
     #: unreachable, so the page's sweep stops rather than clicking an
     #: overlay and recording the result as coverage.
@@ -462,6 +480,11 @@ class InteractionProbe:
     # looks like. Re-measure against that test before shortening this again.
     settle_ms: int = 400
     blocked_labels: tuple[str, ...] = DEFAULT_BLOCKED_LABELS
+    # Keyboard checks on each dialog a click opens (``dialogs.py``). Off by
+    # default; a scan turns it on with its keyboard check, which owns where
+    # the results are written.
+    dialog_checks: bool = False
+    max_dialog_checks: int = DEFAULT_MAX_DIALOG_CHECKS
     # Store the markup of states that held a new defect, so the inspector can
     # show the element in the state it exists in. Off leaves the probe's
     # behaviour exactly as it was.
@@ -491,6 +514,7 @@ class InteractionProbe:
         """
         budget = _Budget(
             remaining=self.max_clicks,
+            dialog_checks_left=self.max_dialog_checks,
             seen_hashes={v.target_hash for v in baseline},
         )
         found: list[RevealedViolation] = []
@@ -552,6 +576,7 @@ class InteractionProbe:
             dialogs_opened=budget.dialogs_opened,
             dialogs_stuck=budget.dialogs_stuck,
             detail=budget.detail,
+            keyboard_findings=tuple(budget.keyboard_findings),
         )
 
     async def _explore(
@@ -774,6 +799,15 @@ class InteractionProbe:
 
             before_hash = await page.evaluate(_DOM_HASH_JS)
             before_dialogs = {item["id"] for item in await self._open_dialogs(page)}
+            checking = self.dialog_checks and budget.dialog_checks_left > 0
+            before_overlays = await dialogs.overlay_ids(page) if checking else set()
+            disclosure = False
+            if checking:
+                # A disclosure or menu button keeps focus on itself by design
+                # (APG disclosure and menu button patterns): what it opens is
+                # not a dialog, whatever its CSS.
+                with contextlib.suppress(Exception):
+                    disclosure = await locator.evaluate(_DISCLOSURE_JS)
             budget.remaining -= 1
             await locator.click(timeout=3000)
             budget.clicks_succeeded += 1
@@ -825,6 +859,8 @@ class InteractionProbe:
                 item for item in await self._open_dialogs(page) if item["id"] not in before_dialogs
             ]
             budget.dialogs_opened += len(opened)
+            if self.dialog_checks and not checking and opened:
+                budget.limits.add("dialog_checks")  # a dialog the cap left unchecked
             # Links can be created by menus/dialogs after the load-time
             # snapshot. Keep them for the crawler's normal scope checks.
             links = await page.locator("a[href]").evaluate_all(
@@ -865,6 +901,30 @@ class InteractionProbe:
                 new_violations=len(found) - before_found,
             )
 
+            # Dialogs this click opened, checked for keyboard access while
+            # they are open, before the nested sweep operates their controls.
+            checked: list[dialogs.DialogRecord] = []
+            if checking:
+                checked = await self._check_new_dialogs(
+                    page, budget, before_overlays, label=label, disclosure=disclosure
+                )
+                # Escape now, while the dialog is as the click left it: the
+                # nested sweep below may press its own close button. If
+                # Escape closed it, click the opener again so that sweep still
+                # explores inside.
+                closed_any = False
+                for record in checked:
+                    with contextlib.suppress(Exception):
+                        results, closed = await dialogs.check_escape(page, record)
+                        budget.keyboard_findings.extend(results)
+                        closed_any = closed_any or closed
+                if closed_any and budget.remaining > 0:
+                    with contextlib.suppress(Exception):
+                        budget.remaining -= 1
+                        await locator.click(timeout=3000)
+                        budget.clicks_succeeded += 1
+                        await page.wait_for_timeout(self.settle_ms)
+
             # Whatever this click opened may itself contain controls. Only
             # those: fresh_only keeps the descent inside what appeared.
             await self._explore(
@@ -904,6 +964,30 @@ class InteractionProbe:
             if page.url != pinned:
                 await self._restore(page, pinned)
             return True
+
+    async def _check_new_dialogs(
+        self,
+        page: Page,
+        budget: _Budget,
+        before: set[str],
+        *,
+        label: str,
+        disclosure: bool,
+    ) -> list[dialogs.DialogRecord]:
+        """Run the open-state dialog checks on what the last click opened."""
+        if disclosure:
+            return []
+        records: list[dialogs.DialogRecord] = []
+        with contextlib.suppress(Exception):
+            for overlay in await dialogs.new_overlays(page, before):
+                if budget.dialog_checks_left <= 0:
+                    budget.limits.add("dialog_checks")
+                    break
+                budget.dialog_checks_left -= 1
+                record = await dialogs.check_opened(page, overlay, opener=label)
+                budget.keyboard_findings.extend(record.findings)
+                records.append(record)
+        return records
 
     async def _open_dialogs(self, page: Page) -> list[dict[str, Any]]:
         try:

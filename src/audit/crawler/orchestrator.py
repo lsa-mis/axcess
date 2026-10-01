@@ -575,6 +575,9 @@ async def run_crawl(
             # in front: the URL defaults are path fragments ("/logout") and
             # would never match a rendered label on their own.
             blocked_labels=DEFAULT_BLOCKED_LABELS + tuple(config.blocked_url_patterns),
+            # Keyboard checks on the dialogs a click opens are part of the
+            # keyboard check: its switch turns them on, and its rows hold them.
+            dialog_checks=config.keyboard_probe_enabled,
         )
     js_holder: _LazyJs | None = None
     if js_fetcher is not None or config.js_enabled:
@@ -854,6 +857,10 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # Absent from older reports, whose keyboard check was SC 2.1.2 only.
             "keyboard_operability_version": 1,
             "keyboard_advanced": config.keyboard_advanced,
+            # 1: Click-Through also checks the dialogs a click opens (focus
+            # moved in, kept in a modal, close control, Escape). Needs both
+            # the keyboard check and Click-Through.
+            "keyboard_dialog_checks_version": 1,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "visual_checks_enabled": config.visual_checks_enabled,

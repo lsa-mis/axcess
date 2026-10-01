@@ -388,8 +388,10 @@ criteria:
     automated_check: >-
       The focus probe flags positive tabindex (WCAG failure F44), a manual
       tab order that overrides the natural DOM order and usually breaks the
-      sequence; tabindex="0" on plain content with no role or handler; and
-      side-by-side controls whose Tab order differs from their order on screen.
+      sequence; tabindex="0" on plain content with no role or handler;
+      side-by-side controls whose Tab order differs from their order on screen;
+      and, in states Click-Through opens, dialogs that do not take focus or let
+      Tab leave them.
     manual_check: >-
       Tab through the whole page and confirm the focus order preserves meaning
       and operability, the order can break without a positive tabindex (e.g.

@@ -30,6 +30,7 @@ from playwright.async_api import async_playwright  # noqa: E402
 
 from audit.analyzer.axe import AxeAnalyzer  # noqa: E402
 from audit.analyzer.focus import FocusProbe  # noqa: E402
+from audit.analyzer.interaction import InteractionProbe  # noqa: E402
 from audit.analyzer.keyboard import KeyboardOperabilityProbe, KeyboardProbe  # noqa: E402
 from experiments.tabbing.runner.bakeoff import CORPORA  # noqa: E402
 from experiments.tabbing.runner.serve import ContextFactory, page_url  # noqa: E402
@@ -41,7 +42,13 @@ _TAG_JS = """
   let current = null;
   for (const el of document.querySelectorAll('h3[id], div.example')) {
     if (el.tagName === 'H3') current = el.id;
-    else if (current) el.setAttribute('data-gds-case', current);
+    else if (current) {
+      // Every element, not just the box: a script can move one out of its
+      // example (GDS appends the "focus far" lightbox to <body>).
+      for (const node of [el, ...el.querySelectorAll('*')]) {
+        if (!node.hasAttribute('data-gds-case')) node.setAttribute('data-gds-case', current);
+      }
+    }
   }
 }
 """
@@ -61,10 +68,11 @@ async def main() -> None:
     # Findings outside the keyboard cases: the other 126 GDS cases test other
     # criteria, so a hit there is either another real problem or noise.
     elsewhere: dict[str, list[str]] = {}
+    clicks: dict[str, object] = {}
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         factory = ContextFactory(browser, {"width": 1280, "height": 900}, root)
-        for name in ("axe", "focus", "keyboard", "keyboard-advanced"):
+        for name in ("axe", "focus", "keyboard", "keyboard-advanced", "click-through"):
             context = await factory()
             page = await context.new_page()
             await page.goto(page_url("pages/test-cases.html"), wait_until="load")
@@ -83,6 +91,17 @@ async def main() -> None:
             elif name == "focus":
                 for f in await FocusProbe().run(page):
                     found.append((f"focus:{f.rule_id}", f.target_selector))
+            elif name == "click-through":
+                # Click-Through at a scan's default bounds, with the dialog
+                # checks a scan turns on alongside the keyboard check.
+                interaction = InteractionProbe(
+                    axe=AxeAnalyzer.from_bundled(), level="AA", dialog_checks=True
+                )
+                result = await interaction.run(page)
+                found += [
+                    (f"{name}:{f.rule_id}", f.target_selector) for f in result.keyboard_findings
+                ]
+                clicks[name] = (result.clicks_succeeded, sorted(result.limits))
             else:
                 probe = KeyboardProbe(
                     operability=KeyboardOperabilityProbe(advanced=name == "keyboard-advanced")
@@ -97,12 +116,13 @@ async def main() -> None:
                 case = await page.evaluate(_CASE_OF_JS, selector)
                 if case in cases:
                     cases[case].add(rule)
-                elif name in ("focus", "keyboard"):
+                elif name in ("focus", "keyboard", "click-through"):
                     elsewhere.setdefault(rule, []).append(case or "(outside any example)")
             await context.close()
         await browser.close()
     print(json.dumps({case: sorted(rules) for case, rules in cases.items()}, indent=1))
     print(json.dumps({"outside keyboard cases": elsewhere}, indent=1))
+    print(json.dumps({"click-through clicks and limits": clicks}))
 
 
 if __name__ == "__main__":

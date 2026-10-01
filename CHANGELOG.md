@@ -15,8 +15,15 @@ merge.
   key cannot reach, and custom controls Tab reaches that have no key handler.
   It also finds clicks the page handles for the whole document (including
   jQuery's), and menus that open only when the mouse is over them (CSS
-  `:hover` with no keyboard equivalent). It reads the page's event listeners
+  `:hover` with no keyboard equivalent), and controls that act only on
+  mouse-down, which Enter and Space never send. It reads the page's event listeners
   and styles in a few steps, so it adds well under a second per page. The switch is now called **Check keyboard access**.
+- Click-Through, with the keyboard check on: each dialog a click opens is
+  checked for keyboard access. Focus should move into it, Tab should not
+  leave a modal for the page behind it, its close control should get
+  keyboard focus, and Escape should close it. Click-Through now also opens
+  links that go nowhere (`href="#"`), which scripts often use to open
+  dialogs.
 - Focus check: it now also finds controls that show no change at all when
   they have keyboard focus (WCAG 2.4.7), the Tab key stopping on plain content
   with `tabindex="0"`, and rows of controls whose Tab order differs from

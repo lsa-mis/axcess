@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dialog fixture: what a click opens</title>
+<style>
+  .box { position: fixed; top: 15%; left: 30%; width: 420px; padding: 12px;
+         background: #fff; border: 3px solid #000; z-index: 10; }
+  .hidden { display: none; }
+  .toast { position: fixed; bottom: 0; right: 0; width: 300px; height: 80px; background: #ffe; }
+  .drawer { position: fixed; top: 0; left: 0; width: 300px; height: 100%; background: #eef; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dialogs</h1>
+  <p>Each button opens one dialog. Only the first and the last two are built well.</p>
+  <button type="button" data-open="good">Open good dialog</button>
+  <button type="button" data-open="far">Open dialog that does not take focus</button>
+  <button type="button" data-open="spanclose">Open dialog with a span close</button>
+  <button type="button" data-open="leaky">Open dialog that lets focus out</button>
+  <button type="button" data-open="stuck">Open dialog Escape cannot close</button>
+  <button type="button" data-open="toast">Show a status message</button>
+  <button type="button" data-open="drawer" aria-expanded="false" aria-controls="drawer">Menu</button>
+  <a href="#after">A link after the buttons</a>
+  <!-- Last: a dialog nothing can close stops Click-Through for the page. -->
+  <button type="button" data-open="trapped">Open dialog with no way out</button>
+</main>
+
+<!-- Good: modal, focus moves in, Tab wraps inside, Escape and a button close it. -->
+<div id="good" class="box hidden" role="dialog" aria-modal="true" aria-label="Good dialog">
+  <p>A well-built dialog.</p>
+  <a href="#g1">A link inside</a>
+  <button type="button" class="close">Close</button>
+</div>
+<!-- Focus is not moved into it (GDS: focus not moved to the lightbox). -->
+<div id="far" class="box hidden">
+  <p>Opened, but focus stays on the button. <a href="#f1">A link inside</a></p>
+  <button type="button" class="close">Close</button>
+</div>
+<!-- The close control is a span (GDS: close button does not receive focus). -->
+<div id="spanclose" class="box hidden" role="dialog" aria-modal="true" aria-label="Span close">
+  <span class="close-button" title="Close dialog">X</span>
+  <p>Read this. <a href="#s1">A link inside</a></p>
+</div>
+<!-- Tab leaves it for the page (GDS: focus is not retained within the lightbox). -->
+<div id="leaky" class="box hidden" role="dialog" aria-modal="true" aria-label="Leaky">
+  <a href="#l1">First link inside</a>
+  <button type="button" class="close">Close</button>
+</div>
+<!-- Escape does nothing; a close button is the only way out (GDS: Esc does not close). -->
+<div id="stuck" class="box hidden" role="dialog" aria-modal="true" aria-label="No Escape">
+  <a href="#k1">A link inside</a>
+  <button type="button" class="close">Close</button>
+</div>
+<!-- No Escape, focus held inside, no close control: a keyboard trap. -->
+<div id="trapped" class="box hidden" role="dialog" aria-modal="true" aria-label="Trapped">
+  <a href="#t1">One link inside</a> <a href="#t2">Another link inside</a>
+</div>
+<div id="toast" class="toast hidden" role="status">Saved.</div>
+<nav id="drawer" class="drawer hidden" aria-label="Site"><a href="#n1">Home</a> <a href="#n2">News</a></nav>
+<p id="after">After.</p>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let opener = null;
+  const open = (id) => {
+    $(id).classList.remove('hidden');
+    if (id !== 'far') { const f = $(id).querySelector('a, button'); if (f) f.focus(); }
+  };
+  const close = (id) => { $(id).classList.add('hidden'); if (opener) opener.focus(); };
+  document.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => {
+    opener = b; const id = b.dataset.open;
+    if (id === 'drawer') { b.setAttribute('aria-expanded', 'true'); $(id).classList.remove('hidden'); return; }
+    open(id);
+  }));
+  document.querySelectorAll('.close').forEach((c) =>
+    c.addEventListener('click', () => close(c.closest('.box').id)));
+  $('spanclose').querySelector('.close-button').addEventListener('click', () => close('spanclose'));
+  // Focus containment for the modals, except "leaky".
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      for (const id of ['good', 'far', 'spanclose', 'leaky']) if (!$(id).classList.contains('hidden')) close(id);
+      if (!$('drawer').classList.contains('hidden')) {
+        $('drawer').classList.add('hidden');
+        document.querySelector('[data-open="drawer"]').setAttribute('aria-expanded', 'false');
+      }
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    for (const id of ['good', 'spanclose', 'stuck', 'trapped']) {
+      const box = $(id);
+      if (box.classList.contains('hidden')) continue;
+      const items = Array.from(box.querySelectorAll('a, button'));
+      const i = items.indexOf(document.activeElement);
+      e.preventDefault();
+      items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
+    }
+  });
+</script>
+</body>
+</html>

@@ -84,7 +84,7 @@ export const SWITCHES = {
   keyboard: {
     label: "Check keyboard access",
     hint:
-      "Finds keyboard traps (a control you can Tab into but not back out of) and controls that work with a mouse but that the keyboard cannot reach or press (WCAG 2.1.1, 2.1.2). Adds 1–3 seconds per page.",
+      "Finds keyboard traps (a control you can Tab into but not back out of) and controls that work with a mouse but that the keyboard cannot reach or press (WCAG 2.1.1, 2.1.2). With Click-Through on, it also checks each dialog a click opens: that focus moves into it, stays in it, and that the keyboard can close it. Adds 1–3 seconds per page.",
   },
   keyboard_advanced: {
     label: "Keyboard (Advanced): try each control it finds",

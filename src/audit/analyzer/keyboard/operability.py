@@ -120,12 +120,13 @@ _SAME_EFFECT_JACCARD = 0.5
 
 # Listener bits, written by the CDP marking pass and read by the collector.
 _BIT_ACTIVATE = 1  # click, mousedown, mouseup, pointerdown, pointerup
+_BIT_CLICK = 32  # click alone: what Enter and Space dispatch
 _BIT_DBLCLICK = 2
 _BIT_HOVER = 4  # mouseover, mouseenter
 _BIT_KEY = 8  # keydown, keyup, keypress
 _BIT_FOCUS = 16  # focus, focusin: a script that opens something on focus
 _LISTENER_BITS: dict[str, int] = {
-    "click": _BIT_ACTIVATE,
+    "click": _BIT_ACTIVATE | _BIT_CLICK,
     "mousedown": _BIT_ACTIVATE,
     "mouseup": _BIT_ACTIVATE,
     "pointerdown": _BIT_ACTIVATE,
@@ -486,10 +487,28 @@ _COLLECT_JS = r"""
       ' ' + (el.textContent || '').slice(0, 200);
     return CHORD.test(text);
   };
+  // Where an element goes, when the page code says: a link's address, or a
+  // URL in an inline onclick (location.href='/x'). Null when it does not.
+  const destination = (el) => {
+    try {
+      if (el.matches('a[href]')) {
+        const raw = el.getAttribute('href') || '';
+        if (!raw || raw === '#' || /^javascript:/i.test(raw)) return null;
+        return new URL(raw, location.href).href;
+      }
+      const code = el.getAttribute('onclick') || '';
+      const m = code.match(/location(?:\.href)?\s*=\s*['"]([^'"]+)['"]/) ||
+        code.match(/window\.open\(\s*['"]([^'"]+)['"]/);
+      return m ? new URL(m[1], location.href).href : null;
+    } catch (e) { return null; }
+  };
   let twins = null;
   const twinOf = (el) => {
     const name = accName(el);
     if (name.length < 2) return false;
+    // A twin must do the same job: when this element's destination is known,
+    // the twin has to go to the same place, not merely share a name.
+    const goesTo = destination(el);
     if (twins === null) {
       twins = new Map();
       for (const c of all) {
@@ -502,7 +521,9 @@ _COLLECT_JS = r"""
       }
     }
     for (const c of twins.get(name) || []) {
-      if (c !== el && !el.contains(c) && !c.contains(el)) return true;
+      if (c === el || el.contains(c) || c.contains(el)) continue;
+      if (goesTo !== null && destination(c) !== goesTo) continue;
+      return true;
     }
     return false;
   };
@@ -531,6 +552,20 @@ _COLLECT_JS = r"""
     const onclick = typeof el.onclick === 'function';
     const role = el.getAttribute('role') || '';
     const native = el.matches(NATIVE);
+    // WCAG F54: the action is on mouse-down/up (or pointer) and nothing
+    // handles click, which is what Enter and Space send. A link with a real
+    // address still works from the keyboard (and its mousedown is usually
+    // click tracking), and text fields take mousedown for caret behaviour, so
+    // both are left out.
+    const clickBound = !!(bits & 32) || typeof el.onclick === 'function' ||
+      !!(props && typeof props.onClick === 'function') || delegatedEls.has(el);
+    const href = (el.getAttribute('href') || '').trim();
+    const realLink = el.matches('a[href]') && href !== '' && href !== '#' &&
+      !/^javascript:/i.test(href);
+    const downOnly = !!(bits & 1) && !clickBound && !realLink &&
+      !el.matches('input:not([type=button]):not([type=submit]):not([type=checkbox]):' +
+        'not([type=radio]):not([type=image]):not([type=reset]), textarea, select') &&
+      !reactRoot(el);
     const isLabel = tag === 'LABEL';
     const strongRaw = !!(bits & 1) || !!(bits & 2) || onclick || reactMouse;
     const reactHover = opts.extended && !!(props && Object.keys(props).some(
@@ -607,6 +642,8 @@ _COLLECT_JS = r"""
       kind = 'no_key_handler';
     } else if (linkButton && !hasKeyPath(el, props)) {
       kind = 'no_key_handler';
+    } else if (downOnly && !hasKeyPath(el, props)) {
+      kind = 'no_key_handler';
     }
     if (!kind) { drop(el, 'keyboard path'); continue; }
     // A weak lead with no element-level delegate is left to Advanced, where
@@ -640,6 +677,9 @@ _COLLECT_JS = r"""
     if (onclick && !(bits & 1)) signals.push('onclick property');
     if (reactMouse) signals.push('React mouse handler');
     if (roleSig || linkButton) signals.push('role=' + role);
+    if (downOnly && kind === 'no_key_handler') {
+      signals.push('only mouse-down or mouse-up listeners, and Enter and Space send a click');
+    }
     if (nativeSig && !strong && !roleSig) signals.push('native ' + tag.toLowerCase());
     if (weak) {
       signals.push(elementDelegate(el)

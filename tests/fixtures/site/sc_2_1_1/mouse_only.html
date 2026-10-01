@@ -19,6 +19,16 @@
   <a data-t="blur" id="blur" href="#b" class="btnish">Focus goes away</a>
   <a data-t="linkbtn" id="linkbtn" href="#lb" role="button" class="btnish">Link as button</a>
   <div data-t="noop" id="noop" class="btnish">Does nothing</div>
+  <button data-t="downonly" id="downonly" type="button" onmousedown="document.getElementById('out').textContent='down'">Mouse-down only</button>
+
+  <!-- A real link with a mousedown tracker still works from the keyboard. -->
+  <a data-t="tracked" href="#tracked-target" onmousedown="window.tracked = 1">Tracked link</a>
+  <a data-t="tracked2" href="https://example.test/page" onmousedown="window.tracked = 1">Tracked real link</a>
+  <!-- Same name, different destination: not a twin. Same destination: a twin. -->
+  <span data-t="otherplace" onclick="location.href='/elsewhere'">Help</span>
+  <a href="/help">Help</a>
+  <span data-t="sameplace" onclick="location.href='/contact'">Contact</span>
+  <a href="/contact">Contact</a>
 
   <!-- Not leads: each has a keyboard path. -->
   <button data-t="real" id="real" type="button">Real button</button>

@@ -1,7 +1,11 @@
 {
  "cases": {
   "keyboard-access-alert-shows-for-a-short-time": [],
-  "keyboard-access-lightbox-close-button-doesnt-receive-focus": [],
+  "keyboard-access-lightbox-close-button-doesnt-receive-focus": [
+   "click-through:keyboard-dialog-close-not-focusable",
+   "click-through:keyboard-dialog-focus-escapes",
+   "click-through:keyboard-dialog-focus-not-moved"
+  ],
   "keyboard-access-focus-order-in-wrong-order": [
    "focus:focus-order-visual-mismatch"
   ],
@@ -23,15 +27,26 @@
    "keyboard-advanced:keyboard-mouse-only-control",
    "keyboard:keyboard-mouse-only-control"
   ],
-  "keyboard-access-lightbox-esc-key-doesnt-close-the-lightbox": [],
+  "keyboard-access-lightbox-esc-key-doesnt-close-the-lightbox": [
+   "click-through:keyboard-dialog-escape-does-not-close",
+   "click-through:keyboard-dialog-focus-escapes",
+   "click-through:keyboard-dialog-focus-not-moved"
+  ],
   "keyboard-access-link-with-a-rolebutton-does-not-work-with-space-bar": [
    "keyboard-advanced:keyboard-no-key-activation",
    "keyboard:keyboard-no-key-activation"
   ],
   "keyboard-access-tooltips-dont-receive-keyboard-focus": [],
   "keyboard-access-accesskey-attribute-used": [],
-  "keyboard-access-lightbox-focus-is-not-moved-immediately-to-lightbox": [],
-  "keyboard-access-lightbox-focus-is-not-retained-within-the-lightbox": [],
+  "keyboard-access-lightbox-focus-is-not-moved-immediately-to-lightbox": [
+   "click-through:keyboard-dialog-close-not-focusable",
+   "click-through:keyboard-dialog-focus-escapes",
+   "click-through:keyboard-dialog-focus-not-moved"
+  ],
+  "keyboard-access-lightbox-focus-is-not-retained-within-the-lightbox": [
+   "click-through:keyboard-dialog-focus-escapes",
+   "click-through:keyboard-dialog-focus-not-moved"
+  ],
   "keyboard-access-fake-button-is-not-keyboard-accessible": [
    "keyboard-advanced:keyboard-mouse-only-control",
    "keyboard:keyboard-mouse-only-control"
