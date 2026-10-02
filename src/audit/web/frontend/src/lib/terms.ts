@@ -1,4 +1,13 @@
-import type { DetectionPipeline, FindingStatus, ReviewLane, ScanStatus } from "../api/types";
+import type {
+  DetectionPipeline,
+  FindingStatus,
+  ReviewLane,
+  ScanStatus,
+  SuggestionAudience,
+  SuggestionCheckOutcome,
+  SuggestionErrorCode,
+  SuggestionStatus,
+} from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -64,4 +73,43 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   completed: "Complete",
   failed: "Failed",
   interrupted: "Stopped",
+};
+
+/** The feature's one name, on its button and in its heading. */
+export const AI_SUGGESTION = "AI suggestion";
+
+/** Where an AI suggestion is in its queue, for its status line. */
+export const SUGGESTION_STATUS_LABEL: Record<SuggestionStatus, string> = {
+  queued: "Waiting to start",
+  running: "Writing a suggestion",
+  ready: "Ready",
+  failed: "Could not write a suggestion",
+  cancelled: "Stopped",
+};
+
+/** Who an AI suggestion is written for. */
+export const SUGGESTION_AUDIENCE_LABEL: Record<SuggestionAudience, string> = {
+  developer: "For developers",
+  editor: "For content editors",
+};
+
+/**
+ * What Axcess saw when it re-ran the one rule check on the suggested code.
+ * A pass checks one rule only, so it never says the page now passes.
+ */
+export const SUGGESTION_CHECK_LABEL: Record<SuggestionCheckOutcome, string> = {
+  passed: "The rule check passed on the suggested code",
+  still_fails: "The rule check still fails on the suggested code",
+  not_checked: "Axcess could not check this suggestion",
+};
+
+/** Why a suggestion failed, in words that say what to do next. */
+export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
+  model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
+  model_missing: "The AI model is not installed in Ollama. Ask the person who set up Axcess to install it.",
+  timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
+  bad_answer: "The AI model gave an answer Axcess could not use safely, so it is not shown. Try again.",
+  restarted: "Axcess restarted before the suggestion was finished. Try again.",
+  occurrence_gone: "This occurrence is no longer in the report.",
+  internal: "Something went wrong in Axcess. Try again.",
 };

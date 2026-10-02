@@ -11,6 +11,7 @@ datas = [
     (str(audit_source / "db" / "migrations"), "audit/db/migrations"),
     (str(audit_source / "rules"), "audit/rules"),
     (str(audit_source / "analyzer" / "vlm" / "prompts"), "audit/analyzer/vlm/prompts"),
+    (str(audit_source / "suggest" / "prompts"), "audit/suggest/prompts"),
     (str(audit_source / "web" / "frontend" / "dist"), "audit/web/frontend/dist"),
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),
     (str(audit_source / "web" / "static"), "audit/web/static"),

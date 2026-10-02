@@ -19,7 +19,7 @@ import secrets
 import shutil
 import sqlite3
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
@@ -92,6 +92,19 @@ from audit.protected.repository import (
 )
 from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
+from audit.suggest import service as suggest_service
+from audit.suggest.models import (
+    FeedbackUpdate,
+    OccurrenceKind,
+    SuggestionAvailability,
+    SuggestionCreate,
+    SuggestionRecord,
+)
+from audit.suggest.provider import OllamaSuggestionProvider
+from audit.suggest.provider import Provider as SuggestionProvider
+from audit.suggest.queue import SuggestionWorker
+from audit.suggest.verify import AxeFragmentVerifier
+from audit.suggest.verify import Verifier as SuggestionVerifier
 from audit.synthesizer.diff import compute_diff
 from audit.wcag_version import (
     DEFAULT_WCAG_VERSION,
@@ -621,6 +634,8 @@ def create_app(
     blob_dir: Path | None = None,
     *,
     protected_vault: ProtectedVault | None = None,
+    suggestion_provider: SuggestionProvider | None = None,
+    suggestion_verifier: SuggestionVerifier | None = None,
 ) -> FastAPI:
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
     settings = get_settings()
@@ -831,6 +846,48 @@ def create_app(
         with contextlib.suppress(asyncio.CancelledError):
             await retention_task
         retention_task = None
+
+    # AI fix suggestions: one background worker, started only when an
+    # administrator has turned the feature on. With it off, nothing talks
+    # to the model and no task runs.
+    suggestion_state: dict[str, Any] = {"worker": None, "provider": suggestion_provider}
+
+    @app.on_event("startup")
+    async def _start_suggestion_worker() -> None:
+        if not settings.suggestions_enabled:
+            return
+        provider = suggestion_state["provider"]
+        if provider is None:
+            client = httpx.AsyncClient()
+            suggestion_state["client"] = client
+            provider = OllamaSuggestionProvider(
+                client,
+                base_url=settings.ollama_base_url,
+                timeout_s=settings.suggestion_timeout_s,
+            )
+            suggestion_state["provider"] = provider
+        worker = SuggestionWorker(
+            db_path=resolved_db,
+            blob_dir=resolved_blob,
+            provider=provider,
+            verifier=suggestion_verifier or AxeFragmentVerifier(),
+            text_model=settings.suggestion_text_model,
+            vision_model=settings.suggestion_vision_model,
+            timeout_s=settings.suggestion_timeout_s,
+        )
+        suggestion_state["worker"] = worker
+        worker.start()
+
+    @app.on_event("shutdown")
+    async def _stop_suggestion_worker() -> None:
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            await worker.stop()
+            suggestion_state["worker"] = None
+        client = suggestion_state.pop("client", None)
+        if client is not None:
+            await client.aclose()
+            suggestion_state["provider"] = suggestion_provider
 
     @app.middleware("http")
     async def _require_protected_scan_access(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -1763,6 +1820,99 @@ def create_app(
         if payload is None:
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
+
+    def _suggestion_call(fn: Callable[[], SuggestionRecord]) -> SuggestionRecord:
+        try:
+            return fn()
+        except suggest_service.SuggestionRefusedError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    def _is_protected(conn: sqlite3.Connection, scan_id: int) -> bool:
+        return _get_protected_scan_compat(conn, scan_id=scan_id) is not None
+
+    @app.get("/api/suggestions/status")
+    async def api_suggestion_status() -> SuggestionAvailability:
+        """Whether AI fix suggestions can be used now, and why not if not."""
+        conn = get_conn()
+        try:
+            task = crawl_state.get("task")
+            running = isinstance(task, asyncio.Task) and not task.done()
+            return await suggest_service.availability(
+                conn, settings, suggestion_state["provider"], scan_running=running
+            )
+        finally:
+            conn.close()
+
+    @app.post("/api/scans/{scan_id:int}/suggestions", status_code=202)
+    def api_create_suggestion(scan_id: int, body: SuggestionCreate) -> SuggestionRecord:
+        """Queue an AI fix suggestion for one occurrence in this report."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            record = _suggestion_call(
+                lambda: suggest_service.create(
+                    conn, settings, scan_id=scan_id, body=body, is_protected=protected
+                )
+            )
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            worker.wake()
+        return record
+
+    @app.get("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}")
+    def api_get_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.get(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion"
+    )
+    def api_latest_suggestion(
+        scan_id: int, occurrence_kind: OccurrenceKind, occurrence_id: int
+    ) -> SuggestionRecord | None:
+        """The newest suggestion for one occurrence, or null if none yet."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            try:
+                return suggest_service.latest(
+                    conn,
+                    scan_id=scan_id,
+                    occurrence_kind=occurrence_kind,
+                    occurrence_id=occurrence_id,
+                    is_protected=protected,
+                )
+            except suggest_service.SuggestionRefusedError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel")
+    def api_cancel_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.cancel(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback")
+    def api_suggestion_feedback(
+        scan_id: int, suggestion_id: int, body: FeedbackUpdate
+    ) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.set_feedback(
+                    conn,
+                    scan_id=scan_id,
+                    suggestion_id=suggestion_id,
+                    body=body,
+                    is_protected=protected,
+                )
+            )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(

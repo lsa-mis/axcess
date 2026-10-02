@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
 
+    # AI fix suggestions (on demand, per occurrence). Off until an
+    # administrator turns them on. The models are deliberately separate from
+    # the scan-analysis models above and in ``analyzer_models.yaml``, so
+    # changing them can never change how a finished report was produced.
+    # They talk only to the Ollama daemon at ``ollama_base_url``; Axcess never
+    # downloads a model by itself.
+    suggestions_enabled: bool = False
+    suggestion_text_model: str = "qwen2.5-coder:7b-instruct"
+    suggestion_vision_model: str = "qwen2.5vl:7b"
+    suggestion_timeout_s: float = Field(default=120.0, ge=10.0, le=600.0)
+    suggestion_queue_max: int = Field(default=20, ge=1, le=200)
+
     # Hosting / access control. Empty by default → the tool stays a
     # zero-auth local app (binds to 127.0.0.1, no token needed). Set
     # ``AUDIT_ACCESS_TOKEN`` before binding to a LAN/Tailscale address

@@ -368,6 +368,15 @@ longer found means only that the later scan did not find the issue again. It
 is not proof of a fix, so check the page yourself before you mark the issue
 Fixed.
 
+### AI suggestion
+
+A fix that the local AI model suggests for one [occurrence](#occurrence),
+when you press **Suggest a fix (AI)** on a page's details. It has a view for
+developers (element code before and after) and a view for content editors
+(steps and text to paste). It is written on this computer and can be wrong,
+so check it before you use it. It is off unless an administrator turns it
+on. See [AI fix suggestions](./ai-suggestions.md).
+
 ### Draft export
 
 An export downloaded from the app before expert review is finished. The app

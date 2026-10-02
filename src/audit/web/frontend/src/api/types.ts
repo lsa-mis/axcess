@@ -1289,3 +1289,76 @@ export interface ExportOptions {
   evaluation_status: string;
   formats: ExportFormatOption[];
 }
+
+/* ---------------------------------------------------------------------------
+ * AI fix suggestions (src/audit/suggest/models.py). Mirrors the Pydantic
+ * models; keep the two in step.
+ * ------------------------------------------------------------------------- */
+
+export type SuggestionOccurrenceKind = "a11y" | "image";
+export type SuggestionStatus = "queued" | "running" | "ready" | "failed" | "cancelled";
+export type SuggestionAudience = "developer" | "editor";
+export type SuggestionCheckOutcome = "passed" | "still_fails" | "not_checked";
+export type SuggestionConfidence = "likely" | "guess";
+export type SuggestionFeedback = "helpful" | "not_helpful";
+export type SuggestionErrorCode =
+  | "model_unavailable"
+  | "model_missing"
+  | "timeout"
+  | "bad_answer"
+  | "restarted"
+  | "occurrence_gone"
+  | "internal";
+export type SuggestionAvailabilityReason =
+  | "ready"
+  | "turned_off"
+  | "database_update_needed"
+  | "model_unavailable"
+  | "model_missing";
+
+export interface SuggestionResult {
+  summary: string;
+  developer: { explanation: string; after_html: string | null; css: string | null };
+  editor: {
+    steps: string[];
+    paste_text: Array<{ label: string; value: string }>;
+    needs_developer: boolean;
+  };
+  /** From the scan's stored evidence, never from the model. */
+  before_html: string | null;
+  confidence: SuggestionConfidence;
+  needs_manual_check: boolean;
+  manual_check_reason: string | null;
+  check_rule_id: string | null;
+}
+
+export interface SuggestionRecord {
+  id: number;
+  scan_id: number;
+  page_id: number;
+  occurrence_kind: SuggestionOccurrenceKind;
+  occurrence_id: number;
+  status: SuggestionStatus;
+  audience_default: SuggestionAudience;
+  text_model: string;
+  vision_model: string | null;
+  result: SuggestionResult | null;
+  check_outcome: SuggestionCheckOutcome | null;
+  error_code: SuggestionErrorCode | null;
+  error_detail: string | null;
+  feedback: SuggestionFeedback | null;
+  created_at: string;
+  finished_at: string | null;
+  /** 1 = next to run. Null once it is no longer waiting. */
+  queue_position: number | null;
+}
+
+export interface SuggestionAvailability {
+  enabled: boolean;
+  reason: SuggestionAvailabilityReason;
+  text_model: string;
+  vision_model: string;
+  missing_models: string[];
+  queue_length: number;
+  scan_running: boolean;
+}

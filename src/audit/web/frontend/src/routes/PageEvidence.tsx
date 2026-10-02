@@ -4,11 +4,12 @@ import { Crosshair, ExternalLink, ImageOff, ScanEye } from "lucide-react";
 import { useLocation, useParams } from "react-router";
 import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import FixSuggestion from "../components/FixSuggestion";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
-import type { DetectionPipeline, PageEvidence } from "../api/types";
+import type { DetectionPipeline, PageEvidence, SuggestionAvailability } from "../api/types";
 import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
@@ -35,6 +36,15 @@ export default function PageEvidenceRoute() {
     queryKey: ["page-evidence", scan, page],
     queryFn: () => api.getPageEvidence(scan, page),
     enabled: Number.isFinite(scan) && Number.isFinite(page),
+  });
+  // AI fix suggestions are off unless an administrator turns them on. When
+  // the status cannot load, the feature stays hidden and the rest of the
+  // page works as before.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -74,6 +84,19 @@ export default function PageEvidenceRoute() {
   // Only group when a click actually revealed something: on a page where
   // nothing was, a lone "At page load" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
+
+  // Suggestions need a finished, unprotected report: a protected report's
+  // evidence is encrypted and must not reach a model, and a running scan's
+  // evidence is not final. The server refuses both too; hiding the button
+  // here means nobody is offered something that will be refused.
+  const suggestionsApply =
+    scanData.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    suggestionsApply && suggestionStatus.enabled ? suggestionStatus : null;
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
+      ? suggestionStatus
+      : null;
 
   return (
     <>
@@ -121,6 +144,8 @@ export default function PageEvidenceRoute() {
         </Card>
       )}
 
+      {suggestionsBlocked && <SuggestionsBlockedNote status={suggestionsBlocked} />}
+
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
           {findings.length === 0 ? "Accessibility checks" : "Occurrences"}
@@ -134,7 +159,13 @@ export default function PageEvidenceRoute() {
         ) : groups === null ? (
           <div className="space-y-3">
             {findings.map((finding) => (
-              <FindingCard key={finding.id} finding={finding} pageUrl={data.page.url_normalized} />
+              <FindingCard
+                key={finding.id}
+                finding={finding}
+                pageUrl={data.page.url_normalized}
+                scanId={scan}
+                suggestions={suggestions}
+              />
             ))}
           </div>
         ) : (
@@ -153,6 +184,8 @@ export default function PageEvidenceRoute() {
                       key={finding.id}
                       finding={finding}
                       pageUrl={data.page.url_normalized}
+                      scanId={scan}
+                      suggestions={suggestions}
                     />
                   ))}
                 </div>
@@ -207,6 +240,15 @@ export default function PageEvidenceRoute() {
                     {image.vlm_rationale}
                   </p>
                 )}
+                {/* Only an image the scan flagged has an issue to fix. */}
+                {suggestions && image.issue_key && (
+                  <FixSuggestion
+                    scanId={scan}
+                    kind="image"
+                    occurrenceId={image.occurrence_id}
+                    availability={suggestions}
+                  />
+                )}
               </Card>
             ))}
           </div>
@@ -241,9 +283,14 @@ export default function PageEvidenceRoute() {
 function FindingCard({
   finding,
   pageUrl,
+  scanId,
+  suggestions,
 }: {
   finding: PageEvidenceFinding;
   pageUrl: string;
+  scanId: number;
+  /** Null when AI fix suggestions are off or cannot be used for this report. */
+  suggestions: SuggestionAvailability | null;
 }) {
   const location = findingLocation(pageUrl, finding.target_selector, finding.target_display);
   const cantTell = finding.engine_outcome === "cant_tell";
@@ -327,6 +374,37 @@ function FindingCard({
             : "Axcess did not take a screenshot of this occurrence."}
         </p>
       )}
+
+      {/* Last in the card: the suggestion is built from the evidence above,
+          so it reads after it (SC 1.3.2 Meaningful Sequence, Level A). */}
+      {suggestions && (
+        <FixSuggestion
+          scanId={scanId}
+          kind="a11y"
+          occurrenceId={finding.id}
+          availability={suggestions}
+        />
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Said once for the page, not on every card: the setting is on but the
+ * model cannot run, so each card's button would only fail the same way.
+ * One note above the occurrences says why and who can fix it.
+ */
+function SuggestionsBlockedNote({ status }: { status: SuggestionAvailability }) {
+  const why =
+    status.reason === "database_update_needed"
+      ? "the Axcess database needs an update first (run make migrate)."
+      : status.reason === "model_missing"
+        ? `the AI model (${status.missing_models.join(", ") || status.text_model}) is not installed in Ollama.`
+        : "the local AI service (Ollama) is not running.";
+  return (
+    <Card className="mb-5 p-4 text-sm text-fg-muted">
+      AI fix suggestions are turned on, but cannot run because {why} Ask the person who set up
+      Axcess.
     </Card>
   );
 }

@@ -201,6 +201,10 @@ continues without those checks. The report's "What this scan actually checked"
 list shows whether the vision model and the wording check ran. The motion
 check has no row there, so note it separately when it was off.
 
+AI fix suggestions are off by default and also need Ollama. When they are
+on and Ollama is not reachable, the page details show one note saying so;
+everything else works. See [AI fix suggestions](./ai-suggestions.md).
+
 ---
 
 ## Keeping it running (autostart)

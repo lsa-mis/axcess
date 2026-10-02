@@ -44,6 +44,10 @@ import type {
   ScanSummary,
   SiteGroup,
   ScopePreview,
+  SuggestionAvailability,
+  SuggestionFeedback,
+  SuggestionOccurrenceKind,
+  SuggestionRecord,
   TrackingData,
 } from "./types";
 
@@ -248,6 +252,34 @@ export const api = {
     }),
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /** Whether AI fix suggestions are turned on and their local model is ready. */
+  getSuggestionStatus: () =>
+    request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
+  /** Queue an AI fix suggestion for one occurrence. Nothing leaves this computer. */
+  requestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ occurrence_kind: kind, occurrence_id: occurrenceId }),
+    }),
+  /** The newest suggestion for one occurrence, or null when there is none. */
+  getLatestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord | null>(
+      `/api/scans/${scanId}/occurrences/${kind}/${occurrenceId}/suggestion`,
+      { cache: "no-store" },
+    ),
+  cancelSuggestion: (scanId: number, suggestionId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/cancel`, {
+      method: "POST",
+    }),
+  setSuggestionFeedback: (
+    scanId: number,
+    suggestionId: number,
+    feedback: SuggestionFeedback | null,
+  ) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ feedback }),
+    }),
   /**
    * Rendered page + DOM for the Page/DOM inspector. Serves the rendered
    * document persisted at scan time when present; otherwise re-renders the

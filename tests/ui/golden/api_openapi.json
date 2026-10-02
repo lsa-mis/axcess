@@ -933,6 +933,188 @@
         }
       }
     },
+    "/api/suggestions/status": {
+      "get": {
+        "summary": "Api Suggestion Status",
+        "description": "Whether AI fix suggestions can be used now, and why not if not.",
+        "operationId": "api_suggestion_status_api_suggestions_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/SuggestionAvailability"}}
+            }
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions": {
+      "post": {
+        "summary": "Api Create Suggestion",
+        "description": "Queue an AI fix suggestion for one occurrence in this report.",
+        "operationId": "api_create_suggestion_api_scans__scan_id__suggestions_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionCreate"}}}
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}": {
+      "get": {
+        "summary": "Api Get Suggestion",
+        "operationId": "api_get_suggestion_api_scans__scan_id__suggestions__suggestion_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/occurrences/{occurrence_kind}/{occurrence_id}/suggestion": {
+      "get": {
+        "summary": "Api Latest Suggestion",
+        "description": "The newest suggestion for one occurrence, or null if none yet.",
+        "operationId": "api_latest_suggestion_api_scans__scan_id__occurrences__occurrence_kind___occurrence_id__suggestion_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "occurrence_kind",
+            "in": "path",
+            "required": true,
+            "schema": {"enum": ["a11y", "image"], "type": "string", "title": "Occurrence Kind"}
+          },
+          {
+            "name": "occurrence_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Occurrence Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [{"$ref": "#/components/schemas/SuggestionRecord"}, {"type": "null"}],
+                  "title": "Response Api Latest Suggestion Api Scans  Scan Id  Occurrences  Occurrence Kind   Occurrence Id  Suggestion Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Suggestion",
+        "operationId": "api_cancel_suggestion_api_scans__scan_id__suggestions__suggestion_id__cancel_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}/feedback": {
+      "post": {
+        "summary": "Api Suggestion Feedback",
+        "operationId": "api_suggestion_feedback_api_scans__scan_id__suggestions__suggestion_id__feedback_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedbackUpdate"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}/inspect": {
       "get": {
         "summary": "Api Page Inspect",
@@ -1794,6 +1976,35 @@
         "title": "DataClassification",
         "description": "Minimal data labels for protected scan approval records."
       },
+      "DeveloperView": {
+        "properties": {
+          "explanation": {"type": "string", "maxLength": 800, "minLength": 1, "title": "Explanation"},
+          "after_html": {
+            "anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}],
+            "title": "After Html"
+          },
+          "css": {"anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}], "title": "Css"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["explanation"],
+        "title": "DeveloperView"
+      },
+      "EditorView": {
+        "properties": {
+          "steps": {"items": {"type": "string"}, "type": "array", "maxItems": 6, "title": "Steps"},
+          "paste_text": {
+            "items": {"$ref": "#/components/schemas/PasteText"},
+            "type": "array",
+            "maxItems": 4,
+            "title": "Paste Text"
+          },
+          "needs_developer": {"type": "boolean", "title": "Needs Developer", "default": false}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EditorView"
+      },
       "EvaluationUpdate": {
         "properties": {
           "target_standard": {
@@ -1868,6 +2079,18 @@
         "required": ["scan_id", "draft", "evaluation_status", "formats"],
         "title": "ExportOptions",
         "description": "The Export panel's facts for one report."
+      },
+      "FeedbackUpdate": {
+        "properties": {
+          "feedback": {
+            "anyOf": [{"type": "string", "enum": ["helpful", "not_helpful"]}, {"type": "null"}],
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["feedback"],
+        "title": "FeedbackUpdate"
       },
       "GroupTotals": {
         "properties": {
@@ -1986,6 +2209,17 @@
         "type": "object",
         "required": ["state", "checked", "total"],
         "title": "MethodCoverage"
+      },
+      "PasteText": {
+        "properties": {
+          "label": {"type": "string", "maxLength": 60, "minLength": 1, "title": "Label"},
+          "value": {"type": "string", "maxLength": 800, "minLength": 1, "title": "Value"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["label", "value"],
+        "title": "PasteText",
+        "description": "Text an editor can paste into a CMS field, with the field's name."
       },
       "ProtectedEnvironment": {
         "type": "string",
@@ -2272,6 +2506,129 @@
         "type": "object",
         "required": ["occurrences", "issue_occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
         "title": "Snapshot"
+      },
+      "SuggestionAvailability": {
+        "properties": {
+          "enabled": {"type": "boolean", "title": "Enabled"},
+          "reason": {
+            "type": "string",
+            "enum": ["ready", "turned_off", "database_update_needed", "model_unavailable", "model_missing"],
+            "title": "Reason"
+          },
+          "text_model": {"type": "string", "title": "Text Model"},
+          "vision_model": {"type": "string", "title": "Vision Model"},
+          "missing_models": {"items": {"type": "string"}, "type": "array", "title": "Missing Models"},
+          "queue_length": {"type": "integer", "title": "Queue Length", "default": 0},
+          "scan_running": {"type": "boolean", "title": "Scan Running", "default": false}
+        },
+        "type": "object",
+        "required": ["enabled", "reason", "text_model", "vision_model"],
+        "title": "SuggestionAvailability",
+        "description": "Whether the feature can be used, and why not."
+      },
+      "SuggestionCreate": {
+        "properties": {
+          "occurrence_kind": {"type": "string", "enum": ["a11y", "image"], "title": "Occurrence Kind"},
+          "occurrence_id": {"type": "integer", "minimum": 1.0, "title": "Occurrence Id"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["occurrence_kind", "occurrence_id"],
+        "title": "SuggestionCreate"
+      },
+      "SuggestionRecord": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "occurrence_kind": {"type": "string", "enum": ["a11y", "image"], "title": "Occurrence Kind"},
+          "occurrence_id": {"type": "integer", "title": "Occurrence Id"},
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "ready", "failed", "cancelled"],
+            "title": "Status"
+          },
+          "audience_default": {"type": "string", "enum": ["developer", "editor"], "title": "Audience Default"},
+          "text_model": {"type": "string", "title": "Text Model"},
+          "vision_model": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Vision Model"},
+          "result": {"anyOf": [{"$ref": "#/components/schemas/SuggestionResult"}, {"type": "null"}]},
+          "check_outcome": {
+            "anyOf": [{"type": "string", "enum": ["passed", "still_fails", "not_checked"]}, {"type": "null"}],
+            "title": "Check Outcome"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_unavailable",
+                  "model_missing",
+                  "timeout",
+                  "bad_answer",
+                  "restarted",
+                  "occurrence_gone",
+                  "internal"
+                ]
+              },
+              {"type": "null"}
+            ],
+            "title": "Error Code"
+          },
+          "error_detail": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error Detail"},
+          "feedback": {
+            "anyOf": [{"type": "string", "enum": ["helpful", "not_helpful"]}, {"type": "null"}],
+            "title": "Feedback"
+          },
+          "created_at": {"type": "string", "title": "Created At"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"},
+          "queue_position": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Queue Position"}
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scan_id",
+          "page_id",
+          "occurrence_kind",
+          "occurrence_id",
+          "status",
+          "audience_default",
+          "text_model",
+          "vision_model",
+          "result",
+          "check_outcome",
+          "error_code",
+          "error_detail",
+          "feedback",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "SuggestionRecord",
+        "description": "One suggestion as the browser sees it."
+      },
+      "SuggestionResult": {
+        "properties": {
+          "summary": {"type": "string", "title": "Summary"},
+          "developer": {"$ref": "#/components/schemas/DeveloperView"},
+          "editor": {"$ref": "#/components/schemas/EditorView"},
+          "before_html": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Before Html"},
+          "confidence": {"type": "string", "enum": ["likely", "guess"], "title": "Confidence"},
+          "needs_manual_check": {"type": "boolean", "title": "Needs Manual Check"},
+          "manual_check_reason": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Manual Check Reason"},
+          "check_rule_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Check Rule Id"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "summary",
+          "developer",
+          "editor",
+          "before_html",
+          "confidence",
+          "needs_manual_check",
+          "manual_check_reason"
+        ],
+        "title": "SuggestionResult",
+        "description": "What Axcess stores: the model's answer plus facts Axcess adds itself.\n\n``before_html`` comes from the stored evidence, never from the model, so\nthe \"before\" side of the comparison is always what the scan saw.\n``confidence`` is set by Axcess from the kind of check, not by the model."
       },
       "ValidationError": {
         "properties": {
