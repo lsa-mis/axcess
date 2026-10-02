@@ -148,7 +148,9 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
         f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-input-field-name",
         wait_until="networkidle",
     )
-    box = page.get_by_role("group", name="The flagged element you are on", exact=True)
+    # Not inside the facts box: that waits for the saved copy to load, and
+    # the suggestion must not wait for, or vanish with, the frame.
+    box = page.locator("#inspect-panel-page")
     button = box.get_by_role("button", name="Suggest a fix (AI)")
     await button.wait_for()
     await button.focus()

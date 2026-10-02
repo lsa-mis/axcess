@@ -1084,18 +1084,26 @@ export default function InspectorRoute() {
                     )
                   )}
                 </dl>
-                {/* The AI suggestion sits in this box, under the facts about
-                    the element it is for, and follows Previous / Next: the
-                    reader sees the element, what it is, and a suggested fix
-                    together. Rejected: a list of suggestions under the page,
-                    which put the fix a long scroll away from the element and
-                    left the reader to match them up (W3C COGA "Making Content
-                    Usable", paraphrased: keep related content together;
-                    https://www.w3.org/TR/coga-usable/). Keyed on the
-                    occurrence so stepping never shows the last element's
-                    suggestion. Heading level 2: this box sits straight under
-                    the page's h1 (SC 1.3.1 Info and Relationships, Level A). */}
-                {suggestions && currentOccurrence && (
+              </div>
+            )}
+            {/* The AI suggestion sits right under the facts about the element
+                it is for, and follows Previous / Next: the reader sees the
+                element, what it is, and a suggested fix together. Rejected: a
+                list of suggestions under the page, which put the fix a long
+                scroll away from the element and left the reader to match them
+                up (W3C COGA "Making Content Usable", paraphrased: keep related
+                content together; https://www.w3.org/TR/coga-usable/). Also
+                rejected: a third tab beside "Saved copy", which would hide the
+                outlined element while the fix is read. Its own row, not inside
+                the facts box: the facts wait for the saved copy to load (its
+                styles come from the live site), and the suggestion needs only
+                the occurrence, so it must not wait for, or vanish with, the
+                frame. Keyed on the occurrence so stepping never shows the last
+                element's suggestion. Heading level 2: this sits straight under
+                the page's h1 (SC 1.3.1 Info and Relationships, Level A). */}
+            {showHighlights && highlightedCount > 0 && currentOccurrence && (suggestions || suggestionsBlocked) && (
+              <div className="border-b border-border bg-surface px-3 pb-3">
+                {suggestions && (
                   <FixSuggestion
                     key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
                     scanId={scan}
@@ -1105,7 +1113,7 @@ export default function InspectorRoute() {
                     headingLevel={2}
                   />
                 )}
-                {suggestionsBlocked && currentOccurrence && (
+                {suggestionsBlocked && (
                   <SuggestionsBlockedNote status={suggestionsBlocked} className="mt-3" />
                 )}
               </div>
