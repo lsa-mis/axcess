@@ -233,6 +233,17 @@ section.band .btn-maize { color: var(--navy); }
 
 /* ---------- Product shot ---------- */
 .shot { display: block; width: 100%; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+/* A screenshot beside a step (Get started, Steps 2 and 3): its own size
+   at most, so a small crop such as one button is not blown up and blurred,
+   and never wider than the step. Why screenshots: see "Screenshots of
+   Axcess itself" in build.py. */
+.step-shot { display: block; width: auto; max-width: 100%; height: auto; margin-top: .9rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+/* On a phone, a screenshot also uses the space under the step number:
+   the number column is a sixth of a 320 px screen, and every pixel makes
+   the picture's words easier to read. The text keeps its indent. */
+@media (max-width: 600px) {
+  .step-shot { margin-left: -3.2rem; max-width: calc(100% + 3.2rem); }
+}
 .shot-frame { padding: .6rem; background: linear-gradient(160deg, var(--soft-2), #fff); border-radius: 20px; border: 1px solid var(--line); }
 .caption { color: var(--muted); font-size: .9rem; margin-top: .8rem; }
 

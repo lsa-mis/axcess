@@ -1442,7 +1442,7 @@ def privacy() -> str:
     <ul class="checks">
       <li>The sign-in window is a normal Chromium window with a fresh temporary profile.</li>
       <li>You type your password, passkey, or one-time code into the website, never into Axcess.</li>
-      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don&rsquo;t store rendered pages</em>.</li>
+      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>.</li>
     </ul>
     <p style="margin-top:1rem"><a href="../get-started/#sign-in">Step by step: scan a site behind a sign-in.</a></p>
     <div style="margin-top:1.5rem">{callout("<strong>You stay in control of sign-in.</strong> Axcess only continues after you sign in yourself, so use accounts and sites you have permission to test.", "callout-maize", "lock")}</div>
@@ -1722,6 +1722,47 @@ def win_finish() -> str:
     )
 
 
+# Screenshots of Axcess itself, beside the steps for a first scan.
+#
+# What: Steps 2 and 3 of Get started show the real Axcess screen for a step,
+# cropped to the part the step talks about. The step text still says
+# everything; the picture shows where it is.
+#
+# Why screenshots here, when the install steps use drawings: Axcess is our
+# own app, so a screenshot is exactly what people will see, and it costs
+# little to retake when the screen changes. Drawings were chosen for the
+# macOS and Windows screens because we cannot control those, and they
+# change with each system update. Rejected: drawings here too. They would
+# take more work, and they would still look less like the real screen.
+# A screenshot does not reflow at 320 px (it shrinks), so it must never
+# carry anything the step text leaves out. That keeps images of text to
+# the SC 1.4.5 Images of Text (Level AA) exception for pictures whose
+# words are also in the text, which is a paraphrase.
+#
+# Each picture's alt text says what it shows and where the thing to choose
+# is, for people who cannot see it (SC 1.1.1 Non-text Content, Level A).
+# width and height reserve its space before it loads, so the steps do not
+# jump. Left out on purpose: the site's own sign-in page. Every
+# organization's looks different, so a screenshot of one would send people
+# looking for a screen they will never see.
+#
+# Retake a screenshot when its screen's words change: the words in the
+# steps come from src/audit/web/frontend/src/components/newScan/copy.ts and
+# LocalLoginScan.tsx.
+def _png_size(path: Path) -> tuple[int, int]:
+    with path.open("rb") as f:
+        header = f.read(24)
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+
+
+def step_shot(name: str, alt: str) -> str:
+    width, height = _png_size(SITE / "assets" / "screens" / f"{name}.png")
+    return (
+        f'<img class="step-shot" src="../assets/screens/{name}.png" width="{width}" height="{height}" '
+        f'loading="lazy" alt="{alt}">'
+    )
+
+
 def get_started() -> str:
     return f"""
 <section class="hero hero-compact">
@@ -1825,11 +1866,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
-        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
-      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
+      <li><h3>Select "New scan"</h3><p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
+        {step_shot("new-scan-button", "The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them.")}</li>
+      <li><h3>Enter the address of one section</h3><p>In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>, turned off.</p>
+        {step_shot("new-scan-public", "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey.")}</li>
+      <li><h3>Set "Maximum pages" to about 25</h3><p>Open <em>Limits and rule check tool</em> to find it. The other settings are fine as they are, and the browser-based checks need no AI. The <em>What this scan will do</em> panel lists exactly which checks will run.</p>
+        {step_shot("maximum-pages", "The Limits and rule check tool group, open. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.")}
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under <em>Speed and browser window</em>.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are found and tested, and you can select <em>Stop scan</em> at any time.</p>
+        {step_shot("start-scan", "The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes.")}</li>
     </ol>
   </div>
 </section>
@@ -1842,14 +1887,17 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
     <ol class="steps">
-      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
-      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
-      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>Choose the sign-in tab</h3><p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
+        {step_shot("sign-in-tab", "The top of the New scan page. The second tab, Site with a sign-in or two-step sign-in (2FA), is chosen, beside the Public website tab.")}</li>
+      <li><h3>Enter where to start, and confirm you may scan</h3><p>In <em>Website address to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from. Axcess shows which pages it will scan. Then check the box that says the site owner allows this scan and that you will sign in with a test account that has only the access it needs.</p>
+        {step_shot("sign-in-address", "The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs.")}</li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens at the site&rsquo;s own sign-in page, which looks different for every organization. Sign in there as you usually do, including any two-step sign-in. If sign-in opens a new tab, finish in that tab.  </p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, check that the browser window shows the site you signed in to, not its sign-in screen. Then select <em>I&rsquo;m signed in, start scan</em>. The scan starts from the page in the newest tab that is still open. If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
+        {step_shot("signed-in-start", "The Finished signing in? box. It lists what happens when you start, and the button I&rsquo;m signed in, start scan is at its bottom left.")}</li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
-      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>. No password or reusable login is saved.</p></article>
       <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
@@ -1881,7 +1929,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="grid grid-3">
       <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
       <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
-      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. On the New scan page, the <em>Checks</em> group lets you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>

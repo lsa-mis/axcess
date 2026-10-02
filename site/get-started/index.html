@@ -209,11 +209,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
-        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
-      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
+      <li><h3>Select "New scan"</h3><p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
+        <img class="step-shot" src="../assets/screens/new-scan-button.png" width="386" height="302" loading="lazy" alt="The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them."></li>
+      <li><h3>Enter the address of one section</h3><p>In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>, turned off.</p>
+        <img class="step-shot" src="../assets/screens/new-scan-public.png" width="1007" height="452" loading="lazy" alt="The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey."></li>
+      <li><h3>Set "Maximum pages" to about 25</h3><p>Open <em>Limits and rule check tool</em> to find it. The other settings are fine as they are, and the browser-based checks need no AI. The <em>What this scan will do</em> panel lists exactly which checks will run.</p>
+        <img class="step-shot" src="../assets/screens/maximum-pages.png" width="995" height="420" loading="lazy" alt="The Limits and rule check tool group, open. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.">
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under <em>Speed and browser window</em>.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are found and tested, and you can select <em>Stop scan</em> at any time.</p>
+        <img class="step-shot" src="../assets/screens/start-scan.png" width="454" height="180" loading="lazy" alt="The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes."></li>
     </ol>
   </div>
 </section>
@@ -226,14 +230,17 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
     <ol class="steps">
-      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
-      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
-      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>Choose the sign-in tab</h3><p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
+        <img class="step-shot" src="../assets/screens/sign-in-tab.png" width="630" height="170" loading="lazy" alt="The top of the New scan page. The second tab, Site with a sign-in or two-step sign-in (2FA), is chosen, beside the Public website tab."></li>
+      <li><h3>Enter where to start, and confirm you may scan</h3><p>In <em>Website address to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from. Axcess shows which pages it will scan. Then check the box that says the site owner allows this scan and that you will sign in with a test account that has only the access it needs.</p>
+        <img class="step-shot" src="../assets/screens/sign-in-address.png" width="997" height="456" loading="lazy" alt="The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs."></li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens at the site&rsquo;s own sign-in page, which looks different for every organization. Sign in there as you usually do, including any two-step sign-in. If sign-in opens a new tab, finish in that tab.  </p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, check that the browser window shows the site you signed in to, not its sign-in screen. Then select <em>I&rsquo;m signed in, start scan</em>. The scan starts from the page in the newest tab that is still open. If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
+        <img class="step-shot" src="../assets/screens/signed-in-start.png" width="970" height="418" loading="lazy" alt="The Finished signing in? box. It lists what happens when you start, and the button I&rsquo;m signed in, start scan is at its bottom left."></li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
-      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>. No password or reusable login is saved.</p></article>
       <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
@@ -265,7 +272,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="grid grid-3">
       <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
       <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
-      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. On the New scan page, the <em>Checks</em> group lets you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>

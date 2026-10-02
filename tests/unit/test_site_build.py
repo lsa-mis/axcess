@@ -118,3 +118,43 @@ def test_install_drawings_are_named_pictures(pages: dict[str, str]) -> None:
     assert len(drawings) == page.count('class="mock"') == 8
     assert all(d.startswith(("Drawing of", "Two drawings of")) for d in drawings)
     assert "The drawings are simplified, so your screen may look a little different." in page
+
+
+def test_step_screenshots_have_alt_text_and_size(pages: dict[str, str]) -> None:
+    page = pages["get-started"]
+    shots = re.findall(
+        r'<img class="step-shot" src="\.\./assets/screens/([\w-]+)\.png" '
+        r'width="(\d+)" height="(\d+)" loading="lazy" alt="([^"]+)">',
+        page,
+    )
+    assert len(shots) == page.count('class="step-shot"') == 7
+    for name, width, height, alt in shots:
+        assert (ROOT / "site" / "assets" / "screens" / f"{name}.png").is_file(), name
+        assert int(width) > 0 and int(height) > 0, name
+        assert len(alt) > 40, name
+
+
+def test_first_scan_steps_use_the_app_words(pages: dict[str, str]) -> None:
+    """Steps 2 and 3 name what the New scan screen shows (newScan/copy.ts)."""
+    page = pages["get-started"]
+    for words in (
+        "Website address",
+        "Scan the whole website",
+        "Pages to scan",
+        "Limits and rule check tool",
+        "Maximum pages",
+        "Speed and browser window",
+        "What this scan will do",
+        "Site with a sign-in or two-step sign-in (2FA)",
+        "Website address to scan after you sign in",
+        "Open browser to sign in",
+    ):
+        assert words in page, words
+    for old in (
+        "Create New Scan",
+        "Advanced settings",
+        "Max pages",
+        "Site URL",
+        "Crawl the entire host",
+    ):
+        assert old not in page, old
