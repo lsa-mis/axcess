@@ -510,6 +510,8 @@ td b { color: var(--navy); }
 /* The selected row is as wide as the list, so its number sits inside
    the row's end, not past the drawing's edge. */
 .mock-selected::after { right: .3em; }
+/* A setting whose name the drawing leaves out: a grey bar, one line tall. */
+.mock-hidden { display: inline-block; vertical-align: middle; width: 6em; height: .6em; border-radius: 4px; background: #d5dae1; }
 .mock-main { padding: .7rem .8rem; min-width: 0; }
 .mock-group { border: 1px solid #d5dae1; border-radius: 8px; background: #f7f8fa; padding: .55rem .65rem; }
 .mock-faint { display: grid; gap: .45rem; }

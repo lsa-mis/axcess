@@ -1597,17 +1597,21 @@ def mac_not_opened() -> str:
 
 
 def mac_privacy_and_security() -> str:
-    sidebar = "".join(
-        f"<li>{name}</li>" for name in ("General", "Appearance", "Accessibility", "Control Center")
-    )
+    # Only the names people need to find Privacy & Security are written
+    # out; the other settings are grey bars. More names were more to read
+    # for no gain, and they change between macOS versions (W3C COGA,
+    # "Making Content Usable": keep only what helps the task,
+    # https://www.w3.org/TR/coga-usable/, a paraphrase).
+    hidden = '<li><i class="mock-hidden"></i></li>'
+    sidebar = "".join(f"<li>{name}</li>" for name in ("General", "Appearance", "Accessibility")) + hidden
     return drawing(
-        "Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4. "
+        "Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4, below General, Appearance and Accessibility. "
         "On the right, below other settings, is the Security heading. Under it, the message “Axcess” was "
         "blocked to protect your Mac has an Open Anyway button on its right, marked 5.",
         f"""<div class="mock-win mock-settings">
           <div class="mock-side">
             {_MAC_DOTS}
-            <ul>{sidebar}<li>{mark(4, "Privacy &amp; Security", "mock-selected")}</li><li>Desktop &amp; Dock</li><li>Displays</li></ul>
+            <ul>{sidebar}<li>{mark(4, "Privacy &amp; Security", "mock-selected")}</li>{hidden}{hidden}</ul>
           </div>
           <div class="mock-main">
             <p class="mock-title">Privacy &amp; Security</p>
