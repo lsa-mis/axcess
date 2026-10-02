@@ -476,8 +476,12 @@ td b { color: var(--navy); }
 /* macOS: the disk image window */
 .mock-drag { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 1rem 1.4rem; padding: 1.4rem 1rem 1.1rem; }
 .mock-icon { display: inline-grid; justify-items: center; gap: .3rem; padding: .3rem .4rem; }
-.mock-app { display: grid; place-items: center; width: 3.2em; height: 3.2em; border-radius: 22%; background: var(--navy); color: #fff; }
-.mock-app svg { width: 62%; height: 62%; }
+/* The real app icon (desktop/assets/axcess.svg): the navy mark on a light
+   tile, so people look for the icon they will actually see. The tile is
+   close to white, so a thin border and a shadow, as a Mac gives app
+   icons, keep its shape visible on a white window. */
+.mock-app { display: grid; place-items: center; width: 3.2em; height: 3.2em; border-radius: 22%; background: #f2f5f9; color: var(--navy); border: 1px solid #aab3bf; box-shadow: 0 1px 3px rgba(0, 39, 76, .18); }
+.mock-app svg { width: 60%; height: 60%; }
 .mock-folder { position: relative; width: 3.4em; height: 2.6em; margin-top: .6em; border-radius: 4px; background: #5aa9e6; }
 .mock-folder::before { content: ""; position: absolute; left: 0; top: -.45em; width: 45%; height: .6em; border-radius: 4px 4px 0 0; background: #5aa9e6; }
 .mock-arrow { width: 3em; color: var(--navy); }
