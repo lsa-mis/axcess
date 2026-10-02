@@ -1571,14 +1571,14 @@ def mark(step: int, inner: str, css: str = "") -> str:
 
 def mac_drag_to_applications() -> str:
     return drawing(
-        "Drawing of the window that opens with the downloaded file. It shows the Axcess app on the left and "
-        "the Applications folder on the right, with an arrow from Axcess to Applications. Axcess is marked 2.",
+        "Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and "
+        "the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2.",
         f"""<div class="mock-win">
           <div class="mock-bar">{_MAC_DOTS}<span class="mock-bar-title">Axcess</span></div>
           <div class="mock-drag">
-            {mark(2, f'{_APP_TILE}<span>Axcess</span>', "mock-icon")}
-            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M2 8h40m-8-6 8 6-8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {mark(2, f'{_APP_TILE}<span>Axcess</span>', "mock-icon")}
           </div>
         </div>""",
     )
@@ -1927,7 +1927,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <li><h3>Enter where to start, and confirm you may scan</h3><p>In <em>Website address to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from. Axcess shows which pages it will scan. Then check the box that says the site owner allows this scan and that you will sign in with a test account that has only the access it needs.</p>
         {step_shot("sign-in-address", "The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs.")}</li>
       <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens at the site&rsquo;s own sign-in page, which looks different for every organization. Sign in there as you usually do, including any two-step sign-in. If sign-in opens a new tab, finish in that tab.  </p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, check that the browser window shows the site you signed in to, not its sign-in screen. Then select <em>I&rsquo;m signed in, start scan</em>. The scan starts from the page in the newest tab that is still open. If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
+      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, check that the browser window shows the site you signed in to, not its sign-in screen. Then select <em>I&rsquo;m signed in, start scan</em>.   If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
         {step_shot("signed-in-start", "The Finished signing in? box. It lists what happens when you start, and the button I&rsquo;m signed in, start scan is at its bottom left.")}</li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
