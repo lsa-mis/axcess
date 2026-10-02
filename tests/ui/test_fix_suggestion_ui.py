@@ -90,8 +90,20 @@ async def test_suggestion_works_by_keyboard_and_passes_axe(
         arg=await status.element_handle(),
         timeout=15000,
     )
-    await card.get_by_text("Add a label so screen readers announce the field.").wait_for()
+    # Brief by default: the code, not the model's explanation or summary.
+    await card.get_by_text('<input id="q" aria-label="Search">').wait_for()
+    assert await card.get_by_text("Add a label so screen readers announce the field.").count() == 0
+    assert await card.get_by_text("Give the search box a name.").count() == 0
+    assert await card.get_by_text("After", exact=True).is_visible()
+    # "Ready" is announced, not shown.
+    assert (await status.bounding_box() or {"width": 0})["width"] <= 1
     await card.get_by_text("The rule check passed on the suggested code").wait_for()
+    # Model, time and the export note are kept, one press away.
+    about = card.locator("details", has_text="About this suggestion")
+    assert await about.get_attribute("open") is None
+    await about.locator("summary").focus()
+    await page.keyboard.press("Enter")
+    await card.get_by_text("Not included in exports.").wait_for()
     await card.get_by_text("It does not show that the page meets WCAG").wait_for()
 
     editor = card.get_by_role("button", name="For content editors")
@@ -159,9 +171,7 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
     heading = box.get_by_role("heading", name="AI suggestion", level=2)
     await heading.wait_for()
     assert await heading.evaluate("el => el === document.activeElement")
-    await box.get_by_text("Add a label so screen readers announce the field.").wait_for(
-        timeout=15000
-    )
+    await box.get_by_text('<input id="q" aria-label="Search">').wait_for(timeout=15000)
 
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

@@ -14,20 +14,23 @@ On a page's details, each occurrence has a **Suggest a fix (AI)** button.
 Images get one too, when the scan found a problem with the image. Press it,
 and the suggestion waits in a queue, then appears in the same card.
 
-The Page inspector has the same button. It is in the box that describes the
-flagged element you are on, under the saved copy's toolbar. Move to another
-element with Previous or Next, and the box shows that element's suggestion.
+The Page inspector has the same button. It is in its own row under the
+saved copy's toolbar, below the facts about the flagged element you are on.
+Move to another element with Previous or Next, and the row shows that
+element's suggestion.
 
-Each suggestion has:
+Each suggestion sits in its own tinted box with a thick left border, so it
+is never mistaken for what the scan found. It is brief on purpose:
 
 | Part | What it is |
 | --- | --- |
-| Summary | One or two sentences on the fix. |
-| For developers | Why it is a problem, the element code (HTML) the scan found, the suggested element code, and any CSS. |
-| For content editors | Steps to follow in your content system, and text to paste, such as alt text. |
-| Rule check result | For some rule check (axe) issues, Axcess runs that one rule on the suggested code. A pass means only that one rule passed. It does not show that the page meets WCAG. |
-| Check by hand | Shown when the issue came from a check that needs a person's judgement, or when the model says so. |
+| For developers | **Before**: the element code (HTML) the scan found. **After**: the suggested element code, and any CSS. When there is no code, a short explanation instead. |
+| For content editors | Short steps to follow in your content system, and text to paste, such as alt text. Text already in a step is not repeated. |
+| Rule check result | Shown only when it ran. For some rule check (axe) issues, Axcess runs that one rule on the suggested code. A pass means only that one rule passed. It does not show that the page meets WCAG. |
+| About this suggestion | Closed by default. What to check by hand, whether a rule check could run, which model wrote it and when, and that it is not included in exports. |
 | Helpful / Not helpful | Your answer is saved with the suggestion, to help judge the model. |
+
+The warning "It can be wrong. Check it before you use it." is always shown.
 
 The view that opens first follows the issue's "Who fixes it": content editors
 for text and images, developers for code.

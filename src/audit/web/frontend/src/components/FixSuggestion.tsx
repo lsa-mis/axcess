@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleCheck, CircleHelp, CircleX, Copy, Sparkles } from "lucide-react";
+import { Check, ChevronRight, CircleCheck, CircleHelp, CircleX, Copy, Sparkles } from "lucide-react";
 import { ApiError, api } from "../api/client";
 import type {
   SuggestionAudience,
@@ -57,6 +57,25 @@ import { Button, Card, relativeTime } from "./ui";
  * scroll sideways, so the panel reflows at 320 px (SC 1.4.10 Reflow,
  * Level AA). Code is shown as text; nothing the model wrote is rendered as
  * HTML.
+ *
+ * **Brief by default.** A reader came for the fix, so the panel shows the
+ * fix and little else: the code before and after for developers, the steps
+ * for content editors. The model's summary and explanation repeat what the
+ * issue already says, so they are not shown (the developer view falls back
+ * to the explanation only when there is no code to show). "Ready" is
+ * still announced to screen readers but not shown, since the answer itself
+ * shows that it is ready. Facts that must not be lost but are not needed
+ * to act (what to check by hand, which model wrote it and when, that it is
+ * not exported, and when no rule check could run) sit in a closed "About
+ * this suggestion" section, one press away (the repo rule "never drop a
+ * limitation, privacy, or safety fact to make text shorter"). The warning
+ * "It can be wrong" stays in view, and so does a rule-check result that
+ * passed or failed, because those change what the reader should do.
+ *
+ * **Its own area.** The panel sits in a tinted box with a thick left
+ * border, so AI-written content is never mistaken for what the scan found.
+ * The heading, icon and border say it as well as the tint, so colour is not
+ * the only cue (SC 1.4.1 Use of Color, Level A).
  *
  * **Check result.** Each outcome has its own icon *and* sentence, never
  * colour alone (SC 1.4.1 Use of Color, Level A). A pass is described as one
@@ -155,7 +174,10 @@ export default function FixSuggestion({
   const waiting = record.status === "queued" || record.status === "running";
 
   return (
-    <section aria-labelledby={headingId} className="mt-4 border-t border-border pt-3">
+    <section
+      aria-labelledby={headingId}
+      className="mt-4 rounded-xs border border-l-4 border-border border-l-umich-blue bg-umich-blue/5 p-3"
+    >
       <Heading
         id={headingId}
         ref={headingRef}
@@ -169,7 +191,15 @@ export default function FixSuggestion({
         Written by AI on this computer. It can be wrong. Check it before you use it.
       </p>
 
-      <p role="status" aria-live="polite" aria-atomic="true" className="mt-2 text-sm text-fg">
+      {/* One live region for every status. Visible while waiting or after a
+          failure; read to screen readers only once ready, where the answer
+          below shows it. */}
+      <p
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={record.status === "ready" ? "sr-only" : "mt-2 text-sm text-fg"}
+      >
         {statusSentence(record, availability)}
       </p>
 
@@ -244,7 +274,6 @@ function ReadySuggestion({
   onAskAgain: () => void;
   asking: boolean;
 }) {
-  const result = record.result!;
   const [audience, setAudience] = useState<SuggestionAudience>(record.audience_default);
   const feedback = useMutation({
     mutationFn: (value: SuggestionRecord["feedback"]) =>
@@ -262,18 +291,6 @@ function ReadySuggestion({
 
   return (
     <div className="mt-2 space-y-3">
-      <p className="text-sm leading-relaxed text-fg">{result.summary}</p>
-
-      {(result.needs_manual_check || result.confidence === "guess") && (
-        <p className="text-sm text-fg-muted">
-          <span className="font-semibold text-fg">Check by hand: </span>
-          {result.manual_check_reason ??
-            (result.confidence === "guess"
-              ? "The check that found this needs a person's judgement, so treat this as a starting point."
-              : "A person should confirm the fix works on the real page.")}
-        </p>
-      )}
-
       <Tabs
         mode="filter"
         label="Who the suggestion is for"
@@ -291,12 +308,7 @@ function ReadySuggestion({
         )}
       </div>
 
-      <p className="text-xs text-fg-muted">
-        Written by {record.text_model}
-        {record.vision_model ? ` with ${record.vision_model} reading the picture` : ""}
-        {record.finished_at ? `, ${relativeTime(record.finished_at)}` : ""}. Not included in
-        exports.
-      </p>
+      <AboutSuggestion record={record} />
 
       <div className="flex flex-wrap items-center gap-2">
         <div role="group" aria-label="Was this suggestion helpful?" className="flex flex-wrap gap-2">
@@ -339,18 +351,21 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
   const { developer, before_html } = record.result!;
   return (
     <div className="space-y-3">
-      <p className="text-sm leading-relaxed text-fg">{developer.explanation}</p>
+      {/* The explanation only when there is no code: then it is the fix. */}
+      {!developer.after_html && !developer.css && (
+        <p className="text-sm leading-relaxed text-fg">{developer.explanation}</p>
+      )}
       {(before_html || developer.after_html) && (
         <div className="grid gap-3 lg:grid-cols-2">
           {before_html && (
             <div className="min-w-0">
-              <p className="text-2xs font-semibold text-fg-subtle">Before: the element code (HTML) the scan found</p>
+              <p className="text-2xs font-semibold text-fg-subtle">Before</p>
               <pre className={CODE_BOX}>{before_html}</pre>
             </div>
           )}
           {developer.after_html && (
             <div className="min-w-0">
-              <p className="text-2xs font-semibold text-fg-subtle">After: suggested element code (HTML)</p>
+              <p className="text-2xs font-semibold text-fg-subtle">After</p>
               <pre className={CODE_BOX}>{developer.after_html}</pre>
               <CopyButton value={developer.after_html} name="suggested element code" />
             </div>
@@ -371,6 +386,10 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
 
 function EditorPanel({ record }: { record: SuggestionRecord }) {
   const { editor } = record.result!;
+  // Words already in a step are not repeated in a box of their own.
+  const pasteText = editor.paste_text.filter(
+    (item) => !editor.steps.some((step) => step.includes(item.value.trim())),
+  );
   return (
     <div className="space-y-3">
       {editor.steps.length > 0 && (
@@ -380,7 +399,7 @@ function EditorPanel({ record }: { record: SuggestionRecord }) {
           ))}
         </ol>
       )}
-      {editor.paste_text.map((item, index) => (
+      {pasteText.map((item, index) => (
         <div key={index} className="min-w-0">
           <p className="text-2xs font-semibold text-fg-subtle">{item.label}</p>
           <p className={CODE_BOX}>{item.value}</p>
@@ -392,7 +411,7 @@ function EditorPanel({ record }: { record: SuggestionRecord }) {
           A content editor cannot fully fix this alone. Ask a developer to use the developer view.
         </p>
       )}
-      {editor.steps.length === 0 && editor.paste_text.length === 0 && !editor.needs_developer && (
+      {editor.steps.length === 0 && pasteText.length === 0 && !editor.needs_developer && (
         <p className="text-sm text-fg-muted">The AI model wrote no steps for content editors.</p>
       )}
     </div>
@@ -401,6 +420,9 @@ function EditorPanel({ record }: { record: SuggestionRecord }) {
 
 function CheckOutcome({ record }: { record: SuggestionRecord }) {
   const outcome = record.check_outcome ?? "not_checked";
+  // "Not checked" changes nothing the reader does; it is said under
+  // "About this suggestion" instead.
+  if (outcome === "not_checked") return null;
   const Icon = outcome === "passed" ? CircleCheck : outcome === "still_fails" ? CircleX : CircleHelp;
   const tone =
     outcome === "passed" ? "text-ok" : outcome === "still_fails" ? "text-sev-critical" : "text-fg-muted";
@@ -411,8 +433,6 @@ function CheckOutcome({ record }: { record: SuggestionRecord }) {
         {SUGGESTION_CHECK_LABEL[outcome]}
         {outcome === "passed" &&
           ". This checks one rule on the suggested code only. It does not show that the page meets WCAG."}
-        {outcome === "not_checked" &&
-          ". Only some rule check (axe) issues can be checked this way."}
       </span>
     </p>
   );
@@ -479,5 +499,62 @@ export function SuggestionsBlockedNote({
       AI fix suggestions are turned on, but cannot run because {why} Ask the person who set up
       Axcess.
     </Card>
+  );
+}
+
+/**
+ * Facts a reader may want but does not need to act: closed by default.
+ *
+ * A native `<details>` rather than the shared `Disclosure`: `Disclosure`
+ * always renders a heading (level 2 or 3), and small print under a heading
+ * that is itself level 2 to 4 would add a heading to the outline for every
+ * suggestion. `<details>` gives the same open/close behaviour, keyboard
+ * support and expanded state without ARIA (W3C "Using ARIA", rule 1,
+ * paraphrased: use the native element when it does the job;
+ * https://www.w3.org/TR/using-aria/#rule1). The summary is 44 px tall
+ * (SC 2.5.5 Target Size (Enhanced), Level AAA, which this repo meets).
+ */
+function AboutSuggestion({ record }: { record: SuggestionRecord }) {
+  const result = record.result!;
+  const checkByHand =
+    result.needs_manual_check || result.confidence === "guess"
+      ? (result.manual_check_reason ??
+        (result.confidence === "guess"
+          ? "The check that found this needs a person's judgement, so treat this as a starting point."
+          : "A person should confirm the fix works on the real page."))
+      : null;
+  return (
+    <details className="group text-xs text-fg-muted">
+      {/* The same rotating caret as the shared Disclosure, so it reads as
+          the same control (SC 3.2.4 Consistent Identification, Level AA).
+          The flex layout hides the browser's own marker. */}
+      <summary className="flex min-h-target cursor-pointer list-none items-center gap-2 font-semibold text-fg [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-fg-subtle transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+          aria-hidden
+        />
+        About this suggestion
+      </summary>
+      <ul className="list-disc space-y-1 pl-5">
+        {checkByHand && (
+          <li>
+            <span className="font-semibold text-fg">Check by hand: </span>
+            {checkByHand}
+          </li>
+        )}
+        {(record.check_outcome ?? "not_checked") === "not_checked" && (
+          <li>
+            {SUGGESTION_CHECK_LABEL.not_checked}. Only some rule check (axe) issues can be checked
+            this way.
+          </li>
+        )}
+        <li>
+          Written by {record.text_model}
+          {record.vision_model ? ` with ${record.vision_model} reading the picture` : ""}
+          {record.finished_at ? `, ${relativeTime(record.finished_at)}` : ""}.
+        </li>
+        <li>Not included in exports.</li>
+      </ul>
+    </details>
   );
 }
