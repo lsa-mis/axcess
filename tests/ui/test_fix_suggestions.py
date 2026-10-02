@@ -14,12 +14,19 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from audit.db.schema import connect
 from audit.suggest import context, repo
-from audit.suggest.provider import SuggestionError, build_prompt, parse_answer
+from audit.suggest.provider import (
+    ANSWER_SCHEMA,
+    OllamaSuggestionProvider,
+    SuggestionError,
+    build_prompt,
+    parse_answer,
+)
 from audit.suggest.queue import SuggestionWorker
 from audit.suggest.verify import can_check
 from audit.web.server import create_app
@@ -651,3 +658,22 @@ def test_image_before_comes_from_the_saved_copy(
     resp = _client(seeded_db).get(f"/api/scans/{scan_id}/occurrences/image/{occ['id']}/suggestion")
     assert resp.status_code == 200, resp.text
     assert resp.json()["result"]["before_html"] == '<img src="/banner.png" class="hero">'
+
+
+async def test_ollama_request_is_bounded_and_schema_shaped() -> None:
+    """Ollama is asked for the answer's exact shape, with bounded size and memory."""
+    sent: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={"response": json.dumps(GOOD_ANSWER)})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OllamaSuggestionProvider(client, base_url="http://ollama", timeout_s=30)
+        raw = await provider.generate("prompt", model="m", image=None)
+    assert parse_answer(raw).summary == GOOD_ANSWER["summary"]
+    assert sent["format"] == ANSWER_SCHEMA
+    assert sent["keep_alive"] == "10m"
+    assert sent["options"]["temperature"] == 0
+    assert sent["options"]["num_predict"] > 0
+    assert sent["options"]["num_ctx"] >= 4096

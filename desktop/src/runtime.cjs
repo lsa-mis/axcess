@@ -100,7 +100,13 @@ function windowsUpdateMethod({ execPath, exists }) {
   return exists(path.join(path.dirname(execPath), "Uninstall Axcess.exe")) ? "installer" : "download";
 }
 
-function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, packaged }) {
+function desktopEnvironment({
+  userDataPath,
+  electronExecutable,
+  resourcesPath,
+  packaged,
+  inherited = process.env,
+}) {
   const dataRoot = path.join(userDataPath, "data");
   const ocrRoot = path.join(resourcesPath, "ocr-runtime");
   const environment = {
@@ -111,6 +117,12 @@ function desktopEnvironment({ userDataPath, electronExecutable, resourcesPath, p
     AUDIT_ACCESS_TOKEN: "",
     AUDIT_NODE_EXECUTABLE: electronExecutable,
     AUDIT_NODE_RUN_AS_NODE: "1",
+    // AI fix suggestions are on in the desktop app: one person on their own
+    // computer, and each suggestion is asked for with a click and answered
+    // by the Ollama on this computer. Without Ollama or its model the
+    // button explains what is missing; nothing is downloaded. Setting
+    // AUDIT_SUGGESTIONS_ENABLED=false before starting Axcess turns them off.
+    AUDIT_SUGGESTIONS_ENABLED: inherited.AUDIT_SUGGESTIONS_ENABLED || "true",
     PYTHONUNBUFFERED: "1",
   };
   if (packaged) {

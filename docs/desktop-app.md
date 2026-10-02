@@ -23,6 +23,12 @@ React workbench in a sandboxed Electron window.
 - Ollama and its optional local language/vision models are not silently
   installed or downloaded. Model-assisted checks remain optional and clearly
   report when a separately configured loopback Ollama service is unavailable.
+- AI fix suggestions are on by default (`AUDIT_SUGGESTIONS_ENABLED=true`
+  in `desktopEnvironment`), because each one is asked for with a click and
+  answered by the Ollama on the same computer. Without Ollama or the model,
+  the inspector says what is missing and gives the `ollama pull` command.
+  Set `AUDIT_SUGGESTIONS_ENABLED=false` before launch to turn them off. See
+  [AI fix suggestions](ai-suggestions.md).
 
 Typical data locations are:
 

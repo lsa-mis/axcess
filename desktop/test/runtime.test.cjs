@@ -86,9 +86,11 @@ test("desktop evidence uses the operating system application-data directory", ()
     electronExecutable: path.join("Applications", "Axcess"),
     resourcesPath: path.join("Applications", "Axcess Resources"),
     packaged: true,
+    inherited: {},
   });
   assert.equal(env.AUDIT_DB_PATH, path.join("tmp", "Axcess User", "data", "audit.db"));
   assert.equal(env.AUDIT_ACCESS_TOKEN, "");
+  assert.equal(env.AUDIT_SUGGESTIONS_ENABLED, "true");
   assert.equal(
     env.PLAYWRIGHT_BROWSERS_PATH,
     path.join("Applications", "Axcess Resources", "playwright-browsers"),
@@ -204,3 +206,14 @@ test("only a copy Setup installed updates in place", () => {
   assert.equal(windowsUpdateMethod({ execPath: exe, exists: () => false }), "download");
 });
 
+
+test("a person can turn AI suggestions off before starting the app", () => {
+  const env = desktopEnvironment({
+    userDataPath: "u",
+    electronExecutable: "e",
+    resourcesPath: "r",
+    packaged: false,
+    inherited: { AUDIT_SUGGESTIONS_ENABLED: "false" },
+  });
+  assert.equal(env.AUDIT_SUGGESTIONS_ENABLED, "false");
+});

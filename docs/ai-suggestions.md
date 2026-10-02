@@ -65,6 +65,14 @@ flowchart LR
 
 ## Turn it on
 
+**In the desktop app** AI fix suggestions are already on. You only need
+Ollama and the model (steps 1 and 2). Until they are there, the button's
+place shows what is missing and the command to fix it. Axcess never
+downloads a model by itself. To turn suggestions off, set
+`AUDIT_SUGGESTIONS_ENABLED=false` before you start the app.
+
+**In the web version** follow all four steps.
+
 1. Install [Ollama](https://ollama.com) and start it.
 2. Install the models. The vision model is optional; without it, image
    suggestions use the text model and do not look at the picture.
@@ -79,12 +87,17 @@ flowchart LR
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `AUDIT_SUGGESTIONS_ENABLED` | `false` | Turns the feature on. |
+| `AUDIT_SUGGESTIONS_ENABLED` | `false` (`true` in the desktop app) | Turns the feature on. |
 | `AUDIT_SUGGESTION_TEXT_MODEL` | `qwen2.5-coder:7b-instruct` | Model for all suggestions. |
 | `AUDIT_SUGGESTION_VISION_MODEL` | `qwen2.5vl:7b` | Model used when a picture helps (images, contrast, focus). |
 | `AUDIT_SUGGESTION_TIMEOUT_S` | `120` | Longest wait for one answer, 10 to 600 seconds. |
 | `AUDIT_SUGGESTION_QUEUE_MAX` | `20` | Most suggestions waiting at once, 1 to 200. |
 | `AUDIT_OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama is. Keep it on this computer. |
+
+Axcess asks Ollama for the exact answer shape it checks (structured
+output), caps the answer's length, and keeps the model loaded for 10
+minutes after the last suggestion so the next one starts faster. Then
+Ollama frees the memory.
 
 These settings are separate from the models a scan uses, so changing them
 never changes a finished report.

@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 from pydantic import ValidationError
@@ -24,6 +24,10 @@ from audit.analyzer.ollama_base import prompt_content_version
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer
 
+ANSWER_SCHEMA: dict[str, Any] = ModelAnswer.model_json_schema()
+KEEP_ALIVE = "10m"
+CONTEXT_TOKENS = 8192
+MAX_ANSWER_TOKENS = 1536
 PROMPT_PATH = Path(__file__).parent / "prompts" / "suggest_fix_v1.txt"
 _EVIDENCE_OPEN = "<<<EVIDENCE"
 _EVIDENCE_CLOSE = "EVIDENCE>>>"
@@ -148,8 +152,21 @@ class OllamaSuggestionProvider:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
-            "options": {"temperature": 0},
+            # Ollama constrains the output to this schema (structured
+            # outputs), so the answer cannot drift from the shape Axcess
+            # checks. With "json" alone the model sometimes wrote
+            # ``"paste_text": null`` and the suggestion failed.
+            "format": ANSWER_SCHEMA,
+            # Stays loaded between clicks, then frees the memory.
+            "keep_alive": KEEP_ALIVE,
+            "options": {
+                "temperature": 0,
+                # Room for the largest evidence bundle plus the answer, so a
+                # long prompt is never cut off silently.
+                "num_ctx": CONTEXT_TOKENS,
+                # Caps the time a runaway answer can take.
+                "num_predict": MAX_ANSWER_TOKENS,
+            },
         }
         if image is not None:
             payload["images"] = [base64.b64encode(image).decode("ascii")]

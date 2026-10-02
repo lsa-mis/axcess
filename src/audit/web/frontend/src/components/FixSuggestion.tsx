@@ -502,16 +502,39 @@ export function SuggestionsBlockedNote({
   status: SuggestionAvailability;
   className?: string;
 }) {
-  const why =
-    status.reason === "database_update_needed"
-      ? "the Axcess database needs an update first (run make migrate)."
-      : status.reason === "model_missing"
-        ? `the AI model (${status.missing_models.join(", ") || status.text_model}) is not installed in Ollama.`
-        : "the local AI service (Ollama) is not running.";
+  // Says what to do, not only what is wrong: in the desktop app the
+  // person reading this is the person who set Axcess up, so "ask the person
+  // who set up Axcess" sent them nowhere. Axcess never downloads a model
+  // itself, so the note gives the command and says it is a large download.
+  // Rests on WCAG 2.2 SC 3.3.3 Error Suggestion (Level AA; paraphrase: when
+  // a fix is known, tell the person) and W3C COGA "Making Content Usable",
+  // objective 5 (help users avoid mistakes or know how to correct them),
+  // https://www.w3.org/TR/coga-usable/.
+  if (status.reason === "model_missing") {
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        <p>AI fix suggestions are turned on, but the AI model they use is not installed.</p>
+        <p className="mt-2">
+          To install it, run this in a terminal, then reload this page. It downloads several
+          gigabytes.
+        </p>
+        <pre className={CODE_BOX}>ollama pull {status.text_model}</pre>
+      </Card>
+    );
+  }
+  if (status.reason === "database_update_needed") {
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        AI fix suggestions are turned on, but cannot run because the Axcess database needs an
+        update first (run make migrate).
+      </Card>
+    );
+  }
   return (
     <Card className={`${className} p-4 text-sm text-fg-muted`}>
-      AI fix suggestions are turned on, but cannot run because {why} Ask the person who set up
-      Axcess.
+      AI fix suggestions are turned on, but they need Ollama, a free program that runs AI models on
+      this computer, and it is not running. Install it from ollama.com (or start it if it is
+      installed), then reload this page.
     </Card>
   );
 }
