@@ -1547,13 +1547,14 @@ def privacy() -> str:
 # so change both together. The macOS and Windows warning words are from
 # Apple and Microsoft and can change. The note above the steps says the
 # drawings are simplified.
-_APP_TILE = (
-    '<span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" '
+_MARK = (
+    '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" '
     'stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>'
     '<path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 '
     'C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>'
-    '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span>'
+    '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg>'
 )
+_APP_TILE = f'<span class="mock-app">{_MARK}</span>'
 _MAC_DOTS = '<span class="mock-dots"><i></i><i></i><i></i></span>'
 _WIN_FOLDER = "C:\\Users\\(your name)\\AppData\\Local\\Programs\\Axcess"
 
@@ -1586,12 +1587,12 @@ def mac_drag_to_applications() -> str:
 def mac_not_opened() -> str:
     return drawing(
         "Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. "
-        "It has two buttons, one above the other: Done, marked 3, and Move to Trash.",
+        "It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3.",
         f"""<div class="mock-win mock-alert">
           {_APP_TILE}
           <p class="mock-title">“Axcess” Not Opened</p>
           <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
-          <div class="mock-stack">{mark(3, "Done", "mock-btn mock-btn-mac")}<span class="mock-btn">Move to Trash</span></div>
+          <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span>{mark(3, "Done", "mock-btn mock-btn-pale")}</div>
         </div>""",
     )
 
@@ -1667,11 +1668,33 @@ def win_smartscreen() -> str:
     )
 
 
+# The Windows Setup drawings follow the real wizard (photos of 0.2.0 on
+# Windows 11): a blue title bar with the app icon and window buttons, a
+# white header with the logo on its right, the grey page below it, and
+# Windows' own button shapes. Setup's version label ("Axcess 0.2.0", bottom
+# left) and "Space needed" are left out: both change with every release,
+# and instructions should stay true after the next one.
+_WIN_TITLE_BAR = (
+    '<div class="mock-titlebar"><span class="mock-title-icon">'
+    + _MARK
+    + '</span><span class="mock-bar-title">Axcess Setup</span>'
+    '<span class="mock-controls"><i>&ndash;</i><i>▢</i><i>✕</i></span></div>'
+)
+
+
+def win_button(label: str, step: int | None = None, css: str = "") -> str:
+    """A Windows Setup button; marked with its step when it is the one to choose."""
+    cls = f"mock-btn mock-btn-win {css}".strip()
+    if step is None:
+        return f'<span class="{cls}">{label}</span>'
+    return mark(step, label, f"{cls} mock-btn-default")
+
+
 def win_setup(title: str, subtitle: str, body: str, buttons: str) -> str:
     """The frame every Axcess Setup screen shares: header, page, buttons."""
-    return f"""<div class="mock-win mock-flat">
-          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
-          <div class="mock-head"><p class="mock-title">{title}</p><p>{subtitle}</p></div>
+    return f"""<div class="mock-win mock-flat mock-setup">
+          {_WIN_TITLE_BAR}
+          <div class="mock-head"><div class="mock-grow"><p class="mock-title">{title}</p><p>{subtitle}</p></div><span class="mock-head-logo">{_MARK}</span></div>
           <div class="mock-pad">{body}</div>
           <div class="mock-btns mock-foot">{buttons}</div>
         </div>"""
@@ -1679,18 +1702,18 @@ def win_setup(title: str, subtitle: str, body: str, buttons: str) -> str:
 
 def win_who() -> str:
     body = f"""<p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
-            <p class="mock-radio mock-on">{mark(5, "Only for me")}</p>
             <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-radio mock-on">{mark(5, "Only for me (your name)")}</p>
             <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>"""
     return drawing(
-        "Drawing of the Axcess Setup screen Choose who can use Axcess. Of its two choices, Only for me is "
-        "selected and marked 5. The other is Everyone who uses this computer. The Next button at the bottom "
-        "right is marked 5.",
+        "Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses "
+        "this computer, and below it Only for me, followed by your account name. Only for me is selected and "
+        "marked 5. The Next button at the bottom right is marked 5.",
         win_setup(
             "Choose who can use Axcess",
             "Install it for you, or for everyone who uses this computer.",
             body,
-            f'{mark(5, "Next &gt;", "mock-btn")}<span class="mock-btn">Cancel</span>',
+            win_button("Next &gt;", 5) + win_button("Cancel"),
         ),
     )
 
@@ -1698,7 +1721,7 @@ def win_who() -> str:
 def win_folder() -> str:
     body = f"""<p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
             <p class="mock-field-label">Install folder:</p>
-            <div class="mock-row"><span class="mock-field mock-grow">{_WIN_FOLDER}</span><span class="mock-btn">Browse…</span></div>"""
+            <div class="mock-row"><span class="mock-field mock-grow">{_WIN_FOLDER}</span>{win_button("Browse…")}</div>"""
     return drawing(
         "Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a "
         "Browse button to its right. The Install button at the bottom right is marked 6.",
@@ -1706,22 +1729,30 @@ def win_folder() -> str:
             "Choose a folder",
             "Choose where to install Axcess.",
             body,
-            f'<span class="mock-btn">&lt; Back</span>{mark(6, "Install", "mock-btn")}<span class="mock-btn">Cancel</span>',
+            win_button("&lt; Back") + win_button("Install", 6) + win_button("Cancel"),
         ),
     )
 
 
 def win_finish() -> str:
-    body = f"""<p>Axcess is installed in this folder:<br><span class="mock-path">{_WIN_FOLDER}</span></p>
+    body = f"""<p class="mock-title mock-title-big">Axcess is installed</p>
+            <p>Axcess is installed in this folder:<br><span class="mock-path">{_WIN_FOLDER}</span></p>
             <p>Open it from the Start menu or from the shortcut on your desktop.</p>
             <p class="mock-check">Open Axcess now</p>"""
+    # Setup's picture panel: a laptop with a download arrow, on blue.
+    panel = (
+        '<div class="mock-panel"><svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" '
+        'stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"/>'
+        '<path d="M4 52h52M30 6v26m-9-9 9 9 9-9"/></svg></div>'
+    )
     return drawing(
-        "Drawing of the last Axcess Setup screen, Axcess is installed. It shows the install folder. "
-        "Below it, Open Axcess now is checked. The Finish button at the bottom right is marked 7.",
-        f"""<div class="mock-win mock-flat">
-          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
-          <div class="mock-pad"><p class="mock-title">Axcess is installed</p>{body}</div>
-          <div class="mock-btns mock-foot">{mark(7, "Finish", "mock-btn")}</div>
+        "Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the "
+        "left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the "
+        "buttons at the bottom, only Finish can be chosen, and it is marked 7.",
+        f"""<div class="mock-win mock-flat mock-setup">
+          {_WIN_TITLE_BAR}
+          <div class="mock-finish">{panel}<div class="mock-pad">{body}</div></div>
+          <div class="mock-btns mock-foot">{win_button("&lt; Back", css="mock-off")}{win_button("Finish", 7)}{win_button("Cancel", css="mock-off")}</div>
         </div>""",
     )
 

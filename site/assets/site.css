@@ -456,7 +456,6 @@ td b { color: var(--navy); }
 .mock-foot { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
 .mock-bar { display: flex; align-items: center; gap: .6rem; padding: .35rem .7rem; background: #eef0f3; border-bottom: 1px solid #d5dae1; }
 .mock-bar-title { font-weight: 600; flex: 1; }
-.mock-close { color: #374151; }
 .mock-dots { display: inline-flex; gap: .3rem; }
 .mock-dots i { width: .7em; height: .7em; border-radius: 50%; background: #ff5f57; }
 .mock-dots i:nth-child(2) { background: #febc2e; }
@@ -470,6 +469,7 @@ td b { color: var(--navy); }
 .mock b, .mock-path, .mock-field { overflow-wrap: anywhere; }
 .mock-btn { display: inline-block; padding: .25em .85em; border: 1px solid #8a94a3; border-radius: 6px; background: #fff; color: #1d1d1f; font-weight: 600; white-space: nowrap; }
 .mock-btn-mac { background: #0050c0; border-color: #0050c0; color: #fff; }
+.mock-btn-pale { background: #e5e5ea; border-color: #e5e5ea; }
 .mock-btn-icon { padding: .1em .6em; font-size: 1.1em; }
 .mock-btns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
 .mock-stack { display: grid; gap: .5rem; }
@@ -541,24 +541,43 @@ td b { color: var(--navy); }
 .mock-blue .mock-btns { margin-top: .9rem; }
 .mock-link { text-decoration: underline; padding: 0 .15rem; }
 
-/* Windows: Axcess Setup */
-.mock-head { padding: .6rem .9rem; border-bottom: 1px solid #d5dae1; }
-.mock-head p:not(.mock-title) { color: #374151; }
-.mock-foot { padding: .6rem .9rem; border-top: 1px solid #d5dae1; background: #f3f4f6; }
-.mock-foot .mock-btn { border-radius: 3px; }
+/* Windows: Axcess Setup. Colours follow the real wizard on Windows 11;
+   the title bar blue is darkened from Windows' accent so its white text
+   keeps 7:1. Setup's greyed-out buttons keep 7:1 text too, and show that
+   they are off by their faint border and lighter face. */
+.mock-titlebar { display: flex; align-items: center; gap: .5rem; padding: .3rem .6rem; background: #0b4f94; color: #fff; border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.mock-titlebar .mock-bar-title { font-weight: 400; }
+.mock-title-icon { display: grid; place-items: center; width: 1.25em; height: 1.25em; border-radius: 3px; background: #fff; color: var(--navy); }
+.mock-title-icon svg { width: 80%; height: 80%; }
+.mock-controls { display: flex; gap: 1.1em; }
+.mock-controls i { font-style: normal; }
+.mock-setup .mock-pad, .mock-setup .mock-foot { background: #f0f0f0; }
+.mock-head { display: flex; align-items: center; gap: .8rem; padding: .6rem .9rem; border-bottom: 1px solid #c8c8c8; background: #fff; }
+.mock-head p:not(.mock-title) { color: #374151; padding-left: .7rem; }
+.mock-head-logo { flex: none; width: 1.9em; height: 1.9em; color: var(--navy); }
+.mock-foot { padding: .7rem .9rem; border-top: 1px solid #c8c8c8; background: #f3f4f6; border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+.mock-btn-win { min-width: 5.5em; text-align: center; padding: .25em 1em; border: 1px solid #adadad; border-radius: 4px; background: #fdfdfd; font-weight: 400; }
+.mock-btn-default { border: 2px solid #005fb8; }
+.mock-off { background: #f5f5f5; border-color: #d4d4d4; color: #374151; }
 .mock-radio, .mock-check { display: flex; align-items: center; gap: .55rem; }
-.mock-radio::before { content: ""; flex: none; width: .95em; height: .95em; border-radius: 50%; border: 2px solid #4b5563; background: #fff; }
-.mock-on::before { background: radial-gradient(circle, #1d1d1f 0 38%, #fff 42%); }
-.mock-check::before { content: "✓"; flex: none; display: grid; place-items: center; width: 1.05em; height: 1.05em; border: 2px solid #1d1d1f; border-radius: 2px; font-weight: 800; line-height: 1; }
+.mock-radio { margin-left: 1.6rem; }
+.mock-radio::before { content: ""; flex: none; width: 1em; height: 1em; border-radius: 50%; border: 1px solid #5f6368; background: #fff; }
+.mock-on::before { border: 0; background: radial-gradient(circle, #fff 0 28%, #005fb8 32%); }
+.mock-check::before { content: "✓"; flex: none; display: grid; place-items: center; width: 1.1em; height: 1.1em; border-radius: 3px; background: #005fb8; color: #fff; font-weight: 800; line-height: 1; }
 .mock-radio .mock-mark { padding: 0 .3rem; }
-.mock .mock-note { color: #374151; }
+.mock .mock-note { color: #374151; margin-top: .9rem; }
 .mock-field-label { margin-bottom: .25rem; }
-.mock-field { border: 1px solid #8a94a3; padding: .2rem .4rem; font-family: var(--mono); font-size: .92em; background: #fff; }
+.mock-field { border: 1px solid #c8c8c8; border-bottom: 2px solid #005fb8; border-radius: 3px; padding: .25rem .5rem; background: #fff; }
+.mock-finish { display: grid; grid-template-columns: minmax(3.5rem, 30%) 1fr; background: #fff; }
+.mock-finish .mock-pad { background: #fff; }
+.mock-title-big { font-size: 1.3em; }
+.mock-panel { display: grid; place-items: center; background: #0b4f94; color: #fff; padding: .8rem; }
+.mock-panel svg { width: 80%; max-width: 6rem; }
 
 @media (forced-colors: active) {
   .mock-mark { outline-color: Highlight; }
   .mock-mark::after { border-color: Highlight; }
-  .mock-btn-mac, .mock-selected, .mock-blue { border: 1px solid CanvasText; }
+  .mock-btn-mac, .mock-selected, .mock-blue, .mock-titlebar, .mock-panel { border: 1px solid CanvasText; }
 }
 
 @media print {
