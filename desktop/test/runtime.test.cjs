@@ -91,6 +91,7 @@ test("desktop evidence uses the operating system application-data directory", ()
   assert.equal(env.AUDIT_DB_PATH, path.join("tmp", "Axcess User", "data", "audit.db"));
   assert.equal(env.AUDIT_ACCESS_TOKEN, "");
   assert.equal(env.AUDIT_SUGGESTIONS_ENABLED, "true");
+  assert.equal(env.AUDIT_DESKTOP, "1");
   assert.equal(
     env.PLAYWRIGHT_BROWSERS_PATH,
     path.join("Applications", "Axcess Resources", "playwright-browsers"),

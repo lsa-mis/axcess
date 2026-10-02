@@ -16,6 +16,7 @@ datas = [
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),
     (str(audit_source / "web" / "static"), "audit/web/static"),
     (str(audit_source / "alfa_runner"), "audit/alfa_runner"),
+    (str(audit_source / "ai" / "catalog.json"), "audit/ai"),
 ]
 datas += copy_metadata("yoyo-migrations")
 # tldextract loads its bundled public-suffix snapshot through importlib

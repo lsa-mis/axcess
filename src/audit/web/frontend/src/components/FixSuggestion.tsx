@@ -15,8 +15,9 @@ import {
   SUGGESTION_ERROR_LABEL,
   SUGGESTION_STATUS_LABEL,
 } from "../lib/terms";
+import { useAiSetup } from "../hooks/useAiSetup";
 import Tabs from "./Tabs";
-import { Button, Card, relativeTime } from "./ui";
+import { Button, Card, LinkButton, relativeTime } from "./ui";
 
 /**
  * "Suggest a fix (AI)" for one occurrence, and the suggestion it produces.
@@ -505,11 +506,23 @@ export function SuggestionsBlockedNote({
   // Says what to do, not only what is wrong: in the desktop app the
   // person reading this is the person who set Axcess up, so "ask the person
   // who set up Axcess" sent them nowhere. Axcess never downloads a model
-  // itself, so the note gives the command and says it is a large download.
+  // without being asked, so the note offers the setup page (desktop) or the
+  // command, and says it is a large download.
   // Rests on WCAG 2.2 SC 3.3.3 Error Suggestion (Level AA; paraphrase: when
   // a fix is known, tell the person) and W3C COGA "Making Content Usable",
   // objective 5 (help users avoid mistakes or know how to correct them),
   // https://www.w3.org/TR/coga-usable/.
+  // In the desktop app the first fix offered is Settings > AI features,
+  // which downloads Ollama and the models with a button; the terminal
+  // command stays for people who run their own Ollama.
+  const aiSetup = useAiSetup();
+  const setupLink = aiSetup ? (
+    <p className="mt-3">
+      <LinkButton to="/settings/ai" variant="primary">
+        Set up AI features
+      </LinkButton>
+    </p>
+  ) : null;
   if (status.reason === "model_missing") {
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
@@ -519,6 +532,7 @@ export function SuggestionsBlockedNote({
           gigabytes.
         </p>
         <pre className={CODE_BOX}>ollama pull {status.text_model}</pre>
+        {setupLink}
       </Card>
     );
   }
@@ -535,6 +549,7 @@ export function SuggestionsBlockedNote({
       AI fix suggestions are turned on, but they need Ollama, a free program that runs AI models on
       this computer, and it is not running. Install it from ollama.com (or start it if it is
       installed), then reload this page.
+      {setupLink}
     </Card>
   );
 }

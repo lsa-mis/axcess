@@ -21,8 +21,15 @@ React workbench in a sandboxed Electron window.
   packages, Tesseract executable, and English OCR language data. Users do not
   need Python, Node.js, Chromium, or Tesseract installed separately.
 - Ollama and its optional local language/vision models are not silently
-  installed or downloaded. Model-assisted checks remain optional and clearly
-  report when a separately configured loopback Ollama service is unavailable.
+  installed or downloaded. **Settings > AI features** (on because
+  `desktopEnvironment` sets `AUDIT_DESKTOP=1`) checks memory, disk and
+  graphics chip, suggests a size, and downloads a pinned, checksum-verified
+  Ollama and the models only after the person selects **Download and set up**. It reuses
+  an Ollama already on port 11434; otherwise it runs a private copy on a
+  random loopback port, started and stopped with the backend. See
+  [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
+  Model-assisted scan checks stay off for each new scan and clearly report
+  when Ollama is unavailable.
 - AI fix suggestions are on by default (`AUDIT_SUGGESTIONS_ENABLED=true`
   in `desktopEnvironment`), because each one is asked for with a click and
   answered by the Ollama on the same computer. Without Ollama or the model,

@@ -670,6 +670,7 @@ function routeTitle(pathname: string): string {
     [/^\/tracking\/?$/, "Product roadmap"],
     [/^\/about\/?$/, "About"],
     [/^\/settings\/?$/, "Settings"],
+    [/^\/settings\/ai\/?$/, "AI features"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

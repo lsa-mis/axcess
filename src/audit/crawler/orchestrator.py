@@ -250,6 +250,10 @@ class CrawlConfig:
         "1.2.1",  # Audio-only (prerecorded) transcript presence
     )
     semantic_concurrency: int = 1
+    # One text model for every semantic check, chosen by the desktop AI
+    # setup for this computer's size. ``None`` keeps the per-criterion
+    # picks in ``analyzer_models.yaml``.
+    semantic_model: str | None = None
     # SC 2.1.2 keyboard-exit probe. Default ON, but intentionally partial:
     # only repeated bidirectional exit failure on the same observable element
     # becomes a review lead. Cost is bounded (≤ max_focusable*2+4 forward
@@ -1143,17 +1147,17 @@ async def _build_semantic_analyzers(
     from audit.analyzer.semantic.ollama_text import OllamaTextProvider
     from audit.analyzer.semantic.registry import build_analyzers
 
-    default_pick = get_pick(None, kind="text")
+    default_model = config.semantic_model or get_pick(None, kind="text").primary
     provider = OllamaTextProvider(
         client,
-        model=default_pick.primary,
+        model=default_model,
         base_url=config.vlm_base_url,
         concurrency=config.semantic_concurrency,
     )
     if not await provider.healthy():
         log.warning(
             "semantic.unavailable",
-            model=default_pick.primary,
+            model=default_model,
             base_url=config.vlm_base_url,
             hint=(
                 "Ollama daemon not running or model not pulled; "
@@ -1162,7 +1166,9 @@ async def _build_semantic_analyzers(
         )
         return None, []
 
-    analyzers = build_analyzers(config.semantic_criteria, provider)
+    analyzers = build_analyzers(
+        config.semantic_criteria, provider, model_override=config.semantic_model
+    )
     if not analyzers:
         log.warning(
             "semantic.no_registered_analyzers",

@@ -120,9 +120,13 @@ function desktopEnvironment({
     // AI fix suggestions are on in the desktop app: one person on their own
     // computer, and each suggestion is asked for with a click and answered
     // by the Ollama on this computer. Without Ollama or its model the
-    // button explains what is missing; nothing is downloaded. Setting
+    // button explains what is missing and links to Settings > AI features;
+    // nothing is downloaded until the person chooses to. Setting
     // AUDIT_SUGGESTIONS_ENABLED=false before starting Axcess turns them off.
     AUDIT_SUGGESTIONS_ENABLED: inherited.AUDIT_SUGGESTIONS_ENABLED || "true",
+    // Turns on the Settings > AI features page. It downloads Ollama and
+    // models only after the person chooses a size and selects Download.
+    AUDIT_DESKTOP: "1",
     PYTHONUNBUFFERED: "1",
   };
   if (packaged) {

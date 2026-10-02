@@ -1362,3 +1362,65 @@ export interface SuggestionAvailability {
   queue_length: number;
   scan_running: boolean;
 }
+
+/** Desktop AI setup (`/api/ai/*`). Only the desktop app serves these. */
+export type AiTierId = "small" | "standard" | "large";
+export type AiInstallState = "idle" | "running" | "paused" | "failed" | "done";
+export type AiInstallStep = "program" | "starting" | "text_model" | "vision_model" | "finishing";
+
+export interface AiModelInfo {
+  tag: string;
+  size_bytes: number;
+  licence: string;
+}
+
+export interface AiTierPlan {
+  id: AiTierId;
+  label: string;
+  min_memory_gb: number;
+  text: AiModelInfo;
+  vision: AiModelInfo;
+  models_bytes: number;
+  download_bytes: number;
+  fits: boolean;
+}
+
+export interface AiInstallStatus {
+  state: AiInstallState;
+  tier: AiTierId | null;
+  step: AiInstallStep | null;
+  step_done_bytes: number;
+  step_total_bytes: number;
+  done_bytes: number;
+  total_bytes: number;
+  error: string | null;
+}
+
+export interface AiSetup {
+  source: "system" | "private";
+  base_url: string;
+  tier: AiTierId;
+  text_model: string;
+  vision_model: string;
+  ollama_version: string | null;
+}
+
+export interface AiPlan {
+  hardware: {
+    memory_bytes: number;
+    free_disk_bytes: number;
+    accelerator: "apple" | "nvidia" | "amd" | "none";
+  };
+  program: {
+    version: string;
+    licence: string;
+    release_url: string;
+    download_bytes: number;
+    available_for_this_computer: boolean;
+    system_version: string | null;
+  };
+  tiers: AiTierPlan[];
+  recommended: AiTierId | null;
+  current: AiSetup | null;
+  install: AiInstallStatus;
+}

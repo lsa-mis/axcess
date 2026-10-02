@@ -51,6 +51,10 @@ from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation
+from audit.ai.manager import AIManager
+from audit.ai.state import AIConfig
+from audit.ai.state import effective_settings as effective_ai_settings
+from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
@@ -113,6 +117,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
+from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -638,7 +643,11 @@ def create_app(
     suggestion_verifier: SuggestionVerifier | None = None,
 ) -> FastAPI:
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
-    settings = get_settings()
+    base_settings = get_settings()
+    # The desktop AI setup (if any) chooses the Ollama address and models.
+    # ``settings`` is rebound when that setup changes, so every route below
+    # reads the current choice.
+    settings = effective_ai_settings(base_settings)
     resolved_db = db_path or settings.db_path
     slow_request_ms = settings.slow_request_ms
     resolved_blob = blob_dir or settings.blob_dir
@@ -852,8 +861,7 @@ def create_app(
     # to the model and no task runs.
     suggestion_state: dict[str, Any] = {"worker": None, "provider": suggestion_provider}
 
-    @app.on_event("startup")
-    async def _start_suggestion_worker() -> None:
+    async def _start_worker() -> None:
         if not settings.suggestions_enabled:
             return
         provider = suggestion_state["provider"]
@@ -878,8 +886,7 @@ def create_app(
         suggestion_state["worker"] = worker
         worker.start()
 
-    @app.on_event("shutdown")
-    async def _stop_suggestion_worker() -> None:
+    async def _stop_worker() -> None:
         worker = suggestion_state.get("worker")
         if worker is not None:
             await worker.stop()
@@ -888,6 +895,49 @@ def create_app(
         if client is not None:
             await client.aclose()
             suggestion_state["provider"] = suggestion_provider
+
+    @app.on_event("startup")
+    async def _start_suggestion_worker() -> None:
+        await _start_worker()
+
+    @app.on_event("shutdown")
+    async def _stop_suggestion_worker() -> None:
+        await _stop_worker()
+
+    # Desktop AI setup. Only the desktop app has it: a server install keeps
+    # the AI settings its administrator chose in the environment.
+    ai_state: dict[str, Any] = {"manager": None, "loop": None}
+
+    async def _apply_ai_setup() -> None:
+        nonlocal settings
+        settings = effective_ai_settings(base_settings)
+        await _stop_worker()
+        await _start_worker()
+
+    def _ai_changed(_config: AIConfig | None) -> None:
+        # Called from the setup thread; the worker lives on the event loop.
+        loop = ai_state["loop"]
+        if loop is not None and loop.is_running():
+            asyncio.run_coroutine_threadsafe(_apply_ai_setup(), loop)
+
+    if base_settings.desktop:
+        ai_state["manager"] = AIManager(base_settings, _ai_changed)
+
+    @app.on_event("startup")
+    async def _start_ai_runtime() -> None:
+        ai_state["loop"] = asyncio.get_running_loop()
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.startup)
+
+    @app.on_event("shutdown")
+    async def _stop_ai_runtime() -> None:
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.shutdown)
+
+    if ai_state["manager"] is not None:
+        app.include_router(build_ai_router(ai_state["manager"]), prefix="/api")
 
     @app.middleware("http")
     async def _require_protected_scan_access(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -1167,7 +1217,12 @@ def create_app(
 
         vision_model = settings.vlm_model
         vision_size = installed_size(vision_model)
-        semantic_models = sorted({get_pick(sc).primary for sc in supported_criteria()})
+        chosen_semantic = ai_semantic_model(settings)
+        semantic_models = (
+            [chosen_semantic]
+            if chosen_semantic
+            else sorted({get_pick(sc).primary for sc in supported_criteria()})
+        )
         semantic_ready = [model for model in semantic_models if installed_size(model) is not None]
         semantic_missing = [model for model in semantic_models if model not in semantic_ready]
 
@@ -3185,6 +3240,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         vlm_base_url=settings.ollama_base_url,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
+        semantic_model=ai_semantic_model(settings),
         # Render-every-page is the default (audit mode). `static_only`
         # is the opt-out fast path, HTML checkboxes can't post
         # "unchecked", so the form field is the inversion.

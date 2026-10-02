@@ -47,6 +47,8 @@ def supported_criteria() -> list[str]:
 def build_analyzers(
     criteria: Sequence[str],
     provider: OllamaTextProvider,
+    *,
+    model_override: str | None = None,
 ) -> list[SemanticAnalyzer]:
     """Instantiate the analyzers for the requested ``criteria``.
 
@@ -60,7 +62,9 @@ def build_analyzers(
     :class:`OllamaTextProvider` carries the default model; the
     per-criterion pick is passed through as the analyzer's
     ``model=`` override so a single provider can drive every analyzer
-    while still using the right model for each.
+    while still using the right model for each. ``model_override``
+    replaces every pick with one model (the desktop AI setup's text
+    model).
     """
     out: list[SemanticAnalyzer] = []
     seen: set[str] = set()
@@ -83,8 +87,8 @@ def build_analyzers(
             continue
         # Look up the model recommended for this SC. The registry
         # falls back to a sensible default if the SC has no pin.
-        pick = get_pick(sc)
-        out.append(cls(provider, model=pick.primary))  # type: ignore[call-arg]
+        model = model_override or get_pick(sc).primary
+        out.append(cls(provider, model=model))  # type: ignore[call-arg]
     return out
 
 

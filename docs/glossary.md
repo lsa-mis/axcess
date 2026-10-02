@@ -295,7 +295,8 @@ when you turn on **Check motion and animation**.
 
 An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer through a free program called
-Ollama. Axcess never installs one for you, and AI results
+Ollama. Axcess installs one only in the desktop app, from **Settings > AI
+features**, after you choose a size (Small, Standard or Large). AI results
 are never reported as [Barriers](#barrier).
 
 ### OCR

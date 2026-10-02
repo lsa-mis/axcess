@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
-import { Button, Card, PageHeader } from "../components/ui";
+import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { useAiSetup } from "../hooks/useAiSetup";
+import { AI_TIER_LABEL } from "../lib/terms";
 import { cn } from "../lib/cn";
 import { PRESETS, presetIsOn, presetOffValues, type Preferences } from "../lib/preferences";
 import { SETTING_SECTIONS, type Setting } from "../lib/settingsCatalog";
@@ -21,6 +23,7 @@ import {
  */
 export default function SettingsRoute() {
   const prefs = usePreferences();
+  const aiSetup = useAiSetup();
   const [message, setMessage] = useState("");
 
   return (
@@ -93,6 +96,23 @@ export default function SettingsRoute() {
             </ul>
           </div>
         </Card>
+
+        {/* Desktop only. A link to its own page, not a row here: rows on
+            this page apply at once and stay on this computer, while AI
+            setup downloads gigabytes and needs a deliberate step. */}
+        {aiSetup && (
+          <Card className="px-4 py-4">
+            <h2 className="text-sm font-semibold text-fg">AI features</h2>
+            <p className="mt-0.5 text-xs leading-5 text-fg-muted">
+              {aiSetup.current
+                ? `On. Size: ${AI_TIER_LABEL[aiSetup.current.tier]}. The AI runs on this computer.`
+                : "Off. Optional AI that suggests fixes and checks images and wording. It runs on this computer."}
+            </p>
+            <LinkButton to="/settings/ai" className="mt-3">
+              {aiSetup.current ? "Change AI features" : "Set up AI features"}
+            </LinkButton>
+          </Card>
+        )}
 
         {SETTING_SECTIONS.map((section) => (
           <Card key={section.id} className="overflow-hidden">

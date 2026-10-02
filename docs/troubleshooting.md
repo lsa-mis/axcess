@@ -65,8 +65,9 @@ and the page title.
 
 ## The local AI checks aren't running
 
-A [local AI model](./glossary.md#local-ai-model) runs through Ollama, which
-you install separately.
+A [local AI model](./glossary.md#local-ai-model) runs through Ollama. In the
+desktop app, **Settings > AI features** can install Ollama and the models for
+you. Otherwise you install it separately.
 
 - **Is the switch on?** For a public website, the AI switches under Advanced
   settings, **Local AI**, are off by default. **Read text inside images
@@ -84,6 +85,18 @@ you install separately.
 
 If Ollama can't be reached when a scan starts, Axcess logs a warning and
 continues without those checks.
+
+## AI features setup in the desktop app stopped or failed
+
+- **"Not enough free disk space"**: free up space or choose a smaller size.
+  The page shows how much each size downloads.
+- **The download stopped or was paused**: select **Resume download**. It
+  carries on from where it stopped. After an error, select **Try again**.
+- **"The Ollama download did not match its published checksum"**: the file
+  was changed or damaged on the way. Axcess deletes it and does not run it.
+  Try again later.
+- **Ollama did not start**: read `ai/ollama.log` in the Axcess data folder.
+- **Start over**: select **Remove AI features**, then download again.
 
 ## Compare reports has nothing to compare, or shows a surprise
 

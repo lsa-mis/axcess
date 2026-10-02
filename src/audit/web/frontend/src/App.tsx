@@ -46,6 +46,7 @@ const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
 const SettingsRoute = lazy(() => import("./routes/Settings"));
+const AiSetupRoute = lazy(() => import("./routes/AiSetup"));
 const NotFoundRoute = lazy(() => import("./routes/NotFound"));
 
 export default function App() {
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/tracking" element={<TrackingRoute />} />
         <Route path="/about" element={<AboutRoute />} />
         <Route path="/settings" element={<SettingsRoute />} />
+        <Route path="/settings/ai" element={<AiSetupRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
         </Routes>
       </Suspense>

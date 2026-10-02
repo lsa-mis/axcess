@@ -1,4 +1,7 @@
 import type {
+  AiInstallState,
+  AiInstallStep,
+  AiTierId,
   DetectionPipeline,
   FindingStatus,
   ReviewLane,
@@ -101,6 +104,31 @@ export const SUGGESTION_CHECK_LABEL: Record<SuggestionCheckOutcome, string> = {
   passed: "The rule check passed on the suggested code",
   still_fails: "The rule check still fails on the suggested code",
   not_checked: "Axcess could not check this suggestion",
+};
+
+/** Desktop AI setup: what the download is doing now. */
+export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
+  program: "Downloading the Ollama program",
+  starting: "Starting Ollama",
+  text_model: "Downloading the text model",
+  vision_model: "Downloading the image model",
+  finishing: "Finishing setup",
+};
+
+/** Desktop AI setup: where the download stands. */
+export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
+  idle: "Not set up",
+  running: "Downloading",
+  paused: "Paused",
+  failed: "Stopped with a problem",
+  done: "Ready",
+};
+
+/** Desktop AI setup: the size of the AI models. */
+export const AI_TIER_LABEL: Record<AiTierId, string> = {
+  small: "Small",
+  standard: "Standard",
+  large: "Large",
 };
 
 /** Why a suggestion failed, in words that say what to do next. */

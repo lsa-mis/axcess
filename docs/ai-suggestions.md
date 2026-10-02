@@ -63,13 +63,56 @@ flowchart LR
 - The rule check runs in a browser with no network access, on the suggested
   code alone.
 
+## Set up AI features in the desktop app
+
+**Settings > AI features** installs everything the AI features need, after
+you ask it to. Nothing is downloaded before that.
+
+1. Axcess checks this computer: memory (RAM), free disk space, and whether
+   there is a graphics chip that speeds AI up (an Apple chip, or an NVIDIA or
+   AMD card).
+2. It suggests a size. You can pick another one.
+
+   | Size | Needs at least | Text model | Image model | Download |
+   | --- | --- | --- | --- | --- |
+   | Small | 8 GB memory | `qwen3:4b-instruct-2507-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.4 GB |
+   | Standard | 16 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
+   | Large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
+
+   Without a graphics chip Axcess suggests Small, because larger models are
+   very slow on the processor alone. All models use the Apache 2.0 licence.
+3. Select **Download and set up**. If Ollama is already running on this computer
+   (port 11434), Axcess uses it and adds the models there. If not, Axcess
+   downloads Ollama 0.33.0 (MIT licence) from its GitHub release, checks the
+   file against a fixed SHA-256 checksum, and runs its own copy on a private
+   port that only this computer can reach.
+4. You can select **Pause download** and **Resume download** later. A
+   download that stops part way picks up where it stopped. Axcess does not
+   start the download if the disk does not have room for what is left, plus 3 GB.
+
+When it finishes, AI fix suggestions use the new models. The AI checks during
+a scan are still off for each new scan; turn them on in the scan form if you
+want them.
+
+Files are kept in the Axcess data folder, under `ai/`: the Ollama program in
+`ai/runtime`, models in `ai/models`, and the setup in `ai/config.json`.
+**Remove AI features** deletes them. If Axcess used an Ollama you already had,
+removing only forgets the setup; the models stay in your Ollama.
+
+Sizes, checksums, and model names are pinned in `src/audit/ai/catalog.json`.
+To move to a newer Ollama or model, update that file in a release.
+
 ## Turn it on
 
 **In the desktop app** AI fix suggestions are already on. You only need
-Ollama and the model (steps 1 and 2). Until they are there, the button's
-place shows what is missing and the command to fix it. Axcess never
-downloads a model by itself. To turn suggestions off, set
-`AUDIT_SUGGESTIONS_ENABLED=false` before you start the app.
+Ollama and the models. The easy way is **Settings > AI features** (see
+[Set up AI features in the desktop app](#set-up-ai-features-in-the-desktop-app)).
+You can also do steps 1 and 2 yourself. Until the models are there, the
+button's place shows what is missing and links to the setup page. Axcess
+never downloads anything until you choose a size and select **Download and
+set up**.
+To turn suggestions off, set `AUDIT_SUGGESTIONS_ENABLED=false` before you
+start the app.
 
 **In the web version** follow all four steps.
 

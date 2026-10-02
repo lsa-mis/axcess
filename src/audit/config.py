@@ -50,13 +50,20 @@ class Settings(BaseSettings):
     # administrator turns them on. The models are deliberately separate from
     # the scan-analysis models above and in ``analyzer_models.yaml``, so
     # changing them can never change how a finished report was produced.
-    # They talk only to the Ollama daemon at ``ollama_base_url``; Axcess never
-    # downloads a model by itself.
+    # They talk only to the Ollama daemon at ``ollama_base_url``. Axcess never
+    # downloads a model by itself: only the desktop app's Settings > AI
+    # features page does, after the person chooses a size (``audit.ai``).
     suggestions_enabled: bool = False
     suggestion_text_model: str = "qwen2.5-coder:7b-instruct"
     suggestion_vision_model: str = "qwen2.5vl:7b"
     suggestion_timeout_s: float = Field(default=120.0, ge=10.0, le=600.0)
     suggestion_queue_max: int = Field(default=20, ge=1, le=200)
+
+    # Set by the desktop app (``AUDIT_DESKTOP=1``). Turns on the optional AI
+    # setup page, which can download a pinned Ollama and models into
+    # ``data_dir/ai`` after the person asks for it. Its choices are layered
+    # over the AI settings above by ``audit.ai.state.effective_settings``.
+    desktop: bool = False
 
     # Hosting / access control. Empty by default → the tool stays a
     # zero-auth local app (binds to 127.0.0.1, no token needed). Set

@@ -44,6 +44,9 @@ import type {
   ScanSummary,
   SiteGroup,
   ScopePreview,
+  AiInstallStatus,
+  AiPlan,
+  AiTierId,
   SuggestionAvailability,
   SuggestionFeedback,
   SuggestionOccurrenceKind,
@@ -252,6 +255,18 @@ export const api = {
     }),
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
+  getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
+  getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
+  /** Start or resume downloading the AI program and models for one size. */
+  installAi: (tier: AiTierId) =>
+    request<AiInstallStatus>("/api/ai/install", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  pauseAiInstall: () => request<AiInstallStatus>("/api/ai/install", { method: "DELETE" }),
+  /** Turn AI features off and delete what Axcess downloaded. */
+  removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
   /** Whether AI fix suggestions are turned on and their local model is ready. */
   getSuggestionStatus: () =>
     request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
