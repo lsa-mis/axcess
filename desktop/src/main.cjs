@@ -28,6 +28,17 @@ const {
 } = require("./updates.cjs");
 const packageJson = require("../package.json");
 
+// No macOS keychain prompt. Chromium asks the keychain for an "Axcess Safe
+// Storage" key to encrypt saved cookies and passwords, and while the app is
+// not signed by Apple, macOS asks people to allow that ("Axcess wants to use
+// your confidential information"), again after updates. Axcess keeps nothing
+// there: the desktop backend sets no access cookie (AUDIT_ACCESS_TOKEN is
+// empty, runtime.cjs), the window keeps only display preferences in
+// localStorage, and reports live in the backend's own database. The scan
+// browsers already use a stand-in keychain (Playwright passes the same
+// switch). Set before the app is ready, when Chromium reads its switches.
+if (process.platform === "darwin") app.commandLine.appendSwitch("use-mock-keychain");
+
 const STARTUP_TIMEOUT_MS = 60_000;
 const HEALTH_POLL_MS = 200;
 const UPDATE_FETCH_TIMEOUT_MS = 10_000;
