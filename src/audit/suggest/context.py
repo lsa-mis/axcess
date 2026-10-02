@@ -17,6 +17,7 @@ from typing import Any, cast
 
 from bs4 import BeautifulSoup
 
+from audit.extractor.html_images import image_element_html
 from audit.protected.redaction import redact_text, redact_url
 from audit.suggest.models import (
     MAX_SNIPPET_CHARS,
@@ -139,6 +140,23 @@ def _nearby_text(rendered: bytes | None, selector: str | None) -> str | None:
     return safe_text(text, MAX_NEARBY_CHARS)
 
 
+def _image_markup(page: sqlite3.Row, position: int, alt: str | None) -> str | None:
+    """The image's element code from the saved copy, for the "Before" view.
+
+    The images check stores the image's facts, not its markup, so without
+    this an image suggestion had no "Before" to compare the "After" with.
+    """
+    rendered = page["rendered_html"]
+    if not rendered:
+        return None
+    try:
+        body = gzip.decompress(rendered)
+    except (OSError, EOFError):
+        return None
+    base = str(page["final_url"] or page["url_normalized"] or "")
+    return safe_markup(image_element_html(body, base, position, alt))
+
+
 def _blob_bytes(blob_dir: Path, content_hash: str | None) -> bytes | None:
     if not content_hash or not _HASH_RE.match(content_hash):
         return None
@@ -240,6 +258,25 @@ def _image_occurrence_ids(
     return int(row["page_id"]), int(row["image_id"])
 
 
+def image_before_html(conn: sqlite3.Connection, *, scan_id: int, occurrence_id: int) -> str | None:
+    """The "Before" code for an image occurrence of this report, or None.
+
+    Suggestions saved before the image element was looked up have no
+    "Before"; this fills it in when they are read.
+    """
+    row = conn.execute(
+        """
+        SELECT pi.position, pi.alt_text, p.url_normalized, p.final_url, p.rendered_html
+          FROM page_images pi JOIN pages p ON p.id = pi.page_id
+         WHERE pi.id = ? AND p.scan_id = ?
+        """,
+        (occurrence_id, scan_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return _image_markup(row, int(row["position"]), row["alt_text"])
+
+
 def build(
     conn: sqlite3.Connection,
     blob_dir: Path,
@@ -317,7 +354,8 @@ def _build_image(
         raise OccurrenceNotFoundError
     occ = conn.execute(
         """
-        SELECT pi.alt_text, pi.role, pi.context_snippet, i.src_url_canonical, i.blob_path,
+        SELECT pi.alt_text, pi.role, pi.context_snippet, pi.position,
+               i.src_url_canonical, i.blob_path,
                a.ocr_text, a.vlm_classification, a.vlm_rationale
           FROM page_images pi
           JOIN images i ON i.id = pi.image_id
@@ -362,7 +400,7 @@ def _build_image(
         wcag_sc=(row.wcag_sc if row else "1.4.5"),
         page_url=redact_url(str(page["final_url"] or page["url_normalized"])),
         problem=(row.description if row and row.description else "An image may contain text."),
-        snippet=None,
+        snippet=_image_markup(page, int(occ["position"]), alt),
         selector=None,
         nearby_text=safe_text(occ["context_snippet"], MAX_NEARBY_CHARS),
         fix_steps=tuple(

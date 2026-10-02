@@ -357,12 +357,26 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
       )}
       {(before_html || developer.after_html) && (
         <div className="grid gap-3 lg:grid-cols-2">
-          {before_html && (
-            <div className="min-w-0">
-              <p className="text-2xs font-semibold text-fg-subtle">Before</p>
+          {/* "Before" sits beside "After" so a developer can see what
+              changes. It always comes from the scan (the saved copy), never
+              from the model. When the scan kept no element code (a check of
+              the whole page, say) the column says so rather than vanishing,
+              so the missing comparison is a stated fact, not a silent gap.
+              Rejected: hiding the column, which left "After" with nothing
+              to compare against and read like a layout bug. Rests on W3C
+              COGA "Making Content Usable", objective 3 (paraphrase: help
+              people understand what things are and how to use them) and
+              the repo rule to never drop a limitation fact. */}
+          <div className="min-w-0">
+            <p className="text-2xs font-semibold text-fg-subtle">Before</p>
+            {before_html ? (
               <pre className={CODE_BOX}>{before_html}</pre>
-            </div>
-          )}
+            ) : (
+              <p className="mt-1 text-xs text-fg-muted">
+                The scan kept no element code for this occurrence.
+              </p>
+            )}
+          </div>
           {developer.after_html && (
             <div className="min-w-0">
               <p className="text-2xs font-semibold text-fg-subtle">After</p>

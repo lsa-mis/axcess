@@ -599,3 +599,55 @@ def test_eval_cases_build_prompts() -> None:
     for case in cases:
         prompt = build_prompt(evals._bundle(case))
         assert case["rule_id"] in prompt
+
+
+def test_image_before_comes_from_the_saved_copy(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    """An image suggestion's "Before" is the element in this report's saved copy."""
+    db_path, blob_dir, scan_id = seeded_db
+    conn = connect(db_path)
+    try:
+        occ = conn.execute(
+            "SELECT pi.id, pi.page_id FROM page_images pi "
+            "WHERE pi.alt_text IS NULL AND pi.position = 0"
+        ).fetchone()
+        saved = '<html><body><img src="/banner.png" class="hero"></body></html>'
+        conn.execute(
+            "UPDATE pages SET rendered_html = ? WHERE id = ?",
+            (gzip.compress(saved.encode()), occ["page_id"]),
+        )
+        conn.commit()
+        bundle = context.build(
+            conn, blob_dir, scan_id=scan_id, occurrence_kind="image", occurrence_id=occ["id"]
+        )
+        assert bundle.snippet == '<img src="/banner.png" class="hero">'
+        # Another report cannot reach this occurrence's element.
+        other = _second_scan(db_path)
+        assert context.image_before_html(conn, scan_id=other, occurrence_id=occ["id"]) is None
+        # A copy whose alt disagrees with what the scan stored gives nothing.
+        changed = '<html><body><img src="/banner.png" alt="Sale"></body></html>'
+        conn.execute(
+            "UPDATE pages SET rendered_html = ? WHERE id = ?",
+            (gzip.compress(changed.encode()), occ["page_id"]),
+        )
+        conn.commit()
+        assert context.image_before_html(conn, scan_id=scan_id, occurrence_id=occ["id"]) is None
+        conn.execute(
+            "UPDATE pages SET rendered_html = ? WHERE id = ?",
+            (gzip.compress(saved.encode()), occ["page_id"]),
+        )
+        # A suggestion saved without "Before" gets it when read.
+        answer = {**GOOD_ANSWER, "confidence": "guess", "before_html": None}
+        conn.execute(
+            "INSERT INTO fix_suggestions (scan_id, page_id, occurrence_kind, occurrence_id, "
+            "status, audience_default, text_model, prompt_version, result_json) "
+            "VALUES (?, ?, 'image', ?, 'ready', 'editor', 'm', 'v', ?)",
+            (scan_id, occ["page_id"], occ["id"], json.dumps(answer)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    resp = _client(seeded_db).get(f"/api/scans/{scan_id}/occurrences/image/{occ['id']}/suggestion")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["result"]["before_html"] == '<img src="/banner.png" class="hero">'

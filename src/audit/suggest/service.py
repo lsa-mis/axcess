@@ -125,7 +125,7 @@ def get(
     row = repo.get(conn, scan_id=scan_id, suggestion_id=suggestion_id)
     if row is None:
         raise SuggestionRefusedError(404, "AI suggestion not found.")
-    return repo.to_record(conn, row)
+    return _with_before(conn, repo.to_record(conn, row))
 
 
 def latest(
@@ -140,7 +140,23 @@ def latest(
     row = repo.latest_for_occurrence(
         conn, scan_id=scan_id, occurrence_kind=occurrence_kind, occurrence_id=occurrence_id
     )
-    return repo.to_record(conn, row) if row is not None else None
+    return _with_before(conn, repo.to_record(conn, row)) if row is not None else None
+
+
+def _with_before(conn: sqlite3.Connection, record: SuggestionRecord) -> SuggestionRecord:
+    """Fill in "Before" for image suggestions saved without it.
+
+    Read from the same report's saved copy, never from the model.
+    """
+    result = record.result
+    if record.occurrence_kind != "image" or result is None or result.before_html:
+        return record
+    before = context.image_before_html(
+        conn, scan_id=record.scan_id, occurrence_id=record.occurrence_id
+    )
+    if before is None:
+        return record
+    return record.model_copy(update={"result": result.model_copy(update={"before_html": before})})
 
 
 def cancel(

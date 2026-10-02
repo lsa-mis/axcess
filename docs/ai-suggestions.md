@@ -24,7 +24,7 @@ is never mistaken for what the scan found. It is brief on purpose:
 
 | Part | What it is |
 | --- | --- |
-| For developers | **Before**: the element code (HTML) the scan found. **After**: the suggested element code, and any CSS. When there is no code, a short explanation instead. |
+| For developers | **Before**: the element code (HTML) the scan found. For an image, Axcess reads it from the saved copy of the page. If the scan kept no element code (for example, a check of the whole page), "Before" says so. **After**: the suggested element code, and any CSS. When there is no code, a short explanation instead. |
 | For content editors | Short steps to follow in your content system, and text to paste, such as alt text. Text already in a step is not repeated. |
 | Rule check result | Shown only when it ran. For some rule check (axe) issues, Axcess runs that one rule on the suggested code. A pass means only that one rule passed. It does not show that the page meets WCAG. |
 | About this suggestion | Closed by default. What to check by hand, whether a rule check could run, which model wrote it and when, and that it is not included in exports. |
