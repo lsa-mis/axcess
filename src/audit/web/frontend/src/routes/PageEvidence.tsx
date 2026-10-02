@@ -4,7 +4,7 @@ import { Crosshair, ExternalLink, ImageOff, ScanEye } from "lucide-react";
 import { useLocation, useParams } from "react-router";
 import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
-import FixSuggestion from "../components/FixSuggestion";
+import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
@@ -385,26 +385,6 @@ function FindingCard({
           availability={suggestions}
         />
       )}
-    </Card>
-  );
-}
-
-/**
- * Said once for the page, not on every card: the setting is on but the
- * model cannot run, so each card's button would only fail the same way.
- * One note above the occurrences says why and who can fix it.
- */
-function SuggestionsBlockedNote({ status }: { status: SuggestionAvailability }) {
-  const why =
-    status.reason === "database_update_needed"
-      ? "the Axcess database needs an update first (run make migrate)."
-      : status.reason === "model_missing"
-        ? `the AI model (${status.missing_models.join(", ") || status.text_model}) is not installed in Ollama.`
-        : "the local AI service (Ollama) is not running.";
-  return (
-    <Card className="mb-5 p-4 text-sm text-fg-muted">
-      AI fix suggestions are turned on, but cannot run because {why} Ask the person who set up
-      Axcess.
     </Card>
   );
 }

@@ -4,9 +4,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
+import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
 import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
-import type { PageEvidence } from "../api/types";
+import type { PageEvidence, SuggestionAvailability, SuggestionOccurrenceKind } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -132,7 +133,7 @@ export default function InspectorRoute() {
   // identical siblings are intentionally one location). This list drives both
   // the highlight pass and the auto-scroll, so it is computed once.
   const targets = useMemo<Target[]>(() => {
-    const seen = new Set<string>();
+    const seen = new Map<string, Target>();
     const out: Target[] = [];
     for (const f of currentFindings) {
       const selector = f.target_selector || null;
@@ -148,16 +149,22 @@ export default function InspectorRoute() {
         selector ?? "",
         snippet ? normalizeWhitespace(snippet) : "",
       ].join("\u0000");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
+      const existing = seen.get(key);
+      if (existing) {
+        existing.findingIds?.push(f.id);
+        continue;
+      }
+      const target: Target = {
         selector,
         snippet,
         revealedBy: f.revealed_by || null,
         stateKey: f.revealed_state_key || null,
         place: f.element_place,
         cutAt: snippetCutFor(f.pipeline),
-      });
+        findingIds: [f.id],
+      };
+      seen.set(key, target);
+      out.push(target);
     }
     // Images were read at page load. Each occurrence is its own element.
     for (const image of shownImages) {
@@ -167,6 +174,7 @@ export default function InspectorRoute() {
         revealedBy: null,
         stateKey: null,
         image: { locator: image.locator, alt: image.alt_text },
+        imageOccurrenceId: image.occurrence_id,
       });
     }
     return out;
@@ -662,6 +670,34 @@ export default function InspectorRoute() {
   const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
   // How many occurrences share the element the reader is on.
   const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
+  // The occurrence an AI suggestion is asked for: the first one on the
+  // element the reader is on. Occurrences sharing an element are of the same
+  // issue on the same markup, so one suggestion fixes them all.
+  const currentOccurrence = useMemo((): { kind: SuggestionOccurrenceKind; id: number } | null => {
+    for (const index of highlight?.steps[pageMark]?.targets ?? []) {
+      const target = scopedTargets[index];
+      if (target?.imageOccurrenceId !== undefined) return { kind: "image", id: target.imageOccurrenceId };
+      const findingId = target?.findingIds?.[0];
+      if (findingId !== undefined) return { kind: "a11y", id: findingId };
+    }
+    return null;
+  }, [highlight, pageMark, scopedTargets]);
+  // Same gating as the page details screen (PageEvidence): only a finished,
+  // unprotected report, and only when an administrator turned the feature on.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const suggestionsApply =
+    scanData?.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    suggestionsApply && suggestionStatus.enabled ? suggestionStatus : null;
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
+      ? suggestionStatus
+      : null;
   // readableLocator returns a selector unchanged and turns a Rule check
   // (Alfa) record into its XPath, so a changed string is an XPath. An AI
   // review selector such as ``a[ord=6]`` counts the analyzer's own list of
@@ -1048,6 +1084,30 @@ export default function InspectorRoute() {
                     )
                   )}
                 </dl>
+                {/* The AI suggestion sits in this box, under the facts about
+                    the element it is for, and follows Previous / Next: the
+                    reader sees the element, what it is, and a suggested fix
+                    together. Rejected: a list of suggestions under the page,
+                    which put the fix a long scroll away from the element and
+                    left the reader to match them up (W3C COGA "Making Content
+                    Usable", paraphrased: keep related content together;
+                    https://www.w3.org/TR/coga-usable/). Keyed on the
+                    occurrence so stepping never shows the last element's
+                    suggestion. Heading level 2: this box sits straight under
+                    the page's h1 (SC 1.3.1 Info and Relationships, Level A). */}
+                {suggestions && currentOccurrence && (
+                  <FixSuggestion
+                    key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
+                    scanId={scan}
+                    kind={currentOccurrence.kind}
+                    occurrenceId={currentOccurrence.id}
+                    availability={suggestions}
+                    headingLevel={2}
+                  />
+                )}
+                {suggestionsBlocked && currentOccurrence && (
+                  <SuggestionsBlockedNote status={suggestionsBlocked} className="mt-3" />
+                )}
               </div>
             )}
             {layout && (

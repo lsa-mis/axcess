@@ -16,7 +16,7 @@ import {
   SUGGESTION_STATUS_LABEL,
 } from "../lib/terms";
 import Tabs from "./Tabs";
-import { Button, relativeTime } from "./ui";
+import { Button, Card, relativeTime } from "./ui";
 
 /**
  * "Suggest a fix (AI)" for one occurrence, and the suggestion it produces.
@@ -68,12 +68,20 @@ export default function FixSuggestion({
   kind,
   occurrenceId,
   availability,
+  headingLevel = 4,
 }: {
   scanId: number;
   kind: SuggestionOccurrenceKind;
   occurrenceId: number;
   availability: SuggestionAvailability;
+  /**
+   * The panel's heading level: 4 inside an occurrence card under an h3, 2
+   * where it sits straight under the page's h1 (the Page inspector), so the
+   * outline never skips a level (SC 1.3.1 Info and Relationships, Level A).
+   */
+  headingLevel?: 2 | 3 | 4;
 }) {
+  const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
   const queryClient = useQueryClient();
   const headingId = useId();
   const panelId = useId();
@@ -148,7 +156,7 @@ export default function FixSuggestion({
 
   return (
     <section aria-labelledby={headingId} className="mt-4 border-t border-border pt-3">
-      <h4
+      <Heading
         id={headingId}
         ref={headingRef}
         tabIndex={-1}
@@ -156,7 +164,7 @@ export default function FixSuggestion({
       >
         <Sparkles className="h-4 w-4" aria-hidden />
         {AI_SUGGESTION}
-      </h4>
+      </Heading>
       <p className="mt-1 text-xs text-fg-muted">
         Written by AI on this computer. It can be wrong. Check it before you use it.
       </p>
@@ -445,5 +453,31 @@ function CopyButton({ value, name }: { value: string; name: string }) {
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * Said once for the screen, not beside every occurrence: the setting is on
+ * but the model cannot run, so each button would only fail the same way.
+ * One note says why and who can fix it.
+ */
+export function SuggestionsBlockedNote({
+  status,
+  className = "mb-5",
+}: {
+  status: SuggestionAvailability;
+  className?: string;
+}) {
+  const why =
+    status.reason === "database_update_needed"
+      ? "the Axcess database needs an update first (run make migrate)."
+      : status.reason === "model_missing"
+        ? `the AI model (${status.missing_models.join(", ") || status.text_model}) is not installed in Ollama.`
+        : "the local AI service (Ollama) is not running.";
+  return (
+    <Card className={`${className} p-4 text-sm text-fg-muted`}>
+      AI fix suggestions are turned on, but cannot run because {why} Ask the person who set up
+      Axcess.
+    </Card>
   );
 }

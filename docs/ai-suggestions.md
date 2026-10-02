@@ -12,7 +12,13 @@ using it. It never changes your site or your report.
 
 On a page's details, each occurrence has a **Suggest a fix (AI)** button.
 Images get one too, when the scan found a problem with the image. Press it,
-and the suggestion waits in a queue, then appears in the same card with:
+and the suggestion waits in a queue, then appears in the same card.
+
+The Page inspector has the same button. It is in the box that describes the
+flagged element you are on, under the saved copy's toolbar. Move to another
+element with Previous or Next, and the box shows that element's suggestion.
+
+Each suggestion has:
 
 | Part | What it is |
 | --- | --- |

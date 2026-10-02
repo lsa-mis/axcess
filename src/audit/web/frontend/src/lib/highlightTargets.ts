@@ -52,6 +52,10 @@ export type Target = {
    * element's code, and matches as a prefix. See ``snippetCutFor``.
    */
   cutAt?: number | null;
+  /** The occurrences (finding ids) on this element, for per-occurrence actions. */
+  findingIds?: number[];
+  /** The image occurrence this target is, for an Images with text issue. */
+  imageOccurrenceId?: number;
 };
 
 /**

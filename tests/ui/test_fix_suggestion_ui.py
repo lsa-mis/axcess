@@ -137,3 +137,29 @@ async def test_no_button_when_suggestions_are_off(
     await page.goto(f"{base}/app/scans/{scan_id}/pages/{page_id}", wait_until="networkidle")
     await page.locator(f"#finding-{finding_id}").wait_for()
     assert await page.get_by_role("button", name="Suggest a fix (AI)").count() == 0
+
+
+async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
+    suggest_server: tuple[str, int, int, int], new_page: Any
+) -> None:
+    base, scan_id, page_id, _ = suggest_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-input-field-name",
+        wait_until="networkidle",
+    )
+    box = page.get_by_role("group", name="The flagged element you are on", exact=True)
+    button = box.get_by_role("button", name="Suggest a fix (AI)")
+    await button.wait_for()
+    await button.focus()
+    await page.keyboard.press("Enter")
+
+    heading = box.get_by_role("heading", name="AI suggestion", level=2)
+    await heading.wait_for()
+    assert await heading.evaluate("el => el === document.activeElement")
+    await box.get_by_text("Add a label so screen readers announce the field.").wait_for(
+        timeout=15000
+    )
+
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
