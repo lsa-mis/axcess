@@ -1442,7 +1442,7 @@ def privacy() -> str:
     <ul class="checks">
       <li>The sign-in window is a normal Chromium window with a fresh temporary profile.</li>
       <li>You type your password, passkey, or one-time code into the website, never into Axcess.</li>
-      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don&rsquo;t store rendered pages</em>.</li>
+      <li>The session stays in memory and ends with the scan, and the temporary profile is deleted. Rendered pages and screenshots of what you signed in to are saved in the local report unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>.</li>
     </ul>
     <p style="margin-top:1rem"><a href="../get-started/#sign-in">Step by step: scan a site behind a sign-in.</a></p>
     <div style="margin-top:1.5rem">{callout("<strong>You stay in control of sign-in.</strong> Axcess only continues after you sign in yourself, so use accounts and sites you have permission to test.", "callout-maize", "lock")}</div>
@@ -1512,6 +1512,292 @@ def privacy() -> str:
 """
 
 
+# Drawings of the install screens, beside the step that needs each one.
+#
+# What: each drawing is plain HTML and CSS (site.css, "Install drawings"),
+# not a screenshot. A two-colour outline and the step's number mark what to
+# choose. People who are new to installing apps can then match the words in
+# a step to a place on their screen.
+#
+# Why HTML and not a PNG or SVG picture: its text reflows at 320 px wide
+# instead of shrinking (SC 1.4.10 Reflow, Level AA). It grows with the
+# browser's text size (SC 1.4.4 Resize Text, Level AA). It takes the
+# colours of a Windows high-contrast theme. And it needs no new picture
+# files to keep up to date. A screenshot was rejected for the same reasons,
+# and because it would date with every macOS or Windows update.
+#
+# For screen readers, each drawing is one picture (role="img") named by a
+# short description. That matches technique ARIA4. Screen readers treat the
+# drawn "buttons" inside as part of the picture and do not read them as
+# controls; nothing in a drawing can be focused, so keyboard users do not
+# stop on fake controls. The description says where each marked thing is,
+# for screen reader users and for anyone the picture does not help.
+# Paraphrased from the ARIA spec: the img role's children are
+# presentational (https://www.w3.org/TR/wai-aria-1.2/#img).
+#
+# The marks use an outline, a number and a ring, not colour alone (SC 1.4.1
+# Use of Color, Level A). The ring has a navy part and a maize part, so
+# one of them stands out on a white or a blue window (SC 1.4.11 Non-text
+# Contrast, Level AA; the two-colour idea is technique C40). All text in a
+# drawing keeps the site's 7:1 contrast (SC 1.4.6, Level AAA), so some
+# button blues are darker than the real ones.
+#
+# The words in a drawing are the words on the real screen, where we know
+# them. The Windows setup words come from desktop/installer/installer.nsh,
+# so change both together. The macOS and Windows warning words are from
+# Apple and Microsoft and can change. The note above the steps says the
+# drawings are simplified.
+_MARK = (
+    '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" '
+    'stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>'
+    '<path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 '
+    'C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>'
+    '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg>'
+)
+_APP_TILE = f'<span class="mock-app">{_MARK}</span>'
+_MAC_DOTS = '<span class="mock-dots"><i></i><i></i><i></i></span>'
+_WIN_FOLDER = "C:\\Users\\(your name)\\AppData\\Local\\Programs\\Axcess"
+
+
+def drawing(description: str, body: str) -> str:
+    """One install-screen drawing, read as a single picture."""
+    return f'<div class="mock" role="img" aria-label="{description}">{body}</div>'
+
+
+def mark(step: int, inner: str, css: str = "") -> str:
+    """Outline what to choose in a drawing, with its step number."""
+    return f'<span class="mock-mark {css}" data-step="{step}">{inner}</span>'
+
+
+def mac_drag_to_applications() -> str:
+    return drawing(
+        "Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and "
+        "the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2.",
+        f"""<div class="mock-win">
+          <div class="mock-bar">{_MAC_DOTS}<span class="mock-bar-title">Axcess</span></div>
+          <div class="mock-drag">
+            <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {mark(2, f'{_APP_TILE}<span>Axcess</span>', "mock-icon")}
+          </div>
+        </div>""",
+    )
+
+
+def mac_not_opened() -> str:
+    return drawing(
+        "Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. "
+        "It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3.",
+        f"""<div class="mock-win mock-alert">
+          {_APP_TILE}
+          <p class="mock-title">“Axcess” Not Opened</p>
+          <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+          <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span>{mark(3, "Done", "mock-btn mock-btn-pale")}</div>
+        </div>""",
+    )
+
+
+def mac_privacy_and_security() -> str:
+    # Only the names people need to find Privacy & Security are written
+    # out; the other settings are grey bars. More names were more to read
+    # for no gain, and they change between macOS versions (W3C COGA,
+    # "Making Content Usable": keep only what helps the task,
+    # https://www.w3.org/TR/coga-usable/, a paraphrase).
+    hidden = '<li><i class="mock-hidden"></i></li>'
+    sidebar = "".join(f"<li>{name}</li>" for name in ("General", "Appearance", "Accessibility")) + hidden
+    return drawing(
+        "Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4, below General, Appearance and Accessibility. "
+        "On the right, below other settings, is the Security heading. Under it, the message “Axcess” was "
+        "blocked to protect your Mac has an Open Anyway button on its right, marked 5.",
+        f"""<div class="mock-win mock-settings">
+          <div class="mock-side">
+            {_MAC_DOTS}
+            <ul>{sidebar}<li>{mark(4, "Privacy &amp; Security", "mock-selected")}</li>{hidden}{hidden}</ul>
+          </div>
+          <div class="mock-main">
+            <p class="mock-title">Privacy &amp; Security</p>
+            <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+            <p class="mock-scroll">Scroll down <span>↓</span></p>
+            <p class="mock-heading">Security</p>
+            <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span>{mark(5, "Open Anyway", "mock-btn")}</div>
+          </div>
+        </div>""",
+    )
+
+
+def win_keep_download() -> str:
+    return drawing(
+        "Drawing of the browser&rsquo;s list of downloads. The Axcess installer has a warning that it is not "
+        "commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu "
+        "that opens below it.",
+        f"""<div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+          <div class="mock-row mock-pad">
+            <span class="mock-warn">!</span>
+            <span class="mock-grow"><b data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</b> is not commonly downloaded. Make sure you trust it before you open it.</span>
+            {mark(2, "⋯", "mock-btn mock-btn-icon")}
+          </div>
+          <ul class="mock-menu"><li>Delete</li><li>{mark(2, "Keep")}</li></ul>
+        </div>""",
+    )
+
+
+def win_smartscreen() -> str:
+    text = (
+        "<p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. "
+        "Running this app might put your PC at risk.</p>"
+    )
+    return drawing(
+        "Two drawings of the blue Windows protected your PC window. In the first, the More info link under "
+        "the message is marked 4. In the second, after you choose More info, it shows the app and Unknown "
+        "publisher, and the Run anyway button at the bottom is marked 4.",
+        f"""<div class="mock-pair">
+          <div><p class="mock-label">First</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>{text}
+              <p>{mark(4, "More info", "mock-link")}</p>
+              <div class="mock-btns"><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+          <div><p class="mock-label">After you choose More info</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>{text}
+              <p>App: <span data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</span><br>Publisher: Unknown publisher</p>
+              <div class="mock-btns">{mark(4, "Run anyway", "mock-btn")}<span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+        </div>""",
+    )
+
+
+# The Windows Setup drawings follow the real wizard (photos of 0.2.0 on
+# Windows 11): a blue title bar with the app icon and window buttons, a
+# white header with the logo on its right, the grey page below it, and
+# Windows' own button shapes. Setup's version label ("Axcess 0.2.0", bottom
+# left) and "Space needed" are left out: both change with every release,
+# and instructions should stay true after the next one.
+_WIN_TITLE_BAR = (
+    '<div class="mock-titlebar"><span class="mock-title-icon">'
+    + _MARK
+    + '</span><span class="mock-bar-title">Axcess Setup</span>'
+    '<span class="mock-controls"><i>&ndash;</i><i>▢</i><i>✕</i></span></div>'
+)
+
+
+def win_button(label: str, step: int | None = None, css: str = "") -> str:
+    """A Windows Setup button; marked with its step when it is the one to choose."""
+    cls = f"mock-btn mock-btn-win {css}".strip()
+    if step is None:
+        return f'<span class="{cls}">{label}</span>'
+    return mark(step, label, f"{cls} mock-btn-default")
+
+
+def win_setup(title: str, subtitle: str, body: str, buttons: str) -> str:
+    """The frame every Axcess Setup screen shares: header, page, buttons."""
+    return f"""<div class="mock-win mock-flat mock-setup">
+          {_WIN_TITLE_BAR}
+          <div class="mock-head"><div class="mock-grow"><p class="mock-title">{title}</p><p>{subtitle}</p></div><span class="mock-head-logo">{_MARK}</span></div>
+          <div class="mock-pad">{body}</div>
+          <div class="mock-btns mock-foot">{buttons}</div>
+        </div>"""
+
+
+def win_who() -> str:
+    body = f"""<p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+            <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-radio mock-on">{mark(5, "Only for me (your name)")}</p>
+            <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>"""
+    return drawing(
+        "Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses "
+        "this computer, and below it Only for me, followed by your account name. Only for me is selected and "
+        "marked 5. The Next button at the bottom right is marked 5.",
+        win_setup(
+            "Choose who can use Axcess",
+            "Install it for you, or for everyone who uses this computer.",
+            body,
+            win_button("Next &gt;", 5) + win_button("Cancel"),
+        ),
+    )
+
+
+def win_folder() -> str:
+    body = f"""<p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+            <p class="mock-field-label">Install folder:</p>
+            <div class="mock-row"><span class="mock-field mock-grow">{_WIN_FOLDER}</span>{win_button("Browse…")}</div>"""
+    return drawing(
+        "Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a "
+        "Browse button to its right. The Install button at the bottom right is marked 6.",
+        win_setup(
+            "Choose a folder",
+            "Choose where to install Axcess.",
+            body,
+            win_button("&lt; Back") + win_button("Install", 6) + win_button("Cancel"),
+        ),
+    )
+
+
+def win_finish() -> str:
+    body = f"""<p class="mock-title mock-title-big">Axcess is installed</p>
+            <p>Axcess is installed in this folder:<br><span class="mock-path">{_WIN_FOLDER}</span></p>
+            <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+            <p class="mock-check">Open Axcess now</p>"""
+    # Setup's picture panel: a laptop with a download arrow, on blue.
+    panel = (
+        '<div class="mock-panel"><svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" '
+        'stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"/>'
+        '<path d="M4 52h52M30 6v26m-9-9 9 9 9-9"/></svg></div>'
+    )
+    return drawing(
+        "Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the "
+        "left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the "
+        "buttons at the bottom, only Finish can be chosen, and it is marked 7.",
+        f"""<div class="mock-win mock-flat mock-setup">
+          {_WIN_TITLE_BAR}
+          <div class="mock-finish">{panel}<div class="mock-pad">{body}</div></div>
+          <div class="mock-btns mock-foot">{win_button("&lt; Back", css="mock-off")}{win_button("Finish", 7)}{win_button("Cancel", css="mock-off")}</div>
+        </div>""",
+    )
+
+
+# Screenshots of Axcess itself, beside the steps for a first scan.
+#
+# What: Steps 2 and 3 of Get started show the real Axcess screen for a step,
+# cropped to the part the step talks about. The step text still says
+# everything; the picture shows where it is.
+#
+# Why screenshots here, when the install steps use drawings: Axcess is our
+# own app, so a screenshot is exactly what people will see, and it costs
+# little to retake when the screen changes. Drawings were chosen for the
+# macOS and Windows screens because we cannot control those, and they
+# change with each system update. Rejected: drawings here too. They would
+# take more work, and they would still look less like the real screen.
+# A screenshot does not reflow at 320 px (it shrinks), so it must never
+# carry anything the step text leaves out. That keeps images of text to
+# the SC 1.4.5 Images of Text (Level AA) exception for pictures whose
+# words are also in the text, which is a paraphrase.
+#
+# Each picture's alt text says what it shows and where the thing to choose
+# is, for people who cannot see it (SC 1.1.1 Non-text Content, Level A).
+# width and height reserve its space before it loads, so the steps do not
+# jump. Left out on purpose: the site's own sign-in page. Every
+# organization's looks different, so a screenshot of one would send people
+# looking for a screen they will never see.
+#
+# Retake a screenshot when its screen's words change: the words in the
+# steps come from src/audit/web/frontend/src/components/newScan/copy.ts and
+# LocalLoginScan.tsx.
+def _png_size(path: Path) -> tuple[int, int]:
+    with path.open("rb") as f:
+        header = f.read(24)
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+
+
+def step_shot(name: str, alt: str) -> str:
+    width, height = _png_size(SITE / "assets" / "screens" / f"{name}.png")
+    return (
+        f'<img class="step-shot" src="../assets/screens/{name}.png" width="{width}" height="{height}" '
+        f'loading="lazy" alt="{alt}">'
+    )
+
+
 def get_started() -> str:
     return f"""
 <section class="hero hero-compact">
@@ -1557,14 +1843,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     </div>
     <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
     <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
+    <p class="small" style="margin-bottom:1rem">The drawings in the steps show where to look. A thick outline and the step number mark what to choose. The drawings are simplified, so your screen may look a little different.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for macOS</strong> and wait for {release_file_name("Mac-Apple-Silicon.dmg")} to finish downloading.</li>
-          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
-          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
-          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
+          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.{mac_drag_to_applications()}</li>
+          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.{mac_not_opened()}</li>
+          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.{mac_privacy_and_security()}</li>
           <li>Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>, then confirm with your Mac password or Touch ID.</li>
           <li>Choose <strong>Open</strong> in the final dialog. Axcess starts, and from now on it opens like any other app.</li>
         </ol>
@@ -1574,12 +1861,12 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for Windows</strong> and wait for {release_file_name("Windows-Installer.exe")} to finish downloading.</li>
-          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
+          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.{win_keep_download()}</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
-          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
-          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
+          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.{win_smartscreen()}</li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.{win_who()}</li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.{win_folder()}</li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.{win_finish()}</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
@@ -1614,11 +1901,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
-        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
-      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
+      <li><h3>Select "New scan"</h3><p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
+        {step_shot("new-scan-button", "The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them.")}</li>
+      <li><h3>Enter the address of one section</h3><p>In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>, turned off.</p>
+        {step_shot("new-scan-public", "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey.")}</li>
+      <li><h3>Set "Maximum pages" to about 25</h3><p>Open <em>Limits and rule check tool</em> to find it. The other settings are fine as they are, and the browser-based checks need no AI. The <em>What this scan will do</em> panel lists exactly which checks will run.</p>
+        {step_shot("maximum-pages", "The Limits and rule check tool group, open. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.")}
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under <em>Speed and browser window</em>.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are found and tested, and you can select <em>Stop scan</em> at any time.</p>
+        {step_shot("start-scan", "The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes.")}</li>
     </ol>
   </div>
 </section>
@@ -1631,14 +1922,17 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
     <ol class="steps">
-      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
-      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
-      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>Choose the sign-in tab</h3><p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
+        {step_shot("sign-in-tab", "The top of the New scan page. The second tab, Site with a sign-in or two-step sign-in (2FA), is chosen, beside the Public website tab.")}</li>
+      <li><h3>Enter where to start, and confirm you may scan</h3><p>In <em>Website address to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from. Axcess shows which pages it will scan. Then check the box that says the site owner allows this scan and that you will sign in with a test account that has only the access it needs.</p>
+        {step_shot("sign-in-address", "The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs.")}</li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens at the site&rsquo;s own sign-in page, which looks different for every organization. Sign in there as you usually do, including any two-step sign-in. If sign-in opens a new tab, finish in that tab. You are done when the browser shows the site itself, not a sign-in page.</p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, select <em>I&rsquo;m signed in, start scan</em>. The scan starts from the page in the newest tab that is still open in the browser. If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
+        {step_shot("signed-in-start", "The Finished signing in? box. It lists what happens when you start, and the button I&rsquo;m signed in, start scan is at its bottom left.")}</li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
-      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>. No password or reusable login is saved.</p></article>
       <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
@@ -1670,7 +1964,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="grid grid-3">
       <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
       <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
-      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. On the New scan page, the <em>Checks</em> group lets you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>

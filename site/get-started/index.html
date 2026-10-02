@@ -85,14 +85,39 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     </div>
     <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
     <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
+    <p class="small" style="margin-bottom:1rem">The drawings in the steps show where to look. A thick outline and the step number mark what to choose. The drawings are simplified, so your screen may look a little different.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for macOS</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
-          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
-          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
-          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
+          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.<div class="mock" role="img" aria-label="Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2."><div class="mock-win">
+          <div class="mock-bar"><span class="mock-dots"><i></i><i></i><i></i></span><span class="mock-bar-title">Axcess</span></div>
+          <div class="mock-drag">
+            <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="mock-mark mock-icon" data-step="2"><span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span><span>Axcess</span></span>
+          </div>
+        </div></div></li>
+          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.<div class="mock" role="img" aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3."><div class="mock-win mock-alert">
+          <span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span>
+          <p class="mock-title">“Axcess” Not Opened</p>
+          <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+          <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span><span class="mock-mark mock-btn mock-btn-pale" data-step="3">Done</span></div>
+        </div></div></li>
+          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.<div class="mock" role="img" aria-label="Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4, below General, Appearance and Accessibility. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."><div class="mock-win mock-settings">
+          <div class="mock-side">
+            <span class="mock-dots"><i></i><i></i><i></i></span>
+            <ul><li>General</li><li>Appearance</li><li>Accessibility</li><li><i class="mock-hidden"></i></li><li><span class="mock-mark mock-selected" data-step="4">Privacy &amp; Security</span></li><li><i class="mock-hidden"></i></li><li><i class="mock-hidden"></i></li></ul>
+          </div>
+          <div class="mock-main">
+            <p class="mock-title">Privacy &amp; Security</p>
+            <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+            <p class="mock-scroll">Scroll down <span>↓</span></p>
+            <p class="mock-heading">Security</p>
+            <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span><span class="mock-mark mock-btn" data-step="5">Open Anyway</span></div>
+          </div>
+        </div></div></li>
           <li>Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>, then confirm with your Mac password or Touch ID.</li>
           <li>Choose <strong>Open</strong> in the final dialog. Axcess starts, and from now on it opens like any other app.</li>
         </ol>
@@ -102,12 +127,55 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for Windows</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish downloading.</li>
-          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
+          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.<div class="mock" role="img" aria-label="Drawing of the browser&rsquo;s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."><div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+          <div class="mock-row mock-pad">
+            <span class="mock-warn">!</span>
+            <span class="mock-grow"><b data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</b> is not commonly downloaded. Make sure you trust it before you open it.</span>
+            <span class="mock-mark mock-btn mock-btn-icon" data-step="2">⋯</span>
+          </div>
+          <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark " data-step="2">Keep</span></li></ul>
+        </div></div></li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
-          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
-          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
+          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.<div class="mock" role="img" aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."><div class="mock-pair">
+          <div><p class="mock-label">First</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p><p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</p>
+              <p><span class="mock-mark mock-link" data-step="4">More info</span></p>
+              <div class="mock-btns"><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+          <div><p class="mock-label">After you choose More info</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p><p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</p>
+              <p>App: <span data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</span><br>Publisher: Unknown publisher</p>
+              <div class="mock-btns"><span class="mock-mark mock-btn" data-step="4">Run anyway</span><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+        </div></div></li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.<div class="mock" role="img" aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses this computer, and below it Only for me, followed by your account name. Only for me is selected and marked 5. The Next button at the bottom right is marked 5."><div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>&ndash;</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-head"><div class="mock-grow"><p class="mock-title">Choose who can use Axcess</p><p>Install it for you, or for everyone who uses this computer.</p></div><span class="mock-head-logo"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span></div>
+          <div class="mock-pad"><p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+            <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-radio mock-on"><span class="mock-mark " data-step="5">Only for me (your name)</span></p>
+            <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p></div>
+          <div class="mock-btns mock-foot"><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="5">Next &gt;</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+        </div></div></li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.<div class="mock" role="img" aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."><div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>&ndash;</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-head"><div class="mock-grow"><p class="mock-title">Choose a folder</p><p>Choose where to install Axcess.</p></div><span class="mock-head-logo"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span></div>
+          <div class="mock-pad"><p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+            <p class="mock-field-label">Install folder:</p>
+            <div class="mock-row"><span class="mock-field mock-grow">C:\Users\(your name)\AppData\Local\Programs\Axcess</span><span class="mock-btn mock-btn-win">Browse…</span></div></div>
+          <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="6">Install</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+        </div></div></li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.<div class="mock" role="img" aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the buttons at the bottom, only Finish can be chosen, and it is marked 7."><div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>&ndash;</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-finish"><div class="mock-panel"><svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"/><path d="M4 52h52M30 6v26m-9-9 9 9 9-9"/></svg></div><div class="mock-pad"><p class="mock-title mock-title-big">Axcess is installed</p>
+            <p>Axcess is installed in this folder:<br><span class="mock-path">C:\Users\(your name)\AppData\Local\Programs\Axcess</span></p>
+            <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+            <p class="mock-check">Open Axcess now</p></div></div>
+          <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win mock-off">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="7">Finish</span><span class="mock-btn mock-btn-win mock-off">Cancel</span></div>
+        </div></div></li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
@@ -142,11 +210,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">Start with a public site you are authorized to test and a low page limit. You will get a report quickly and a feel for the tool.</p>
     </div>
     <ol class="steps">
-      <li><h3>Select "Create New Scan"</h3><p>It is in the top bar of every screen. Choose the <em>Public website</em> tab.</p></li>
-      <li><h3>Paste the address of one section</h3><p>In <em>Site URL</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Crawl the entire host</em>, under <em>Advanced settings</em>, unchecked.</p></li>
-      <li><h3>Set "Max pages" to about 25</h3><p>You will find it under <em>Advanced settings</em>. The other defaults are fine, and the browser-based checks need no AI. The <em>Default scan settings</em> card lists exactly which checks will run.</p>
-        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under Advanced settings.</p></li>
-      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are discovered and tested, and you can select <em>Stop scan</em> at any time.</p></li>
+      <li><h3>Select "New scan"</h3><p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
+        <img class="step-shot" src="../assets/screens/new-scan-button.png" width="386" height="302" loading="lazy" alt="The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them."></li>
+      <li><h3>Enter the address of one section</h3><p>In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>, turned off.</p>
+        <img class="step-shot" src="../assets/screens/new-scan-public.png" width="1007" height="452" loading="lazy" alt="The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey."></li>
+      <li><h3>Set "Maximum pages" to about 25</h3><p>Open <em>Limits and rule check tool</em> to find it. The other settings are fine as they are, and the browser-based checks need no AI. The <em>What this scan will do</em> panel lists exactly which checks will run.</p>
+        <img class="step-shot" src="../assets/screens/maximum-pages.png" width="995" height="420" loading="lazy" alt="The Limits and rule check tool group, open. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.">
+        <p class="tip">Want to watch it work? Turn on "Show the scanning browser window" under <em>Speed and browser window</em>.</p></li>
+      <li><h3>Start the scan</h3><p>Select <em>Start scan</em>. Progress updates as pages are found and tested, and you can select <em>Stop scan</em> at any time.</p>
+        <img class="step-shot" src="../assets/screens/start-scan.png" width="454" height="180" loading="lazy" alt="The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes."></li>
     </ol>
   </div>
 </section>
@@ -159,14 +231,17 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
       <p class="sub">When you are comfortable, try a site that needs a login. You sign in yourself, so single sign-on and two-factor steps work, and Axcess never sees your password.</p>
     </div>
     <ol class="steps">
-      <li><h3>Choose the login tab</h3><p>Select <em>Create New Scan</em>, then the <em>Site with a login or 2FA</em> tab.</p></li>
-      <li><h3>Enter where to start</h3><p>In <em>Page to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from.</p></li>
-      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens. Sign in directly with the site, including any two-factor step.</p></li>
-      <li><h3>Start the scan</h3><p>Come back to Axcess and select <em>I&rsquo;m signed in, start scan</em>. The scan starts from where you landed and stays inside the scope of the address you entered.</p></li>
+      <li><h3>Choose the sign-in tab</h3><p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
+        <img class="step-shot" src="../assets/screens/sign-in-tab.png" width="630" height="170" loading="lazy" alt="The top of the New scan page. The second tab, Site with a sign-in or two-step sign-in (2FA), is chosen, beside the Public website tab."></li>
+      <li><h3>Enter where to start, and confirm you may scan</h3><p>In <em>Website address to scan after you sign in</em>, enter the HTTPS address of the page you want the scan to start from. Axcess shows which pages it will scan. Then check the box that says the site owner allows this scan and that you will sign in with a test account that has only the access it needs.</p>
+        <img class="step-shot" src="../assets/screens/sign-in-address.png" width="997" height="456" loading="lazy" alt="The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs."></li>
+      <li><h3>Sign in in the browser window</h3><p>Select <em>Open browser to sign in</em>. A browser window opens at the site&rsquo;s own sign-in page, which looks different for every organization. Sign in there as you usually do, including any two-step sign-in. If sign-in opens a new tab, finish in that tab. You are done when the browser shows the site itself, not a sign-in page.</p></li>
+      <li><h3>Start the scan</h3><p>Come back to Axcess. Under <em>Finished signing in?</em>, select <em>I&rsquo;m signed in, start scan</em>. The scan starts from the page in the newest tab that is still open in the browser. If that page is outside the address you entered, the scan starts from that address instead. Either way, it stays inside the address you entered.</p>
+        <img class="step-shot" src="../assets/screens/signed-in-start.png" width="970" height="418" loading="lazy" alt="The Finished signing in? box. It lists what happens when you start, and the button I&rsquo;m signed in, start scan is at its bottom left."></li>
     </ol>
     <div class="grid grid-3" style="margin-top:1.5rem">
       <article class="card"><h3>What it needs</h3><p>An HTTPS site whose address resolves to a public IP address. Sites on private network addresses cannot be scanned this way.</p></article>
-      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t store rendered pages</em>. No password or reusable login is saved.</p></article>
+      <article class="card"><h3>What is saved</h3><p>Rendered pages and screenshots of what you signed in to are saved in the local report, unless you choose <em>Don&rsquo;t keep a saved copy of each page</em>. No password or reusable login is saved.</p></article>
       <article class="card"><h3>What is different</h3><p>Login scans do not check robots.txt. They can't run the AI language and motion checks. Image text checks are off unless you turn them on. If Axcess restarts during a scan, start a new login scan.</p></article>
     </div>
   </div>
@@ -198,7 +273,7 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="grid grid-3">
       <article class="card"><h3>Authorization</h3><p>Scan only the sites and accounts you have permission to test. If you choose to ignore robots.txt, that choice is saved with the scan. Axcess refuses to press controls named sign out, delete, or unsubscribe.</p></article>
       <article class="card"><h3>One scan at a time</h3><p>Axcess runs one scan at a time. Start the next scan when the first one finishes.</p></article>
-      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. Advanced settings let you turn off individual checks when speed matters more.</p></article>
+      <article class="card" id="speed"><h3>Speed and coverage</h3><p>By default, Axcess renders each page in a real browser and checks it several ways, so large scans take a while. On the New scan page, the <em>Checks</em> group lets you turn off individual checks when speed matters more.</p></article>
     </div>
   </div>
 </section>

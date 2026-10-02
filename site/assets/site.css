@@ -233,6 +233,17 @@ section.band .btn-maize { color: var(--navy); }
 
 /* ---------- Product shot ---------- */
 .shot { display: block; width: 100%; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
+/* A screenshot beside a step (Get started, Steps 2 and 3): its own size
+   at most, so a small crop such as one button is not blown up and blurred,
+   and never wider than the step. Why screenshots: see "Screenshots of
+   Axcess itself" in build.py. */
+.step-shot { display: block; width: auto; max-width: 100%; height: auto; margin-top: .9rem; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+/* On a phone, a screenshot also uses the space under the step number:
+   the number column is a sixth of a 320 px screen, and every pixel makes
+   the picture's words easier to read. The text keeps its indent. */
+@media (max-width: 600px) {
+  .step-shot { margin-left: -3.2rem; max-width: calc(100% + 3.2rem); }
+}
 .shot-frame { padding: .6rem; background: linear-gradient(160deg, var(--soft-2), #fff); border-radius: 20px; border: 1px solid var(--line); }
 .caption { color: var(--muted); font-size: .9rem; margin-top: .8rem; }
 
@@ -421,6 +432,153 @@ td b { color: var(--navy); }
 .site-footer .brand { color: #fff; }
 .site-footer .brand small { color: #c9d7e6; }
 .site-footer .fine { border-top: 1px solid rgba(255,255,255,.12); padding-top: 1.3rem; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .88rem; }
+
+/* ---------- Install drawings (Get started) ----------
+   Simplified screens beside the install steps. Why they are HTML, how a
+   screen reader gets them, and why the marks look as they do: see
+   "Drawings of the install screens" in build.py. Sizes are in em, so a
+   drawing grows with the text, and the drawing's own width (a container
+   query, not the window's) decides when its parts stack, because the
+   drawing sits in a narrow card even on a wide screen. All text is 7:1 or
+   more on its background (SC 1.4.6 Contrast (Enhanced), Level AAA). */
+.mock { container-type: inline-size; margin: .7rem 0 1.1rem; font: .82rem/1.45 var(--font); color: #1d1d1f; letter-spacing: 0; }
+/* :where() keeps these defaults weaker than the part rules below. */
+:where(.mock) p { margin: 0 0 .5rem; }
+/* Beats ".card p" (muted grey), which would hide white text on blue. */
+.mock p { color: inherit; }
+:where(.mock) p:last-child { margin-bottom: 0; }
+:where(.mock) ul { list-style: none; margin: 0; padding: 0; }
+.mock-win { background: #fff; border: 1px solid #aab3bf; border-radius: 12px; box-shadow: var(--shadow); }
+.mock-flat { border-radius: 4px; }
+/* No overflow: hidden on the window, so a step number on a mark near
+   the edge is never cut off; the first and last parts round themselves. */
+.mock-bar, .mock-head { border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.mock-foot { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+.mock-bar { display: flex; align-items: center; gap: .6rem; padding: .35rem .7rem; background: #eef0f3; border-bottom: 1px solid #d5dae1; }
+.mock-bar-title { font-weight: 600; flex: 1; }
+.mock-dots { display: inline-flex; gap: .3rem; }
+.mock-dots i { width: .7em; height: .7em; border-radius: 50%; background: #ff5f57; }
+.mock-dots i:nth-child(2) { background: #febc2e; }
+.mock-dots i:nth-child(3) { background: #28c840; }
+.mock-pad { padding: .8rem .9rem; }
+.mock-title { font-weight: 700; font-size: 1.08em; }
+.mock-row { display: flex; align-items: center; justify-content: flex-end; gap: .7rem; }
+/* 10em before it wraps: a narrow drawing puts the button under the
+   text rather than squeezing the text to one word per line. */
+.mock-grow { flex: 1 1 10em; min-width: 0; }
+.mock b, .mock-path, .mock-field { overflow-wrap: anywhere; }
+.mock-btn { display: inline-block; padding: .25em .85em; border: 1px solid #8a94a3; border-radius: 6px; background: #fff; color: #1d1d1f; font-weight: 600; white-space: nowrap; }
+.mock-btn-mac { background: #0050c0; border-color: #0050c0; color: #fff; }
+.mock-btn-pale { background: #e5e5ea; border-color: #e5e5ea; }
+.mock-btn-icon { padding: .1em .6em; font-size: 1.1em; }
+.mock-btns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.mock-stack { display: grid; gap: .5rem; }
+.mock-stack .mock-btn { text-align: center; }
+
+/* The mark: navy outline outside a maize ring. Outline, not only a shadow,
+   because a high-contrast theme keeps outlines and drops shadows. */
+.mock-mark { position: relative; display: inline-block; outline: 3px solid var(--navy); outline-offset: 3px; box-shadow: 0 0 0 3px var(--maize); border-radius: 6px; }
+.mock-mark::after {
+  content: attr(data-step); position: absolute; top: -1.15em; right: -1.1em; z-index: 1;
+  min-width: 1.6em; height: 1.6em; border-radius: 50%; display: grid; place-items: center;
+  background: var(--navy); color: #fff; border: 2px solid var(--maize); font: 800 .78rem/1 var(--font);
+}
+
+/* macOS: the disk image window */
+.mock-drag { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 1rem 1.4rem; padding: 1.4rem 1rem 1.1rem; }
+.mock-icon { display: inline-grid; justify-items: center; gap: .3rem; padding: .3rem .4rem; }
+/* The real app icon (desktop/assets/axcess.svg): the navy mark on a light
+   tile, so people look for the icon they will actually see. The tile is
+   close to white, so a thin border and a shadow, as a Mac gives app
+   icons, keep its shape visible on a white window. */
+.mock-app { display: grid; place-items: center; width: 3.2em; height: 3.2em; border-radius: 22%; background: #f2f5f9; color: var(--navy); border: 1px solid #aab3bf; box-shadow: 0 1px 3px rgba(0, 39, 76, .18); }
+.mock-app svg { width: 60%; height: 60%; }
+.mock-folder { position: relative; width: 3.4em; height: 2.6em; margin-top: .6em; border-radius: 4px; background: #5aa9e6; }
+.mock-folder::before { content: ""; position: absolute; left: 0; top: -.45em; width: 45%; height: .6em; border-radius: 4px 4px 0 0; background: #5aa9e6; }
+.mock-arrow { width: 3em; color: var(--navy); }
+
+/* macOS: the warning message */
+.mock-alert { max-width: 17rem; margin: 0 auto; padding: 1rem; text-align: center; background: #f6f6f6; }
+.mock-alert .mock-app { margin: 0 auto .6rem; }
+
+/* macOS: System Settings */
+.mock-settings { display: grid; grid-template-columns: minmax(8.5rem, 38%) 1fr; }
+.mock-side { border-radius: 12px 0 0 12px; background: #eef0f3; border-right: 1px solid #d5dae1; padding: .6rem .5rem; }
+.mock-side .mock-dots { margin: 0 0 .6rem .3rem; }
+.mock-side li { padding: .2rem .45rem; }
+.mock-selected { display: block; margin: .15rem -.45rem; padding: .2rem .45rem; background: #0050c0; color: #fff; font-weight: 600; }
+/* The selected row is as wide as the list, so its number sits inside
+   the row's end, not past the drawing's edge. */
+.mock-selected::after { right: .3em; }
+/* A setting whose name the drawing leaves out: a grey bar, one line tall. */
+.mock-hidden { display: inline-block; vertical-align: middle; width: 6em; height: .6em; border-radius: 4px; background: #d5dae1; }
+.mock-main { padding: .7rem .8rem; min-width: 0; }
+.mock-group { border: 1px solid #d5dae1; border-radius: 8px; background: #f7f8fa; padding: .55rem .65rem; }
+.mock-faint { display: grid; gap: .45rem; }
+.mock-faint i { display: block; height: .55em; border-radius: 4px; background: #dde1e7; }
+.mock-faint i:nth-child(2) { width: 80%; }
+.mock-faint i:nth-child(3) { width: 60%; }
+.mock .mock-scroll { margin: .5rem 0; color: #374151; font-style: italic; text-align: center; }
+.mock-heading { font-weight: 700; margin-bottom: .35rem; }
+@container (max-width: 22rem) {
+  .mock-settings { grid-template-columns: 1fr; }
+  .mock-side { border-right: 0; border-bottom: 1px solid #d5dae1; border-radius: 12px 12px 0 0; }
+  .mock-row { flex-wrap: wrap; }
+}
+
+/* Windows: the browser's downloads list */
+.mock-warn { flex: none; display: grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%; background: #fde7b0; color: #5c3b00; font-weight: 800; }
+.mock-menu { margin: 0 .9rem .9rem auto; width: max-content; max-width: 100%; border: 1px solid #aab3bf; border-radius: 6px; box-shadow: var(--shadow); padding: .35rem 0; }
+.mock-menu li { padding: .3rem 1rem; }
+.mock-menu .mock-mark { padding: 0 .4rem; }
+
+/* Windows: the blue SmartScreen window */
+.mock-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
+.mock .mock-label { font-weight: 700; color: var(--navy); margin-bottom: .35rem; }
+.mock-blue { background: #0a4a87; border-color: #0a4a87; color: #fff; padding: .9rem; }
+.mock-blue .mock-title { font-size: 1.3em; font-weight: 400; }
+.mock-blue .mock-btn { background: transparent; border-color: #fff; color: #fff; border-radius: 2px; }
+.mock-blue .mock-btns { margin-top: .9rem; }
+.mock-link { text-decoration: underline; padding: 0 .15rem; }
+
+/* Windows: Axcess Setup. Colours follow the real wizard on Windows 11;
+   the title bar blue is darkened from Windows' accent so its white text
+   keeps 7:1. Setup's greyed-out buttons keep 7:1 text too, and show that
+   they are off by their faint border and lighter face. */
+.mock-titlebar { display: flex; align-items: center; gap: .5rem; padding: .3rem .6rem; background: #0b4f94; color: #fff; border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.mock-titlebar .mock-bar-title { font-weight: 400; }
+.mock-title-icon { display: grid; place-items: center; width: 1.25em; height: 1.25em; border-radius: 3px; background: #fff; color: var(--navy); }
+.mock-title-icon svg { width: 80%; height: 80%; }
+.mock-controls { display: flex; gap: 1.1em; }
+.mock-controls i { font-style: normal; }
+.mock-setup .mock-pad, .mock-setup .mock-foot { background: #f0f0f0; }
+.mock-head { display: flex; align-items: center; gap: .8rem; padding: .6rem .9rem; border-bottom: 1px solid #c8c8c8; background: #fff; }
+.mock-head p:not(.mock-title) { color: #374151; padding-left: .7rem; }
+.mock-head-logo { flex: none; width: 1.9em; height: 1.9em; color: var(--navy); }
+.mock-foot { padding: .7rem .9rem; border-top: 1px solid #c8c8c8; background: #f3f4f6; border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+.mock-btn-win { min-width: 5.5em; text-align: center; padding: .25em 1em; border: 1px solid #adadad; border-radius: 4px; background: #fdfdfd; font-weight: 400; }
+.mock-btn-default { border: 2px solid #005fb8; }
+.mock-off { background: #f5f5f5; border-color: #d4d4d4; color: #374151; }
+.mock-radio, .mock-check { display: flex; align-items: center; gap: .55rem; }
+.mock-radio { margin-left: 1.6rem; }
+.mock-radio::before { content: ""; flex: none; width: 1em; height: 1em; border-radius: 50%; border: 1px solid #5f6368; background: #fff; }
+.mock-on::before { border: 0; background: radial-gradient(circle, #fff 0 28%, #005fb8 32%); }
+.mock-check::before { content: "✓"; flex: none; display: grid; place-items: center; width: 1.1em; height: 1.1em; border-radius: 3px; background: #005fb8; color: #fff; font-weight: 800; line-height: 1; }
+.mock-radio .mock-mark { padding: 0 .3rem; }
+.mock .mock-note { color: #374151; margin-top: .9rem; }
+.mock-field-label { margin-bottom: .25rem; }
+.mock-field { border: 1px solid #c8c8c8; border-bottom: 2px solid #005fb8; border-radius: 3px; padding: .25rem .5rem; background: #fff; }
+.mock-finish { display: grid; grid-template-columns: minmax(3.5rem, 30%) 1fr; background: #fff; }
+.mock-finish .mock-pad { background: #fff; }
+.mock-title-big { font-size: 1.3em; }
+.mock-panel { display: grid; place-items: center; background: #0b4f94; color: #fff; padding: .8rem; }
+.mock-panel svg { width: 80%; max-width: 6rem; }
+
+@media (forced-colors: active) {
+  .mock-mark { outline-color: Highlight; }
+  .mock-mark::after { border-color: Highlight; }
+  .mock-btn-mac, .mock-selected, .mock-blue, .mock-titlebar, .mock-panel { border: 1px solid CanvasText; }
+}
 
 @media print {
   .site-header, .site-footer, .pager, .nav-toggle, .skip { display: none !important; }
