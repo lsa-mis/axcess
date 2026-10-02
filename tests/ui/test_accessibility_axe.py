@@ -703,8 +703,12 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     assert "issue groups" not in text and "issues" not in text, text
     assert "occurrences" not in text, text
     issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    # The scan's start time ("Oct 2, 2026, 04:00 PM") is not a count, and on
+    # the 2nd of a month its day matched a count of 2. Leave it out of the
+    # search; a count anywhere else in the subtitle still fails.
+    without_date = re.sub(r"\b[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}\s?[AP]M\b", "", text)
     for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
-        assert not re.search(rf"\b{count}\b", text), (count, text)
+        assert not re.search(rf"\b{count}\b", without_date), (count, text)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(
