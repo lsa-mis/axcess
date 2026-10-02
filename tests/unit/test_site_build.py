@@ -79,3 +79,42 @@ def test_volume_is_unlisted(pages: dict[str, str]) -> None:
 def test_honesty_statement_is_present(pages: dict[str, str]) -> None:
     for slug, doc in pages.items():
         assert "does not certify WCAG conformance" in doc, slug
+
+
+def test_setup_drawings_use_the_installer_words(pages: dict[str, str]) -> None:
+    """The Windows Setup drawings repeat the wizard's words; keep them in step.
+
+    The words come from desktop/installer/installer.nsh. If the installer's
+    wording changes, the drawings on Get started must change with it.
+    """
+    nsh = (ROOT / "desktop" / "installer" / "installer.nsh").read_text(encoding="utf-8")
+    words = {
+        m.group(1): m.group(2).replace("&", "")
+        for m in re.finditer(r'LangString (\w+) \$\{LANG_ENGLISH\} "([^"]*)"', nsh)
+    }
+    page = pages["get-started"]
+    for key in (
+        "chooseInstallationOptions",
+        "whoShouldThisApplicationBeInstalledFor",
+        "selectUserMode",
+        "onlyForMe",
+        "forAll",
+        "freshInstallForCurrent",
+        "MUI_TEXT_DIRECTORY_TITLE",
+        "MUI_TEXT_DIRECTORY_SUBTITLE",
+        "axcessFolderIntro",
+        "axcessFolderLabel",
+        "MUI_TEXT_FINISH_INFO_TITLE",
+        "MUI_TEXT_FINISH_RUN",
+    ):
+        assert words[key] in page, key
+    finish_last_line = words["MUI_TEXT_FINISH_INFO_TEXT"].split("$\\r$\\n")[-1]
+    assert finish_last_line in page
+
+
+def test_install_drawings_are_named_pictures(pages: dict[str, str]) -> None:
+    page = pages["get-started"]
+    drawings = re.findall(r'<div class="mock" role="img" aria-label="([^"]+)">', page)
+    assert len(drawings) == page.count('class="mock"') == 8
+    assert all(d.startswith(("Drawing of", "Two drawings of")) for d in drawings)
+    assert "The drawings are simplified, so your screen may look a little different." in page

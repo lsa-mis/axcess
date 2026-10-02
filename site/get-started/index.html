@@ -85,14 +85,39 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     </div>
     <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
     <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
+    <p class="small" style="margin-bottom:1rem">The drawings in the steps show where to look. A thick outline and the step number mark what to choose. The drawings are simplified, so your screen may look a little different.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for macOS</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish downloading.</li>
-          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
-          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
-          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
+          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.<div class="mock" role="img" aria-label="Drawing of the window that opens with the downloaded file. It shows the Axcess app on the left and the Applications folder on the right, with an arrow from Axcess to Applications. Axcess is marked 2."><div class="mock-win">
+          <div class="mock-bar"><span class="mock-dots"><i></i><i></i><i></i></span><span class="mock-bar-title">Axcess</span></div>
+          <div class="mock-drag">
+            <span class="mock-mark mock-icon" data-step="2"><span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span><span>Axcess</span></span>
+            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M2 8h40m-8-6 8 6-8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+          </div>
+        </div></div></li>
+          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.<div class="mock" role="img" aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: Done, marked 3, and Move to Trash."><div class="mock-win mock-alert">
+          <span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span>
+          <p class="mock-title">“Axcess” Not Opened</p>
+          <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+          <div class="mock-stack"><span class="mock-mark mock-btn mock-btn-mac" data-step="3">Done</span><span class="mock-btn">Move to Trash</span></div>
+        </div></div></li>
+          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.<div class="mock" role="img" aria-label="Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."><div class="mock-win mock-settings">
+          <div class="mock-side">
+            <span class="mock-dots"><i></i><i></i><i></i></span>
+            <ul><li>General</li><li>Appearance</li><li>Accessibility</li><li>Control Center</li><li><span class="mock-mark mock-selected" data-step="4">Privacy &amp; Security</span></li><li>Desktop &amp; Dock</li><li>Displays</li></ul>
+          </div>
+          <div class="mock-main">
+            <p class="mock-title">Privacy &amp; Security</p>
+            <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+            <p class="mock-scroll">Scroll down <span>↓</span></p>
+            <p class="mock-heading">Security</p>
+            <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span><span class="mock-mark mock-btn" data-step="5">Open Anyway</span></div>
+          </div>
+        </div></div></li>
           <li>Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>, then confirm with your Mac password or Touch ID.</li>
           <li>Choose <strong>Open</strong> in the final dialog. Axcess starts, and from now on it opens like any other app.</li>
         </ol>
@@ -102,12 +127,54 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for Windows</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish downloading.</li>
-          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
+          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.<div class="mock" role="img" aria-label="Drawing of the browser&rsquo;s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."><div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+          <div class="mock-row mock-pad">
+            <span class="mock-warn">!</span>
+            <span class="mock-grow"><b data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</b> is not commonly downloaded. Make sure you trust it before you open it.</span>
+            <span class="mock-mark mock-btn mock-btn-icon" data-step="2">⋯</span>
+          </div>
+          <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark " data-step="2">Keep</span></li></ul>
+        </div></div></li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
-          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
-          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
+          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.<div class="mock" role="img" aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."><div class="mock-pair">
+          <div><p class="mock-label">First</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p><p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</p>
+              <p><span class="mock-mark mock-link" data-step="4">More info</span></p>
+              <div class="mock-btns"><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+          <div><p class="mock-label">After you choose More info</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p><p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.</p>
+              <p>App: <span data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</span><br>Publisher: Unknown publisher</p>
+              <div class="mock-btns"><span class="mock-mark mock-btn" data-step="4">Run anyway</span><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+        </div></div></li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.<div class="mock" role="img" aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. Of its two choices, Only for me is selected and marked 5. The other is Everyone who uses this computer. The Next button at the bottom right is marked 5."><div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
+          <div class="mock-head"><p class="mock-title">Choose who can use Axcess</p><p>Install it for you, or for everyone who uses this computer.</p></div>
+          <div class="mock-pad"><p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+            <p class="mock-radio mock-on"><span class="mock-mark " data-step="5">Only for me</span></p>
+            <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p></div>
+          <div class="mock-btns mock-foot"><span class="mock-mark mock-btn" data-step="5">Next &gt;</span><span class="mock-btn">Cancel</span></div>
+        </div></div></li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.<div class="mock" role="img" aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."><div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
+          <div class="mock-head"><p class="mock-title">Choose a folder</p><p>Choose where to install Axcess.</p></div>
+          <div class="mock-pad"><p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+            <p class="mock-field-label">Install folder:</p>
+            <div class="mock-row"><span class="mock-field mock-grow">C:\Users\(your name)\AppData\Local\Programs\Axcess</span><span class="mock-btn">Browse…</span></div></div>
+          <div class="mock-btns mock-foot"><span class="mock-btn">&lt; Back</span><span class="mock-mark mock-btn" data-step="6">Install</span><span class="mock-btn">Cancel</span></div>
+        </div></div></li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.<div class="mock" role="img" aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. It shows the install folder. Below it, Open Axcess now is checked. The Finish button at the bottom right is marked 7."><div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
+          <div class="mock-pad"><p class="mock-title">Axcess is installed</p><p>Axcess is installed in this folder:<br><span class="mock-path">C:\Users\(your name)\AppData\Local\Programs\Axcess</span></p>
+            <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+            <p class="mock-check">Open Axcess now</p></div>
+          <div class="mock-btns mock-foot"><span class="mock-mark mock-btn" data-step="7">Finish</span></div>
+        </div></div></li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>

@@ -1512,6 +1512,216 @@ def privacy() -> str:
 """
 
 
+# Drawings of the install screens, beside the step that needs each one.
+#
+# What: each drawing is plain HTML and CSS (site.css, "Install drawings"),
+# not a screenshot. A two-colour outline and the step's number mark what to
+# choose. People who are new to installing apps can then match the words in
+# a step to a place on their screen.
+#
+# Why HTML and not a PNG or SVG picture: its text reflows at 320 px wide
+# instead of shrinking (SC 1.4.10 Reflow, Level AA). It grows with the
+# browser's text size (SC 1.4.4 Resize Text, Level AA). It takes the
+# colours of a Windows high-contrast theme. And it needs no new picture
+# files to keep up to date. A screenshot was rejected for the same reasons,
+# and because it would date with every macOS or Windows update.
+#
+# For screen readers, each drawing is one picture (role="img") named by a
+# short description. That matches technique ARIA4. Screen readers treat the
+# drawn "buttons" inside as part of the picture and do not read them as
+# controls; nothing in a drawing can be focused, so keyboard users do not
+# stop on fake controls. The description says where each marked thing is,
+# for screen reader users and for anyone the picture does not help.
+# Paraphrased from the ARIA spec: the img role's children are
+# presentational (https://www.w3.org/TR/wai-aria-1.2/#img).
+#
+# The marks use an outline, a number and a ring, not colour alone (SC 1.4.1
+# Use of Color, Level A). The ring has a navy part and a maize part, so
+# one of them stands out on a white or a blue window (SC 1.4.11 Non-text
+# Contrast, Level AA; the two-colour idea is technique C40). All text in a
+# drawing keeps the site's 7:1 contrast (SC 1.4.6, Level AAA), so some
+# button blues are darker than the real ones.
+#
+# The words in a drawing are the words on the real screen, where we know
+# them. The Windows setup words come from desktop/installer/installer.nsh,
+# so change both together. The macOS and Windows warning words are from
+# Apple and Microsoft and can change. The note above the steps says the
+# drawings are simplified.
+_APP_TILE = (
+    '<span class="mock-app"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" '
+    'stroke-linecap="round" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/>'
+    '<path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 '
+    'C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/>'
+    '<circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg></span>'
+)
+_MAC_DOTS = '<span class="mock-dots"><i></i><i></i><i></i></span>'
+_WIN_FOLDER = "C:\\Users\\(your name)\\AppData\\Local\\Programs\\Axcess"
+
+
+def drawing(description: str, body: str) -> str:
+    """One install-screen drawing, read as a single picture."""
+    return f'<div class="mock" role="img" aria-label="{description}">{body}</div>'
+
+
+def mark(step: int, inner: str, css: str = "") -> str:
+    """Outline what to choose in a drawing, with its step number."""
+    return f'<span class="mock-mark {css}" data-step="{step}">{inner}</span>'
+
+
+def mac_drag_to_applications() -> str:
+    return drawing(
+        "Drawing of the window that opens with the downloaded file. It shows the Axcess app on the left and "
+        "the Applications folder on the right, with an arrow from Axcess to Applications. Axcess is marked 2.",
+        f"""<div class="mock-win">
+          <div class="mock-bar">{_MAC_DOTS}<span class="mock-bar-title">Axcess</span></div>
+          <div class="mock-drag">
+            {mark(2, f'{_APP_TILE}<span>Axcess</span>', "mock-icon")}
+            <svg class="mock-arrow" viewBox="0 0 48 16" focusable="false"><path d="M2 8h40m-8-6 8 6-8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+          </div>
+        </div>""",
+    )
+
+
+def mac_not_opened() -> str:
+    return drawing(
+        "Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. "
+        "It has two buttons, one above the other: Done, marked 3, and Move to Trash.",
+        f"""<div class="mock-win mock-alert">
+          {_APP_TILE}
+          <p class="mock-title">“Axcess” Not Opened</p>
+          <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+          <div class="mock-stack">{mark(3, "Done", "mock-btn mock-btn-mac")}<span class="mock-btn">Move to Trash</span></div>
+        </div>""",
+    )
+
+
+def mac_privacy_and_security() -> str:
+    sidebar = "".join(
+        f"<li>{name}</li>" for name in ("General", "Appearance", "Accessibility", "Control Center")
+    )
+    return drawing(
+        "Drawing of System Settings. The list on the left has Privacy &amp; Security selected, marked 4. "
+        "On the right, below other settings, is the Security heading. Under it, the message “Axcess” was "
+        "blocked to protect your Mac has an Open Anyway button on its right, marked 5.",
+        f"""<div class="mock-win mock-settings">
+          <div class="mock-side">
+            {_MAC_DOTS}
+            <ul>{sidebar}<li>{mark(4, "Privacy &amp; Security", "mock-selected")}</li><li>Desktop &amp; Dock</li><li>Displays</li></ul>
+          </div>
+          <div class="mock-main">
+            <p class="mock-title">Privacy &amp; Security</p>
+            <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+            <p class="mock-scroll">Scroll down <span>↓</span></p>
+            <p class="mock-heading">Security</p>
+            <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span>{mark(5, "Open Anyway", "mock-btn")}</div>
+          </div>
+        </div>""",
+    )
+
+
+def win_keep_download() -> str:
+    return drawing(
+        "Drawing of the browser&rsquo;s list of downloads. The Axcess installer has a warning that it is not "
+        "commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu "
+        "that opens below it.",
+        f"""<div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+          <div class="mock-row mock-pad">
+            <span class="mock-warn">!</span>
+            <span class="mock-grow"><b data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</b> is not commonly downloaded. Make sure you trust it before you open it.</span>
+            {mark(2, "⋯", "mock-btn mock-btn-icon")}
+          </div>
+          <ul class="mock-menu"><li>Delete</li><li>{mark(2, "Keep")}</li></ul>
+        </div>""",
+    )
+
+
+def win_smartscreen() -> str:
+    text = (
+        "<p>Microsoft Defender SmartScreen prevented an unrecognized app from starting. "
+        "Running this app might put your PC at risk.</p>"
+    )
+    return drawing(
+        "Two drawings of the blue Windows protected your PC window. In the first, the More info link under "
+        "the message is marked 4. In the second, after you choose More info, it shows the app and Unknown "
+        "publisher, and the Run anyway button at the bottom is marked 4.",
+        f"""<div class="mock-pair">
+          <div><p class="mock-label">First</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>{text}
+              <p>{mark(4, "More info", "mock-link")}</p>
+              <div class="mock-btns"><span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+          <div><p class="mock-label">After you choose More info</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>{text}
+              <p>App: <span data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</span><br>Publisher: Unknown publisher</p>
+              <div class="mock-btns">{mark(4, "Run anyway", "mock-btn")}<span class="mock-btn">Don&rsquo;t run</span></div>
+            </div></div>
+        </div>""",
+    )
+
+
+def win_setup(title: str, subtitle: str, body: str, buttons: str) -> str:
+    """The frame every Axcess Setup screen shares: header, page, buttons."""
+    return f"""<div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
+          <div class="mock-head"><p class="mock-title">{title}</p><p>{subtitle}</p></div>
+          <div class="mock-pad">{body}</div>
+          <div class="mock-btns mock-foot">{buttons}</div>
+        </div>"""
+
+
+def win_who() -> str:
+    body = f"""<p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+            <p class="mock-radio mock-on">{mark(5, "Only for me")}</p>
+            <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>"""
+    return drawing(
+        "Drawing of the Axcess Setup screen Choose who can use Axcess. Of its two choices, Only for me is "
+        "selected and marked 5. The other is Everyone who uses this computer. The Next button at the bottom "
+        "right is marked 5.",
+        win_setup(
+            "Choose who can use Axcess",
+            "Install it for you, or for everyone who uses this computer.",
+            body,
+            f'{mark(5, "Next &gt;", "mock-btn")}<span class="mock-btn">Cancel</span>',
+        ),
+    )
+
+
+def win_folder() -> str:
+    body = f"""<p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+            <p class="mock-field-label">Install folder:</p>
+            <div class="mock-row"><span class="mock-field mock-grow">{_WIN_FOLDER}</span><span class="mock-btn">Browse…</span></div>"""
+    return drawing(
+        "Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a "
+        "Browse button to its right. The Install button at the bottom right is marked 6.",
+        win_setup(
+            "Choose a folder",
+            "Choose where to install Axcess.",
+            body,
+            f'<span class="mock-btn">&lt; Back</span>{mark(6, "Install", "mock-btn")}<span class="mock-btn">Cancel</span>',
+        ),
+    )
+
+
+def win_finish() -> str:
+    body = f"""<p>Axcess is installed in this folder:<br><span class="mock-path">{_WIN_FOLDER}</span></p>
+            <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+            <p class="mock-check">Open Axcess now</p>"""
+    return drawing(
+        "Drawing of the last Axcess Setup screen, Axcess is installed. It shows the install folder. "
+        "Below it, Open Axcess now is checked. The Finish button at the bottom right is marked 7.",
+        f"""<div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Axcess Setup</span><span class="mock-close">✕</span></div>
+          <div class="mock-pad"><p class="mock-title">Axcess is installed</p>{body}</div>
+          <div class="mock-btns mock-foot">{mark(7, "Finish", "mock-btn")}</div>
+        </div>""",
+    )
+
+
 def get_started() -> str:
     return f"""
 <section class="hero hero-compact">
@@ -1557,14 +1767,15 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     </div>
     <h3 id="first-launch" style="margin:2rem 0 .4rem">Desktop app installation steps</h3>
     <p class="small" style="margin-bottom:1rem">The preview is not yet notarized by Apple or code-signed for Windows, so each system shows a warning the first time. The warning is expected for this build. You approve it once, and later launches open normally.</p>
+    <p class="small" style="margin-bottom:1rem">The drawings in the steps show where to look. A thick outline and the step number mark what to choose. The drawings are simplified, so your screen may look a little different.</p>
     <div class="grid grid-2">
       <article class="card">
         <h4>On a Mac (Apple Silicon)</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for macOS</strong> and wait for {release_file_name("Mac-Apple-Silicon.dmg")} to finish downloading.</li>
-          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.</li>
-          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.</li>
-          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.</li>
+          <li>Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.{mac_drag_to_applications()}</li>
+          <li>Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.{mac_not_opened()}</li>
+          <li>Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.{mac_privacy_and_security()}</li>
           <li>Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>, then confirm with your Mac password or Touch ID.</li>
           <li>Choose <strong>Open</strong> in the final dialog. Axcess starts, and from now on it opens like any other app.</li>
         </ol>
@@ -1574,12 +1785,12 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
         <h4>On Windows 10 or 11</h4>
         <ol style="margin:.75rem 0 0;padding-left:1.25rem">
           <li>Select <strong>Download for Windows</strong> and wait for {release_file_name("Windows-Installer.exe")} to finish downloading.</li>
-          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.</li>
+          <li>If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.{win_keep_download()}</li>
           <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.</li>
-          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.</li>
-          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.</li>
-          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.</li>
+          <li>Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears; choose it.{win_smartscreen()}</li>
+          <li>Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.{win_who()}</li>
+          <li>The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to pick another. Then choose <strong>Install</strong>.{win_folder()}</li>
+          <li>The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.{win_finish()}</li>
           <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
         </ol>
         <p class="small" style="margin-top:.75rem">If <strong>Run anyway</strong> does not appear, your computer is managed by your organization and blocks unsigned apps. Ask your IT support to allow it.</p>
