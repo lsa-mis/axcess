@@ -98,7 +98,7 @@ async def test_flags_no_visible_focus_extra_stops_and_reordered_rows(page) -> No
     # checkbox), the paragraph with tabindex="0" (not the scroller, the custom
     # control or the described term) and the floated row (not the plain nav).
     assert found == {
-        RULE_FOCUS_NOT_VISIBLE: ["none"],
+        RULE_FOCUS_NOT_VISIBLE: ["none", "f78"],
         RULE_NON_INTERACTIVE_STOP: ["stop"],
         RULE_VISUAL_ORDER: ["broken"],
     }
@@ -114,3 +114,27 @@ async def test_flags_no_visible_focus_extra_stops_and_reordered_rows(page) -> No
 async def test_the_newer_checks_can_be_turned_off(page) -> None:  # type: ignore[no-untyped-def]
     await page.goto(_file_url("visibility_order.html"))
     assert await FocusProbe(focus_order_checks=False).run(page) == []
+
+
+async def test_focus_appearance_runs_only_when_asked_and_flags_thin_indicators(page) -> None:  # type: ignore[no-untyped-def]
+    from audit.analyzer.focus.base import RULE_FOCUS_APPEARANCE
+
+    await page.goto(_file_url("visibility_order.html"))
+    assert RULE_FOCUS_APPEARANCE not in {f.rule_id for f in await FocusProbe().run(page)}
+    findings = await FocusProbe(include_aaa=True).run(page)
+    thin = [f for f in findings if f.rule_id == RULE_FOCUS_APPEARANCE]
+    ids = {await page.locator(f.target_selector).get_attribute("id") for f in thin}
+    # The 1px grey outline fails; the 3px blue outline, the default ring and
+    # the 3px box-shadow ring pass.
+    assert "thin" in ids and not ids & {"thick", "default", "ring"}
+    assert (thin[0].criterion_sc, thin[0].wcag_level) == ("2.4.13", "AAA")
+
+
+async def test_a_control_left_focused_is_measured_unfocused_first(page) -> None:  # type: ignore[no-untyped-def]
+    # One control with a box-shadow ring. The obscured check focuses it and
+    # leaves it focused; the visibility check must not read that as "before".
+    await page.set_content(
+        "<style>.b:focus{outline:none;box-shadow:0 0 0 3px #005fcc}</style>"
+        "<main><button class='b'>Only control</button></main>"
+    )
+    assert await FocusProbe().run(page) == []

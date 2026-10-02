@@ -32,7 +32,7 @@ async def main(subjects):
                 await pg.goto(url, wait_until="load", timeout=60000)
                 await pg.wait_for_timeout(3000)
                 t = time.perf_counter()
-                fs = await FocusProbe().run(pg)
+                fs = await FocusProbe(include_aaa="--aaa" in sys.argv).run(pg)
                 ms = (time.perf_counter() - t) * 1000
                 print(
                     json.dumps(
@@ -50,4 +50,4 @@ async def main(subjects):
         await b.close()
 
 
-asyncio.run(main(sys.argv[1:]))
+asyncio.run(main([a for a in sys.argv[1:] if a != "--aaa"]))

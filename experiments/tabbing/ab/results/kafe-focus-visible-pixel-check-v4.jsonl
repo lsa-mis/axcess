@@ -1,0 +1,71 @@
+{"s": "fandango", "sel": "a#ctl00_GlobalBody_SignOnControl_SignInButton", "noise": 0, "change": 0, "area": 29057}
+{"s": "snapchat", "sel": "div#root > div:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2500}
+{"s": "snapchat", "sel": "div#root > div:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 12325}
+{"s": "snapchat", "sel": "div#root > div:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 2025}
+{"s": "snapchat", "sel": "button#cookiePopupAcceptEU", "err": "Page.screenshot: Clipped area is either empty or outside the"}
+{"s": "flickr", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 4180}
+{"s": "venmo", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 30652}
+{"s": "groupon", "sel": "a#ls-groupon-logo", "noise": 0, "change": 0, "area": 6278}
+{"s": "groupon", "sel": "a#ls-rvd-link", "noise": 0, "change": 0, "area": 4722}
+{"s": "groupon", "sel": "a#ls-cart-link", "noise": 0, "change": 0, "area": 1624}
+{"s": "groupon", "sel": "a#user-merchant", "noise": 0, "change": 0, "area": 1676}
+{"s": "groupon", "sel": "a#user-help", "noise": 0, "change": 0, "area": 1953}
+{"s": "groupon", "sel": "form#login-form > fieldset:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 6572}
+{"s": "groupon", "sel": "input#remember-me-checkbox", "noise": 0, "change": 0, "area": 1089}
+{"s": "groupon", "sel": "li#field-login-acceptTerms-input > label:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 4104}
+{"s": "groupon", "sel": "li#field-login-acceptTerms-input > label:nth-of-type(1) > a:nth-of-type(2)", "noise": 0, "change": 0, "area": 5361}
+{"s": "groupon", "sel": "body#ls-body > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1)", "noise": 0, "change": 0, "area": 79540}
+{"s": "raise", "sel": "div#raise-search > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 1444}
+{"s": "vk", "sel": "div#top_nav > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 11470}
+{"s": "vk", "sel": "button#index_login_button", "noise": 0, "change": 0, "area": 6600}
+{"s": "vk", "sel": "a#index_forgot", "noise": 0, "change": 0, "area": 5180}
+{"s": "vk", "sel": "div#ij_sex_row > div:nth-of-type(2)", "noise": 0, "change": 0, "area": 4126}
+{"s": "vk", "sel": "button#ij_submit", "noise": 0, "change": 0, "area": 15950}
+{"s": "vk", "sel": "div#content > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 93786}
+{"s": "vk", "sel": "div#content > div:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3465}
+{"s": "vk", "sel": "div#index_footer_wrap > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 1260}
+{"s": "vk", "sel": "div#index_footer_wrap > div:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2418}
+{"s": "carlsjr", "sel": "select#birth_m", "noise": 0, "change": 0, "area": 9486}
+{"s": "carlsjr", "sel": "button#signup", "noise": 0, "change": 0, "area": 37913}
+{"s": "roblox", "sel": "a#main-login-button", "noise": 0, "change": 0, "area": 8960}
+{"s": "roblox", "sel": "select#MonthDropdown", "noise": 0, "change": 0, "area": 10089}
+{"s": "roblox", "sel": "div#FemaleButton", "noise": 0, "change": 0, "area": 14496}
+{"s": "roblox", "sel": "div#signup > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 23238}
+{"s": "roblox", "sel": "div#app-stores > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 11870}
+{"s": "roblox", "sel": "footer#footer-container > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(7) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3237}
+{"s": "ask", "sel": "button#js-PartialHeader-button", "noise": 0, "change": 0, "area": 5625}
+{"s": "coinbase", "sel": "div#root > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 8010}
+{"s": "dell", "sel": "div#countryselector > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 6240}
+{"s": "wendys", "sel": "div#block-dropdownlanguage > fieldset:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(2) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 1496}
+{"s": "stacksocial", "sel": "body#stacksocial-wrapper > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 6102}
+{"s": "stacksocial", "sel": "body#stacksocial-wrapper > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 25339}
+{"s": "stacksocial", "sel": "body#stacksocial-wrapper > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 6426}
+{"s": "stacksocial", "sel": "nav#main-navbar > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2704}
+{"s": "stacksocial", "sel": "nav#main-navbar > div:nth-of-type(1) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3468}
+{"s": "stacksocial", "sel": "body#stacksocial-wrapper > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > p:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2432}
+{"s": "stacksocial", "sel": "form#newsletter-subscribe-form > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 8050}
+{"s": "stacksocial", "sel": "a#bbblink", "noise": 0, "change": 0, "area": 6960}
+{"s": "ubersignup", "sel": "form#answerForm > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 33120}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 8456}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(2) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3234}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > ul:nth-of-type(2) > li:nth-of-type(4) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 4628}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 17550}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2183}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3120}
+{"s": "discordapp", "sel": "div#app-mount > div:nth-of-type(1) > div:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 8978}
+{"s": "alexa", "sel": "header#alx-header > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 1956}
+{"s": "alexa", "sel": "header#alx-header > div:nth-of-type(1) > section:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 5677}
+{"s": "alexa", "sel": "header#alx-header > div:nth-of-type(1) > section:nth-of-type(2) > a:nth-of-type(2)", "noise": 0, "change": 0, "area": 11930}
+{"s": "alexa", "sel": "section#footer-content > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 13601}
+{"s": "alexa", "sel": "section#footer-content > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 6139}
+{"s": "alexa", "sel": "section#footer-terms > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 3480}
+{"s": "wiktionary", "sel": "body#www-wiktionary-org > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 14500}
+{"s": "wiktionary", "sel": "body#www-wiktionary-org > div:nth-of-type(4) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2632}
+{"s": "resellerratings", "sel": "div#consumer-site-nav > div:nth-of-type(2) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 8681}
+{"s": "resellerratings", "sel": "div#consumer-site-nav > div:nth-of-type(2) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 8681}
+{"s": "resellerratings", "sel": "div#signupForm > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 12320}
+{"s": "resellerratings", "sel": "div#footer > div:nth-of-type(1) > div:nth-of-type(6) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "change": 0, "area": 2925}
+{"s": "cnn", "sel": "div#nav > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(2) > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 5225}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > div:nth-of-type(8) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 6380}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > div:nth-of-type(8) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(2)", "noise": 0, "change": 0, "area": 3600}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "change": 0, "area": 3465}

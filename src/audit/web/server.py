@@ -3268,7 +3268,10 @@ async def _run_local_login_background(
                 if config.responsive_checks_enabled
                 else None
             ),
-            focus_probe=FocusProbe(suppress_diagnostics=True),
+            focus_probe=FocusProbe(
+                suppress_diagnostics=True,
+                include_aaa=config.axe_level == "AAA" and config.wcag_version == "2.2",
+            ),
             interaction_probe=login_interaction,
             # Follow the scan's own setting rather than hardcoding it off.
             # This fetcher is built here instead of by the orchestrator, so

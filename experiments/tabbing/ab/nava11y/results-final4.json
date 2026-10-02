@@ -1,0 +1,627 @@
+{
+ "rows": [
+  {
+   "id": 1,
+   "file": "tests/keyboard-access-keyboard-focus-is-not-indicated-visually.html",
+   "category": "original",
+   "expected": {
+    "2.4.7": "FAIL"
+   },
+   "found": [
+    [
+     "focus-not-visible",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > a:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "FAIL",
+    "defect:2.4.7": "FAIL"
+   }
+  },
+  {
+   "id": 2,
+   "file": "tests/colour-and-contrast-focus-not-visible.html",
+   "category": "original",
+   "expected": {
+    "2.4.7": "FAIL"
+   },
+   "found": [
+    [
+     "focus-not-visible",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ],
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > a:nth-of-type(1)"
+    ],
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "FAIL",
+    "defect:2.4.7": "FAIL"
+   }
+  },
+  {
+   "id": 3,
+   "file": "tests/keyboard-access-focus-order-in-wrong-order.html",
+   "category": "original",
+   "expected": {
+    "2.4.3": "FAIL"
+   },
+   "found": [
+    [
+     "focus-order-visual-mismatch",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.3": "FAIL",
+    "defect:2.4.3": "FAIL"
+   }
+  },
+  {
+   "id": 4,
+   "file": "tests/keyboard-access-tabindex-greater-than-0.html",
+   "category": "original",
+   "expected": {
+    "2.4.3": "FAIL"
+   },
+   "found": [
+    [
+     "focus-order-positive-tabindex",
+     "a"
+    ]
+   ],
+   "verdicts": {
+    "2.4.3": "FAIL",
+    "defect:2.4.3": "FAIL"
+   }
+  },
+  {
+   "id": 5,
+   "file": "example-pages/keyboardtrap.html",
+   "category": "original",
+   "expected": {
+    "2.4.3": "FAIL"
+   },
+   "found": [
+    [
+     "keyboard-trap-stuck",
+     "a.trap"
+    ]
+   ],
+   "verdicts": {
+    "2.4.3": "PASS",
+    "defect:2.4.3": "FAIL"
+   }
+  },
+  {
+   "id": 6,
+   "file": "tests/keyboard-access-keyboard-focus-assigned-to-a-non-focusable-element-using-tabindex0.html",
+   "category": "original",
+   "expected": {
+    "2.4.7": "PASS"
+   },
+   "found": [
+    [
+     "focus-order-non-interactive-stop",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > p:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "defect:2.4.7": "PASS"
+   }
+  },
+  {
+   "id": 7,
+   "file": "tests/focus-visible-using-box-shadow.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "defect:2.4.7": "PASS"
+   }
+  },
+  {
+   "id": 8,
+   "file": "tests/focus-visible-using-background-colour-change.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "defect:2.4.7": "PASS"
+   }
+  },
+  {
+   "id": 9,
+   "file": "tests/focus-visible-using-text-decoration.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS"
+   },
+   "found": [
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "defect:2.4.7": "PASS"
+   }
+  },
+  {
+   "id": 10,
+   "file": "tests/focus-visible-using-border-increase.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "defect:2.4.7": "PASS"
+   }
+  },
+  {
+   "id": 11,
+   "file": "tests/focus-order-correct-with-skip-link.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.3": "FAIL"
+   },
+   "found": [
+    [
+     "focus-order-positive-tabindex",
+     "a.skip-link"
+    ]
+   ],
+   "verdicts": {
+    "2.4.3": "FAIL",
+    "defect:2.4.3": "FAIL"
+   }
+  },
+  {
+   "id": 12,
+   "file": "tests/focus-order-matches-visual-order.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.3": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.3": "PASS",
+    "defect:2.4.3": "PASS"
+   }
+  },
+  {
+   "id": 13,
+   "file": "tests/focus-appearance-outline-insufficient-contrast.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL"
+   },
+   "found": [
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "FAIL"
+   }
+  },
+  {
+   "id": 14,
+   "file": "tests/focus-appearance-background-sufficient-contrast.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "PASS"
+   }
+  },
+  {
+   "id": 15,
+   "file": "tests/focus-appearance-border-sufficient-width-and-contrast.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "PASS"
+   }
+  },
+  {
+   "id": 16,
+   "file": "tests/focus-obscured-by-fixed-footer.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.11": "FAIL",
+    "2.4.12": "FAIL"
+   },
+   "found": [
+    [
+     "focus-not-obscured",
+     "button.footer-btn"
+    ]
+   ],
+   "verdicts": {
+    "2.4.11": "FAIL",
+    "2.4.12": "FAIL",
+    "defect:2.4.11": "FAIL",
+    "defect:2.4.12": "FAIL"
+   }
+  },
+  {
+   "id": 17,
+   "file": "tests/focus-obscured-by-cookie-banner.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.11": "FAIL",
+    "2.4.12": "FAIL"
+   },
+   "found": [
+    [
+     "focus-not-obscured",
+     "button.banner-btn"
+    ]
+   ],
+   "verdicts": {
+    "2.4.11": "FAIL",
+    "2.4.12": "FAIL",
+    "defect:2.4.11": "FAIL",
+    "defect:2.4.12": "FAIL"
+   }
+  },
+  {
+   "id": 18,
+   "file": "tests/focus-appearance-outline-insufficient-width.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL"
+   },
+   "found": [
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "FAIL"
+   }
+  },
+  {
+   "id": 19,
+   "file": "tests/focus-appearance-outline-sufficient-width-and-contrast.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "PASS"
+   }
+  },
+  {
+   "id": 20,
+   "file": "tests/focus-appearance-background-insufficient-contrast.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL"
+   },
+   "found": [
+    [
+     "focus-appearance-insufficient",
+     "html > body:nth-of-type(1) > main:nth-of-type(1) > button:nth-of-type(1)"
+    ]
+   ],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "FAIL"
+   }
+  },
+  {
+   "id": 21,
+   "file": "tests/focus-appearance-border-insufficient-width.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "FAIL"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "PASS"
+   }
+  },
+  {
+   "id": 22,
+   "file": "tests/focus-appearance-outline-offset-sufficient.html",
+   "category": "contributed",
+   "expected": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS"
+   },
+   "found": [],
+   "verdicts": {
+    "2.4.7": "PASS",
+    "2.4.13": "PASS",
+    "defect:2.4.7": "PASS",
+    "defect:2.4.13": "PASS"
+   }
+  }
+ ],
+ "all": {
+  "strict": {
+   "total": {
+    "TP": 12,
+    "TN": 18,
+    "FP": 0,
+    "FN": 2
+   },
+   "precision": 1.0,
+   "recall": 0.8571428571428571,
+   "f1": 0.923076923076923,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 2,
+     "TN": 13,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 3,
+     "TN": 1,
+     "FP": 0,
+     "FN": 1
+    },
+    "2.4.13": {
+     "TP": 3,
+     "TN": 4,
+     "FP": 0,
+     "FN": 1
+    },
+    "2.4.11": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.12": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    }
+   }
+  },
+  "defect": {
+   "total": {
+    "TP": 13,
+    "TN": 18,
+    "FP": 0,
+    "FN": 1
+   },
+   "precision": 1.0,
+   "recall": 0.9285714285714286,
+   "f1": 0.962962962962963,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 2,
+     "TN": 13,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 4,
+     "TN": 1,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.13": {
+     "TP": 3,
+     "TN": 4,
+     "FP": 0,
+     "FN": 1
+    },
+    "2.4.11": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.12": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    }
+   }
+  }
+ },
+ "contributed": {
+  "strict": {
+   "total": {
+    "TP": 8,
+    "TN": 17,
+    "FP": 0,
+    "FN": 1
+   },
+   "precision": 1.0,
+   "recall": 0.8888888888888888,
+   "f1": 0.9411764705882353,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 0,
+     "TN": 12,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 1,
+     "TN": 1,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.13": {
+     "TP": 3,
+     "TN": 4,
+     "FP": 0,
+     "FN": 1
+    },
+    "2.4.11": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.12": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    }
+   }
+  },
+  "defect": {
+   "total": {
+    "TP": 8,
+    "TN": 17,
+    "FP": 0,
+    "FN": 1
+   },
+   "precision": 1.0,
+   "recall": 0.8888888888888888,
+   "f1": 0.9411764705882353,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 0,
+     "TN": 12,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 1,
+     "TN": 1,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.13": {
+     "TP": 3,
+     "TN": 4,
+     "FP": 0,
+     "FN": 1
+    },
+    "2.4.11": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.12": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    }
+   }
+  }
+ },
+ "original": {
+  "strict": {
+   "total": {
+    "TP": 4,
+    "TN": 1,
+    "FP": 0,
+    "FN": 1
+   },
+   "precision": 1.0,
+   "recall": 0.8,
+   "f1": 0.888888888888889,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 2,
+     "TN": 1,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 2,
+     "TN": 0,
+     "FP": 0,
+     "FN": 1
+    }
+   }
+  },
+  "defect": {
+   "total": {
+    "TP": 5,
+    "TN": 1,
+    "FP": 0,
+    "FN": 0
+   },
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "per_sc": {
+    "2.4.7": {
+     "TP": 2,
+     "TN": 1,
+     "FP": 0,
+     "FN": 0
+    },
+    "2.4.3": {
+     "TP": 3,
+     "TN": 0,
+     "FP": 0,
+     "FN": 0
+    }
+   }
+  }
+ },
+ "freeze": {
+  "src/audit/analyzer/focus/probe.py": "64aedb9d5e94e04721b239f9c4dcb74f754436e2f81c07699f46452f49045b6e",
+  "src/audit/analyzer/keyboard/operability.py": "05accc7fb71fba8d0cce705a9e5f1d4569e92f5d57851ebf4bc264c957d3d58f",
+  "src/audit/analyzer/interaction/dialogs.py": "2ee682282d97f5e275bc74780686592929764e90b575e1f07842913f6c2c0349",
+  "src/audit/analyzer/interaction/probe.py": "e122dbe70e6762683415454533f171c38b931112f04bae18590be8e10907f224"
+ }
+}

@@ -542,7 +542,11 @@ async def run_crawl(
     # SC 2.4.11 focus-obscured probe, default on. Deterministic, stateless.
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
-        focus_probe = FocusProbe()
+        # Focus Appearance (2.4.13) is a WCAG 2.2 Level AAA criterion: only a
+        # scan testing AAA against 2.2 runs it.
+        focus_probe = FocusProbe(
+            include_aaa=config.axe_level == "AAA" and config.wcag_version == "2.2"
+        )
     # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
     # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
     # the provider only when one is reachable (else that check no-ops).

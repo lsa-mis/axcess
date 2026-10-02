@@ -19,7 +19,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
 DATA = (
-    REPO / "experiments/tabbing/literature-replication/artifacts/nava11y"
+    REPO
+    / "experiments/tabbing/literature-replication/artifacts/nava11y"
     / "dataset/focus-behavior-dataset"
 )
 for extra in (REPO, REPO / "src"):
@@ -44,7 +45,7 @@ STRICT = {
     },
     "2.4.11": {"focus-not-obscured"},
     "2.4.12": {"focus-not-obscured"},
-    "2.4.13": set(),
+    "2.4.13": {"focus-appearance-insufficient"},
 }
 TRAPS = {"keyboard-trap-stuck", "keyboard-dialog-no-keyboard-exit"}
 
@@ -60,7 +61,9 @@ async def rules_on(browser, path: Path) -> list[tuple[str, str]]:  # type: ignor
             probe = KeyboardProbe(operability=KeyboardOperabilityProbe())
             found += [(f.rule_id, f.target_selector) for f in await probe.run(page)]
         elif step == "focus":
-            found += [(f.rule_id, f.target_selector) for f in await FocusProbe().run(page)]
+            # NavA11y scores AAA (2.4.13), so the focus check runs as an AAA scan.
+            focus = FocusProbe(include_aaa=True)
+            found += [(f.rule_id, f.target_selector) for f in await focus.run(page)]
         else:
             result = await InteractionProbe(
                 axe=AxeAnalyzer.from_bundled(), level="AA", dialog_checks=True
@@ -104,24 +107,38 @@ async def main() -> None:
             rows.append({**case, "found": found})
         await browser.close()
     report = {"rows": rows}
-    for name, subset in (("all", rows), ("contributed", [r for r in rows if r["category"] == "contributed"]),
-                         ("original", [r for r in rows if r["category"] == "original"])):
+    for name, subset in (
+        ("all", rows),
+        ("contributed", [r for r in rows if r["category"] == "contributed"]),
+        ("original", [r for r in rows if r["category"] == "original"]),
+    ):
         report[name] = {"strict": score(subset, False), "defect": score(subset, True)}
     report["freeze"] = {
         p: hashlib.sha256((REPO / p).read_bytes()).hexdigest()
-        for p in ("src/audit/analyzer/focus/probe.py", "src/audit/analyzer/keyboard/operability.py",
-                  "src/audit/analyzer/interaction/dialogs.py", "src/audit/analyzer/interaction/probe.py")
+        for p in (
+            "src/audit/analyzer/focus/probe.py",
+            "src/audit/analyzer/keyboard/operability.py",
+            "src/audit/analyzer/interaction/dialogs.py",
+            "src/audit/analyzer/interaction/probe.py",
+        )
     }
     out.write_text(json.dumps(report, indent=1) + "\n")
     for name in ("all", "contributed", "original"):
         for kind in ("strict", "defect"):
             s = report[name][kind]
-            print(f"{name:12s} {kind:7s} {s['total']} P={s['precision']} R={s['recall']} F1={s['f1']}")
+            print(
+                f"{name:12s} {kind:7s} {s['total']} P={s['precision']} R={s['recall']} F1={s['f1']}"
+            )
     print(json.dumps(report["all"]["strict"]["per_sc"]))
     for row in rows:
-        print(row["id"], row["category"][:4], row["file"].split("/")[-1][:60], row["expected"],
-              {k: v for k, v in row["verdicts"].items() if not k.startswith("defect")},
-              sorted({r for r, _ in row["found"]}))
+        print(
+            row["id"],
+            row["category"][:4],
+            row["file"].split("/")[-1][:60],
+            row["expected"],
+            {k: v for k, v in row["verdicts"].items() if not k.startswith("defect")},
+            sorted({r for r, _ in row["found"]}),
+        )
     print(f"wrote {out}")
 
 

@@ -25,8 +25,8 @@ def diff(a, b):
     ib = Image.open(io.BytesIO(b)).convert("RGB")
     if ia.size != ib.size:
         return 10**6
-    d = ImageChops.difference(ia, ib).convert("L").point(lambda v: 255 if v > 24 else 0)
-    return sum(1 for v in d.getdata() if v)
+    # In colour: a change of hue can keep the same grey level.
+    return sum(1 for px in ImageChops.difference(ia, ib).get_flattened_data() if max(px) > 24)
 
 
 async def main():

@@ -1,0 +1,66 @@
+{"s": "tesla", "sel": "form#login-form > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > input:nth-of-type(1)", "noise": 0, "area": 1041, "need": 2316, "passes": false}
+{"s": "tesla", "sel": "form#login-form > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(6) > button:nth-of-type(1)", "noise": 0, "area": 196, "need": 2316, "passes": false}
+{"s": "spotify", "sel": "input#login-username", "noise": 0, "area": 0, "need": 1960, "passes": false}
+{"s": "adorama", "sel": "input#login-email", "noise": 0, "area": 0, "need": 1616, "passes": false}
+{"s": "adorama", "sel": "div#loginLayoutPlaceholder > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "area": 0, "need": 1026, "passes": false}
+{"s": "flickr", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "area": 0, "need": 396, "passes": false}
+{"s": "dmv_ca", "sel": "div#UserInfo > p:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 23, "need": 232, "passes": false}
+{"s": "dmv_ca", "sel": "li#home-link > a:nth-of-type(1)", "noise": 0, "area": 59, "need": 5311, "passes": false}
+{"s": "dmv_ca", "sel": "select#officeId", "noise": 0, "area": 0, "need": 1184, "passes": false}
+{"s": "dmv_ca", "sel": "input#firstName", "noise": 0, "area": 0, "need": 1807, "passes": false}
+{"s": "bowiestate", "sel": "input#question-inputtext-1", "noise": 0, "area": 0, "need": 2091, "passes": false}
+{"s": "bowiestate", "sel": "select#question-select-1284795", "noise": 0, "area": 0, "need": 2096, "passes": false}
+{"s": "raise", "sel": "input#search", "noise": 0, "area": 0, "need": 1140, "passes": false}
+{"s": "raise", "sel": "input#user_email", "noise": 0, "area": 0, "need": 1320, "passes": false}
+{"s": "raise", "sel": "input#user_password", "noise": 0, "area": 0, "need": 1320, "passes": false}
+{"s": "vk", "sel": "input#index_email", "noise": 0, "area": 0, "need": 1220, "passes": false}
+{"s": "roblox", "sel": "input#signup-username", "noise": 0, "area": 0, "need": 1844, "passes": false}
+{"s": "roblox", "sel": "footer#footer-container > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 388, "passes": false}
+{"s": "roblox", "sel": "button#language-switcher", "noise": 0, "area": 58, "need": 1122, "passes": false}
+{"s": "coinbase", "sel": "div#main > div:nth-of-type(1) > div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1) > div:nth-of-type(2) > input:nth-of-type(1)", "noise": 0, "area": 0, "need": 1092, "passes": false}
+{"s": "coinbase", "sel": "div#main > div:nth-of-type(1) > div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(4) > label:nth-of-type(1) > div:nth-of-type(2) > select:nth-of-type(1)", "noise": 0, "area": 1045, "need": 1988, "passes": false}
+{"s": "coinbase", "sel": "div#main > div:nth-of-type(1) > div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(5) > div:nth-of-type(1) > div:nth-of-type(1)", "noise": 0, "area": 44, "need": 128, "passes": false}
+{"s": "coinbase", "sel": "div#main > div:nth-of-type(1) > div:nth-of-type(1) > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "area": 0, "need": 2019, "passes": false}
+{"s": "cloudflare", "sel": "div#react-root > div:nth-of-type(1) > div:nth-of-type(1) > article:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > form:nth-of-type(1) > div:nth-of-type(1) > input:nth-of-type(1)", "noise": 0, "area": 0, "need": 2283, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 860, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 97, "need": 608, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > nav:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "area": 89, "need": 576, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > header:nth-of-type(1) > div:nth-of-type(1) > nav:nth-of-type(2) > a:nth-of-type(2)", "noise": 0, "area": 0, "need": 536, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 876, "passes": false}
+{"s": "ancestry", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(12) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 325, "area": 103, "need": 524, "passes": false}
+{"s": "ssa", "sel": "main#content > section:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 1730, "need": 3438, "passes": false}
+{"s": "ed", "sel": "html > body:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > nav:nth-of-type(1) > div:nth-of-type(1) > small:nth-of-type(1) > ul:nth-of-type(1) > li:nth-of-type(5) > a:nth-of-type(1)", "noise": 0, "area": 106, "need": 575, "passes": false}
+{"s": "ed", "sel": "input#query", "noise": 0, "area": 876, "need": 1760, "passes": false}
+{"s": "boostmobile", "sel": "button#asapp-chat-sdk-badge", "noise": 0, "area": 0, "need": 480, "passes": false}
+{"s": "dell", "sel": "div#masthead-search > div:nth-of-type(1) > form:nth-of-type(1) > input:nth-of-type(6)", "noise": 0, "area": 0, "need": 2267, "passes": false}
+{"s": "dell", "sel": "div#masthead-search > div:nth-of-type(1) > form:nth-of-type(1) > button:nth-of-type(1)", "noise": 0, "area": 190, "need": 388, "passes": false}
+{"s": "dell", "sel": "input#stHolder", "noise": 0, "area": 0, "need": 884, "passes": false}
+{"s": "dell", "sel": "a#detectmyproduct_homepage", "noise": 0, "area": 0, "need": 764, "passes": false}
+{"s": "dell", "sel": "select#drpdwnIUse", "noise": 0, "area": 0, "need": 1348, "passes": false}
+{"s": "dpreview", "sel": "div#mainSiteSearch > form:nth-of-type(1) > input:nth-of-type(1)", "noise": 0, "area": 12, "need": 1200, "passes": false}
+{"s": "stacksocial", "sel": "nav#main-navbar > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 900, "passes": false}
+{"s": "stacksocial", "sel": "form#new_user > div:nth-of-type(1) > div:nth-of-type(1) > input:nth-of-type(1)", "noise": 0, "area": 5, "need": 1680, "passes": false}
+{"s": "stacksocial", "sel": "input#login_button", "noise": 0, "area": 0, "need": 1672, "passes": false}
+{"s": "ubersignup", "sel": "input#firstName", "noise": 0, "area": 0, "need": 1070, "passes": false}
+{"s": "live", "sel": "input#MemberName", "noise": 0, "area": 0, "need": 1536, "passes": false}
+{"s": "alexa", "sel": "section#alexa-logo > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 1088, "passes": false}
+{"s": "alexa", "sel": "input#email", "noise": 0, "area": 0, "need": 1064, "passes": false}
+{"s": "alexa", "sel": "input#pwd", "noise": 0, "area": 0, "need": 1064, "passes": false}
+{"s": "alexa", "sel": "section#alx-content > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 577, "passes": false}
+{"s": "alexa", "sel": "section#alx-content > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(2) > a:nth-of-type(2)", "noise": 0, "area": 0, "need": 551, "passes": false}
+{"s": "resellerratings", "sel": "ul#topBarLogo > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 808, "passes": false}
+{"s": "resellerratings", "sel": "div#app > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(3) > div:nth-of-type(1) > form:nth-of-type(1) > div:nth-of-type(1) > input:nth-of-type(1)", "noise": 0, "area": 0, "need": 3880, "passes": false}
+{"s": "resellerratings", "sel": "input#username", "noise": 0, "area": 0, "need": 2192, "passes": false}
+{"s": "steam", "sel": "input#store_nav_search_term", "noise": 0, "area": 0, "need": 824, "passes": false}
+{"s": "cnn", "sel": "p#alert-box-message > a:nth-of-type(1)", "noise": 0, "area": 116, "need": 436, "passes": false}
+{"s": "cnn", "sel": "a#logo", "noise": 0, "area": 43, "need": 480, "passes": false}
+{"s": "cnn", "sel": "div#nav > div:nth-of-type(2) > div:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "area": 48, "need": 163, "passes": false}
+{"s": "cnn", "sel": "a#nav-mobileTV", "noise": 0, "area": 118, "need": 446, "passes": false}
+{"s": "cnn", "sel": "input#search-input-field", "noise": 0, "area": 0, "need": 184, "passes": false}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(2) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 184, "need": 709, "passes": false}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(1) > ol:nth-of-type(2) > li:nth-of-type(1) > ol:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 128, "need": 488, "passes": false}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 414, "passes": false}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 844, "passes": false}
+{"s": "cnn", "sel": "html > body:nth-of-type(1) > footer:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)", "noise": 0, "area": 0, "need": 389, "passes": false}
+{"s": "usgsgov", "sel": "div#block-system-main > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(7) > div:nth-of-type(1) > div:nth-of-type(1) > a:nth-of-type(2)", "noise": 0, "area": 108, "need": 650, "passes": false}
+{"s": "usgsgov", "sel": "div#block-system-main > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > section:nth-of-type(1) > div:nth-of-type(9) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > a:nth-of-type(1)", "noise": 0, "area": 87, "need": 551, "passes": false}

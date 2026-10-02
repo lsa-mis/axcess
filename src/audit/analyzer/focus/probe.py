@@ -18,6 +18,7 @@ from typing import Any
 from playwright.async_api import Page
 
 from audit.analyzer.focus.base import (
+    RULE_FOCUS_APPEARANCE,
     RULE_FOCUS_NOT_VISIBLE,
     RULE_FOCUS_OBSCURED,
     RULE_NON_INTERACTIVE_STOP,
@@ -169,12 +170,59 @@ _NOT_VISIBLE_JS = """
     }
     return parts.join('|');
   };
+  // The control's own frame: widest border side, outline width (0 when it
+  // does not draw), border colours, and every other indicator property.
+  const frame = (el) => {
+    const s = getComputedStyle(el);
+    const widths = ['Top', 'Right', 'Bottom', 'Left'].map((side) =>
+      s['border' + side + 'Style'] === 'none' ? 0 : parseFloat(s['border' + side + 'Width']) || 0);
+    const outline = s.outlineStyle === 'none' ? 0 : parseFloat(s.outlineWidth) || 0;
+    const pseudo = ['::before', '::after'].map((p) => {
+      const ps = getComputedStyle(el, p);
+      return PROPS.map((k) => ps[k]).join('|') + drawn(ps) + ps.content;
+    });
+    return {
+      border: Math.max(...widths), outline,
+      colors: ['Top', 'Right', 'Bottom', 'Left'].map((x) => s['border' + x + 'Color']).join('|'),
+      core: PROPS.map((k) => s[k]).join('|') + '#' + pseudo.join('#'),
+    };
+  };
+  // The background a person sees: a transparent background shows its
+  // parent's, so "transparent" turning into the parent's own colour on focus
+  // changes nothing on screen.
+  const shownBg = (el) => {
+    for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+      const c = getComputedStyle(cur).backgroundColor;
+      if (!/rgba\\(.*,\\s*0\\)$/.test(c) && c !== 'transparent') return c;
+    }
+    return 'rgb(255, 255, 255)';
+  };
+  // Text colour shows only through text, or an SVG drawn with currentColor:
+  // on an icon-only link whose SVG has its own fill, a colour change is unseen.
+  const colourShows = (el) => {
+    // innerText is rendered text only: an SVG <title> is in textContent too.
+    if ((el.innerText || '').trim()) return true;
+    const own = getComputedStyle(el).color;
+    for (const g of el.querySelectorAll('svg, svg *')) {
+      const gs = getComputedStyle(g);
+      if (gs.fill === own || gs.stroke === own) return true;
+    }
+    return false;
+  };
   const sig = (el) => {
     if (!el || el.nodeType !== 1) return '';
-    const parts = [];
+    const parts = [shownBg(el)];
+    const textless = !colourShows(el);
     for (const pseudo of [null, '::before', '::after']) {
       const s = getComputedStyle(el, pseudo);
-      parts.push(PROPS.map((k) => s[k]).join('|'), drawn(s));
+      // A pseudo-element with no content is not drawn, so its styles show nothing.
+      if (pseudo && (s.content === 'none' || s.content === 'normal')) continue;
+      const values = PROPS.map((k) => {
+        if (k === 'backgroundColor' && !pseudo) return '';
+        if (!pseudo && textless && (k === 'color' || k.startsWith('textDecoration'))) return '';
+        return s[k];
+      });
+      parts.push(values.join('|'), drawn(s));
       if (pseudo) parts.push(s.content);
     }
     return parts.join('#');
@@ -203,12 +251,26 @@ _NOT_VISIBLE_JS = """
       const cs = getComputedStyle(el);
       if (cs.visibility !== 'visible') continue;
       if (el.closest('[aria-hidden="true"],[inert]')) continue;
+      // The unfocused state must really be unfocused: an earlier check (or
+      // the page) may have left focus on this very control.
+      const held = document.activeElement;
+      if (held && held !== document.body && held.blur) held.blur();
       const before = around(el).map(sig);
+      const frameBefore = frame(el);
       try { el.focus({ preventScroll: true }); } catch (e) { continue; }
       if (document.activeElement !== el) continue;
       const after = around(el).map(sig);
+      const frameAfter = frame(el);
       el.blur();
-      if (before.every((v, i) => v === after[i])) {
+      // WCAG F78: a border that shrinks while an outline no thicker than the
+      // lost border appears looks the same as before (2px border becomes a
+      // 1px border and a 1px outline). Only that frame changed, so nothing
+      // visibly did.
+      const sameFrame = !after.some((v, i) => i > 0 && v !== before[i]) &&
+        frameBefore.core === frameAfter.core && frameBefore.colors === frameAfter.colors &&
+        frameAfter.border < frameBefore.border &&
+        frameAfter.outline <= frameBefore.border - frameAfter.border;
+      if (before.every((v, i) => v === after[i]) || sameFrame) {
         const cls = (el.getAttribute('class') || '').trim().split(/\\s+/)[0];
         out.push({ selector: cssPath(el), shape: el.tagName + '.' + cls,
                    html: (el.outerHTML || '').slice(0, 300) });
@@ -348,6 +410,133 @@ _VISUAL_ORDER_JS = """
 """
 
 
+# SC 2.4.13 Focus Appearance (AAA), estimated from computed styles. A focus
+# indicator passes when one of its parts is both big enough and contrasting
+# enough: an outline or added border at least 2 CSS px thick, or a box-shadow
+# with at least 2 px of spread or blur, whose colour has 3:1 against what is
+# behind it; or a background change of 3:1 between the unfocused and focused
+# colours. The thresholds are 2.4.13's (2 CSS px, 3:1); measuring area from
+# styles rather than pixels is an approximation, so results are leads.
+# Controls with no indicator at all are left to focus-not-visible.
+_APPEARANCE_JS = """
+(cap) => {
+  const cssPath = (el) => {
+    const parts = [];
+    for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+      const tag = cur.tagName.toLowerCase();
+      if (cur.id && /^[A-Za-z][\\w-]*$/.test(cur.id) &&
+          document.querySelectorAll('#' + cur.id).length === 1) {
+        parts.unshift(tag + '#' + cur.id);
+        break;
+      }
+      const parent = cur.parentElement;
+      if (!parent) { parts.unshift(tag); break; }
+      let n = 1;
+      for (let sib = cur.previousElementSibling; sib; sib = sib.previousElementSibling) {
+        if (sib.tagName === cur.tagName) n += 1;
+      }
+      parts.unshift(tag + ':nth-of-type(' + n + ')');
+    }
+    return parts.join(' > ');
+  };
+  const rgb = (c) => {
+    const m = (c || '').match(/rgba?\\(([^)]+)\\)/);
+    if (!m) return null;
+    const v = m[1].split(/[ ,\\/]+/).filter(Boolean).map(parseFloat);
+    return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 };
+  };
+  const lum = (c) => {
+    const f = (x) => {
+      x /= 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  };
+  const ratio = (a, b) => {
+    if (!a || !b) return 0;
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const behind = (el) => {
+    for (let cur = el.parentElement; cur; cur = cur.parentElement) {
+      const c = rgb(getComputedStyle(cur).backgroundColor);
+      if (c && c.a > 0.5) return c;
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+  };
+  const ownBg = (el, s) => {
+    const c = rgb(s.backgroundColor);
+    return c && c.a > 0.5 ? c : behind(el);
+  };
+  const shadowOk = (shadow, back) => {
+    if (!shadow || shadow === 'none') return false;
+    for (const part of shadow.split(/,(?![^(]*\\))/)) {
+      const color = rgb(part);
+      const nums = part.replace(/rgba?\\([^)]*\\)/, '').match(/-?[\\d.]+px/g) || [];
+      const [, , blur = '0px', spread = '0px'] = nums;
+      const big = parseFloat(spread) >= 2 || parseFloat(blur) >= 2;
+      if (big && ratio(color, back) >= 3) return true;
+    }
+    return false;
+  };
+  const read = (el) => {
+    const s = getComputedStyle(el);
+    const widths = ['Top', 'Right', 'Bottom', 'Left'].map((x) =>
+      s['border' + x + 'Style'] === 'none' ? 0 : parseFloat(s['border' + x + 'Width']) || 0);
+    return {
+      outlineStyle: s.outlineStyle, outlineWidth: parseFloat(s.outlineWidth) || 0,
+      outlineColor: rgb(s.outlineColor), border: Math.min(...widths),
+      borderColor: rgb(s.borderTopColor), bg: ownBg(el, s), shadow: s.boxShadow,
+      deco: s.textDecorationLine,
+    };
+  };
+  const freeze = document.createElement('style');
+  freeze.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}';
+  document.documentElement.appendChild(freeze);
+  const sel = 'a[href], button, input:not([type=hidden]), select, textarea, summary, ' +
+    '[tabindex]:not([tabindex="-1"])';
+  const out = [];
+  try {
+    for (const el of Array.from(document.querySelectorAll(sel)).slice(0, cap)) {
+      if (el.disabled || el.tabIndex < 0 || !el.getClientRects().length) continue;
+      if (el.closest('[aria-hidden="true"],[inert]')) continue;
+      const held = document.activeElement;
+      if (held && held !== document.body && held.blur) held.blur();
+      const a = read(el);
+      try { el.focus({ preventScroll: true }); } catch (e) { continue; }
+      if (document.activeElement !== el) continue;
+      const b = read(el);
+      el.blur();
+      const back = behind(el);
+      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+      const outline = b.outlineStyle !== 'none' && (b.outlineStyle !== a.outlineStyle ||
+        b.outlineWidth !== a.outlineWidth || !same(b.outlineColor, a.outlineColor));
+      const border = b.border !== a.border || !same(b.borderColor, a.borderColor);
+      const bgChange = JSON.stringify(b.bg) !== JSON.stringify(a.bg);
+      const shadow = b.shadow !== a.shadow && b.shadow !== 'none';
+      const deco = b.deco !== a.deco;
+      if (!(outline || border || bgChange || shadow || deco)) continue; // focus-not-visible's case
+      const passes =
+        (outline && (b.outlineStyle === 'auto' ||
+          (b.outlineWidth >= 2 && ratio(b.outlineColor, back) >= 3))) ||
+        (border && b.border >= 2 && b.border >= a.border &&
+          (b.border - a.border >= 2 || ratio(b.borderColor, a.borderColor) >= 3) &&
+          ratio(b.borderColor, back) >= 3) ||
+        (bgChange && ratio(a.bg, b.bg) >= 3) ||
+        (shadow && shadowOk(b.shadow, back));
+      if (passes) continue;
+      const cls = (el.getAttribute('class') || '').trim().split(/\\s+/)[0];
+      out.push({ selector: cssPath(el), shape: el.tagName + '.' + cls,
+                 html: (el.outerHTML || '').slice(0, 300) });
+    }
+  } finally {
+    freeze.remove();
+  }
+  return out;
+}
+"""
+
+
 @dataclass
 class FocusProbe:
     """Runs the SC 2.4.11 focus-obscured check against a live page."""
@@ -358,6 +547,9 @@ class FocusProbe:
     suppress_diagnostics: bool = False
     # SC 2.4.7 focus visible and the two further SC 2.4.3 order checks.
     focus_order_checks: bool = True
+    # SC 2.4.13 Focus Appearance is Level AAA: only a scan that tests AAA
+    # asks for it, so an AA report is not filled with AAA results.
+    include_aaa: bool = False
 
     async def run(self, page: Page) -> list[FocusFinding]:
         """Run both focus checks. Never raises, each check is isolated so
@@ -376,6 +568,7 @@ class FocusProbe:
                 ("not_visible", self._check_not_visible),
                 ("non_interactive", self._check_non_interactive_stop),
                 ("visual_order", self._check_visual_order),
+                *((("appearance", self._check_appearance),) if self.include_aaa else ()),
             ):
                 try:
                     findings.extend(await check(page))
@@ -404,6 +597,30 @@ class FocusProbe:
                 help="Give every control a visible focus style, such as an outline.",
                 criterion_sc="2.4.7",
                 wcag_level="AA",
+            )
+            for item in _first_per_shape(raw)
+        ]
+
+    async def _check_appearance(self, page: Page) -> list[FocusFinding]:
+        """SC 2.4.13 (AAA), a focus indicator too thin or too faint."""
+        with contextlib.suppress(Exception):
+            await page.keyboard.press("Shift")
+        raw: Any = await page.evaluate(_APPEARANCE_JS, MAX_FOCUS_VISIBLE)
+        return [
+            FocusFinding(
+                rule_id=RULE_FOCUS_APPEARANCE,
+                target_selector=item["selector"],
+                failure_summary=(
+                    "Measured from its styles: this control's focus indicator is less "
+                    "than 2 CSS pixels thick or has less than 3:1 contrast, against what "
+                    "is behind it or against its unfocused look. WCAG 2.4.13 Focus "
+                    "Appearance (Level AAA) asks for both."
+                ),
+                html_snippet=str(item.get("html") or ""),
+                help="Make the focus indicator at least 2 px thick with 3:1 contrast.",
+                criterion_sc="2.4.13",
+                wcag_level="AAA",
+                impact="moderate",
             )
             for item in _first_per_shape(raw)
         ]

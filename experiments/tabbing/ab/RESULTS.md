@@ -476,3 +476,41 @@ misses, so the round-5 figure is a development result.
 
 Cost: unchanged in kind. The new rule reads listener bits the census already
 collects, and the twin check parses one attribute.
+
+## Round 6 (in progress): NavA11y focus dataset and Ma11y F44/F78
+
+Status at this commit. **The final regression run for the last two focus-rule
+fixes was stopped before it finished; re-run it before quoting round-6
+numbers.** The fixes are the "rendered text only" and "skip pseudo-elements
+with no content" rules.
+
+- **NavA11y** (MIT, 22 labelled pages, cloned git-ignored). Detectors were
+  frozen and scoring preregistered first (`nava11y/FREEZE.sha256`,
+  `nava11y/PREREGISTRATION.md`, commit `522909c`).
+  - **Held-out first score** (`nava11y/results-heldout.json`): precision 38%,
+    recall 57%. On the 16 new pages alone: precision 29%, recall 56%.
+  - **Cause:** `focus-not-visible` measured its "before" state on a control
+    that an earlier check had left focused.
+  - **After fixes** (development): precision 100%, recall 85.7% strict /
+    92.9% defect-level (`results-final4.json`). The fixes:
+    - blur before the snapshot;
+    - WCAG F78: a border that shrinks by what a new outline adds counts as no
+      change;
+    - compare the background actually shown;
+    - a new Level AAA rule, `focus-appearance-insufficient` (SC 2.4.13), that
+      runs only on AAA + WCAG 2.2 scans.
+  - **Two remaining misses:**
+    - NavA11y files the keyboard-trap page under 2.4.3; Axcess files traps
+      under 2.1.2.
+    - One 2.4.13 label (border 1px grey → 2px black) passes by WCAG's own
+      pixel definition: 1835 contrasting pixels against the 1066 needed.
+- **Ma11y F44 and F78**, ported from upstream (`mutants.py --ops F44 F78`):
+  - **F44:** 59 of 59 verified mutants caught.
+  - **F78:** 86 of 89 before the last two fixes; cloudflare caught after them.
+  - Mutant verification now compares pixels in colour, not greyscale.
+- **KAFE regression for the focus rules** (`kafe-focus-v4-aaa.jsonl` and the
+  pixel checks):
+  - `focus-not-visible` is unchanged: 71 leads on 20 pages, and the RGB pixel
+    check agrees with all 70 measurable ones.
+  - The AAA rule gives 66 leads on 25 pages, and a WCAG-definition pixel check
+    agrees with all 65 measurable ones.

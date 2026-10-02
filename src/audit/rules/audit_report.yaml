@@ -9384,6 +9384,51 @@ probe_rules:
       keyboard focus.
     confidence_default: medium
 
+  focus-appearance-insufficient:
+    title: "The focus indicator may be too thin or too faint (Level AAA)"
+    wcag_sc: "2.4.13"
+    wcag_name: "Focus Appearance"
+    wcag_level: "AAA"
+    abilities_affected: [vision, motor, cognition]
+    what_happening: >-
+      The focus check runs this only on scans set to Level AAA and WCAG 2.2.
+      It gives each control keyboard focus and reads how its look changes.
+      It reports a control whose focus indicator is less than 2 CSS pixels
+      thick, or has less than 3:1 contrast against what is behind it or
+      against how the control looked before. It works from the page's styles,
+      not from the pixels on screen, so check it by eye.
+    why_matters: >-
+      A thin or faint focus outline is easy to lose on a busy page, especially
+      for people with low vision and people who use a keyboard because they
+      cannot use a mouse.
+    owner: designer
+    effort: under_15m
+    fix_steps:
+      - >-
+        Press Tab to the control on the live page and look at its focus
+        indicator.
+      - >-
+        Make the indicator at least 2 px thick with strong contrast, for
+        example <code>outline: 3px solid #1d70b8; outline-offset: 2px;</code>.
+    fix_options:
+      - label: "Use a thick, high-contrast outline"
+        approach: >-
+          A solid outline 2 px or thicker, in a colour with at least 3:1
+          contrast against the background, meets the size and contrast.
+        watch_out: >-
+          Check it on every background the control appears on, including dark
+          sections.
+    verify_manual: >-
+      Press Tab through the page and check that each focus indicator is at
+      least 2 px thick and clearly darker or lighter than what is around it.
+    verify_automated: >-
+      Scan again at Level AAA with WCAG 2.2, and see if the control is still
+      found.
+    acceptance: >-
+      Every focus indicator is at least as large as a 2 px thick border
+      around the control and has 3:1 contrast with its unfocused look.
+    confidence_default: medium
+
   focus-order-non-interactive-stop:
     title: "The Tab key stops on something that is not a control"
     wcag_sc: "2.4.3"

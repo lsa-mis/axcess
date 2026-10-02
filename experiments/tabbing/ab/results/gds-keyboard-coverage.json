@@ -55,6 +55,9 @@
  "outside keyboard cases": {
   "focus:focus-order-positive-tabindex": [
    "(outside any example)"
+  ],
+  "focus:focus-not-visible": [
+   "colour-and-contrast-focus-not-visible"
   ]
  }
 }
