@@ -1,0 +1,1528 @@
+---
+/**
+ * Download and install (/get-started/).
+ *
+ * What: the one page that takes a person from "I want to try it" to a first
+ * report. Order: download (the header's Download button and the home page
+ * land on #download, so it comes first), install on your system, a first
+ * public scan, a sign-in scan, reading the report, and things to know
+ * before scanning. Each part is an <h2>, so the "On this page" list and a
+ * screen reader's headings list show the whole path (SC 2.4.6 Headings and
+ * Labels, Level AA; SC 1.3.1 Info and Relationships, Level A).
+ *
+ * Why one page in this order rather than separate pages per system: most
+ * people need only one system's steps, but the steps before and after are
+ * the same for everyone, and one page keeps "download, then install, then
+ * scan" in reading order (SC 2.4.3 Focus Order, Level A, follows it).
+ * Rejected: tabs for macOS, Windows and Linux. Tabs need scripts (the site
+ * must work without them) and hide the steps from find-in-page and print.
+ * Rejected: a <details> per system. A link to #windows would land on a
+ * closed box in some browsers. The "On this page" list jumps straight to
+ * each system instead.
+ *
+ * Material that belongs to using the app day to day (updates, where
+ * reports are kept, the app not starting) is in the desktop app guide,
+ * linked at the end of the install section, not repeated here.
+ *
+ * Every app word in the steps is the app's own: the New scan words come
+ * from src/audit/web/frontend/src/components/newScan/copy.ts and
+ * LocalLoginScan.tsx, the Windows Setup words from
+ * desktop/installer/installer.nsh. tests/site/test_public_site.py checks
+ * both, so change the page and the app together.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import DownloadLink from "../components/DownloadLink.astro";
+import { HONESTY, RELEASES, REPO, url } from "../lib/site";
+
+/*
+ * Drawings of the install screens, beside the step that needs each one.
+ * (Ported from site/build.py, "Drawings of the install screens".)
+ *
+ * What: each drawing is plain HTML and CSS, not a screenshot. A two-colour
+ * outline and the step's number mark what to choose, so people who are new
+ * to installing apps can match the words in a step to a place on their
+ * screen.
+ *
+ * Why HTML and not a picture file: its text reflows at 320 px instead of
+ * shrinking (SC 1.4.10 Reflow, Level AA), grows with the browser's text
+ * size (SC 1.4.4 Resize Text, Level AA), takes the colours of a Windows
+ * high-contrast theme and of the site's light or dark theme, and needs no
+ * picture files to keep up to date. A screenshot was rejected for those
+ * reasons and because it would date with every macOS or Windows update.
+ *
+ * For screen readers, each drawing is one picture (role="img") named by a
+ * short description (technique ARIA4 uses role="img" this way, as the old
+ * site did). The children of an img role are presentational (WAI-ARIA 1.2,
+ * https://www.w3.org/TR/wai-aria-1.2/#img, paraphrased), so the drawn
+ * "buttons" are not read as controls. They are <span>s, so nothing in a
+ * drawing can take focus and keyboard users never stop on a fake control.
+ * The description says where each marked thing is, for screen reader users
+ * and for anyone the picture does not help.
+ *
+ * The marks use an outline, a number and a ring, not colour alone (SC 1.4.1
+ * Use of Color, Level A). The ring has two colours (the theme's focus
+ * colour and maize), so one of them stands out on a white, dark or blue
+ * window (SC 1.4.11 Non-text Contrast, Level AA). All text in a drawing
+ * keeps 7:1 contrast (SC 1.4.6 Contrast (Enhanced), Level AAA), so some
+ * button blues are darker than the real ones.
+ *
+ * The words in a drawing are the words on the real screen where we know
+ * them. The Windows Setup words come from desktop/installer/installer.nsh.
+ * The macOS and Windows warning words are Apple's and Microsoft's and can
+ * change, so the note above the steps says the drawings are simplified.
+ */
+const MARK =
+  '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M 20.31 4.16 A 12.6 12.6 0 1 0 26.45 8.95"/><path d="M 17.438 21.016 C 16.989 21.141 16.515 21.208 16.026 21.208 C 13.135 21.208 10.792 18.865 10.792 15.974 C 10.792 13.083 13.135 10.74 16.026 10.74 C 18.917 10.74 21.26 13.083 21.26 15.974 C 21.26 17.37 21.26 18.97 21.26 21.016"/><circle cx="20.31" cy="4.16" r="3.2" fill="currentColor" stroke="none"/></svg>';
+// Setup's default folder for an install "Only for me" (docs/desktop-app.md).
+const WIN_FOLDER = "C:\\Users\\(your name)\\AppData\\Local\\Programs\\Axcess";
+const SMARTSCREEN_TEXT =
+  "Microsoft Defender SmartScreen prevented an unrecognized app from starting. Running this app might put your PC at risk.";
+
+/*
+ * Screenshots of Axcess itself, beside the first-scan steps.
+ *
+ * Why screenshots here when the install steps use drawings: Axcess is our
+ * own app, so a screenshot is exactly what people will see, and it is cheap
+ * to retake. A screenshot shrinks rather than reflows at 320 px, so it never
+ * carries anything the step text leaves out; the words are always in the
+ * text too (SC 1.4.5 Images of Text, Level AA, allows pictures whose words
+ * are also given as text; paraphrase). Each alt text says what the picture
+ * shows and where the thing to choose is (SC 1.1.1 Non-text Content, Level
+ * A). Width and height reserve its space so the steps do not jump. Left out
+ * on purpose: a site's own sign-in page, which looks different for every
+ * organization. Retake a screenshot when the words on its screen change.
+ */
+const shots = {
+  "new-scan-button": {
+    w: 386,
+    h: 302,
+    alt: "The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them.",
+  },
+  "new-scan-public": {
+    w: 1007,
+    h: 452,
+    alt: "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey.",
+  },
+  "maximum-pages": {
+    w: 995,
+    h: 420,
+    alt: "The Limits and rule check tool group. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.",
+  },
+  "start-scan": {
+    w: 454,
+    h: 180,
+    alt: "The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes.",
+  },
+  "sign-in-tab": {
+    w: 630,
+    h: 170,
+    alt: "The top of the New scan page. The second tab, Site with a sign-in or two-step sign-in (2FA), is chosen, beside the Public website tab.",
+  },
+  "sign-in-address": {
+    w: 997,
+    h: 456,
+    alt: "The address https://umich.instructure.com/ in the box Website address to scan after you sign in. Below it, a check mark and the words: Will scan umich.instructure.com/ and every page under it, after you sign in. Below that, the box is checked that says the site owner allows this scan and you will sign in with a test account that has only the access it needs.",
+  },
+  "signed-in-start": {
+    w: 970,
+    h: 418,
+    alt: "The Finished signing in? box. It lists what happens when you start, and the button I\u2019m signed in, start scan is at its bottom left.",
+  },
+} as const;
+type Shot = keyof typeof shots;
+const shot = (name: Shot) => ({
+  src: url(`/screens/${name}.png`),
+  width: shots[name].w,
+  height: shots[name].h,
+  alt: shots[name].alt,
+});
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Download and install",
+    description:
+      "Download Axcess for Mac, Windows or Linux, install it, then run your first scan and read your first report.",
+  }}
+  headings={[
+    { depth: 2, slug: "download", text: "Download Axcess" },
+    { depth: 2, slug: "install", text: "Install the app" },
+    { depth: 3, slug: "mac", text: "On a Mac with Apple silicon" },
+    { depth: 3, slug: "windows", text: "On Windows 10 or 11" },
+    { depth: 3, slug: "linux", text: "On Linux" },
+    { depth: 2, slug: "from-source", text: "Run it from the source code (for developers)" },
+    { depth: 2, slug: "first-scan", text: "Run a small first scan" },
+    { depth: 2, slug: "sign-in", text: "Scan a site behind a sign-in" },
+    { depth: 2, slug: "first-report", text: "Read your first report" },
+    { depth: 2, slug: "before-you-scan", text: "Before you scan" },
+  ]}
+>
+  <p class="lede">
+    Install the desktop app, run a small scan of a public site, then try a site behind a sign-in. You don't need to
+    be a developer: the desktop app has everything it needs inside it.
+  </p>
+
+  <h2 id="download">Download Axcess</h2>
+  <p>
+    Choose the file for your computer. The desktop app includes the browser, both rule checks (axe and Alfa) and
+    text recognition (OCR), so you don't need to install anything else. It is free, and you don't need an account
+    to download it.
+  </p>
+
+  {
+    /* One row per build, as a list of panels rather than a table: a table
+       with four columns would need to scroll sideways at 320 px, and each
+       row here is one choice with its own button, which a list says
+       plainly (SC 1.3.1 Info and Relationships, Level A; SC 1.4.10 Reflow,
+       Level AA). The requirement sits beside each button so nobody
+       downloads a file their computer cannot run (COGA "Making Content
+       Usable": related content grouped, https://www.w3.org/TR/coga-usable/,
+       paraphrased). The four buttons share the outlined style: they are
+       equal choices, and the right one depends on your computer, so none
+       is filled as the single main action. The link text names the system,
+       so each link makes sense out of context (SC 2.4.4 Link Purpose (In
+       Context), Level A). */
+  }
+  <ul class="not-content ax-prose downloads">
+    <li>
+      <div class="dl-text">
+        <h3 class="dl-name">Mac with Apple silicon</h3>
+        <p>
+          For a Mac with an Apple chip (M1 or newer). There is no build for a Mac with an Intel processor. To check,
+          open the Apple menu and choose About This Mac: a Mac with Apple silicon lists a Chip, not a Processor.
+        </p>
+        <p class="dl-file">File: <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code></p>
+      </div>
+      <DownloadLink file="Mac-Apple-Silicon.dmg" class="dl-button">Download for Mac (Apple silicon)</DownloadLink>
+    </li>
+    <li>
+      <div class="dl-text">
+        <h3 class="dl-name">Windows installer</h3>
+        <p>For Windows 10 or 11, 64-bit. Installs Axcess for your account, without administrator permission.</p>
+        <p class="dl-file">File: <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code></p>
+      </div>
+      <DownloadLink file="Windows-Installer.exe" class="dl-button">Download the Windows installer</DownloadLink>
+    </li>
+    <li>
+      <div class="dl-text">
+        <h3 class="dl-name">Windows, without installing</h3>
+        <p>
+          For Windows 10 or 11, 64-bit, on a computer where you can't install programs, or to keep Axcess and its
+          reports on a USB drive.
+        </p>
+        <p class="dl-file">File: <code data-release-name="Windows-Portable.zip">Axcess-(version)-Windows-Portable.zip</code></p>
+      </div>
+      <DownloadLink file="Windows-Portable.zip" class="dl-button">Download the portable Windows zip</DownloadLink>
+    </li>
+    <li>
+      <div class="dl-text">
+        <h3 class="dl-name">Linux</h3>
+        <p>
+          For 64-bit Linux (x64) from 2022 or newer, such as Ubuntu 22.04, Debian 12 or Fedora 36. The whole app is
+          in one file (an AppImage).
+        </p>
+        <p class="dl-file">File: <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code></p>
+      </div>
+      <DownloadLink file="Linux.AppImage" class="dl-button">Download for Linux (AppImage)</DownloadLink>
+    </li>
+  </ul>
+
+  <p>
+    Each button gets the newest build. In a file name, "(version)" stands for the version number, which changes
+    with every build. If your browser blocks scripts, a button opens the newest release on GitHub instead: choose
+    the file with the name shown above. Release notes and earlier builds are on <a href={RELEASES}>the releases page on GitHub</a>.
+  </p>
+  <p>
+    These are preview builds. A new one is published each time the app changes. To find the newest file, this page
+    asks GitHub once. <a href={url("/privacy/#this-site")}>What this site loads</a>.
+  </p>
+
+  {
+    /* The warning comes before the install steps, not after them: people
+       who meet an unexpected security message often stop or delete the
+       app, so they need to know it is coming (COGA "Making Content
+       Usable": help users avoid mistakes,
+       https://www.w3.org/TR/coga-usable/, paraphrased). A bordered box
+       with a text label, not colour alone, sets it apart (SC 1.4.1 Use of
+       Color, Level A). */
+  }
+  <div class="not-content ax-prose callout">
+    <p>
+      <strong>The builds are not signed yet.</strong> Code signing tells macOS and Windows who made an app. Without
+      it, both show a warning the first time you open Axcess. That is expected for these builds. Read <a href="#install">the install steps</a> before you open the app: you approve it once, and after that it opens
+      normally.
+    </p>
+  </div>
+
+  <h2 id="install">Install the app</h2>
+  <p>
+    Apple has not checked (notarized) these builds, and they are not signed for Windows, so each system shows a
+    warning the first time. The steps below show how to approve Axcess once. On Linux you allow the file to run.
+  </p>
+  <p>
+    The drawings in the steps show where to look. A thick outline and the step number mark what to choose. The
+    drawings are simplified, so your screen may look a little different.
+  </p>
+
+  <h3 id="mac">On a Mac with Apple silicon</h3>
+  <ol class="install-steps">
+    <li>
+      Select <strong>Download for Mac (Apple silicon)</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish
+      downloading.
+    </li>
+    <li>
+      Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2."
+      >
+        <div class="mock-win">
+          <div class="mock-bar"><span class="mock-dots"><i></i><i></i><i></i></span><span class="mock-bar-title">Axcess</span></div>
+          <div class="mock-drag">
+            <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+            <svg class="mock-arrow" viewBox="0 0 48 16" aria-hidden="true" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span class="mock-mark mock-icon" data-step="2"><span class="mock-app" set:html={MARK} /><span>Axcess</span></span>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li>
+      Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the
+      app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3."
+      >
+        <div class="mock-win mock-alert">
+          <span class="mock-app" set:html={MARK} />
+          <p class="mock-title">“Axcess” Not Opened</p>
+          <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+          <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span><span class="mock-mark mock-btn mock-btn-pale" data-step="3">Done</span></div>
+        </div>
+      </div>
+    </li>
+    <li>
+      Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.
+      {
+        /* Only the names people need to find Privacy & Security are written
+           out; the other settings are grey bars. More names were more to
+           read for no gain, and they change between macOS versions (COGA
+           "Making Content Usable": keep only what helps the task,
+           https://www.w3.org/TR/coga-usable/, paraphrased). */
+      }
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of System Settings. The list on the left has Privacy & Security selected, marked 4, below General, Appearance and Accessibility. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."
+      >
+        <div class="mock-win mock-settings">
+          <div class="mock-side">
+            <span class="mock-dots"><i></i><i></i><i></i></span>
+            <ul>
+              <li>General</li>
+              <li>Appearance</li>
+              <li>Accessibility</li>
+              <li><i class="mock-hidden"></i></li>
+              <li><span class="mock-mark mock-selected" data-step="4">Privacy &amp; Security</span></li>
+              <li><i class="mock-hidden"></i></li>
+              <li><i class="mock-hidden"></i></li>
+            </ul>
+          </div>
+          <div class="mock-main">
+            <p class="mock-title">Privacy &amp; Security</p>
+            <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+            <p class="mock-scroll">Scroll down <span>↓</span></p>
+            <p class="mock-heading">Security</p>
+            <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span><span class="mock-mark mock-btn" data-step="5">Open Anyway</span></div>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li>
+      Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>. Then confirm with your Mac
+      password or Touch ID.
+    </li>
+    <li>
+      Choose <strong>Open</strong> in the last message. Axcess starts, and from now on it opens like any other app.
+    </li>
+  </ol>
+  <p>
+    On macOS 14 (Sonoma) or earlier there is a shortcut: in Applications, right-click <strong>Axcess</strong>,
+    choose <strong>Open</strong>, then choose <strong>Open</strong> again in the message.
+  </p>
+
+  <h3 id="windows">On Windows 10 or 11</h3>
+  <ol class="install-steps">
+    <li>
+      Select <strong>Download the Windows installer</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish
+      downloading.
+    </li>
+    <li>
+      If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and
+      choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the browser’s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."
+      >
+        <div class="mock-win mock-flat">
+          <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+          <div class="mock-row mock-pad">
+            <span class="mock-warn">!</span>
+            <span class="mock-grow"><code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> is not commonly downloaded. Make sure you trust it before you open it.</span>
+            <span class="mock-mark mock-btn mock-btn-icon" data-step="2">⋯</span>
+          </div>
+          <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark" data-step="2">Keep</span></li></ul>
+        </div>
+      </div>
+    </li>
+    <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
+    <li>
+      Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears. Choose it.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."
+      >
+        <div class="mock-pair">
+          <div>
+            <p class="mock-label">First</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>
+              <p>{SMARTSCREEN_TEXT}</p>
+              <p><span class="mock-mark mock-link" data-step="4">More info</span></p>
+              <div class="mock-btns"><span class="mock-btn">Don’t run</span></div>
+            </div>
+          </div>
+          <div>
+            <p class="mock-label">After you choose More info</p>
+            <div class="mock-win mock-flat mock-blue">
+              <p class="mock-title">Windows protected your PC</p>
+              <p>{SMARTSCREEN_TEXT}</p>
+              <p>
+                App: <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code><br />Publisher:
+                Unknown publisher
+              </p>
+              <div class="mock-btns"><span class="mock-mark mock-btn" data-step="4">Run anyway</span><span class="mock-btn">Don’t run</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+    <li>
+      Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works
+      without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.
+      {
+        /* The Setup drawings follow the real wizard on Windows 11: a blue
+           title bar, a white header with the logo on its right, the grey
+           page, and Windows' button shapes. Setup's version label and
+           "Space needed" are left out: both change with every build, and
+           the steps should stay true after the next one. */
+      }
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses this computer, and below it Only for me, followed by your account name. Only for me is selected and marked 5. The Next button at the bottom right is marked 5."
+      >
+        <div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-head">
+            <div class="mock-grow"><p class="mock-title">Choose who can use Axcess</p><p>Install it for you, or for everyone who uses this computer.</p></div>
+            <span class="mock-head-logo" set:html={MARK} />
+          </div>
+          <div class="mock-pad">
+            <p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+            <p class="mock-radio">Everyone who uses this computer</p>
+            <p class="mock-radio mock-on"><span class="mock-mark" data-step="5">Only for me (your name)</span></p>
+            <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>
+          </div>
+          <div class="mock-btns mock-foot"><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="5">Next &gt;</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+        </div>
+      </div>
+    </li>
+    <li>
+      The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to
+      pick another. Then choose <strong>Install</strong>.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."
+      >
+        <div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-head">
+            <div class="mock-grow"><p class="mock-title">Choose a folder</p><p>Choose where to install Axcess.</p></div>
+            <span class="mock-head-logo" set:html={MARK} />
+          </div>
+          <div class="mock-pad">
+            <p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+            <p class="mock-field-label">Install folder:</p>
+            <div class="mock-row"><span class="mock-field mock-grow">{WIN_FOLDER}</span><span class="mock-btn mock-btn-win">Browse…</span></div>
+          </div>
+          <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="6">Install</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+        </div>
+      </div>
+    </li>
+    <li>
+      The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.
+      <div
+        class="mock not-content"
+        role="img"
+        aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the buttons at the bottom, only Finish can be chosen, and it is marked 7."
+      >
+        <div class="mock-win mock-flat mock-setup">
+          <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+          <div class="mock-finish">
+            <div class="mock-panel">
+              <svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"></rect><path d="M4 52h52M30 6v26m-9-9 9 9 9-9"></path></svg>
+            </div>
+            <div class="mock-pad">
+              <p class="mock-title mock-title-big">Axcess is installed</p>
+              <p>Axcess is installed in this folder:<br /><span class="mock-path">{WIN_FOLDER}</span></p>
+              <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+              <p class="mock-check">Open Axcess now</p>
+            </div>
+          </div>
+          <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win mock-off">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="7">Finish</span><span class="mock-btn mock-btn-win mock-off">Cancel</span></div>
+        </div>
+      </div>
+    </li>
+    <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
+  </ol>
+  <p>
+    If <strong>Run anyway</strong> does not appear, your organization manages your computer and blocks apps that
+    are not signed. Ask your IT support to allow it.
+  </p>
+
+  <h4 id="windows-portable">Windows, without installing</h4>
+  <p>Use <strong>Download the portable Windows zip</strong>.</p>
+  <ol>
+    <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
+    <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
+    <li>
+      Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess,
+      move the whole folder. On a USB drive, close Axcess before you unplug the drive, or the reports can be
+      damaged.
+    </li>
+  </ol>
+
+  <h3 id="linux">On Linux</h3>
+  <ol>
+    <li>
+      Select <strong>Download for Linux (AppImage)</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the
+      whole app in one file.
+    </li>
+    <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
+    <li>
+      Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a
+      terminal.
+    </li>
+    <li>Double-click it to open Axcess.</li>
+  </ol>
+  <p>
+    On Ubuntu 23.10 and later, an AppImage can't use the browser sandbox, which keeps web pages apart from the rest
+    of your computer. There, Axcess opens with that sandbox off, so open saved copies only of sites you trust in the
+    Page inspector. On other Linux systems the sandbox stays on.
+  </p>
+
+  <h3 id="after-install">After you install</h3>
+  <p>
+    AI checks are optional. AI review, and the part of the Image text check that compares image text with alt text,
+    need Ollama: a separate program that runs AI models on your computer, with models you download yourself. Skip
+    this at first. Every other check runs without it. <a href={url("/privacy/#ai")}>How the AI checks stay on
+    your computer</a>.
+  </p>
+  <p>
+    For updates, where Axcess keeps your reports, and what to do if the app does not start, read <a href={url("/docs/desktop-app/")}>Using the desktop app</a> and <a href={url("/docs/troubleshooting/")}>Troubleshooting</a>.
+  </p>
+
+  <h2 id="from-source">Run it from the source code (for developers)</h2>
+  <p>
+    For developers and IT staff on macOS (including Intel Macs), Linux, or Windows with WSL (Windows Subsystem for
+    Linux). You need Python 3.11 or newer, uv, Node.js 22.22 or newer, and Tesseract (the text recognition
+    program). Copy the code from GitHub, then run these from its top folder:
+  </p>
+  {
+    /* A list of commands, each with what it does, rather than one code
+       block: a code block keeps its long lines and would scroll sideways
+       at 320 px (SC 1.4.10 Reflow, Level AA), and a list says what each
+       command is for in plain words. */
+  }
+  <ol>
+    <li><code>make setup</code> installs the Python parts and the Chromium browser.</li>
+    <li><code>make migrate</code> creates the local database.</li>
+    <li><code>make alfa-install</code> adds the second rule check (Alfa). This is optional.</li>
+    <li><code>make frontend-build</code> builds the interface.</li>
+    <li><code>make run</code> starts Axcess. Open <code>http://127.0.0.1:8765/app/</code> in your browser.</li>
+  </ol>
+  <p>
+    Setup for contributors, quality checks and running it for a team are in <a href={`${REPO}/blob/main/CONTRIBUTING.md`}>the contributing guide</a> and <a href={url("/docs/hosting/")}>Hosting Axcess</a>.
+  </p>
+
+  <h2 id="first-scan">Run a small first scan</h2>
+  <p>
+    Start with a public site you are allowed to test and a low page limit. You will get a report quickly and a feel
+    for the tool.
+  </p>
+  {
+    /* Numbered panels with a heading per step: the heading is the action,
+       the paragraph says where, the screenshot shows where. The number is
+       drawn by CSS from the list's own order, so a screen reader still
+       hears an ordered list (SC 1.3.1 Info and Relationships, Level A).
+       Rejected: screenshots without step text. A picture shrinks at 320 px
+       and cannot be read by everyone, so the text says it all. */
+  }
+  <ol class="not-content ax-prose steps">
+    <li>
+      <h3>Select "New scan"</h3>
+      <p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
+      <img class="step-shot" loading="lazy" {...shot("new-scan-button")} />
+    </li>
+    <li>
+      <h3>Enter the address of one section</h3>
+      <p>
+        In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan
+        stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>,
+        turned off.
+      </p>
+      <img class="step-shot" loading="lazy" {...shot("new-scan-public")} />
+    </li>
+    <li>
+      <h3>Set "Maximum pages" to about 25</h3>
+      <p>
+        You find it under <em>Limits and rule check tool</em>. The other settings are fine as they are. The <em>What this scan will do</em> panel lists exactly which checks will run.
+      </p>
+      <img class="step-shot" loading="lazy" {...shot("maximum-pages")} />
+      <p class="tip">
+        Want to watch it work? Turn on <em>Show the scanning browser window</em> under <em>Speed and browser
+        window</em>.
+      </p>
+    </li>
+    <li>
+      <h3>Start the scan</h3>
+      <p>
+        Select <em>Start scan</em>. The progress updates as Axcess finds and checks pages. You can select <em>Stop
+        scan</em> at any time.
+      </p>
+      <img class="step-shot" loading="lazy" {...shot("start-scan")} />
+    </li>
+  </ol>
+
+  <h2 id="sign-in">Scan a site behind a sign-in</h2>
+  <p>
+    When you are comfortable, try a site that needs a sign-in. You sign in yourself, in a browser window on your
+    computer, so U-M sign-in and Duo two-step sign-in work, and Axcess never sees your password. Your sign-in is
+    deleted when the scan ends.
+  </p>
+  <p>
+    Sign-in scans work only when Axcess runs on your own computer: the desktop app, or Axcess run from the source
+    code. They are not available when Axcess runs on a shared server for a team.
+  </p>
+  <ol class="not-content ax-prose steps">
+    <li>
+      <h3>Choose the sign-in tab</h3>
+      <p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
+      <img class="step-shot" loading="lazy" {...shot("sign-in-tab")} />
+    </li>
+    <li>
+      <h3>Enter where to start, and confirm you may scan</h3>
+      <p>
+        In <em>Website address to scan after you sign in</em>, enter the address of the page the scan should start
+        from. It must start with https://. Axcess shows which pages it will scan. Then check the box that says the
+        site owner allows this scan and that you will sign in with a test account that has only the access it
+        needs.
+      </p>
+      <img class="step-shot" loading="lazy" {...shot("sign-in-address")} />
+    </li>
+    <li>
+      <h3>Sign in in the browser window</h3>
+      <p>
+        Select <em>Open browser to sign in</em>. A browser window opens at the site's own sign-in page, which looks
+        different for every organization. Sign in there as you usually do, including any two-step sign-in. If
+        sign-in opens a new tab, finish in that tab. You are done when the browser shows the site itself, not a
+        sign-in page.
+      </p>
+    </li>
+    <li>
+      <h3>Start the scan</h3>
+      <p>
+        Come back to Axcess. Under <em>Finished signing in?</em>, select <em>I’m signed in, start scan</em>. The
+        scan starts from the page in the newest tab that is still open in the browser. If that page is outside the
+        address you entered, the scan starts from that address instead. Either way, it stays inside the address you
+        entered.
+      </p>
+      <img class="step-shot" loading="lazy" {...shot("signed-in-start")} />
+    </li>
+  </ol>
+
+  {
+    /* Three short cards for the three questions people ask about a
+       sign-in scan (what it needs, what it keeps, what is different), so
+       no limit or privacy fact is lost in a long paragraph (COGA "Making
+       Content Usable": one idea per chunk; the repo's rule never to drop
+       a limitation). Card is the shared panel used on every page (SC 3.2.4
+       Consistent Identification, Level AA). */
+  }
+  <div class="not-content ax-prose facts stack">
+    <Card heading="What it needs">
+      <p>
+        A site whose address starts with https://, uses a name (not a number such as an IP address), and points to
+        a public internet address. Sites on a private network address can't be scanned this way.
+      </p>
+    </Card>
+    <Card heading="What is saved">
+      <p>
+        The report on your computer keeps a saved copy of each page you signed in to, and screenshots. To leave out
+        the saved copies, choose <em>Don’t keep a saved copy of each page</em>. Axcess never saves your password or
+        your sign-in.
+      </p>
+    </Card>
+    <Card heading="What is different">
+      <p>
+        Sign-in scans skip the site's robots.txt file (where a site asks scanners to stay away from pages). Your
+        confirmation that the site owner allows the scan takes its place. They don't run AI review or the Motion
+        and reading-order check, and the Image text check is off unless you turn it on. If Axcess closes during a
+        sign-in scan, start a new one.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="first-report">Read your first report</h2>
+  <p>
+    Every issue has one of three types: <strong>Barrier</strong>, <strong>Needs review</strong> or <strong>Informational</strong>. <a href={url("/docs/glossary/")}>The glossary explains each one</a>.
+  </p>
+  <div class="not-content ax-prose facts">
+    <Card heading="Start at the Issues tab">
+      <p>
+        Barriers come first, then the rest by priority. Filter by <em>Type</em> or <em>Level</em>, and open an
+        issue's title to see its pages and how to fix it.
+      </p>
+    </Card>
+    <Card heading="Open an occurrence">
+      <p>
+        An occurrence is one place an issue appears. It shows the page, the element, its code and a screenshot. For
+        a problem found after a click, the page state names the control, for example "After clicking “Open menu”".
+      </p>
+    </Card>
+    <Card heading="See what was checked">
+      <p>
+        <em>What was checked</em>, above the Issues table, shows which checks ran and which did not. Read it before
+        you draw conclusions.
+      </p>
+    </Card>
+    <Card heading="Export and scan again">
+      <p>
+        The <em>Export</em> menu has an issue list with fixes (Excel), a written report (Markdown), an occurrence
+        list (CSV) and all report data (JSON). Exports made before an expert reviews the report are marked as a
+        draft. After you fix things, scan again and use <em>Compare reports</em> to see what changed.
+      </p>
+    </Card>
+  </div>
+  <p>{HONESTY}</p>
+  <p>
+    The full walkthrough, with every column and export, is in <a href={url("/docs/reading-your-report/")}>Reading your report</a>.
+  </p>
+
+  <h2 id="before-you-scan">Before you scan</h2>
+  <ul>
+    <li>
+      <strong>Permission.</strong> Scan only the sites and accounts you are allowed to test. If you choose to
+      ignore a site's robots.txt rules, Axcess records that choice with the scan. When it opens menus and dialogs,
+      it skips buttons like Sign out, Delete and Buy.
+    </li>
+    <li><strong>One scan at a time.</strong> Axcess runs one scan at a time. Start the next scan when the first one finishes.</li>
+    <li>
+      <strong>Speed.</strong> By default, Axcess opens each page in a real browser and checks it several ways, so a
+      large scan takes a while. On the New scan page, the <em>Checks</em> group lets you turn off checks when speed
+      matters more.
+    </li>
+  </ul>
+</StarlightPage>
+
+<style>
+  .lede {
+    color: var(--ax-fg-muted);
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+
+  /* Download rows. Panels stack their text and button below about 34rem
+     (container query on the list, not the window, because the sidebar
+     changes how wide the content is). */
+  .downloads {
+    container-type: inline-size;
+    display: grid;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .downloads li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .dl-text {
+    flex: 1 1 20rem;
+    min-width: 0;
+  }
+  .dl-name {
+    margin: 0 0 0.375rem;
+    color: var(--ax-fg);
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .dl-text p {
+    margin: 0;
+    color: var(--ax-fg-muted);
+    line-height: 1.55;
+  }
+  .dl-text .dl-file {
+    margin-top: 0.5rem;
+    color: var(--ax-fg-subtle);
+    font-size: 0.9375rem;
+  }
+  .downloads code,
+  .callout code {
+    overflow-wrap: anywhere;
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+    font-family: var(--sl-font-mono);
+    font-size: 0.875em;
+  }
+  /* Page-local copy of LinkButton's "secondary" look. DownloadLink is its
+     own <a> (it carries the release lookup), so LinkButton's scoped styles
+     can't reach it. At least 44 px tall (SC 2.5.5 Target Size (Enhanced),
+     Level AAA) and underlined on hover, so the change is not colour alone
+     (SC 1.4.1 Use of Color, Level A). */
+  .downloads :global(.dl-button) {
+    display: inline-flex;
+    align-items: center;
+    min-height: max(var(--ax-target), 3.25rem);
+    padding: 0.75rem 1.25rem;
+    border: 2px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+    background: var(--ax-surface);
+    color: var(--ax-link);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+  .downloads :global(.dl-button:hover) {
+    border-color: var(--ax-link);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  @container (max-width: 34rem) {
+    .downloads :global(.dl-button) {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+    }
+  }
+
+  .callout {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--ax-border-strong);
+    border-inline-start: 6px solid var(--ax-maize);
+    border-radius: 0.5rem;
+    background: var(--ax-surface-subtle);
+  }
+  .callout p {
+    margin: 0;
+    color: var(--ax-fg);
+    line-height: 1.6;
+  }
+
+  /* First-scan steps: numbered panels. The number comes from a CSS counter
+     on the <ol>, so the list keeps its meaning without the styles. */
+  .steps {
+    counter-reset: step;
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps > li {
+    position: relative;
+    min-width: 0;
+    padding: 1.25rem 1.25rem 1.25rem 4.25rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .steps > li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    top: 1.15rem;
+    left: 1.25rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+    font-weight: 700;
+  }
+  .steps h3 {
+    margin: 0 0 0.375rem;
+    color: var(--ax-fg);
+    font-size: 1.1875rem;
+    line-height: 1.3;
+  }
+  .steps p {
+    margin: 0;
+    color: var(--ax-fg-muted);
+    line-height: 1.6;
+  }
+  .steps code {
+    overflow-wrap: anywhere;
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+    font-family: var(--sl-font-mono);
+    font-size: 0.875em;
+  }
+  .steps .tip {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-inline-start: 4px solid var(--ax-maize);
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+  }
+  /* A screenshot is never larger than its own size (a small crop blown up
+     would blur) and never wider than its step. No CSS width: the width
+     attribute sets it, and with height: auto the browser reserves the
+     picture's space from width and height before it loads. */
+  .step-shot {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-top: 0.875rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+  }
+  /* On a phone, the screenshot also uses the space under the step number:
+     every pixel makes its words easier to read. The text keeps its indent. */
+  @media (max-width: 37.5rem) {
+    .steps > li {
+      padding-left: 3.75rem;
+    }
+    .steps > li::before {
+      left: 0.875rem;
+    }
+    .step-shot {
+      margin-left: -2.75rem;
+      max-width: calc(100% + 2.75rem);
+    }
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  /* Three cards would leave one alone on a second row in the 48rem
+     column, which reads as an afterthought; stacked, they read in order. */
+  .facts.stack {
+    grid-template-columns: 1fr;
+  }
+
+  .install-steps > li + li {
+    margin-top: 0.75rem;
+  }
+
+  /* -------------------------------------------------------------------
+   * Install drawings. Why they are HTML, how a screen reader gets them,
+   * and why the marks look as they do: see the comment in the frontmatter.
+   *
+   * Colours: the window, its text and its lines use the site's --ax-*
+   * tokens, so a drawing follows the light or dark theme the way macOS and
+   * Windows follow theirs, and its text keeps 7:1 in both. The parts that
+   * are blue on the real screen in either theme (the SmartScreen window,
+   * Setup's title bar, the macOS default button) keep a fixed blue with
+   * white text, each 7.2:1 or more. Sizes are in em, so a drawing grows
+   * with the text, and the drawing's own width (a container query) decides
+   * when its parts stack.
+   * ----------------------------------------------------------------- */
+  .mock {
+    --mock-win: var(--ax-surface);
+    --mock-bar: var(--ax-surface-muted);
+    --mock-page: var(--ax-surface-subtle);
+    --mock-line: var(--ax-border-strong);
+    --mock-faint: var(--ax-border);
+    --mock-fg: var(--ax-fg);
+    --mock-fg-muted: var(--ax-fg-muted);
+    --mock-mark: var(--ax-focus);
+    container-type: inline-size;
+    margin: 0.75rem 0 1.25rem;
+    color: var(--mock-fg);
+    font-family: var(--sl-font);
+    font-size: 0.875rem;
+    line-height: 1.45;
+    letter-spacing: 0;
+  }
+  .mock p {
+    margin: 0 0 0.5rem;
+    color: inherit;
+  }
+  .mock p:last-child {
+    margin-bottom: 0;
+  }
+  .mock ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .mock code {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .mock-win {
+    border: 1px solid var(--mock-line);
+    border-radius: 12px;
+    background: var(--mock-win);
+    box-shadow: var(--ax-shadow);
+  }
+  .mock-flat {
+    border-radius: 4px;
+  }
+  /* No overflow: hidden on the window, so a step number near the edge is
+     never cut off; the first and last parts round themselves. */
+  .mock-bar,
+  .mock-head,
+  .mock-titlebar {
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+  }
+  .mock-foot {
+    border-bottom-left-radius: inherit;
+    border-bottom-right-radius: inherit;
+  }
+  .mock-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.35rem 0.7rem;
+    border-bottom: 1px solid var(--mock-faint);
+    background: var(--mock-bar);
+  }
+  .mock-bar-title {
+    flex: 1;
+    font-weight: 600;
+  }
+  .mock-dots {
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+  .mock-dots i {
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 50%;
+    background: #ff5f57;
+  }
+  .mock-dots i:nth-child(2) {
+    background: #febc2e;
+  }
+  .mock-dots i:nth-child(3) {
+    background: #28c840;
+  }
+  .mock-pad {
+    padding: 0.8rem 0.9rem;
+  }
+  .mock-title {
+    font-size: 1.08em;
+    font-weight: 700;
+  }
+  .mock-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.7rem;
+  }
+  /* 10em before it wraps: a narrow drawing puts the button under the text
+     rather than squeezing the text to one word per line. */
+  .mock-grow {
+    flex: 1 1 10em;
+    min-width: 0;
+  }
+  .mock-path,
+  .mock-field {
+    overflow-wrap: anywhere;
+  }
+  .mock-btn {
+    display: inline-block;
+    padding: 0.25em 0.85em;
+    border: 1px solid var(--mock-line);
+    border-radius: 6px;
+    background: var(--mock-win);
+    color: var(--mock-fg);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .mock-btn-mac {
+    border-color: #0050c0;
+    background: #0050c0;
+    color: #fff;
+  }
+  .mock-btn-pale {
+    border-color: var(--mock-bar);
+    background: var(--mock-bar);
+  }
+  .mock-btn-icon {
+    padding: 0.1em 0.6em;
+    font-size: 1.1em;
+  }
+  .mock-btns {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+  .mock-stack {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .mock-stack .mock-btn {
+    text-align: center;
+  }
+
+  /* The mark: an outline in the theme's focus colour outside a maize ring.
+     An outline, not only a shadow, because a high-contrast theme keeps
+     outlines and drops shadows. */
+  .mock-mark {
+    position: relative;
+    display: inline-block;
+    outline: 3px solid var(--mock-mark);
+    outline-offset: 3px;
+    border-radius: 6px;
+    box-shadow: 0 0 0 3px var(--ax-maize);
+  }
+  .mock-mark::after {
+    content: attr(data-step);
+    position: absolute;
+    top: -1.15em;
+    right: -1.1em;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    min-width: 1.6em;
+    height: 1.6em;
+    border: 2px solid var(--ax-maize);
+    border-radius: 50%;
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+    font: 700 0.8rem/1 var(--sl-font);
+  }
+
+  /* macOS: the disk image window */
+  .mock-drag {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem 1.4rem;
+    padding: 1.4rem 1rem 1.1rem;
+  }
+  .mock-icon {
+    display: inline-grid;
+    justify-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.4rem;
+  }
+  /* The real app icon (desktop/assets/axcess.svg): the navy mark on a light
+     tile, in both themes, because that is the icon people will see. */
+  .mock-app {
+    display: grid;
+    place-items: center;
+    width: 3.2em;
+    height: 3.2em;
+    border: 1px solid #aab3bf;
+    border-radius: 22%;
+    background: #f2f5f9;
+    color: #00274c;
+    box-shadow: 0 1px 3px rgb(0 39 76 / 0.18);
+  }
+  .mock-app :global(svg) {
+    width: 60%;
+    height: 60%;
+  }
+  .mock-folder {
+    position: relative;
+    width: 3.4em;
+    height: 2.6em;
+    margin-top: 0.6em;
+    border-radius: 4px;
+    background: #5aa9e6;
+  }
+  .mock-folder::before {
+    content: "";
+    position: absolute;
+    top: -0.45em;
+    left: 0;
+    width: 45%;
+    height: 0.6em;
+    border-radius: 4px 4px 0 0;
+    background: #5aa9e6;
+  }
+  .mock-arrow {
+    width: 3em;
+    color: var(--mock-fg);
+  }
+
+  /* macOS: the warning message */
+  .mock-alert {
+    max-width: 17rem;
+    margin: 0 auto;
+    padding: 1rem;
+    background: var(--mock-page);
+    text-align: center;
+  }
+  .mock-alert .mock-app {
+    margin: 0 auto 0.6rem;
+  }
+
+  /* macOS: System Settings */
+  .mock-settings {
+    display: grid;
+    grid-template-columns: minmax(8.5rem, 38%) 1fr;
+  }
+  .mock-side {
+    padding: 0.6rem 0.5rem;
+    border-right: 1px solid var(--mock-faint);
+    border-radius: 12px 0 0 12px;
+    background: var(--mock-bar);
+  }
+  .mock-side .mock-dots {
+    margin: 0 0 0.6rem 0.3rem;
+  }
+  .mock-side li {
+    padding: 0.2rem 0.45rem;
+  }
+  .mock-selected {
+    display: block;
+    margin: 0.15rem -0.45rem;
+    padding: 0.2rem 0.45rem;
+    background: #0050c0;
+    color: #fff;
+    font-weight: 600;
+  }
+  /* The selected row is as wide as the list, so its number sits inside the
+     row's end, not past the drawing's edge. */
+  .mock-selected::after {
+    right: 0.3em;
+  }
+  /* A setting whose name the drawing leaves out: a grey bar. */
+  .mock-hidden {
+    display: inline-block;
+    width: 6em;
+    height: 0.6em;
+    border-radius: 4px;
+    background: var(--mock-faint);
+    vertical-align: middle;
+  }
+  .mock-main {
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+  }
+  .mock-group {
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--mock-faint);
+    border-radius: 8px;
+    background: var(--mock-page);
+  }
+  .mock-faint {
+    display: grid;
+    gap: 0.45rem;
+  }
+  .mock-faint i {
+    display: block;
+    height: 0.55em;
+    border-radius: 4px;
+    background: var(--mock-faint);
+  }
+  .mock-faint i:nth-child(2) {
+    width: 80%;
+  }
+  .mock-faint i:nth-child(3) {
+    width: 60%;
+  }
+  .mock .mock-scroll {
+    margin: 0.5rem 0;
+    color: var(--mock-fg-muted);
+    font-style: italic;
+    text-align: center;
+  }
+  .mock-heading {
+    margin-bottom: 0.35rem;
+    font-weight: 700;
+  }
+  @container (max-width: 22rem) {
+    .mock-settings {
+      grid-template-columns: 1fr;
+    }
+    .mock-side {
+      border-right: 0;
+      border-bottom: 1px solid var(--mock-faint);
+      border-radius: 12px 12px 0 0;
+    }
+    .mock-row {
+      flex-wrap: wrap;
+    }
+  }
+
+  /* Windows: the browser's downloads list */
+  .mock-warn {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 50%;
+    background: #fde7b0;
+    color: #5c3b00;
+    font-weight: 800;
+  }
+  .mock-menu {
+    width: max-content;
+    max-width: calc(100% - 1.8rem);
+    margin: 0 0.9rem 0.9rem auto !important;
+    padding: 0.35rem 0 !important;
+    border: 1px solid var(--mock-line);
+    border-radius: 6px;
+    background: var(--mock-win);
+    box-shadow: var(--ax-shadow);
+  }
+  .mock-menu li {
+    padding: 0.3rem 1rem;
+  }
+  .mock-menu .mock-mark {
+    padding: 0 0.4rem;
+  }
+
+  /* Windows: the blue SmartScreen window. Blue in both themes, as on the
+     real screen; white text on it is 9:1. */
+  .mock-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 1rem;
+  }
+  .mock .mock-label {
+    margin-bottom: 0.35rem;
+    color: var(--mock-fg);
+    font-weight: 700;
+  }
+  .mock-blue {
+    padding: 0.9rem;
+    border-color: #0a4a87;
+    background: #0a4a87;
+    color: #fff;
+  }
+  .mock-blue .mock-title {
+    font-size: 1.3em;
+    font-weight: 400;
+  }
+  .mock-blue .mock-btn {
+    border-color: #fff;
+    border-radius: 2px;
+    background: transparent;
+    color: #fff;
+  }
+  .mock-blue .mock-btns {
+    margin-top: 0.9rem;
+  }
+  .mock-link {
+    padding: 0 0.15rem;
+    text-decoration: underline;
+  }
+
+  /* Windows: Axcess Setup. The title bar blue is darker than Windows'
+     accent so its white text keeps 7:1 (8.2:1). Setup's greyed-out buttons
+     keep 7:1 text too, and show that they are off by a fainter border. */
+  .mock-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background: #0b4f94;
+    color: #fff;
+  }
+  .mock-titlebar .mock-bar-title {
+    font-weight: 400;
+  }
+  .mock-title-icon {
+    display: grid;
+    place-items: center;
+    width: 1.25em;
+    height: 1.25em;
+    border-radius: 3px;
+    background: #fff;
+    color: #00274c;
+  }
+  .mock-title-icon :global(svg) {
+    width: 80%;
+    height: 80%;
+  }
+  .mock-controls {
+    display: flex;
+    gap: 1.1em;
+  }
+  .mock-controls i {
+    font-style: normal;
+  }
+  .mock-setup .mock-pad {
+    background: var(--mock-page);
+  }
+  .mock-head {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--mock-faint);
+    background: var(--mock-win);
+  }
+  .mock-head p:not(.mock-title) {
+    padding-left: 0.7rem;
+    color: var(--mock-fg-muted);
+  }
+  .mock-head-logo {
+    flex: none;
+    width: 1.9em;
+    height: 1.9em;
+    color: var(--ax-link);
+  }
+  .mock-foot {
+    padding: 0.7rem 0.9rem;
+    border-top: 1px solid var(--mock-faint);
+    background: var(--mock-bar);
+  }
+  .mock-btn-win {
+    min-width: 5.5em;
+    padding: 0.25em 1em;
+    border-radius: 4px;
+    font-weight: 400;
+    text-align: center;
+  }
+  .mock-btn-default {
+    border: 2px solid var(--ax-link);
+  }
+  .mock-off {
+    border-color: var(--mock-faint);
+    background: var(--mock-page);
+    color: var(--mock-fg-muted);
+  }
+  .mock-radio,
+  .mock-check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .mock-radio {
+    margin-left: 1.6rem;
+  }
+  .mock-radio::before {
+    content: "";
+    flex: none;
+    width: 1em;
+    height: 1em;
+    border: 1px solid var(--mock-fg-muted);
+    border-radius: 50%;
+    background: var(--mock-win);
+  }
+  .mock-on::before {
+    border: 0;
+    background: radial-gradient(circle, var(--mock-win) 0 28%, var(--ax-link) 32%);
+  }
+  .mock-check::before {
+    content: "✓";
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 3px;
+    background: var(--ax-link);
+    color: var(--mock-win);
+    font-weight: 800;
+    line-height: 1;
+  }
+  .mock-radio .mock-mark {
+    padding: 0 0.3rem;
+  }
+  .mock .mock-note {
+    margin-top: 0.9rem;
+    color: var(--mock-fg-muted);
+  }
+  .mock-field-label {
+    margin-bottom: 0.25rem;
+  }
+  .mock-field {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--mock-line);
+    border-bottom: 2px solid var(--ax-link);
+    border-radius: 3px;
+    background: var(--mock-win);
+  }
+  .mock-finish {
+    display: grid;
+    grid-template-columns: minmax(3.5rem, 30%) 1fr;
+    background: var(--mock-win);
+  }
+  .mock-setup .mock-finish .mock-pad {
+    background: var(--mock-win);
+  }
+  .mock-title-big {
+    font-size: 1.3em;
+  }
+  .mock-panel {
+    display: grid;
+    place-items: center;
+    padding: 0.8rem;
+    background: #0b4f94;
+    color: #fff;
+  }
+  .mock-panel svg {
+    width: 80%;
+    max-width: 6rem;
+  }
+
+  @media (forced-colors: active) {
+    .mock-mark {
+      outline-color: Highlight;
+    }
+    .mock-mark::after {
+      border-color: Highlight;
+    }
+    .mock-btn-mac,
+    .mock-selected,
+    .mock-blue,
+    .mock-titlebar,
+    .mock-panel {
+      border: 1px solid CanvasText;
+    }
+  }
+</style>

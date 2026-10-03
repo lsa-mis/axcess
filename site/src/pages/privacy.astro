@@ -1,0 +1,336 @@
+---
+/**
+ * Privacy and trust (/privacy/).
+ *
+ * What: every fact about where Axcess keeps data and what it connects to,
+ * then sign-in scans, the optional AI, where the files are, team use,
+ * accuracy, and last, this website's own promise. An IT reviewer reads it
+ * top to bottom; everyone else jumps from "On this page".
+ *
+ * Why this order: "what stays and what leaves" is the question that
+ * decides whether Axcess may be used at all, so it comes first (U.S.
+ * Federal Plain Language Guidelines: lead with the main point). Each later
+ * section answers one follow-up question (COGA "Making Content Usable":
+ * one idea per chunk, https://www.w3.org/TR/coga-usable/, paraphrased).
+ *
+ * Every fact was checked against the code (desktop/src/updates.cjs and
+ * main.cjs for the update check, src/audit/config.py for Ollama,
+ * src/audit/web/server.py and src/audit/protected/ for sign-in scans,
+ * docs/desktop-app.md for the folders). Where the old page said more than
+ * the code does, the claim is narrowed here, never dropped: for example,
+ * Ollama's address can be changed for public scans, so the page says so.
+ *
+ * Rejected: the old page's two diagrams (privacy-boundary.png,
+ * login-scan-flow.png). Their words are out of date ("Site with a login or
+ * 2FA", "Don't store rendered pages", "Rule docs"), and a picture whose
+ * words differ from the app sends people looking for buttons that do not
+ * exist. The lists below carry every fact the diagrams did. Bring them back
+ * once docs/images/diagrams/ is redrawn with the app's words.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import { REPO, url } from "../lib/site";
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Privacy and trust",
+    description:
+      "What stays on your computer, what Axcess connects to, and how it scans pages behind a sign-in without ever seeing your password.",
+  }}
+  headings={[
+    { depth: 2, slug: "boundary", text: "What stays on your computer and what connects out" },
+    { depth: 3, slug: "stays", text: "Stays on your computer" },
+    { depth: 3, slug: "connects", text: "Connects out" },
+    { depth: 2, slug: "sign-in", text: "Scanning behind a sign-in without sharing your password" },
+    { depth: 2, slug: "ai", text: "AI checks are optional and labelled" },
+    { depth: 2, slug: "data", text: "Where your data is kept" },
+    { depth: 2, slug: "teams", text: "Using Axcess as a team" },
+    { depth: 2, slug: "accuracy", text: "What Axcess claims about its own accuracy" },
+    { depth: 2, slug: "this-site", text: "This website" },
+  ]}
+>
+  <p class="lede">
+    Accessibility work often involves private pages and pages behind a sign-in. Those should not be uploaded to
+    anyone's cloud. Axcess keeps scans, sign-ins and reports on the computer that runs it. It has no account, no
+    tracking (telemetry) and no upload.
+  </p>
+
+  <h2 id="boundary">What stays on your computer and what connects out</h2>
+
+  {
+    /* Two plain lists, not the old drawn boxes with role="list" on <div>s:
+       a native <ul> under a heading gives the same structure without ARIA
+       (W3C "Using ARIA", rule 1, https://www.w3.org/TR/using-aria/#rule1,
+       paraphrased; SC 1.3.1 Info and Relationships, Level A). Each item
+       starts with its name in bold, so the list can be scanned. */
+  }
+  <h3 id="stays">Stays on your computer</h3>
+  <ul>
+    <li>
+      <strong>What a scan finds.</strong> Pages, elements, their code, screenshots and image files, kept in a local
+      database and a folder of files.
+    </li>
+    <li>
+      <strong>Your decisions.</strong> Every status change and the reason you gave, with its history.
+    </li>
+    <li>
+      <strong>Reports and exports.</strong> Exported files are written to your disk and go only where you send them.
+    </li>
+    <li>
+      <strong>The browser.</strong> Chromium opens the pages on your computer, including the window you sign in
+      with. The desktop app includes it.
+    </li>
+    <li>
+      <strong>Text recognition (OCR).</strong> Reading text inside images happens on your computer. The desktop app
+      includes it. If you run Axcess from the source code, you install Tesseract yourself.
+    </li>
+    <li>
+      <strong>Optional AI.</strong> If you install Ollama, a program that runs AI models, Axcess uses it on this
+      computer by default. <a href="#ai">More about the AI checks</a>.
+    </li>
+  </ul>
+
+  <h3 id="connects">Connects out</h3>
+  <ul>
+    <li>
+      <strong>The website you scan.</strong> Axcess loads pages from that site at the speed you set. A public scan
+      follows the site's robots.txt file (where a site asks scanners to skip pages) unless you choose to ignore it.
+      A sign-in scan does not check robots.txt: your confirmation that the site owner allows the scan takes its
+      place. Opening a saved copy of a page later can also load that site's styles, fonts and images.
+    </li>
+    <li>
+      <strong>GitHub, to check for a newer desktop app.</strong> Each time you open the desktop app, it asks GitHub
+      once whether a newer version exists. On a Mac it also asks when you reopen its window. The request carries no
+      scan data. Nothing is downloaded unless you choose to update. Setting <code>AXCESS_DISABLE_UPDATE_CHECK=1</code> turns the check off.
+    </li>
+    <li>
+      <strong>Links you choose to open.</strong> <em>Give feedback</em> opens a form in your browser, and <em>About this rule</em> opens the rule's help page. They open only when you select them, and nothing about
+      your scan is sent with them.
+    </li>
+    <li>
+      <strong>Nothing else.</strong> No tracking, no usage statistics (analytics), no cloud AI built in. Anything
+      else would need an administrator to set it up on purpose.
+    </li>
+  </ul>
+
+  <h2 id="sign-in">Scanning behind a sign-in without sharing your password</h2>
+  <p>
+    Many of the pages that matter most are behind a sign-in. Axcess handles this the safe way: you sign in
+    yourself, and it scans with that sign-in. U-M sign-in and Duo two-step sign-in work.
+  </p>
+  <ul>
+    <li>
+      Sign-in scans work only when Axcess runs on your own computer. They are not available on a shared server.
+    </li>
+    <li>The sign-in window is a normal Chromium window with a new, empty browser profile made just for this scan.</li>
+    <li>You type your password, passkey or one-time code into the website, never into Axcess.</li>
+    <li>
+      Axcess keeps the sign-in in memory only. When the scan ends, the sign-in is deleted with the temporary browser
+      profile. No password or reusable sign-in is saved.
+    </li>
+    <li>
+      The report on your computer keeps saved copies of the pages you signed in to, and screenshots, unless you
+      choose <em>Don’t keep a saved copy of each page</em>.
+    </li>
+    <li>
+      The site's address must start with https:// and point to a public internet address. Sites on a private
+      network address can't be scanned this way.
+    </li>
+  </ul>
+  <p><a href={url("/get-started/#sign-in")}>Step by step: scan a site behind a sign-in</a>.</p>
+
+  {
+    /* The permission reminder is a bordered box with a bold lead-in, not
+       colour alone (SC 1.4.1 Use of Color, Level A), because it is a
+       safety fact people must not skim past. */
+  }
+  <div class="not-content ax-prose callout">
+    <p>
+      <strong>You stay in control of sign-in.</strong> Axcess only continues after you sign in yourself. Use sites
+      and accounts you have permission to test.
+    </p>
+  </div>
+
+  <h2 id="ai">AI checks are optional and labelled</h2>
+  {
+    /* Shared Card panels in a grid that becomes one column on a narrow
+       screen (SC 1.4.10 Reflow, Level AA). Card keeps every panel on the
+       site the same (SC 3.2.4 Consistent Identification, Level AA). */
+  }
+  <div class="not-content ax-prose cards">
+    <Card heading="You install it, or you don't">
+      <p>
+        AI review, and comparing image text with alt text, need Ollama and models you download yourself. Axcess
+        never installs them or downloads a model by itself, and every other check works without them.
+      </p>
+      <p>
+        Axcess looks for Ollama on this computer. Whoever sets up Axcess can point a public scan at Ollama on
+        another computer (the <code>AUDIT_OLLAMA_BASE_URL</code> setting). A sign-in scan only accepts Ollama on this
+        same computer.
+      </p>
+    </Card>
+    <Card heading="Every AI result is marked">
+      <p>
+        An AI result is shown as Needs review, with the model's reasons beside the original evidence. It can't
+        become a Barrier without a person.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="data">Where your data is kept</h2>
+  <p>
+    The desktop app keeps your reports in your system's folder for app data, never inside the app itself. Delete
+    the folder and the reports are gone.
+  </p>
+  {
+    /* A real table with a caption and row headers (SC 1.3.1 Info and
+       Relationships, Level A). The folder paths may break anywhere, so the
+       table fits at 320 px and needs no sideways scrolling (SC 1.4.10
+       Reflow, Level AA). */
+  }
+  <table class="folders">
+    <caption>Where the desktop app keeps your reports</caption>
+    <thead>
+      <tr><th scope="col">System</th><th scope="col">Folder</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">macOS</th><td><code>~/Library/Application Support/Axcess/data/</code></td></tr>
+      <tr><th scope="row">Windows</th><td><code>%APPDATA%/Axcess/data/</code></td></tr>
+      <tr><th scope="row">Windows, portable zip</th><td><code>Axcess data/data/</code>, next to <code>Axcess.exe</code></td></tr>
+      <tr><th scope="row">Linux</th><td><code>~/.config/Axcess/data/</code></td></tr>
+    </tbody>
+  </table>
+  <p>Inside the folder:</p>
+  <ul>
+    <li>one database (SQLite), which is the record of every report;</li>
+    <li>a <code>blobs</code> folder of images and screenshots;</li>
+    <li>logs, which include the address and title of every page scanned.</li>
+  </ul>
+  <p>
+    The files are not encrypted, so treat the folder with the same care as the pages you scanned. Deleting a report
+    keeps its image and screenshot files. Exported files are copies, not the record.
+  </p>
+
+  <h2 id="teams">Using Axcess as a team</h2>
+  <div class="not-content ax-prose cards">
+    <Card heading="A small team on a private network">
+      <p>
+        Axcess can run on an always-on computer for a trusted team, on a private network or a private link such as
+        Tailscale, behind a shared access code. The code only lets people in. There are no separate accounts.
+        Sign-in scans are not available there.
+      </p>
+      <p>
+        Never make it an open public address: anyone who reaches it can point the scanner at any site. <a href={url("/docs/hosting/")}>Hosting Axcess</a> explains the safe setups.
+      </p>
+    </Card>
+    <Card heading="Protected scans run by IT">
+      <p>
+        For sensitive university systems there is a stricter setup that IT runs. People reach it only through an
+        approved university sign-in. Its evidence is encrypted and deleted after seven days, and exports leave out
+        sensitive details. It needs university systems to run, and it is off unless IT turns it on.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="accuracy">What Axcess claims about its own accuracy</h2>
+  <div class="not-content ax-prose cards">
+    <Card heading="A safety check, not a sales number">
+      <p>
+        The project keeps a fixed set of made-up examples, each labelled with the right answer, and scores the
+        checks against it. For each kind of check, fewer than 5% of the problems it reports may be wrong, and it
+        must find at least 80% of the real problems in the set.
+      </p>
+      <p>
+        Because the examples are made up, this protects the rules for what counts as a Barrier. It does not measure
+        accuracy on real sites.
+      </p>
+    </Card>
+    <Card heading="What that does not mean">
+      <p>
+        It does not promise the same results on every real website. A real-world accuracy figure would need a new,
+        typical sample of real pages, checked separately by at least two accessibility experts. The project says so
+        in writing.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="this-site">This website</h2>
+  <p>
+    Every page can be read and navigated without JavaScript. Search and the light or dark switch need it.
+  </p>
+  <p>
+    The site loads no fonts, trackers or scripts from other companies. Its fonts are stored on the site itself. The
+    site is hosted on GitHub Pages, so GitHub delivers each page to your browser.
+  </p>
+  <p>
+    The only other request is optional. On <a href={url("/get-started/#download")}>the download section</a>, your
+    browser asks GitHub for the newest release, so each button can point straight at its file. If scripts are off,
+    no request is made and the buttons open the release page on GitHub instead.
+  </p>
+  <p>
+    Links to GitHub, such as "Edit page" and the source code at <a href={REPO}>github.com/lsa-mis/axcess</a>, open
+    only when you select them.
+  </p>
+</StarlightPage>
+
+<style>
+  .lede {
+    color: var(--ax-fg-muted);
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+  .callout {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--ax-border-strong);
+    border-inline-start: 6px solid var(--ax-maize);
+    border-radius: 0.5rem;
+    background: var(--ax-surface-subtle);
+  }
+  .callout p {
+    margin: 0;
+    color: var(--ax-fg);
+    line-height: 1.6;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .cards code {
+    overflow-wrap: anywhere;
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+    font-family: var(--sl-font-mono);
+    font-size: 0.875em;
+  }
+  /* The caption is visible: unlike the home page's table there is no
+     heading right above that says what the table holds. */
+  .folders {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .folders caption {
+    margin-bottom: 0.5rem;
+    color: var(--ax-fg);
+    font-weight: 700;
+    text-align: start;
+  }
+  .folders th[scope="col"]:first-child {
+    width: 38%;
+  }
+  .folders th,
+  .folders td {
+    vertical-align: top;
+    text-align: start;
+  }
+  .folders code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+</style>
