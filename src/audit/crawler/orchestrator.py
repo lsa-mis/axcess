@@ -587,9 +587,6 @@ async def run_crawl(
             headless=config.browser_headless,
             search_explorer=build_search_explorer(config, axe_analyzer),
             idle_timeout_ms=config.js_idle_timeout_ms,
-            # A saved copy's CSS is part of the saved copy: a scan that opted
-            # out of storing pages stores neither.
-            capture_styles=config.store_rendered_html,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -959,7 +956,6 @@ class _LazyJs:
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
         idle_timeout_ms: int | None = None,
-        capture_styles: bool = False,
     ) -> None:
         self._user_agent = user_agent
         self._fetcher: JsFetcher | None = injected
@@ -976,7 +972,6 @@ class _LazyJs:
         self._headless = headless
         self._search_explorer = search_explorer
         self._idle_timeout_ms = idle_timeout_ms
-        self._capture_styles = capture_styles
 
     async def get(self) -> JsFetcher:
         if self._fetcher is None:
@@ -994,7 +989,6 @@ class _LazyJs:
                 headless=self._headless,
                 search_explorer=self._search_explorer,
                 idle_timeout_ms=self._idle_timeout_ms,
-                capture_styles=self._capture_styles,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher

@@ -179,7 +179,6 @@ class JsFetcher:
         max_rendered_html_chars: int | None = None,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
-        capture_styles: bool = False,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -242,10 +241,10 @@ class JsFetcher:
         self._search_explorer = search_explorer
         # Save the page's CSS beside its saved copy (and each captured
         # state's), so the inspector need not fetch it from the live site.
-        # Only for scans that store saved copies; off by default, so callers
-        # that build their own fetcher (the protected companion) are unchanged.
-        # The cache lives as long as this fetcher, which is one crawl.
-        self._capture_styles = capture_styles
+        # Every fetcher does this, whichever scan built it (anonymous, sign-in,
+        # helper app): the CSS is stored wherever the saved copy itself is
+        # stored, by the same code. The cache lives as long as this fetcher,
+        # which is one crawl.
         self._sheet_cache = SheetCache()
         if max_rendered_html_chars is not None and max_rendered_html_chars <= 0:
             raise ValueError("max_rendered_html_chars must be positive when configured")
@@ -346,11 +345,7 @@ class JsFetcher:
             # touches the page. Never fatal (``capture_styles`` returns None
             # on any failure), like the screenshot pass below.
             styles: StyleSnapshot | None = None
-            if (
-                self._capture_styles
-                and 200 <= status < 300
-                and "text/html" in headers.get("content-type", "text/html")
-            ):
+            if 200 <= status < 300 and "text/html" in headers.get("content-type", "text/html"):
                 styles = await self._snapshot_styles(page)
             # ``Response.url`` omits the fragment because fragments are not
             # sent over HTTP. ``Page.url`` retains React/Vue hash-router
@@ -432,7 +427,7 @@ class JsFetcher:
                         capture_screenshot=(
                             self._capture_element if self._capture_screenshots else None
                         ),
-                        capture_styles=(self._snapshot_styles if self._capture_styles else None),
+                        capture_styles=self._snapshot_styles,
                     )
                 interaction_evaluated = interaction.evaluated
 

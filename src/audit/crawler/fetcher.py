@@ -98,8 +98,9 @@ class FetchResult:
     discovered_urls: tuple[str, ...] = ()
     search_result: SearchResult | None = None
     # The page's CSS and style fingerprint, read right after ``body`` was
-    # serialized (see ``audit.crawler.style_snapshot``). JsFetcher only, and
-    # only when the scan saves copies of pages; None otherwise.
+    # serialized (see ``audit.crawler.style_snapshot``). Every JsFetcher
+    # reads it; None from the static fetcher, for a non-HTML response, or when
+    # reading failed. It is stored wherever the saved copy itself is stored.
     styles: StyleSnapshot | None = None
 
     @property

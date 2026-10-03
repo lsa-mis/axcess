@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -127,8 +129,12 @@ async def test_headless_handoff_restores_storage_without_replaying_old_tokens(
             await browser.close()
 
 
-_APP = """<!doctype html><html lang="en"><title>Fixture sign in</title><body>
+_APP = """<!doctype html><html lang="en"><title>Fixture sign in</title>
+<style>main { color: rgb(1, 2, 3); }</style><body>
 <main></main><script>
+const added = document.createElement('style');
+document.head.appendChild(added);
+added.sheet.insertRule('main { outline-color: rgb(4, 5, 6); }');
 const prefix = 'ROUTER_PREFIX';
 const tabSession = TAB_SESSION;
 const signedIn = () => tabSession ? sessionStorage.getItem('fixture') === 'yes'
@@ -165,9 +171,15 @@ setTimeout(render, 75);
 @pytest.mark.parametrize("prefix", ["#", "#!", ""])
 @pytest.mark.parametrize("tab_session", [False, True])
 async def test_login_traverses_nested_spa_routes_with_session_intact(
-    tmp_db: sqlite3.Connection, prefix: str, tab_session: bool, monkeypatch: pytest.MonkeyPatch
+    tmp_db: sqlite3.Connection,
+    prefix: str,
+    tab_session: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     origin = "https://app.example.test"
+    blob_dir = tmp_path / "blobs"
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(blob_dir))
     html = _APP.replace("ROUTER_PREFIX", prefix).replace("TAB_SESSION", str(tab_session).lower())
 
     async def serve(route: Route) -> None:
@@ -261,6 +273,21 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
                 (summary.scan_id,),
             ).fetchone()[0]
             assert revealed == 3
+            # A sign-in scan saves each saved copy's CSS exactly as any other
+            # scan does: every page and every revealed state, with the
+            # stylesheet rule and the rule a script added through the CSSOM.
+            styles = tmp_db.execute(
+                "SELECT state_key, sheets_json FROM saved_copy_styles WHERE scan_id = ?",
+                (summary.scan_id,),
+            ).fetchall()
+            assert sum(1 for row in styles if row["state_key"] == "") == 3
+            assert sum(1 for row in styles if row["state_key"]) == summary.interaction_states_total
+            for row in styles:
+                css = "".join(
+                    (blob_dir / s["sha256"][:2] / f"{s['sha256']}.css").read_text(encoding="utf-8")
+                    for s in json.loads(row["sheets_json"])
+                )
+                assert "rgb(1, 2, 3)" in css and "rgb(4, 5, 6)" in css, row["state_key"]
             assert len(pages) == (1 if tab_session else 2)
         finally:
             await session.close()
