@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, L
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
-import type { PageEvidence } from "../api/types";
+import type { PageEvidence, PageInspection, SavedStyles } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -55,10 +55,12 @@ type TabId = "page" | "dom";
  * or an over-bound page falls back to a one-page on-demand render in a
  * throwaway headless Chromium. The "Rendered page" tab loads that HTML into a
  * sandboxed iframe and highlights the flagged element(s) (a CSS outline baked
- * into the markup, computed off the main render path). The capture is given
- * the page's own URL as `<base href>` first, without which its relative
- * stylesheets and images would resolve against the review UI and the page
- * would render unstyled (see `withBaseHref`); the "Loaded DOM" tab
+ * into the markup, computed off the main render path). When the scan saved
+ * the copy's CSS, the frame uses that file from this app instead of the
+ * site's stylesheets (see `prepareCapture`). The capture is also given the
+ * page's own URL as `<base href>`, without which its relative fonts, images
+ * and (for older reports) stylesheets would resolve against the review UI
+ * (see `withBaseHref`); the "Loaded DOM" tab
  * shows the same markup as escaped source with the element's markup
  * highlighted. No screenshot is captured or stored. An "Open live page"
  * action stays available in the header.
@@ -274,6 +276,7 @@ export default function InspectorRoute() {
         const html = prepareCapture(
           inspection.render.dom_html,
           inspection.render.final_url || inspection.page.url || null,
+          savedStylesFor(inspection)?.url ?? null,
         );
         const found = countFound(html, stateTargets);
         next.set(key, { missing: stateTargets.length - found, total: stateTargets.length });
@@ -508,15 +511,19 @@ export default function InspectorRoute() {
   // document URL of its own, so every relative stylesheet/font/image in the
   // capture would resolve against the review UI's origin and 404 (the page
   // rendered unstyled). Injecting the page's own URL as <base> makes those
-  // subresources resolve against the site they came from. The DOM tab keeps
-  // the untouched capture.
+  // subresources resolve against the site they came from, and a copy whose
+  // CSS the scan saved uses that instead of the site's stylesheets (see
+  // `prepareCapture`). The DOM tab keeps the untouched capture.
+  const savedStyles = data ? savedStylesFor(data) : null;
+  const savedStylesUrl = savedStyles?.url ?? null;
   const documentHtml = useMemo(
     () =>
       prepareCapture(
         data?.render.dom_html ?? null,
         data?.render.final_url || data?.page.url || null,
+        savedStylesUrl,
       ),
-    [data?.render.dom_html, data?.render.final_url, data?.page.url],
+    [data?.render.dom_html, data?.render.final_url, data?.page.url, savedStylesUrl],
   );
 
   // Bake the highlight into the srcdoc rather than reaching into the frame's
@@ -1174,13 +1181,16 @@ export default function InspectorRoute() {
             </div>
             {/* Outside the live region above: this is standing context about
                 the capture, not a status that changes, so it should not be
-                re-announced every time the highlight count updates. */}
+                re-announced every time the highlight count updates. It says
+                where the styles come from, because that differs: a copy with
+                saved styles uses them, an older copy loads the site's. */}
             <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              The page code shown here is a copy. Its styles, fonts, and images
-              load from the live site now, so the page can look different from
-              how it looked during the scan. The page&rsquo;s own scripts never
-              run here. So if the site would only show a flagged element with
-              JavaScript, Axcess makes it visible to highlight it.
+              {savedStyles
+                ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
+                : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
+              The page&rsquo;s own scripts never run here. So if the site would
+              only show a flagged element with JavaScript, Axcess makes it
+              visible to highlight it.
             </p>
             {/* Below the page and closed: above it, the list pushed the page
                 the reviewer came to see out of view. */}
@@ -1298,13 +1308,46 @@ export default function InspectorRoute() {
 }
 
 /**
+ * The saved CSS for the document an inspection returned, or null.
+ *
+ * Only for a saved copy: the page as it loaded uses the page's own saved CSS,
+ * a page state uses that state's. A live render is the site now, so its CSS
+ * is the site's own. Older servers send no field at all, which reads as null.
+ */
+function savedStylesFor(inspection: PageInspection): SavedStyles | null {
+  const { render } = inspection;
+  if (!render.ok) return null;
+  if (render.source === "stored") return inspection.saved_styles ?? null;
+  if (render.source === "state") {
+    return inspection.states.find((state) => state.state_key === render.state_key)?.saved_styles ?? null;
+  }
+  return null;
+}
+
+/**
  * Make a stored capture renderable in the inspector's frame.
  *
- * Four things are wrong with a capture the moment it leaves the site it came
- * from, and all four make a correct page look broken:
+ * A capture is correct markup that renders wrongly the moment it leaves the
+ * site it came from. What this does depends on whether the scan saved the
+ * copy's CSS (`savedStylesUrl`).
  *
- * 1. Relative subresources resolve against the review UI, so `<base href>` is
- *    injected (see `withBaseHref`).
+ * With saved CSS (new reports):
+ *
+ * 1. The copy's own `<link rel="stylesheet">` and `<style>` elements are
+ *    removed and one `<link>` to the saved CSS goes at the end of `<head>`.
+ *    The saved file holds all of their rules, in the same order, including
+ *    rules the page's scripts added, which the markup never had. It comes
+ *    from this app's own origin, so none of the problems below can stop it:
+ *    the site's policy (`'self'` here is this app), `crossorigin`,
+ *    `integrity`, CSS behind a sign-in, or CSS the site has since deleted.
+ *    The link is absolute, because the `<base>` below points at the site.
+ *    Rejected: keeping the site's stylesheets as well, which would load the
+ *    site's current CSS over the saved one.
+ *
+ * Without saved CSS (reports made before it, or a copy whose CSS the scan
+ * could not save), the copy loads the site's stylesheets live, and two edits
+ * keep that working:
+ *
  * 2. `crossorigin` on a stylesheet link was free on the site, where the sheet
  *    was same-origin. Here the frame's origin is the review UI, so the same
  *    attribute puts the request in CORS mode and the server -- serving what it
@@ -1315,14 +1358,20 @@ export default function InspectorRoute() {
  *    it: the browser can only check subresource integrity on a CORS request,
  *    so a link that keeps `integrity` without `crossorigin` is refused
  *    outright (CDN Font Awesome and Bootstrap links carry both).
- * 3. A `<meta http-equiv="Content-Security-Policy">` was written for the
+ *
+ * On both paths:
+ *
+ * 3. Relative subresources resolve against the review UI, so `<base href>` is
+ *    injected (see `withBaseHref`). Fonts and images still come from the
+ *    live site, with saved CSS too: its `url()` values were made absolute.
+ * 4. A `<meta http-equiv="Content-Security-Policy">` was written for the
  *    site's own address. In this frame `'self'` means the review UI, so a
  *    policy such as `style-src 'self' https://cdn...` refuses the site's own
- *    stylesheets, and every saved page of such a site renders unstyled. The
- *    frame's real limits are its `sandbox` (no scripts) and the app's own
- *    policy, which a `srcdoc` document inherits; the site's policy adds
- *    nothing but the refusal.
- * 4. `<noscript>` content becomes visible because the frame runs with scripts
+ *    stylesheets, and with saved CSS it would refuse the site's fonts and
+ *    images. The frame's real limits are its `sandbox` (no scripts) and the
+ *    app's own policy, which a `srcdoc` document inherits; the site's policy
+ *    adds nothing but the refusal.
+ * 5. `<noscript>` content becomes visible because the frame runs with scripts
  *    disabled, so a single-page app announces "You need to enable JavaScript
  *    to run this app" over markup that was captured with JavaScript running.
  *    It is the alternative to a state this document is not in.
@@ -1330,15 +1379,41 @@ export default function InspectorRoute() {
  * The DOM-source view deliberately does not go through this: that tab shows
  * the evidence as stored, and these edits exist only to render it.
  */
-function prepareCapture(html: string | null, url: string | null): string | null {
+function prepareCapture(html: string | null, url: string | null, savedStylesUrl: string | null = null): string | null {
   if (!html) return html;
-  const rendered = html
-    .replace(/<link\b[^>]*>/gi, (tag) =>
-      tag.replace(/\s+(crossorigin|integrity)(=("[^"]*"|'[^']*'|[^\s>]*))?/gi, ""),
-    )
+  let rendered = html
     .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy[^>]*>/gi, "")
     .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, "");
+  if (savedStylesUrl) {
+    rendered = withSavedStyles(
+      rendered
+        .replace(/<link\b[^>]*>/gi, (tag) => (isStylesheetLink(tag) ? "" : tag))
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ""),
+      api.savedStylesUrl(savedStylesUrl),
+    );
+  } else {
+    rendered = rendered.replace(/<link\b[^>]*>/gi, (tag) =>
+      tag.replace(/\s+(crossorigin|integrity)(=("[^"]*"|'[^']*'|[^\s>]*))?/gi, ""),
+    );
+  }
   return withBaseHref(rendered, url);
+}
+
+/** Whether a `<link>` tag loads a stylesheet (`rel` lists `stylesheet`). */
+function isStylesheetLink(tag: string): boolean {
+  const rel = /\brel\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+  const value = rel ? (rel[2] ?? rel[3] ?? rel[4] ?? "") : "";
+  return value.toLowerCase().split(/\s+/).includes("stylesheet");
+}
+
+/** Put a link to the saved CSS last in `<head>`, where the page's own CSS ended. */
+function withSavedStyles(html: string, href: string): string {
+  const tag = `<link rel="stylesheet" href="${escapeAttribute(href)}" data-axcess-saved-styles>`;
+  const close = html.search(/<\/head>/i);
+  if (close !== -1) return html.slice(0, close) + tag + html.slice(close);
+  const body = html.search(/<body\b/i);
+  if (body !== -1) return html.slice(0, body) + tag + html.slice(body);
+  return tag + html;
 }
 
 /**
@@ -1392,9 +1467,10 @@ function escapeAttribute(value: string): string {
 /**
  * Center ``target`` in its frame and hold it there while the layout settles.
  *
- * A single `scrollIntoView` is not enough: the capture's stylesheets, fonts and
- * images are fetched from the live site *after* the frame fires `load`, and
- * every one of them reflows the document, so an element centered at load time
+ * A single `scrollIntoView` is not enough: the capture's fonts and images (and,
+ * for a copy without saved styles, stylesheets) are fetched from the live site
+ * and can arrive *after* the frame fires `load`, and every one of them reflows
+ * the document, so an element centered at load time
  * drifts far off-screen a moment later. This re-centers until the element's
  * position in the document stops moving (two consecutive quiet checks), with a
  * hard ceiling so a page that never stops animating cannot spin forever.

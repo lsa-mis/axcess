@@ -195,3 +195,96 @@ async def test_the_site_policy_integrity_and_relative_base_do_not_unstyle_the_ca
     assert "Content-Security-Policy" in source
     assert "integrity" in source
     assert '<base href="/static/">' in source
+
+
+# A copy the scan saved CSS for: its own stylesheets would come from the live
+# site (and here the site's policy would refuse them), the saved file holds
+# the rules a script added, which the markup has as an empty <style>.
+CAPTURE_WITH_SAVED_STYLES = (
+    "<!doctype html><html><head><title>App</title>"
+    '<meta http-equiv="Content-Security-Policy" content="style-src \'self\'">'
+    '<link rel="stylesheet" href="/assets/app.css" integrity="sha384-abc" crossorigin>'
+    '<link rel="preload" href="/assets/font.woff2" as="font">'
+    "<style>#app { color: rgb(255, 0, 0); }</style><style></style>"
+    '</head><body><div id="app">Hydrated content</div>'
+    "<style>.late { color: red; }</style></body></html>"
+)
+
+
+def _seed_saved_styles(
+    db_path: Path, blob_dir: Path, page_id: int, scan_id: int, css: str, *, complete: bool = True
+) -> None:
+    from audit.blob_store import BlobStore
+    from audit.crawler.style_snapshot import SheetRef, StoredStyles
+    from audit.db import repo
+
+    digest, _ = BlobStore(blob_dir).store(css.encode(), "text/css")
+    conn = connect(db_path)
+    try:
+        repo.set_page_styles(
+            conn,
+            scan_id=scan_id,
+            page_id=page_id,
+            styles=StoredStyles(
+                sheets=(SheetRef(sha256=digest, media="", source_url=None),),
+                complete=complete,
+                fingerprint={},
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+async def test_a_copy_with_saved_styles_uses_them_instead_of_the_sites(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The saved file comes from the review UI, so nothing can refuse it."""
+    db_path, blob_dir, scan_id = seeded_db
+    page_id = _seed_capture(db_path, scan_id, CAPTURE_WITH_SAVED_STYLES)
+    _seed_saved_styles(db_path, blob_dir, page_id, scan_id, "#app { color: rgb(0, 0, 255); }")
+    base = live_server[0]
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect",
+        wait_until="domcontentloaded",
+    )
+    await page.locator("iframe").wait_for(timeout=15000)
+    frame = page.frame_locator("iframe")
+    await frame.locator("link[data-axcess-saved-styles]").wait_for(state="attached", timeout=15000)
+    await page.wait_for_timeout(500)
+    state = await frame.locator("html").evaluate(
+        """el => ({
+            sheets: Array.from(el.querySelectorAll('link[rel~="stylesheet"]')).map(l => l.href),
+            styles: el.querySelectorAll('style').length,
+            preload: el.querySelectorAll('link[rel="preload"]').length,
+            policy: el.querySelectorAll('meta[http-equiv]').length,
+            base: el.querySelector('base')?.getAttribute('href'),
+            lastInHead: el.querySelector('head').lastElementChild?.hasAttribute(
+                'data-axcess-saved-styles'),
+            color: getComputedStyle(el.querySelector('#app')).color,
+        })"""
+    )
+
+    assert len(state["sheets"]) == 1
+    assert state["sheets"][0].startswith(
+        f"{base}/api/scans/{scan_id}/pages/{page_id}/saved-styles.css?v="
+    ), "absolute on the review UI, not resolved against the site's <base>"
+    assert state["styles"] == 0, "the copy's own rules are in the saved file"
+    assert state["preload"] == 1, "only stylesheets are replaced"
+    assert state["policy"] == 0
+    assert state["base"] == "http://example.com/", "fonts and images still come from the site"
+    assert state["lastInHead"]
+    assert state["color"] == "rgb(0, 0, 255)"
+
+    # The evidence tab still shows the copy exactly as stored.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?view=dom",
+        wait_until="domcontentloaded",
+    )
+    source = await page.locator('[aria-label="Scrollable page code (DOM)"]').inner_text()
+    assert "/assets/app.css" in source
+    assert "saved-styles.css" not in source

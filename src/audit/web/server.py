@@ -1804,6 +1804,51 @@ def create_app(
         accept_gzip = "gzip" in request.headers.get("accept-encoding", "").lower()
         return GzippedJsonResponse(payload, accept_gzip=accept_gzip)
 
+    @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/saved-styles.css")
+    def api_page_saved_styles(
+        request: Request,
+        scan_id: int,
+        page_id: int,
+        state: str | None = None,
+        v: str | None = None,
+    ) -> Response:
+        """The CSS the scan saved for one saved copy, as one stylesheet.
+
+        The Inspector links this from the saved copy instead of the site's own
+        stylesheets, so it loads from the review UI's origin and behind the
+        same access-token gate as the inspector API. Scoped like ``/inspect``:
+        the page must belong to the scan and the rows to that page. The bytes
+        are fixed by the stored blob hashes, so the ETag is derived from them
+        and the URL the inspect payload gives carries the same version (``v``).
+        """
+        from audit.web.page_inspector import InspectionUnavailableError, saved_styles_css
+
+        with get_conn() as conn:
+            try:
+                css, etag = saved_styles_css(
+                    conn,
+                    blob_store,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    state_key=(state or "")[:700],
+                )
+            except InspectionUnavailableError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        quoted = f'"{etag}"'
+        headers = {
+            "ETag": quoted,
+            # Private: it is report evidence behind the access gate. Kept
+            # without asking again only at the versioned URL; any other URL
+            # revalidates, so a re-fetched page cannot keep its old CSS.
+            "Cache-Control": (
+                "private, max-age=31536000, immutable" if v == etag else "private, no-cache"
+            ),
+            "X-Content-Type-Options": "nosniff",
+        }
+        if quoted in [tag.strip() for tag in request.headers.get("if-none-match", "").split(",")]:
+            return Response(status_code=304, headers=headers)
+        return Response(css, media_type="text/css; charset=utf-8", headers=headers)
+
     @app.get("/api/scans/{scan_id:int}/findings")
     def api_list_findings(
         scan_id: int,

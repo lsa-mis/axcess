@@ -43,16 +43,25 @@ from __future__ import annotations
 
 import contextlib
 import gzip
+import hashlib
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
+
+from pydantic import BaseModel, ConfigDict
 
 from audit.crawler import url_policy
+from audit.crawler.style_snapshot import StoredStyles, concatenate
+from audit.db import repo
 from audit.labels import CLICK_THROUGH_STATE
 
 if TYPE_CHECKING:
     from playwright.async_api import ViewportSize
+
+    from audit.blob_store import BlobStore
 
 # Generous cap so a genuinely large rendered document is still inspectable
 # without letting one pathological page feed an unbounded string into the
@@ -62,6 +71,91 @@ MAX_INSPECT_DOM_CHARS = 2_000_000
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 8_000
+
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class SavedStylesRef(BaseModel):
+    """Where a saved copy's CSS is served, and what the inspector checks it by.
+
+    ``url`` is on the review UI's own origin, so the site's CSP, ``crossorigin``,
+    ``integrity`` and sign-in cannot stop it loading. ``complete`` is false when
+    the scan hit a size bound or could not read a sheet. ``fingerprint`` is the
+    computed-style sample taken with the CSS (see
+    ``audit.crawler.style_snapshot``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    complete: bool
+    fingerprint: dict[str, Any]
+
+
+def _styles_etag(styles: StoredStyles) -> str:
+    """A version of the CSS from its blob hashes and media, which fix its bytes."""
+    digest = hashlib.sha256()
+    for sheet in styles.sheets:
+        digest.update(f"{sheet.sha256}\n{sheet.media}\n".encode())
+    return digest.hexdigest()[:32]
+
+
+def _saved_styles(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str, StoredStyles]:
+    """Every saved copy's CSS for this page, keyed by state ('' = page load)."""
+    if not _table_exists(conn, "saved_copy_styles"):
+        return {}
+    return repo.saved_copy_styles(conn, scan_id=scan_id, page_id=page_id)
+
+
+def _styles_ref(
+    styles: StoredStyles | None, *, scan_id: int, page_id: int, state_key: str
+) -> dict[str, Any] | None:
+    if styles is None:
+        return None
+    query = f"v={_styles_etag(styles)}"
+    if state_key:
+        query = f"state={quote(state_key, safe='')}&{query}"
+    return SavedStylesRef(
+        url=f"/api/scans/{scan_id}/pages/{page_id}/saved-styles.css?{query}",
+        complete=styles.complete,
+        fingerprint=styles.fingerprint,
+    ).model_dump()
+
+
+def saved_styles_css(
+    conn: sqlite3.Connection,
+    blob_store: BlobStore,
+    *,
+    scan_id: int,
+    page_id: int,
+    state_key: str = "",
+) -> tuple[str, str]:
+    """One saved copy's CSS as one file, and its ETag.
+
+    The sheets are joined in cascade order, each one with media wrapped in
+    ``@media``. Authorized like the inspector itself (``_validate``: the page
+    must belong to the scan, protected reports are refused), and the rows are
+    read for that exact scan and page, so one report can never serve another's
+    CSS. Raises :class:`InspectionUnavailableError` (404) when this copy has no
+    saved CSS. A sheet whose blob file has gone is left out rather than
+    failing the whole file; the inspector's style check then reports the
+    difference.
+    """
+    _validate(conn, scan_id, page_id)
+    styles = _saved_styles(conn, scan_id, page_id).get(state_key)
+    if styles is None:
+        raise InspectionUnavailableError("This saved copy has no saved styles.", status_code=404)
+    parts: list[tuple[str, str]] = []
+    for sheet in styles.sheets:
+        if not _SHA256_RE.match(sheet.sha256):
+            continue
+        path = blob_store.path_for(f"{sheet.sha256[:2]}/{sheet.sha256}.css")
+        try:
+            parts.append((path.read_text(encoding="utf-8"), sheet.media))
+        except OSError:
+            continue
+    return concatenate(parts), _styles_etag(styles)
 
 
 class InspectionUnavailableError(Exception):
@@ -388,7 +482,22 @@ async def inspect_page(
     """
     validated = _validate(conn, scan_id, page_id)
     page = validated["page"]
-    states = _dom_states(conn, page_id)
+    saved = _saved_styles(conn, scan_id, page_id)
+    states = [
+        state
+        | {
+            "saved_styles": _styles_ref(
+                saved.get(state["state_key"]),
+                scan_id=scan_id,
+                page_id=page_id,
+                state_key=state["state_key"],
+            )
+        }
+        for state in _dom_states(conn, page_id)
+    ]
+    # The page's own saved CSS, for the copy stored at page load. Never with a
+    # live render: that document is the site now, and its CSS is the site's.
+    page_styles = _styles_ref(saved.get(""), scan_id=scan_id, page_id=page_id, state_key="")
 
     if state_key:
         captured = _decode_state_html(conn, page_id, state_key)
@@ -396,6 +505,7 @@ async def inspect_page(
             "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
             "store_rendered_html": validated["store_rendered_html"],
             "states": states,
+            "saved_styles": page_styles,
             "render": (
                 _render_payload(
                     ok=True,
@@ -426,6 +536,7 @@ async def inspect_page(
             "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
             "store_rendered_html": validated["store_rendered_html"],
             "states": states,
+            "saved_styles": page_styles,
             "render": _render_payload(
                 ok=True,
                 source="stored",
@@ -448,6 +559,7 @@ async def inspect_page(
             "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
             "store_rendered_html": validated["store_rendered_html"],
             "states": states,
+            "saved_styles": None,
             "render": {
                 "ok": False,
                 "source": "stored",
@@ -470,6 +582,7 @@ async def inspect_page(
             "page": _page_payload(page, captured_at=captured_at),
             "store_rendered_html": validated["store_rendered_html"],
             "states": states,
+            "saved_styles": None,
             "render": {
                 "ok": False,
                 "source": "live",
@@ -481,6 +594,7 @@ async def inspect_page(
         "page": _page_payload(page, captured_at=captured_at),
         "store_rendered_html": validated["store_rendered_html"],
         "states": states,
+        "saved_styles": None,
         "render": _render_payload(
             ok=True,
             source="live",

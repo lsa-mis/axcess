@@ -967,6 +967,46 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages/{page_id}/saved-styles.css": {
+      "get": {
+        "summary": "Api Page Saved Styles",
+        "description": "The CSS the scan saved for one saved copy, as one stylesheet.\n\nThe Inspector links this from the saved copy instead of the site's own\nstylesheets, so it loads from the review UI's origin and behind the\nsame access-token gate as the inspector API. Scoped like ``/inspect``:\nthe page must belong to the scan and the rows to that page. The bytes\nare fixed by the stored blob hashes, so the ETag is derived from them\nand the URL the inspect payload gives carries the same version (``v``).",
+        "operationId": "api_page_saved_styles_api_scans__scan_id__pages__page_id__saved_styles_css_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "State"}
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "V"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/findings": {
       "get": {
         "summary": "Api List Findings",
