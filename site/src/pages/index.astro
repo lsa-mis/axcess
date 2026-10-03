@@ -15,14 +15,18 @@
  * every page is checked against all of WCAG. The coverage section replaces
  * it with numbers taken from the product's own criterion list.
  *
+ * Layout, spacing, type sizes and colours copy the v3 design artifact
+ * exactly (the developer's choice): full-width bands that alternate the
+ * page grey and white, a 1200 px column, and 96 px between sections. What
+ * differs from the artifact, and why, is in the home page section of
+ * theme.css. The artifact's own markup is kept where it is native HTML;
+ * its comparison table and questions are a real <table> and <details>.
+ *
  * Every number here comes from src/data/coverage.json, exported from
  * src/audit/rules/wcag_coverage.yaml by site/export_data.py, so the page
  * cannot claim coverage the code does not have.
  */
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
-import Card from "../components/Card.astro";
-import LinkButton from "../components/LinkButton.astro";
-import SectionHeader from "../components/SectionHeader.astro";
 import coverage from "../data/coverage.json";
 import { QUESTIONS } from "../data/questions";
 import { HONESTY, url } from "../lib/site";
@@ -63,198 +67,206 @@ const rows = [
     hero: {
       title: "Test the site your users actually see.",
       tagline:
-        "Many scanners only check a page as it first loads. Axcess also opens menus and dialogs, checks the pages behind your sign-in, and has your report ready when the scan finishes.",
+        "Many accessibility scanners only check a page as it first loads. Axcess also opens menus and dialogs, checks the pages behind your sign-in, and has your report ready when the scan finishes.",
     },
   }}
   hasSidebar={true}
 >
   <div class="not-content home">
-    <section class="band" aria-labelledby="catches">
-      <SectionHeader id="catches" label="What it catches" heading="Problems hide where scanners don't look. Axcess looks there." />
+    <section class="band white" aria-labelledby="catches">
+      <div class="wrap">
+        <p class="eyebrow">What it catches that others don't</p>
+        <h2 id="catches" class="section-title spaced">Problems hide where scanners don't look. Axcess looks there.</h2>
 
-      <div class="group">
-        <div class="group-intro">
-          <p class="group-label">1 · Less risk</p>
-          <h3>Find more of what is really there</h3>
-          <p>So problems don't first come to light in a complaint.</p>
-        </div>
-        <div class="cards">
-          <Card heading="Opens what your users open" level={4}>
-            <p>
-              Menus, tabs, accordions and dialogs only appear after a click. Axcess opens them, within set limits,
-              and runs the rule check on each page state it reaches. It skips buttons like Sign out, Delete and Buy.
-            </p>
-            <Fragment slot="proof">
-              <dl class="stat-pair">
-                <div><dt>Pages</dt><dd>194</dd></div>
-                <div><dt>Page states opened by clicking</dt><dd>1,171</dd></div>
-              </dl>
-              <p class="example-note">From an example scan.</p>
-            </Fragment>
-          </Card>
-          <Card heading="Checks pages behind a sign-in" level={4}>
-            <p>
-              Student portals, staff tools and course pages usually go untested. Sign in yourself, including U-M
-              sign-in and Duo two-step sign-in, and Axcess checks the pages behind it. It deletes the sign-in when
-              the scan ends.
-            </p>
-            <Fragment slot="proof"><p class="kv"><span>Pages behind a sign-in</span><strong>Included</strong></p></Fragment>
-          </Card>
-        </div>
-      </div>
-
-      <div class="group">
-        <div class="group-intro">
-          <p class="group-label">2 · Less time</p>
-          <h3>Fix it without the hunt</h3>
-          <p>Designers and developers start with the answer, not a search.</p>
-        </div>
-        <div class="cards">
-          <Card heading="Outlines the exact element" label="For designers" level={4}>
-            <p>Each problem is outlined on a saved copy of the page, with its size and its text beside it.</p>
-            <Fragment slot="proof">
-              <div class="outline-sample">
-                <span class="target" aria-hidden="true"></span>
-                <span><strong>Size</strong><br />35 pixels wide, 20 pixels tall</span>
+        <div class="groups">
+          <div class="group">
+            <div class="group-intro">
+              <p class="group-label">01 · Less risk</p>
+              <h3>Find more of what's really there</h3>
+              <p>So problems don't first come to light in a complaint.</p>
+            </div>
+            <div class="cards">
+              <div class="card">
+                <h4>Opens what your users open</h4>
+                <p>Menus, tabs, accordions and dialogs only appear after a click. Axcess opens them, within set limits, and runs the rule check on each page state it reaches. It skips buttons like Sign out, Delete and Buy.</p>
+                <div class="proof stats">
+                  <div><span class="n">194</span><span class="l">pages</span></div>
+                  <div><span class="n">1,171</span><span class="l">page states opened by clicking</span></div>
+                </div>
               </div>
-            </Fragment>
-          </Card>
-          <Card heading="Points to the code" label="For developers" level={4}>
-            <p>Copy the element locator (CSS selector) and paste it into your browser's developer tools.</p>
-            <Fragment slot="proof"><code class="locator">.post &gt; .copy-link-btn</code></Fragment>
-          </Card>
+              <div class="card">
+                <h4>Checks pages behind a sign-in</h4>
+                <p>Student portals, staff tools and course pages usually go untested. Sign in yourself, including U-M sign-in and Duo, and Axcess checks the pages behind it. It deletes the sign-in when the scan ends.</p>
+                <p class="proof kv"><span>Pages behind a sign-in</span><strong>Included in scan</strong></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-intro">
+              <p class="group-label">02 · Less time</p>
+              <h3>Fix it without the hunt</h3>
+              <p>Designers and developers start with the answer, not a search.</p>
+            </div>
+            <div class="cards">
+              <div class="card">
+                <p class="card-label">For designers</p>
+                <h4>Highlights the exact element</h4>
+                <p>Each problem is outlined on a saved copy of the page, with its size and label.</p>
+                <div class="proof outline-sample">
+                  <span class="target" aria-hidden="true"></span>
+                  <span><strong>Size</strong><br /><span class="muted">35 pixels wide, 20 pixels tall</span></span>
+                </div>
+              </div>
+              <div class="card">
+                <p class="card-label">For developers</p>
+                <h4>Points to the code</h4>
+                <p>Copy the element locator (CSS selector) and paste it into your browser's developer tools.</p>
+                <code class="proof locator">.copy-link-btn.before.auto-heading-links</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-intro">
+              <p class="group-label">03 · Less friction</p>
+              <h3>Move as fast as your team can</h3>
+              <p>No waiting for a write-up, no cloud approvals.</p>
+            </div>
+            <div class="cards">
+              <div class="card">
+                <h4>Report ready when the scan finishes</h4>
+                <p>Every issue comes with its pages, where it is on each page, and how to fix it in plain language. Export it as an Excel issue list, a written report, or a CSV or JSON file.</p>
+                <div class="proof kv">
+                  <strong>Scan finished · 12 barriers</strong>
+                  <span class="pill" aria-hidden="true">Open report →</span>
+                </div>
+              </div>
+              <div class="card">
+                <h4>Keeps your data local</h4>
+                <p>Scans, sign-ins and reports stay on your computer, which makes IT review easier.</p>
+                <p class="proof kv"><span>Where scans run</span><strong>This computer</strong></p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="group">
-        <div class="group-intro">
-          <p class="group-label">3 · Less friction</p>
-          <h3>Move as fast as your team can</h3>
-          <p>No waiting for a write-up, and no cloud service to approve.</p>
-        </div>
-        <div class="cards">
-          <Card heading="Report ready when the scan finishes" level={4}>
-            <p>
-              Every issue comes with its pages, where it is on each page, and how to fix it in plain language.
-              Export it as an Excel issue list, a written report, or a CSV or JSON file.
-            </p>
-            <Fragment slot="proof"><p class="kv"><span>Scan finished</span><strong>12 barriers found</strong></p></Fragment>
-          </Card>
-          <Card heading="Keeps your data on your computer" level={4}>
-            <p>Scans, sign-ins and reports stay on the computer that ran them, which makes IT review easier.</p>
-            <Fragment slot="proof"><p class="kv"><span>Where scans run</span><strong>This computer</strong></p></Fragment>
-          </Card>
+    <section class="band" aria-labelledby="limits">
+      <div class="wrap">
+        <p class="eyebrow">What it can't do</p>
+        <h2 id="limits" class="section-title">Honest about what a scan can check.</h2>
+        <p class="lead">No tool can test all of WCAG. Here is exactly how much Axcess helps with, so you know what a person still needs to test before you share the results.</p>
+        <div class="coverage">
+          <div class="figure">
+            <p class="big"><span>{covered}</span> of {total}</p>
+            <p>WCAG 2.2 Level A and AA criteria get help from Axcess's checks.</p>
+          </div>
+          <div class="figure">
+            <p class="big"><span>{manualOnly}</span> of {total}</p>
+            <p>need a person to test them. The report gives the steps.</p>
+          </div>
+          <div class="figure plain">
+            <p>{HONESTY}</p>
+            <a class="button secondary" href={url("/coverage/")}>See every criterion</a>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="band shaded" aria-labelledby="limits">
-      <SectionHeader id="limits" label="What it can't do" heading="Honest about what a scan can check.">
-        No tool can test all of WCAG. Here is exactly how much Axcess helps with, so you know what a person still
-        needs to test.
-      </SectionHeader>
-      <div class="coverage">
-        <div class="coverage-figure">
-          <p class="big"><span>{covered}</span> of {total}</p>
-          <p>WCAG 2.2 Level A and AA criteria get help from Axcess's checks.</p>
-        </div>
-        <div class="coverage-figure">
-          <p class="big"><span>{manualOnly}</span> of {total}</p>
-          <p>need a person to test them. The report gives the steps.</p>
-        </div>
-        <div class="coverage-more">
-          <p>{HONESTY}</p>
-          <LinkButton href={url("/coverage/")} variant="secondary">See every criterion</LinkButton>
+    <section class="band white" aria-labelledby="compare">
+      <div class="wrap">
+        <h2 id="compare" class="section-title compare-title">Compared with other scanners</h2>
+        <div class="table-wrap" role="region" aria-labelledby="compare-caption" tabindex="0">
+          <table>
+            <caption id="compare-caption" class="sr-only">Axcess compared with many other accessibility scanners</caption>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Topic</span></th>
+                <th scope="col">Many other scanners</th>
+                <th scope="col" class="ours-head">Axcess</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                rows.map((r) => (
+                  <tr>
+                    <th scope="row">{r.k}</th>
+                    <td>{r.a}</td>
+                    <td class="ours">{r.b}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <section class="band" aria-labelledby="compare">
-      <SectionHeader id="compare" label="Compare" heading="How Axcess differs from many scanners" />
-      <div class="table-wrap" role="region" aria-labelledby="compare-caption" tabindex="0">
-        <table>
-          <caption id="compare-caption" class="sr-only">Axcess compared with many other accessibility scanners</caption>
-          <thead>
-            <tr>
-              <th scope="col">Topic</th>
-              <th scope="col">Many other scanners</th>
-              <th scope="col">Axcess</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              rows.map((r) => (
-                <tr>
-                  <th scope="row">{r.k}</th>
-                  <td>{r.a}</td>
-                  <td class="ours">{r.b}</td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="band shaded title2" aria-labelledby="title-ii">
-      <div>
-        <SectionHeader id="title-ii" label="Americans with Disabilities Act (ADA) Title II" heading="You have time to do this well. Start now." />
-        <div class="prose">
-          <p>
-            Public universities and state and local governments must make their web content meet WCAG 2.1 Level
-            AA. The Department of Justice moved the deadlines back a year, but the requirements stayed the same.
+    <section class="band" aria-labelledby="title-ii">
+      <div class="wrap title2">
+        <div>
+          <p class="eyebrow">Americans with Disabilities Act (ADA) Title II</p>
+          <h2 id="title-ii" class="section-title tight">You have time to do this well. Start now.</h2>
+          <p class="body-lg">Public universities and state and local governments must make their web content meet WCAG 2.1 Level AA. The Department of Justice moved the deadlines back a year, but the requirements stayed the same.</p>
+          <p class="body">Axcess checks against WCAG 2.1 AA by default, the level Title II requires. Its results are evidence for a person to review, not proof that you comply.</p>
+        </div>
+        <div>
+          <div class="deadlines">
+            <div class="deadline">
+              <div>
+                <p class="who">Population of 50,000 or more</p>
+                <p class="date"><time datetime="2027-04-26">April 26, 2027</time></p>
+                <p class="was">Was April 24, 2026</p>
+              </div>
+              <p class="countdown" data-countdown="2027-04-26"></p>
+            </div>
+            <div class="deadline">
+              <div>
+                <p class="who">Smaller entities and special district governments</p>
+                <p class="date"><time datetime="2028-04-26">April 26, 2028</time></p>
+                <p class="was">Was April 26, 2027</p>
+              </div>
+            </div>
+          </div>
+          <p class="source">
+            Source: <a href="https://www.ada.gov/resources/2024-03-08-web-rule/">the Department of Justice's page on the Title II web and mobile app rule (ada.gov)</a>.
           </p>
-          <p>
-            Axcess checks against WCAG 2.1 AA by default, the level Title II requires. Its results are evidence for
-            a person to review, not proof that you comply.
-          </p>
         </div>
-      </div>
-      <div class="deadlines">
-        <div class="deadline">
-          <p class="who">Population of 50,000 or more</p>
-          <p class="date"><time datetime="2027-04-26">April 26, 2027</time></p>
-          <p class="was">Was April 24, 2026</p>
-          <p class="countdown" data-countdown="2027-04-26"></p>
-        </div>
-        <div class="deadline">
-          <p class="who">Population under 50,000, and special district governments</p>
-          <p class="date"><time datetime="2028-04-26">April 26, 2028</time></p>
-          <p class="was">Was April 26, 2027</p>
-        </div>
-        <p class="source">
-          Source: <a href="https://www.ada.gov/resources/2024-03-08-web-rule/">the Department of Justice's page on the Title II web and mobile app rule (ada.gov)</a>.
-        </p>
       </div>
     </section>
 
-    <section class="band" aria-labelledby="questions">
-      <SectionHeader id="questions" label="Questions" heading="Common questions" />
-      <div class="questions">
-        {
-          homeQuestions.map((q) => (
-            <details>
-              <summary>{q.q}</summary>
-              <p>{q.a}</p>
-            </details>
-          ))
-        }
+    <section class="band white" aria-labelledby="questions">
+      <div class="wrap narrow">
+        <h2 id="questions" class="section-title questions-title">Common questions</h2>
+        <div class="questions">
+          {
+            homeQuestions.map((q) => (
+              <details>
+                <summary>{q.q}</summary>
+                <p>{q.a}</p>
+              </details>
+            ))
+          }
+        </div>
+        <p class="more"><a href={url("/faq/")}>All questions</a></p>
       </div>
-      <p class="more"><a href={url("/faq/")}>All questions</a></p>
     </section>
 
-    <section class="cta ax-inverse" aria-labelledby="next">
-      <div>
-        <h2 id="next">See your site the way your users do.</h2>
-        <p>
-          It's free, and your first scan takes a few minutes to set up. Not the one who decides? Send this page to the
-          person who does.
-        </p>
-      </div>
-      <div class="cta-actions">
-        <LinkButton href={url("/get-started/#download")} variant="on-inverse">Download Axcess</LinkButton>
-        <button type="button" class="share ax-js-only" data-share>Copy link to this page</button>
-        <p class="share-status" role="status" data-share-status></p>
+    <section class="band" aria-labelledby="next">
+      <div class="wrap">
+        <div class="cta ax-inverse">
+          <div class="cta-copy">
+            <h2 id="next">See your site the way your users do.</h2>
+            <p>It's free, and your first scan takes minutes to set up. Not the one who decides? Send this page to the person who does.</p>
+          </div>
+          <div class="cta-actions">
+            <a class="button on-cta" href={url("/get-started/#download")}>Download Axcess <span aria-hidden="true">↓</span></a>
+            <button type="button" class="button share ax-js-only" data-share>Share with my team</button>
+            <p class="share-status" role="status" data-share-status></p>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -284,285 +296,463 @@ const rows = [
 </script>
 
 <style>
-  .home {
-    --gap: 1.5rem;
-  }
+  /* Bands and column, as in the artifact. */
   .band {
-    padding: 3.5rem 0;
+    background: var(--h-page);
   }
-  .band:not(.shaded) + .band:not(.shaded) {
-    border-top: 1px solid var(--ax-border);
+  .band.white {
+    border-top: 1px solid var(--h-line);
+    border-bottom: 1px solid var(--h-line);
+    background: var(--h-band);
   }
-  /* A rounded panel rather than an edge-to-edge band: the content column's
-     edges move with the sidebar, so a full-bleed band left uneven strips. */
-  .shaded {
-    padding: 3rem clamp(1.25rem, 4vw, 2.5rem);
-    border: 1px solid var(--ax-border);
-    border-radius: 1rem;
-    background: var(--ax-surface-subtle);
+  .wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 96px 32px;
+  }
+  .wrap.narrow {
+    max-width: 880px;
+  }
+  /* Section labels: sentence case, not the artifact's spaced capitals, by
+     the developer's choice (docs/plain-language.md rule 11). */
+  .eyebrow {
+    margin: 0 0 12px;
+    color: var(--h-label);
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .section-title {
+    max-width: 780px;
+    margin: 0 0 16px;
+    color: var(--h-text);
+    font-size: clamp(30px, 3.6vw, 44px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .section-title.spaced {
+    margin-bottom: 56px;
+  }
+  .section-title.tight {
+    margin-bottom: 18px;
+  }
+  .compare-title {
+    max-width: 760px;
+    margin-bottom: 36px;
+  }
+  .questions-title {
+    margin-bottom: 32px;
+  }
+  .lead {
+    max-width: 680px;
+    margin: 0 0 44px;
+    color: var(--h-muted);
+    font-size: 19px;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .muted {
+    color: var(--h-muted);
   }
 
-  /* Catches */
+  /* What it catches */
+  /* minmax(0, 1fr): a grid column otherwise refuses to shrink below its
+     content's minimum width, which pushed the cards 74 px past a 320 px
+     screen (SC 1.4.10 Reflow, Level AA). */
+  .groups {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 56px;
+  }
   .group {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem 2.5rem;
+    gap: 24px 40px;
     align-items: flex-start;
   }
-  .group + .group {
-    margin-top: 3rem;
-  }
   .group-intro {
-    flex: 1 1 15rem;
-    max-width: 22rem;
+    flex: 1 1 260px;
+    max-width: 380px;
   }
   .group-label {
-    margin: 0 0 0.5rem;
-    color: var(--ax-fg-subtle);
-    font-size: 0.9375rem;
+    margin: 0 0 8px;
+    color: var(--h-label);
+    font-size: 14px;
     font-weight: 700;
   }
   .group-intro h3 {
-    margin: 0 0 0.5rem;
-    color: var(--ax-fg);
-    font-size: 1.5rem;
-    line-height: 1.2;
+    margin: 0 0 10px;
+    color: var(--h-text);
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
   }
   .group-intro p:last-child {
     margin: 0;
-    color: var(--ax-fg-muted);
-    font-size: 1.0625rem;
+    color: var(--h-muted);
+    font-size: 17px;
     line-height: 1.55;
   }
   .cards {
-    flex: 2 1 30rem;
+    flex: 2 1 520px;
     min-width: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-    gap: var(--gap);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 24px;
   }
-  .stat-pair {
+  .card {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    padding: 26px;
+    border: 1px solid var(--h-card-line);
+    border-radius: 12px;
+    background: var(--h-card);
+  }
+  .card h4 {
     margin: 0;
+    color: var(--h-text);
+    font-size: 20px;
+    line-height: 1.25;
   }
-  .stat-pair div {
-    display: flex;
-    flex-direction: column-reverse;
-  }
-  .stat-pair dt {
-    color: var(--ax-fg-subtle);
-    font-size: 0.875rem;
-  }
-  .stat-pair dd {
+  .card > p:not(.proof):not(.card-label) {
     margin: 0;
-    font-size: 1.5rem;
+    color: var(--h-muted);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .card-label {
+    margin: 0;
+    color: var(--h-label);
+    font-size: 13px;
     font-weight: 700;
   }
-  .example-note {
-    margin: 0.5rem 0 0;
-    color: var(--ax-fg-subtle);
-    font-size: 0.875rem;
+  .proof {
+    margin: auto 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--h-divider);
+    color: var(--h-text);
+    font-size: 14px;
+  }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .stats > div {
+    display: flex;
+    flex-direction: column;
+  }
+  .n {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .l {
+    color: var(--h-muted);
+    font-size: 13px;
   }
   .kv {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 0.5rem 1rem;
-    margin: 0;
+    align-items: center;
+    gap: 12px;
   }
-  .kv span {
-    color: var(--ax-fg-subtle);
+  .kv > span:not(.pill) {
+    color: var(--h-muted);
+  }
+  .kv strong {
+    font-weight: 600;
+  }
+  .pill {
+    padding: 7px 12px;
+    border-radius: 7px;
+    background: var(--h-primary-bg);
+    color: var(--h-primary-fg);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
   }
   .outline-sample {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 12px;
   }
   .target {
     flex-shrink: 0;
-    width: 1.625rem;
-    height: 2.125rem;
-    border: 3px solid var(--ax-maize);
-    outline: 2px solid #00274c;
-    outline-offset: -5px;
+    width: 26px;
+    height: 34px;
+    border: 3px solid #f5c400;
     border-radius: 2px;
-    background: var(--ax-surface);
+    outline: 2px solid #0a2647;
+    outline-offset: -5px;
+    background: #ffffff;
   }
   .locator {
     display: block;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    color: var(--h-text);
     font-family: var(--sl-font-mono);
-    font-size: 0.875rem;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* Coverage */
+  /* What it can't do */
   .coverage {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
-    gap: var(--gap);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
   }
-  .coverage-figure {
-    padding: 1.5rem;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-    background: var(--ax-surface);
+  .figure {
+    padding: 22px;
+    border: 1px solid var(--h-card-line);
+    border-radius: 12px;
+    background: var(--h-band);
   }
-  .coverage-figure p {
+  .figure.plain {
+    border: 0;
+    background: none;
+    padding: 0 0 0 10px;
+  }
+  .figure p {
     margin: 0;
-    color: var(--ax-fg-muted);
-    font-size: 1.0625rem;
+    color: var(--h-muted);
+    font-size: 16px;
     line-height: 1.5;
   }
-  .coverage-figure .big {
-    margin-bottom: 0.5rem;
-    color: var(--ax-fg);
-    font-size: 1.25rem;
+  .figure .big {
+    margin-bottom: 8px;
+    color: var(--h-text);
+    font-size: 19px;
     font-weight: 700;
   }
   .big span {
-    font-size: 2.75rem;
+    font-size: 40px;
     letter-spacing: -0.02em;
   }
-  .coverage-more p {
-    margin: 0 0 1.25rem;
-    color: var(--ax-fg-muted);
-    font-size: 1rem;
-    line-height: 1.6;
+  .figure.plain p {
+    margin-bottom: 16px;
+  }
+
+  /* Buttons (artifact sizes; at least 44 px tall). */
+  .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--ax-target);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 18px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .button:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .secondary {
+    padding: 15px 24px;
+    border: 1px solid var(--h-button-line);
+    background: var(--h-band);
+    color: var(--h-accent);
+  }
+  .secondary:hover {
+    border-color: var(--h-accent);
   }
 
   /* Comparison table. Only the table scrolls sideways at 320 px; the page
      never does (SC 1.4.10 Reflow, Level AA, allows it for data tables). The
      scroll area is focusable and named so keyboard users can scroll it. The
      caption names the table for screen readers but is hidden visually,
-     because the visible heading just above says the same thing and a
-     caption inside the scroll area was cut off at 320 px. */
+     because the visible heading just above says the same thing. */
   .table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
+    border: 1px solid var(--h-card-line);
+    border-radius: 12px;
   }
   table {
     width: 100%;
-    min-width: 38rem;
+    min-width: 620px;
     border-collapse: collapse;
-    font-size: 1.0625rem;
+    font-size: 17px;
     line-height: 1.45;
     text-align: start;
   }
   th,
   td {
-    padding: 1rem 1.25rem;
-    border-top: 1px solid var(--ax-border);
+    padding: 18px 22px;
+    border-top: 1px solid var(--h-divider);
     text-align: start;
     vertical-align: top;
   }
+  thead tr {
+    background: var(--h-th);
+  }
   thead th {
+    padding: 16px 22px;
     border-top: 0;
-    background: var(--ax-surface-muted);
-    color: var(--ax-fg);
+    color: var(--h-muted);
+    font-size: 16px;
+  }
+  thead th:first-child {
+    width: 28%;
+  }
+  thead th.ours-head {
+    background: var(--h-th-ours);
+    color: var(--h-accent);
   }
   tbody th {
-    font-weight: 700;
+    color: var(--h-text);
+    font-weight: 600;
   }
   td {
-    color: var(--ax-fg-muted);
+    color: var(--h-muted);
   }
   td.ours {
-    background: var(--ax-surface-subtle);
-    color: var(--ax-fg);
-    font-weight: 600;
+    background: var(--h-td-ours);
+    color: var(--h-text);
+    font-weight: 500;
   }
 
   /* Title II */
   .title2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
-    gap: 2.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    gap: 48px;
     align-items: center;
   }
-  .prose p {
-    margin: 0 0 1rem;
-    color: var(--ax-fg-muted);
-    font-size: 1.125rem;
+  .body-lg {
+    margin: 0 0 16px;
+    color: var(--h-muted);
+    font-size: 19px;
     line-height: 1.6;
+    text-wrap: pretty;
+  }
+  .body {
+    margin: 0;
+    color: var(--h-muted);
+    font-size: 17px;
+    line-height: 1.6;
+    text-wrap: pretty;
   }
   .deadlines {
-    display: grid;
-    gap: 0.75rem;
+    overflow: hidden;
+    border: 1px solid var(--h-card-line);
+    border-radius: 14px;
+    background: var(--h-band);
   }
   .deadline {
-    padding: 1.5rem;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-    background: var(--ax-surface);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 24px 26px;
+  }
+  .deadline + .deadline {
+    border-top: 1px solid var(--h-divider);
   }
   .deadline p {
     margin: 0;
   }
   .who {
-    color: var(--ax-fg-muted);
+    color: var(--h-muted);
+    font-size: 15px;
     font-weight: 600;
   }
   .date {
-    margin-top: 0.25rem !important;
-    color: var(--ax-fg);
-    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    margin-top: 4px !important;
+    color: var(--h-text);
+    font-size: clamp(26px, 3vw, 34px);
     font-weight: 700;
     letter-spacing: -0.02em;
   }
-  .was,
-  .countdown,
-  .source {
-    color: var(--ax-fg-subtle);
-    font-size: 0.9375rem;
+  .was {
+    margin-top: 4px !important;
+    color: var(--h-muted);
+    font-size: 14px;
+  }
+  /* "N days from today" is added by a script; without one the pill is
+     empty and hidden, and the date above still says everything. */
+  .countdown {
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--h-tint);
+    color: var(--h-accent);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .countdown:empty {
+    display: none;
   }
   .source {
-    margin: 0.25rem 0 0;
+    margin: 12px 0 0;
+    color: var(--h-muted);
+    font-size: 14px;
+    line-height: 1.5;
   }
-  .source a {
-    color: var(--ax-link);
+  .source a,
+  .more a {
+    color: var(--h-accent);
     text-underline-offset: 0.2em;
   }
 
   /* Questions: native <details>, which open and close without scripts and
-     are announced as expandable (WAI-ARIA APG Disclosure pattern). */
+     are announced as expandable (WAI-ARIA APG Disclosure pattern). The
+     artifact's + and − are drawn in CSS and hidden from screen readers,
+     which already say "collapsed" or "expanded". */
   .questions {
     display: grid;
-    gap: 0.75rem;
-    max-width: 52rem;
+    gap: 12px;
   }
   details {
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-    background: var(--ax-surface-subtle);
+    border: 1px solid var(--h-card-line);
+    border-radius: 12px;
+    background: var(--h-card);
   }
   summary {
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    gap: 16px;
     min-height: var(--ax-target);
-    padding: 1rem 1.5rem;
-    color: var(--ax-fg);
-    font-size: 1.1875rem;
-    font-weight: 700;
+    padding: 20px 24px;
+    color: var(--h-text);
+    font-size: 19px;
+    font-weight: 600;
+    list-style: none;
     cursor: pointer;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::after {
+    content: "+";
+    content: "+" / "";
+    flex-shrink: 0;
+    color: var(--h-label);
+    font-size: 22px;
+  }
+  details[open] summary::after {
+    content: "−";
+    content: "−" / "";
   }
   details p {
     margin: 0;
-    padding: 0 1.5rem 1.25rem;
-    color: var(--ax-fg-muted);
-    font-size: 1.0625rem;
+    padding: 0 24px 22px;
+    color: var(--h-muted);
+    font-size: 17px;
     line-height: 1.6;
   }
   .more {
-    margin: 1.25rem 0 0;
-    font-size: 1.0625rem;
-  }
-  .more a {
-    color: var(--ax-link);
+    margin: 20px 0 0;
+    font-size: 17px;
     font-weight: 600;
-    text-underline-offset: 0.2em;
   }
 
   /* Call to action */
@@ -571,52 +761,66 @@ const rows = [
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
-    gap: 2rem;
-    margin: 3.5rem 0 1rem;
-    padding: clamp(2rem, 5vw, 3.5rem);
-    border-radius: 1rem;
-    background: var(--ax-inverse-bg);
-    color: var(--ax-inverse-fg);
+    gap: 32px;
+    padding: clamp(32px, 5vw, 56px);
+    border-radius: 16px;
+    background: var(--h-cta-bg);
+    color: var(--h-cta-fg);
+  }
+  .cta-copy {
+    max-width: 600px;
   }
   .cta h2 {
-    margin: 0 0 0.75rem;
-    color: var(--ax-inverse-fg);
-    font-size: clamp(1.75rem, 3.2vw, 2.5rem);
-    line-height: 1.15;
+    margin: 0 0 12px;
+    color: var(--h-cta-fg);
+    font-size: clamp(28px, 3.2vw, 40px);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
   }
   .cta p {
-    max-width: 38rem;
     margin: 0;
-    color: var(--ax-inverse-fg-subtle);
-    font-size: 1.125rem;
+    color: var(--h-cta-muted);
+    font-size: 18px;
     line-height: 1.55;
   }
   .cta-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 12px;
+  }
+  .on-cta {
+    padding: 16px 26px;
+    background: var(--h-cta-fg);
+    color: var(--h-cta-bg);
+    font-weight: 700;
   }
   .share {
-    min-height: 3.25rem;
-    padding: 0.75rem 1.5rem;
-    border: 2px solid var(--ax-inverse-fg-subtle);
-    border-radius: 0.5rem;
+    padding: 15px 24px;
+    border: 1px solid var(--h-cta-line);
     background: transparent;
-    color: var(--ax-inverse-fg);
-    font: inherit;
-    font-size: 1.125rem;
-    font-weight: 700;
-    cursor: pointer;
+    color: var(--h-cta-fg);
   }
   .share:hover {
-    border-color: var(--ax-inverse-fg);
-    text-decoration: underline;
+    border-color: var(--h-cta-fg);
   }
   /* Always rendered, even when empty: a live region that appears at the
      moment it changes is often not announced. */
-  .share-status {
+  .cta .share-status {
     flex-basis: 100%;
-    font-size: 1rem !important;
+    font-size: 16px;
+  }
+  .ax-js-only.share {
+    display: none;
+  }
+  :global(.ax-js) .ax-js-only.share {
+    display: inline-flex;
+  }
+
+  @media (max-width: 30rem) {
+    .wrap {
+      padding: 64px 20px;
+    }
   }
 </style>

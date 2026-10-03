@@ -231,16 +231,132 @@ site-search > button,
 }
 
 /* ---------------------------------------------------------------------
- * Home page (the only page with a hero). Wider than the guides, because it
- * is cards and figures rather than paragraphs.
+ * Home page (the only page with a hero).
  *
- * The home page keeps the sidebar for the phone menu and between 50 and
- * 72rem, where the header has no room for its links, so at every width
- * there is one way to every page. From 72rem the header links take over and
- * the sidebar is hidden here, giving the hero the full width.
+ * The home page copies the v3 design artifact's layout and palette exactly
+ * (the developer's choice, 2026-10-03): full-width bands on a #f5f7fa page,
+ * a 1200 px column with 32 px sides, 96 px between sections, and the
+ * artifact's navy #0a2647. Three things differ from the artifact, also by
+ * the developer's choice: the app's font, sentence-case section labels,
+ * and a navy focus ring (the artifact's yellow ring is about 1.6:1 on this
+ * page, which fails SC 1.4.11 Non-text Contrast, Level AA). The label grey
+ * is #475263 instead of the artifact's #4a5b6e (6.5:1), so it clears 7:1.
+ * The artifact has no dark theme; the dark values follow the app's.
+ *
+ * The page keeps the sidebar for the phone menu and between 50 and 72rem,
+ * where the header has no room for its links, so at every width there is
+ * one way to every page. From 72rem the header links take over and the
+ * sidebar is hidden here.
  * ------------------------------------------------------------------- */
 :root[data-has-hero] {
-  --sl-content-width: 76rem;
+  --sl-content-width: none;
+  --sl-color-bg: var(--h-page);
+  --h-page: #0b121b;
+  --h-band: #111a26;
+  --h-line: #2c3a4d;
+  --h-card: #16202d;
+  --h-card-line: #2c3a4d;
+  --h-divider: #2c3a4d;
+  --h-text: #edf1f6;
+  --h-muted: #c8d1dc;
+  --h-label: #aeb9c7;
+  --h-accent: #9ec5ee;
+  --h-primary-bg: #cfe0f3;
+  --h-primary-hover: #b8d5f3;
+  --h-primary-fg: #0b121b;
+  --h-tint: #1a2533;
+  --h-th: #1a2533;
+  --h-th-ours: #1f2c3d;
+  --h-td-ours: #16202d;
+  --h-button-line: #5b6e86;
+  --h-chip-line: #5b6e86;
+  --h-cta-bg: #cfe0f3;
+  --h-cta-fg: #0b121b;
+  --h-cta-muted: #22303f;
+  --h-cta-line: #22303f;
+  --h-saved: #2c3a4d;
+  --h-saved-link: #b8d5f3;
+  --h-shadow-soft: 0 10px 30px -20px rgb(0 0 0 / 0.6);
+  --h-shadow: 0 30px 70px -30px rgb(0 0 0 / 0.8);
+}
+:root[data-has-hero][data-theme="light"] {
+  --h-page: #f5f7fa;
+  --h-band: #ffffff;
+  --h-line: #e1e6ed;
+  --h-card: #f8fafc;
+  --h-card-line: #dfe5ec;
+  --h-divider: #e6ebf1;
+  --h-text: #0d1b2a;
+  --h-muted: #3a4a5c;
+  --h-label: #475263;
+  --h-accent: #0a2647;
+  --h-primary-bg: #0a2647;
+  --h-primary-hover: #123a66;
+  --h-primary-fg: #ffffff;
+  --h-tint: #e8eef6;
+  --h-th: #eef2f7;
+  --h-th-ours: #e3eaf4;
+  --h-td-ours: #f6f9fc;
+  --h-button-line: #c9d2de;
+  --h-chip-line: #d3dae3;
+  --h-cta-bg: #0a2647;
+  --h-cta-fg: #ffffff;
+  --h-cta-muted: #d4deea;
+  --h-cta-line: #5d7a9e;
+  --h-saved: #b3c0cc;
+  --h-saved-link: #1a4fa0;
+  --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
+  --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-has-hero]:not(.ax-js) {
+  --h-page: #f5f7fa;
+  --h-band: #ffffff;
+  --h-line: #e1e6ed;
+  --h-card: #f8fafc;
+  --h-card-line: #dfe5ec;
+  --h-divider: #e6ebf1;
+  --h-text: #0d1b2a;
+  --h-muted: #3a4a5c;
+  --h-label: #475263;
+  --h-accent: #0a2647;
+  --h-primary-bg: #0a2647;
+  --h-primary-hover: #123a66;
+  --h-primary-fg: #ffffff;
+  --h-tint: #e8eef6;
+  --h-th: #eef2f7;
+  --h-th-ours: #e3eaf4;
+  --h-td-ours: #f6f9fc;
+  --h-button-line: #c9d2de;
+  --h-chip-line: #d3dae3;
+  --h-cta-bg: #0a2647;
+  --h-cta-fg: #ffffff;
+  --h-cta-muted: #d4deea;
+  --h-cta-line: #5d7a9e;
+  --h-saved: #b3c0cc;
+  --h-saved-link: #1a4fa0;
+  --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
+  --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
+  }
+}
+/* The bands run edge to edge of the main column, so the content panel
+   gives up its own padding and width here; each band centres a 1200 px
+   column itself. */
+:root[data-has-hero] .content-panel {
+  padding: 0;
+}
+:root[data-has-hero] .sl-container > * + * {
+  margin-top: 0;
+}
+:root[data-has-hero] .content-panel footer,
+:root[data-has-hero] .site-footer {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
+}
+:root[data-has-hero] .site-footer {
+  margin-top: 0;
+  padding-bottom: 2rem;
 }
 @media (min-width: 72rem) {
   :root[data-has-hero] .sidebar-pane {
