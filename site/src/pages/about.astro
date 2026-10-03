@@ -1,0 +1,202 @@
+---
+/**
+ * About Axcess: why it exists, how it grew, what it holds itself to, where
+ * it is going, and who builds it.
+ *
+ * Order is the story in time (past, present, future), then the people
+ * behind it and where to find the source. A reader who wants only "who
+ * builds this" finds it in the last section and in the "On this page" list.
+ *
+ * The history follows the project's white paper
+ * (whitepaper/AXCESS-WHITE-PAPER.md, sections 2 and 3) and the primary
+ * persona (docs/internal/personas.md). The direction cards follow the white
+ * paper's section 5. Who builds Axcess follows README.md:17-18. The old page
+ * named no individual author and did not link a personal site, so this page
+ * does not either.
+ *
+ * Story sections are plain prose with Starlight's article styles. The
+ * principles and direction are card grids, one idea per card (COGA "Making
+ * Content Usable": one idea per chunk), using the shared Card so they look
+ * like every other card on the site (SC 3.2.4 Consistent Identification,
+ * Level AA).
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import LinkButton from "../components/LinkButton.astro";
+import coverage from "../data/coverage.json";
+import { REPO, url } from "../lib/site";
+
+const { covered, total } = coverage.summary;
+const WHITEPAPER = `${REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md`;
+
+const headings = [
+  { depth: 2, slug: "beginning", text: "It started with one hard problem" },
+  { depth: 2, slug: "growth", text: "Finding a problem is only the first question" },
+  { depth: 2, slug: "principles", text: "What the project holds itself to" },
+  { depth: 2, slug: "direction", text: "Where Axcess is going" },
+  { depth: 2, slug: "open-source", text: "Built in the open at the University of Michigan" },
+];
+
+const direction = [
+  {
+    h: "Show exactly what was checked",
+    p: 'Record what happened for every page, page state and check. "Found nothing", "skipped" and "not available" must never look the same.',
+  },
+  {
+    h: "Test what people do, not just addresses",
+    p: "Let a person record the steps of a task, with their permission, so Axcess can check the page after a click, a form error or a sign-in too.",
+  },
+  {
+    h: "Treat issues as lasting work",
+    p: "Keep what a check saw, what people decided, what was fixed and what a comparison showed as separate records.",
+  },
+  {
+    h: "Make the report the product",
+    p: "A complete, accessible web page (HTML) report that works without Axcess running. It says what was checked, what was not, and what to fix first.",
+  },
+  {
+    h: 'Define "fully offline"',
+    p: "A private live scan that contacts only the site being checked, and a replay mode that contacts nothing at all.",
+  },
+  {
+    h: "Test new checks before trusting them",
+    p: "Measure every new check against real examples that experts have reviewed before it is trusted.",
+  },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "About Axcess",
+    description:
+      "Why Axcess exists, how it grew from one problem into a tool for collecting evidence, and where it is going.",
+  }}
+  headings={headings}
+>
+  <p>
+    Axcess started with one hard problem and grew into a way of working. This is the story, the idea that guides it, and
+    where it is going.
+  </p>
+
+  <h2 id="beginning">It started with one hard problem</h2>
+  <p>
+    An accessibility lead at the University of Michigan needed to find every image that was really a picture of text,
+    across a whole website, before the next report was due. Text inside an image can't be resized, restyled or read
+    aloud. Existing tools could not find it well enough across a whole site, and checking every page and image by hand
+    was slow, repetitive and easy to get wrong.
+  </p>
+  <p>The first version of Axcess did that one job. It:</p>
+  <ul>
+    <li>visited a website without sending anything to a cloud service</li>
+    <li>found the images and read the text inside them</li>
+    <li>compared that text with the image's alt text (the text a screen reader reads for an image)</li>
+    <li>ranked the likely problems for a person to review</li>
+    <li>scanned again to confirm the fixes</li>
+  </ul>
+  <p>The goal was never to replace the expert. It was to take away the repetitive search and give the expert better evidence.</p>
+
+  <h2 id="growth">Finding a problem is only the first question</h2>
+  <p>
+    A raw result doesn't answer what people really ask. What happened? Who is affected? Which pages? How certain is it?
+    What should change? How will we know it is fixed?
+  </p>
+  <p>
+    So Axcess grew into a place to collect and review evidence. New checks came for page structure, names and roles,
+    keyboard use, focus, small screens, media and meaning. A way to record manual testing came too, because software
+    can't honestly answer many accessibility questions.
+  </p>
+  <p>
+    Axcess also became clear about how certain each result is. A failed rule, a behavior seen in the browser and an AI
+    suggestion are never treated as equally certain. Each result keeps the name of the check that found it.
+  </p>
+  <p>The guiding idea is simple: <strong>keep the evidence before giving a verdict.</strong></p>
+
+  <h2 id="principles">What the project holds itself to</h2>
+  <!-- Two columns of cards at wide widths, one at narrow widths
+       (SC 1.4.10 Reflow, Level AA). -->
+  <div class="not-content cards two">
+    <Card heading="Honest about what it checks">
+      <p>
+        Axcess's checks help with {covered} of the {total} Web Content Accessibility Guidelines (WCAG) 2.2 Level A and AA
+        criteria, and it says so. Every number on this site comes from the same file the app reads, so a claim can't
+        drift away from the code.
+      </p>
+    </Card>
+    <!-- Changed from the old page's "No telemetry, no cloud AI, no
+         account": adds the desktop app's update check
+         (desktop/src/updates.cjs), which can be turned off. -->
+    <Card heading="Private by default">
+      <p>
+        Evidence stays on the computer that ran the scan. There is no usage tracking (telemetry), no cloud AI and no
+        account. The desktop app asks GitHub for updates when it opens, with no scan data, and you can turn that off.
+      </p>
+    </Card>
+    <!-- docs/internal/design-principles.md: "When they pull apart,
+         Universal Design wins". The app meets AAA where it can (AGENTS.md:
+         44 px targets, 7:1 contrast, plain language), so "aims for". -->
+    <Card heading="Universal design first">
+      <p>
+        The app aims for WCAG 2.2 Level AAA. It is designed around an accessibility professional who may use a screen
+        reader, magnification or only a keyboard. When speed and universal design pull apart, universal design wins.
+      </p>
+    </Card>
+    <Card heading="People decide, and the decisions are kept">
+      <p>
+        Automated results are a starting point, not the answer. People confirm, reject and fix them, with reasons and
+        history, and the report says what was and wasn't checked.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="direction">Where Axcess is going</h2>
+  <p>
+    The project's white paper sets out its long-term direction: a private, offline tool built on evidence. It follows
+    the World Wide Web Consortium's (W3C) method for evaluating websites (WCAG-EM) and the format for accessibility test rules (ACT rules). These
+    are plans, not features Axcess has today.
+  </p>
+  <div class="not-content cards three">
+    {
+      direction.map((d) => (
+        <Card heading={d.h}>
+          <p>{d.p}</p>
+        </Card>
+      ))
+    }
+  </div>
+  <div class="not-content actions">
+    <LinkButton href={WHITEPAPER} variant="secondary">Read the white paper</LinkButton>
+  </div>
+
+  <h2 id="open-source">Built in the open at the University of Michigan</h2>
+  <p>
+    Axcess is open source under the MIT license. It is built by LSA Technology Services at the University of Michigan.
+    The code that visits pages, stores the evidence, shows the report and makes the exports is all public.
+  </p>
+  <!-- One filled button for the main action here (the source), the rest
+       outlined, as on the home page: one main action per section. -->
+  <div class="not-content actions">
+    <LinkButton href={REPO}>Source code on GitHub</LinkButton>
+    <LinkButton href={url("/docs/")} variant="secondary">Documentation</LinkButton>
+    <LinkButton href={url("/get-started/")} variant="secondary">Download and install</LinkButton>
+  </div>
+</StarlightPage>
+
+<style>
+  .cards {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+  .two {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+  .three {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+</style>

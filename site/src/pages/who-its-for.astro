@@ -1,0 +1,196 @@
+---
+/**
+ * Who Axcess is for: one section per kind of reader, then the jobs Axcess is
+ * the wrong tool for.
+ *
+ * Order follows the work: the accessibility lead who runs the scans, the
+ * editors and developers who receive the fixes, the leaders who fund the
+ * work, and the IT reviewers who approve the tool. Each section says who the
+ * reader is, the job in their words, and what they get, so a reader can find
+ * their own section from the "On this page" list and skip the rest (COGA
+ * "Making Content Usable": help users find what they need; SC 2.4.6
+ * Headings and Labels, Level AA).
+ *
+ * The persona sections are plain prose with Starlight's article styles,
+ * not a two-column card layout as on the old page: lists read best in one
+ * column at every width, and nothing has to reflow at 320 px (SC 1.4.10
+ * Reflow, Level AA). The old page's sticky left column is gone too, since
+ * sticky content can cover focused items (SC 2.4.11 Focus Not Obscured
+ * (Minimum), Level AA).
+ *
+ * Copy changed from the old page where the code says otherwise (see the
+ * comments beside each list).
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import { url } from "../lib/site";
+
+const headings = [
+  { depth: 2, slug: "accessibility-lead", text: "The accessibility lead" },
+  { depth: 2, slug: "editors-and-developers", text: "The editor or developer who makes the fix" },
+  { depth: 2, slug: "leadership", text: "Leaders and compliance owners" },
+  { depth: 2, slug: "it-and-security", text: "IT and security reviewers" },
+  { depth: 2, slug: "not-designed-for", text: "Where Axcess is the wrong tool" },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Who Axcess is for",
+    description:
+      "Accessibility leads, the editors and developers who fix things, leaders, and IT reviewers: what each of them gets from Axcess.",
+  }}
+  headings={headings}
+>
+  <p>
+    Axcess was made for an accessibility lead at a large university, and designed around the people that lead hands work
+    to. Find yourself below to see what you would get.
+  </p>
+
+  <h2 id="accessibility-lead">The accessibility lead</h2>
+  <p>
+    You are responsible for dozens of sites. You sort through hundreds of issues in one sitting, often while sharing your
+    screen with an editor who has never seen the tool.
+  </p>
+  <!-- The job statement is a paraphrase of the persona's goal
+       (docs/internal/personas.md), not a quote from a real person, so it is
+       labelled "The job" rather than set as a quotation. -->
+  <p class="job"><strong>The job:</strong> find every barrier across a site before the next report, hand a list in priority order to the content team, and check the fixes.</p>
+  <h3>What you get</h3>
+  <!-- Changed from the old page: no "one-keystroke decisions" (number keys
+       work only on an image's own page, routes/FindingDetail.tsx), no "who
+       decided" (status history stores no person's identity), and no manual
+       review matrix in the app for ordinary scans (the old
+       /scans/:id/manual-checks route now redirects, App.tsx); the written
+       report's checklist replaces it (exports/audit_report.py). -->
+  <ul>
+    <li>A grouped issue table, sorted by priority, as soon as a scan finishes. It shows only that report's results.</li>
+    <li>For each issue: its type (Barrier, Needs review or Informational), the abilities it affects, such as vision, and the evidence, side by side.</li>
+    <li>
+      A status for every occurrence: New, Reviewing, In progress, Fixed, Accepted risk or Not a problem. The last four
+      need a short reason, kept with the report.
+    </li>
+    <li>
+      For Web Content Accessibility Guidelines (WCAG) criteria that no check covers, a list in the written report of what
+      a person needs to test.
+    </li>
+    <li>A comparison with an earlier report, so you spend your time on what changed.</li>
+  </ul>
+  <h3>Designed for you</h3>
+  <p>
+    The app aims for WCAG 2.2 Level AAA where it can, with large targets, strong text contrast and plain language. It works
+    fully by keyboard, fits a phone-width screen, and never shows how serious a problem is by color alone. If you use a
+    screen reader, magnification or only a keyboard, Axcess was built with you in mind.
+  </p>
+
+  <h2 id="editors-and-developers">The editor or developer who makes the fix</h2>
+  <p>You may never open Axcess. You get a ticket, a spreadsheet row or a report, and you need to know what to change.</p>
+  <p class="job"><strong>The job:</strong> take the issue, fix the page, mark it done, and move on.</p>
+  <h3>What you get</h3>
+  <!-- Changed from the old page: "grouped by cause" is not true; Axcess
+       groups occurrences by the check that found them (docs/glossary.md
+       "Root cause"). The Jira file is a command-line export only
+       (cli.py --format jira; the app's Export menu lists four formats,
+       ExportMenu.tsx). -->
+  <ul>
+    <li>Plain-language steps to fix each issue, written for the person making the change.</li>
+    <li>The exact page, the element locator (CSS selector) and the element code (HTML), so there is no hunting.</li>
+    <li>A "Done when" note, so you know when the fix is complete.</li>
+    <li>An Excel issue list with links you can click, and a file you can import into Jira from the command line.</li>
+    <li>Every page an issue appears on, in one place, so you can spot a problem that comes from one shared template.</li>
+  </ul>
+
+  <h2 id="leadership">Leaders and compliance owners</h2>
+  <p>You need to know how exposed a site is, what to fund first, and whether last quarter's work made a difference.</p>
+  <p class="job"><strong>The job:</strong> know how well the site was checked, what to fix first, and whether it is getting better.</p>
+  <h3>What you get</h3>
+  <!-- Changed from the old page: there is no "Who's Affected" view in the
+       app. Each issue lists who it affects ("Affects", IssueEvidence.tsx),
+       and the written report has a "Who is affected" section
+       (audit_report.py). Priority combines impact with spread
+       (docs/glossary.md "Priority"). -->
+  <ul>
+    <li>A written report that starts with what was checked: the start page, the WCAG version and level, the pages and the checks used.</li>
+    <li>Issues ranked by priority, which combines how badly a problem affects people with how many pages it is on.</li>
+    <li>A "Who is affected" section that counts the issues affecting each ability: vision, hearing, movement (motor) and thinking (cognition).</li>
+    <li>A plain list of which WCAG criteria Axcess's checks help with, and which a person still needs to test.</li>
+    <li>A trend chart across reports, instead of a new number each time that can't be compared.</li>
+  </ul>
+  <h3>What you won't get</h3>
+  <p>
+    A certificate. Axcess never makes a claim that a site meets WCAG, and never writes an Accessibility Conformance
+    Report (ACR) for you. A qualified person writes those, using Axcess evidence.
+  </p>
+
+  <h2 id="it-and-security">IT and security reviewers</h2>
+  <p>You have to approve a tool that visits your organization's websites, some of them behind a sign-in.</p>
+  <p class="job"><strong>The job:</strong> know where the data goes, what the tool connects to, and what happens to passwords.</p>
+  <h3>What you get</h3>
+  <!-- Changed from the old page: added the desktop app's update check
+       (desktop/src/updates.cjs, off with AXCESS_DISABLE_UPDATE_CHECK=1,
+       desktop/src/main.cjs). Dropped "login pages are not stored as
+       evidence", which the code could not confirm. The stricter setup is
+       the protected-scan deployment (docs/hosting.md;
+       protected_scans_enabled defaults to false in src/audit/config.py). -->
+  <ul>
+    <li>
+      No cloud service, no account and no usage tracking (telemetry). In the desktop app, reports live in a database in the
+      folder the computer keeps for app data.
+    </li>
+    <li>
+      Connections only to the site being scanned, and to a local AI model on the same computer if you install one. The
+      desktop app also asks GitHub once each time it opens whether a newer version exists. That request carries no scan
+      data, and you can turn it off.
+    </li>
+    <li>Passwords never enter Axcess. The person scanning signs in themselves, in a browser window they can see.</li>
+    <li>A desktop app that runs in a locked-down window (sandbox) with a written security boundary, and source code you can read.</li>
+    <li>
+      A separate, stricter setup for sensitive sign-in scans across an organization, with your organization's sign-in,
+      encrypted evidence and automatic deletion after seven days. It is off by default, and IT has to set it up.
+    </li>
+  </ul>
+  <p><a href={url("/privacy/")}>Read the full privacy and trust page.</a></p>
+
+  <h2 id="not-designed-for">Where Axcess is the wrong tool</h2>
+  <!-- Three equal cards in a grid: three separate "no" answers of the same
+       kind, so the same card component as the rest of the site (SC 3.2.4
+       Consistent Identification, Level AA). The grid falls to one column
+       at narrow widths (SC 1.4.10 Reflow, Level AA). -->
+  <div class="not-content wrong-tool">
+    <Card heading="Public scanning services">
+      <p>
+        Axcess runs on one computer, for one person or a small trusted team. It is not a web service anyone can point at
+        any site, and it must never be open to the public internet.
+      </p>
+    </Card>
+    <Card heading="Nightly checks of many sites">
+      <p>
+        You can run scans on a schedule from the command line. But the app is built for careful review of one report at a
+        time, not for dashboards across many sites.
+      </p>
+    </Card>
+    <Card heading="Automatic certification">
+      <p>No scan proves a site meets WCAG. Testing with people who use assistive technology is still essential.</p>
+    </Card>
+  </div>
+</StarlightPage>
+
+<style>
+  /* The job line: a tinted band so it reads as a summary, set apart by a
+     border and a bold label as well as the tint, so it does not rely on
+     colour (SC 1.4.1 Use of Color, Level A). */
+  .job {
+    padding: 0.875rem 1.125rem;
+    border-inline-start: 4px solid var(--ax-border-strong);
+    border-radius: 0 0.5rem 0.5rem 0;
+    background: var(--ax-surface-subtle);
+    color: var(--ax-fg);
+  }
+
+  .wrong-tool {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+</style>

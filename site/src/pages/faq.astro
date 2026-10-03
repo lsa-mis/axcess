@@ -1,0 +1,247 @@
+---
+/**
+ * Questions page: every common question, answered from src/data/questions.ts,
+ * the same list the home page draws its four questions from, so an answer
+ * reads the same wherever it appears (COGA "Making Content Usable": the same
+ * word for the same thing; SC 3.2.4 Consistent Identification, Level AA).
+ *
+ * Order: a one-line purpose, then the way to the glossary, then the
+ * questions. The glossary link sits above the questions because looking up a
+ * word from a report is the other common reason to land here, and a reader
+ * should not have to open every question to find it.
+ *
+ * Rejected: copying the glossary onto this page, as the old site did. The
+ * glossary is its own page now (/docs/glossary/, built from
+ * docs/glossary.md), and two copies would drift apart. One link, one place
+ * (COGA: one way to do one thing).
+ *
+ * Rejected: headings inside each <summary>. A summary is announced as a
+ * button, and some screen readers flatten or skip a heading inside it. The
+ * questions are a flat list, as on the old page, so there is no heading per
+ * question. "On this page" is off: it would list only the two headings, both
+ * already in view.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import LinkButton from "../components/LinkButton.astro";
+import { QUESTIONS } from "../data/questions";
+import { url } from "../lib/site";
+
+/** Site paths get the base path; full addresses are left alone. */
+const href = (h: string) => (h.startsWith("/") ? url(h) : h);
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Questions",
+    description:
+      "Straight answers to common questions about Axcess: what it checks, what a scan can't prove, where your data goes, and how to run it.",
+    tableOfContents: false,
+  }}
+>
+  <p>The questions people ask before they trust a tool, with straight answers about what Axcess does today.</p>
+
+  <div class="not-content faq">
+    <!-- The glossary link as a labelled panel with a button-styled link,
+         not a sentence buried in the intro, so it is easy to find
+         (COGA "Making Content Usable": make the important things easy to
+         find). It is a link, because it goes to another page
+         (W3C "Using ARIA", rule 1). -->
+    <aside class="glossary" aria-labelledby="glossary-heading">
+      <h2 id="glossary-heading">Looking up a word from your report?</h2>
+      <p>The glossary explains every word Axcess uses, such as Barrier, occurrence and page state, in plain language.</p>
+      <LinkButton href={url("/docs/glossary/")} variant="secondary">Open the glossary</LinkButton>
+    </aside>
+
+    <h2 id="questions" class="questions-heading">Common questions</h2>
+    <!-- Native <details>: opens and closes from the keyboard and works
+         without scripts, and is announced as expandable (WAI-ARIA APG
+         Disclosure pattern, https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/).
+         Each one has an id so a question can be linked, for example
+         /faq/#sign-in. -->
+    <div class="questions">
+      {
+        QUESTIONS.map((item) => (
+          <details id={item.id}>
+            <summary>{item.q}</summary>
+            <div class="answer ax-prose">
+              <p>{item.a}</p>
+              {item.list && (
+                <ul>
+                  {item.list.map((li) => (
+                    <li>{li}</li>
+                  ))}
+                </ul>
+              )}
+              {item.after && <p>{item.after}</p>}
+              {item.links &&
+                (item.links.length === 1 ? (
+                  <p class="links">
+                    <a href={href(item.links[0].href)}>{item.links[0].text}</a>
+                  </p>
+                ) : (
+                  <ul class="links">
+                    {item.links.map((l) => (
+                      <li>
+                        <a href={href(l.href)}>{l.text}</a>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+            </div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
+</StarlightPage>
+
+<script>
+  // A link to one question (/faq/#sign-in) opens it. Without scripts, some
+  // browsers open it anyway and the rest scroll to its summary, which is
+  // still one key press from the answer.
+  function openTarget() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const el = id ? document.getElementById(id) : null;
+    if (el instanceof HTMLDetailsElement) el.open = true;
+  }
+  openTarget();
+  window.addEventListener("hashchange", openTarget);
+</script>
+
+<style>
+  .faq {
+    margin-top: 1.5rem;
+  }
+
+  .glossary {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .glossary h2 {
+    margin: 0 0 0.5rem;
+    color: var(--ax-fg);
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .glossary p {
+    margin: 0 0 1rem;
+    color: var(--ax-fg-muted);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+
+  .questions-heading {
+    margin: 0 0 1rem;
+    color: var(--ax-fg);
+    font-size: 1.5rem;
+    line-height: 1.25;
+  }
+  .questions {
+    display: grid;
+    gap: 0.75rem;
+  }
+  details {
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+    /* A linked question is not hidden under the fixed header (SC 2.4.11
+       Focus Not Obscured (Minimum), Level AA). */
+    scroll-margin-top: calc(var(--sl-nav-height, 4rem) + 1rem);
+  }
+  /* The linked question gets a visible edge, so it is clear which one the
+     link meant, shown by a thicker border and not by colour alone. */
+  details:target {
+    border: 3px solid var(--ax-focus);
+  }
+
+  /* Summary: at least 44 px tall (SC 2.5.5 Target Size (Enhanced), Level
+     AAA). The open or closed state is shown by a chevron that turns, drawn
+     with CSS, because the native marker disappears once a summary is styled
+     as flex (SC 1.4.1 Use of Color, Level A: the state is a shape, not a
+     colour). The browser still announces expanded or collapsed. */
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: var(--ax-target);
+    padding: 1rem 1.25rem;
+    color: var(--ax-fg);
+    font-size: 1.1875rem;
+    font-weight: 700;
+    line-height: 1.35;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::before {
+    content: "";
+    flex-shrink: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: 3px solid currentColor;
+    border-bottom: 3px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+  }
+  details[open] > summary::before {
+    transform: rotate(45deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    summary::before {
+      transition: none;
+    }
+  }
+  summary:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .answer {
+    padding: 0 1.25rem 1.25rem calc(1.25rem + 0.55rem + 0.75rem);
+    color: var(--ax-fg-muted);
+    font-size: 1.0625rem;
+    line-height: 1.6;
+  }
+  .answer p,
+  .answer ul {
+    margin: 0 0 0.75rem;
+  }
+  .answer > :last-child {
+    margin-bottom: 0;
+  }
+  .answer ul {
+    padding-inline-start: 1.25rem;
+  }
+  .answer li + li {
+    margin-top: 0.25rem;
+  }
+  .answer .links {
+    font-weight: 600;
+  }
+  /* Links are underlined (theme.css .ax-prose) and tall enough to tap. */
+  .answer .links a {
+    display: inline-block;
+    padding-block: 0.6rem;
+  }
+  ul.links {
+    list-style: none;
+    padding-inline-start: 0;
+  }
+  ul.links li + li {
+    margin-top: 0;
+  }
+
+  @media (max-width: 30rem) {
+    summary {
+      padding: 0.875rem 1rem;
+    }
+    .answer {
+      padding: 0 1rem 1rem;
+    }
+  }
+</style>
