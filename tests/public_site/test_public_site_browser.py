@@ -43,6 +43,25 @@ AXE = ROOT / "src" / "audit" / "web" / "static" / "axe.min.js"
 # The review app's main-screen tags (tests/ui/test_accessibility_axe.py, _AXE_TAGS).
 AXE_TAGS = ["wcag2a", "wcag2aa", "wcag2aaa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]
 
+# Runs axe, then drops contrast results for text inside a picture
+# (role="img", such as the home page's drawing of a report). SC 1.4.3 and
+# SC 1.4.6 set no contrast requirement for text that is part of a picture
+# with significant other visual content; the picture's text alternative
+# carries its meaning. Every other rule still applies inside pictures, and
+# contrast still applies everywhere else.
+AXE_JS = """async tags => {
+  const result = await axe.run(document, {runOnly: {type: 'tag', values: tags}});
+  const inPicture = n => {
+    const el = document.querySelector(n.target[n.target.length - 1]);
+    return el && el.closest('[role=img]');
+  };
+  result.violations = result.violations
+    .map(v => v.id.startsWith('color-contrast')
+      ? {...v, nodes: v.nodes.filter(n => !inPicture(n))} : v)
+    .filter(v => v.nodes.length);
+  return result;
+}"""
+
 # Names the site uses that the app's list does not need. Each is a name.
 SITE_NAMES = {
     *("Linux", "AppImage", "Duo", "Apple", "Intel", "DevTools", "Deque", "Tailscale"),
@@ -152,10 +171,7 @@ def test_axe_finds_nothing(site_browser: Browser, dist: Path, scheme: str, width
     for route in ROUTES:
         page = _open(ctx, route)
         page.add_script_tag(path=str(AXE))
-        result = page.evaluate(
-            "tags => axe.run(document, {runOnly: {type: 'tag', values: tags}})",
-            AXE_TAGS,
-        )
+        result = page.evaluate(AXE_JS, AXE_TAGS)
         for v in result["violations"]:
             targets = ", ".join(str(n["target"]) for n in v["nodes"][:3])
             problems.append(f"{route} [{scheme}, {width}px] {v['id']}: {v['help']} ({targets})")
