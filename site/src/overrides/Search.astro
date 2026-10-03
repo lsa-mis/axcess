@@ -1,0 +1,34 @@
+---
+/**
+ * Starlight's search, plus a plain link for readers whose scripts are off.
+ *
+ * Search runs on Pagefind, which needs JavaScript; without it Starlight shows
+ * a disabled button that does nothing. theme.css hides that button when
+ * scripts have not run and shows this "All pages" link in its place, so every
+ * page can still be found (SC 2.4.5 Multiple Ways, Level AA). A <noscript>
+ * block was rejected because it misses the case where scripts are allowed
+ * but fail to load; the ax-js class (overrides/ThemeProvider.astro) catches
+ * both.
+ */
+import Default from "@astrojs/starlight/components/Search.astro";
+import { url } from "../lib/site";
+---
+
+<Default {...Astro.props} />
+<a class="ax-nojs all-pages" href={url("/all-pages/")}>All pages</a>
+
+<style>
+  .all-pages {
+    align-items: center;
+    min-height: var(--ax-target);
+    padding: 0 0.75rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+    color: var(--ax-fg);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  :root:not(.ax-js) .all-pages {
+    display: inline-flex;
+  }
+</style>

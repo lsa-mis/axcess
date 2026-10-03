@@ -1,0 +1,4 @@
+node_modules/
+.astro/
+dist/
+src/data/coverage.json

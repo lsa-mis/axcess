@@ -1,0 +1,301 @@
+---
+/**
+ * The home page hero (only the home page sets `hero` in its frontmatter).
+ *
+ * Left: what Axcess is and the two next steps. Right: a picture of a report,
+ * drawn in HTML rather than a screenshot so it stays sharp, follows the
+ * light and dark theme, and can be kept in step with the app's wording.
+ *
+ * Choices and why:
+ * - One filled button ("Download Axcess"). It goes to the download section
+ *   rather than straight to a file: guessing the system can't tell an Intel
+ *   Mac from Apple silicon, and only Apple silicon is built, so a direct
+ *   file link would hand some readers a file that won't open.
+ * - The second button goes to "What Axcess checks", the honest coverage
+ *   numbers, because the next question after "what is it" is "what does it
+ *   miss" (Articulating Design Decisions: answer the objection early).
+ * - The mockup uses a made-up site (www.example.org, reserved by RFC 2606)
+ *   and only words the app really shows (Dashboard and Inspector screens).
+ *   It is one image to assistive technology, with a text description, so a
+ *   screen reader does not read out a fake interface piece by piece
+ *   (role="img" with aria-label, WCAG technique ARIA6; SC 1.1.1 Non-text
+ *   Content, Level A).
+ * - "WCAG" links to its glossary entry, which spells it out (SC 3.1.4
+ *   Abbreviations, Level AAA, technique G55). The badge says only "Free and
+ *   open source" so it stays one line at 320 px.
+ */
+import LinkButton from "../components/LinkButton.astro";
+import { url } from "../lib/site";
+
+const { hero, title } = Astro.locals.starlightRoute.entry.data;
+---
+
+<section class="hero not-content" aria-labelledby="_top">
+  <div class="copy">
+    <p class="badge">Free and open source</p>
+    <h1 id="_top">{hero?.title ?? title}</h1>
+    {hero?.tagline && <p class="tagline">{hero.tagline}</p>}
+    <div class="actions">
+      <LinkButton href={url("/get-started/#download")}>Download Axcess</LinkButton>
+      <LinkButton href={url("/coverage/")} variant="secondary">See what it checks</LinkButton>
+    </div>
+    <ul class="facts">
+      <li>Runs on your own computer</li>
+      <li>No account needed</li>
+      <li>Mac, Windows and Linux</li>
+      <li>
+        Checks <a href={url("/docs/glossary/#wcag")}>WCAG</a> 2.1 AA, or 2.2 if you choose
+      </li>
+    </ul>
+  </div>
+
+  <div
+    class="mockup"
+    role="img"
+    aria-label="Example of an Axcess report for www.example.org: 12 barriers, 7 that need review, and 143 occurrences across 194 pages. Below it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
+  >
+    <div class="panel summary" aria-hidden="true">
+      <p class="meta">Example report · www.example.org</p>
+      <p class="scope">194 pages · 1,171 page states opened by clicking</p>
+      <div class="stats">
+        <div><span class="n">12</span><span class="l">Barriers</span></div>
+        <div><span class="n">7</span><span class="l">Needs review</span></div>
+        <div><span class="n">143</span><span class="l">Occurrences</span></div>
+      </div>
+    </div>
+    <div class="panel inspector" aria-hidden="true">
+      <div class="bar">
+        <span>Flagged element 1 of 19</span>
+        <span class="chips"><span class="chip">Previous</span><span class="chip">Next</span></span>
+      </div>
+      <dl class="facts-list">
+        <dt>What it is</dt><dd>Link</dd>
+        <dt>Text or label</dt><dd>“Copy link to this heading”</dd>
+        <dt>Size</dt><dd>35 pixels wide, 20 pixels tall</dd>
+        <dt>Element locator (CSS selector)</dt><dd class="mono">.post &gt; .copy-link-btn</dd>
+      </dl>
+      <div class="saved-copy">
+        <p class="page-heading">Using editors to build accessible pages</p>
+        <span class="tag">1 of 19</span>
+        <div class="row">
+          <span class="target"></span>
+          <span class="page-sub">Give your post a clear title</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+    gap: 3rem;
+    align-items: center;
+    padding: 2.5rem 0 3rem;
+  }
+  .badge {
+    display: inline-block;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    background: var(--ax-tint);
+    color: var(--ax-link);
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+  h1 {
+    margin: 1.25rem 0 1.25rem;
+    color: var(--ax-fg);
+    font-size: clamp(2.5rem, 5.2vw, 4rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  .tagline {
+    max-width: 34rem;
+    margin: 0 0 2rem;
+    color: var(--ax-fg-muted);
+    font-size: 1.25rem;
+    line-height: 1.55;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .facts a {
+    color: var(--ax-link);
+    text-underline-offset: 0.2em;
+  }
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ax-fg-muted);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* Mockup */
+  .mockup {
+    position: relative;
+    padding-inline-start: 1.75rem;
+  }
+  .panel {
+    border: 1px solid var(--ax-border);
+    border-radius: 0.875rem;
+    background: var(--ax-surface);
+  }
+  .summary {
+    padding: 1.25rem 1.375rem 4rem;
+  }
+  .meta {
+    margin: 0;
+    color: var(--ax-fg-subtle);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .scope {
+    margin: 0.25rem 0 1rem;
+    color: var(--ax-fg);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+  .stats > div {
+    display: flex;
+    flex-direction: column;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--ax-surface-muted);
+  }
+  .n {
+    color: var(--ax-fg);
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+  .l {
+    color: var(--ax-fg-subtle);
+    font-size: 0.8125rem;
+  }
+  .inspector {
+    position: relative;
+    margin: -2.75rem 0 0 -1.75rem;
+    overflow: hidden;
+    box-shadow: var(--ax-shadow);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid var(--ax-border);
+    color: var(--ax-fg-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .chips {
+    display: flex;
+    gap: 0.375rem;
+  }
+  .chip {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.45rem;
+    color: var(--ax-fg);
+    font-size: 0.8125rem;
+  }
+  .facts-list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.375rem 1.25rem;
+    margin: 0;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid var(--ax-border);
+    font-size: 0.875rem;
+  }
+  dt {
+    color: var(--ax-fg-subtle);
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+    color: var(--ax-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mono {
+    font-family: var(--sl-font-mono);
+    font-size: 0.8125rem;
+  }
+  /* The saved copy of a page, with the app's maize outline and navy tag. */
+  .saved-copy {
+    padding: 1.25rem 1.5rem 1.5rem;
+    background: var(--ax-surface-muted);
+  }
+  .page-heading {
+    margin: 0 0 1rem;
+    color: var(--ax-link);
+    font-size: clamp(1.125rem, 2vw, 1.5rem);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border: 3px solid var(--ax-maize);
+    border-bottom: 0;
+    border-radius: 0.375rem 0.375rem 0 0;
+    background: #00274c;
+    color: #ffffff;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .target {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.75rem;
+    border: 4px solid var(--ax-maize);
+    outline: 3px solid #00274c;
+    outline-offset: -7px;
+    border-radius: 2px;
+    background: var(--ax-surface);
+  }
+  .page-sub {
+    color: var(--ax-link);
+    font-size: clamp(1rem, 1.8vw, 1.25rem);
+    font-weight: 700;
+  }
+  @media (max-width: 30rem) {
+    .mockup {
+      padding-inline-start: 0;
+    }
+    .inspector {
+      margin: -2.75rem 0 0;
+    }
+    .facts-list {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.125rem;
+    }
+    dd + dt {
+      margin-top: 0.5rem;
+    }
+  }
+</style>

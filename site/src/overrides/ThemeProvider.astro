@@ -1,0 +1,14 @@
+---
+/**
+ * Starlight's theme provider plus one line that marks <html> with `ax-js`
+ * once scripts run. Starlight always writes data-theme="dark" into the HTML,
+ * so that attribute can't tell us whether scripts ran; this class can.
+ * theme.css uses its absence to follow the system light or dark setting and
+ * to swap controls that need scripts for plain links. Inline and first, so
+ * there is no flash of the wrong state.
+ */
+import Default from "@astrojs/starlight/components/ThemeProvider.astro";
+---
+
+<script is:inline>document.documentElement.classList.add("ax-js");</script>
+<Default {...Astro.props} />

@@ -1,0 +1,57 @@
+---
+/**
+ * A link styled as a button: for actions that go somewhere (download, read
+ * more). Native <a href>, so it works without scripts and is announced as a
+ * link, which is what it is (W3C "Using ARIA", rule 1).
+ *
+ * Variants: "primary" is the one filled button per section (a single main
+ * action per screen); "secondary" is outlined; "on-inverse" is for the dark
+ * call-to-action band. Every variant is at least 44 px tall (SC 2.5.5 Target
+ * Size (Enhanced), Level AAA) and underlines on hover so the change is not
+ * colour alone.
+ */
+interface Props {
+  href: string;
+  variant?: "primary" | "secondary" | "on-inverse";
+  [attr: string]: unknown;
+}
+const { href, variant = "primary", ...rest } = Astro.props;
+---
+
+<a href={href} class:list={["ax-button", variant]} {...rest}><slot /></a>
+
+<style>
+  .ax-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 3.25rem;
+    padding: 0.75rem 1.5rem;
+    border: 2px solid transparent;
+    border-radius: 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+  .ax-button:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .primary {
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+  }
+  .secondary {
+    background: var(--ax-surface);
+    border-color: var(--ax-border-strong);
+    color: var(--ax-link);
+  }
+  .secondary:hover {
+    border-color: var(--ax-link);
+  }
+  .on-inverse {
+    background: var(--ax-inverse-fg);
+    color: var(--ax-inverse-bg);
+  }
+</style>

@@ -1,0 +1,150 @@
+---
+/**
+ * Site header: name, search, the three main destinations, GitHub, the theme
+ * switch, and Download.
+ *
+ * Why these three links: they are the questions a first-time visitor asks
+ * (how do I use it, what does it check, where does my data go). Everything
+ * else is one level down in the sidebar, which lists every page. Download is
+ * the one filled button, so there is a single primary action per screen.
+ *
+ * Below 72rem the three links are left to the sidebar, which lists them
+ * too. Below 50rem the GitHub and theme controls also move into
+ * Starlight's menu panel (opened by the menu button, which works without
+ * JavaScript because it uses the HTML popover attribute). Showing them in the
+ * header as a second row was rejected: a fixed two-row header covers too
+ * much of the page at 320 px and at 400% zoom (SC 1.4.10 Reflow, Level AA;
+ * SC 2.4.11 Focus Not Obscured (Minimum), Level AA). The order of items is
+ * the same on every page (SC 3.2.3 Consistent Navigation, Level AA).
+ */
+// Public component paths, not Starlight's virtual modules, so `astro check`
+// can type them. Search and SiteTitle are this site's own overrides.
+import SocialIcons from "@astrojs/starlight/components/SocialIcons.astro";
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
+import Search from "./Search.astro";
+import SiteTitle from "./SiteTitle.astro";
+import { MAIN_NAV, url } from "../lib/site";
+
+const path = Astro.url.pathname;
+---
+
+<div class="header">
+  <div class="title-wrapper">
+    <SiteTitle />
+  </div>
+  <div class="search print:hidden">
+    <Search />
+  </div>
+  <nav aria-label="Main" class="main-nav print:hidden">
+    <ul>
+      {
+        MAIN_NAV.map((item) => (
+          <li>
+            <a href={url(item.href)} aria-current={path.startsWith(url(item.href)) ? "page" : undefined}>
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+  <div class="right-group print:hidden">
+    <div class="social-icons">
+      <SocialIcons />
+    </div>
+    <ThemeSelect />
+    <a class="download" href={url("/get-started/#download")}>Download</a>
+  </div>
+</div>
+
+<style>
+  .header {
+    display: flex;
+    gap: var(--sl-nav-gap);
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+  }
+  .title-wrapper {
+    overflow: clip;
+    padding: 0.25rem;
+    margin: -0.25rem;
+    min-width: 0;
+  }
+  .search {
+    display: flex;
+  }
+  .main-nav,
+  .right-group {
+    display: none;
+  }
+  @media (min-width: 72rem) {
+    .header {
+      gap: 1.5rem;
+    }
+    .search {
+      margin-inline-end: auto;
+    }
+    .main-nav {
+      display: block;
+    }
+    .main-nav ul {
+      display: flex;
+      gap: 0.25rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .main-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--ax-target);
+      padding: 0 0.75rem;
+      border-radius: 0.5rem;
+      color: var(--ax-fg);
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .main-nav a:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    /* The current section is marked by an underline as well as weight, not
+       by colour alone (SC 1.4.1 Use of Color, Level A). */
+    .main-nav a[aria-current="page"] {
+      text-decoration: underline;
+      text-decoration-thickness: 3px;
+      text-underline-offset: 0.35em;
+    }
+  }
+  /* From 50rem Starlight shows the sidebar instead of its menu panel, so the
+     GitHub link, theme switch and Download move up here. */
+  @media (min-width: 50rem) {
+    .right-group {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    .social-icons {
+      display: flex;
+      align-items: center;
+    }
+  }
+  .download {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--ax-target);
+    padding: 0 1.1rem;
+    border-radius: 0.5rem;
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .download:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+</style>

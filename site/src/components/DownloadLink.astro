@@ -1,0 +1,56 @@
+---
+/**
+ * A link to one desktop build.
+ *
+ * Release files carry the version in their names
+ * (Axcess-<version>-Mac-Apple-Silicon.dmg, desktop-build.yml), so there is no
+ * fixed file address. Without scripts the link opens the newest release's
+ * page, which lists every file. With scripts, the code below asks GitHub for
+ * the newest release once, points each link straight at its file, and fills
+ * the version into any file name shown as
+ * <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-...</code>.
+ * No version number is ever written into the page source, so nothing goes
+ * stale (the repo's evergreen rule).
+ */
+import { LATEST_RELEASE } from "../lib/site";
+
+export type ReleaseFile =
+  | "Mac-Apple-Silicon.dmg"
+  | "Windows-Installer.exe"
+  | "Windows-Portable.zip"
+  | "Linux.AppImage";
+
+interface Props {
+  file: ReleaseFile;
+  class?: string;
+}
+const { file, class: className } = Astro.props;
+---
+
+<a href={LATEST_RELEASE} data-release-file={file} class={className}><slot /></a>
+
+<script>
+  type Release = { tag_name?: string; assets?: { name: string; browser_download_url: string }[] };
+  const links = document.querySelectorAll<HTMLAnchorElement>("a[data-release-file]");
+  if (links.length || document.querySelector("code[data-release-name]")) {
+    fetch("https://api.github.com/repos/lsa-mis/axcess/releases/latest", {
+      headers: { Accept: "application/vnd.github+json" },
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<Release>) : null))
+      .then((rel) => {
+        if (!rel?.tag_name) return;
+        const version = rel.tag_name.replace(/^desktop-v/, "");
+        for (const a of links) {
+          const name = `Axcess-${version}-${a.dataset.releaseFile}`;
+          const asset = rel.assets?.find((x) => x.name === name);
+          if (asset) a.href = asset.browser_download_url;
+        }
+        for (const code of document.querySelectorAll<HTMLElement>("code[data-release-name]")) {
+          code.textContent = `Axcess-${version}-${code.dataset.releaseName}`;
+        }
+      })
+      .catch(() => {
+        // Offline or rate-limited: the links keep pointing at the release page.
+      });
+  }
+</script>

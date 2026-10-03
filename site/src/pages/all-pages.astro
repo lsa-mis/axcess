@@ -1,0 +1,25 @@
+---
+/**
+ * Every page on the site in one list. It is where the "All pages" link goes
+ * when search can't run (no JavaScript), and a plain site map for anyone who
+ * prefers one (SC 2.4.5 Multiple Ways, Level AA).
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { getCollection } from "astro:content";
+import { PRODUCT_PAGES, url } from "../lib/site";
+
+const guides = (await getCollection("docs")).sort((a, b) =>
+  a.id === "docs" ? -1 : b.id === "docs" ? 1 : a.data.title.localeCompare(b.data.title),
+);
+---
+
+<StarlightPage frontmatter={{ title: "All pages", description: "Every page on the Axcess site, in one list." }}>
+  <h2>About Axcess</h2>
+  <ul>
+    {PRODUCT_PAGES.map((p) => <li><a href={url(p.href)}>{p.title}</a></li>)}
+  </ul>
+  <h2>Guides</h2>
+  <ul>
+    {guides.map((g) => <li><a href={url(`/${g.id}/`)}>{g.data.title}</a></li>)}
+  </ul>
+</StarlightPage>

@@ -1,0 +1,59 @@
+---
+/**
+ * Starlight's page footer (edit link and previous/next) followed by the site
+ * footer, which repeats the main destinations as plain links. That gives a
+ * second way to reach every key page on any screen size, scripts or not
+ * (SC 2.4.5 Multiple Ways, Level AA). It also carries the one-line honesty
+ * statement on every page (docs/plain-language.md rule 12), which
+ * tests/public_site/ checks.
+ */
+import Default from "@astrojs/starlight/components/Footer.astro";
+import { ISSUES, RELEASES, REPO, url } from "../lib/site";
+---
+
+<Default {...Astro.props} />
+<div class="site-footer">
+  <p>
+    Axcess is built by LSA Technology Services at the University of Michigan. Free and open source under the MIT
+    license. Axcess does not certify WCAG conformance: its results are evidence for people to review.
+  </p>
+  <nav aria-label="Site">
+    <ul>
+      <li><a href={url("/get-started/")}>Download and install</a></li>
+      <li><a href={url("/docs/")}>Documentation</a></li>
+      <li><a href={url("/privacy/")}>Privacy and trust</a></li>
+      <li><a href={url("/all-pages/")}>All pages</a></li>
+      <li><a href={REPO}>Source code on GitHub</a></li>
+      <li><a href={RELEASES}>Releases</a></li>
+      <li><a href={ISSUES}>Give feedback</a></li>
+    </ul>
+  </nav>
+</div>
+
+<style>
+  .site-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--ax-border);
+    color: var(--ax-fg-muted);
+    font-size: var(--sl-text-sm);
+  }
+  .site-footer p {
+    margin: 0 0 0.75rem;
+  }
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--ax-target);
+    color: var(--ax-link);
+    text-underline-offset: 0.2em;
+  }
+</style>
