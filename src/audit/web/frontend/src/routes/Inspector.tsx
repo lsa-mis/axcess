@@ -1298,23 +1298,10 @@ export default function InspectorRoute() {
 }
 
 /**
- * Give the captured markup the page's own URL as its base.
- *
- * A `srcDoc` frame has no document URL, so a capture's relative and
- * root-relative subresources (`href="/site.css"`, `src="logo.png"`) would be
- * requested from the review UI's origin and 404 — the page renders with no CSS
- * at all. A single `<base href>` restores the original resolution, so the frame
- * loads the site's real stylesheets, fonts and images.
- *
- * Left untouched when the capture already carries its own `<base href>` (the
- * first one in the document wins, and the page's own is the authoritative one)
- * or when the URL is not an http(s) address we should point a browser at.
- */
-/**
  * Make a stored capture renderable in the inspector's frame.
  *
- * Three things are wrong with a capture the moment it leaves the site it came
- * from, and all three make a correct page look broken:
+ * Four things are wrong with a capture the moment it leaves the site it came
+ * from, and all four make a correct page look broken:
  *
  * 1. Relative subresources resolve against the review UI, so `<base href>` is
  *    injected (see `withBaseHref`).
@@ -1324,9 +1311,18 @@ export default function InspectorRoute() {
  *    believes is a same-origin asset -- sends no `Access-Control-Allow-Origin`.
  *    The stylesheet is refused and a fully styled application renders as
  *    unstyled serif text. Dropping the attribute makes it an ordinary no-CORS
- *    stylesheet load, which is what it effectively was. Nothing here checks
- *    subresource integrity, so nothing is lost.
- * 3. `<noscript>` content becomes visible because the frame runs with scripts
+ *    stylesheet load, which is what it effectively was. `integrity` goes with
+ *    it: the browser can only check subresource integrity on a CORS request,
+ *    so a link that keeps `integrity` without `crossorigin` is refused
+ *    outright (CDN Font Awesome and Bootstrap links carry both).
+ * 3. A `<meta http-equiv="Content-Security-Policy">` was written for the
+ *    site's own address. In this frame `'self'` means the review UI, so a
+ *    policy such as `style-src 'self' https://cdn...` refuses the site's own
+ *    stylesheets, and every saved page of such a site renders unstyled. The
+ *    frame's real limits are its `sandbox` (no scripts) and the app's own
+ *    policy, which a `srcdoc` document inherits; the site's policy adds
+ *    nothing but the refusal.
+ * 4. `<noscript>` content becomes visible because the frame runs with scripts
  *    disabled, so a single-page app announces "You need to enable JavaScript
  *    to run this app" over markup that was captured with JavaScript running.
  *    It is the alternative to a state this document is not in.
@@ -1338,22 +1334,42 @@ function prepareCapture(html: string | null, url: string | null): string | null 
   if (!html) return html;
   const rendered = html
     .replace(/<link\b[^>]*>/gi, (tag) =>
-      tag.replace(/\s+crossorigin(=("[^"]*"|'[^']*'|[^\s>]*))?/gi, ""),
+      tag.replace(/\s+(crossorigin|integrity)(=("[^"]*"|'[^']*'|[^\s>]*))?/gi, ""),
     )
+    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy[^>]*>/gi, "")
     .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, "");
   return withBaseHref(rendered, url);
 }
 
+/**
+ * Give the captured markup the page's own URL as its base.
+ *
+ * A `srcDoc` frame has no document URL, so a capture's relative and
+ * root-relative subresources (`href="/site.css"`, `src="logo.png"`) would be
+ * requested from the review UI's origin and 404 — the page renders with no CSS
+ * at all. A `<base href>` restores the original resolution, so the frame loads
+ * the site's real stylesheets, fonts and images.
+ *
+ * When the capture has its own `<base href>`, that one decides how the page's
+ * relative URLs resolve, exactly as on the site, so it is resolved against the
+ * page's address and the absolute result goes first (the first `<base>` in a
+ * document wins). Left as it was, a relative one such as Angular's
+ * `<base href="/">` would resolve against the frame's `about:srcdoc` and load
+ * nothing. Left untouched when the URL is not an http(s) address we should
+ * point a browser at.
+ */
 function withBaseHref(html: string | null, url: string | null): string | null {
   if (!html || !url) return html;
+  const own = /<base\b[^>]*\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(html)?.[1]?.replace(/&amp;/g, "&");
+  let href: string;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return html;
+    href = new URL(own ?? url, parsed).href;
   } catch {
     return html;
   }
-  if (/<base\b[^>]*\bhref\b/i.test(html)) return html;
-  const tag = `<base href="${escapeAttribute(url)}">`;
+  const tag = `<base href="${escapeAttribute(href)}">`;
   const head = /<head\b[^>]*>/i.exec(html);
   if (head) {
     const at = head.index + head[0].length;
