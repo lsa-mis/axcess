@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from audit.analyzer.axe import AxeViolation
+from audit.crawler.style_snapshot import StyleSnapshot
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,11 @@ class StateCapture:
     #: gzip of the UTF-8 document, ``compresslevel=1, mtime=0`` to match
     #: ``_compress_html`` so identical documents always produce identical bytes.
     html: bytes
+    #: The state's CSS and style fingerprint, read in the same open state
+    #: (see :mod:`audit.crawler.style_snapshot`). ``None`` when the scan does
+    #: not save styles or the read failed; the inspector then loads the CSS
+    #: from the live site, as it does for older reports.
+    styles: StyleSnapshot | None = None
 
 
 @dataclass(frozen=True)

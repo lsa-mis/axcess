@@ -1,4 +1,4 @@
-"""Content-addressed image blob storage.
+"""Content-addressed blob storage (images, screenshots, saved-copy CSS).
 
 Layout: ``<root>/<aa>/<full_sha256>.<ext>``, first two hex chars are used as a
 bucket so no single directory grows without bound. Writes are idempotent: if a
@@ -22,6 +22,8 @@ _MIME_TO_EXT: dict[str, str] = {
     "image/avif": "avif",
     "image/x-icon": "ico",
     "image/vnd.microsoft.icon": "ico",
+    # Saved-copy stylesheets (see ``audit.crawler.style_snapshot``).
+    "text/css": "css",
 }
 
 

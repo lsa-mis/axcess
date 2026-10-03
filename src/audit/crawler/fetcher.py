@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
     from audit.crawler.search import SearchResult
+    from audit.crawler.style_snapshot import StyleSnapshot
 
 _HTML_CONTENT_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 
@@ -96,6 +97,10 @@ class FetchResult:
     interaction_detail: str = ""
     discovered_urls: tuple[str, ...] = ()
     search_result: SearchResult | None = None
+    # The page's CSS and style fingerprint, read right after ``body`` was
+    # serialized (see ``audit.crawler.style_snapshot``). JsFetcher only, and
+    # only when the scan saves copies of pages; None otherwise.
+    styles: StyleSnapshot | None = None
 
     @property
     def is_html(self) -> bool:

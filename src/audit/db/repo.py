@@ -14,6 +14,7 @@ from typing import Literal
 
 from audit.analyzer.interaction.base import StateCapture
 from audit.crawler.search import SearchOutcome
+from audit.crawler.style_snapshot import SheetRef, StoredStyles
 from audit.protected.redaction import redact_text
 
 
@@ -90,6 +91,134 @@ def replace_page_dom_states(
                 ),
             )
     return sum(1 for state in states if state.state_key and state.html)
+
+
+def _styles_page_check(conn: sqlite3.Connection, scan_id: int, page_id: int) -> None:
+    if (
+        conn.execute(
+            "SELECT 1 FROM pages WHERE id = ? AND scan_id = ?", (page_id, scan_id)
+        ).fetchone()
+        is None
+    ):
+        raise ValueError("Saved copy styles page does not belong to scan")
+
+
+def _insert_styles(
+    conn: sqlite3.Connection, scan_id: int, page_id: int, state_key: str, styles: StoredStyles
+) -> None:
+    conn.execute(
+        "INSERT INTO saved_copy_styles (scan_id, page_id, state_key, sheets_json, "
+        "complete, fingerprint_json) VALUES (?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(page_id, state_key) DO UPDATE SET scan_id = excluded.scan_id, "
+        "sheets_json = excluded.sheets_json, complete = excluded.complete, "
+        "fingerprint_json = excluded.fingerprint_json, captured_at = CURRENT_TIMESTAMP",
+        (
+            scan_id,
+            page_id,
+            state_key,
+            json.dumps(
+                [
+                    {"sha256": s.sha256, "media": s.media, "source_url": s.source_url}
+                    for s in styles.sheets
+                ],
+                separators=(",", ":"),
+            ),
+            1 if styles.complete else 0,
+            json.dumps(styles.fingerprint, separators=(",", ":")),
+        ),
+    )
+
+
+def set_page_styles(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    styles: StoredStyles | None,
+) -> None:
+    """Make ``styles`` the saved CSS of the page as it loaded (``state_key ''``).
+
+    ``None`` deletes the row: ``upsert_page`` has just replaced the saved copy,
+    so CSS kept from an earlier fetch would describe a document the report no
+    longer holds. The scan-belongs check mirrors ``replace_page_dom_states``.
+    """
+    _styles_page_check(conn, scan_id, page_id)
+    with _status_transaction(conn):
+        if styles is None:
+            conn.execute(
+                "DELETE FROM saved_copy_styles WHERE page_id = ? AND state_key = ''",
+                (page_id,),
+            )
+        else:
+            _insert_styles(conn, scan_id, page_id, "", styles)
+
+
+def replace_state_styles(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    styles: dict[str, StoredStyles],
+) -> int:
+    """Make ``styles`` the complete set of saved CSS for a page's states.
+
+    Replace, not merge, for the reason ``replace_page_dom_states`` gives. The
+    page's own row (``state_key ''``) is left alone. Returns rows written.
+    """
+    _styles_page_check(conn, scan_id, page_id)
+    written = 0
+    with _status_transaction(conn):
+        conn.execute(
+            "DELETE FROM saved_copy_styles WHERE page_id = ? AND state_key != ''",
+            (page_id,),
+        )
+        for state_key, entry in styles.items():
+            if not state_key:
+                continue
+            _insert_styles(conn, scan_id, page_id, state_key, entry)
+            written += 1
+    return written
+
+
+def saved_copy_styles(
+    conn: sqlite3.Connection, *, scan_id: int, page_id: int
+) -> dict[str, StoredStyles]:
+    """Every saved copy's CSS for one page of one scan, keyed by state key.
+
+    Both ids are required and must match the same row, so one report can
+    never read another's styles. Malformed JSON reads as no sheets.
+    """
+    rows = conn.execute(
+        "SELECT s.state_key, s.sheets_json, s.complete, s.fingerprint_json "
+        "FROM saved_copy_styles s JOIN pages p ON p.id = s.page_id "
+        "WHERE s.page_id = ? AND s.scan_id = ? AND p.scan_id = ?",
+        (page_id, scan_id, scan_id),
+    ).fetchall()
+    out: dict[str, StoredStyles] = {}
+    for row in rows:
+        try:
+            sheets_raw = json.loads(row["sheets_json"] or "[]")
+        except (ValueError, TypeError):
+            sheets_raw = []
+        try:
+            fingerprint = json.loads(row["fingerprint_json"] or "{}")
+        except (ValueError, TypeError):
+            fingerprint = {}
+        sheets = tuple(
+            SheetRef(
+                sha256=str(item.get("sha256") or ""),
+                media=str(item.get("media") or ""),
+                source_url=item.get("source_url") or None,
+            )
+            for item in (sheets_raw if isinstance(sheets_raw, list) else [])
+            if isinstance(item, dict) and item.get("sha256")
+        )
+        out[row["state_key"]] = StoredStyles(
+            sheets=sheets,
+            complete=bool(row["complete"]),
+            fingerprint=fingerprint if isinstance(fingerprint, dict) else {},
+        )
+    return out
 
 
 def record_interaction_run(
