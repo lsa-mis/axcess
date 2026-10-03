@@ -42,6 +42,7 @@ import {
   type Target,
   type Unreachable,
 } from "../lib/highlightTargets";
+import { checkFingerprint, looksDifferent } from "../lib/styleFingerprint";
 
 type TabId = "page" | "dom";
 
@@ -614,16 +615,36 @@ export default function InspectorRoute() {
   // an effect keyed on it would run.
   const [canvasCheck, setCanvasCheck] = useState<{ doc: string; drawn: boolean } | null>(null);
   const canvasPage = canvasCheck?.doc === srcDoc && canvasCheck.drawn;
+  // Whether the saved copy, with its saved styles, still looks like the page
+  // the scan checked (see ``lib/styleFingerprint``). Measured once its fonts
+  // have settled, and kept with the document it was measured in, as above.
+  const [styleCheck, setStyleCheck] = useState<{ doc: string; differs: boolean } | null>(null);
+  const stylesDiffer = styleCheck?.doc === srcDoc && styleCheck.differs;
+  const fingerprint = savedStyles?.fingerprint ?? null;
   const onFrameLoad = useCallback(() => {
     scrollToElement();
     try {
       const frame = frameRef.current;
       const doc = frame?.contentDocument;
-      if (frame && doc) setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
+      if (frame && doc) {
+        setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
+        if (fingerprint?.samples?.length) {
+          const measured = frame.srcdoc;
+          // `load` already waited for the stylesheets; fonts can still be
+          // arriving, and one more settle tick lets late layout finish.
+          void (doc.fonts?.ready ?? Promise.resolve())
+            .then(() => new Promise((resolve) => window.setTimeout(resolve, 300)))
+            .then(() => {
+              if (frameRef.current?.srcdoc !== measured) return;
+              setStyleCheck({ doc: measured, differs: looksDifferent(checkFingerprint(doc, fingerprint)) });
+            })
+            .catch(() => undefined);
+        }
+      }
     } catch {
       // Opaque document: nothing to measure.
     }
-  }, [scrollToElement]);
+  }, [scrollToElement, fingerprint]);
 
   // What the element the reader is on is, for the line under the toolbar,
   // and the locator the occurrence was recorded with.
@@ -1057,6 +1078,33 @@ export default function InspectorRoute() {
                 </dl>
               </div>
             )}
+            {/* Says when the saved copy may not look like the page Axcess
+                checked: the scan could not save all of the page's styles, or
+                its rendering here fails the style check (fewer than 70% of
+                the sampled elements match the fonts and colours recorded
+                during the scan, see ``lib/styleFingerprint``). Without it a
+                copy that lost its styles looks like evidence of a broken
+                page. It names the way to check, the Open live page button.
+                Above the frame, so it is read before the page, and in words,
+                not a colour or icon alone (SC 1.4.1 Use of Color, Level A).
+                The check finishes after the frame loads, so the note is a
+                polite live region that is always in the page and empty until
+                there is something to say, as the stepper's status is (SC
+                4.1.3 Status Messages, Level AA). An incomplete save is said
+                whatever the check finds: it is a limitation of the evidence,
+                and the plain-language rules say never to drop one. Rejected:
+                a dismissible banner, which would hide that limitation. */}
+            <div role="status" className="empty:sr-only">
+              {savedStyles && (!savedStyles.complete || stylesDiffer) && (
+                <p className="border-b border-sev-major/40 bg-sev-major-bg px-3 py-2 text-sm text-fg">
+                  This saved copy may look different from the page Axcess checked.{" "}
+                  {savedStyles.complete
+                    ? "Some of its styles may not have loaded."
+                    : "Axcess could not save all of this page's styles."}{" "}
+                  Use <span className="font-semibold">Open live page</span> to compare.
+                </p>
+              )}
+            </div>
             {layout && (
               <p className="border-b border-border bg-umich-blue/5 px-3 py-2 text-xs text-fg">
                 <span className="font-semibold">As the zoom and layout check saw it: </span>

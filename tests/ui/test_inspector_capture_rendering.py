@@ -288,3 +288,142 @@ async def test_a_copy_with_saved_styles_uses_them_instead_of_the_sites(
     source = await page.locator('[aria-label="Scrollable page code (DOM)"]').inner_text()
     assert "/assets/app.css" in source
     assert "saved-styles.css" not in source
+
+
+# The page the style check is tested on: varied fonts and colours, with the
+# elements the sample order skips (noscript, script, template, a <style> in
+# the body) placed before the sampled ones, so a filter that disagreed with
+# the capture's would look up the wrong elements.
+STYLE_CHECK_PAGE = (
+    "<!doctype html><html><head><title>Check</title><style>"
+    "body { font-family: Georgia, serif; color: rgb(20, 20, 20); }"
+    "h1 { font-family: 'Trebuchet MS', sans-serif; color: rgb(120, 0, 0); }"
+    ".a { color: rgb(0, 90, 0); background-color: rgb(250, 240, 200); }"
+    ".b { font-weight: 700; text-decoration: underline; }"
+    "a { color: rgb(0, 0, 160); }"
+    "</style></head><body>"
+    "<noscript><p>off</p></noscript><script>var x = 1;</script>"
+    "<template><p>inert</p></template><style>.late { color: rgb(1, 2, 3); }</style>"
+    "<h1>Heading</h1>"
+    + "".join(
+        f'<p class="{"a" if i % 2 else "b"}">Paragraph {i} <a href="#">link {i}</a></p>'
+        for i in range(30)
+    )
+    + "</body></html>"
+)
+
+
+async def _capture_for_seed(new_page: Any) -> tuple[str, Any]:
+    """Render the page and take its copy and styles the way the crawl does."""
+    from audit.crawler.style_snapshot import SheetCache, capture_styles
+
+    live = await new_page()
+    await live.set_content(STYLE_CHECK_PAGE)
+    html = await live.content()
+    snapshot = await capture_styles(live, SheetCache())
+    assert snapshot is not None and snapshot.fingerprint["samples"]
+    return html, snapshot
+
+
+def _seed_snapshot(
+    db_path: Path, blob_dir: Path, scan_id: int, page_id: int, snapshot: Any, *, css: str | None
+) -> None:
+    from audit.blob_store import BlobStore
+    from audit.crawler.style_snapshot import SheetRef, StoredStyles
+    from audit.db import repo
+
+    store = BlobStore(blob_dir)
+    texts = [sheet.css for sheet in snapshot.sheets] if css is None else [css]
+    conn = connect(db_path)
+    try:
+        repo.set_page_styles(
+            conn,
+            scan_id=scan_id,
+            page_id=page_id,
+            styles=StoredStyles(
+                sheets=tuple(
+                    SheetRef(
+                        sha256=store.store(t.encode(), "text/css")[0], media="", source_url=None
+                    )
+                    for t in texts
+                ),
+                complete=snapshot.complete,
+                fingerprint=snapshot.fingerprint,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+async def _style_note(page: Any, base: str, scan_id: int, page_id: int) -> str:
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect", wait_until="domcontentloaded"
+    )
+    await page.locator("iframe").wait_for(timeout=15000)
+    await (
+        page.frame_locator("iframe")
+        .locator("link[data-axcess-saved-styles]")
+        .wait_for(state="attached", timeout=15000)
+    )
+    # The check runs after load, fonts and a settle tick.
+    await page.wait_for_timeout(2000)
+    notes = page.get_by_role("status").filter(has_text="This saved copy may look different")
+    return " ".join(await notes.all_inner_texts())
+
+
+async def test_a_copy_that_renders_like_the_scan_shows_no_style_note(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The frame's sample order and styles agree with the capture's."""
+    db_path, blob_dir, scan_id = seeded_db
+    html, snapshot = await _capture_for_seed(new_page)
+    page_id = _seed_capture(db_path, scan_id, html)
+    _seed_snapshot(db_path, blob_dir, scan_id, page_id, snapshot, css=None)
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    assert await _style_note(page, live_server[0], scan_id, page_id) == ""
+
+
+async def test_a_copy_whose_styles_did_not_load_says_so(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    db_path, blob_dir, scan_id = seeded_db
+    html, snapshot = await _capture_for_seed(new_page)
+    page_id = _seed_capture(db_path, scan_id, html)
+    # The saved file holds none of the page's rules.
+    _seed_snapshot(db_path, blob_dir, scan_id, page_id, snapshot, css="/* nothing */")
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    note = await _style_note(page, live_server[0], scan_id, page_id)
+    assert "This saved copy may look different from the page Axcess checked." in note
+    assert "Some of its styles may not have loaded." in note
+    assert "Use Open live page to compare." in note
+    # The note meets the same bar as the rest of the inspector (WCAG 2.2 AAA
+    # pack, including 7:1 contrast), in the light theme it was drawn in.
+    from .test_accessibility_axe import _render_violations, _run_axe
+
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+
+async def test_an_incomplete_save_is_said_instead(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    from dataclasses import replace
+
+    db_path, blob_dir, scan_id = seeded_db
+    html, snapshot = await _capture_for_seed(new_page)
+    page_id = _seed_capture(db_path, scan_id, html)
+    _seed_snapshot(db_path, blob_dir, scan_id, page_id, replace(snapshot, complete=False), css=None)
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    note = await _style_note(page, live_server[0], scan_id, page_id)
+    assert "Axcess could not save all of this page's styles." in note
+    assert "may not have loaded" not in note
