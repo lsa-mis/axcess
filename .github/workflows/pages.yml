@@ -1,5 +1,11 @@
 name: Deploy GitHub Pages
 
+# Builds the public site (site/, Astro + Starlight) and publishes it. The
+# site is built here rather than committed: product pages read the coverage
+# numbers exported from src/audit/rules/wcag_coverage.yaml, and the guides
+# are read straight from docs/, so a change to either redeploys the site.
+# The site tests (tests/public_site) must pass before anything is published.
+
 on:
   push:
     branches:
@@ -7,6 +13,11 @@ on:
     paths:
       - .github/workflows/pages.yml
       - site/**
+      - docs/**
+      - src/audit/rules/wcag_coverage.yaml
+      - src/audit/coverage_matrix.py
+      - src/audit/web/coverage_status.py
+      - tests/public_site/**
   workflow_dispatch:
 
 permissions:
@@ -20,17 +31,42 @@ concurrency:
 
 jobs:
   build:
-    name: Prepare static site
-    runs-on: ubuntu-latest
+    name: Build and test the site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - name: Stage public files
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install locked dependencies
         run: |
-          rsync -a --exclude build.py site/ _site/
+          uv sync --frozen --no-install-project
+          npm ci --prefix site
+      - name: Export coverage data, type-check and build
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run --no-sync python site/export_data.py
+          npm run check --prefix site
+          npm run build --prefix site
+      - name: Install Chromium
+        run: uv run --no-sync playwright install --with-deps chromium
+      - name: Test the built site
+        env:
+          PYTHONPATH: src
+          AXCESS_SITE_REQUIRED: "1"
+        run: uv run --no-sync pytest -p no:cacheprovider tests/public_site
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: site/dist
 
   deploy:
     name: Deploy

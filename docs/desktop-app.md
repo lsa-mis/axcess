@@ -237,8 +237,9 @@ download, the Windows installer's `.blockmap`, and the Windows update feed
 
 Each release holds one file per platform and the two files the Windows
 updater reads, nothing else. The public site's download links open
-`https://github.com/lsa-mis/axcess/releases/latest`, and `site/assets/site.js`
-points each at its file there when the GitHub API answers. The ten
+`https://github.com/lsa-mis/axcess/releases/latest`, and a small script on
+the page (`site/src/components/DownloadLink.astro`) points each at its file
+there when the GitHub API answers. The ten
 newest preview releases are kept; `https://github.com/lsa-mis/axcess/releases/latest`
 always points at the most recent one and needs no GitHub sign-in. Workflow
 artifacts are not a public download channel: GitHub requires a signed-in user

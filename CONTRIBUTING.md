@@ -145,26 +145,38 @@ for people too:
   one, follow the
   [diagram sources guide](docs/images/diagrams/source/README.md): edit the
   source, render the PNG again, and update the image's alt text everywhere it
-  appears. Three of them are also copied to `site/assets/diagrams/`, and
-  `DIAGRAM_SIZES` in `site/build.py` holds their pixel sizes, so update it if
-  a size changes.
+  appears. `report-groups.png` is also copied to `site/public/diagrams/`, which is
+  where the site's guides load it from, so copy it there again when you
+  re-render it. Pages that show one give its pixel size; update it if the size
+  changes.
 
 ## Editing the public site
 
-The [public site](https://lsa-mis.github.io/axcess/) is generated.
+The [public site](https://lsa-mis.github.io/axcess/) is an Astro + Starlight
+project in `site/`. GitHub Actions builds it and publishes it
+(`.github/workflows/pages.yml`); nothing generated is committed.
 
-- Page copy lives in `site/build.py`. Edit it, then run `make site` to
-  regenerate `site/**/index.html`.
-- Commit the regenerated HTML with your change. `.github/workflows/pages.yml`
-  publishes the committed `site/` folder when a push to `main` changes it, and
-  never runs the generator, so an edit to `site/build.py` alone never reaches
-  the site.
+- Product pages are Astro pages in `site/src/pages/`. Shared parts are in
+  `site/src/components/`, Starlight overrides in `site/src/overrides/`, and
+  colours and fonts in `site/src/styles/`.
+- The user guides on the site are the files in `docs/`, read directly by
+  `site/src/loaders/repo-docs.ts`. Edit the guide in `docs/` and the site
+  follows. To add a guide to the site, add it to `GUIDES` in that loader and
+  to the sidebar in `site/astro.config.mjs`.
 - Coverage numbers come from `src/audit/rules/wcag_coverage.yaml` and
-  `src/audit/web/coverage_status.py`, and the FAQ glossary is rendered from
-  `docs/glossary.md`. Run `make site` after changing any of them.
-- `tests/unit/test_site_build.py` pins the list of pages, so adding or removing
-  a page means updating that test. It also checks page structure, coverage
-  numbers, and the statement that Axcess does not certify WCAG conformance.
+  `src/audit/web/coverage_status.py` through `site/export_data.py`. Never
+  type a coverage number into a page.
+- Every page can be read and navigated without JavaScript. Search and the
+  light or dark switch need it. Keep it that way: use native HTML
+  (`<details>`, links) and treat scripts as extras. `tests/public_site/` checks
+  this with scripts turned off.
+- Run `make site-dev` to preview with live reload, `make site-check` to
+  type-check the pages and components (`make typecheck` runs it too),
+  `make site` to build into `site/dist`, and `make site-test` to build and
+  run the site tests
+  (structure, links, axe in both themes at 320 and 1280 px, and use without
+  JavaScript). `tests/public_site/conftest.py` lists every page, so adding or
+  removing one means updating that list.
 
 ## Where to read next
 

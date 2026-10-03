@@ -1,4 +1,4 @@
-.PHONY: help site setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
+.PHONY: help site site-install site-dev site-check site-test setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
 
 PY := uv run
 DB := data/audit.db
@@ -13,8 +13,27 @@ PORT ?= 8765
 help:
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-site: ## Regenerate the public site (site/**/index.html) from the coverage source of truth
-	$(PY) python site/build.py
+SITE_DEPS := site/node_modules/.package-lock.json
+
+$(SITE_DEPS): site/package-lock.json
+	cd site && npm ci
+
+site-install: $(SITE_DEPS) ## Install the public site's locked npm packages (Astro, Starlight)
+
+site: $(SITE_DEPS) ## Build the public site into site/dist (exports coverage data first)
+	$(PY) python site/export_data.py
+	cd site && npm run build
+
+site-dev: $(SITE_DEPS) ## Serve the public site with live reload on 127.0.0.1:4321
+	$(PY) python site/export_data.py
+	cd site && npm run dev
+
+site-check: $(SITE_DEPS) ## Type-check the public site's pages and components (astro check)
+	$(PY) python site/export_data.py
+	cd site && npm run check
+
+site-test: site ## Build the public site and run its tests (structure, links, axe, no-JavaScript)
+	AXCESS_SITE_REQUIRED=1 $(PY) pytest tests/public_site
 
 setup: ## Install deps, Playwright chromium, and prepare data dirs
 	uv sync
@@ -163,7 +182,7 @@ lint-fix: ## Apply lint + format fixes
 	$(PY) ruff format src tests scripts
 	cd $(FRONTEND) && npm run lint:fix
 
-typecheck: ## Run mypy strict on src/
+typecheck: site-check ## Run mypy strict on src/, and type-check the frontend and public site
 	$(PY) mypy
 	cd $(FRONTEND) && npm run typecheck
 
