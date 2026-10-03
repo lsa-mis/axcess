@@ -703,8 +703,12 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     assert "issue groups" not in text and "issues" not in text, text
     assert "occurrences" not in text, text
     issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    # The date after "started"/"generated" has its own numbers ("Oct 3, 2026"),
+    # which matched a count of 3 on the 3rd of any month. Only the rest of the
+    # subtitle must not repeat a count.
+    words = re.sub(r"\b(started|generated)\b.*$", "", text)
     for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
-        assert not re.search(rf"\b{count}\b", text), (count, text)
+        assert not re.search(rf"\b{count}\b", words), (count, text)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(
