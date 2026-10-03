@@ -1,33 +1,87 @@
 ---
 /**
  * Starlight's page footer (edit link and previous/next) followed by the site
- * footer, which repeats the main destinations as plain links. That gives a
- * second way to reach every key page on any screen size, scripts or not
- * (SC 2.4.5 Multiple Ways, Level AA). It also carries the one-line honesty
- * statement on every page (docs/plain-language.md rule 12), which
- * tests/public_site/ checks.
+ * footer.
+ *
+ * The site footer follows the production site's footer: the one-line
+ * description, three link groups (Learn, Use, Project), the honesty
+ * statement, and who leads Axcess, in the production site's exact words
+ * (the developer's direction, 2026-10-03). The links repeat every main
+ * destination on any screen size, scripts or not (SC 2.4.5 Multiple Ways,
+ * Level AA). Each group is a list under a heading, so a screen reader can
+ * jump between them; the whole block is one "Site" navigation landmark,
+ * named so it is not confused with the header's "Main" or the sidebar's
+ * "Pages". tests/public_site checks the honesty statement on every page.
  */
 import Default from "@astrojs/starlight/components/Footer.astro";
-import { ISSUES, RELEASES, REPO, url } from "../lib/site";
+import { RELEASES, REPO, url } from "../lib/site";
+
+const WHITEPAPER = `${REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md`;
+const LICENSE = `${REPO}/blob/main/LICENSE`;
+
+const groups = [
+  {
+    title: "Learn",
+    links: [
+      { text: "How it works", href: url("/how-it-works/") },
+      { text: "What it checks", href: url("/coverage/") },
+      { text: "Who it's for", href: url("/who-its-for/") },
+      { text: "Questions", href: url("/faq/") },
+      { text: "Glossary", href: url("/docs/glossary/") },
+    ],
+  },
+  {
+    title: "Use",
+    links: [
+      { text: "Download and install", href: url("/get-started/") },
+      { text: "Privacy and trust", href: url("/privacy/") },
+      { text: "Reading your report", href: url("/docs/reading-your-report/") },
+      { text: "Desktop releases", href: RELEASES },
+      { text: "Documentation", href: url("/docs/") },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { text: "About Axcess", href: url("/about/") },
+      { text: "White paper", href: WHITEPAPER },
+      { text: "Source on GitHub", href: REPO },
+      { text: "MIT license", href: LICENSE },
+      { text: "All pages", href: url("/all-pages/") },
+    ],
+  },
+];
 ---
 
 <Default {...Astro.props} />
 <div class="site-footer">
-  <p>
-    Axcess is built by LSA Technology Services at the University of Michigan. Free and open source under the MIT
-    license. Axcess does not certify WCAG conformance: its results are evidence for people to review.
+  <p class="about">
+    Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of
+    Michigan.
   </p>
-  <nav aria-label="Site">
-    <ul>
-      <li><a href={url("/get-started/")}>Download and install</a></li>
-      <li><a href={url("/docs/")}>Documentation</a></li>
-      <li><a href={url("/privacy/")}>Privacy and trust</a></li>
-      <li><a href={url("/all-pages/")}>All pages</a></li>
-      <li><a href={REPO}>Source code on GitHub</a></li>
-      <li><a href={RELEASES}>Releases</a></li>
-      <li><a href={ISSUES}>Give feedback</a></li>
-    </ul>
+  <nav aria-label="Site" class="groups">
+    {
+      groups.map((g) => (
+        <div>
+          <h2 class="group-title">{g.title}</h2>
+          <ul>
+            {g.links.map((l) => (
+              <li>
+                <a href={l.href}>{l.text}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
   </nav>
+  <p class="fine">
+    Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.
+  </p>
+  <p class="fine">
+    Led by the College of Literature, Science, and the Arts Technology Services (LSA-TS) and Information and
+    Technology Services (ITS) groups at the University of Michigan
+  </p>
 </div>
 
 <style>
@@ -38,13 +92,23 @@ import { ISSUES, RELEASES, REPO, url } from "../lib/site";
     color: var(--ax-fg-muted);
     font-size: var(--sl-text-sm);
   }
-  .site-footer p {
-    margin: 0 0 0.75rem;
+  .about {
+    max-width: 36rem;
+    margin: 0 0 1.25rem;
+  }
+  .groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 1rem 2rem;
+    margin-bottom: 1.25rem;
+  }
+  .group-title {
+    margin: 0 0 0.25rem;
+    color: var(--ax-fg);
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
   }
   ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 1.25rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -55,5 +119,8 @@ import { ISSUES, RELEASES, REPO, url } from "../lib/site";
     min-height: var(--ax-target);
     color: var(--ax-link);
     text-underline-offset: 0.2em;
+  }
+  .fine {
+    margin: 0 0 0.5rem;
   }
 </style>

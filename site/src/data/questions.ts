@@ -179,11 +179,11 @@ export const QUESTIONS: Question[] = [
     q: "What does it cost?",
     a: "Nothing. Axcess is free and open source under the MIT license. There are no seats and no subscriptions.",
   },
-  // README.md:17-18.
+  // The production site's footer wording (the developer's direction).
   {
     id: "who-builds",
     q: "Who builds and looks after Axcess?",
-    a: "LSA Technology Services at the University of Michigan. The source code, documentation and white paper are public on GitHub.",
+    a: "Axcess is led by the College of Literature, Science, and the Arts Technology Services (LSA-TS) and Information and Technology Services (ITS) groups at the University of Michigan. The source code, documentation and white paper are public on GitHub.",
     links: [
       { href: REPO, text: "Axcess on GitHub" },
       { href: "/about/", text: "About Axcess" },
