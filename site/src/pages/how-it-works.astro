@@ -1,0 +1,338 @@
+---
+/**
+ * How Axcess works: the six steps from a web address to a checked fix, then
+ * what each check looks at, how sure each result is, how it copes with web
+ * apps, and how to compare scans.
+ *
+ * Order: the steps come first because "what will I do?" is the first
+ * question on a page called "How it works" (Federal Plain Language
+ * Guidelines: lead with the main point). The checks follow, then how much
+ * to trust them, then the details that matter to people scanning web apps,
+ * and last what to do after fixing.
+ *
+ * Changed from the old page, to match the app:
+ * - Step 3 uses the scan page's own words: a percentage, the three steps
+ *   "Find pages", "Check pages", "Prepare report", and the time left
+ *   (src/audit/web/frontend/src/components/ScanProgress.tsx).
+ * - Check names are the app's (frontend lib/terms.ts, CHECK_LABEL).
+ * - Statuses are the app's (lib/terms.ts, STATUS_LABEL), and the comparison
+ *   uses New, Still found, No longer found (compare/ChangeTag.tsx).
+ * - "Assign the work" is gone: the app has no assignment feature.
+ * - No diagram: the old page had none in its body (only as a sharing
+ *   image). The report-groups diagram is on What Axcess checks.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import { HONESTY, url } from "../lib/site";
+
+/** One card per check, with how it decides and whether a new scan runs it.
+ *  Defaults are from DEFAULT_SETTINGS in
+ *  src/audit/web/frontend/src/components/newScan/scanPolicy.ts. */
+const CHECKS: { name: string; text: string; how: string; on: string; link?: { href: string; text: string } }[] = [
+  {
+    name: "Rule check (axe)",
+    text: "The widely used axe-core rules inspect each opened page for problems a computer can test: missing image descriptions, broken headings, form fields without names, low contrast, and more.",
+    how: "Fixed rules",
+    on: "On by default",
+  },
+  {
+    name: "Rule check (Alfa)",
+    text: "A second, separate rule check: Siteimprove's open-source Alfa engine takes its own look. Each result keeps the name of the check that found it, so you can compare them yourself.",
+    how: "Fixed rules",
+    on: "Off unless you choose it",
+  },
+  {
+    name: "Keyboard check",
+    text: "Presses Tab and Shift+Tab through each page, looking for places where keyboard users get stuck. It is careful on purpose: ordinary focus loops and dialogs are not reported as traps.",
+    how: "Seen in the browser",
+    on: "On by default",
+  },
+  {
+    name: "Zoom and layout check",
+    text: "Checks each page 320 pixels wide, at about 200% zoom, and with wider text spacing, to see whether anything is cut off or overlaps.",
+    how: "Seen in the browser",
+    on: "On by default",
+  },
+  {
+    name: "Focus check",
+    text: "Finds keyboard focus hidden behind sticky headers or banners, and tab orders forced out of sequence.",
+    how: "Seen in the browser",
+    on: "On by default",
+  },
+  {
+    name: "Click-Through",
+    text: "Opens menus, tabs, and dialogs, within set limits, and runs the rule check (axe) again on each page state it reaches.",
+    how: "Fixed rules",
+    on: "On by default",
+    link: { href: "/docs/glossary/#click-through", text: "What Click-Through is" },
+  },
+  {
+    name: "Image text check",
+    text: "Text recognition (optical character recognition, OCR), included in the desktop app, finds text inside images. An optional local vision model checks whether the alt text says the same.",
+    how: "Text recognition, plus optional AI",
+    on: "Text recognition on by default; the vision model is off unless you turn it on",
+    link: { href: "/docs/glossary/#image-of-text", text: "What an image of text is" },
+  },
+  {
+    name: "Motion and reading-order check",
+    text: "Finds video and audio that play by themselves without controls, and scrolling text. With a local vision model, it also compares the order you see with the order a screen reader would read.",
+    how: "Measured, plus optional AI",
+    on: "Off unless you turn it on",
+  },
+  {
+    name: "AI review",
+    text: "A local language model asks questions a rule cannot answer: does this link make sense out of context? Does this heading describe its section? Is this form field explained well enough?",
+    how: "AI, for a person to confirm",
+    on: "Off unless you turn it on",
+  },
+];
+
+const headings = [
+  { depth: 2, slug: "steps", text: "Six steps, one scan" },
+  { depth: 2, slug: "checks", text: "What each check looks at" },
+  { depth: 2, slug: "how-sure", text: "How sure is each result?" },
+  { depth: 2, slug: "web-apps", text: "Works with web apps, not just pages" },
+  { depth: 2, slug: "compare", text: "Scan again and compare" },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "How Axcess works",
+    description:
+      "Six plain-language steps from a web address to a fix you have tested, and what each Axcess check looks at.",
+  }}
+  headings={headings}
+>
+  <p class="lede">
+    Axcess follows the way an accessibility expert already works. Here is each step in plain language. After that:
+    what the checks look at, and how sure each one is.
+  </p>
+
+  <h2 id="steps">Six steps, one scan</h2>
+  <!-- A numbered list with a heading per step: the order matters, and the
+       headings let screen reader users jump between steps (SC 1.3.1 Info
+       and Relationships, Level A; SC 2.4.6 Headings and Labels, Level AA).
+       Plain prose rather than cards, because each step is a short
+       paragraph that reads best at text width. -->
+  <ol class="steps">
+    <li>
+      <h3 id="step-choose">Choose the site</h3>
+      <p>
+        Pick a public website, or choose <em>Site with a sign-in or two-step sign-in (2FA)</em>. For a{" "}
+        <a href={url("/docs/glossary/#sign-in-scan")}>sign-in scan</a>, Axcess opens a browser window and you sign in
+        yourself, including U-M sign-in and Duo. You type your password into the website, never into Axcess.
+      </p>
+      <p>
+        Sign-in scans work only when Axcess runs on your own computer, not on a shared server. Axcess deletes the
+        sign-in when the scan ends.
+      </p>
+      <p><strong>Only scan sites you are allowed to test.</strong></p>
+    </li>
+    <li>
+      <h3 id="step-scope">Set the scope</h3>
+      <p>
+        Choose which part of the site to scan: one section, such as <code>/admissions/</code>, or the whole website.
+        Set the maximum pages, how many links deep to follow, and how many pages per second Axcess asks the site for.
+        As you type the address, Axcess says in a sentence which pages it will scan.
+      </p>
+      <p>
+        Choose the standard to check against. New scans use WCAG 2.1 Level AA, the current University of Michigan
+        (U-M) standard, unless you choose WCAG 2.2.
+      </p>
+    </li>
+    <li>
+      <h3 id="step-watch">Watch the scan</h3>
+      <p>
+        The scan page shows how much is checked as a percentage, and the time left. It shows the three steps a scan
+        goes through: <em>Find pages</em>, <em>Check pages</em>, and <em>Prepare report</em>. Under that, a table
+        shows each page and where each check stands for it.
+      </p>
+      <p>
+        Screen readers hear the progress as a polite update. You can pause live updates, or stop the scan.
+      </p>
+    </li>
+    <li>
+      <h3 id="step-read">Read the report</h3>
+      <p>
+        The Issues table lists each issue once. Axcess groups every occurrence of one rule into one issue, so you can
+        look for a shared cause. Open an issue to see:
+      </p>
+      <ul>
+        <li>what the issue is,</li>
+        <li>why it matters,</li>
+        <li>how to fix it, or for a Needs review issue, how to confirm it first,</li>
+        <li>which pages it is on.</li>
+      </ul>
+    </li>
+    <li>
+      <h3 id="step-evidence">Open the evidence</h3>
+      <p>
+        From any issue, open a page it is on. The saved copy of the page outlines each flagged element, with its
+        element code (HTML), its element locator (CSS selector), and a screenshot. If you turned off saved copies,
+        Axcess opens the live page instead.
+      </p>
+      <p>Axcess keeps this evidence with the report on your computer, so you can check a claim months later.</p>
+    </li>
+    <li>
+      <h3 id="step-export">Export and check the fix</h3>
+      <p>
+        Set a status for each occurrence, such as Reviewing, In progress, or Fixed. Export the report as an Excel issue
+        list, a written report, or a CSV or JSON file. Until an expert has finished reviewing the report, each file is
+        marked DRAFT.
+      </p>
+      <p>When fixes go live, scan again and compare the two reports.</p>
+    </li>
+  </ol>
+
+  <h2 id="checks">What each check looks at</h2>
+  <p>
+    A scan runs several separate checks. Each result keeps the name of the check that produced it, so two checks are
+    never blended into one unexplained verdict.
+  </p>
+  <!-- One Card per check, each with the same two facts at the bottom (how it
+       decides, and whether a new scan runs it) so cards can be compared at a
+       glance. Words, not coloured chips: the old site's coloured
+       "Deterministic" chips relied on colour and jargon (SC 1.4.1 Use of
+       Color, Level A; repo plain-language rules). -->
+  <div class="not-content cards">
+    {
+      CHECKS.map((c) => (
+        <Card heading={c.name} level={3}>
+          <p>{c.text}</p>
+          {c.link && (
+            <p>
+              <a href={url(c.link.href)}>{c.link.text}</a>
+            </p>
+          )}
+          <Fragment slot="proof">
+            <dl class="facts">
+              <div>
+                <dt>How it decides</dt>
+                <dd>{c.how}</dd>
+              </div>
+              <div>
+                <dt>In a new scan</dt>
+                <dd>{c.on}</dd>
+              </div>
+            </dl>
+          </Fragment>
+        </Card>
+      ))
+    }
+  </div>
+  <p>
+    Every check that uses AI is optional and runs on a local model you install yourself, in Ollama. Without one, the
+    other checks still run in full. <a href={url("/coverage/")}>See which WCAG criteria each check helps with.</a>
+  </p>
+
+  <h2 id="how-sure">How sure is each result?</h2>
+  <p>
+    Not every result is equally certain, and Axcess never pretends it is. Each issue gets one of three types:
+    Barrier, Needs review, or Informational. Only failures of a fixed rule, from the Rule check (axe) or the Rule check
+    (Alfa), become Barriers. <a href={url("/docs/glossary/#barrier")}>The glossary explains each type</a>, and{" "}
+    <a href={url("/coverage/#groups")}>What Axcess checks shows which checks lead to each one</a>.
+  </p>
+  <p class="callout">
+    <strong>Decisions are recorded, not just made.</strong> You can mark each occurrence Reviewing, In progress, Fixed,
+    Accepted risk, or Not a problem. In progress, Fixed, Accepted risk, and Not a problem each need a short written
+    reason.
+  </p>
+  <p>{HONESTY}</p>
+
+  <h2 id="web-apps">Works with web apps, not just pages</h2>
+  <p>
+    Many sites today are web apps built with React, Vue, Angular, or similar tools. A simple scanner sees an empty
+    shell. By default, Axcess opens every page in a real browser first.
+  </p>
+  <div class="not-content cards two">
+    <Card heading="It finds pages by following real links" level={3}>
+      <p>
+        Axcess follows the links it can see on each opened page, including app-style routes, and stays inside the
+        scope you set. It does not guess addresses or read the app's code.
+      </p>
+    </Card>
+    <Card heading="Page states are counted apart from pages" level={3}>
+      <p>
+        When Axcess opens a menu or dialog and checks what appears, it counts that as a page state opened by clicking,
+        next to the page count, not inside it. A page count alone would undersell an app, and counting page states as
+        pages would oversell the scan.
+      </p>
+    </Card>
+    <Card heading="Clicking is limited and careful" level={3}>
+      <p>
+        While it clicks, Axcess does not follow links to other addresses or send data to the site. It skips buttons
+        like Sign out, Delete, and Buy. It stops at 100 clicks per page, 20 clicks on any one repeated kind of control,
+        5 levels of newly shown controls, 120 seconds, or 25 saved page states.
+      </p>
+    </Card>
+    <Card heading="Some things still need a person" level={3}>
+      <p>
+        Content that appears only on hover, gestures, operating-system menus, embedded widgets from other companies, and
+        page states with no visible change are outside what Click-Through can see. A person checks these by hand.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="compare">Scan again and compare</h2>
+  <p>
+    Scan the same site again and open <em>Compare reports</em>. It shows each issue as New, Still found, or No longer
+    found.
+  </p>
+  <p>
+    Axcess also lists what differs between the two scans, such as their pages or checks. Those differences can make
+    an issue look new or gone when the site did not change. "No longer found" is not proof of a fix: check the page
+    yourself before you mark it Fixed.{" "}
+    <a href={url("/docs/reading-your-report/#compare-reports-after-a-fix")}>Read what each comparison result means.</a>
+  </p>
+</StarlightPage>
+
+<style>
+  .lede {
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+  /* The step number comes from the list itself, so it is read out with the
+     step (SC 1.3.1 Info and Relationships, Level A). */
+  .steps > li + li {
+    margin-top: 1.5rem;
+  }
+  .steps h3 {
+    margin-top: 0;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+  .cards.two {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  }
+  .cards a {
+    color: var(--ax-link);
+    text-underline-offset: 0.2em;
+  }
+  .facts {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+  }
+  .facts dt {
+    color: var(--ax-fg-subtle);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .facts dd {
+    margin: 0;
+    color: var(--ax-fg);
+  }
+  .callout {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--ax-border);
+    border-inline-start: 4px solid var(--ax-link);
+    border-radius: 0.5rem;
+    background: var(--ax-surface-subtle);
+  }
+</style>

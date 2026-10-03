@@ -1,0 +1,1132 @@
+---
+/**
+ * What Axcess checks: every check, the three issue types, how Axcess sits
+ * next to Siteimprove and axe DevTools, what a person still tests, the
+ * numbers, and then every WCAG criterion with what Axcess does for it.
+ *
+ * Order follows the old page, which follows the reader's questions in turn:
+ * what runs (the checks), how sure each result is (issue types), how this
+ * compares with tools I know (comparison), what is left for me (testing by
+ * hand), how much in total (numbers), and finally the full reference list
+ * (criteria) and what comes next (roadmap). The full list is last because it
+ * is long and is mostly reached by search or a deep link from the app.
+ *
+ * A "Which WCAG version?" section sits near the top. The criteria list is
+ * WCAG 2.2 Level A and AA, but new scans default to WCAG 2.1 AA
+ * (src/audit/wcag_version.py, DEFAULT_WCAG_VERSION). Said once, plainly,
+ * early, so the two numbers never look like a contradiction.
+ *
+ * Every number and every criterion comes from src/data/coverage.json
+ * (exported from src/audit/rules/wcag_coverage.yaml by site/export_data.py),
+ * so the page cannot claim more than the product's own list.
+ *
+ * Without JavaScript every criterion is listed as a native <details> that
+ * opens and closes from the keyboard. The filters are added by the script
+ * at the end and stay hidden until it runs (class ax-js-only).
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import Card from "../components/Card.astro";
+import coverage from "../data/coverage.json";
+import { HONESTY, ISSUES, url } from "../lib/site";
+
+const { total, covered, manualOnly, byMethod, byLevel } = coverage.summary;
+const criteria = coverage.criteria;
+
+/** Check names exactly as the app shows them (frontend lib/terms.ts, CHECK_LABEL). */
+const CHECK_LABEL: Record<string, string> = {
+  axe: "Rule check (axe)",
+  alfa: "Rule check (Alfa)",
+  keyboard: "Keyboard check",
+  responsive: "Zoom and layout check",
+  focus: "Focus check",
+  visual: "Motion and reading-order check",
+  semantic: "AI review",
+  image: "Image text check",
+};
+
+type Method = "automated" | "partial" | "ai-assisted" | "manual";
+const METHODS: Method[] = ["automated", "partial", "ai-assisted", "manual"];
+/** How Axcess helps with a criterion. "AI-assisted", not "AI-assisted lead":
+ *  "lead" is a retired word for an issue type (docs/plain-language.md). */
+const METHOD_PLAIN: Record<Method, [string, string]> = {
+  automated: [
+    "Automated",
+    "Axcess checks this reliably on its own. A person confirms it applies and reviews any remaining page states.",
+  ],
+  partial: ["Partly automated", "Axcess catches the mechanical failures. A person tests the parts that need judgment."],
+  "ai-assisted": [
+    "AI-assisted",
+    "A local AI model flags likely problems. A person confirms each one before it counts. These checks are off unless you turn them on.",
+  ],
+  manual: ["Manual only", "Axcess has no check for this yet. The report gives you the steps to test it yourself."],
+};
+
+const CONFIDENCE: Record<string, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  "n/a": "Does not apply",
+};
+
+const PRINCIPLES: [string, string, string][] = [
+  [
+    "1",
+    "Perceivable",
+    "Can everyone perceive the content? Text alternatives for images, captions, contrast, zoom, and layouts that reflow on small screens.",
+  ],
+  [
+    "2",
+    "Operable",
+    "Can everyone operate the site? Keyboard access, enough time, nothing that flashes, and clear ways to move around and find things.",
+  ],
+  [
+    "3",
+    "Understandable",
+    "Can everyone understand it? Readable language, predictable behavior, and forms that help people avoid and fix mistakes.",
+  ],
+  [
+    "4",
+    "Robust",
+    "Does it work with assistive technology? Names, roles, and status messages that screen readers can rely on.",
+  ],
+];
+
+// The WCAG 2.2 Level A and AA criteria that WCAG 2.1 does not have. This is
+// a fact about WCAG, not about Axcess, so it is listed here rather than in
+// the coverage file (https://www.w3.org/TR/WCAG22/#new-features-in-wcag-2-2).
+const NEW_IN_22 = new Set(["2.4.11", "2.5.7", "2.5.8", "3.2.6", "3.3.7", "3.3.8"]);
+const newCount = criteria.filter((c) => NEW_IN_22.has(c.sc)).length;
+
+const anchor = (sc: string) => `sc-${sc.replaceAll(".", "-")}`;
+const levelCount = (lvl: "A" | "AA") => METHODS.reduce((n, m) => n + byLevel[lvl][m], 0);
+
+/** One card per check, in the order the app's "What was checked" table lists
+ *  them. Each id (check-<key>) is where the app's "More about this check"
+ *  link lands (MethodCoverageLedger.tsx), so keys must match _methods_used in
+ *  src/audit/web/server.py. The name, what it does, and its main limit. */
+const CHECK_CARDS: [string, string, string, string][] = [
+  [
+    "search",
+    "Site search",
+    "Runs the searches you set up and checks the result pages.",
+    "Other search words can reach other pages. You approve these searches, so they can send data to the site.",
+  ],
+  [
+    "rendered",
+    "Opened in a browser",
+    "Opens each page in a real browser, so its scripts run and the browser checks can test it.",
+    "Opening a page is not a pass.",
+  ],
+  [
+    "axe",
+    "Rule check (axe)",
+    "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose (WCAG 2.1 AA unless you change it). Failures are Barriers.",
+    "A page with nothing found can still fail WCAG.",
+  ],
+  [
+    "alfa",
+    "Rule check (Alfa)",
+    "Runs Siteimprove Alfa's standard test rules (Accessibility Conformance Testing, ACT). Each rule passes, fails, or cannot tell. It runs only when you choose it.",
+    "A failed rule is not proof the page fails WCAG. Each “cannot tell” goes to Needs review.",
+  ],
+  [
+    "image",
+    "Image text check",
+    "Reads text in images (optical character recognition, OCR). If you turn on the vision model, a local AI model also checks whether the alt text says the same.",
+    "A person confirms each result.",
+  ],
+  [
+    "semantic",
+    "AI review",
+    "A local AI model reads link text, headings, labels, and instructions in context. It runs only when you turn it on.",
+    "Results go to Needs review. A person confirms each one.",
+  ],
+  [
+    "keyboard",
+    "Keyboard check",
+    "Presses Tab and Shift+Tab to find places keyboard focus gets stuck.",
+    "It only looks for traps. Test the rest of keyboard use yourself.",
+  ],
+  [
+    "responsive",
+    "Zoom and layout check",
+    "Checks each page 320 pixels wide, at 200% zoom, and with wider text spacing, for cut-off content.",
+    "A person confirms whether cut-off content is a barrier.",
+  ],
+  [
+    "interaction",
+    "Click-Through",
+    "Opens menus, tabs, and dialogs, then runs the rule check (axe) on each page state it reveals. It stops at 100 clicks, 5 levels deep, 120 seconds, or 25 saved page states per page. It skips buttons like Sign out, Delete, and Buy.",
+    "It skips payments and other risky actions and blocks sending data, so a page state can be incomplete. It may not use every control it finds, and a dialog that would not close stops that page. A person checks custom controls and anything it did not reach.",
+  ],
+];
+
+/** Compared with Siteimprove and axe DevTools. The tool columns are sourced
+ *  (note under the table). Only Axcess's own facts were brought up to date
+ *  with the code: check names, and that target size and focus hidden by
+ *  sticky content are WCAG 2.2 criteria. */
+const CHECKS: [string, string, string, string, string, string][] = [
+  [
+    "Rule check (axe)",
+    "Problems a computer can test on every opened page, such as missing text alternatives, unlabeled form fields, low text contrast, and errors in ARIA (Accessible Rich Internet Applications) code. It runs axe's rules for the WCAG version and level you choose, plus axe's best-practice rules.",
+    "Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2",
+    "Barrier",
+    "Yes. Siteimprove checks the same kinds of problems with its own rules.",
+    "Yes. axe DevTools runs these same axe-core rules.",
+  ],
+  [
+    "Click-Through",
+    "Problems that only appear after a control is used. Axcess operates each safe control, runs the rule check (axe) again on what appears, and records which control revealed each problem.",
+    "The same criteria as the rule check (axe)",
+    "Barrier",
+    "Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.",
+    "Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.",
+  ],
+  [
+    "Zoom and layout check: reflow at phone width",
+    "Pages that need sideways scrolling at 320 CSS pixels wide.",
+    "1.4.10 (AA)",
+    "Needs review",
+    "No automated check found.",
+    "No automated check found.",
+  ],
+  [
+    "Zoom and layout check: text cut off at 200% zoom",
+    "Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.",
+    "1.4.4 (AA)",
+    "Needs review",
+    "Partly. It flags pages that block zooming. It has also documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026, so ask Siteimprove whether it still runs.",
+    "Partly. axe-core flags pages that block zooming, not clipped text.",
+  ],
+  [
+    "Zoom and layout check: text spacing",
+    "Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.",
+    "1.4.12 (AA)",
+    "Needs review",
+    "Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.",
+    "Partly. The same inline-style check.",
+  ],
+  [
+    "Keyboard check",
+    "Places where Tab and Shift+Tab both fail to move focus away (keyboard traps). Reported at most once per page.",
+    "2.1.2 (A)",
+    "Needs review",
+    "No automated check found.",
+    "Only in the paid Keyboard guided test. No axe-core rule.",
+  ],
+  [
+    "Focus check",
+    "A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.",
+    "2.4.11 (AA, new in WCAG 2.2; a WCAG 2.1 scan reports it as Best practice), 2.4.3 (A)",
+    "Needs review",
+    "No automated check found.",
+    "Partly. axe-core flags positive tabindex as a best practice, and the paid Keyboard guided test reviews tab order. No rule found for focus hidden behind other content.",
+  ],
+  [
+    "Rule check (axe): target size",
+    "Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.",
+    "2.5.8 (AA, new in WCAG 2.2)",
+    "Barrier",
+    "Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess checks only when the rule check (Alfa) runs at Level AAA.",
+    "Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on only for WCAG 2.2 scans.",
+  ],
+  [
+    "Image text check",
+    "Images that contain words, found with text recognition (OCR) and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.",
+    "1.4.5 (AA), 1.1.1 (A)",
+    "Needs review (Informational when the alt text already matches)",
+    "No automated images-of-text check found. Its open-source engine has an experimental rule that asks whether an image contains text. An on-demand AI check judges whether alt text matches the image.",
+    "No automated check found. A paid guided test reviews image alternatives.",
+  ],
+  [
+    "Motion and reading-order check (optional)",
+    "Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.",
+    "1.4.2, 2.2.2, 1.3.2 (A)",
+    "Needs review",
+    "Partly. Its open-source engine has an autoplaying audio rule that asks a person to confirm how long the audio plays, and a best-practice rule flags blink and marquee. No reading-order check found.",
+    "Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.",
+  ],
+  [
+    "AI review (optional)",
+    "Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.",
+    "2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)",
+    "Needs review",
+    "Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.",
+    "Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.",
+  ],
+];
+
+// The old site's description of the diagram (build.py REPORT_GROUPS_ALT). Its
+// pixel size, 3200 by 1800, is in build.py DIAGRAM_SIZES.
+const REPORT_GROUPS_ALT =
+  "Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, " +
+  "including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. " +
+  "Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is " +
+  'missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a ' +
+  "decision. Informational holds images whose alt text already matches and older records kept for history; no " +
+  "action is needed.";
+
+const LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html";
+const LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html";
+
+const planned = coverage.roadmap.filter((r) => r.status === "planned");
+
+const headings = [
+  { depth: 2, slug: "version", text: "Which version of WCAG?" },
+  { depth: 2, slug: "checks", text: "What each check does, and its limit" },
+  { depth: 2, slug: "groups", text: "Every issue gets one of three types" },
+  { depth: 2, slug: "compare", text: "Where Axcess fits next to Siteimprove and axe DevTools" },
+  { depth: 2, slug: "by-hand", text: "What you still need to test by hand" },
+  { depth: 2, slug: "at-a-glance", text: `${covered} of ${total} criteria get help from Axcess` },
+  { depth: 2, slug: "explorer", text: `All ${total} WCAG criteria` },
+  ...PRINCIPLES.map(([n, name]) => ({ depth: 3, slug: `principle-${n}`, text: `${n}. ${name}` })),
+  { depth: 2, slug: "roadmap", text: "Next on the list" },
+];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "What Axcess checks",
+    description: `What each Axcess check does and its limit, which type of issue each result becomes, how Axcess compares with Siteimprove and axe DevTools, and all ${total} WCAG 2.2 Level A and AA criteria with what a person still needs to test.`,
+  }}
+  headings={headings}
+>
+  <p class="lede">
+    The <a href={url("/docs/glossary/#wcag")}>Web Content Accessibility Guidelines (WCAG)</a> 2.2 have {total}{" "}
+    criteria at Level A and AA. Axcess's checks give evidence for {covered} of them. A person must test the other{" "}
+    {manualOnly}, and this page gives the steps for each one.
+  </p>
+  <p>{HONESTY}</p>
+
+  <h2 id="version">Which version of WCAG?</h2>
+  <ul>
+    <li>
+      New scans check against <strong>WCAG 2.1 Level AA</strong> by default. That is the current University of
+      Michigan (U-M) standard. You can choose WCAG 2.2 on the New scan form.
+    </li>
+    <li>
+      The list on this page is <strong>WCAG 2.2 Level A and AA</strong>, {total} criteria. WCAG 2.2 has every 2.1
+      criterion except 4.1.1 Parsing, which 2.2 removed, so that one is not in this list.
+    </li>
+    <li>
+      {newCount} of the {total} are new in WCAG 2.2. Each is marked "New in WCAG 2.2". A WCAG 2.1 scan does not run
+      the rule check (axe) rules for them, such as target size (2.5.8). The Focus check still runs, and reports focus
+      hidden behind other content (2.4.11) as Best practice.
+    </li>
+  </ul>
+
+  <h2 id="checks">What each check does, and its limit</h2>
+  <p>The same checks as the <em>What was checked</em> table in every report.</p>
+  <!-- Cards, not a table: each check has a sentence or two on what it does
+       and one on its limit, which reads badly in narrow table cells at
+       320 px. The limit sits in the card's separate bottom area, labeled
+       "Limit", so it is never lost in the text (repo rule: never drop a
+       limitation). Each card keeps its id because the app links to it. -->
+  <div class="not-content cards">
+    {
+      CHECK_CARDS.map(([key, name, what, limit]) => (
+        <div id={`check-${key}`} class="anchor-target">
+          <Card heading={name} level={3}>
+            <p>{what}</p>
+            <Fragment slot="proof">
+              <p class="limit">
+                <strong>Limit:</strong> {limit}
+              </p>
+            </Fragment>
+          </Card>
+        </div>
+      ))
+    }
+  </div>
+  <p>
+    Two more checks add occurrences to the report but have no row in that table yet: the Focus check, which is on
+    by default, and the Motion and reading-order check, which runs only when you turn it on. The comparison table
+    below says what they look for.
+  </p>
+
+  <h2 id="groups">Every issue gets one of three types</h2>
+  <p>
+    The type tells you how certain an issue is and what to do next. It is shown in the Type column of the Issues
+    table. <a href={url("/docs/glossary/#barrier")}>The glossary explains each type.</a>
+  </p>
+  <!-- The diagram is an image of text, so the same facts follow as real text
+       in the three cards (SC 1.4.5 Images of Text, Level AA), and the full
+       size file is linked for anyone who wants to zoom into it (SC 1.4.4
+       Resize Text, Level AA). The alt text is the old site's description. -->
+  <figure class="not-content diagram">
+    <img
+      src={url("/diagrams/report-groups.png")}
+      width="3200"
+      height="1800"
+      alt={REPORT_GROUPS_ALT}
+      loading="lazy"
+      decoding="async"
+    />
+    <figcaption><a href={url("/diagrams/report-groups.png")}>Open the diagram at full size</a></figcaption>
+  </figure>
+  <div class="not-content cards">
+    <Card heading="Barrier: confirm it, then fix it" level={3}>
+      <p>
+        Comes from failures in the Rule check (axe), including problems found by Click-Through or after a search you
+        set up, and failures in the Rule check (Alfa). Confirm it on the page, fix it, then scan again.
+      </p>
+    </Card>
+    <Card heading="Needs review: a person decides" level={3}>
+      <p>
+        Comes from the Zoom and layout, Focus, Keyboard, and Motion and reading-order checks, from the Image text
+        check when alt text is missing or does not match, from the AI review, and from Rule check (Alfa) "cannot
+        tell" results. Test it on the page and record your decision.
+      </p>
+    </Card>
+    <Card heading="Informational: nothing to fix" level={3}>
+      <p>
+        Comes from the Image text check when the alt text already matches, and from older records kept for history.
+        No action is needed.
+      </p>
+    </Card>
+  </div>
+
+  <h2 id="compare">Where Axcess fits next to Siteimprove and axe DevTools</h2>
+  <p>
+    We use and like both. Siteimprove monitors whole sites from the cloud, and the axe DevTools browser extension
+    checks the page in front of you. Axcess fills gaps: pages behind a sign-in, content behind a click, and checks
+    that need a real browser or a person's judgment.
+  </p>
+  <!-- A native table with a caption and column and row headers (SC 1.3.1
+       Info and Relationships, Level A; techniques H39, H63). It needs six
+       columns, so only the table scrolls sideways at narrow widths, inside a
+       focusable, named region so keyboard users can scroll it (SC 1.4.10
+       Reflow, Level AA, allows this for data tables; SC 2.1.1 Keyboard,
+       Level A). The caption names the table and its scroll region for screen
+       readers but is hidden visually: inside the scroll area a long caption
+       is as wide as the table and was cut off even at 1280 px, and the
+       heading and paragraph above already say what the table compares (the
+       same choice as the home page's comparison table). -->
+  <div class="not-content table-wrap" role="region" aria-labelledby="compare-caption" tabindex="0">
+    <table class="wide">
+      <caption id="compare-caption" class="sr-only">Axcess checks, what they catch, and whether Siteimprove or axe DevTools also catch them</caption>
+      <thead>
+        <tr>
+          <th scope="col">Check</th>
+          <th scope="col">What it catches</th>
+          <th scope="col">WCAG criteria</th>
+          <th scope="col">Issue type</th>
+          <th scope="col">Also caught by Siteimprove?</th>
+          <th scope="col">Also caught by axe DevTools?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          CHECKS.map(([check, what, sc, group, si, axe]) => (
+            <tr>
+              <th scope="row">{check}</th>
+              <td>{what}</td>
+              <td>{sc}</td>
+              <td>{group}</td>
+              <td>{si}</td>
+              <td>{axe}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+  <div class="not-content cards two">
+    <Card heading="Pages behind a sign-in" level={3}>
+      <p>
+        Axcess scans them after you sign in yourself in a browser window, including U-M sign-in and Duo two-step
+        sign-in. This works only when Axcess runs on your own computer, not on a shared server. Axcess deletes the
+        sign-in when the scan ends.
+      </p>
+      <p>
+        Siteimprove's help center describes crawling behind a login through a setup done by its support team, and
+        points to an add-on for sites that use multi-factor sign-in. Its free browser extension checks signed-in
+        pages one at a time in your own browser, and so does the axe DevTools extension.
+      </p>
+    </Card>
+    <Card heading="A second opinion from Siteimprove's engine" level={3}>
+      <p>
+        Axcess can also run Siteimprove Alfa, the open-source engine behind Siteimprove's checks, on your computer:
+        the Rule check (Alfa). Each result keeps the name of the check that found it, so you can compare them. Results
+        can differ from what the Siteimprove platform reports, which adds its own reviews and settings.
+      </p>
+    </Card>
+  </div>
+  <p class="source">
+    Checked in September 2026 against public Siteimprove and Deque documentation and the open-source axe-core and
+    Alfa code. “No automated check found” means we found none in their documentation, not that none can exist.
+    Tools change quickly, so please <a href={ISSUES}>open an issue on GitHub</a> if something here is out of date.
+  </p>
+
+  <h2 id="by-hand">What you still need to test by hand</h2>
+  <p>
+    These checks still need a person. See <a href={url("/docs/glossary/#axcess-and-manual-testing")}>Axcess and
+    manual testing</a>.
+  </p>
+  <div class="not-content cards">
+    <Card heading="Keyboard" level={3}>
+      <p>
+        Use only the keyboard to reach and operate everything, with Tab, Shift+Tab, Enter, Space, the arrow keys, and
+        Escape. Check that focus is always visible and moves in a sensible order. Axcess's Keyboard check only looks
+        for traps.
+      </p>
+    </Card>
+    <Card heading="Screen reader" level={3}>
+      <p>
+        Listen to key pages and tasks with a screen reader such as NVDA, JAWS, or VoiceOver. Check that names, roles,
+        headings, and announcements make sense in context.
+      </p>
+    </Card>
+    <Card heading="Real tasks" level={3}>
+      <p>
+        Complete real tasks from start to finish, such as applying or registering, including error messages and time
+        limits. Axcess does not submit forms or complete tasks on its own, apart from a search you set up.
+      </p>
+    </Card>
+  </div>
+  <p>
+    The list of criteria below gives the steps a person takes for every WCAG criterion. For guides and training, see{" "}
+    <a href={LSA_WEB_RESOURCES}>LSA Accessibility's web accessibility resources</a> and{" "}
+    <a href={LSA_TRAINING}>LSA Accessibility training</a>.
+  </p>
+
+  <h2 id="at-a-glance">{covered} of {total} criteria get help from Axcess</h2>
+  <p>
+    These numbers come from the same list of criteria the app reads, so they cannot drift from the code. They count
+    every check Axcess has. Some checks are off unless you turn them on, such as the AI review and the Motion and
+    reading-order check, so a scan with fewer checks helps with fewer criteria.
+  </p>
+  <!-- Four cards, one per way Axcess helps, then the same numbers split by
+       level in a table. The old page also drew a coloured stacked bar; it is
+       dropped because it repeated these numbers and needed colours that
+       carry meaning (COGA "Making Content Usable": no duplicate content;
+       SC 1.4.1 Use of Color, Level A). -->
+  <div class="not-content cards four">
+    {
+      METHODS.map((m) => (
+        <Card heading={`${byMethod[m]} criteria`} label={METHOD_PLAIN[m][0]} level={3}>
+          <p>{METHOD_PLAIN[m][1]}</p>
+        </Card>
+      ))
+    }
+  </div>
+  <p>The table splits the same numbers by WCAG level.</p>
+  <div class="not-content table-wrap" role="region" aria-labelledby="level-caption" tabindex="0">
+    <table>
+      <caption id="level-caption" class="sr-only">How Axcess helps, by WCAG level</caption>
+      <thead>
+        <tr>
+          <th scope="col">Level</th>
+          <th scope="col">Criteria</th>
+          {METHODS.map((m) => <th scope="col">{METHOD_PLAIN[m][0]}</th>)}
+          <th scope="col">Get help from Axcess</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          (["A", "AA"] as const).map((lvl) => (
+            <tr>
+              <th scope="row">Level {lvl}</th>
+              <td>{levelCount(lvl)}</td>
+              {METHODS.map((m) => <td>{byLevel[lvl][m]}</td>)}
+              <td><strong>{levelCount(lvl) - byLevel[lvl].manual}</strong></td>
+            </tr>
+          ))
+        }
+        <tr>
+          <th scope="row">A and AA</th>
+          <td>{total}</td>
+          {METHODS.map((m) => <td>{byMethod[m]}</td>)}
+          <td><strong>{covered}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="callout">
+    <strong>"Gives evidence" is not "proves it meets WCAG".</strong> Even an automated criterion leaves a judgment for a
+    person, which is why every criterion below has a <em>What a person still checks</em> part.
+  </p>
+
+  <h2 id="explorer">All {total} WCAG criteria</h2>
+  <p>
+    Open any criterion to read what Axcess does and what a person still checks. The criteria are grouped by the four
+    WCAG principles.
+  </p>
+
+  <!-- Filters: shown only when scripts run (ax-js-only), because without a
+       script they would do nothing; the full list below works without them.
+       Each filter is a native radio group in a fieldset with a legend, not a
+       row of aria-pressed toggle buttons: the choice is "one of these", which
+       radios say natively (name, role, checked state, arrow keys between
+       options), while separate toggle buttons would each claim to be on or
+       off by themselves (W3C "Using ARIA" rule 1,
+       https://www.w3.org/TR/using-aria/#rule1; SC 1.3.1 Info and
+       Relationships and SC 4.1.2 Name, Role, Value, both Level A). Picking
+       one filters the list in place, which is not a change of context
+       (SC 3.2.2 On Input, Level A). The result count is a polite status
+       message (SC 4.1.3 Status Messages, Level AA). The search hint is
+       visible text, not a placeholder, so it stays while you type. -->
+  <form class="not-content ax-js-only filters" data-filters aria-label="Filter the criteria">
+    <fieldset>
+      <legend>How Axcess helps</legend>
+      <div class="options">
+        <label><input type="radio" name="method" value="all" checked /> All ({total})</label>
+        {
+          METHODS.map((m) => (
+            <label>
+              <input type="radio" name="method" value={m} /> {METHOD_PLAIN[m][0]} ({byMethod[m]})
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Level</legend>
+      <div class="options">
+        <label><input type="radio" name="level" value="all" checked /> A and AA ({total})</label>
+        <label><input type="radio" name="level" value="A" /> Level A ({levelCount("A")})</label>
+        <label><input type="radio" name="level" value="AA" /> Level AA ({levelCount("AA")})</label>
+      </div>
+    </fieldset>
+    <div class="search">
+      <label for="crit-search">Search the criteria</label>
+      <p id="crit-search-hint" class="hint">A number, name, or word. For example: 2.4.4, captions, keyboard.</p>
+      <input id="crit-search" name="q" type="search" autocomplete="off" aria-describedby="crit-search-hint" />
+    </div>
+    <div class="result-row">
+      <p class="result-count" role="status" data-count></p>
+      <div class="result-actions">
+        <button type="button" data-expand>Open all shown</button>
+        <button type="button" data-collapse>Close all</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="not-content explorer" data-explorer>
+    {
+      PRINCIPLES.map(([pnum, pname, pblurb]) => {
+        const items = criteria.filter((c) => c.sc.startsWith(`${pnum}.`));
+        return (
+          <section class="principle" aria-labelledby={`principle-${pnum}`} data-principle>
+            <h3 id={`principle-${pnum}`}>
+              {pnum}. {pname}
+            </h3>
+            <p class="principle-blurb">{pblurb}</p>
+            <p class="principle-count" data-principle-count data-total={items.length}>
+              {items.length} criteria
+            </p>
+            <div class="crit-list">
+              {items.map((c) => {
+                const label = METHOD_PLAIN[c.method as Method][0];
+                const pipes = c.pipelines.map((p) => CHECK_LABEL[p] ?? p);
+                const isNew = NEW_IN_22.has(c.sc);
+                const text = [
+                  c.sc,
+                  c.name,
+                  `level ${c.level}`,
+                  label,
+                  c.automatedCheck,
+                  c.manualCheck,
+                  ...pipes,
+                  isNew ? "new in wcag 2.2" : "",
+                ]
+                  .join(" ")
+                  .toLowerCase();
+                return (
+                  <details
+                    class="crit anchor-target"
+                    id={anchor(c.sc)}
+                    data-method={c.method}
+                    data-level={c.level}
+                    data-text={text}
+                  >
+                    <summary>
+                      <span class="sc">{c.sc}</span>
+                      <span class="name">{c.name}</span>
+                      <span class="tags">
+                        <span class="tag">Level {c.level}</span>
+                        <span class="tag">{label}</span>
+                        {isNew && <span class="tag">New in WCAG 2.2</span>}
+                      </span>
+                    </summary>
+                    <div class="crit-body">
+                      <h4>What Axcess does</h4>
+                      {/* data-source marks text shown word for word from
+                          src/audit/rules/wcag_coverage.yaml, which the app's
+                          reports also use. It still needs a plain-language
+                          pass of its own; tests/public_site skips only this
+                          marked text in its terms check until then. */}
+                      {c.automatedCheck ? (
+                        <p data-source="wcag_coverage.yaml">{c.automatedCheck}</p>
+                      ) : (
+                        <p>No automated check yet. The report includes this criterion in the list of things to test by hand, with the steps below.</p>
+                      )}
+                      <h4>What a person still checks</h4>
+                      <p data-source="wcag_coverage.yaml">{c.manualCheck}</p>
+                      {pipes.length > 0 && (
+                        <>
+                          <h4>Checks involved</h4>
+                          <ul class="pipes">
+                            {pipes.map((p) => (
+                              <li>{p}</li>
+                            ))}
+                          </ul>
+                          <p class="confidence">How sure the checks are: {CONFIDENCE[c.confidence] ?? c.confidence}</p>
+                        </>
+                      )}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })
+    }
+    <p class="no-match" data-no-match hidden>
+      No criteria match. Choose "All" under each filter, or change the search.
+    </p>
+  </div>
+
+  <h2 id="roadmap">Next on the list</h2>
+  <p>
+    Criteria the project has planned a check for but not yet shipped. They stay labeled Manual only until the code
+    exists and has been tested.
+  </p>
+  <div class="not-content cards">
+    {
+      planned.map((r) => (
+        <Card heading={`${r.wcag} ${r.issue}`} level={3}>
+          <p>{r.what}</p>
+        </Card>
+      ))
+    }
+  </div>
+  <p>
+    The <a href={url("/docs/coverage-tracker/")}>product roadmap</a> checks these plans and the numbers on this page
+    against the code.
+  </p>
+</StarlightPage>
+
+<script>
+  // Coverage explorer: filters, search and deep links. Progressive
+  // enhancement only; without it every criterion is listed and opens natively.
+  const form = document.querySelector<HTMLFormElement>("[data-filters]");
+  const explorer = document.querySelector<HTMLElement>("[data-explorer]");
+  if (form && explorer) {
+    const cards = [...explorer.querySelectorAll<HTMLDetailsElement>("details.crit")];
+    const groups = [...explorer.querySelectorAll<HTMLElement>("[data-principle]")];
+    const count = form.querySelector<HTMLElement>("[data-count]");
+    const noMatch = explorer.querySelector<HTMLElement>("[data-no-match]");
+    const search = form.querySelector<HTMLInputElement>("#crit-search");
+
+    const value = (name: string) =>
+      (form.querySelector<HTMLInputElement>(`input[name="${name}"]:checked`)?.value ?? "all");
+
+    const apply = () => {
+      const method = value("method");
+      const level = value("level");
+      const q = (search?.value ?? "").trim().toLowerCase();
+      let shown = 0;
+      for (const card of cards) {
+        const ok =
+          (method === "all" || card.dataset.method === method) &&
+          (level === "all" || card.dataset.level === level) &&
+          (!q || (card.dataset.text ?? "").includes(q));
+        card.hidden = !ok;
+        if (ok) shown += 1;
+        // A search opens what it found, so the matching words are visible.
+        if (ok && q) card.open = true;
+      }
+      for (const g of groups) {
+        const visible = g.querySelectorAll("details.crit:not([hidden])").length;
+        g.hidden = visible === 0;
+        const n = g.querySelector<HTMLElement>("[data-principle-count]");
+        if (n) {
+          const all = Number(n.dataset.total);
+          n.textContent = visible === all ? `${all} criteria` : `Showing ${visible} of ${all} criteria`;
+        }
+      }
+      if (noMatch) noMatch.hidden = shown !== 0;
+      if (count) {
+        count.textContent =
+          shown === 0
+            ? "No criteria match."
+            : shown === cards.length
+              ? `Showing all ${cards.length} criteria.`
+              : `Showing ${shown} of ${cards.length} criteria.`;
+      }
+    };
+
+    // Radios apply at once. Typing waits for a short pause, so the count is
+    // announced once rather than on every key.
+    let timer: number | undefined;
+    form.addEventListener("change", (e) => {
+      if ((e.target as HTMLElement).matches("input[type=radio]")) apply();
+    });
+    search?.addEventListener("input", () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(apply, 250);
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      apply();
+    });
+    form.querySelector("[data-expand]")?.addEventListener("click", () => {
+      for (const c of cards) if (!c.hidden) c.open = true;
+    });
+    form.querySelector("[data-collapse]")?.addEventListener("click", () => {
+      for (const c of cards) c.open = false;
+    });
+
+    // Deep link: /coverage/#sc-2-4-4 opens that criterion. If a filter hid
+    // it, the filters are cleared first, so what the link points at is shown.
+    const openHash = () => {
+      const id = decodeURIComponent(location.hash.slice(1));
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (!(el instanceof HTMLDetailsElement) || !el.classList.contains("crit")) return;
+      if (el.hidden) {
+        form.reset();
+        apply();
+      }
+      el.open = true;
+      el.scrollIntoView();
+    };
+    window.addEventListener("hashchange", openHash);
+    apply();
+    openHash();
+  }
+</script>
+
+<style>
+  .lede {
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+
+  /* Card grids. Each card is one idea (COGA "Making Content Usable": one
+     idea per chunk); the grid falls to one column on narrow screens, so
+     nothing scrolls sideways (SC 1.4.10 Reflow, Level AA). */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+  .cards.two {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  }
+  .cards.four {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+  .limit {
+    margin: 0;
+    color: var(--ax-fg-muted);
+    line-height: 1.55;
+  }
+  /* Keep a deep-linked card or criterion clear of Starlight's sticky
+     header (SC 2.4.11 Focus Not Obscured (Minimum), Level AA, applied to
+     the target of a link as well as to focus). */
+  .anchor-target {
+    scroll-margin-top: calc(var(--sl-nav-height, 4rem) + 1rem);
+  }
+
+  .diagram {
+    margin: 1.25rem 0 0;
+  }
+  .diagram img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+  }
+  .diagram figcaption {
+    margin-top: 0.5rem;
+    font-size: 1rem;
+  }
+  .diagram a,
+  .principle a {
+    color: var(--ax-link);
+    text-underline-offset: 0.2em;
+  }
+
+  /* Tables. Only the table scrolls sideways at 320 px, never the page (SC
+     1.4.10 Reflow, Level AA, allows it for data tables). */
+  .table-wrap {
+    margin-top: 1.25rem;
+    overflow-x: auto;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+  }
+  table {
+    width: 100%;
+    min-width: 36rem;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  table.wide {
+    min-width: 64rem;
+  }
+  caption {
+    padding: 0.875rem 1.25rem;
+    color: var(--ax-fg);
+    font-weight: 700;
+    text-align: start;
+  }
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--ax-border);
+    color: var(--ax-fg-muted);
+    text-align: start;
+    vertical-align: top;
+  }
+  thead th {
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+  }
+  tbody th {
+    color: var(--ax-fg);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  /* In the wide comparison table the row headers are long names, so they
+     wrap, but never narrower than a readable column. */
+  table.wide tbody th {
+    min-width: 11rem;
+    white-space: normal;
+  }
+  .source {
+    color: var(--ax-fg-subtle);
+    font-size: 0.9375rem;
+  }
+  .callout {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--ax-border);
+    border-inline-start: 4px solid var(--ax-link);
+    border-radius: 0.5rem;
+    background: var(--ax-surface-subtle);
+  }
+
+  /* Filters. The global .ax-js-only rule shows hidden controls as
+     inline-flex; the form needs a block layout, so it is set here, but only
+     under .ax-js, so the form stays hidden without scripts. */
+  :global(.ax-js) .filters {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  legend,
+  .search > label {
+    margin-bottom: 0.5rem;
+    padding: 0;
+    color: var(--ax-fg);
+    font-weight: 700;
+  }
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  /* Each option is a 44 px target, the label as well as the radio (SC 2.5.5
+     Target Size (Enhanced), Level AAA). The checked one is marked by the
+     radio's own dot and a heavier border, never colour alone (SC 1.4.1 Use
+     of Color, Level A). */
+  .options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--ax-target);
+    padding: 0.25rem 0.875rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+    background: var(--ax-surface);
+    color: var(--ax-fg);
+    cursor: pointer;
+  }
+  .options label:has(input:checked) {
+    border: 2px solid var(--ax-link);
+    font-weight: 700;
+  }
+  .options input {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin: 0;
+    accent-color: var(--ax-link);
+  }
+  .search > label {
+    display: block;
+  }
+  .hint {
+    margin: 0 0 0.5rem;
+    color: var(--ax-fg-muted);
+    font-size: 0.9375rem;
+  }
+  .search input {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 28rem;
+    min-height: var(--ax-target);
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+    background: var(--ax-surface);
+    color: var(--ax-fg);
+    font: inherit;
+  }
+  .result-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .result-count {
+    margin: 0;
+    color: var(--ax-fg);
+    font-weight: 700;
+  }
+  .result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .result-actions button {
+    min-height: var(--ax-target);
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+    background: var(--ax-surface);
+    color: var(--ax-link);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .result-actions button:hover {
+    border-color: var(--ax-link);
+    text-decoration: underline;
+  }
+
+  /* Criteria: native <details>, which open and close without scripts and
+     are announced as expandable (WAI-ARIA APG Disclosure pattern). */
+  .principle {
+    margin-top: 2rem;
+  }
+  .principle h3 {
+    margin: 0;
+    color: var(--ax-fg);
+    font-size: 1.375rem;
+  }
+  .principle-blurb {
+    margin: 0.375rem 0 0;
+    color: var(--ax-fg-muted);
+    line-height: 1.55;
+  }
+  .principle-count {
+    margin: 0.25rem 0 0.75rem;
+    color: var(--ax-fg-subtle);
+    font-size: 0.9375rem;
+  }
+  .crit-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .crit {
+    border: 1px solid var(--ax-border);
+    border-radius: 0.625rem;
+    background: var(--ax-surface-subtle);
+  }
+  .crit[hidden] {
+    display: none;
+  }
+  summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    min-height: var(--ax-target);
+    padding: 0.625rem 1rem;
+    color: var(--ax-fg);
+    cursor: pointer;
+  }
+  /* A drawn arrow before each criterion shows it opens, because a flex
+     summary loses the browser's own marker. It turns when open, so the
+     state is shown by shape, and the browser announces it (expanded or
+     collapsed) for screen readers. Decorative: CSS only, not read out. */
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::before {
+    content: "";
+    flex: none;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    margin-inline-end: 0.25rem;
+    border-inline-end: 2px solid currentColor;
+    border-block-end: 2px solid currentColor;
+    transform: rotate(-45deg);
+  }
+  details[open] > summary::before {
+    transform: rotate(45deg);
+  }
+  .sc {
+    font-family: var(--sl-font-mono);
+    font-weight: 700;
+  }
+  .name {
+    flex: 1 1 12rem;
+    font-weight: 700;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .tag {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 999px;
+    background: var(--ax-surface);
+    color: var(--ax-fg-muted);
+    font-size: 0.875rem;
+  }
+  .crit-body {
+    padding: 0 1rem 1rem;
+    color: var(--ax-fg-muted);
+    line-height: 1.6;
+  }
+  .crit-body h4 {
+    margin: 0.75rem 0 0.25rem;
+    color: var(--ax-fg);
+    font-size: 1rem;
+  }
+  .crit-body p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .pipes {
+    margin: 0;
+    padding-inline-start: 1.25rem;
+  }
+  .confidence {
+    margin-top: 0.5rem !important;
+  }
+  .no-match {
+    margin-top: 1.5rem;
+    color: var(--ax-fg);
+    font-weight: 700;
+  }
+</style>
