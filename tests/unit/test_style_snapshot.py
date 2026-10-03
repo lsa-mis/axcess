@@ -177,8 +177,12 @@ def test_bounds_skip_what_is_over_and_record_it() -> None:
     assert not over_sheet.complete
 
     chunk = "a{content:'" + "x" * (ss.MAX_SHEET_BYTES - 100) + "'}"
-    over_page = _run(ss.build_snapshot({"parts": [{**part, "text": chunk}] * 5}, _no_fetch))
-    assert len(over_page.sheets) == ss.MAX_PAGE_BYTES // ss.MAX_SHEET_BYTES
+    # One more near-full sheet than the page bound holds, whatever the bounds are.
+    fits = ss.MAX_PAGE_BYTES // ss.MAX_SHEET_BYTES
+    over_page = _run(
+        ss.build_snapshot({"parts": [{**part, "text": chunk}] * (fits + 1)}, _no_fetch)
+    )
+    assert len(over_page.sheets) == fits
     assert not over_page.complete
 
     many = _run(

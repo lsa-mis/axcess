@@ -62,9 +62,14 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-MAX_SHEET_BYTES = 2_000_000
-MAX_PAGE_BYTES = 8_000_000
-MAX_SHEETS = 300
+# Sized to keep real sites whole while still stopping a runaway page:
+# a full, unpurged utility framework build is several MB in one sheet, and
+# CSS-in-JS libraries can add one <style> per component, hundreds per page.
+# Sheets are content-addressed, so a site's shared CSS is stored once however
+# many pages use it.
+MAX_SHEET_BYTES = 10_000_000
+MAX_PAGE_BYTES = 50_000_000
+MAX_SHEETS = 2_000
 # Elements sampled for the fingerprint. The inspector reads the same count.
 FINGERPRINT_SAMPLES = 40
 # Elements walked when choosing the sample. Index order is still the full
@@ -75,7 +80,7 @@ _MAX_IMPORT_DEPTH = 8
 _FETCH_TIMEOUT_MS = 10_000
 # Fetched sheet texts kept for the whole scan. Beyond this new results are
 # still used, just not kept.
-_MAX_CACHE_BYTES = 32_000_000
+_MAX_CACHE_BYTES = 128_000_000
 
 
 @dataclass(frozen=True)
