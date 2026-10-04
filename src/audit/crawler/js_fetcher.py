@@ -36,6 +36,7 @@ from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler import live_progress
 from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.search import SearchExplorer
+from audit.crawler.style_snapshot import SheetCache, StyleSnapshot, capture_styles
 from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
@@ -238,6 +239,13 @@ class JsFetcher:
         # shared context and ignore this launch preference.
         self._headless = headless
         self._search_explorer = search_explorer
+        # Save the page's CSS beside its saved copy (and each captured
+        # state's), so the inspector need not fetch it from the live site.
+        # Every fetcher does this, whichever scan built it (anonymous, sign-in,
+        # helper app): the CSS is stored wherever the saved copy itself is
+        # stored, by the same code. The cache lives as long as this fetcher,
+        # which is one crawl.
+        self._sheet_cache = SheetCache()
         if max_rendered_html_chars is not None and max_rendered_html_chars <= 0:
             raise ValueError("max_rendered_html_chars must be positive when configured")
         self._max_rendered_html_chars = max_rendered_html_chars
@@ -333,6 +341,12 @@ class JsFetcher:
             html = await page.content()
             status = resp.status
             headers = resp.headers
+            # The CSS of the document just serialized, read before any probe
+            # touches the page. Never fatal (``capture_styles`` returns None
+            # on any failure), like the screenshot pass below.
+            styles: StyleSnapshot | None = None
+            if 200 <= status < 300 and "text/html" in headers.get("content-type", "text/html"):
+                styles = await self._snapshot_styles(page)
             # ``Response.url`` omits the fragment because fragments are not
             # sent over HTTP. ``Page.url`` retains React/Vue hash-router
             # routes such as ``#/projects`` and also reflects client-side
@@ -413,6 +427,7 @@ class JsFetcher:
                         capture_screenshot=(
                             self._capture_element if self._capture_screenshots else None
                         ),
+                        capture_styles=self._snapshot_styles,
                     )
                 interaction_evaluated = interaction.evaluated
 
@@ -510,6 +525,7 @@ class JsFetcher:
                 ),
                 search_result=search_result,
                 screenshots=screenshots,
+                styles=styles,
             )
         finally:
             # A shared authenticated context belongs to the companion, which
@@ -523,6 +539,13 @@ class JsFetcher:
             elif page is not None:
                 with contextlib.suppress(Exception):
                     await page.close()
+
+    async def _snapshot_styles(self, page: Page) -> StyleSnapshot | None:
+        """The live page's CSS and fingerprint, sharing this crawl's sheet cache."""
+        snapshot = await capture_styles(page, self._sheet_cache)
+        if snapshot is None and not self._private_context:
+            log.info("styles.not_saved", url=page.url)
+        return snapshot
 
     async def _capture_element(
         self, page: Page, selector: str, *, center: bool = False

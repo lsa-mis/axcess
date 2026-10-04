@@ -1166,6 +1166,11 @@ export interface PageInspection {
    * reports made before state capture.
    */
   states: PageDomState[];
+  /**
+   * The CSS the scan saved with the copy of the page as it loaded, or null
+   * (older reports, scans that kept no copies, and every live render).
+   */
+  saved_styles: SavedStyles | null;
   render: {
     ok: boolean;
     /**
@@ -1195,6 +1200,39 @@ export interface PageDomState {
   /** Controls operated to arrive here, ending with this state's own. The
    *  reproduction recipe for a reviewer working by hand. */
   path_labels: string[];
+  /** The CSS the scan saved with this state's copy, or null. */
+  saved_styles: SavedStyles | null;
+}
+
+/**
+ * A saved copy's CSS, read from the live page during the scan and served by
+ * /api/scans/{id}/pages/{page}/saved-styles.css from the review UI's origin.
+ */
+export interface SavedStyles {
+  /** Root-relative URL of the stylesheet, versioned by its content. */
+  url: string;
+  /** False when the scan hit a size limit or could not read a sheet. */
+  complete: boolean;
+  /** Computed styles of a few elements, taken with the CSS. */
+  fingerprint: StyleFingerprint;
+}
+
+/** One sampled element's computed styles at scan time. */
+export interface StyleSample {
+  /** Position in the filtered element order (see lib/styleFingerprint.ts). */
+  index: number;
+  fontFamily: string;
+  fontWeight: string;
+  color: string;
+  backgroundColor: string;
+  textDecorationLine: string;
+}
+
+export interface StyleFingerprint {
+  /** The colour scheme the scan's browser preferred. */
+  scheme?: "light" | "dark";
+  forced_colors?: boolean;
+  samples?: StyleSample[];
 }
 
 

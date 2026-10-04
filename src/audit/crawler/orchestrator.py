@@ -63,6 +63,7 @@ from audit.crawler.render_detect import (
 )
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
+from audit.crawler.style_snapshot import SheetRef, StoredStyles, StyleSnapshot
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
 from audit.db.schema import write_batch
@@ -1613,7 +1614,7 @@ def _record_page(
     # how a login form came to be filed under an application URL.
     landed = result.url if result is not None else None
     final_url = landed if landed and landed != url else None
-    return repo.upsert_page(
+    page_id = repo.upsert_page(
         ctx.conn,
         scan_id=ctx.scan_id,
         final_url=final_url,
@@ -1623,6 +1624,40 @@ def _record_page(
         render_mode=render_mode,
         html_hash=html_hash,
         rendered_html=rendered_html,
+    )
+    if ctx.config.store_rendered_html:
+        # The saved copy's CSS goes with the saved copy: none when the copy
+        # was not kept (too large, not HTML), and a re-fetch replaces it.
+        styles = (
+            _store_styles(ctx, result.styles)
+            if rendered_html is not None and result is not None and result.styles is not None
+            else None
+        )
+        try:
+            repo.set_page_styles(ctx.conn, scan_id=ctx.scan_id, page_id=page_id, styles=styles)
+        except (sqlite3.Error, ValueError) as exc:
+            # The inspector falls back to the live site's CSS without it.
+            log.warning("styles.persist_failed", page_id=page_id, error_type=type(exc).__name__)
+    return page_id
+
+
+def _store_styles(ctx: _WorkerContext, snapshot: StyleSnapshot) -> StoredStyles | None:
+    """Write a snapshot's sheets to the blob store; None if any write fails.
+
+    Content-addressed, so a site's shared CSS is stored once however many
+    pages use it. All or nothing: a copy styled by half its sheets would look
+    plausible and wrong, while no row makes the inspector fall back openly.
+    """
+    refs: list[SheetRef] = []
+    try:
+        for sheet in snapshot.sheets:
+            digest, _rel = ctx.blob_store.store(sheet.css.encode("utf-8"), "text/css")
+            refs.append(SheetRef(sha256=digest, media=sheet.media, source_url=sheet.source_url))
+    except Exception as exc:  # pragma: no cover - defensive
+        log.warning("styles.blob_failed", error_type=type(exc).__name__)
+        return None
+    return StoredStyles(
+        sheets=tuple(refs), complete=snapshot.complete, fingerprint=snapshot.fingerprint
     )
 
 
@@ -1949,6 +1984,16 @@ def _persist_interaction(
                 scan_id=ctx.scan_id,
                 page_id=page_id,
                 states=captures,
+            )
+            state_styles: dict[str, StoredStyles] = {}
+            for capture in captures:
+                if capture.styles is None:
+                    continue
+                stored = _store_styles(ctx, capture.styles)
+                if stored is not None:
+                    state_styles[capture.state_key] = stored
+            repo.replace_state_styles(
+                ctx.conn, scan_id=ctx.scan_id, page_id=page_id, styles=state_styles
             )
         except (sqlite3.Error, ValueError) as exc:
             # Evidence the report can do without. The findings below are not.

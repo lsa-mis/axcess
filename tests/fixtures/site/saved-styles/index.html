@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- In the inspector 'self' is the review UI, so this policy would refuse
+     site.css there. The saved CSS must not depend on it. -->
+<meta http-equiv="Content-Security-Policy" content="style-src 'self' 'unsafe-inline'">
+<title>Saved styles fixture</title>
+<link rel="stylesheet" href="css/site.css">
+<style>.inline-rule { color: rgb(0, 128, 0); }</style>
+</head>
+<body>
+<h1 class="linked-rule">Saved styles</h1>
+<p class="inline-rule">Styled by an inline style element.</p>
+<p class="script-rule">Styled by a rule a script inserted.</p>
+<noscript><p>Not part of the fingerprint.</p></noscript>
+<script>
+  // What CSS-in-JS libraries do: an empty <style> filled through the CSSOM,
+  // which page.content() serializes as an empty element.
+  const sheet = document.head.appendChild(document.createElement("style")).sheet;
+  sheet.insertRule(".script-rule { color: rgb(0, 0, 255); }", 0);
+</script>
+</body>
+</html>

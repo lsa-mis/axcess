@@ -422,6 +422,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/saved-styles.css",
+        "methods": ["GET"],
+        "name": "api_page_saved_styles",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state", "v"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/findings",
         "methods": ["GET"],
         "name": "api_list_findings",
@@ -1128,6 +1138,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/saved-styles.css",
+        "methods": ["GET"],
+        "name": "api_page_saved_styles",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state", "v"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/findings",
         "methods": ["GET"],
         "name": "api_list_findings",
@@ -1815,6 +1835,16 @@
         "name": "api_page_inspect",
         "async": true,
         "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/saved-styles.css",
+        "methods": ["GET"],
+        "name": "api_page_saved_styles",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state", "v"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -2520,6 +2550,16 @@
         "name": "api_page_inspect",
         "async": true,
         "params": {"path": ["scan_id", "page_id"], "query": ["state"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/saved-styles.css",
+        "methods": ["GET"],
+        "name": "api_page_saved_styles",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "query": ["state", "v"]},
         "request_param": "request",
         "background_tasks_param": null
       },
