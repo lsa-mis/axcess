@@ -211,7 +211,7 @@ export function EmptyState({
  * and a primary <Link>-styled-as-button look identical.
  *
  * **Words.** Each one says what it does in its own text: a verb and an
- * object ("Cancel new scan", "Filter issues") or the place it goes. Never a
+ * object ("Cancel sign-in", "Filter issues") or the place it goes. Never a
  * bare "Cancel", "Done", "Read more" or "Download". The words are real text,
  * visible or screen-reader-only inside the control (WCAG technique C7), not
  * an `aria-label`: no ARIA is better than bad ARIA (W3C "Using ARIA", rule 1,

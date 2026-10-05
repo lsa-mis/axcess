@@ -4,7 +4,7 @@ import { Button } from "../ui";
 export const SUBMIT_NOTE_ID = "scan-submit-note";
 
 /**
- * Cancel and Start, pinned at the foot of the summary rail beside the form
+ * Start, pinned at the foot of the summary rail beside the form
  * (`ScanForm`'s `actions`), and after the form on a narrow screen, where the
  * rail follows it.
  *
@@ -28,6 +28,13 @@ export const SUBMIT_NOTE_ID = "scan-submit-note";
  * - There is one Start, not one at the top and one here: two controls for
  *   one action make a reader wonder how they differ (W3C COGA, "Making
  *   Content Usable", https://www.w3.org/TR/coga-usable/).
+ * - No Cancel beside it. It only went to Reports, which the sidebar's
+ *   Reports link and the browser's Back already do, and nothing exists to
+ *   cancel before Start; a third way out is a duplicate control for one
+ *   function (COGA, as above), and next to Start a slip lost every entry.
+ *   The waiting sign-in card keeps its own "Cancel sign-in", which does
+ *   something nothing else does: it closes the window and forgets the
+ *   sign-in.
  *
  * Start keeps `form`, naming the form it submits, though it now sits inside
  * it: Enter in a field still submits, as the form's default button.
@@ -44,23 +51,15 @@ export default function SubmitBar({
   pendingLabel,
   pending,
   hasNote,
-  onCancel,
 }: {
   form: string;
   label: string;
   pendingLabel: string;
   pending: boolean;
   hasNote: boolean;
-  onCancel: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* "Cancel new scan", not a bare "Cancel": it says what is given up
-          (SC 2.4.6 Headings and Labels, Level AA; docs/plain-language.md
-          rule 8, a verb and an object). */}
-      <Button type="button" onClick={onCancel}>
-        Cancel new scan
-      </Button>
       <Button
         type="submit"
         form={form}

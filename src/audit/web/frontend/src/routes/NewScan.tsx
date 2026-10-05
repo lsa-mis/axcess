@@ -343,7 +343,7 @@ export default function NewScanRoute() {
       {/* No `crumbs` here: the trail lives in the topbar, same as every report
           view. Passing it again would print the breadcrumb twice on this one
           route and in a different place from the rest of the app. */}
-      {/* No actions here: Start and Cancel are at the foot of the summary
+      {/* No actions here: Start is at the foot of the summary
           rail, after the form (see SubmitBar for why). */}
       <PageHeader title="New scan" />
 
@@ -431,7 +431,6 @@ export default function NewScanRoute() {
               pendingLabel={policy.submitPendingLabel}
               pending={pending}
               hasNote={Boolean(policy.submitNote)}
-              onCancel={() => navigate("/scans")}
             />
           }
           beforeGroups={

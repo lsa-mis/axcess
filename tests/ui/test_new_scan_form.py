@@ -362,9 +362,9 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_be_visible()
 
-    # Start and Cancel are at the foot of the summary rail, beside the form,
-    # not in the page header; they come after the fields in keyboard order,
-    # and they stay in view as the page scrolls. Start still names the form.
+    # Start is at the foot of the summary rail, beside the form, not in the
+    # page header; it comes after the fields in keyboard order, and it stays
+    # in view as the page scrolls. Start still names the form.
     heading = await page.get_by_role("heading", name="New scan", level=1).bounding_box()
     start_button = page.get_by_role("button", name=re.compile(r"^(Start scan|Open browser)"))
     start = await start_button.bounding_box()
@@ -386,9 +386,11 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
     await page.evaluate("window.scrollTo(0, 0)")
     await playwright_async.expect(start_button).to_be_in_viewport()
     await playwright_async.expect(start_button).to_have_attribute("form", "scan-form")
+    # Start is the only button there: leaving is the sidebar's Reports link
+    # or Back, not a Cancel beside Start (SubmitBar.tsx).
     await playwright_async.expect(
-        page.get_by_role("button", name="Cancel new scan", exact=True)
-    ).to_be_visible()
+        page.get_by_role("button", name=re.compile(r"^Cancel"))
+    ).to_have_count(0)
 
 
 @pytest.mark.parametrize(
