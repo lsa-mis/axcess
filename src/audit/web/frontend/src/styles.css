@@ -195,8 +195,16 @@
     background: rgb(var(--c-umich-maize));
     color: #00274c;
   }
+  /* The default focus ring, for anything without its own: solid U-M blue,
+     15:1 on white and 14:1 on the page grey. It used to be maize, which is
+     1.5:1 on white and fails SC 1.4.11 Non-text Contrast (Level AA); a yellow
+     dark enough to pass reads as mustard and still fails on the grey. In the
+     dark theme --c-umich-blue is the light blue, so the ring stays clear
+     there too. Maize remains the ring on a navy surface only
+     (`shadow-focus-inverse`, 9.9:1). Same colour as the components' own
+     ring (`shadow-focus`, tailwind.config.ts). */
   :focus-visible {
-    outline: 3px solid rgb(var(--c-umich-maize));
+    outline: 3px solid rgb(var(--c-umich-blue));
     outline-offset: 2px;
     border-radius: 2px;
   }

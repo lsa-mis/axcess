@@ -15,7 +15,10 @@
   --soft: #f5f7fa;
   --soft-2: #eef2f7;
   --link: #003f75;
-  --focus: #ffcb05;
+  /* Focus ring on light backgrounds: U-M blue, 15:1 on white. Maize was
+     1.5:1 and failed SC 1.4.11 Non-text Contrast (Level AA). Navy sections
+     switch it to white below (.hero, .band, footer). */
+  --focus: #00274c;
 
   /* Method colours: text on white (all ≥ 7:1) and their tints. */
   --m-automated: #0f5132;   --m-automated-bg: #e6f4ec;
