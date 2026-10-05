@@ -208,7 +208,8 @@ export default function TrackingRoute() {
             pager={<TablePagination label="Criteria" noun="criteria" {...criteria} />}
             footer={<ActiveFilters items={activeFilterItems(filterGroups)} onClear={clearFilters} />}
           >
-            <FilterMenu groups={filterGroups} onChange={onFilter} onReset={clearFilters} />
+            <FilterMenu
+          label="Filter criteria" groups={filterGroups} onChange={onFilter} onReset={clearFilters} />
           </TableBar>
           <TableStatus
             actions={
@@ -235,7 +236,7 @@ export default function TrackingRoute() {
                     Level
                   </SortHeader>
                   <SortHeader column="method" kind={SORT_KINDS.method} {...sortProps}>
-                    Group
+                    How it&apos;s checked
                   </SortHeader>
                   <ColumnHeader>Where it stands</ColumnHeader>
                   <ColumnHeader>What Axcess does</ColumnHeader>
@@ -472,7 +473,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   sc: "Number",
   name: "WCAG criterion",
   level: "Level",
-  method: "Group",
+  method: "How it's checked",
 };
 
 /**

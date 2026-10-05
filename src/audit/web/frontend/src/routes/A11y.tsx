@@ -376,6 +376,7 @@ function DrillDownView({
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
         >
           <FilterMenu
+          label="Filter issues"
             groups={filters}
             onChange={(_key, value) => onStatusFilterChange(value as FindingStatus | "")}
             onReset={() => onStatusFilterChange("")}

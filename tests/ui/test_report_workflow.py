@@ -1103,7 +1103,7 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["group"] == "Report views" and s["name"] == "Compare reports"),
         first(lambda s: s["name"] == "Search issues"),
         # One Filter menu holds Level, Type and Found by.
-        first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter"),
+        first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter issues"),
         first(lambda s: s["group"] == "table"),
     ]
     assert order == sorted(order), names

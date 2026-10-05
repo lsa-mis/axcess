@@ -169,6 +169,7 @@ export default function A11yByRuleRoute() {
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => setStatusParam("")} />}
         >
           <FilterMenu
+          label="Filter issues"
             groups={filters}
             onChange={(_key, value) => setStatusParam(value as FindingStatus | "")}
             onReset={() => setStatusParam("")}

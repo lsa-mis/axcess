@@ -387,7 +387,7 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
     await playwright_async.expect(start_button).to_be_in_viewport()
     await playwright_async.expect(start_button).to_have_attribute("form", "scan-form")
     await playwright_async.expect(
-        page.get_by_role("button", name="Cancel", exact=True)
+        page.get_by_role("button", name="Cancel new scan", exact=True)
     ).to_be_visible()
 
 

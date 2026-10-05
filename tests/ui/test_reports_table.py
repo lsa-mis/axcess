@@ -135,7 +135,10 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row.locator("td")).to_have_count(6)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
-    await playwright_async.expect(row.locator("td").nth(2)).to_have_text("5")
+    # The count says what it counts; "in Report #N" is screen-reader-only text.
+    await playwright_async.expect(row.locator("td").nth(2)).to_have_text(
+        f"5 issues in Report #{headline_id}"
+    )
     await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(count))
     await playwright_async.expect(row.locator("td").nth(4)).to_have_text("4")
     open_link = row.get_by_role(

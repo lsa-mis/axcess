@@ -55,8 +55,11 @@ export default function SubmitBar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* "Cancel new scan", not a bare "Cancel": it says what is given up
+          (SC 2.4.6 Headings and Labels, Level AA; docs/plain-language.md
+          rule 8, a verb and an object). */}
       <Button type="button" onClick={onCancel}>
-        Cancel
+        Cancel new scan
       </Button>
       <Button
         type="submit"
