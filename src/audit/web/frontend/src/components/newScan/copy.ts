@@ -22,14 +22,14 @@ export const URL_COPY = {
   public: {
     label: "Website address",
     help:
-      "Start with https://. The scan only visits pages under this address. For example, an address ending in /section/ scans only that section.",
-    placeholder: "https://example.edu/section/",
+      "For example, example.edu/section/. Axcess adds https:// for you, or http:// for localhost and IP addresses. The scan only visits pages under this address, so an address ending in /section/ scans only that section.",
+    placeholder: "example.edu/section/",
   },
   login: {
     label: "Website address to scan after you sign in",
     help:
-      "Start with https://. Leave out anything after a ? or #. The scan only visits pages under this address and never leaves this website.",
-    placeholder: "https://umich.instructure.com/courses/",
+      "For example, umich.instructure.com/courses/. Axcess adds https:// for you. Leave out anything after a ? or #. The scan only visits pages under this address and never leaves this website.",
+    placeholder: "umich.instructure.com/courses/",
   },
 } as const;
 
@@ -224,7 +224,7 @@ export const ERRORS = {
   title: "The scan could not start",
   lead: "Fix these problems, then start the scan:",
   urlEmpty: "Enter a website address to start from.",
-  urlNotHttp: "Add https:// at the start. Axcess only scans web addresses.",
+  urlNotHttp: "Use a web address, such as example.edu. Axcess only scans web pages.",
   urlNotHttps: "Start the address with https://. Sign-in scans only run over a secure connection.",
   urlHasExtras: "Remove anything after a ? or #, and any user name or password, from the address.",
   staticWithAxe:

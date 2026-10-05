@@ -326,6 +326,44 @@ async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
     ).to_be_visible()
 
 
+@pytest.mark.parametrize(
+    ("typed", "completed"),
+    [
+        ("example.edu/section/", "https://example.edu/section/"),
+        ("localhost:8000", "http://localhost:8000"),
+        ("192.168.1.10/app", "http://192.168.1.10/app"),
+        ("http://example.edu/", "http://example.edu/"),
+    ],
+)
+async def test_an_address_without_a_scheme_is_completed(
+    live_server: tuple[str, int], new_page: Any, typed: str, completed: str
+) -> None:
+    """No "Add https://" error: New scan adds the scheme (lib/webAddress.ts),
+    shows it in the box on leaving it, and sends it, even on Enter."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+
+    async def refuse(route: Any) -> None:
+        # Refuse politely so the form stays put and no crawl starts.
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", refuse)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    field = page.get_by_role("textbox", name="Website address", exact=True)
+
+    # Leaving the box shows the address as it will be scanned.
+    await field.fill(typed)
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(field).to_have_value(completed)
+    await playwright_async.expect(field).not_to_have_attribute("aria-invalid", "true")
+
+    # Enter submits without leaving the box; what is sent is still complete.
+    await field.fill(typed)
+    async with page.expect_request("**/api/scans") as sent:
+        await field.press("Enter")
+    assert (await sent.value).post_data_json["url"] == completed
+
+
 @pytest.mark.parametrize("mode", ["public", "login"])
 async def test_settings_are_closed_accordions_and_start_is_top_right(
     live_server: tuple[str, int], new_page: Any, mode: str

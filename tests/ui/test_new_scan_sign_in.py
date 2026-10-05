@@ -116,6 +116,23 @@ async def test_switching_tabs_keeps_the_waiting_sign_in(
     assert await page.evaluate("history.length") == entries_before + 2
 
 
+async def test_a_sign_in_address_without_https_is_completed(
+    fake_sign_in: type, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Typed without its scheme, the address is sent as https:// (lib/webAddress.ts)."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    field = page.get_by_role("textbox", name=re.compile(r"^Website address to scan"))
+    await field.fill(f"{SITE}/secure/")
+    await page.keyboard.press("Tab")
+    await expect(field).to_have_value(SEED)
+    await page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan")).check()
+    async with page.expect_request("**/api/local-login-scans") as sent:
+        await page.get_by_role("button", name="Open browser to sign in").click()
+    assert (await sent.value).post_data_json["seed_url"] == SEED
+
+
 async def test_new_scan_shows_the_form_when_no_sign_in_waits(
     fake_sign_in: type, live_server: tuple[str, int], new_page: Any
 ) -> None:

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { withScheme } from "../lib/webAddress";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -323,7 +324,9 @@ export default function NewScanRoute() {
     setEndNotice(null);
     if (found.length) return;
     if (mode === "login") createLogin.mutate(settings);
-    else createPublic.mutate(settings);
+    // The public payload sends the address as typed, so complete it here; the
+    // sign-in payload completes it in toLocalLoginPayload (parseUrl).
+    else createPublic.mutate({ ...settings, url: withScheme(settings.url) });
   };
 
   const loginDisabledReason =

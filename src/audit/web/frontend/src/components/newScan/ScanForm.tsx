@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode, type Ref } from "react";
+import { withScheme } from "../../lib/webAddress";
 import { Disclosure } from "../ui";
 import ChecksGroup from "./ChecksGroup";
 import { GROUPS } from "./copy";
@@ -138,6 +139,15 @@ export default function ScanForm({
             placeholder={policy.urlPlaceholder}
             value={settings.url}
             onChange={(url) => update({ url })}
+            // On leaving the box, show the address as it will be scanned:
+            // "example.edu" becomes "https://example.edu", "localhost:8000"
+            // becomes "http://localhost:8000" (lib/webAddress.ts). Done on
+            // blur, not while typing, so the text never changes under the
+            // reader's cursor (SC 3.2.2 On Input, Level A).
+            onBlur={() => {
+              const completed = withScheme(settings.url);
+              if (completed !== settings.url) update({ url: completed });
+            }}
             preview={preview}
             error={urlError}
             afterSignIn={policy.mode === "login"}
