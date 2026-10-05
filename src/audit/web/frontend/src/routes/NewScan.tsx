@@ -98,8 +98,14 @@ export default function NewScanRoute() {
     params.delete("scan");
     params.delete("sign_in");
     setEndNotice(null);
-    if (next === "login") params.set("mode", "login");
-    else params.delete("mode");
+    if (next === "login") {
+      params.set("mode", "login");
+      // Back on the sign-in tab, a sign-in that is still waiting comes back
+      // as its card, in whatever state it is in (window open or closed),
+      // instead of the empty form: it was only hidden by the other tab.
+      // Same check as a fresh visit (below), so there is one way it works.
+      setCheckSignIn(true);
+    } else params.delete("mode");
     setSearchParams(params);
   };
 
@@ -185,7 +191,8 @@ export default function NewScanRoute() {
     protectedCapability.data?.available || protectedCapability.data?.local_available,
   );
 
-  // Once per visit, and only when the address names no tab and no card.
+  // Once per visit when the address names no tab and no card, and again
+  // each time the reader returns to the sign-in tab (selectMode).
   // Until the answer comes the form is held back, so it does not appear and
   // then vanish under the reader's pointer or focus. The request is local
   // and answers at once; an error (a browser that is not on this computer

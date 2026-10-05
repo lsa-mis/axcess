@@ -92,6 +92,30 @@ async def test_new_scan_without_a_tab_returns_to_the_waiting_sign_in(
     await expect(page.get_by_role("heading", name=OPEN_TITLE)).to_have_count(0)
 
 
+async def test_switching_tabs_keeps_the_waiting_sign_in(
+    fake_sign_in: type, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Public website and back shows the waiting card, not the empty form."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    sign_in_id = await _open_sign_in_through_the_api(page, base)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await expect(page.get_by_role("heading", name=OPEN_TITLE)).to_be_visible()
+    entries_before = await page.evaluate("history.length")
+
+    await page.get_by_role("tab", name="Public website").click()
+    await expect(page.get_by_role("textbox", name="Website address", exact=True)).to_be_visible()
+    await page.get_by_role("tab", name="Site with a sign-in or two-step sign-in (2FA)").click()
+
+    await expect(page.get_by_role("heading", name=OPEN_TITLE)).to_be_visible()
+    await expect(page).to_have_url(re.compile(rf"mode=login.*sign_in={sign_in_id}"))
+    await expect(
+        page.get_by_role("textbox", name=re.compile(r"^Website address to scan"))
+    ).to_have_count(0)
+    # Two tab changes, two entries: the card's return replaces, adds none.
+    assert await page.evaluate("history.length") == entries_before + 2
+
+
 async def test_new_scan_shows_the_form_when_no_sign_in_waits(
     fake_sign_in: type, live_server: tuple[str, int], new_page: Any
 ) -> None:
