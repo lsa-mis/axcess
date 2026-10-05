@@ -1975,6 +1975,18 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
             "VALUES ('https://stop.example.test/', 'running', 5, 0, '{}')"
         )
         scan_id = int(cur.lastrowid or 0)
+        # The five pages the row counts. Stopping now counts the saved pages
+        # into the row in the same write, so the pages have to exist.
+        for number in range(5):
+            repo.upsert_page(
+                conn,
+                scan_id=scan_id,
+                url_normalized=f"https://stop.example.test/{number}",
+                status_code=200,
+                title=f"Page {number}",
+                render_mode="static",
+                html_hash=f"{number}" * 64,
+            )
         for state in ("pending", "leased"):
             conn.execute(
                 "INSERT INTO jobs (kind, payload_json, state, dedupe_key) VALUES "
@@ -2007,8 +2019,89 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
         assert (
             conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0] == 5
         )
+        assert (
+            conn.execute("SELECT COUNT(*) FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()[0]
+            == 5
+        )
     finally:
         conn.close()
+
+
+def _running_scan_with_pages(db_path: Path, pages: int) -> int:
+    """A running public scan whose row still says 0 pages, with ``pages`` saved."""
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://live.example.test/', 'running', 0, 0, '{}')"
+        )
+        scan_id = int(cur.lastrowid or 0)
+        for number in range(pages):
+            repo.upsert_page(
+                conn,
+                scan_id=scan_id,
+                url_normalized=f"https://live.example.test/{number}",
+                status_code=200,
+                title=f"Page {number}",
+                render_mode="static",
+                html_hash=f"{number}" * 64,
+            )
+        conn.commit()
+        return scan_id
+    finally:
+        conn.close()
+
+
+def test_stopping_a_scan_counts_its_saved_pages_at_once(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Stop writes the page count with the status, not 15 seconds later.
+
+    The crawl wrote ``page_count`` only when its task wound down. Until then
+    the row said "interrupted, 0 pages", and the stopped-scan page said "No
+    report was produced" over three saved pages.
+    """
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 3)
+
+    assert client.post(f"/api/scans/{scan_id}/cancel").status_code == 200
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status, page_count FROM scans WHERE id = ?", (scan_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    assert (row["status"], row["page_count"]) == ("interrupted", 3)
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert (body["status"], body["page_count"]) == ("interrupted", 3)
+
+
+@pytest.mark.parametrize("status", ["running", "interrupted", "failed"])
+def test_scan_detail_counts_saved_pages_live_until_the_scan_completes(
+    client: TestClient, seeded_db: tuple[Path, Path, int], status: str
+) -> None:
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 4)
+    with connect(db_path) as conn:
+        conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
+
+    assert client.get(f"/api/scans/{scan_id}").json()["page_count"] == 4
+
+
+def test_scan_detail_keeps_a_completed_scans_stored_page_count(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """A completed report is not recounted: its row is the record."""
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 4)
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET status = 'completed', page_count = 2 WHERE id = ?", (scan_id,)
+        )
+
+    assert client.get(f"/api/scans/{scan_id}").json()["page_count"] == 2
 
 
 # ---------------------------------------------------------------------------

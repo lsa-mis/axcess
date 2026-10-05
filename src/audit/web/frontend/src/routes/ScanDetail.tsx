@@ -136,7 +136,13 @@ export default function ScanDetailRoute() {
             on the status rather than on whether anything was collected. A
             stopped scan keeps everything it reached; what it cannot claim is
             that the site was covered. Say that, and leave the evidence
-            reachable. */}
+            reachable.
+
+            `page_count` is the live number of saved pages for any scan that
+            has not completed (the server counts them, and Stop writes the
+            count with the status). It used to be written only when the crawl
+            wound down, so for about 15 seconds after Stop this card said "No
+            report was produced" over pages that were saved. */}
         <h2 className="font-semibold text-fg">
           {data.page_count > 0 ? "Partial report" : "No report was produced"}
         </h2>

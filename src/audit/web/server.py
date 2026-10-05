@@ -1003,6 +1003,12 @@ def create_app(
     def api_scan_detail(scan_id: int) -> JSONResponse:
         with get_conn() as conn:
             scan = _load_scan_or_404(conn, scan_id)
+            if scan["status"] != "completed":
+                # ``scans.page_count`` is written when a crawl finishes, so
+                # for a scan that is running, stopped or failed it can lag
+                # behind the pages already saved. Count them here so no view
+                # reads a stale 0. A completed scan keeps its stored count.
+                scan["page_count"] = _saved_page_count(conn, scan_id)
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
             prev = previous_scan_id(conn, scan)
@@ -1536,10 +1542,17 @@ def create_app(
             if existing is None:
                 raise HTTPException(status_code=404, detail="Scan not found")
             if existing["status"] == "running":
+                # The page count goes in the same write as the status. Only
+                # ``_finalize_scan`` used to set it, once the crawl task had
+                # wound down, often 15 seconds later. In between the row said
+                # "interrupted, 0 pages", and the stopped-scan page told the
+                # reader "No report was produced" over pages it had saved.
                 conn.execute(
                     "UPDATE scans SET status = 'interrupted', "
-                    "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (scan_id,),
+                    "finished_at = CURRENT_TIMESTAMP, "
+                    "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = ?) "
+                    "WHERE id = ?",
+                    (scan_id, scan_id),
                 )
                 # Both states, for every scan. A leased job is one a worker
                 # had checked out when the stop arrived; leaving it behind
@@ -4119,6 +4132,12 @@ def _split_csv(value: str) -> list[str]:
     if not value:
         return []
     return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
+    """How many pages this scan has saved so far, counted from ``pages``."""
+    row = conn.execute("SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()
+    return int(row["n"]) if row is not None else 0
 
 
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

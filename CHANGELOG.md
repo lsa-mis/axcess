@@ -150,6 +150,10 @@ merge.
 
 ### Fixed
 
+- Stopping a scan: the page now says "Partial report", with "Review what
+  the scan found", as soon as you press Stop. It said "No report was
+  produced" for about 15 seconds, even when the scan had saved pages,
+  because the page count was written only once the scan had wound down.
 - Reports: a site's very first scan now shows while it runs. Starting it
   and going straight back to Reports showed "No reports yet" until the
   page was reloaded.
