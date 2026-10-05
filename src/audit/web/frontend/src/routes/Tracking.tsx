@@ -235,6 +235,11 @@ export default function TrackingRoute() {
                   <SortHeader column="level" kind={SORT_KINDS.level} {...sortProps}>
                     Level
                   </SortHeader>
+                  {/* "How it's checked", not "Group": the column holds how each
+                      criterion is checked (Automated, Partly automated, AI-assisted,
+                      Manual only), and its sort button's words must say so on their
+                      own (SC 2.4.6 Headings and Labels, Level AA;
+                      tests/ui/test_control_text_purpose.py). */}
                   <SortHeader column="method" kind={SORT_KINDS.method} {...sortProps}>
                     How it&apos;s checked
                   </SortHeader>
@@ -468,7 +473,7 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
   method: "text",
 };
 
-/** Column names as the status line says them. */
+/** Column names as the status line says them; the same words as the headers. */
 const SORT_LABELS: Record<SortKey, string> = {
   sc: "Number",
   name: "WCAG criterion",
