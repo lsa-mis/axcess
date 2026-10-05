@@ -125,14 +125,63 @@ class ManualAuthenticationError(RuntimeError):
 class _KeptSignIn:
     """The newest in-memory copy of the signed-in state. Never on disk.
 
-    ``storage`` is Playwright's storage state with IndexedDB (cookies, local
-    storage, IndexedDB), ``tab_storage`` the current tab's sessionStorage by
-    origin, and ``url`` the page the auditor was last on.
+    ``storage`` is in Playwright's storage-state shape: every cookie, and the
+    local storage of each site seen in an open tab. ``tab_storage`` is the
+    current tab's sessionStorage by origin, and ``url`` the page the auditor
+    was last on. IndexedDB is not kept here (see :func:`_quiet_storage`); the
+    full capture at confirmation, with the window open, still includes it.
     """
 
     storage: dict[str, Any]
     tab_storage: SessionStorage
     url: str
+
+
+# Local storage of the site in one frame, read in place. Same limits as the
+# sessionStorage capture (handoff.py).
+_LOCAL_STORAGE_JS = """() => {
+    if (!/^https?:$/.test(location.protocol) || self.origin === 'null') return null;
+    const localStorage = Object.entries(window.localStorage)
+        .map(([name, value]) => ({name, value}));
+    if (JSON.stringify(localStorage).length > 8 * 1024 * 1024)
+        throw new Error('Local storage exceeds the handoff limit');
+    return {origin: location.origin, localStorage};
+}"""
+
+
+async def _quiet_storage(context: BrowserContext, previous: _KeptSignIn | None) -> dict[str, Any]:
+    """The signed-in state, read without opening a tab.
+
+    Playwright's ``storage_state()`` reads each site the browser has visited;
+    for one that is not open in a tab (the U-M or Duo sign-in page the person
+    was sent through), it opens a tab, loads that site, reads it and closes
+    the tab. In the visible sign-in window that showed as a tab flashing open
+    and shut every few seconds while the kept copy refreshed. So the refresh
+    reads only what needs no tab: every cookie (``context.cookies()``), where
+    most sign-ins live, and the local storage of each site in an open tab,
+    read inside that tab. A site's local storage read earlier is kept when
+    its tab is gone. IndexedDB, which only ``storage_state()`` can read, is
+    left to the full capture at confirmation, made while the window is open.
+    """
+    origins: dict[str, list[dict[str, str]]] = {}
+    if previous is not None:
+        for entry in previous.storage.get("origins", []):
+            if entry.get("localStorage"):
+                origins[entry["origin"]] = entry["localStorage"]
+    for page in context.pages:
+        for frame in page.frames:
+            try:
+                snapshot = await frame.evaluate(_LOCAL_STORAGE_JS)
+            except Exception:  # noqa: S112 - a frame mid-navigation keeps its last copy
+                continue
+            if snapshot:
+                origins[snapshot["origin"]] = snapshot["localStorage"]
+    return {
+        "cookies": await context.cookies(),
+        "origins": [
+            {"origin": origin, "localStorage": items} for origin, items in origins.items() if items
+        ],
+    }
 
 
 def _is_web_url(url: str) -> bool:
@@ -999,7 +1048,7 @@ class ManualAuthenticationSession:
             try:
                 async with asyncio.timeout(_KEEP_CAPTURE_TIMEOUT_S):
                     tab_storage = await capture_session_storage(page)
-                    storage = await context.storage_state(indexed_db=True)
+                    storage = await _quiet_storage(context, self._kept)
                 url = page.url
             except Exception:
                 return False
